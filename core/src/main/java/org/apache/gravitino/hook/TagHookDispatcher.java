@@ -24,6 +24,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -58,7 +59,7 @@ public class TagHookDispatcher implements TagDispatcher {
       String metalake, String name, String comment, Map<String, String> properties) {
     Tag tag = dispatcher.createTag(metalake, name, comment, properties);
 
-    // Set the creator as the owner of the catalog.
+    // Set the creator as the owner of the tag.
     OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerDispatcher != null) {
       ownerDispatcher.setOwner(
@@ -73,7 +74,8 @@ public class TagHookDispatcher implements TagDispatcher {
   }
 
   @Override
-  public Tag alterTag(String metalake, String name, TagChange... changes) {
+  public Tag alterTag(String metalake, String name, TagChange... changes)
+      throws IllegalArgumentException, TagAlreadyExistsException {
     return dispatcher.alterTag(metalake, name, changes);
   }
 

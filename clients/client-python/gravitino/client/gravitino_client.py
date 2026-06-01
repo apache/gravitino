@@ -19,12 +19,18 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from gravitino.api.authorization.group import Group
+from gravitino.api.authorization.owner import Owner
+from gravitino.api.authorization.role import Role
+from gravitino.api.authorization.securable_objects import SecurableObject
+from gravitino.api.authorization.user import User
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_handle import JobHandle
 from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
+from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
@@ -312,6 +318,8 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         Raises:
             NoSuchTagException: If the tag does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
+            IllegalArgumentException: If the changes cannot be applied to the tag.
+            TagAlreadyExistsException: If a tag with the new name already exists.
         """
         return self.get_metalake().alter_tag(tag_name, *changes)
 
@@ -330,3 +338,238 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().delete_tag(tag_name)
+
+    # Owner operations
+    def get_owner(self, metadata_object: MetadataObject) -> Optional[Owner]:
+        """Get the owner of a metadata object.
+
+        Args:
+            metadata_object: The metadata object to get the owner for.
+
+        Returns:
+            Optional[Owner]: The owner of the metadata object, or None if no owner is set.
+
+        Raises:
+            NoSuchMetadataObjectException: If the metadata object does not exist.
+            NotFoundException: If a related resource is not found.
+            MetalakeNotInUseException: If the metalake is not in use.
+        """
+        return self.get_metalake().get_owner(metadata_object)
+
+    def set_owner(
+        self, metadata_object: MetadataObject, owner_name: str, owner_type: Owner.Type
+    ) -> None:
+        """Set the owner of a metadata object.
+
+        Args:
+            metadata_object: The metadata object to set the owner for.
+            owner_name: The name of the owner.
+            owner_type: The type of the owner (USER or GROUP).
+
+        Raises:
+            NoSuchMetadataObjectException: If the metadata object does not exist.
+            NotFoundException: If a related resource is not found.
+            MetalakeNotInUseException: If the metalake is not in use.
+            UnsupportedOperationException: If the operation is not supported.
+        """
+        self.get_metalake().set_owner(metadata_object, owner_name, owner_type)
+
+    # User operations
+
+    def add_user(self, user: str) -> User:
+        """Add a user to the metalake.
+
+        Args:
+            user: The name of the user.
+
+        Returns:
+            The added User object.
+
+        Raises:
+            UserAlreadyExistsException: If a user with the same name already exists.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().add_user(user)
+
+    def remove_user(self, user: str) -> bool:
+        """Remove a user from the metalake.
+
+        Args:
+            user: The name of the user.
+
+        Returns:
+            True if the user was removed, False if the user did not exist.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().remove_user(user)
+
+    def get_user(self, user: str) -> User:
+        """Get a user by name from the metalake.
+
+        Args:
+            user: The name of the user.
+
+        Returns:
+            The User object.
+
+        Raises:
+            NoSuchUserException: If the user does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().get_user(user)
+
+    def list_users(self) -> list[User]:
+        """List all users with details under the metalake.
+
+        Returns:
+            A list of User objects.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_users()
+
+    def list_user_names(self) -> list[str]:
+        """List all user names under the metalake.
+
+        Returns:
+            A list of user name strings.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_user_names()
+
+    # Group operations
+
+    def add_group(self, group: str) -> Group:
+        """Add a group to the metalake.
+
+        Args:
+            group: The name of the group.
+
+        Returns:
+            The added Group object.
+
+        Raises:
+            GroupAlreadyExistsException: If a group with the same name already exists.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().add_group(group)
+
+    def remove_group(self, group: str) -> bool:
+        """Remove a group from the metalake.
+
+        Args:
+            group: The name of the group.
+
+        Returns:
+            True if the group was removed, False if the group did not exist.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().remove_group(group)
+
+    def get_group(self, group: str) -> Group:
+        """Get a group by name from the metalake.
+
+        Args:
+            group: The name of the group.
+
+        Returns:
+            The Group object.
+
+        Raises:
+            NoSuchGroupException: If the group does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().get_group(group)
+
+    def list_groups(self) -> list[Group]:
+        """List all groups with details under the metalake.
+
+        Returns:
+            A list of Group objects.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_groups()
+
+    def list_group_names(self) -> list[str]:
+        """List all group names under the metalake.
+
+        Returns:
+            A list of group name strings.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_group_names()
+
+    # Role operations
+
+    def create_role(
+        self,
+        role_name: str,
+        properties: Optional[Dict[str, str]] = None,
+        securable_objects: Optional[List[SecurableObject]] = None,
+    ) -> Role:
+        """Create a new role under the metalake.
+
+        Args:
+            role_name: The name of the role.
+            properties: The properties of the role.
+            securable_objects: The securable objects of the role.
+
+        Returns:
+            The created Role object.
+
+        Raises:
+            RoleAlreadyExistsException: If a role with the same name already exists.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().create_role(role_name, properties, securable_objects)
+
+    def get_role(self, role_name: str) -> Role:
+        """Get a role by name from the metalake.
+
+        Args:
+            role_name: The name of the role.
+
+        Returns:
+            The Role object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().get_role(role_name)
+
+    def delete_role(self, role_name: str) -> bool:
+        """Delete a role from the metalake.
+
+        Args:
+            role_name: The name of the role.
+
+        Returns:
+            True if the role was deleted, False otherwise.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().delete_role(role_name)
+
+    def list_role_names(self) -> list[str]:
+        """List all role names under the metalake.
+
+        Returns:
+            A list of role name strings.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_role_names()

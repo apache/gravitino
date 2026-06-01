@@ -60,6 +60,14 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().listSchemaPOsBySchemaIds(schemaIds);
   }
 
+  public static String listSchemaPOsByCatalogIdAndNamePrefix(
+      @Param("catalogId") Long catalogId,
+      @Param("schemaName") String schemaName,
+      @Param("descendantPrefix") String descendantPrefix) {
+    return getProvider()
+        .listSchemaPOsByCatalogIdAndNamePrefix(catalogId, schemaName, descendantPrefix);
+  }
+
   public static String listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().listSchemaPOsByCatalogId(catalogId);
   }
@@ -94,13 +102,22 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().insertSchemaMetaOnDuplicateKeyUpdate(schemaPO);
   }
 
+  public static String batchInsertSchemaMeta(@Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return getProvider().batchInsertSchemaMeta(schemaMetas);
+  }
+
+  public static String batchInsertSchemaMetaOnDuplicateKeyUpdate(
+      @Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return getProvider().batchInsertSchemaMetaOnDuplicateKeyUpdate(schemaMetas);
+  }
+
   public static String updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
     return getProvider().updateSchemaMeta(newSchemaPO, oldSchemaPO);
   }
 
-  public static String softDeleteSchemaMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteSchemaMetasBySchemaId(schemaId);
+  public static String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteSchemaMetasBySchemaIds(schemaIds);
   }
 
   public static String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

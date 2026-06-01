@@ -50,6 +50,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactor
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -103,6 +104,8 @@ public class RESTService implements GravitinoAuxiliaryService {
     this.configProvider = IcebergConfigProviderFactory.create(configProperties);
     configProvider.initialize(configProperties);
     String metalakeName = configProvider.getMetalakeName();
+    boolean skipAuthorizationForRestBackend =
+        icebergConfig.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ);
 
     Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
@@ -110,33 +113,44 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
     IcebergRESTServerContext authorizationContext =
         IcebergRESTServerContext.create(
-            configProvider, enableAuth, auxMode, icebergCatalogWrapperManager);
+            configProvider,
+            enableAuth,
+            auxMode,
+            skipAuthorizationForRestBackend,
+            icebergCatalogWrapperManager);
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
-    if (authorizationContext.isAuthorizationEnabled()) {
-      icebergTableOperationDispatcher =
-          new IcebergTableHookDispatcher(icebergTableOperationDispatcher);
-    }
-    IcebergTableEventDispatcher icebergTableEventDispatcher =
+    IcebergTableOperationDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
+    if (authorizationContext.isAuthorizationEnabled()) {
+      icebergTableEventDispatcher = new IcebergTableHookDispatcher(icebergTableEventDispatcher);
+    }
+    IcebergTableOperationDispatcher icebergTableDispatcher = icebergTableEventDispatcher;
+
+    // View: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergViewOperationDispatcher icebergViewOperationDispatcher =
         new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
-    if (authorizationContext.isAuthorizationEnabled()) {
-      icebergViewOperationDispatcher =
-          new IcebergViewHookDispatcher(icebergViewOperationDispatcher, metalakeName);
-    }
-    IcebergViewEventDispatcher icebergViewEventDispatcher =
+    IcebergViewOperationDispatcher icebergViewEventDispatcher =
         new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
+    if (authorizationContext.isAuthorizationEnabled()) {
+      icebergViewEventDispatcher =
+          new IcebergViewHookDispatcher(icebergViewEventDispatcher, metalakeName);
+    }
+    IcebergViewOperationDispatcher icebergViewDispatcher = icebergViewEventDispatcher;
 
+    // Namespace: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
         new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
-    if (authorizationContext.isAuthorizationEnabled()) {
-      namespaceOperationDispatcher =
-          new IcebergNamespaceHookDispatcher(namespaceOperationDispatcher);
-    }
-    IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
+    IcebergNamespaceOperationDispatcher icebergNamespaceEventDispatcher =
         new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
+    if (authorizationContext.isAuthorizationEnabled()) {
+      icebergNamespaceEventDispatcher =
+          new IcebergNamespaceHookDispatcher(icebergNamespaceEventDispatcher);
+    }
+    IcebergNamespaceOperationDispatcher icebergNamespaceDispatcher =
+        icebergNamespaceEventDispatcher;
 
     config.register(
         new AbstractBinder() {
@@ -149,9 +163,9 @@ public class RESTService implements GravitinoAuxiliaryService {
             }
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
-            bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
-            bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
-            bind(icebergNamespaceEventDispatcher)
+            bind(icebergTableDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
+            bind(icebergViewDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
+            bind(icebergNamespaceDispatcher)
                 .to(IcebergNamespaceOperationDispatcher.class)
                 .ranked(1);
           }
@@ -161,6 +175,11 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.addServlet(servlet, ICEBERG_SPEC);
     server.addCustomFilters(ICEBERG_SPEC);
     server.addSystemFilters(ICEBERG_SPEC);
+
+    // Root-level aliases for health checks to improve compatibility with various monitoring
+    // systems that expect a /health endpoint.
+    server.addServlet(new HealthAliasServlet("/iceberg"), "/health/*");
+    server.addServlet(new HealthAliasServlet("/iceberg"), "/health.html");
   }
 
   @Override

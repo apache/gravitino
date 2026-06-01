@@ -64,6 +64,13 @@ public final class GlueConstants {
   /** Default value for {@link #TABLE_FORMAT_FILTER}: expose all table formats. */
   public static final String DEFAULT_TABLE_FORMAT_FILTER = "all";
 
+  /**
+   * Base storage path used as a warehouse when no explicit {@code location} is given at table
+   * creation time. The table location is derived as {@code warehouse/database/table}. Example:
+   * {@code s3://my-bucket/gravitino-warehouse}.
+   */
+  public static final String WAREHOUSE = "warehouse";
+
   // -------------------------------------------------------------------------
   // Glue Table.parameters() keys (passthrough properties)
   // -------------------------------------------------------------------------
@@ -75,8 +82,66 @@ public final class GlueConstants {
    */
   public static final String TABLE_FORMAT = "table-format";
 
+  /**
+   * Table file format (lowercase, e.g. "parquet", "orc", "textfile") used when creating Hive-format
+   * tables via Trino. Maps to input-format/output-format/serde-lib.
+   */
+  public static final String FORMAT = "format";
+
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
+
+  /**
+   * Key of the {@code table_type} entry in {@code Table.parameters()} that identifies the table
+   * format (e.g., {@code "ICEBERG"}).
+   */
+  public static final String TABLE_TYPE_PARAM = "table_type";
+
+  /** Value of {@link #TABLE_TYPE_PARAM} that identifies an Iceberg table. */
+  public static final String ICEBERG_TABLE_TYPE_VALUE = "ICEBERG";
+
+  /** Default Iceberg spec version used when creating Iceberg tables via Glue. */
+  public static final String ICEBERG_FORMAT_VERSION = "2";
+
+  /**
+   * Key of the {@code current-schema-id} entry in {@code Table.parameters()} that holds the active
+   * Iceberg schema ID.
+   */
+  public static final String CURRENT_SCHEMA_ID_PARAM = "current-schema-id";
+
+  /** Glue column parameter key for the Iceberg field ID (assigned at table creation). */
+  public static final String ICEBERG_FIELD_ID = "iceberg.field.id";
+
+  /** Glue column parameter key indicating whether the Iceberg field is optional (nullable). */
+  public static final String ICEBERG_FIELD_OPTIONAL = "iceberg.field.optional";
+
+  // -------------------------------------------------------------------------
+  // StorageDescriptor-derived table properties (stored in Gravitino properties map)
+  // -------------------------------------------------------------------------
+
+  /** Table data location from {@code StorageDescriptor.location()}. */
+  public static final String LOCATION = "location";
+
+  /** InputFormat class name from {@code StorageDescriptor.inputFormat()}. */
+  public static final String INPUT_FORMAT_CLASS = "input-format";
+
+  /** OutputFormat class name from {@code StorageDescriptor.outputFormat()}. */
+  public static final String OUTPUT_FORMAT = "output-format";
+
+  /** SerDe library class name from {@code StorageDescriptor.serDeInfo().serializationLibrary()}. */
+  public static final String SERDE_LIB = "serde-lib";
+
+  /** SerDe name from {@code StorageDescriptor.serDeInfo().name()}. */
+  public static final String SERDE_NAME = "serde-name";
+
+  /**
+   * Prefix for SerDe parameters from {@code StorageDescriptor.serDeInfo().parameters()}. Each SerDe
+   * parameter key {@code k} is stored as {@code "serde.parameter." + k}.
+   */
+  public static final String SERDE_PARAMETER_PREFIX = "serde.parameter.";
+
+  /** Glue {@code tableType} value for external tables. */
+  public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
 
   private GlueConstants() {}
 }

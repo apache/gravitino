@@ -36,6 +36,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
@@ -74,7 +75,11 @@ public class IcebergRestTestUtil {
       Namespace.of("gravitino-test-2", "nested");
 
   public static final String VIEW_PATH =
-      NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(TEST_NAMESPACE_NAME) + "/views";
+      NAMESPACE_PATH
+          + "/"
+          + RESTUtil.encodeNamespace(
+              TEST_NAMESPACE_NAME, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8)
+          + "/views";
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
 
   public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
@@ -135,7 +140,8 @@ public class IcebergRestTestUtil {
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
           new IcebergCatalogWrapperManagerForTest(
               catalogConf, configProvider, false, configProvider.getMetalakeName());
-      IcebergRESTServerContext.create(configProvider, false, false, icebergCatalogWrapperManager);
+      IcebergRESTServerContext.create(
+          configProvider, false, false, true, icebergCatalogWrapperManager);
 
       EventBus eventBus = new EventBus(eventListenerPlugins);
 

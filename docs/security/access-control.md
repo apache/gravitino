@@ -132,10 +132,7 @@ Every securable object in Gravitino has an owner - the user with administrative 
 - **Automatic assignment**: The creator of an object automatically becomes its owner
 - **Administrative privileges**: Owners have implicit management privileges (e.g., drop, alter)
 - **Exclusive control**: Only the owner can fully manage the object
-
-:::info
-Group ownership is not currently supported. Only user ownership is available.
-:::
+- **Group ownership**: Ownership can be assigned to a group, granting all members of that group owner privileges
 
 **Supported Objects:**
 
@@ -152,6 +149,7 @@ The following metadata objects support ownership:
 | Fileset              |
 | Role                 |
 | Model                |
+| Function             |
 | Tag                  |
 | JobTemplate          |
 | Job                  |
@@ -172,13 +170,9 @@ A group is a collection of users that simplifies permission management by allowi
 
 All users in a group inherit the roles and privileges granted to that group.
 
-:::info
-Groups can be granted roles and privileges, but they cannot be owners of securable objects. Only users can be owners.
-:::
-
 ### Metadata Objects
 
-Metadata objects are entities managed by Gravitino, such as catalogs, schemas, tables, filesets, topics, roles, and metalakes.
+Metadata objects are entities managed by Gravitino, such as catalogs, schemas, tables, filesets, topics, models, functions, roles, and metalakes.
 
 **Naming Convention:**
 - Each metadata object has a **type** and a **name**
@@ -205,7 +199,9 @@ Metalake (top level)
         ├── Table
         ├── View
         ├── Topic
-        └── Fileset
+        ├── Fileset
+        ├── Model
+        └── Function
 ```
 
 ![object_image](../assets/security/object.png)
@@ -272,7 +268,7 @@ Gravitino provides a comprehensive set of privileges organized by the type of op
 
 | Name          | Supports Securable Object | Operation                                                                                                     |
 |---------------|---------------------------|---------------------------------------------------------------------------------------------------------------|
-| MANAGE_GRANTS | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Grants the ability to manage privileges on securable objects. When bound to a **Metalake**, also allows assigning and revoking roles for users and groups across the entire metalake. When bound to a **Catalog, Schema, Table, View, Topic, Fileset, or Model**, privilege management is scoped to that object and its descendants only. |
+| MANAGE_GRANTS | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grants the ability to manage privileges on securable objects. When bound to a **Metalake**, also allows assigning and revoking roles for users and groups across the entire metalake. When bound to a **Catalog, Schema, Table, View, Topic, Fileset, Model, or Function**, privilege management is scoped to that object and its descendants only. |
 
 ### Catalog privileges
 
@@ -359,6 +355,14 @@ The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will
 | USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions                 |
 | CREATE_MODEL         | Metalake, Catalog, Schema        | Register a model, this is deprecated. Please use `REGISTER_MODEL` instead.         |
 | CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Link a model version, this is deprecated. Please use `LINK_MODEL_VERSION` instead. |
+
+### Function privileges
+
+| Name              | Supports Securable Object           | Operation                                                                             |
+|-------------------|-------------------------------------|---------------------------------------------------------------------------------------|
+| REGISTER_FUNCTION | Metalake, Catalog, Schema           | Register a function                                                                   |
+| EXECUTE_FUNCTION  | Metalake, Catalog, Schema, Function | View the metadata of the function and execute the function                            |
+| MODIFY_FUNCTION   | Metalake, Catalog, Schema, Function | Alter or drop the function                                                            |
 
 ### Tag privileges
 
@@ -447,6 +451,8 @@ To enable access control in Gravitino, configure the following settings in your 
 | `gravitino.authorization.jcasbin.cacheExpirationSecs`   | The expiration time in seconds for authorization cache entries            | `3600`        | No                                          | 1.1.1         |
 | `gravitino.authorization.jcasbin.roleCacheSize`         | The maximum size of the role cache for authorization                      | `10000`       | No                                          | 1.1.1         |
 | `gravitino.authorization.jcasbin.ownerCacheSize`        | The maximum size of the owner cache for authorization                     | `100000`      | No                                          | 1.1.1         |
+| `gravitino.authorization.jcasbin.metadataIdCacheSize`   | The maximum size of the metadata ID cache for authorization               | `100000`      | No                                          | 1.3.0         |
+| `gravitino.authorization.jcasbin.changePollIntervalSecs` | The interval in seconds for polling entity and owner changes              | `3`           | No                                          | 1.3.0         |
 
 ### Authorization Cache
 
@@ -457,6 +463,10 @@ Gravitino uses Caffeine caches to improve authorization performance by caching r
 - **`roleCacheSize`**: Controls the maximum number of role entries that can be cached. When the cache reaches this size, the least recently used entries are evicted.
 
 - **`ownerCacheSize`**: Controls the maximum number of owner relationship entries that can be cached. This cache maps metadata object IDs to their owner IDs.
+
+- **`metadataIdCacheSize`**: Controls the maximum number of metadata name-to-ID mapping entries that can be cached. This cache maps metadata object names to internal metadata IDs used by JCasbin authorization checks.
+
+- **`changePollIntervalSecs`**: Controls how often a Gravitino server polls persisted entity and owner changes to invalidate local JCasbin authorization caches in multi-node deployments.
 
 :::info
 When role privileges or ownership are changed through the Gravitino API, the corresponding cache entries are automatically invalidated to ensure authorization decisions reflect the latest state.
@@ -484,6 +494,8 @@ gravitino.authorization.serviceAdmins = admin1,admin2
 gravitino.authorization.jcasbin.cacheExpirationSecs = 3600
 gravitino.authorization.jcasbin.roleCacheSize = 10000
 gravitino.authorization.jcasbin.ownerCacheSize = 100000
+gravitino.authorization.jcasbin.metadataIdCacheSize = 100000
+gravitino.authorization.jcasbin.changePollIntervalSecs = 3
 ```
 
 ## Migration Guide
@@ -1312,6 +1324,11 @@ The following table lists the required privileges for each API.
 | delete model version              | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | alter model version               | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | delete model version alias        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
+| register function                 | First, you should have the privilege to load the catalog and the schema. Then, you have `REGISTER_FUNCTION` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                |
+| alter function                    | First, you should have the privilege to load the catalog and the schema. Then, you have `MODIFY_FUNCTION` on the metalake, catalog, schema, function or are one of the owners of the metalake, catalog, schema, function                      |
+| drop function                     | First, you should have the privilege to load the catalog and the schema. Then, you have `MODIFY_FUNCTION` on the metalake, catalog, schema, function or are one of the owners of the metalake, catalog, schema, function                      |
+| list functions                    | First, you should have the privilege to load the catalog and the schema. Then the owner of the schema, catalog, metalake can see all the functions, others can see the functions which they can load                                          |
+| load function                     | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the function, schema, catalog, metalake or have `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` on the function, schema, catalog, metalake |
 | add user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
 | remove user                       | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
 | get user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake or himself                                                                                                                                                                       |

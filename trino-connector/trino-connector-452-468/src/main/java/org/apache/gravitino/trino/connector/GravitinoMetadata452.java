@@ -23,13 +23,16 @@ import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMergeTableHandle;
 import io.trino.spi.connector.ConnectorOutputMetadata;
+import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableExecuteHandle;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.statistics.ComputedStatistics;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
@@ -65,6 +68,41 @@ public class GravitinoMetadata452 extends GravitinoMetadata {
         sourceTableHandles.stream().map(GravitinoHandle::unWrap).collect(Collectors.toList()),
         fragments,
         computedStatistics);
+  }
+
+  @Override
+  public Optional<ConnectorOutputMetadata> finishCreateTable(
+      ConnectorSession session,
+      ConnectorOutputTableHandle tableHandle,
+      Collection<Slice> fragments,
+      Collection<ComputedStatistics> computedStatistics) {
+    ConnectorInsertTableHandle insertHandle =
+        ((GravitinoOutputTableHandle) tableHandle).getInternalHandle();
+    return internalMetadata.finishInsert(
+        session, insertHandle, List.of(), fragments, computedStatistics);
+  }
+
+  @Override
+  public Optional<ConnectorTableExecuteHandle> getTableHandleForExecute(
+      ConnectorSession session,
+      ConnectorTableHandle tableHandle,
+      String procedureName,
+      Map<String, Object> executeProperties,
+      RetryMode retryMode) {
+    return internalMetadata
+        .getTableHandleForExecute(
+            session,
+            GravitinoHandle.unWrap(tableHandle),
+            procedureName,
+            executeProperties,
+            retryMode)
+        .map(GravitinoTableExecuteHandle::new);
+  }
+
+  @Override
+  public void executeTableExecute(
+      ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
+    internalMetadata.executeTableExecute(session, GravitinoHandle.unWrap(tableExecuteHandle));
   }
 
   @SuppressWarnings("deprecation")

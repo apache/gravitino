@@ -72,6 +72,35 @@ logger.lineage.level = info
 logger.lineage.appenderRef.lineage_file.ref = lineage_file
 logger.lineage.additivity = false
 
+## use separate file for audit log
+appender.audit_file.type = RollingFile
+appender.audit_file.name = audit_file
+appender.audit_file.fileName = ${basePath}/gravitino_audit.log
+appender.audit_file.filePattern = ${basePath}/gravitino_audit_%d{yyyyMMdd}.%i.log.gz
+appender.audit_file.layout.type = PatternLayout
+appender.audit_file.layout.pattern = %msg%n
+appender.audit_file.policies.type = Policies
+appender.audit_file.policies.size.type = SizeBasedTriggeringPolicy
+appender.audit_file.policies.size.size = 256MB
+appender.audit_file.policies.time.type = TimeBasedTriggeringPolicy
+appender.audit_file.policies.time.interval = 1
+appender.audit_file.policies.time.modulate = true
+appender.audit_file.strategy.type = DefaultRolloverStrategy
+appender.audit_file.strategy.delete.type = Delete
+appender.audit_file.strategy.delete.basePath = ${basePath}
+appender.audit_file.strategy.delete.maxDepth = 10
+appender.audit_file.strategy.delete.ifAll.type = IfAll
+appender.audit_file.strategy.delete.ifAll.ifFileName.type = IfFileName
+appender.audit_file.strategy.delete.ifAll.ifFileName.regex = gravitino_audit.*\.log\.gz
+# Delete all audit log files older than 30 days
+appender.audit_file.strategy.delete.ifAll.ifLastModified.type = IfLastModified
+appender.audit_file.strategy.delete.ifAll.ifLastModified.age = 30d
+
+logger.audit.name = gravitino.audit
+logger.audit.level = info
+logger.audit.appenderRef.audit_file.ref = audit_file
+logger.audit.additivity = false
+
 logger.rest.name = org.apache.gravitino.server.web.rest
 logger.rest.level = warn
 logger.rest.appenderRef.rolling.ref = fileLogger

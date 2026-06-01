@@ -43,14 +43,17 @@ import java.util.Collections;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
@@ -59,6 +62,7 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
@@ -67,9 +71,13 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.mockito.Mockito;
 
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestOwnerManager {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
@@ -152,7 +160,7 @@ public class TestOwnerManager {
             .withName(GROUP)
             .withRoleNames(Collections.emptyList())
             .withRoleIds(Collections.emptyList())
-            .withNamespace(AuthorizationUtils.ofUserNamespace(METALAKE))
+            .withNamespace(AuthorizationUtils.ofGroupNamespace(METALAKE))
             .withAuditInfo(audit)
             .build();
     entityStore.put(groupEntity, false /* overwritten*/);
@@ -176,6 +184,7 @@ public class TestOwnerManager {
   }
 
   @Test
+  @Order(1)
   public void testOwner() {
     // Test no owner
     MetadataObject metalakeObject =
@@ -205,18 +214,74 @@ public class TestOwnerManager {
   }
 
   @Test
-  public void testGroupTypeOwnerNotSupported() {
-    // Test that GROUP type owner is not supported and throws IllegalArgumentException
+  @Order(2)
+  public void testGroupTypeOwner() {
     MetadataObject metalakeObject =
         MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
 
-    // Verify that setting GROUP type owner throws IllegalArgumentException
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP));
+    // Test to set the group as the owner
+    ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
+    Mockito.verify(authorizationPlugin, Mockito.atLeastOnce())
+        .onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
 
-    Assertions.assertEquals(
-        "Only USER type is supported as owner currently.", exception.getMessage());
+    Owner owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
+    Assertions.assertEquals(GROUP, owner.name());
+    Assertions.assertEquals(Owner.Type.GROUP, owner.type());
+
+    // Test replacing group owner with user owner
+    ownerManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);
+    Owner replacedOwner = ownerManager.getOwner(METALAKE, metalakeObject).get();
+    Assertions.assertEquals(USER, replacedOwner.name());
+    Assertions.assertEquals(Owner.Type.USER, replacedOwner.type());
+  }
+
+  @Test
+  @Order(3)
+  public void testSetNonExistentGroupAsOwner() {
+    MetadataObject metalakeObject =
+        MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
+
+    Assertions.assertThrows(
+        NotFoundException.class,
+        () ->
+            ownerManager.setOwner(
+                METALAKE, metalakeObject, "non-existent-group", Owner.Type.GROUP));
+  }
+
+  @Test
+  @Order(4)
+  public void testInitialOwnerSetNotifiesAuthorizer() throws IllegalAccessException, IOException {
+    String catalogName = "catalog_initial_owner_notify";
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(catalogName)
+            .withNamespace(Namespace.of(METALAKE))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(catalog, false);
+
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    GravitinoAuthorizer originalAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", authorizer, true);
+    try {
+      MetadataObject catalogObject =
+          MetadataObjects.of(Lists.newArrayList(catalogName), MetadataObject.Type.CATALOG);
+
+      ownerManager.setOwner(METALAKE, catalogObject, USER, Owner.Type.USER);
+
+      Mockito.verify(authorizer)
+          .handleMetadataOwnerChange(
+              Mockito.eq(METALAKE),
+              Mockito.isNull(),
+              Mockito.eq(NameIdentifier.of(METALAKE, catalogName)),
+              Mockito.eq(Entity.EntityType.CATALOG));
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
+    }
   }
 }

@@ -40,7 +40,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -54,17 +53,24 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -108,6 +114,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   private static final String ICEBERG_COL_NAME2 = "iceberg_col_name2";
   private static final String ICEBERG_COL_NAME3 = "iceberg_col_name3";
   private static final String ICEBERG_COL_NAME4 = "iceberg_col_name4";
+  private static final String VIEW_COMMENT = "view comment";
+  private static final String SPARK_DIALECT = "spark";
+  private static final String TRINO_DIALECT = "trino";
   private static final String provider = "lakehouse-iceberg";
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
@@ -185,6 +194,11 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
 
   private void clearTableAndSchema() {
     if (catalog.asSchemas().schemaExists(schemaName)) {
+      NameIdentifier[] viewIdentifiers =
+          catalog.asViewCatalog().listViews(Namespace.of(schemaName));
+      for (NameIdentifier nameIdentifier : viewIdentifiers) {
+        catalog.asViewCatalog().dropView(nameIdentifier);
+      }
       NameIdentifier[] nameIdentifiers =
           catalog.asTableCatalog().listTables(Namespace.of(schemaName));
       for (NameIdentifier nameIdentifier : nameIdentifiers) {
@@ -1113,9 +1127,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                   sortOrders);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Iceberg's Distribution Mode.HASH does not support set expressions."));
+        illegalArgumentException
+            .getMessage()
+            .contains("Iceberg's Distribution Mode.HASH does not support set expressions."));
 
     distribution = Distributions.RANGE;
     // Create a data table for Distributions.hash
@@ -1158,9 +1172,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                   sortOrders);
             });
     Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Iceberg's Distribution Mode.RANGE not support set expressions."));
+        illegalArgumentException
+            .getMessage()
+            .contains("Iceberg's Distribution Mode.RANGE not support set expressions."));
   }
 
   @Test
@@ -1539,6 +1553,534 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
               .getMessage()
               .contains("Iceberg only supports microsecond precision (6) for timestamp type"));
     }
+  }
+
+  @Test
+  void testCreateAndLoadView() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    Column[] columns = {
+      Column.of("id", Types.LongType.get(), "id column"),
+      Column.of("name", Types.StringType.get(), "name column")
+    };
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder()
+            .withDialect(SPARK_DIALECT)
+            .withSql("SELECT id, name FROM some_table")
+            .build();
+
+    String viewName = GravitinoITUtils.genRandomName("test_view");
+    View created =
+        viewCatalog.createView(
+            NameIdentifier.of(schemaName, viewName),
+            VIEW_COMMENT,
+            columns,
+            new SQLRepresentation[] {sparkRep},
+            null,
+            null,
+            Collections.singletonMap("created_by", "test"));
+
+    Assertions.assertEquals(viewName, created.name());
+    Assertions.assertEquals(VIEW_COMMENT, created.comment());
+    Assertions.assertEquals(1, created.representations().length);
+    Assertions.assertEquals(Representation.TYPE_SQL, created.representations()[0].type());
+    Assertions.assertEquals("test", created.properties().get("created_by"));
+
+    View loaded = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+    Assertions.assertEquals(viewName, loaded.name());
+    Assertions.assertEquals(VIEW_COMMENT, loaded.comment());
+    Assertions.assertEquals(1, loaded.representations().length);
+    Assertions.assertEquals(Representation.TYPE_SQL, loaded.representations()[0].type());
+    Assertions.assertEquals("test", loaded.properties().get("created_by"));
+  }
+
+  @Test
+  void testCreateViewWithMultipleRepresentations() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    Column[] columns = {Column.of("id", Types.IntegerType.get(), null)};
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+    SQLRepresentation trinoRep =
+        SQLRepresentation.builder().withDialect(TRINO_DIALECT).withSql("SELECT id FROM t").build();
+
+    String viewName = GravitinoITUtils.genRandomName("multi_rep_view");
+    View view =
+        viewCatalog.createView(
+            NameIdentifier.of(schemaName, viewName),
+            null,
+            columns,
+            new SQLRepresentation[] {sparkRep, trinoRep},
+            null,
+            null,
+            Collections.emptyMap());
+
+    Assertions.assertEquals(2, view.representations().length);
+    Assertions.assertEquals(Representation.TYPE_SQL, view.representations()[0].type());
+    Assertions.assertEquals(Representation.TYPE_SQL, view.representations()[1].type());
+    Assertions.assertNull(view.comment());
+  }
+
+  @Test
+  void testCreateViewAndQueryWithSpark() {
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+
+    String sourceTableName = GravitinoITUtils.genRandomName("view_source_tbl");
+    NameIdentifier sourceTableIdent = NameIdentifier.of(schemaName, sourceTableName);
+    Column[] columns = {
+      Column.of("id", Types.IntegerType.get(), null),
+      Column.of("name", Types.StringType.get(), null)
+    };
+    tableCatalog.createTable(
+        sourceTableIdent,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    TableIdentifier sourceTableIdentifier = TableIdentifier.of(schemaName, sourceTableName);
+    spark.sql(
+        String.format(
+            "INSERT INTO iceberg.%s VALUES (1, 'alice'), (2, 'bob')", sourceTableIdentifier));
+
+    String viewName = GravitinoITUtils.genRandomName("spark_query_view");
+    TableIdentifier viewIdentifier = TableIdentifier.of(schemaName, viewName);
+    String viewSql = String.format("SELECT id, name FROM iceberg.%s", sourceTableIdentifier);
+    viewCatalog.createView(
+        NameIdentifier.of(schemaName, viewName),
+        VIEW_COMMENT,
+        columns,
+        new SQLRepresentation[] {
+          SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql(viewSql).build()
+        },
+        null,
+        null,
+        Collections.emptyMap());
+
+    List<Row> result =
+        spark
+            .sql(String.format("SELECT * FROM iceberg.%s ORDER BY id", viewIdentifier))
+            .collectAsList();
+    Assertions.assertEquals(2, result.size());
+    Assertions.assertEquals(1, result.get(0).getInt(0));
+    Assertions.assertEquals("alice", result.get(0).getString(1));
+    Assertions.assertEquals(2, result.get(1).getInt(0));
+    Assertions.assertEquals("bob", result.get(1).getString(1));
+  }
+
+  @Test
+  void testSparkCreateViewLoadWithGravitino() {
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+
+    String sourceTableName = GravitinoITUtils.genRandomName("spark_create_view_src");
+    NameIdentifier sourceTableIdent = NameIdentifier.of(schemaName, sourceTableName);
+    Column[] columns = {
+      Column.of("id", Types.IntegerType.get(), null),
+      Column.of("name", Types.StringType.get(), null)
+    };
+    tableCatalog.createTable(
+        sourceTableIdent,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    TableIdentifier sourceTableIdentifier = TableIdentifier.of(schemaName, sourceTableName);
+    spark.sql(
+        String.format(
+            "INSERT INTO iceberg.%s VALUES (10, 'spark_created'), (20, 'spark_loaded')",
+            sourceTableIdentifier));
+
+    String viewName = GravitinoITUtils.genRandomName("spark_created_view");
+    TableIdentifier viewIdentifier = TableIdentifier.of(schemaName, viewName);
+    spark.sql(
+        String.format(
+            "CREATE OR REPLACE VIEW iceberg.%s AS SELECT id, name FROM iceberg.%s",
+            viewIdentifier, sourceTableIdentifier));
+
+    View loaded = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+    Assertions.assertEquals(viewName, loaded.name());
+    Assertions.assertEquals(2, loaded.columns().length);
+    Assertions.assertEquals("id", loaded.columns()[0].name());
+    Assertions.assertEquals("name", loaded.columns()[1].name());
+    Assertions.assertTrue(loaded.representations().length > 0);
+    Assertions.assertEquals(Representation.TYPE_SQL, loaded.representations()[0].type());
+  }
+
+  @Test
+  void testCreateViewWithUnsupportedRepresentation() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    Representation unsupportedRepresentation = () -> "unsupported";
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                viewCatalog.createView(
+                    NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("bad_rep_view")),
+                    null,
+                    columns,
+                    new Representation[] {unsupportedRepresentation},
+                    null,
+                    null,
+                    Collections.emptyMap()));
+    Assertions.assertNotNull(exception.getMessage());
+  }
+
+  @Test
+  void testAlterViewReplaceWithUnsupportedRepresentation() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("replace_bad_rep_view");
+    NameIdentifier viewIdent = NameIdentifier.of(schemaName, viewName);
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+    viewCatalog.createView(
+        viewIdent,
+        null,
+        columns,
+        new SQLRepresentation[] {sparkRep},
+        null,
+        null,
+        Collections.emptyMap());
+
+    Representation unsupportedRepresentation = () -> "unsupported";
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                viewCatalog.alterView(
+                    viewIdent,
+                    ViewChange.replaceView(
+                        columns,
+                        new Representation[] {unsupportedRepresentation},
+                        null,
+                        schemaName,
+                        null)));
+    Assertions.assertNotNull(exception.getMessage());
+  }
+
+  @Test
+  void testListViews() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String view1 = GravitinoITUtils.genRandomName("list_view1");
+    String view2 = GravitinoITUtils.genRandomName("list_view2");
+    Column[] columns = {Column.of("c1", Types.StringType.get(), null)};
+    SQLRepresentation rep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT c1 FROM t").build();
+
+    viewCatalog.createView(
+        NameIdentifier.of(schemaName, view1),
+        null,
+        columns,
+        new SQLRepresentation[] {rep},
+        null,
+        null,
+        Collections.emptyMap());
+    viewCatalog.createView(
+        NameIdentifier.of(schemaName, view2),
+        null,
+        columns,
+        new SQLRepresentation[] {rep},
+        null,
+        null,
+        Collections.emptyMap());
+
+    NameIdentifier[] views = viewCatalog.listViews(Namespace.of(schemaName));
+    Assertions.assertTrue(views.length >= 2);
+    boolean foundView1 = false;
+    boolean foundView2 = false;
+    for (NameIdentifier v : views) {
+      if (v.name().equals(view1)) {
+        foundView1 = true;
+      }
+      if (v.name().equals(view2)) {
+        foundView2 = true;
+      }
+    }
+    Assertions.assertTrue(foundView1, "view1 not found in list");
+    Assertions.assertTrue(foundView2, "view2 not found in list");
+  }
+
+  @Test
+  void testViewExists() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("exists_view");
+    NameIdentifier ident = NameIdentifier.of(schemaName, viewName);
+
+    Assertions.assertFalse(viewCatalog.viewExists(ident));
+
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation rep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+    viewCatalog.createView(
+        ident, null, columns, new SQLRepresentation[] {rep}, null, null, Collections.emptyMap());
+
+    Assertions.assertTrue(viewCatalog.viewExists(ident));
+  }
+
+  @Test
+  void testDropView() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("drop_view");
+    NameIdentifier ident = NameIdentifier.of(schemaName, viewName);
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation rep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+
+    viewCatalog.createView(
+        ident, null, columns, new SQLRepresentation[] {rep}, null, null, Collections.emptyMap());
+    Assertions.assertTrue(viewCatalog.viewExists(ident));
+
+    Assertions.assertTrue(viewCatalog.dropView(ident));
+    Assertions.assertFalse(viewCatalog.viewExists(ident));
+    Assertions.assertFalse(viewCatalog.dropView(ident));
+  }
+
+  @Test
+  void testAlterViewRename() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("rename_view");
+    String newName = GravitinoITUtils.genRandomName("renamed_view");
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation rep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+
+    viewCatalog.createView(
+        NameIdentifier.of(schemaName, viewName),
+        null,
+        columns,
+        new SQLRepresentation[] {rep},
+        null,
+        null,
+        Collections.emptyMap());
+
+    View renamed =
+        viewCatalog.alterView(NameIdentifier.of(schemaName, viewName), ViewChange.rename(newName));
+
+    Assertions.assertEquals(newName, renamed.name());
+    Assertions.assertFalse(viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)));
+    Assertions.assertTrue(viewCatalog.viewExists(NameIdentifier.of(schemaName, newName)));
+  }
+
+  @Test
+  void testAlterViewSetAndRemoveProperty() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("prop_view");
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation rep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+
+    viewCatalog.createView(
+        NameIdentifier.of(schemaName, viewName),
+        null,
+        columns,
+        new SQLRepresentation[] {rep},
+        null,
+        null,
+        Collections.singletonMap("initial_key", "initial_val"));
+
+    View withProp =
+        viewCatalog.alterView(
+            NameIdentifier.of(schemaName, viewName), ViewChange.setProperty("new_key", "new_val"));
+    Assertions.assertEquals("new_val", withProp.properties().get("new_key"));
+    Assertions.assertEquals("initial_val", withProp.properties().get("initial_key"));
+
+    View withoutProp =
+        viewCatalog.alterView(
+            NameIdentifier.of(schemaName, viewName), ViewChange.removeProperty("new_key"));
+    Assertions.assertNull(withoutProp.properties().get("new_key"));
+  }
+
+  @Test
+  void testCreateViewAlreadyExists() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("dup_view");
+    NameIdentifier ident = NameIdentifier.of(schemaName, viewName);
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation rep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+
+    viewCatalog.createView(
+        ident, null, columns, new SQLRepresentation[] {rep}, null, null, Collections.emptyMap());
+
+    Assertions.assertThrows(
+        ViewAlreadyExistsException.class,
+        () ->
+            viewCatalog.createView(
+                ident,
+                null,
+                columns,
+                new SQLRepresentation[] {rep},
+                null,
+                null,
+                Collections.emptyMap()));
+  }
+
+  @Test
+  void testLoadNonExistentView() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    NameIdentifier ident = NameIdentifier.of(schemaName, "non_existent_view_xyz");
+    Assertions.assertThrows(NoSuchViewException.class, () -> viewCatalog.loadView(ident));
+  }
+
+  @Test
+  void testAlterViewReplace() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("replace_view");
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+
+    viewCatalog.createView(
+        NameIdentifier.of(schemaName, viewName),
+        "original comment",
+        columns,
+        new SQLRepresentation[] {sparkRep},
+        null,
+        null,
+        Collections.singletonMap("replace.drop-dialect.allowed", "true"));
+
+    SQLRepresentation trinoRep =
+        SQLRepresentation.builder()
+            .withDialect(TRINO_DIALECT)
+            .withSql("SELECT id, name FROM updated_table")
+            .build();
+    Column[] replacedColumns = {
+      Column.of("id", Types.LongType.get(), null), Column.of("name", Types.StringType.get(), null)
+    };
+
+    View altered =
+        viewCatalog.alterView(
+            NameIdentifier.of(schemaName, viewName),
+            ViewChange.replaceView(
+                replacedColumns,
+                new SQLRepresentation[] {trinoRep},
+                null,
+                schemaName,
+                "replaced comment"));
+
+    Assertions.assertEquals("replaced comment", altered.comment());
+    Assertions.assertEquals(1, altered.representations().length);
+    Assertions.assertTrue(altered.sqlFor(TRINO_DIALECT).isPresent());
+    Assertions.assertFalse(altered.sqlFor(SPARK_DIALECT).isPresent());
+    Assertions.assertEquals(2, altered.columns().length);
+    Assertions.assertEquals("name", altered.columns()[1].name());
+  }
+
+  @Test
+  void testAlterViewReplaceThenSetCustomProperty() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("replace_then_set_view");
+    NameIdentifier ident = NameIdentifier.of(schemaName, viewName);
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+
+    Map<String, String> createProps = Maps.newHashMap();
+    createProps.put("keep_key", "keep_val");
+    createProps.put("replace.drop-dialect.allowed", "true");
+
+    viewCatalog.createView(
+        ident,
+        "original comment",
+        columns,
+        new SQLRepresentation[] {sparkRep},
+        null,
+        null,
+        createProps);
+
+    SQLRepresentation trinoRep =
+        SQLRepresentation.builder()
+            .withDialect(TRINO_DIALECT)
+            .withSql("SELECT id, name FROM updated_table")
+            .build();
+    Column[] replacedColumns = {
+      Column.of("id", Types.LongType.get(), null), Column.of("name", Types.StringType.get(), null)
+    };
+
+    View altered =
+        viewCatalog.alterView(
+            ident,
+            ViewChange.replaceView(
+                replacedColumns,
+                new SQLRepresentation[] {trinoRep},
+                "replace_catalog",
+                schemaName,
+                "replace comment"),
+            ViewChange.setProperty("custom_key", "custom_val"));
+
+    Assertions.assertEquals("replace comment", altered.comment());
+    Assertions.assertEquals("replace_catalog", altered.defaultCatalog());
+    Assertions.assertEquals("custom_val", altered.properties().get("custom_key"));
+    Assertions.assertEquals("keep_val", altered.properties().get("keep_key"));
+    Assertions.assertEquals(2, altered.columns().length);
+    Assertions.assertEquals("name", altered.columns()[1].name());
+    Assertions.assertTrue(altered.sqlFor(TRINO_DIALECT).isPresent());
+  }
+
+  @Test
+  void testAlterViewSetCustomPropertyThenReplaceKeepsProperty() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("set_then_replace_view");
+    NameIdentifier ident = NameIdentifier.of(schemaName, viewName);
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+
+    Map<String, String> createProps = Maps.newHashMap();
+    createProps.put("keep_key", "keep_val");
+    createProps.put("replace.drop-dialect.allowed", "true");
+
+    viewCatalog.createView(
+        ident,
+        "original comment",
+        columns,
+        new SQLRepresentation[] {sparkRep},
+        null,
+        null,
+        createProps);
+
+    SQLRepresentation trinoRep =
+        SQLRepresentation.builder()
+            .withDialect(TRINO_DIALECT)
+            .withSql("SELECT id, name FROM updated_table")
+            .build();
+    Column[] replacedColumns = {
+      Column.of("id", Types.LongType.get(), null), Column.of("name", Types.StringType.get(), null)
+    };
+
+    View altered =
+        viewCatalog.alterView(
+            ident,
+            ViewChange.setProperty("custom_key", "custom_val"),
+            ViewChange.replaceView(
+                replacedColumns,
+                new SQLRepresentation[] {trinoRep},
+                "replace_catalog",
+                schemaName,
+                "replace comment"));
+
+    Assertions.assertEquals("replace comment", altered.comment());
+    Assertions.assertEquals("replace_catalog", altered.defaultCatalog());
+    Assertions.assertEquals("custom_val", altered.properties().get("custom_key"));
+    Assertions.assertEquals("keep_val", altered.properties().get("keep_key"));
+    Assertions.assertEquals(2, altered.columns().length);
+    Assertions.assertEquals("name", altered.columns()[1].name());
+    Assertions.assertTrue(altered.sqlFor(TRINO_DIALECT).isPresent());
+  }
+
+  @Test
+  void testListViewsInNonExistentSchema() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () -> viewCatalog.listViews(Namespace.of("non_existent_schema_xyz")));
   }
 
   protected static void assertionsTableInfo(

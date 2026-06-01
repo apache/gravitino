@@ -18,12 +18,20 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static org.apache.gravitino.catalog.glue.GlueConstants.FORMAT;
+import static org.apache.gravitino.catalog.glue.GlueConstants.INPUT_FORMAT_CLASS;
 import static org.apache.gravitino.catalog.glue.GlueConstants.METADATA_LOCATION;
+import static org.apache.gravitino.catalog.glue.GlueConstants.OUTPUT_FORMAT;
+import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_LIB;
 import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT;
+import static org.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -40,25 +48,55 @@ import org.apache.gravitino.connector.PropertyEntry;
  */
 public class GlueTablePropertiesMetadata extends BasePropertiesMetadata {
 
-  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
-      ImmutableMap.<String, PropertyEntry<?>>builder()
-          .put(
-              TABLE_FORMAT,
-              stringOptionalPropertyEntry(
-                  TABLE_FORMAT,
-                  "Table format stored in Table.parameters(). Common values: iceberg, hive.",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .put(
-              METADATA_LOCATION,
-              stringOptionalPropertyEntry(
-                  METADATA_LOCATION,
-                  "Iceberg metadata file location stored in Table.parameters().",
-                  false /* immutable */,
-                  null /* defaultValue */,
-                  false /* hidden */))
-          .build();
+  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
+
+  static {
+    List<PropertyEntry<?>> propertyEntries =
+        ImmutableList.of(
+            stringOptionalPropertyEntry(
+                TABLE_FORMAT,
+                "Table format stored in Table.parameters(). Common values: ICEBERG, HIVE.",
+                false,
+                null,
+                false),
+            stringOptionalPropertyEntry(
+                METADATA_LOCATION,
+                "Iceberg metadata file location stored in Table.parameters().",
+                false,
+                null,
+                false),
+            stringImmutablePropertyEntry(
+                FORMAT,
+                "The table file format (parquet, orc, textfile, etc.). When set, "
+                    + "input-format, output-format, and serde-lib are derived from this.",
+                false,
+                null,
+                false,
+                false),
+            stringImmutablePropertyEntry(
+                INPUT_FORMAT_CLASS,
+                "The input format class for the table.",
+                false,
+                HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
+                false,
+                false),
+            stringImmutablePropertyEntry(
+                OUTPUT_FORMAT,
+                "The output format class for the table.",
+                false,
+                HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+                false,
+                false),
+            stringImmutablePropertyEntry(
+                SERDE_LIB,
+                "The serde library class for the table.",
+                false,
+                HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS,
+                false,
+                false));
+
+    PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
+  }
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {

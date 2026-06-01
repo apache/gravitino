@@ -60,6 +60,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.JOB_TEMPLATE, Entity.EntityType.JOB_TEMPLATE)
           .put(MetadataObject.Type.JOB, Entity.EntityType.JOB)
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
+          .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
           .build();
 
   private MetadataObjectUtil() {}
@@ -129,6 +130,7 @@ public class MetadataObjectUtil {
       case FILESET:
       case COLUMN:
       case MODEL:
+      case FUNCTION:
         String fullName = DOT.join(metalakeName, metadataObject.fullName());
         return NameIdentifier.parse(fullName);
       default:
@@ -199,6 +201,11 @@ public class MetadataObjectUtil {
       case MODEL:
         NameIdentifierUtil.checkModel(identifier);
         check(env.modelDispatcher().modelExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case FUNCTION:
+        NameIdentifierUtil.checkFunction(identifier);
+        check(env.functionDispatcher().functionExists(identifier), exceptionToThrowSupplier);
         break;
 
       case VIEW:

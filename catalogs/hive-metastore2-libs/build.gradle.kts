@@ -29,27 +29,43 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
-  implementation(libs.hadoop2.common) {
+  // Force upgrades for outdated transitive dependencies pulled by Hive Metastore
+  constraints {
+    implementation(libs.thrift)
+    implementation(libs.snappy.java)
+    implementation(libs.commons.beanutils)
+    implementation(libs.woodstox.core)
+  }
+
+  implementation(libs.hadoop3.common) {
     exclude(group = "ch.qos.logback")
+    exclude(group = "ch.qos.reload4j")
     exclude(group = "com.fasterxml.jackson.core")
+    exclude(group = "com.github.pjfanning", module = "jersey-json")
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
+    exclude(group = "com.sun.jersey")
     exclude(group = "log4j")
     exclude(group = "net.java.dev.jets3t")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
+    exclude(group = "org.eclipse.jetty")
     exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
     exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
     exclude(group = "org.slf4j")
   }
-  implementation(libs.hadoop2.mapreduce.client.core) {
+  implementation(libs.hadoop3.mapreduce.client.core) {
+    exclude(group = "ch.qos.reload4j")
+    exclude(group = "com.github.pjfanning", module = "jersey-json")
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
+    exclude(group = "com.sun.jersey")
     exclude(group = "log4j")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
+    exclude(group = "org.eclipse.jetty")
     exclude(group = "org.slf4j")
   }
   implementation(libs.hive2.metastore) {
@@ -69,6 +85,7 @@ dependencies {
     exclude(group = "junit")
     exclude(group = "org.apache.ant")
     exclude(group = "org.apache.avro")
+    exclude(group = "org.apache.derby")
     exclude(group = "org.apache.hadoop", module = "hadoop-yarn-server-resourcemanager")
     exclude(group = "org.apache.hbase")
     exclude(group = "org.apache.logging.log4j")

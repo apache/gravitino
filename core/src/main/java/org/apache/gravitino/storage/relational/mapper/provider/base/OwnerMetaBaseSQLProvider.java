@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper.OWN
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -30,10 +31,16 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaBaseSQLProvider {
+  protected String currentTimestampMillisExpression() {
+    return "(UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+  }
+
   public String selectUserOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
@@ -108,7 +115,7 @@ public class OwnerMetaBaseSQLProvider {
     return "INSERT INTO "
         + OWNER_TABLE_NAME
         + " (metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, deleted_at, updated_at)"
         + " VALUES ("
         + " #{ownerRelPO.metalakeId},"
         + " #{ownerRelPO.metadataObjectId},"
@@ -118,42 +125,87 @@ public class OwnerMetaBaseSQLProvider {
         + " #{ownerRelPO.auditInfo},"
         + " #{ownerRelPO.currentVersion},"
         + " #{ownerRelPO.lastVersion},"
-        + " #{ownerRelPO.deletedAt}"
+        + " #{ownerRelPO.deletedAt},"
+        + " #{ownerRelPO.updatedAt}"
         + ")";
+  }
+
+  public String batchInsertOwnerRels(@Param("ownerRelPOs") List<OwnerRelPO> ownerRelPOs) {
+    return "<script>"
+        + "INSERT INTO "
+        + OWNER_TABLE_NAME
+        + " (metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
+        + " audit_info, current_version, last_version, deleted_at, updated_at) VALUES "
+        + "<foreach collection='ownerRelPOs' item='po' separator=','>"
+        + "(#{po.metalakeId}, #{po.metadataObjectId}, #{po.metadataObjectType},"
+        + " #{po.ownerId}, #{po.ownerType}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt}, #{po.updatedAt})"
+        + "</foreach>"
+        + "</script>";
+  }
+
+  public String batchSoftDeleteOwnerRelByMetadataObjects(
+      @Param("deletions") List<OwnerRelForDeletion> deletions) {
+    String now = currentTimestampMillisExpression();
+    return "<script>"
+        + "UPDATE "
+        + OWNER_TABLE_NAME
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
+        + " WHERE deleted_at = 0 AND ("
+        + "<foreach collection='deletions' item='t' separator=' OR '>"
+        + "(metadata_object_id = #{t.metadataObjectId} AND metadata_object_type = #{t.metadataObjectType})"
+        + "</foreach>"
+        + ")"
+        + "</script>";
   }
 
   public String softDeleteOwnerRelByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0";
   }
 
   public String softDeleteOwnerRelByOwnerIdAndType(
       @Param("ownerId") Long ownerId, @Param("ownerType") String ownerType) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0";
   }
 
   public String softDeleteOwnerRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " ot SET ot.deleted_at = "
+        + now
+        + ", ot.updated_at = "
+        + now
         + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -189,51 +241,131 @@ public class OwnerMetaBaseSQLProvider {
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.catalog_id = #{catalogId} AND"
         + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.catalog_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
+        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
-  public String softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    String now = currentTimestampMillisExpression();
+    return "<script>"
+        + "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " ot SET ot.deleted_at = "
+        + now
+        + ", ot.updated_at = "
+        + now
         + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.schema_id = #{schemaId} AND"
-        + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
+        + " st WHERE st.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
         + " UNION"
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.schema_id = #{schemaId} AND"
-        + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
+        + " tt WHERE tt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
         + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.schema_id = #{schemaId} AND"
-        + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
+        + " tat WHERE tat.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
         + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.schema_id = #{schemaId} AND"
-        + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
+        + " ft WHERE ft.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
         + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " mt WHERE mt.schema_id = #{schemaId} AND"
-        + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
+        + " mt WHERE mt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
         + " UNION"
         + " SELECT vt.schema_id FROM "
         + ViewMetaMapper.TABLE_NAME
-        + " vt WHERE vt.schema_id = #{schemaId} AND"
-        + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
-        + ")";
+        + " vt WHERE vt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
+        + ")"
+        + "</script>";
   }
 
   public String deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    // Keep this cutoff comfortably behind the present time. These deleted owner rows are also used
+    // as short-lived cache-invalidation signals; a running server that is delayed by long GC,
+    // network isolation, scheduler stalls, or clock skew must still have time to consume them.
     return "DELETE FROM "
         + OWNER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String selectOwnerByMetadataObjectIdAndType(
+      @Param("metadataObjectId") long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "SELECT owner_id as ownerId, owner_type as ownerType FROM "
+        + OWNER_TABLE_NAME
+        + " WHERE metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_type = #{metadataObjectType}"
+        + " AND deleted_at = 0"
+        + " ORDER BY updated_at DESC, id DESC LIMIT 1";
+  }
+
+  public String selectChangedOwners(
+      @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId) {
+    // Owner changes are broadcast to every server instance because owner caches are local. Both
+    // inserts and soft-deletes advance owner_meta.updated_at, so a single (updated_at, id) keyset
+    // cursor catches every change; id is the tiebreaker when multiple rows share an updated_at
+    // millisecond (batch soft-deletes do that).
+    return "SELECT id,"
+        + " metadata_object_id as metadataObjectId,"
+        + " metadata_object_type as metadataObjectType,"
+        + " updated_at as updatedAt"
+        + " FROM "
+        + OWNER_TABLE_NAME
+        + " WHERE updated_at > #{lastConsumedUpdatedAt}"
+        + " OR (updated_at = #{lastConsumedUpdatedAt} AND id > #{lastConsumedUpdatedAtId})"
+        + " ORDER BY updated_at, id LIMIT 1000";
+  }
+
+  public String selectMaxChangedOwner() {
+    // A newly started server has an empty local owner cache. It can start from the current tail
+    // tuple and consume only owner changes that happen after startup.
+    return "SELECT id,"
+        + " metadata_object_id as metadataObjectId,"
+        + " metadata_object_type as metadataObjectType,"
+        + " updated_at as updatedAt"
+        + " FROM "
+        + OWNER_TABLE_NAME
+        + " ORDER BY updated_at DESC, id DESC LIMIT 1";
   }
 }

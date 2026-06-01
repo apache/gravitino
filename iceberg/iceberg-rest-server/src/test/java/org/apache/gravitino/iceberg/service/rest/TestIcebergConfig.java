@@ -125,4 +125,37 @@ public class TestIcebergConfig extends IcebergTestBase {
         hasViewListEndpoint,
         "Config response should contain view list endpoint for catalog that supports views");
   }
+
+  @Test
+  public void testConfigScanPlanEndpointPathIsNamespaceScoped() {
+    // Iceberg 1.11+ advertises the namespace-scoped scan plan path via
+    // Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN. This test guards against regressing to the broken
+    // path that existed in Iceberg 1.10.1 (apache/iceberg#14120).
+    Response resp = getConfigClientBuilder().get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+
+    boolean hasScanPlanEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().contains("namespaces/{namespace}/tables/{table}/plan"));
+    Assertions.assertTrue(
+        hasScanPlanEndpoint,
+        "Config response must advertise the namespace-scoped scan plan path: "
+            + "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan");
+
+    boolean hasBrokenScanPlanEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().endsWith("/tables/{table}/plan")
+                        && !endpoint.path().contains("namespaces/{namespace}"));
+    Assertions.assertFalse(
+        hasBrokenScanPlanEndpoint,
+        "Config response must not advertise the namespace-less scan plan path from Iceberg 1.10.1");
+  }
 }

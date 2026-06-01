@@ -55,6 +55,7 @@ import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -167,8 +168,7 @@ public class TableOperations {
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION,
       secondaryExpression = AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
-      secondaryExpressionCondition =
-          AuthorizationExpressionConstants.REQUEST_REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE,
+      secondaryExpressionCondition = ExpressionCondition.REQUIRED_MODIFY_PRIVILEGES,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -266,19 +266,19 @@ public class TableOperations {
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
             boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
-            if (!dropped) {
+            if (dropped) {
+              LOG.info(
+                  "Table {}: {}.{}.{}.{}",
+                  purge ? "purge" : "drop",
+                  metalake,
+                  catalog,
+                  schema,
+                  table);
+            } else {
               LOG.warn("Cannot find to be dropped table {} under schema {}", table, schema);
             }
 
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info(
-                "Table {}: {}.{}.{}.{}",
-                purge ? "purge" : "drop",
-                metalake,
-                catalog,
-                schema,
-                table);
-            return response;
+            return Utils.ok(new DropResponse(dropped));
           });
 
     } catch (Exception e) {

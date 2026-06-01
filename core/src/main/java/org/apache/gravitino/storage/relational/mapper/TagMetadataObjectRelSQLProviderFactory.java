@@ -107,8 +107,9 @@ public class TagMetadataObjectRelSQLProviderFactory {
     return getProvider().softDeleteTagMetadataObjectRelsByCatalogId(catalogId);
   }
 
-  public static String softDeleteTagMetadataObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteTagMetadataObjectRelsBySchemaId(schemaId);
+  public static String softDeleteTagMetadataObjectRelsBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteTagMetadataObjectRelsBySchemaIds(schemaIds);
   }
 
   public static String softDeleteTagMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {

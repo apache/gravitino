@@ -19,9 +19,15 @@ This document provides a comprehensive guide on configuring and using Apache Gra
 
 Place the following JAR files in the lib directory of your Flink installation:
 
-- [`flink-connector-jdbc-${flinkJdbcConnectorVersion}.jar`](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/connectors/table/jdbc/)
-- [`gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18)
+- The Flink JDBC connector JAR that matches your Flink minor version
+- The Gravitino Flink connector runtime JAR that matches your Flink minor version
 - JDBC driver
+
+| Flink version | Flink JDBC connector version | Gravitino runtime artifact |
+|---------------|------------------------------|----------------------------|
+| 1.18          | `3.2.0-1.18`                 | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| 1.19          | `3.3.0-1.19`                 | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
+| 1.20          | `3.3.0-1.20`                 | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
 
 Next, when you create the JDBC catalog in Gravitino, add the `flink.bypass.default-database` property with the value of the default database name.
 
@@ -125,4 +131,3 @@ Gravitino Flink connector will transform below property names which are defined 
 | `username`                      | `username`                         | Username of MySQL account      | 0.9.0-incubating |
 | `password`                      | `password`                         | Password of the account        | 0.9.0-incubating |
 | `flink.bypass.default-database` | `default-database`                 | Default database to connect to | 0.9.0-incubating |
-

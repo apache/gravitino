@@ -35,7 +35,9 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
@@ -56,6 +58,7 @@ import org.apache.gravitino.listener.api.event.IcebergPlanTableScanPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent;
@@ -90,6 +93,7 @@ import org.apache.iceberg.util.JsonUtil;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
@@ -180,9 +184,12 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     JsonNode planResponse = verifyPlanTableScanSucc(namespace, "plan_scan_table", snapshotId);
 
     Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
-    Assertions.assertTrue(planResponse.has("plan-tasks"));
-    Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
-    Assertions.assertTrue(planResponse.get("plan-tasks").size() > 0);
+    Assertions.assertTrue(planResponse.has("file-scan-tasks"));
+    Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
+    Assertions.assertTrue(planResponse.get("file-scan-tasks").size() > 0);
+    Assertions.assertFalse(
+        planResponse.has("plan-tasks"),
+        "Iceberg 1.11+ plan scan must not emit legacy plan-tasks JSON");
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
@@ -226,8 +233,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         verifyPlanTableScanSuccWithRange(
             namespace, "incremental_scan_valid_table", startSnapshotId, endSnapshotId);
     Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
-    Assertions.assertTrue(planResponse.has("plan-tasks"));
-    Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
+    Assertions.assertTrue(planResponse.has("file-scan-tasks"));
+    Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
+    Assertions.assertFalse(
+        planResponse.has("plan-tasks"),
+        "Iceberg 1.11+ plan scan must not emit legacy plan-tasks JSON");
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
@@ -295,7 +305,9 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     dummyEventListener.clearEvent();
     verifyListTableSucc(namespace, ImmutableSet.of("list_foo1", "list_foo2"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListTablePreEvent);
-    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergListTableEvent);
+    Event listTablePostEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(listTablePostEvent instanceof IcebergListTableEvent);
+    Assertions.assertEquals(2, ((IcebergListTableEvent) listTablePostEvent).resultCount());
   }
 
   @ParameterizedTest
@@ -488,13 +500,17 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private Response doLoadTableWithSnapshots(Namespace ns, String name, String snapshots) {
     String path =
-        IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/tables/" + name;
+        IcebergRestTestUtil.NAMESPACE_PATH
+            + "/"
+            + RESTUtil.encodeNamespace(ns, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8)
+            + "/tables/"
+            + name;
     Map<String, String> queryParams = ImmutableMap.of("snapshots", snapshots);
     return getIcebergClientBuilder(path, Optional.of(queryParams)).get();
   }
 
   private Response doPlanTableScan(Namespace ns, String tableName, PlanTableScanRequest request) {
-    Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/scan"));
+    Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/plan"));
     return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
@@ -661,7 +677,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     verifyCreateNamespaceSucc(ns);
 
     // Then create a table
-    verifyCreateTableSucc(ns, tableName);
+    doCreateTableWithCredentialVending(ns, tableName, "s3://abc");
 
     // Then test getting credentials
     Response response = doGetTableCredentials(ns, tableName);
@@ -1045,5 +1061,15 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         defaultTableResponse.tableMetadata().snapshots().size(),
         allTableResponse.tableMetadata().snapshots().size(),
         "Default load and snapshots=all should return the same number of snapshots");
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testIcebergListTableEventDeprecatedConstructorReturnsNegativeCount() {
+    IcebergListTableEvent event =
+        new IcebergListTableEvent(
+            Mockito.mock(IcebergRequestContext.class),
+            NameIdentifier.of("metalake", "catalog", "schema"));
+    Assertions.assertEquals(-1, event.resultCount());
   }
 }

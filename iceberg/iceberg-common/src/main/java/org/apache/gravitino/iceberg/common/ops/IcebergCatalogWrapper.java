@@ -46,6 +46,8 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.rest.RESTCatalogProperties.SnapshotMode;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -245,7 +247,8 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       return LoadTableResponse.builder().withTableMetadata(tableMetadataOptional.get()).build();
     }
 
-    LoadTableResponse loadTableResponse = CatalogHandlers.loadTable(getCatalog(), tableIdentifier);
+    LoadTableResponse loadTableResponse =
+        CatalogHandlers.loadTable(getCatalog(), tableIdentifier, SnapshotMode.ALL);
     if (loadTableResponse != null) {
       getMetadataCache().updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
     }
@@ -372,6 +375,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
   }
 
+  public boolean isRESTCatalog() {
+    return getCatalog() instanceof RESTCatalog;
+  }
+
   /**
    * Whether the wrapper is recreated with a different classloader.
    *
@@ -452,11 +459,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       return TableMetadataCache.DUMMY;
     }
 
-    Preconditions.checkArgument(
-        catalog instanceof SupportsMetadataLocation,
-        "You shouldn't enable Iceberg metadata cache for the catalog %s,"
-            + " because the catalog impl does not support get metadata location.",
-        catalog.name());
+    if (!(catalog instanceof SupportsMetadataLocation)) {
+      LOG.warn(
+          "Catalog '{}' does not support the table metadata cache, because the catalog impl does not "
+              + "support get metadata location. The cache is disabled. Set '{}' to an empty string "
+              + "(\"\") in the configuration before the next restart.",
+          catalog.name(),
+          IcebergConfig.TABLE_METADATA_CACHE_IMPL.getKey());
+      return TableMetadataCache.DUMMY;
+    }
 
     TableMetadataCache cache =
         ClassUtils.loadAndGetInstance(impl, Thread.currentThread().getContextClassLoader());

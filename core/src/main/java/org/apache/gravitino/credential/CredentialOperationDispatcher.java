@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.collect.ImmutableSet;
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.ws.rs.NotSupportedException;
@@ -55,24 +58,36 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
         NoSuchCatalogException.class);
   }
 
-  private List<Credential> getCredentials(
+  List<Credential> getCredentials(
       BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
     Map<String, CredentialContext> contexts =
         getCredentialContexts(baseCatalog, nameIdentifier, privilege);
-    return contexts.entrySet().stream()
-        .map(
-            entry ->
-                baseCatalog
-                    .catalogCredentialManager()
-                    .getCredential(entry.getKey(), entry.getValue()))
-        .filter(Objects::nonNull)
-        .collect(Collectors.toList());
+    List<Credential> credentials = new ArrayList<>();
+    for (Map.Entry<String, CredentialContext> entry : contexts.entrySet()) {
+      Optional<CredentialProvider> providerOptional =
+          baseCatalog.catalogCredentialManager().getCredentialProvider(entry.getKey());
+      if (!providerOptional.isPresent()) {
+        continue;
+      }
+
+      Optional<CredentialContext> contextOptional =
+          filterContextByProvider(providerOptional.get(), entry.getValue());
+      if (!contextOptional.isPresent()) {
+        continue;
+      }
+
+      baseCatalog
+          .catalogCredentialManager()
+          .getCredential(entry.getKey(), contextOptional.get())
+          .ifPresent(credentials::add);
+    }
+    return credentials;
   }
 
   private Map<String, CredentialContext> getCredentialContexts(
       BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
     if (nameIdentifier.equals(NameIdentifierUtil.getCatalogIdentifier(nameIdentifier))) {
-      return getCatalogCredentialContexts(baseCatalog.properties());
+      return getCatalogCredentialContexts(baseCatalog.propertiesWithCredentialProviders());
     }
 
     if (baseCatalog.ops() instanceof SupportsPathBasedCredentials) {
@@ -111,6 +126,47 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
                       PrincipalUtils.getCurrentUserName(), writePaths, readPaths);
                 },
                 CredentialOperationDispatcher::mergeContexts));
+  }
+
+  static Optional<CredentialContext> filterContextByProvider(
+      CredentialProvider credentialProvider, CredentialContext context) {
+    if (!(context instanceof PathBasedCredentialContext)) {
+      return Optional.of(context);
+    }
+
+    PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
+    Set<String> supportedWritePaths =
+        pathBasedCredentialContext.getWritePaths().stream()
+            .filter(path -> isPathSupported(credentialProvider, path))
+            .collect(ImmutableSet.toImmutableSet());
+    Set<String> supportedReadPaths =
+        pathBasedCredentialContext.getReadPaths().stream()
+            .filter(path -> isPathSupported(credentialProvider, path))
+            .collect(ImmutableSet.toImmutableSet());
+
+    if (supportedWritePaths.isEmpty() && supportedReadPaths.isEmpty()) {
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        new PathBasedCredentialContext(
+            pathBasedCredentialContext.getUserName(), supportedWritePaths, supportedReadPaths));
+  }
+
+  private static boolean isPathSupported(CredentialProvider credentialProvider, String path) {
+    if (path == null) {
+      return false;
+    }
+
+    try {
+      String scheme = URI.create(path).getScheme();
+      if (scheme == null) {
+        return false;
+      }
+      return credentialProvider.supportsScheme(scheme);
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   private static PathBasedCredentialContext mergeContexts(

@@ -485,7 +485,7 @@ public class CatalogClickHouseIT extends BaseIT {
     NameIdentifier ident = NameIdentifier.of(schemaName, table);
     Column[] cols =
         new Column[] {
-          Column.of("id", Types.LongType.get(), "id"),
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
           Column.of(
               "event_time",
               Types.TimestampType.withoutTimeZone(),
@@ -497,7 +497,7 @@ public class CatalogClickHouseIT extends BaseIT {
           Column.of("amount", Types.FloatType.get(), "amt")
         };
 
-    Transform[] partitioning = new Transform[] {Transforms.identity("event_time")};
+    Transform[] partitioning = new Transform[] {Transforms.month("event_time")};
     SortOrder[] sortOrders =
         new SortOrder[] {
           SortOrders.of(NamedReference.field("user_id"), SortDirection.ASCENDING),
@@ -526,6 +526,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Table loaded = catalog.asTableCatalog().loadTable(ident);
     Assertions.assertEquals(1, loaded.partitioning().length);
+    Assertions.assertEquals(Transforms.NAME_OF_MONTH, loaded.partitioning()[0].name());
     Assertions.assertEquals(
         "event_time", ((NamedReference) loaded.partitioning()[0].arguments()[0]).fieldName()[0]);
 
@@ -553,6 +554,47 @@ public class CatalogClickHouseIT extends BaseIT {
                 idx ->
                     idx.type() == Index.IndexType.DATA_SKIPPING_MINMAX
                         && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"amount"}})));
+  }
+
+  @Test
+  void testCreateAndLoadWithPartitionTransforms() {
+    assertPartitionRoundTrip("identity_part", Transforms.identity("event_time"));
+    assertPartitionRoundTrip("year_part", Transforms.year("event_time"));
+    assertPartitionRoundTrip("month_part", Transforms.month("event_time"));
+    assertPartitionRoundTrip("day_part", Transforms.day("event_time"));
+  }
+
+  private void assertPartitionRoundTrip(String prefix, Transform partition) {
+    String table = GravitinoITUtils.genRandomName(prefix);
+    NameIdentifier ident = NameIdentifier.of(schemaName, table);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "integer", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              "event_time",
+              Types.TimestampType.withoutTimeZone(),
+              "ts",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET)
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "partition transform roundtrip",
+            createProperties(),
+            new Transform[] {partition},
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals(1, loaded.partitioning().length);
+    Assertions.assertEquals(partition.name(), loaded.partitioning()[0].name());
+    Assertions.assertEquals(
+        "event_time", ((NamedReference) loaded.partitioning()[0].arguments()[0]).fieldName()[0]);
   }
 
   @Test
@@ -652,6 +694,101 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
     Assertions.assertEquals(
         Literals.stringLiteral("now()"), createdTable.columns()[4].defaultValue());
+  }
+
+  @Test
+  void testCreateTableWithCommonTypeLiteralDefaults() {
+    String name = GravitinoITUtils.genRandomName("default_literal_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, name);
+
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              "int_col", Types.IntegerType.get(), "int", false, false, Literals.integerLiteral(7)),
+          Column.of(
+              "double_col",
+              Types.DoubleType.get(),
+              "double",
+              false,
+              false,
+              Literals.doubleLiteral(123.45)),
+          Column.of(
+              "string_col",
+              Types.VarCharType.of(255),
+              "string",
+              false,
+              false,
+              Literals.stringLiteral("hello")),
+          Column.of(
+              "date_col",
+              Types.DateType.get(),
+              "date",
+              false,
+              false,
+              Literals.dateLiteral(LocalDate.of(2024, 4, 1))),
+          Column.of(
+              "decimal_col",
+              Types.DecimalType.of(5, 2),
+              "decimal",
+              false,
+              false,
+              Literals.decimalLiteral(Decimal.of("9.99", 5, 2)))
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            getSortOrders("int_col"));
+
+    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(Literals.integerLiteral(7), loadedTable.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        Literals.doubleLiteral(123.45), loadedTable.columns()[1].defaultValue());
+    Assertions.assertEquals(
+        Literals.stringLiteral("hello"), loadedTable.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        Literals.dateLiteral(LocalDate.of(2024, 4, 1)), loadedTable.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        Literals.decimalLiteral(Decimal.of("9.99", 5, 2)), loadedTable.columns()[4].defaultValue());
+  }
+
+  @Test
+  void testCreateTableWithQuotedStringDefaultLiteral() {
+    String name = GravitinoITUtils.genRandomName("quoted_default_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, name);
+
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              "status",
+              Types.StringType.get(),
+              "Status",
+              false,
+              false,
+              Literals.stringLiteral("'active'"))
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(
+        Literals.stringLiteral("active"), loadedTable.columns()[1].defaultValue());
   }
 
   @Test

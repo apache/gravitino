@@ -19,20 +19,24 @@ import logging
 from typing import Dict, List, Optional
 
 from gravitino.api.catalog import Catalog
-from gravitino.api.metadata_object import MetadataObject
-from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.function.function import Function
 from gravitino.api.function.function_catalog import FunctionCatalog
 from gravitino.api.function.function_change import FunctionChange
 from gravitino.api.function.function_definition import FunctionDefinition
 from gravitino.api.function.function_type import FunctionType
+from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
 from gravitino.api.supports_schemas import SupportsSchemas
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.api.tag.tag import Tag
 from gravitino.client.function_catalog_operations import FunctionCatalogOperations
+from gravitino.client.generic_schema import GenericSchema
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )
+from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.catalog_dto import CatalogDTO
 from gravitino.dto.requests.schema_create_request import SchemaCreateRequest
@@ -51,7 +55,12 @@ from gravitino.utils import HTTPClient
 logger = logging.getLogger(__name__)
 
 
-class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
+class BaseSchemaCatalog(
+    CatalogDTO,
+    SupportsSchemas,
+    FunctionCatalog,
+    SupportsTags,
+):
     """
     BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
     common methods for managing schemas in a catalog. With BaseSchemaCatalog, users can list,
@@ -98,6 +107,9 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
         self._function_operations = FunctionCatalogOperations(
             rest_client, catalog_namespace, self.name()
         )
+        self._object_tag_operations = MetadataObjectTagOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
 
         self.validate()
 
@@ -107,17 +119,32 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
     def as_function_catalog(self):
         return self
 
-    def list_schemas(self) -> List[str]:
-        """List all the schemas under the given catalog namespace.
+    def list_schemas(self, parent_schema: Optional[str] = None) -> List[str]:
+        """List the schemas under the given catalog namespace, or directly under the given parent
+        schema when ``parent_schema`` is provided.
+
+        Args:
+            parent_schema: The parent (possibly hierarchical) schema name whose direct children are
+                listed, e.g. ``"a"`` or ``"a:b"``. When ``None``, all schemas under the catalog are
+                listed. Must not be blank when provided.
 
         Raises:
+            IllegalArgumentException if ``parent_schema`` is provided but blank.
             NoSuchCatalogException if the catalog with specified namespace does not exist.
+            NoSuchSchemaException if ``parent_schema`` is provided but does not exist.
 
         Returns:
-             A list of schema names under the given catalog namespace.
+             A list of schema names under the given catalog namespace or parent schema.
         """
+        params = None
+        if parent_schema is not None:
+            if not parent_schema.strip():
+                raise IllegalArgumentException("parentSchema must not be null or blank")
+            params = {"parentSchema": parent_schema}
+
         resp = self.rest_client.get(
             BaseSchemaCatalog.format_schema_request_path(self._schema_namespace()),
+            params=params,
             error_handler=SCHEMA_ERROR_HANDLER,
         )
         entity_list_response = EntityListResponse.from_json(
@@ -158,7 +185,12 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
 
-        return schema_response.schema()
+        return GenericSchema(
+            schema_response.schema(),
+            self.rest_client,
+            self._catalog_namespace.level(0),
+            self._name,
+        )
 
     def load_schema(self, schema_name: str) -> Schema:
         """Load the schema with specified identifier.
@@ -181,7 +213,12 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
 
-        return schema_response.schema()
+        return GenericSchema(
+            schema_response.schema(),
+            self.rest_client,
+            self._catalog_namespace.level(0),
+            self._name,
+        )
 
     def alter_schema(self, schema_name: str, *changes: SchemaChange) -> Schema:
         """Alter the schema with specified identifier by applying the changes.
@@ -210,7 +247,13 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
         )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
-        return schema_response.schema()
+
+        return GenericSchema(
+            schema_response.schema(),
+            self.rest_client,
+            self._catalog_namespace.level(0),
+            self._name,
+        )
 
     def drop_schema(self, schema_name: str, cascade: bool) -> bool:
         """Drop the schema with specified identifier.
@@ -310,3 +353,20 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas, FunctionCatalog):
             raise IllegalArgumentException("provider must not be blank")
         if self.audit_info() is None:
             raise IllegalArgumentException("audit must not be None")
+
+    def list_tags(self) -> List[str]:
+        return self._object_tag_operations.list_tags()
+
+    def list_tags_info(self) -> List[Tag]:
+        return self._object_tag_operations.list_tags_info()
+
+    def get_tag(self, name: str) -> Tag:
+        return self._object_tag_operations.get_tag(name)
+
+    def associate_tags(
+        self, tags_to_add: List[str], tags_to_remove: List[str]
+    ) -> List[str]:
+        return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
+
+    def supports_tags(self) -> SupportsTags:
+        return self

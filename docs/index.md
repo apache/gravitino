@@ -55,6 +55,8 @@ You can use either to manage metadata. See
   metalakes.
 * [Manage relational metadata using Gravitino](./manage-relational-metadata-using-gravitino.md)
   to learn how to manage relational metadata.
+* [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md)
+  to learn how to manage view metadata.
 * [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
   how to manage fileset metadata.
 * [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
@@ -208,7 +210,8 @@ Gravitino provides several ways to configure and manage the Gravitino server. Se
 Gravitino provides security configurations for Gravitino, including HTTPS, authentication and access control configurations.
 
 * [HTTPS](./security/how-to-use-https.md): provides HTTPS configurations.
-* [Authentication](./security/how-to-authenticate.md): provides authentication configurations including simple, OAuth, Kerberos.
+* [Authentication](./security/how-to-authenticate.md): provides authentication configurations including simple, basic, OAuth, and Kerberos.
+* [Built-in IDP](./security/how-to-use-built-in-idp.md): operator guide for the built-in identity provider (`idp-basic` plugin), including service admin setup and `/api/idp` management APIs.
 * [Access Control](./security/access-control.md): provides access control configurations.
 * [CORS](./security/how-to-use-cors.md): provides CORS configurations.
 

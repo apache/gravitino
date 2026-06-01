@@ -56,9 +56,12 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -859,6 +862,55 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
   }
 
   @Test
+  void testSparkCreateViewAndLoadByGravitino() {
+    String viewName = GravitinoITUtils.genRandomName("spark_create_view");
+    String viewIdentifier = String.join(".", schemaName, viewName);
+
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> {
+          spark.sql(
+              String.format(
+                  "CREATE VIEW paimon.%s AS SELECT 1 AS id, 'name_1' AS name", viewIdentifier));
+          viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+        });
+  }
+
+  @Test
+  void testGravitinoCreateViewAndReadBySpark() {
+    String viewName = GravitinoITUtils.genRandomName("gravitino_create_view");
+    NameIdentifier viewIdentifier = NameIdentifier.of(schemaName, viewName);
+
+    String query = "SELECT 1 AS id, 'name_1' AS name";
+    Representation[] representations =
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("query").withSql(query).build(),
+          SQLRepresentation.builder().withDialect("spark").withSql(query).build()
+        };
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> {
+          viewCatalog.createView(
+              viewIdentifier,
+              "view_for_spark_read",
+              new Column[] {
+                Column.of("id", Types.IntegerType.get(), "id column"),
+                Column.of("name", Types.StringType.get(), "name column")
+              },
+              representations,
+              "paimon",
+              schemaName,
+              Collections.emptyMap());
+          spark
+              .sql(String.format("SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName))
+              .collectAsList();
+        });
+  }
+
+  @Test
   void testTimeTypePrecision() throws org.apache.paimon.catalog.Catalog.TableNotExistException {
     String tableName = GravitinoITUtils.genRandomName("test_time_precision");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -1038,6 +1090,29 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
           String.format("(%d, date_sub(current_date(), %d), 'data%d', %s)", i, i, i, structValue));
     }
     return values;
+  }
+
+  protected NameIdentifier createSimplePaimonTableForViewInterop(String tablePrefix) {
+    Preconditions.checkNotNull(
+        spark, "Spark session is required for Spark view interoperability tests, but it is null.");
+
+    String tableName = GravitinoITUtils.genRandomName(tablePrefix);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            new Column[] {
+              Column.of("id", Types.IntegerType.get(), "id column"),
+              Column.of("name", Types.StringType.get(), "name column")
+            },
+            table_comment,
+            createProperties());
+
+    spark.sql(
+        String.format(
+            "INSERT INTO paimon.%s.%s VALUES (1, 'name_1'), (2, 'name_2')", schemaName, tableName));
+    return tableIdentifier;
   }
 
   private void clearTableAndSchema() {

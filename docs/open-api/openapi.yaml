@@ -48,6 +48,15 @@ security:
   - BasicAuth: []
 
 paths:
+  /health:
+    $ref: "./health.yaml#/paths/~1health"
+
+  /health/live:
+    $ref: "./health.yaml#/paths/~1health~1live"
+
+  /health/ready:
+    $ref: "./health.yaml#/paths/~1health~1ready"
+
   /metalakes:
     # escape the path name by replacing `/` with `~1`
     $ref: "./metalakes.yaml#/paths/~1metalakes"
@@ -139,6 +148,12 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics/{topic}:
     $ref: "./topics.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1topics~1%7Btopic%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views:
+    $ref: "./views.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1views"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}:
+    $ref: "./views.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1views~1%7Bview%7D"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions:
     $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions"
@@ -500,6 +515,14 @@ components:
       name: topic
       in: path
       description: The name of the topic
+      required: true
+      schema:
+        type: string
+
+    view:
+      name: view
+      in: path
+      description: The name of the view
       required: true
       schema:
         type: string

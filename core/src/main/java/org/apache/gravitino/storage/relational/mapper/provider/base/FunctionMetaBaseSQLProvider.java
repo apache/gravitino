@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper.TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper.VERSION_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -200,6 +201,20 @@ public class FunctionMetaBaseSQLProvider {
         + " WHERE fm.schema_id = #{schemaId} AND fm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
+  public String listFunctionPOsByFunctionIds(@Param("functionIds") List<Long> functionIds) {
+    return "<script>"
+        + " SELECT function_id, function_name, schema_id"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at = 0"
+        + " AND function_id IN ("
+        + "<foreach collection='functionIds' item='functionId' separator=','>"
+        + "#{functionId}"
+        + "</foreach>"
+        + ") "
+        + "</script>";
+  }
+
   public String selectFunctionMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
     return "SELECT fm.function_id, fm.function_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
@@ -217,6 +232,14 @@ public class FunctionMetaBaseSQLProvider {
         + " vi ON fm.function_id = vi.function_id AND fm.function_current_version = vi.version"
         + " WHERE fm.schema_id = #{schemaId} AND fm.function_name = #{functionName}"
         + " AND fm.deleted_at = 0 AND vi.deleted_at = 0";
+  }
+
+  public String selectFunctionIdBySchemaIdAndFunctionName(
+      @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
+    return "SELECT function_id"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND function_name = #{functionName} AND deleted_at = 0";
   }
 
   public String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
@@ -243,12 +266,18 @@ public class FunctionMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
-  public String softDeleteFunctionMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteFunctionMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   public String deleteFunctionMetasByLegacyTimeline(

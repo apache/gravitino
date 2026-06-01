@@ -60,8 +60,11 @@ public class TestPassThroughAuthorizer {
           passThroughAuthorizer.isOwner(
               principal, "metalake", metadataObject, new AuthorizationRequestContext()));
       Assertions.assertTrue(passThroughAuthorizer.isServiceAdmin());
-      Assertions.assertTrue(passThroughAuthorizer.isMetalakeUser("metalake"));
-      Assertions.assertTrue(passThroughAuthorizer.isSelf(Entity.EntityType.USER, null));
+      Assertions.assertTrue(
+          passThroughAuthorizer.isMetalakeUser("metalake", new AuthorizationRequestContext()));
+      Assertions.assertTrue(
+          passThroughAuthorizer.isSelf(
+              Entity.EntityType.USER, null, new AuthorizationRequestContext()));
       Assertions.assertTrue(
           passThroughAuthorizer.hasSetOwnerPermission(
               "metalake", "type", "fullName", new AuthorizationRequestContext()));

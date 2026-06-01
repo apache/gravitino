@@ -43,6 +43,11 @@ public class OSSSecretKeyProvider implements CredentialProvider {
   public void close() {}
 
   @Override
+  public boolean supportsScheme(String scheme) {
+    return "oss".equalsIgnoreCase(scheme);
+  }
+
+  @Override
   public String credentialType() {
     return OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE;
   }

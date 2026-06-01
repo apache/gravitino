@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Authentication
 
-Apache Gravitino supports three kinds of authentication mechanisms: simple, OAuth and Kerberos.
+Apache Gravitino supports four kinds of authentication mechanisms: simple, Basic, OAuth and Kerberos.
 If you don't enable authentication for your client and server explicitly, the user `anonymous` will be used to access the server.
 
 ### Simple mode
@@ -40,6 +40,49 @@ curl -v -X GET \
   -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
   -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  http://localhost:8090/api/version
+```
+
+### Basic mode
+
+In Basic mode, Gravitino verifies HTTP Basic credentials against built-in IDP user metadata stored
+in the relational entity store.
+
+To enable Basic mode:
+
+- Set `gravitino.server.rest.extensionPackages` to `org.apache.gravitino.idp.web.rest.feature`.
+- Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
+  the built-in IDP.
+- On the first startup, if any configured service admin does not yet have a password, set the
+  `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable to the initial password (12 to 64
+  characters) before starting Gravitino. The same password is applied to every configured service
+  admin that does not yet exist in the built-in IDP.
+
+For the client side, enable Basic mode with the following code:
+
+```java
+GravitinoClient client = GravitinoClient.builder(uri)
+    .withMetalake("metalake")
+    .withBasicAuth("admin", "YourSecureGravitinoPassword")
+    .build();
+```
+
+```python
+from gravitino.auth.basic_auth_provider import BasicAuthProvider
+from gravitino.client.gravitino_client import GravitinoClient
+
+client = GravitinoClient(
+    uri="http://localhost:8090",
+    metalake_name="metalake",
+    auth_data_provider=BasicAuthProvider("admin", "YourSecureGravitinoPassword"),
+)
+```
+
+```shell
+curl -v -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:YourSecureGravitinoPassword' | base64)" \
   http://localhost:8090/api/version
 ```
 
@@ -314,6 +357,45 @@ The signature algorithms that Gravitino supports follows:
 | PS256 | RSASSA-PSS using SHA-256 and MGF1 with SHA-256 |
 | PS384 | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
 | PS512 | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
+
+### Example: Basic authentication
+
+This example shows how to enable built-in Basic authentication.
+
+**Prerequisites:**
+
+- Gravitino distribution package (includes the idp-basic plugin on the server classpath)
+
+**Configuration:**
+
+Append the following to `conf/gravitino.conf`:
+
+```text
+gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
+gravitino.authorization.serviceAdmins = admin
+```
+
+On the first startup, if the `admin` service admin does not yet have a password in the store,
+set initial passwords before starting the server:
+
+```bash
+export GRAVITINO_INITIAL_ADMIN_PASSWORD='YourSecureGravitinoPassword'
+./bin/start-gravitino.sh
+```
+
+**Usage:**
+
+```shell
+curl -v -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:YourSecureGravitinoPassword' | base64)" \
+  http://localhost:8090/api/version
+```
+
+If the service admin already has a password, you do not need to set
+`GRAVITINO_INITIAL_ADMIN_PASSWORD` on restart. Gravitino does not change existing passwords
+when the server starts again.
 
 ### Example: Azure AD as OIDC Provider with JWKS Validation
 

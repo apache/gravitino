@@ -89,17 +89,27 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
    * <p>Override this method to provide custom handlers based on request characteristics (e.g.,
    * annotations, request types, parameters).
    *
+   * @param method REST method being invoked
    * @param parameters Method parameters
    * @param args Method arguments
    * @return Optional handler for custom authorization processing, or empty if standard
    *     authorization is sufficient
    */
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Parameter[] parameters, Object[] args) {
+      Method method, Parameter[] parameters, Object[] args) {
     return Optional.empty();
   }
 
   protected boolean isExceptionPropagate(Exception e) {
+    return false;
+  }
+
+  /**
+   * Hook for subclasses to skip standard authorization before user validation and expression
+   * evaluation.
+   */
+  protected boolean shouldSkipAuthorization(
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     return false;
   }
 
@@ -123,11 +133,12 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         Object[] args = methodInvocation.getArguments();
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
             extractNameIdentifierFromParameters(parameters, args);
+        boolean skipStandardCheck = shouldSkipAuthorization(nameIdentifierMap);
 
         // Check if current user exists in the metalake.
         NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
 
-        if (metalakeIdent != null) {
+        if (!skipStandardCheck && metalakeIdent != null) {
           String currentUser = PrincipalUtils.getCurrentUserName();
           try {
             AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
@@ -150,10 +161,10 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         }
 
         // Process custom authorization if handler exists
-        Optional<AuthorizationHandler> handler = createAuthorizationHandler(parameters, args);
-        boolean skipStandardCheck = false;
+        Optional<AuthorizationHandler> handler =
+            createAuthorizationHandler(method, parameters, args);
 
-        if (handler.isPresent()) {
+        if (!skipStandardCheck && handler.isPresent()) {
           AuthorizationHandler authzHandler = handler.get();
           authzHandler.process(nameIdentifierMap);
           skipStandardCheck = authzHandler.authorizationCompleted();

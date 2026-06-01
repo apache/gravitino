@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
@@ -96,5 +97,21 @@ public class UserMetaSQLProviderFactory {
   public static String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteUserMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  public static String touchUserUpdatedAt(@Param("userId") long userId) {
+    return getProvider().touchUserUpdatedAt(userId);
+  }
+
+  public static String getUserUpdatedAt(
+      @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
+    return getProvider().getUserUpdatedAt(metalakeName, userName);
+  }
+
+  public static String batchGetAuthSubjectsForUser(
+      @Param("metalakeName") String metalakeName,
+      @Param("userName") String userName,
+      @Param("groupNames") List<String> groupNames) {
+    return getProvider().batchGetAuthSubjectsForUser(metalakeName, userName, groupNames);
   }
 }

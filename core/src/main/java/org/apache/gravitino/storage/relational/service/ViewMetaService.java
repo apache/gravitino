@@ -19,28 +19,33 @@
 package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
+import static org.apache.gravitino.storage.relational.po.ViewPO.buildViewPO;
+import static org.apache.gravitino.storage.relational.po.ViewPO.fromViewPO;
+import static org.apache.gravitino.storage.relational.po.ViewPO.initializeViewPO;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.Entity.EntityType;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.GenericEntity;
-import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.ViewPO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -48,206 +53,25 @@ import org.apache.gravitino.utils.NamespaceUtil;
 
 /** The service class for view metadata. It provides the basic database operations for view. */
 public class ViewMetaService {
+
   private static final ViewMetaService INSTANCE = new ViewMetaService();
+  private BasePOStorageOps<ViewPO, ViewMetaMapper> ops;
 
   public static ViewMetaService getInstance() {
     return INSTANCE;
   }
 
-  private ViewMetaService() {}
+  private ViewMetaService() {
+    this.ops = new HierarchicalConversionPOStorageOps<>(new ViewPOStorageOps());
+  }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getViewIdBySchemaIdAndName")
   public Long getViewIdBySchemaIdAndName(Long schemaId, String viewName) {
-    Long viewId =
-        SessionUtils.getWithoutCommit(
-            ViewMetaMapper.class,
-            mapper -> mapper.selectViewIdBySchemaIdAndName(schemaId, viewName));
-
-    if (viewId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.VIEW.name().toLowerCase(),
-          viewName);
-    }
-    return viewId;
-  }
-
-  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertView")
-  public void insertView(ViewPO viewPO, boolean overwrite) throws IOException {
-    try {
-      SessionUtils.doWithCommit(
-          ViewMetaMapper.class,
-          mapper -> {
-            if (overwrite) {
-              mapper.insertViewMetaOnDuplicateKeyUpdate(viewPO);
-            } else {
-              mapper.insertViewMeta(viewPO);
-            }
-          });
-    } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(re, Entity.EntityType.VIEW, viewPO.getViewName());
-      throw re;
-    }
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteViewMetasByLegacyTimeline")
-  public int deleteViewMetasByLegacyTimeline(Long legacyTimeline, int limit) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        ViewMetaMapper.class,
-        mapper -> mapper.deleteViewMetasByLegacyTimeline(legacyTimeline, limit));
-  }
-
-  /**
-   * List views as GenericEntity by namespace.
-   *
-   * @param namespace The namespace to list views from.
-   * @return A list of GenericEntity representing views.
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "listViewsByNamespace")
-  public List<GenericEntity> listViewsByNamespace(Namespace namespace) {
-    NamespaceUtil.checkView(namespace);
-    List<ViewPO> viewPOs = listViewPOsByNamespace(namespace);
-    return viewPOs.stream()
-        .map(
-            viewPO ->
-                GenericEntity.builder()
-                    .withId(viewPO.getViewId())
-                    .withName(viewPO.getViewName())
-                    .withNamespace(namespace)
-                    .withEntityType(Entity.EntityType.VIEW)
-                    .build())
-        .collect(Collectors.toList());
-  }
-
-  /**
-   * Get a view as GenericEntity by identifier.
-   *
-   * @param identifier The identifier of the view.
-   * @return The GenericEntity representing the view.
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getViewByIdentifier")
-  public GenericEntity getViewByIdentifier(NameIdentifier identifier) {
-    NameIdentifierUtil.checkView(identifier);
-
-    ViewPO viewPO = viewPOFetcher().apply(identifier);
-
-    return GenericEntity.builder()
-        .withId(viewPO.getViewId())
-        .withName(viewPO.getViewName())
-        .withNamespace(identifier.namespace())
-        .withEntityType(Entity.EntityType.VIEW)
-        .build();
-  }
-
-  /**
-   * Insert a view from GenericEntity.
-   *
-   * @param entity The GenericEntity representing the view.
-   * @param overwrite Whether to overwrite an existing view.
-   * @throws IOException If an I/O error occurs.
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "insertViewFromEntity")
-  public void insertView(GenericEntity entity, boolean overwrite) throws IOException {
-    Namespace namespace = entity.namespace();
-    NamespaceUtil.checkView(namespace);
-
-    ViewPO.Builder builder = createViewPOBuilder(namespace);
-    ViewPO viewPO =
-        builder
-            .withViewId(entity.id())
-            .withViewName(entity.name())
-            .withCurrentVersion(1L)
-            .withLastVersion(1L)
-            .withDeletedAt(0L)
-            .build();
-
-    insertView(viewPO, overwrite);
-  }
-
-  /**
-   * Update a view.
-   *
-   * @param ident The identifier of the view.
-   * @param updater The function to update the view entity.
-   * @return The updated GenericEntity.
-   * @throws IOException If an I/O error occurs.
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "updateViewByIdentifier")
-  public <E extends HasIdentifier> GenericEntity updateView(
-      NameIdentifier ident, Function<E, E> updater) throws IOException {
-    NameIdentifierUtil.checkView(ident);
-
-    ViewPO oldViewPO = viewPOFetcher().apply(ident);
-
-    GenericEntity oldEntity =
-        GenericEntity.builder()
-            .withId(oldViewPO.getViewId())
-            .withName(oldViewPO.getViewName())
-            .withNamespace(ident.namespace())
-            .withEntityType(Entity.EntityType.VIEW)
-            .build();
-
-    GenericEntity newEntity = (GenericEntity) updater.apply((E) oldEntity);
-
-    // Check if the namespace (schema) has changed and resolve new schema ID if needed
-    boolean isSchemaChanged =
-        newEntity.namespace() != null && !newEntity.namespace().equals(ident.namespace());
-    Long schemaId =
-        isSchemaChanged
-            ? EntityIdService.getEntityId(
-                NameIdentifier.of(newEntity.namespace().levels()), Entity.EntityType.SCHEMA)
-            : oldViewPO.getSchemaId();
-
-    ViewPO newViewPO =
-        ViewPO.builder()
-            .withViewId(oldViewPO.getViewId())
-            .withViewName(newEntity.name())
-            .withMetalakeId(oldViewPO.getMetalakeId())
-            .withCatalogId(oldViewPO.getCatalogId())
-            .withSchemaId(schemaId)
-            .withDeletedAt(oldViewPO.getDeletedAt())
-            .withLastVersion(oldViewPO.getLastVersion())
-            .withCurrentVersion(oldViewPO.getCurrentVersion())
-            .build();
-
-    updateView(oldViewPO, newViewPO);
-
-    return newEntity;
-  }
-
-  /**
-   * Delete a view by identifier.
-   *
-   * @param ident The identifier of the view.
-   * @return true if the view was deleted, false otherwise.
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteViewByIdentifier")
-  public boolean deleteView(NameIdentifier ident) {
-    NameIdentifierUtil.checkView(ident);
-
-    ViewPO viewPO = viewPOFetcher().apply(ident);
-    return deleteView(viewPO.getViewId());
-  }
-
-  private ViewPO getViewPOBySchemaIdAndName(Long schemaId, String viewName) {
     ViewPO viewPO =
         SessionUtils.getWithoutCommit(
-            ViewMetaMapper.class,
-            mapper -> mapper.selectViewMetaBySchemaIdAndName(schemaId, viewName));
+            ViewMetaMapper.class, mapper -> ops.getPO(mapper, schemaId, viewName));
 
     if (viewPO == null) {
       throw new NoSuchEntityException(
@@ -255,10 +79,152 @@ public class ViewMetaService {
           Entity.EntityType.VIEW.name().toLowerCase(),
           viewName);
     }
-    return viewPO;
+    return viewPO.getViewId();
   }
 
-  private boolean deleteView(Long viewId) {
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listViewsByNamespace")
+  public List<ViewEntity> listViewsByNamespace(Namespace namespace) {
+    NamespaceUtil.checkView(namespace);
+    List<ViewPO> viewPOs = listViewPOs(namespace);
+    return viewPOs.stream().map(po -> fromViewPO(po, namespace)).collect(Collectors.toList());
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getViewByIdentifier")
+  public ViewEntity getViewByIdentifier(NameIdentifier identifier) {
+    ViewPO viewPO = getViewPOByIdentifier(identifier);
+    return fromViewPO(viewPO, identifier.namespace());
+  }
+
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "insertView")
+  public void insertView(ViewEntity viewEntity, boolean overwrite) throws IOException {
+    NameIdentifierUtil.checkView(viewEntity.nameIdentifier());
+
+    ViewPO.ViewPOBuilder builder = ViewPO.builder();
+    try {
+      ViewPO po = initializeViewPO(viewEntity, builder);
+
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ViewMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ViewVersionInfoMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertViewVersionInfoOnDuplicateKeyUpdate(po.getViewVersionInfoPO());
+                    } else {
+                      mapper.insertViewVersionInfo(po.getViewVersionInfoPO());
+                    }
+                  }));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.VIEW, viewEntity.nameIdentifier().toString());
+      throw re;
+    }
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateViewByIdentifier")
+  public <E extends Entity & HasIdentifier> ViewEntity updateView(
+      NameIdentifier ident, Function<E, E> updater) throws IOException {
+    ViewPO oldViewPO = getViewPOByIdentifier(ident);
+    ViewEntity oldViewEntity = fromViewPO(oldViewPO, ident.namespace());
+    ViewEntity newEntity = (ViewEntity) updater.apply((E) oldViewEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldViewEntity.id(), newEntity.id()),
+        "The updated view entity id: %s should be same with the entity id before: %s",
+        newEntity.id(),
+        oldViewEntity.id());
+
+    AtomicInteger updateResult = new AtomicInteger(0);
+    try {
+      ViewPO newViewPO = updateViewPO(oldViewPO, newEntity);
+      String metalakeName = ident.namespace().level(0);
+      String catalogName = ident.namespace().level(1);
+      String schemaName = ident.namespace().level(2);
+      String oldFullName =
+          NameIdentifierUtil.ofView(metalakeName, catalogName, schemaName, oldViewPO.getViewName())
+              .toString();
+      boolean isRenamed = !Objects.equals(oldViewPO.getViewName(), newViewPO.getViewName());
+
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ViewVersionInfoMapper.class,
+                  mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())),
+          () -> {
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO)));
+            if (updateResult.get() == 0) {
+              throw new RuntimeException("Failed to update the entity: " + ident);
+            }
+          },
+          () -> {
+            if (isRenamed && updateResult.get() > 0) {
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertEntityChange(
+                          metalakeName,
+                          Entity.EntityType.VIEW.name(),
+                          oldFullName,
+                          OperateType.ALTER));
+            }
+          });
+      return newEntity;
+    } catch (RuntimeException re) {
+      if (updateResult.get() == 0) {
+        throw new IOException("Failed to update the entity: " + ident);
+      }
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.VIEW, newEntity.nameIdentifier().toString());
+      throw re;
+    }
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteViewByIdentifier")
+  public boolean deleteView(NameIdentifier ident) {
+    ViewPO viewPO = getViewPOByIdentifier(ident);
+    String metalakeName = ident.namespace().level(0);
+    String catalogName = ident.namespace().level(1);
+    String schemaName = ident.namespace().level(2);
+    String viewFullName =
+        NameIdentifierUtil.ofView(metalakeName, catalogName, schemaName, viewPO.getViewName())
+            .toString();
+    return deleteView(viewPO.getViewId(), metalakeName, viewFullName);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteViewMetasByLegacyTimeline")
+  public int deleteViewMetasByLegacyTimeline(Long legacyTimeline, int limit) {
+    int versionDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            ViewVersionInfoMapper.class,
+            mapper -> mapper.deleteViewVersionsByLegacyTimeline(legacyTimeline, limit));
+
+    int metaDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            ViewMetaMapper.class,
+            mapper -> mapper.deleteViewMetasByLegacyTimeline(legacyTimeline, limit));
+
+    return versionDeletedCount + metaDeletedCount;
+  }
+
+  public BasePOStorageOps<ViewPO, ViewMetaMapper> ops() {
+    return ops;
+  }
+
+  private boolean deleteView(Long viewId, String metalakeName, String viewFullName) {
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -267,6 +233,9 @@ public class ViewMetaService {
                     ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByViewId(viewId))),
         () -> {
           if (deleteResult.get() > 0) {
+            SessionUtils.doWithoutCommit(
+                ViewVersionInfoMapper.class,
+                mapper -> mapper.softDeleteViewVersionsByViewId(viewId));
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
@@ -283,111 +252,53 @@ public class ViewMetaService {
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         viewId, MetadataObject.Type.VIEW.name()));
           }
+        },
+        () -> {
+          if (deleteResult.get() > 0) {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.VIEW.name(),
+                        viewFullName,
+                        OperateType.DROP));
+          }
         });
     return deleteResult.get() > 0;
   }
 
-  private void updateView(ViewPO oldViewPO, ViewPO newViewPO) throws IOException {
-    try {
-      Integer updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              ViewMetaMapper.class, mapper -> mapper.updateViewMeta(newViewPO, oldViewPO));
-      if (updateResult == 0) {
-        throw new IOException("Failed to update the view: " + oldViewPO.getViewName());
-      }
-    } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(re, Entity.EntityType.VIEW, newViewPO.getViewName());
-      throw re;
-    }
+  private ViewPO updateViewPO(ViewPO oldViewPO, ViewEntity newEntity) {
+    Long newVersion = oldViewPO.getLastVersion() + 1;
+    ViewPO.ViewPOBuilder builder =
+        ViewPO.builder()
+            .withMetalakeId(oldViewPO.getMetalakeId())
+            .withCatalogId(oldViewPO.getCatalogId())
+            .withSchemaId(oldViewPO.getSchemaId())
+            .withCurrentVersion(newVersion)
+            .withLastVersion(newVersion);
+    return buildViewPO(newEntity, builder, newVersion.intValue());
   }
 
-  private void fillViewPOBuilderParentEntityId(ViewPO.Builder builder, Namespace namespace) {
-    NamespaceUtil.checkView(namespace);
-    NamespacedEntityId namespacedEntityId =
-        EntityIdService.getEntityIds(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-    builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
-    builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
-    builder.withSchemaId(namespacedEntityId.entityId());
-  }
-
-  private ViewPO.Builder createViewPOBuilder(Namespace namespace) {
-    ViewPO.Builder builder = ViewPO.builder();
-    fillViewPOBuilderParentEntityId(builder, namespace);
-    return builder;
-  }
-
-  private List<ViewPO> listViewPOsByNamespace(Namespace namespace) {
-    return viewListFetcher().apply(namespace);
-  }
-
-  private Function<Namespace, List<ViewPO>> viewListFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::listViewPOsBySchemaId
-        : this::listViewPOsByFullQualifiedName;
-  }
-
-  private Function<NameIdentifier, ViewPO> viewPOFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::getViewPOBySchemaId
-        : this::getViewPOByFullQualifiedName;
-  }
-
-  private List<ViewPO> listViewPOsBySchemaId(Namespace namespace) {
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-    return SessionUtils.getWithoutCommit(
-        ViewMetaMapper.class, mapper -> mapper.listViewPOsBySchemaId(schemaId));
-  }
-
-  private List<ViewPO> listViewPOsByFullQualifiedName(Namespace namespace) {
-    String[] namespaceLevels = namespace.levels();
-    List<ViewPO> viewPOs =
-        SessionUtils.getWithoutCommit(
-            ViewMetaMapper.class,
-            mapper ->
-                mapper.listViewPOsByFullQualifiedName(
-                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
-    if (viewPOs.isEmpty() || viewPOs.get(0).getSchemaId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.SCHEMA.name().toLowerCase(),
-          namespaceLevels[2]);
-    }
-    return viewPOs.stream().filter(po -> po.getViewId() != null).collect(Collectors.toList());
-  }
-
-  private ViewPO getViewPOBySchemaId(NameIdentifier identifier) {
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-    return getViewPOBySchemaIdAndName(schemaId, identifier.name());
-  }
-
-  private ViewPO getViewPOByFullQualifiedName(NameIdentifier identifier) {
-    String[] namespaceLevels = identifier.namespace().levels();
+  private ViewPO getViewPOByIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkView(identifier);
     ViewPO viewPO =
         SessionUtils.getWithoutCommit(
             ViewMetaMapper.class,
-            mapper ->
-                mapper.selectViewByFullQualifiedName(
-                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], identifier.name()));
-
-    if (viewPO == null || viewPO.getSchemaId() == null) {
+            mapper -> POStorageReadRouting.getPO(mapper, identifier, ops, Entity.EntityType.VIEW));
+    if (viewPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.SCHEMA.name().toLowerCase(),
-          namespaceLevels[2]);
-    }
-
-    if (viewPO.getViewId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.VIEW.name().toLowerCase(),
+          Entity.EntityType.VIEW.name().toLowerCase(),
           identifier.name());
     }
 
     return viewPO;
+  }
+
+  private List<ViewPO> listViewPOs(Namespace namespace) {
+    return SessionUtils.getWithoutCommit(
+        ViewMetaMapper.class,
+        mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.VIEW));
   }
 }

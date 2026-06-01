@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,11 +27,16 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
@@ -41,7 +47,6 @@ import org.apache.iceberg.rest.RESTUtil;
  */
 public class IcebergMetadataAuthorizationMethodInterceptor
     extends BaseMetadataAuthorizationMethodInterceptor {
-
   private final String metalakeName = IcebergRESTServerContext.getInstance().metalakeName();
 
   @Override
@@ -49,51 +54,54 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       Parameter[] parameters, Object[] args) {
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
     nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalakeName));
-    // get catalog & namespace from params
     String catalog = null;
     String schema = null;
     Namespace rawNamespace = null;
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
     for (int i = 0; i < parameters.length; i++) {
       Parameter parameter = parameters[i];
       AuthorizationMetadata authorizeResource =
           parameter.getAnnotation(AuthorizationMetadata.class);
-      if (authorizeResource == null) {
+      if (authorizeResource != null) {
+        Entity.EntityType type = authorizeResource.type();
+        String value = String.valueOf(args[i]);
+        switch (type) {
+          case CATALOG:
+            catalog = IcebergRESTUtils.getCatalogName(value);
+            nameIdentifierMap.put(
+                Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
+            break;
+          case SCHEMA:
+            rawNamespace =
+                RESTUtil.decodeNamespace(
+                    value, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+            schema = String.join(separator, rawNamespace.levels());
+            nameIdentifierMap.put(
+                Entity.EntityType.SCHEMA,
+                NameIdentifierUtil.ofSchema(metalakeName, catalog, schema));
+            break;
+          case TABLE:
+            nameIdentifierMap.put(
+                EntityType.TABLE,
+                NameIdentifierUtil.ofTable(
+                    metalakeName, catalog, schema, RESTUtil.decodeString(value)));
+            break;
+          case VIEW:
+            String decodedViewName = RESTUtil.decodeString(value);
+            nameIdentifierMap.put(
+                EntityType.VIEW,
+                NameIdentifierUtil.ofView(metalakeName, catalog, schema, decodedViewName));
+            // Also register as TABLE so ANY_SELECT_TABLE in
+            // ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION
+            // matches when Spark probes viewExists(tableName) during table resolution.
+            nameIdentifierMap.put(
+                EntityType.TABLE,
+                NameIdentifierUtil.ofTable(metalakeName, catalog, schema, decodedViewName));
+            break;
+          default:
+            break;
+        }
         continue;
-      }
-      Entity.EntityType type = authorizeResource.type();
-      String value = String.valueOf(args[i]);
-      switch (type) {
-        case CATALOG:
-          catalog = IcebergRESTUtils.getCatalogName(value);
-          nameIdentifierMap.put(
-              Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
-          break;
-        case SCHEMA:
-          rawNamespace = RESTUtil.decodeNamespace(value);
-          schema = rawNamespace.level(rawNamespace.length() - 1);
-          nameIdentifierMap.put(
-              Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, schema));
-          break;
-        case TABLE:
-          nameIdentifierMap.put(
-              EntityType.TABLE,
-              NameIdentifierUtil.ofTable(
-                  metalakeName, catalog, schema, RESTUtil.decodeString(value)));
-          break;
-        case VIEW:
-          String decodedViewName = RESTUtil.decodeString(value);
-          nameIdentifierMap.put(
-              EntityType.VIEW,
-              NameIdentifierUtil.ofView(metalakeName, catalog, schema, decodedViewName));
-          // Also register as TABLE so ANY_SELECT_TABLE in
-          // ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION
-          // matches when Spark probes viewExists(tableName) during table resolution.
-          nameIdentifierMap.put(
-              EntityType.TABLE,
-              NameIdentifierUtil.ofTable(metalakeName, catalog, schema, decodedViewName));
-          break;
-        default:
-          break;
       }
     }
     return nameIdentifierMap;
@@ -105,7 +113,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Parameter[] parameters, Object[] args) {
+      Method method, Parameter[] parameters, Object[] args) {
+    AuthorizationExpression authExpr = method.getAnnotation(AuthorizationExpression.class);
     for (Parameter parameter : parameters) {
       IcebergAuthorizationMetadata icebergMetadata =
           parameter.getAnnotation(IcebergAuthorizationMetadata.class);
@@ -114,11 +123,15 @@ public class IcebergMetadataAuthorizationMethodInterceptor
         RequestType type = icebergMetadata.type();
         switch (type) {
           case LOAD_TABLE:
-            return Optional.of(new LoadTableAuthzHandler(parameters, args));
+            return Optional.of(new LoadTableAuthzHandler(authExpr, parameters, args));
+          case LOAD_VIEW:
+            return Optional.of(new LoadViewAuthzHandler(authExpr, parameters, args));
           case RENAME_TABLE:
             return Optional.of(new RenameTableAuthzHandler(parameters, args));
           case RENAME_VIEW:
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
+          case CREATE_NAMESPACE:
+            return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
           default:
             break;
         }
@@ -130,5 +143,38 @@ public class IcebergMetadataAuthorizationMethodInterceptor
   @Override
   protected boolean isExceptionPropagate(Exception e) {
     return e.getClass().getName().startsWith("org.apache.iceberg.exceptions");
+  }
+
+  /**
+   * Skip local authorization only when this server proxies requests to another Gravitino-backed
+   * Iceberg REST catalog. In that topology, the downstream REST backend performs authorization and
+   * this interceptor avoids duplicate checks.
+   */
+  @Override
+  protected boolean shouldSkipAuthorization(Map<EntityType, NameIdentifier> nameIdentifierMap) {
+    if (!IcebergRESTServerContext.getInstance().skipAuthorizationForRestBackend()) {
+      return false;
+    }
+
+    NameIdentifier catalogId = nameIdentifierMap.get(EntityType.CATALOG);
+    if (catalogId == null) {
+      return false;
+    }
+
+    IcebergCatalogWrapperManager wrapperManager =
+        IcebergRESTServerContext.getInstance().catalogWrapperManager();
+    if (wrapperManager == null) {
+      return false;
+    }
+
+    IcebergCatalogWrapper catalogWrapper;
+    try {
+      catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
+    } catch (NoSuchCatalogException e) {
+      return false;
+    }
+    // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
+    // authorization. IRC2 handles authorization.
+    return catalogWrapper.isRESTCatalog();
   }
 }
