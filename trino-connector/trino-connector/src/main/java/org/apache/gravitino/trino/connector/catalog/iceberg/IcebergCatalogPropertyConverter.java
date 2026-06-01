@@ -26,6 +26,11 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
 
@@ -42,6 +47,36 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
   private static final Set<String> HIVE_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
 
   private static final Set<String> REST_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
+
+  /**
+   * Injects credentials from credential vending into the Iceberg catalog config. Applies JDBC
+   * user/password for the JDBC backend and S3 credentials for S3-backed storage.
+   *
+   * @param credentials the credentials returned by the server
+   * @param config the mutable Trino Iceberg connector config map to update
+   */
+  public static void applyCredentials(Credential[] credentials, Map<String, String> config) {
+    for (Credential credential : credentials) {
+      if (credential instanceof JdbcCredential) {
+        JdbcCredential jdbc = (JdbcCredential) credential;
+        config.put("iceberg.jdbc-catalog.connection-user", jdbc.jdbcUser());
+        config.put("iceberg.jdbc-catalog.connection-password", jdbc.jdbcPassword());
+      } else if (credential instanceof S3SecretKeyCredential) {
+        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
+        config.put("fs.s3a.access.key", s3.accessKeyId());
+        config.put("fs.s3a.secret.key", s3.secretAccessKey());
+      } else if (credential instanceof OSSSecretKeyCredential) {
+        OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
+        config.put("fs.oss.accessKeyId", oss.accessKeyId());
+        config.put("fs.oss.accessKeySecret", oss.secretAccessKey());
+      } else if (credential instanceof AzureAccountKeyCredential) {
+        AzureAccountKeyCredential azure = (AzureAccountKeyCredential) credential;
+        config.put(
+            String.format("fs.azure.account.key.%s.dfs.core.windows.net", azure.accountName()),
+            azure.accountKey());
+      }
+    }
+  }
 
   @Override
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> properties) {

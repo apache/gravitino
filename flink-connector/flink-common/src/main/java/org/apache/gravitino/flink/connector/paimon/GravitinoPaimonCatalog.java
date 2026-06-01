@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
@@ -35,6 +36,8 @@ import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
@@ -45,6 +48,8 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.FlinkTableFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The GravitinoPaimonCatalog class is an implementation of the BaseCatalog class that is used to
@@ -52,21 +57,97 @@ import org.apache.paimon.flink.FlinkTableFactory;
  */
 public class GravitinoPaimonCatalog extends BaseCatalog {
 
-  private final AbstractCatalog paimonCatalog;
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoPaimonCatalog.class);
+
+  private final CatalogFactory.Context context;
+  // Mutable copy shared with BaseCatalog.catalogOptions so credential injection in open() is
+  // visible to the inner Paimon catalog context.
+  private final Map<String, String> mutableOptions;
+  private AbstractCatalog paimonCatalog;
 
   protected GravitinoPaimonCatalog(
       CatalogFactory.Context context,
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
+    this(context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter, null);
+  }
+
+  @VisibleForTesting
+  protected GravitinoPaimonCatalog(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter,
+      AbstractCatalog paimonCatalog) {
+    this(
+        context,
+        defaultDatabase,
+        schemaAndTablePropertiesConverter,
+        partitionConverter,
+        paimonCatalog,
+        new HashMap<>(context.getOptions()));
+  }
+
+  private GravitinoPaimonCatalog(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter,
+      AbstractCatalog paimonCatalog,
+      Map<String, String> mutableOptions) {
     super(
         context.getName(),
-        context.getOptions(),
+        mutableOptions,
         defaultDatabase,
         schemaAndTablePropertiesConverter,
         partitionConverter);
-    FlinkCatalogFactory flinkCatalogFactory = new FlinkCatalogFactory();
-    this.paimonCatalog = flinkCatalogFactory.createCatalog(context);
+    this.context = context;
+    this.mutableOptions = mutableOptions;
+    this.paimonCatalog = paimonCatalog;
+  }
+
+  @Override
+  public void open() throws CatalogException {
+    if (paimonCatalog != null) {
+      super.open();
+      return;
+    }
+    try {
+      CredentialPropertyUtils.applyPaimonCredentials(
+          CredentialPropertyUtils.getCredentials(catalog()), mutableOptions);
+    } catch (NoSuchCatalogException e) {
+      LOG.warn(
+          "Catalog '{}' not found in Gravitino during open(); credential injection skipped."
+              + " This is expected during CREATE CATALOG.",
+          getName(),
+          e);
+    }
+    CatalogFactory.Context contextWithCredentials =
+        new CatalogFactory.Context() {
+          @Override
+          public String getName() {
+            return context.getName();
+          }
+
+          @Override
+          public Map<String, String> getOptions() {
+            return mutableOptions;
+          }
+
+          @Override
+          public ReadableConfig getConfiguration() {
+            return context.getConfiguration();
+          }
+
+          @Override
+          public ClassLoader getClassLoader() {
+            return context.getClassLoader();
+          }
+        };
+    this.paimonCatalog =
+        (AbstractCatalog) new FlinkCatalogFactory().createCatalog(contextWithCredentials);
+    super.open();
   }
 
   @Override

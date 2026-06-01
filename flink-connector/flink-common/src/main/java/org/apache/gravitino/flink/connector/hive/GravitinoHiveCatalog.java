@@ -40,7 +40,14 @@ import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.factories.Factory;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -54,6 +61,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +94,43 @@ public class GravitinoHiveCatalog extends BaseCatalog {
 
   public HiveConf getHiveConf() {
     return hiveCatalog.getHiveConf();
+  }
+
+  @Override
+  public void open() throws CatalogException {
+    try {
+      applyS3Credential(catalog(), hiveCatalog.getHiveConf());
+    } catch (NoSuchCatalogException e) {
+      LOG.warn(
+          "Catalog '{}' not found in Gravitino during open(); credential injection skipped."
+              + " This is expected during CREATE CATALOG.",
+          catalogName(),
+          e);
+    }
+    super.open();
+  }
+
+  static void applyS3Credential(Catalog catalog, Configuration conf) {
+    for (Credential credential : CredentialPropertyUtils.getCredentials(catalog)) {
+      if (credential instanceof S3SecretKeyCredential) {
+        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
+        conf.set("fs.s3a.access.key", s3.accessKeyId());
+        conf.set("fs.s3a.secret.key", s3.secretAccessKey());
+      } else if (credential instanceof OSSSecretKeyCredential) {
+        OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
+        conf.set("fs.oss.accessKeyId", oss.accessKeyId());
+        conf.set("fs.oss.accessKeySecret", oss.secretAccessKey());
+      } else if (credential instanceof AzureAccountKeyCredential) {
+        AzureAccountKeyCredential azure = (AzureAccountKeyCredential) credential;
+        conf.set(
+            String.format("fs.azure.account.key.%s.dfs.core.windows.net", azure.accountName()),
+            azure.accountKey());
+      } else {
+        LOG.warn(
+            "Received unrecognized credential type '{}' for Hive catalog, skipping",
+            credential.getClass().getName());
+      }
+    }
   }
 
   @Override
