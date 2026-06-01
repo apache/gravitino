@@ -434,7 +434,7 @@ This is done using a startup script that parses environment variables prefixed w
 
 These variables override the corresponding entries in `gravitino.conf` at startup.
 
-| Environment Variables                                    | Configuration Key                                    | Default Value                                        | Since Version |
+| Environment Variable                                     | Configuration Key                                    | Default Value                                        | Since Version |
 |----------------------------------------------------------|------------------------------------------------------|------------------------------------------------------|---------------|
 | `GRAVITINO_SERVER_SHUTDOWN_TIMEOUT`                      | `gravitino.server.shutdown.timeout`                  | `3000`                                               | 1.0.0         |
 | `GRAVITINO_SERVER_WEBSERVER_HOST`                        | `gravitino.server.webserver.host`                    | `0.0.0.0`                                            | 1.0.0         |
@@ -542,17 +542,13 @@ docker run --rm -d \
   apache/gravitino:<tag>
 ```
 
-To configure the auxiliary Iceberg REST service with JDBC and S3:
+To configure the auxiliary Iceberg REST service with JDBC catalog and local storage:
 
 ```shell
 docker run --rm -d \
   -p 8090:8090 \
   -p 9001:9001 \
-  -e GRAVITINO_WAREHOUSE=s3://warehouse/ \
-  -e GRAVITINO_IO_IMPL=org.apache.iceberg.aws.s3.S3FileIO \
-  -e GRAVITINO_S3_ENDPOINT=http://minio:9000 \
-  -e GRAVITINO_S3_ACCESS_KEY=admin \
-  -e GRAVITINO_S3_SECRET_KEY=password \
+  -e GRAVITINO_WAREHOUSE=/tmp/warehouse/ \
   -e GRAVITINO_CATALOG_BACKEND=jdbc \
   -e GRAVITINO_URI=jdbc:sqlite::memory: \
   -e GRAVITINO_JDBC_DRIVER=org.sqlite.JDBC \
