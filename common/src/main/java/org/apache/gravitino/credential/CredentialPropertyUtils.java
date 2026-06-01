@@ -61,7 +61,7 @@ public class CredentialPropertyUtils {
   @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
 
   @VisibleForTesting
-  static final String GCS_OAUTH_2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+  static final String ICEBERG_GCS_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
 
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
@@ -110,7 +110,7 @@ public class CredentialPropertyUtils {
       Map<String, String> icebergGCSCredentialProperties =
           transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
       icebergGCSCredentialProperties.put(
-          GCS_OAUTH_2_TOKEN_EXPIRES_AT, String.valueOf(credential.expireTimeInMs()));
+          ICEBERG_GCS_TOKEN_EXPIRES_AT, String.valueOf(credential.expireTimeInMs()));
       return icebergGCSCredentialProperties;
     } else if (credential instanceof ADLSTokenCredential) {
       ADLSTokenCredential adlsCredential = (ADLSTokenCredential) credential;
@@ -148,7 +148,7 @@ public class CredentialPropertyUtils {
     Set<String> credentialPropertyKeys = Sets.newHashSet(icebergCredentialPropertyMap.values());
     credentialPropertyKeys.add(ICEBERG_S3_TOKEN_EXPIRES_AT_MS);
     credentialPropertyKeys.add(ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS);
-    credentialPropertyKeys.add(GCS_OAUTH_2_TOKEN_EXPIRES_AT);
+    credentialPropertyKeys.add(ICEBERG_GCS_TOKEN_EXPIRES_AT);
     Map<String, String> filteredProperties = Maps.newHashMap(properties);
     filteredProperties
         .entrySet()
