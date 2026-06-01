@@ -65,9 +65,9 @@ _MISSING_LANCE_RAY_DEPS = _missing_lance_ray_deps()
 @unittest.skipIf(
     _MISSING_LANCE_RAY_DEPS is not None,
     f"lance-ray test deps not installed: {_MISSING_LANCE_RAY_DEPS}. "
-    "Install with: pip install -e .[lance] (or pip install ray lance-ray "
-    "lance-namespace). Requires the Gravitino server to expose a lance-rest "
-    "auxiliary service backed by lance-namespace-core >= 0.7.5.",
+    "Install with: pip install -r clients/client-python/requirements-dev.txt "
+    "(or pip install -e .[lance]). Requires the Gravitino server to expose a "
+    "lance-rest auxiliary service backed by lance-namespace-core >= 0.7.5.",
 )
 class TestLanceRayIntegration(IntegrationTestEnv):
     """End-to-end test for the lance-ray Python client against a Gravitino-backed

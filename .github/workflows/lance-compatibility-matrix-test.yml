@@ -6,7 +6,7 @@ on:
       lance_spark_versions:
         description: "Comma-separated lance-spark-bundle versions"
         required: false
-        default: "0.1.0,0.1.1,0.2.0,0.4.0"
+        default: "0.2.0,0.4.0"
       lance_ray_versions:
         description: "Comma-separated lance-ray versions"
         required: false
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      LANCE_SPARK_VERSIONS: ${{ github.event.inputs.lance_spark_versions || '0.1.0,0.1.1,0.2.0,0.4.0' }}
+      LANCE_SPARK_VERSIONS: ${{ github.event.inputs.lance_spark_versions || '0.2.0,0.4.0' }}
     steps:
       - uses: actions/checkout@v4
 

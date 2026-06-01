@@ -23,7 +23,7 @@ The following table outlines the tested compatibility between Gravitino versions
 | Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions                  |
 |--------------------------------|--------------------------------|-----------------------------------------------|
 | 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
-| 1.3.0                          | 0.2.0 - 0.4.0                  | 0.3.0 - 0.4.2, 0.2.0 supports with conditions |
+| 1.3.0                          | 0.2.0 - 0.4.0                  | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
 
 :::note
 - These version ranges show which versions are expected to work together.
