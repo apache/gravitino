@@ -145,12 +145,36 @@ def ensure_venv(python: str, venv_dir: Path) -> Path:
     return venv_python
 
 
+def _deps_sentinel(venv_dir: Path, version: str, ray_spec: str, lance_namespace_spec: str) -> Path:
+    """Return the path to the sentinel file that marks a fully-installed venv.
+
+    The sentinel encodes all dep specs so any change in pinned versions forces
+    a reinstall, while an identical set of specs skips all pip invocations.
+    """
+    import hashlib
+
+    key = f"{version}|{ray_spec}|{lance_namespace_spec}"
+    digest = hashlib.sha1(key.encode()).hexdigest()[:12]
+    return venv_dir / f".deps-installed-{digest}"
+
+
 def install_deps(
     venv_python: Path,
+    venv_dir: Path,
     version: str,
     ray_spec: str,
     lance_namespace_spec: str,
 ) -> None:
+    """Install all deps into the venv.  Skips every pip call when a sentinel
+    file proves the identical set of packages was already installed — this
+    makes repeated matrix runs fast when the venv directory is cached (e.g.
+    in CI artifact caches or local re-runs).
+    """
+    sentinel = _deps_sentinel(venv_dir, version, ray_spec, lance_namespace_spec)
+    if sentinel.exists():
+        print(f"[matrix] venv for lance-ray=={version} already populated, skipping pip install")
+        return
+
     rc = run(
         [
             str(venv_python),
@@ -192,6 +216,8 @@ def install_deps(
     ).returncode
     if rc != 0:
         raise RuntimeError("Failed to install apache-gravitino in editable mode")
+
+    sentinel.touch()
 
 
 def generate_version_ini(venv_python: Path) -> None:
@@ -292,6 +318,7 @@ def main() -> int:
                 venv_python = ensure_venv(args.python, venv_dir)
                 install_deps(
                     venv_python,
+                    venv_dir,
                     version,
                     args.ray_spec,
                     args.lance_namespace_spec,

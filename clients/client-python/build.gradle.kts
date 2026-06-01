@@ -282,10 +282,8 @@ tasks {
     val script = projectDir.resolve("scripts/run_lance_ray_matrix.py")
     val gravitinoHome = file("${project.rootDir}/distribution/package")
 
-    doFirst {
-      gravitinoServer("start")
-    }
     doLast {
+      gravitinoServer("start")
       try {
         val args = mutableListOf(
           pythonExecutable,
