@@ -204,30 +204,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
       Credential credential = getCredential(loadTableResponse, privilege);
-      TableMetadata tableMetadata = loadTableResponse.tableMetadata();
-      Map<String, String> credentialConfig =
-          new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
-      IcebergVendedCredentials.appendRefreshEndpoint(
-          credentialConfig, catalogName, identifier, credential);
-      String location = tableMetadata.location();
-      String prefix = location.endsWith("/") ? location : location + "/";
-      org.apache.iceberg.rest.credentials.Credential icebergCredential =
-          new org.apache.iceberg.rest.credentials.Credential() {
-            @Override
-            public String prefix() {
-              return prefix;
-            }
-
-            @Override
-            public Map<String, String> config() {
-              // Convert Gravitino credentials to the Iceberg REST credential payload format.
-              return credentialConfig;
-            }
-
-            @Override
-            public void validate() {}
-          };
-      return ImmutableLoadCredentialsResponse.builder().addCredentials(icebergCredential).build();
+      return ImmutableLoadCredentialsResponse.builder()
+          .addCredentials(
+              IcebergRESTUtils.toRestCredential(
+                  catalogName, identifier, credential, loadTableResponse.tableMetadata()))
+          .build();
     } catch (ServiceUnavailableException e) {
       LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);
       return ImmutableLoadCredentialsResponse.builder().build();
@@ -339,8 +320,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     // response.
     Map<String, String> credentialConfig =
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
-    IcebergVendedCredentials.appendRefreshEndpoint(
-        credentialConfig, catalogName, tableIdentifier, credential);
+    CredentialPropertyUtils.appendRefreshEndpoint(
+        credentialConfig,
+        credential,
+        IcebergRESTUtils.tableCredentialsPath(catalogName, tableIdentifier));
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
         .addAllConfig(loadTableResponse.config())
@@ -946,7 +929,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     try {
       return Collections.singletonList(
-          IcebergVendedCredentials.toRestCredential(
+          IcebergRESTUtils.toRestCredential(
               catalogName,
               tableIdentifier,
               getCredential(metadata, CredentialPrivilege.READ),

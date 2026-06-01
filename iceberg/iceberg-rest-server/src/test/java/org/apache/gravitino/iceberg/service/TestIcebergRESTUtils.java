@@ -19,11 +19,17 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.types.Types.IntegerType;
@@ -86,5 +92,33 @@ public class TestIcebergRESTUtils {
       NestedField clonedField = clonedIcebergRESTObject.schema().columns().get(i);
       Assertions.assertEquals(field, clonedField);
     }
+  }
+
+  @Test
+  void testTableCredentialsPath() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    Assertions.assertEquals(
+        "v1/my_catalog/namespaces/ns/tables/tbl/credentials",
+        IcebergRESTUtils.tableCredentialsPath("my_catalog", table));
+  }
+
+  @Test
+  void testToRestCredential() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata metadataWithSlash = mock(TableMetadata.class);
+    when(metadataWithSlash.location()).thenReturn("s3://bucket/t/");
+    org.apache.iceberg.rest.credentials.Credential credentialWithSlash =
+        IcebergRESTUtils.toRestCredential(
+            "cat", table, new S3TokenCredential("k", "s", "t", 99L), metadataWithSlash);
+    Assertions.assertEquals("s3://bucket/t/", credentialWithSlash.prefix());
+    Assertions.assertEquals(
+        "99", credentialWithSlash.config().get("s3.session-token-expires-at-ms"));
+
+    TableMetadata metadataWithoutSlash = mock(TableMetadata.class);
+    when(metadataWithoutSlash.location()).thenReturn("s3://bucket/path/to/table");
+    org.apache.iceberg.rest.credentials.Credential credentialWithoutSlash =
+        IcebergRESTUtils.toRestCredential(
+            "cat", table, new S3TokenCredential("k", "s", "t", 99L), metadataWithoutSlash);
+    Assertions.assertEquals("s3://bucket/path/to/table/", credentialWithoutSlash.prefix());
   }
 }

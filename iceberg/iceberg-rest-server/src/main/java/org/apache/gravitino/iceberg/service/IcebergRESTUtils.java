@@ -40,7 +40,10 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
@@ -82,6 +85,59 @@ public class IcebergRESTUtils {
   }
 
   private IcebergRESTUtils() {}
+
+  /**
+   * Relative path for the Iceberg table credentials refresh endpoint (no leading slash; Trino and
+   * other clients resolve it against the catalog URI).
+   *
+   * @param catalogName IRC catalog name
+   * @param tableIdentifier table identifier
+   * @return path such as {@code v1/{catalog}/namespaces/{ns}/tables/{table}/credentials}
+   */
+  public static String tableCredentialsPath(String catalogName, TableIdentifier tableIdentifier) {
+    return String.format(
+        "v1/%s/namespaces/%s/tables/%s/credentials",
+        RESTUtil.encodeString(catalogName),
+        RESTUtil.encodeNamespace(tableIdentifier.namespace(), NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
+        RESTUtil.encodeString(tableIdentifier.name()));
+  }
+
+  /**
+   * Builds an Iceberg REST {@link org.apache.iceberg.rest.credentials.Credential} for load-table,
+   * scan-plan, or credentials API responses.
+   *
+   * @param catalogName IRC catalog name used in the refresh path
+   * @param tableIdentifier table receiving the credential
+   * @param credential Gravitino credential to vend
+   * @param tableMetadata table metadata used to derive the storage prefix
+   * @return Iceberg REST credential with prefix and config
+   */
+  public static org.apache.iceberg.rest.credentials.Credential toRestCredential(
+      String catalogName,
+      TableIdentifier tableIdentifier,
+      Credential credential,
+      TableMetadata tableMetadata) {
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+    CredentialPropertyUtils.appendRefreshEndpoint(
+        config, credential, tableCredentialsPath(catalogName, tableIdentifier));
+    String location = tableMetadata.location();
+    String prefix = location.endsWith("/") ? location : location + "/";
+    return new org.apache.iceberg.rest.credentials.Credential() {
+      @Override
+      public String prefix() {
+        return prefix;
+      }
+
+      @Override
+      public Map<String, String> config() {
+        return config;
+      }
+
+      @Override
+      public void validate() {}
+    };
+  }
 
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();

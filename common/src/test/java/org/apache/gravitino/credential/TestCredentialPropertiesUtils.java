@@ -20,6 +20,7 @@
 package org.apache.gravitino.credential;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -99,5 +100,75 @@ public class TestCredentialPropertiesUtils {
                 + storageAccountName,
             String.valueOf(expireTimeInMS));
     Assertions.assertEquals(expectedProperties, icebergProperties);
+  }
+
+  @Test
+  void testAppendRefreshEndpointForS3Token() {
+    Map<String, String> config =
+        new HashMap<>(
+            CredentialPropertyUtils.toIcebergProperties(
+                new S3TokenCredential("key", "secret", "token", 1234L)));
+    CredentialPropertyUtils.appendRefreshEndpoint(
+        config,
+        new S3TokenCredential("key", "secret", "token", 1234L),
+        "v1/aws/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertEquals(
+        "v1/aws/namespaces/ns/tables/tbl/credentials",
+        config.get(CredentialPropertyUtils.S3_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testAppendRefreshEndpointForGcsToken() {
+    Credential gcsToken = new GCSTokenCredential("gcs-token", 5678L);
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(gcsToken));
+    CredentialPropertyUtils.appendRefreshEndpoint(
+        config, gcsToken, "v1/gcs/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertEquals(
+        "v1/gcs/namespaces/ns/tables/tbl/credentials",
+        config.get(CredentialPropertyUtils.GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testAppendRefreshEndpointForOssToken() {
+    Credential ossToken = new OSSTokenCredential("key", "secret", "oss-token", 9012L);
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(ossToken));
+    CredentialPropertyUtils.appendRefreshEndpoint(
+        config, ossToken, "v1/oss/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertEquals(
+        "v1/oss/namespaces/ns/tables/tbl/credentials",
+        config.get(CredentialPropertyUtils.OSS_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testAppendRefreshEndpointForAdlsToken() {
+    Credential adlsToken = new ADLSTokenCredential("storageacct", "sas-token", 3456L);
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(adlsToken));
+    CredentialPropertyUtils.appendRefreshEndpoint(
+        config, adlsToken, "v1/adls/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertEquals(
+        "v1/adls/namespaces/ns/tables/tbl/credentials",
+        config.get(CredentialPropertyUtils.ADLS_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testAppendRefreshEndpointOmitsStaticSecretKey() {
+    Map<String, String> config =
+        new HashMap<>(
+            CredentialPropertyUtils.toIcebergProperties(
+                new S3SecretKeyCredential("key", "secret")));
+    CredentialPropertyUtils.appendRefreshEndpoint(
+        config,
+        new S3SecretKeyCredential("key", "secret"),
+        "v1/aws/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertFalse(
+        config.containsKey(CredentialPropertyUtils.S3_REFRESH_CREDENTIALS_ENDPOINT));
   }
 }
