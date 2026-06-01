@@ -35,31 +35,21 @@ public class CredentialPropertyUtils {
   @VisibleForTesting static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
   @VisibleForTesting static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
   @VisibleForTesting static final String ICEBERG_S3_TOKEN = "s3.session-token";
-
-  @VisibleForTesting
   static final String ICEBERG_S3_TOKEN_EXPIRES_AT_MS = "s3.session-token-expires-at-ms";
 
   @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
   @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
   @VisibleForTesting static final String ICEBERG_OSS_SECURITY_TOKEN = "client.security-token";
-
-  @VisibleForTesting
   static final String ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS =
       "client.security-token-expires-at-ms";
 
   @VisibleForTesting static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
-
-  @VisibleForTesting
   static final String ICEBERG_ADLS_ACCOUNT_NAME = "adls.auth.shared-key.account.name";
-
-  @VisibleForTesting
   static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
-
-  @VisibleForTesting
   static final String ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX = "adls.sas-token-expires-at-ms.";
 
   @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
-  private static final String GCS_OAUTH_2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+  static final String GCS_OAUTH_2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
 
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
