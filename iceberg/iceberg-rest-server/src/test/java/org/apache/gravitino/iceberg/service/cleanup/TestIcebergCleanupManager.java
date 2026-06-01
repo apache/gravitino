@@ -175,6 +175,28 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testDeleteAllStopsSubmittingWhenLeaseLost() {
+    Map<String, String> config = new HashMap<>();
+    config.put("async-cleanup.delete-batch-size", "1");
+    AtomicInteger ownershipChecks = new AtomicInteger();
+    BooleanSupplier stillOwned = () -> ownershipChecks.incrementAndGet() == 1;
+
+    IcebergCleanupManager svc = new IcebergCleanupManager(store, new IcebergConfig(config));
+    try {
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () ->
+              svc.deleteAll(
+                  new RecordingFileIO(new CopyOnWriteArrayList<>()),
+                  Arrays.asList("a", "b"),
+                  stillOwned));
+      Assertions.assertEquals(2, ownershipChecks.get());
+    } finally {
+      svc.close();
+    }
+  }
+
+  @TestTemplate
   void testCleanupDeletesAllFiles() {
     BaseTable base = tableWithDataFile();
     FileIO io = base.io();
@@ -279,6 +301,15 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
     } finally {
       svc.close();
     }
+  }
+
+  @TestTemplate
+  void testStartAfterCloseFailsFast() {
+    IcebergCleanupManager svc =
+        new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
+    svc.close();
+
+    Assertions.assertThrows(IllegalStateException.class, svc::start);
   }
 
   @TestTemplate

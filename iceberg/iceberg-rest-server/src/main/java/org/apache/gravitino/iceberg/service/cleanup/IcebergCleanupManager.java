@@ -77,6 +77,7 @@ public class IcebergCleanupManager implements AutoCloseable {
   private final Map<Long, Long> ownedHeartbeats = new ConcurrentHashMap<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
+  private final AtomicBoolean closed = new AtomicBoolean(false);
   private ExecutorService workers;
   private ScheduledExecutorService scheduler;
 
@@ -132,6 +133,10 @@ public class IcebergCleanupManager implements AutoCloseable {
 
   /** Starts worker threads and the heartbeat/prune scheduler. */
   public void start() {
+    if (closed.get()) {
+      throw new IllegalStateException("Iceberg cleanup manager is already closed");
+    }
+
     // compareAndSet keeps concurrent or repeated start() calls from each allocating a pool.
     if (!running.compareAndSet(false, true)) {
       return;
@@ -153,7 +158,7 @@ public class IcebergCleanupManager implements AutoCloseable {
 
     // One scheduler thread runs both periodic tasks: heartbeat renewal and row pruning.
     scheduler = Executors.newScheduledThreadPool(1, daemon("iceberg-cleanup-heartbeat-prune"));
-    long heartbeatIntervalMs = Math.max(1L, heartbeatTimeoutMs / 3L);
+    long heartbeatIntervalMs = heartbeatTimeoutMs / 3L;
     scheduler.scheduleAtFixedRate(
         this::refreshHeartbeats, heartbeatIntervalMs, heartbeatIntervalMs, TimeUnit.MILLISECONDS);
     scheduler.scheduleAtFixedRate(this::prune, 1L, 1L, TimeUnit.HOURS);
@@ -161,6 +166,10 @@ public class IcebergCleanupManager implements AutoCloseable {
 
   @Override
   public void close() {
+    if (!closed.compareAndSet(false, true)) {
+      return;
+    }
+
     running.set(false);
     if (scheduler != null) {
       scheduler.shutdownNow();
@@ -204,8 +213,9 @@ public class IcebergCleanupManager implements AutoCloseable {
     // Data files are the only huge level, so they are streamed and deleted one manifest at a time
     // rather than all collected first; only the smaller manifest/list/metadata paths are held.
     //
-    // deleteOwned re-checks ownership before each level, so if a peer reclaimed the job we stop and
-    // never delete a parent while the new owner is still deleting its children.
+    // deleteOwned and deleteAll re-check ownership between levels and batches, so if a peer
+    // reclaimed the job we stop and never delete a parent while the new owner is still deleting
+    // its children.
     Set<String> manifests = new LinkedHashSet<>();
     deleteDataFiles(io, metadata, manifests, stillOwned);
     deleteOwned(io, manifests, stillOwned);
@@ -223,34 +233,45 @@ public class IcebergCleanupManager implements AutoCloseable {
   // Deletes one dependency level, but only after confirming we still own the job; throws to stop
   // the cleanup if the lease was lost.
   private void deleteOwned(FileIO io, Iterable<String> files, BooleanSupplier stillOwned) {
-    requireOwnership(stillOwned);
-    deleteAll(io, files);
+    deleteAll(io, files, stillOwned);
   }
 
   void deleteAll(FileIO io, Iterable<String> files) {
+    deleteAll(io, files, () -> true);
+  }
+
+  void deleteAll(FileIO io, Iterable<String> files, BooleanSupplier stillOwned) {
     // Callers pass one manifest's files at a time (or a small fixed list), so futures stay small;
     // CallerRunsPolicy on deleteExecutor also throttles submission when the pool is saturated.
     List<Future<?>> futures = new ArrayList<>();
-    Iterators.partition(files.iterator(), deleteBatchSize)
-        .forEachRemaining(
-            batch ->
+    try {
+      Iterators.partition(files.iterator(), deleteBatchSize)
+          .forEachRemaining(
+              batch -> {
+                requireOwnership(stillOwned);
                 futures.add(
                     deleteExecutor.submit(
-                        () -> CatalogUtil.deleteFiles(io, batch, "cleanup", true))));
+                        () -> CatalogUtil.deleteFiles(io, batch, "cleanup", true)));
+              });
 
-    for (Future<?> future : futures) {
-      try {
-        future.get();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException("Interrupted during bulk delete", e);
-      } catch (ExecutionException e) {
-        if (hasCause(e, NotFoundException.class)) {
-          LOG.debug("Ignoring already-deleted file during async cleanup", e);
-          continue;
+      for (Future<?> future : futures) {
+        requireOwnership(stillOwned);
+        try {
+          future.get();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException("Interrupted during bulk delete", e);
+        } catch (ExecutionException e) {
+          if (hasCause(e, NotFoundException.class)) {
+            LOG.debug("Ignoring already-deleted file during async cleanup", e);
+            continue;
+          }
+          throw new RuntimeException("Bulk delete batch failed", e);
         }
-        throw new RuntimeException("Bulk delete batch failed", e);
       }
+    } catch (OwnershipLostException e) {
+      futures.forEach(future -> future.cancel(true));
+      throw e;
     }
   }
 
@@ -368,7 +389,7 @@ public class IcebergCleanupManager implements AutoCloseable {
         try (CloseableIterable<String> paths =
             ManifestFiles.readPaths(manifest, io, metadata.specsById())) {
           // deleteAll pulls this lazy iterable in batches, so only one batch is held at a time.
-          deleteAll(io, paths);
+          deleteAll(io, paths, stillOwned);
         } catch (NotFoundException manifestGone) {
           // Manifests are deleted after their data files, so a missing one has no data files left.
           LOG.debug("Manifest {} already gone; skipping", manifest.path());
