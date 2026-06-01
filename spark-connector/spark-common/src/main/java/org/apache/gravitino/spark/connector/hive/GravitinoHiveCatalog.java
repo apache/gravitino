@@ -84,15 +84,6 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       Identifier ident,
       View gravitinoView,
       org.apache.spark.sql.connector.catalog.Table sparkTable) {
-    if (!(sparkTable instanceof HiveTable)) {
-      throw new IllegalStateException(
-          String.format(
-              "Expected HiveTable for view %s but got %s", ident, sparkTable.getClass().getName()));
-    }
-    if (!(sparkCatalog instanceof HiveTableCatalog)) {
-      throw new IllegalStateException(
-          String.format("Expected HiveTableCatalog but got %s", sparkCatalog.getClass().getName()));
-    }
     return new SparkHiveView(
         gravitinoView,
         (HiveTable) sparkTable,
