@@ -102,7 +102,9 @@ public class CredentialPropertyUtils {
       return icebergProperties;
     }
 
-    if (credential instanceof S3SecretKeyCredential) {
+    if (credential instanceof S3SecretKeyCredential
+        || credential instanceof OSSSecretKeyCredential
+        || credential instanceof AzureAccountKeyCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
 
@@ -112,10 +114,6 @@ public class CredentialPropertyUtils {
       icebergProperties.put(
           ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
       return icebergProperties;
-    }
-
-    if (credential instanceof OSSSecretKeyCredential) {
-      return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
 
     if (credential instanceof ADLSTokenCredential) {
@@ -131,10 +129,6 @@ public class CredentialPropertyUtils {
           ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsCredential.accountName(),
           String.valueOf(adlsCredential.expireTimeInMs()));
       return icebergADLSCredentialProperties;
-    }
-
-    if (credential instanceof AzureAccountKeyCredential) {
-      return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
 
     if (credential instanceof GCSTokenCredential) {
