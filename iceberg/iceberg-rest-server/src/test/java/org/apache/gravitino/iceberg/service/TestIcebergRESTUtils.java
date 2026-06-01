@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -148,6 +149,36 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals(
         "v1/aws/namespaces/ns/tables/tbl/credentials",
         config.get("client.refresh-credentials-endpoint"));
+    Assertions.assertEquals("1234", config.get("s3.session-token-expires-at-ms"));
+  }
+
+  @Test
+  void testToRestCredentialForAwsIrsa() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
+    Map<String, String> config =
+        IcebergRESTUtils.toRestCredential(
+                "aws", table, new AwsIrsaCredential("key", "secret", "token", 4321L), tableMetadata)
+            .config();
+
+    Assertions.assertEquals(
+        "v1/aws/namespaces/ns/tables/tbl/credentials",
+        config.get("client.refresh-credentials-endpoint"));
+    Assertions.assertEquals("4321", config.get("s3.session-token-expires-at-ms"));
+  }
+
+  @Test
+  void testToRestCredentialConfigIsUnmodifiable() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
+    Map<String, String> config =
+        IcebergRESTUtils.toRestCredential(
+                "aws", table, new S3TokenCredential("k", "s", "t", 99L), tableMetadata)
+            .config();
+
+    Assertions.assertThrows(UnsupportedOperationException.class, () -> config.put("k", "v"));
   }
 
   @Test
@@ -163,6 +194,7 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals(
         "v1/gcs/namespaces/ns/tables/tbl/credentials",
         config.get("gcs.oauth2.refresh-credentials-endpoint"));
+    Assertions.assertEquals("5678", config.get("gcs.oauth2.token-expires-at"));
   }
 
   @Test
@@ -181,6 +213,7 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals(
         "v1/oss/namespaces/ns/tables/tbl/credentials",
         config.get("client.refresh-credentials-endpoint"));
+    Assertions.assertEquals("9012", config.get("client.security-token-expires-at-ms"));
   }
 
   @Test
@@ -199,6 +232,7 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals(
         "v1/adls/namespaces/ns/tables/tbl/credentials",
         config.get("adls.refresh-credentials-endpoint"));
+    Assertions.assertEquals("3456", config.get("adls.sas-token-expires-at-ms.storageacct"));
   }
 
   @Test

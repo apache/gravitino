@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
@@ -150,7 +151,7 @@ public class IcebergRESTUtils {
 
       @Override
       public Map<String, String> config() {
-        return config;
+        return Collections.unmodifiableMap(config);
       }
 
       @Override
