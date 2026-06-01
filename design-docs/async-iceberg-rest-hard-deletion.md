@@ -19,12 +19,12 @@
 
 # Design: Asynchronous Hard Deletion for the Gravitino Iceberg REST Server
 
-| Field    | Value                                                   |
-| -------- | ------------------------------------------------------- |
-| Status   | Complete                                                |
-| Authors  | @roryqi                                                 |
-| Created  | 2026-05-19                                              |
-| Module   | `iceberg/iceberg-rest-server`, `iceberg/iceberg-common` |
+| Field   | Value                                                   |
+| ------- | ------------------------------------------------------- |
+| Status  | Complete                                                |
+| Authors | @roryqi                                                 |
+| Created | 2026-05-19                                              |
+| Module  | `iceberg/iceberg-rest-server`, `iceberg/iceberg-common` |
 
 ---
 
@@ -98,14 +98,14 @@ simpler design with a smaller bug surface. We chose a single async
 implementation gated behind a per-request opt-in, with synchronous deletion
 as the default.
 
-| Approach                                                    | Pros                                                                                     | Cons                                                                                             | Decision                                                                |
-|-------------------------------------------------------------|------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| Synchronous only (status quo)                               | Simplest; strongest "deleted means gone" guarantee                                       | Exceeds HTTP timeouts, saturates Jetty, no retry/audit on large tables                           | **Rejected** — the problem we are solving                               |
-| Pluggable `IcebergPurger` SPI                               | Extensible without code changes                                                          | Real added surface (SPI, discovery factory, context) with **no** second implementation in flight | **Rejected** — revisit when a second implementation has a real customer |
-| Reuse `RelationalGarbageCollector`                          | Proven worker/scheduling pattern                                                         | Different IO surface (object store vs. JDBC) and failure model                                   | **Rejected** — share patterns, not code                                 |
-| External job system (Quartz / Temporal)                     | Mature scheduling, retries, observability                                                | Heavy operational burden on every operator                                                       | **Rejected** — disproportionate for one workload                        |
-| Enumerate files at enqueue time                             | Worker needs no metadata re-read                                                         | Slow on large tables (defeats the latency goal), bloats job rows                                 | **Rejected** — store `metadata_location`, re-read at run time           |
-| Object-store job markers (no DB table)                      | No schema / migration                                                                    | Hand-rolled lease + renewal, no indexed scheduling, fragments per-bucket                         | **Rejected** — higher net complexity (see below)                        |
+| Approach                                                             | Pros                                                                                     | Cons                                                                                             | Decision                                                                |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Synchronous only (status quo)                                        | Simplest; strongest "deleted means gone" guarantee                                       | Exceeds HTTP timeouts, saturates Jetty, no retry/audit on large tables                           | **Rejected** — the problem we are solving                               |
+| Pluggable `IcebergPurger` SPI                                        | Extensible without code changes                                                          | Real added surface (SPI, discovery factory, context) with **no** second implementation in flight | **Rejected** — revisit when a second implementation has a real customer |
+| Reuse `RelationalGarbageCollector`                                   | Proven worker/scheduling pattern                                                         | Different IO surface (object store vs. JDBC) and failure model                                   | **Rejected** — share patterns, not code                                 |
+| External job system (Quartz / Temporal)                              | Mature scheduling, retries, observability                                                | Heavy operational burden on every operator                                                       | **Rejected** — disproportionate for one workload                        |
+| Enumerate files at enqueue time                                      | Worker needs no metadata re-read                                                         | Slow on large tables (defeats the latency goal), bloats job rows                                 | **Rejected** — store `metadata_location`, re-read at run time           |
+| Object-store job markers (no DB table)                               | No schema / migration                                                                    | Hand-rolled lease + renewal, no indexed scheduling, fragments per-bucket                         | **Rejected** — higher net complexity (see below)                        |
 | **JDBC job table + worker pool, async opt-in (synchronous default)** | Smallest bug surface; restart-safe and cluster-safe via CAS claim; one code path to test | No built-in extension point                                                                      | **Chosen**                                                              |
 
 **Why not an S3-only control plane?** Conditional writes (`If-None-Match`)
@@ -218,15 +218,15 @@ already terminal, so it is consistent with the §5.7 tombstone table.
 
 ```sql
 CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
-  `id`                BIGINT(20)    UNSIGNED NOT NULL,
+  `id`                BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique cleanup job id',
   `catalog_id`        BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique id of the owning catalog, stable across catalog rename',
-  `namespace`         VARCHAR(512)  NOT NULL,
-  `table_name`        VARCHAR(256)  NOT NULL,
-  `metadata_location` MEDIUMTEXT   NOT NULL,
-  `file_io_impl`      VARCHAR(256)  NOT NULL,
-  `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON',
+  `namespace`         VARCHAR(512)  NOT NULL COMMENT 'namespace of the table to be cleaned up',
+  `table_name`        VARCHAR(256)  NOT NULL COMMENT 'name of the table to be cleaned up',
+  `metadata_location` MEDIUMTEXT   NOT NULL COMMENT 'location of the table metadata file to purge',
+  `file_io_impl`      VARCHAR(256)  NOT NULL COMMENT 'FileIO implementation class used to access the table files',
+  `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON-encoded FileIO properties',
   `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|FAILED',
-  `attempts`          INT(10)       NOT NULL DEFAULT 0,
+  `attempts`          INT(10)       NOT NULL DEFAULT 0 COMMENT 'number of processing attempts made so far',
   `last_error`        VARCHAR(2048) NULL COMMENT 'truncated reason for the most recent failure, NULL until a job fails',
   `heartbeat_at`      BIGINT(20)    NOT NULL DEFAULT 0 COMMENT 'last heartbeat from the worker, 0 when not running',
   `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
@@ -343,29 +343,59 @@ statement can register its own provider without touching the rest of the design.
    already deleted it). Any other failure (e.g. corrupt/unreadable metadata)
    releases the job for retry, failing it once `attempts` hits the ceiling
    (§5.6).
-3. **Stream & delete.** Walk the snapshot graph lazily, group reachable files
-   into batches of `delete-batch-size`, and hand each batch to the shared
-   `deleteExecutor` for a **bulk** delete; `NotFoundException` counts as
-   deleted. The worker thread itself never issues the storage call directly,
-   and a *separate* background task keeps `heartbeat_at` fresh throughout
-   (see "Heartbeat is decoupled from deletion" below).
+3. **Delete leaves before parents.** Walk the snapshot graph and delete one
+   dependency level at a time — data files → manifests → manifest lists →
+   statistics → ancestor metadata → the root `metadata.json` **last** — only
+   advancing once the current level is fully gone. Within a level, files are
+   independent: group them into batches of `delete-batch-size` and hand each to
+   the shared `deleteExecutor` for a **bulk** delete; `NotFoundException` counts
+   as deleted. Leaf-first ordering keeps every crash recoverable: the root
+   pointer (and the manifests/manifest lists above any leaf still on disk)
+   survives, so a retry re-enumerates and finishes. Deleting a parent first
+   would strand its children — and a `metadata.json` removed early would be
+   misread as "table already gone", leaking everything beneath it. The worker
+   thread itself never issues the storage call directly, and a *separate*
+   background task keeps `heartbeat_at` fresh throughout (see "Heartbeat is
+   decoupled from deletion" below).
 4. **Finish.** Once every reachable file is gone the job is `SUCCEEDED`
    (§5.6). The thread then loops back to step 1.
 
-Execution mirrors `CatalogHandlers.purgeTable`, but **streams** the
-reachable files instead of materializing them. A large table can reference
-millions of data files, so the worker walks the snapshot graph lazily and
-deletes them **in bulk batches**, never one file at a time:
+Execution mirrors `CatalogHandlers.purgeTable`, deleting **in bulk batches**
+and never one file at a time. To keep every crash recoverable it deletes one
+dependency level at a time — leaves first, the root `metadata.json` last — and
+each `deleteAll` blocks until its level is fully gone before the next begins.
+Data files are the only unbounded level, so they are streamed and deleted one
+manifest at a time rather than collected up front — a million-file table never
+materializes its whole path set; only the far smaller manifest, manifest-list
+and metadata path lists are held at once:
 
 ```java
 TableMetadata meta = TableMetadataParser.read(io, job.metadataLocation());
-try (CloseableIterable<String> files = reachableFiles(meta)) {  // lazy, not materialized
-  Iterators.partition(files.iterator(), deleteBatchSize)        // bounded batches
+Set<String> manifests = new LinkedHashSet<>();
+for (Snapshot s : meta.snapshots()) {
+  for (ManifestFile m : s.allManifests(io)) {
+    if (!manifests.add(m.path())) continue;                  // dedup shared manifests
+    try (CloseableIterable<String> dataFiles =               // lazy, one batch resident at a time
+        ManifestFiles.readPaths(m, io, meta.specsById())) {
+      deleteAll(io, dataFiles);                              // leaves: streamed, then deleted
+    }
+  }
+}
+deleteAll(io, manifests);                                    // then their manifests
+deleteAll(io, ReachableFileUtil.manifestListLocations(table));
+deleteAll(io, ReachableFileUtil.statisticsFilesLocations(table));
+deleteAll(io, ancestorMetadata);                             // older metadata.json
+deleteAll(io, List.of(job.metadataLocation()));              // root pointer, deleted last
+
+// deleteAll: bulk-batch the (possibly lazy) iterable, then await it
+void deleteAll(FileIO io, Iterable<String> files) {
+  Iterators.partition(files.iterator(), deleteBatchSize)     // bounded batches
       .forEachRemaining(batch ->
-          deleteExecutor.execute(() ->
+          futures.add(deleteExecutor.submit(() ->
               // SupportsBulkOperations.deleteFiles when the FileIO supports it
               // (e.g. S3FileIO's batch-delete API), else concurrent per-file
-              CatalogUtil.deleteFiles(io, batch, "cleanup", /* bulk */ true)));
+              CatalogUtil.deleteFiles(io, batch, "cleanup", /* bulk */ true))));
+  awaitAll(futures);                                         // NotFoundException counts as deleted
 }
 ```
 
@@ -451,12 +481,12 @@ enumerating reachable files) is already deleted. Any other failure goes back to
 `attempts` each time; when `attempts` reaches `max-attempts` the job goes to
 `FAILED` instead of `PENDING`.
 
-| Outcome                                              | Action                                                                                |
-|------------------------------------------------------|---------------------------------------------------------------------------------------|
-| All files deleted (or already gone)                  | `state='SUCCEEDED'`                                                                    |
-| Failure, `attempts < max-attempts`                   | `attempts++`, set `last_error`, back to `PENDING`, `heartbeat_at=0`; re-claimed later  |
-| Failure, `attempts` reaches `max-attempts`           | `attempts++`, set `last_error` → `FAILED` (gave up retrying)                            |
-| Worker killed mid-job                                | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent  |
+| Outcome                                    | Action                                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| All files deleted (or already gone)        | `state='SUCCEEDED'`                                                                   |
+| Failure, `attempts < max-attempts`         | `attempts++`, set `last_error`, back to `PENDING`, `heartbeat_at=0`; re-claimed later |
+| Failure, `attempts` reaches `max-attempts` | `attempts++`, set `last_error` → `FAILED` (gave up retrying)                          |
+| Worker killed mid-job                      | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent |
 
 **After `SUCCEEDED`.** The files are gone, so the tombstone lifts at once:
 `createTable` / `register` at the identifier succeed again (§5.7). The
@@ -503,7 +533,7 @@ tombstone — no second table is needed. The REST server consults the store on
 the request thread (one indexed lookup via `idx_object`):
 
 | Operation                                   | Active job exists                 | No active job (`SUCCEEDED`/`FAILED`/none) |
-|---------------------------------------------|-----------------------------------|-------------------------------------------|
+| ------------------------------------------- | --------------------------------- | ----------------------------------------- |
 | `loadTable` / `HEAD`, `alterTable` / commit | `404 NoSuchTableException`        | `404`                                     |
 | `dropTable` (same identifier, repeated)     | `404 NoSuchTableException`        | `404`                                     |
 | `createTable` (same identifier)             | **`409 Conflict`** — being purged | succeeds                                  |
@@ -602,15 +632,15 @@ per-request **client** choice via the `X-Gravitino-Async-Purge` header
 (absent ⇒ synchronous; `true` opts into async deletion). The server-side keys
 only tune the worker pool and retries:
 
-| Key                                                           | Default  | Description                                                                  |
-|---------------------------------------------------------------|----------|------------------------------------------------------------------------------|
-| `gravitino.iceberg-rest.async-cleanup.worker-threads`           | `2`      | Worker pool size per server (concurrent jobs).                               |
-| `gravitino.iceberg-rest.async-cleanup.delete-threads`           | `4`      | Server-wide file-delete pool size, shared across all jobs.                   |
-| `gravitino.iceberg-rest.async-cleanup.delete-batch-size`        | `1000`   | Files per bulk-delete batch handed to `deleteExecutor` (§5.5).               |
-| `gravitino.iceberg-rest.async-cleanup.poll-interval-secs`       | `5`      | Worker poll interval in seconds; also the retry interval.                   |
-| `gravitino.iceberg-rest.async-cleanup.heartbeat-timeout-secs`   | `300`    | Age in seconds after which a job with no heartbeat is reclaimable.          |
-| `gravitino.iceberg-rest.async-cleanup.max-attempts`             | `5`      | Attempts before `FAILED`.                                                    |
-| `gravitino.iceberg-rest.async-cleanup.retention-hours`          | `720`    | How long terminal (`SUCCEEDED` / `FAILED`) rows are retained before pruning (30 days). |
+| Key                                                           | Default | Description                                                                            |
+| ------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| `gravitino.iceberg-rest.async-cleanup.worker-threads`         | `2`     | Worker pool size per server (concurrent jobs).                                         |
+| `gravitino.iceberg-rest.async-cleanup.delete-threads`         | `4`     | Server-wide file-delete pool size, shared across all jobs.                             |
+| `gravitino.iceberg-rest.async-cleanup.delete-batch-size`      | `1000`  | Files per bulk-delete batch handed to `deleteExecutor` (§5.5).                         |
+| `gravitino.iceberg-rest.async-cleanup.poll-interval-secs`     | `5`     | Worker poll interval in seconds; also the retry interval.                              |
+| `gravitino.iceberg-rest.async-cleanup.heartbeat-timeout-secs` | `300`   | Age in seconds after which a job with no heartbeat is reclaimable.                     |
+| `gravitino.iceberg-rest.async-cleanup.max-attempts`           | `5`     | Attempts before `FAILED`.                                                              |
+| `gravitino.iceberg-rest.async-cleanup.retention-hours`        | `720`   | How long terminal (`SUCCEEDED` / `FAILED`) rows are retained before pruning (30 days). |
 
 The thread defaults are deliberately modest. Each `delete-threads` thread now
 issues a *bulk* delete of up to `delete-batch-size` files per call (§5.5), so

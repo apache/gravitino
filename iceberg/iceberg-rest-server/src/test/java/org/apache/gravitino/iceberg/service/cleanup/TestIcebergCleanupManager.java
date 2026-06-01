@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -66,6 +67,7 @@ import org.junit.jupiter.api.TestTemplate;
 class TestIcebergCleanupManager extends TestJDBCBackend {
 
   private static final long CATALOG_ID = 100L;
+  private static final String DATA_FILE = "memory://db/t/data/00000-0.parquet";
 
   private IcebergCleanupJobStore store;
 
@@ -114,8 +116,29 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
         "alice");
   }
 
+  // Builds db.t with one appended data file (so it has a manifest list, a manifest, and a data
+  // file) and materializes the data file in the in-memory FileIO so deletions are observable.
+  private static BaseTable tableWithDataFile() {
+    InMemoryCatalog catalog = new InMemoryCatalog();
+    catalog.initialize("test", ImmutableMap.of());
+    catalog.createNamespace(Namespace.of("db"));
+    TableIdentifier id = TableIdentifier.of(Namespace.of("db"), "t");
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    Table table = catalog.createTable(id, schema);
+    DataFile dataFile =
+        DataFiles.builder(PartitionSpec.unpartitioned())
+            .withPath(DATA_FILE)
+            .withFileSizeInBytes(10L)
+            .withRecordCount(1L)
+            .build();
+    table.newAppend().appendFile(dataFile).commit();
+    BaseTable base = (BaseTable) catalog.loadTable(id);
+    ((InMemoryFileIO) base.io()).addFile(DATA_FILE, new byte[] {1});
+    return base;
+  }
+
   @TestTemplate
-  void testDeleteAllBatchesEveryFile() {
+  void testDeleteAllBatches() {
     CopyOnWriteArrayList<String> deleted = new CopyOnWriteArrayList<>();
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
@@ -128,7 +151,7 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDeleteAllIgnoresAlreadyDeletedFiles() {
+  void testDeleteAllIgnoresMissing() {
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
     try {
@@ -140,7 +163,7 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDeleteAllIgnoresAlreadyDeletedBulkFiles() {
+  void testDeleteAllIgnoresMissingBulk() {
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
     try {
@@ -152,35 +175,15 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testCleanupFilesDeletesAllReachableFiles() throws Exception {
-    InMemoryCatalog catalog = new InMemoryCatalog();
-    catalog.initialize("test", ImmutableMap.of());
-    Namespace namespace = Namespace.of("db");
-    catalog.createNamespace(namespace);
-    TableIdentifier identifier = TableIdentifier.of(namespace, "t");
-    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
-    Table table = catalog.createTable(identifier, schema);
-
-    // Append a data file so the snapshot has a manifest list, a manifest, and a data file path.
-    DataFile dataFile =
-        DataFiles.builder(PartitionSpec.unpartitioned())
-            .withPath("memory://db/t/data/00000-0.parquet")
-            .withFileSizeInBytes(10L)
-            .withRecordCount(1L)
-            .build();
-    table.newAppend().appendFile(dataFile).commit();
-
-    BaseTable base = (BaseTable) catalog.loadTable(identifier);
+  void testCleanupDeletesAllFiles() {
+    BaseTable base = tableWithDataFile();
     FileIO io = base.io();
     String metadataLocation = base.operations().current().metadataFileLocation();
-    // Materialize the data file so its deletion is observable in the in-memory FileIO.
-    ((InMemoryFileIO) io).addFile(dataFile.location(), new byte[] {1});
 
-    // Capture every reachable file before cleanup; the manifest list/manifests cannot be read back
-    // afterwards because they will have been deleted.
+    // Capture reachable files before cleanup; the manifests cannot be read once deleted.
     List<String> expected = new ArrayList<>();
     expected.add(metadataLocation);
-    expected.add(dataFile.location());
+    expected.add(DATA_FILE);
     for (Snapshot snapshot : base.snapshots()) {
       expected.add(snapshot.manifestListLocation());
       for (ManifestFile manifest : snapshot.allManifests(io)) {
@@ -201,9 +204,27 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testCleanupFilesTreatsMissingMetadataAsAlreadyGone() {
-    // A missing root metadata.json is the only NotFoundException treated as "table already gone":
-    // cleanupFiles swallows it and returns rather than failing, so the job can be marked SUCCEEDED.
+  void testCleanupStopsWhenLeaseLost() {
+    BaseTable base = tableWithDataFile();
+    FileIO io = base.io();
+    String metadataLocation = base.operations().current().metadataFileLocation();
+
+    IcebergCleanupManager svc =
+        new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
+    try {
+      // A worker that lost its lease must stop before deleting anything.
+      Assertions.assertThrows(
+          RuntimeException.class, () -> svc.cleanupFiles(io, metadataLocation, () -> false));
+      Assertions.assertTrue(((InMemoryFileIO) io).fileExists(DATA_FILE));
+      Assertions.assertTrue(((InMemoryFileIO) io).fileExists(metadataLocation));
+    } finally {
+      svc.close();
+    }
+  }
+
+  @TestTemplate
+  void testCleanupToleratesMissingMetadata() {
+    // A missing root metadata.json means the table is already gone, so cleanup just returns.
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
     try {
@@ -215,12 +236,12 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testWorkerRunsJobToSucceeded() {
+  void testWorkerSucceeds() {
     AtomicInteger calls = new AtomicInteger();
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, fastPollConfig()) {
           @Override
-          void cleanupFiles(FileIO io, String metadataLocation) {
+          void cleanupFiles(FileIO io, String metadataLocation, BooleanSupplier stillOwned) {
             calls.incrementAndGet();
           }
         };
@@ -237,7 +258,7 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testTransientFailureRetriesThenFails() {
+  void testWorkerRetriesThenFails() {
     Map<String, String> config = new HashMap<>();
     config.put("async-cleanup.worker-threads", "1");
     config.put("async-cleanup.poll-interval-secs", "1");
@@ -245,7 +266,7 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, new IcebergConfig(config)) {
           @Override
-          void cleanupFiles(FileIO io, String metadataLocation) {
+          void cleanupFiles(FileIO io, String metadataLocation, BooleanSupplier stillOwned) {
             throw new RuntimeException("transient");
           }
         };
@@ -261,7 +282,7 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testIsNameOccupiedDelegatesToStore() {
+  void testIsNameOccupied() {
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
     try {
