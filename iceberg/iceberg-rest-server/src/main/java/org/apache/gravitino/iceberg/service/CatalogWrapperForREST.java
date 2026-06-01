@@ -96,7 +96,6 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private static final String FORMAT_VERSION = "format-version";
-  private final String catalogName;
   private final CatalogCredentialManager catalogCredentialManager;
 
   private volatile Map<String, String> catalogConfigToClients;
@@ -127,7 +126,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
     super(config);
-    this.catalogName = catalogName;
     // To be compatible with old properties
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
@@ -206,7 +204,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return ImmutableLoadCredentialsResponse.builder()
           .addCredentials(
               IcebergRESTUtils.toRestCredential(
-                  catalogName, identifier, credential, loadTableResponse.tableMetadata()))
+                  catalogCredentialManager.catalogName(),
+                  identifier,
+                  credential,
+                  loadTableResponse.tableMetadata()))
           .build();
     } catch (ServiceUnavailableException e) {
       LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);
@@ -322,7 +323,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     CredentialPropertyUtils.appendRefreshEndpoint(
         credentialConfig,
         credential,
-        IcebergRESTUtils.tableCredentialsPath(catalogName, tableIdentifier));
+        IcebergRESTUtils.tableCredentialsPath(
+            catalogCredentialManager.catalogName(), tableIdentifier));
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
         .addAllConfig(loadTableResponse.config())

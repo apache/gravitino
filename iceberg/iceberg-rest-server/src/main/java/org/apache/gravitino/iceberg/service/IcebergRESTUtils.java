@@ -39,6 +39,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
@@ -121,7 +122,7 @@ public class IcebergRESTUtils {
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
     CredentialPropertyUtils.appendRefreshEndpoint(
         config, credential, tableCredentialsPath(catalogName, tableIdentifier));
-    String prefix = StringUtils.appendIfMissing(tableMetadata.location(), "/");
+    String prefix = Strings.CS.appendIfMissing(tableMetadata.location(), "/");
     return new org.apache.iceberg.rest.credentials.Credential() {
       @Override
       public String prefix() {
