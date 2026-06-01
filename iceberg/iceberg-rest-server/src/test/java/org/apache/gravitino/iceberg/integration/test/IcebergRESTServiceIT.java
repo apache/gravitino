@@ -324,6 +324,27 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
         isNoSuchNamespace(thrown), () -> "Expected a NoSuchNamespace error but got: " + thrown);
   }
 
+  @Test
+  @EnabledIf("isSupportsViewCatalog")
+  void testCreateViewInNonExistentNamespace() {
+    String sourceTable = getTestNamespace() + ".view_source_for_absent_ns";
+    sql(String.format("CREATE TABLE %s (id bigint) using iceberg", sourceTable));
+    // The child namespace is intentionally never created.
+    String namespaceName = getTestNamespace("absent_view_ns");
+    Throwable thrown =
+        Assertions.assertThrows(
+            Throwable.class,
+            () ->
+                sql(
+                    String.format(
+                        "CREATE VIEW %s.view_in_absent AS SELECT * FROM %s",
+                        namespaceName, sourceTable)));
+    // Strict mode must also reject creating a view in a namespace that does not exist, instead of
+    // implicitly creating the namespace.
+    Assertions.assertTrue(
+        isNoSuchNamespace(thrown), () -> "Expected a NoSuchNamespace error but got: " + thrown);
+  }
+
   // Walks the cause chain because the missing namespace may surface as either Spark's or Iceberg's
   // NoSuchNamespaceException, and Spark may wrap it.
   private static boolean isNoSuchNamespace(Throwable thrown) {
