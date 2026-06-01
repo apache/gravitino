@@ -42,6 +42,12 @@ public class IcebergCatalogCapability implements Capability {
     return CapabilityResult.unsupported("Iceberg does not support column default value.");
   }
 
+  @Override
+  public CapabilityResult supportsHierarchicalSchema() {
+    // Iceberg namespaces can be multi-level, so Iceberg supports hierarchical (nested) schemas.
+    return CapabilityResult.SUPPORTED;
+  }
+
   /**
    * Validates the schema name specification for Iceberg.
    *

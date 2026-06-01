@@ -92,6 +92,13 @@ public class TestIcebergCatalogCapability {
   }
 
   @Test
+  public void testSupportsHierarchicalSchema() {
+    IcebergCatalogCapability capability = new IcebergCatalogCapability(":");
+
+    Assertions.assertTrue(capability.supportsHierarchicalSchema().supported());
+  }
+
+  @Test
   public void testCustomSeparatorSlash() {
     IcebergCatalogCapability capability = new IcebergCatalogCapability("/");
 

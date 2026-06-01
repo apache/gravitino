@@ -45,6 +45,18 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
 
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
+    // A namespace with more than two levels ([metalake, catalog]) carries a parentSchema, i.e. the
+    // caller is listing sub-schemas under a parent schema. Catalogs that do not support
+    // hierarchical schemas have no sub-schemas, so we must reject the request instead of returning
+    // the catalog's flat schemas as if they were children of the parent schema (see issue #11317).
+    if (namespace.length() > 2 && !supportsHierarchicalSchema(namespace)) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "The catalog [%s] does not support hierarchical schemas, so listing schemas under a "
+                  + "parent schema is not supported.",
+              NameIdentifier.of(namespace.levels())));
+    }
+
     NameIdentifier[] identifiers = dispatcher.listSchemas(namespace);
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
@@ -82,6 +94,11 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     return dispatcher.dropSchema(normalizeNameIdentifier(ident), cascade);
+  }
+
+  private boolean supportsHierarchicalSchema(Namespace namespace) {
+    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
+    return capabilities.supportsHierarchicalSchema().supported();
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {
