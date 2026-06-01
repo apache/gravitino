@@ -202,9 +202,8 @@ public class IcebergCleanupManager implements AutoCloseable {
     // Data files are the only huge level, so they are streamed and deleted one manifest at a time
     // rather than all collected first; only the smaller manifest/list/metadata paths are held.
     //
-    // requireOwnership stops between levels if a peer reclaimed the job, so we never delete a
-    // parent
-    // while the new owner is still deleting its children.
+    // requireOwnership stops between levels if a peer reclaimed the job, so we never
+    // delete a parent while the new owner is still deleting its children.
     Set<String> manifests = new LinkedHashSet<>();
     deleteDataFiles(io, metadata, manifests, stillOwned);
     requireOwnership(stillOwned);
