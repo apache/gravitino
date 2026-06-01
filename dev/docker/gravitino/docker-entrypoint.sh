@@ -47,9 +47,11 @@ iceberg_rest_lib_dir="${gravitino_dir}/iceberg-rest-server/libs"
 if [ -d "${jdbc_driver_dir}" ]; then
   mkdir -p "${gravitino_dir}/libs"
   mkdir -p "${iceberg_rest_lib_dir}"
+  # Link JDBC drivers for the main Gravitino server.
   find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
   find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
   find "${jdbc_driver_dir}" -name "sqlite-jdbc-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
+  # Link the same JDBC drivers for the auxiliary Iceberg REST service.
   find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${iceberg_rest_lib_dir}/" \;
   find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${iceberg_rest_lib_dir}/" \;
   find "${jdbc_driver_dir}" -name "sqlite-jdbc-*.jar" -exec ln -sfv {} "${iceberg_rest_lib_dir}/" \;
