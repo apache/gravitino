@@ -565,9 +565,7 @@ curl http://127.0.0.1:9001/iceberg/v1/config
 ```
 
 :::note
-If both `gravitino.conf` and an environment variable exist, the container's startup script
-overwrites the configuration file value with the environment variable at startup.
-Set `SKIP_CONFIG_REWRITE=true` to keep a mounted `gravitino.conf` unchanged.
+If both `gravitino.conf` and environment variable exist, the container's startup script will overwrite the config file value with the environment variable.
 :::
 
 
