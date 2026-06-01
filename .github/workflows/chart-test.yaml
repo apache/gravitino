@@ -66,6 +66,10 @@ jobs:
         if: steps.list-changed.outputs.changed == 'true'
         run: helm unittest --with-subchart=false dev/charts/gravitino-iceberg-rest-server
 
+      - name: Unit test Gravitino Lance REST Server chart
+        if: steps.list-changed.outputs.changed == 'true'
+        run: helm unittest --with-subchart=false dev/charts/gravitino-lance-rest-server
+
       - name: Set up kind cluster
         if: steps.list-changed.outputs.changed == 'true'
         uses: container-tools/kind-action@v2
