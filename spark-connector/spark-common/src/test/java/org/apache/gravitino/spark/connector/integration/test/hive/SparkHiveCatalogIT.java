@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -591,7 +590,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
         new SQLRepresentation[] {sparkRep},
         getCatalogName(),
         schemaName,
-        Collections.emptyMap());
+        ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
 
     try {
       List<String> data =
@@ -629,7 +628,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
         new SQLRepresentation[] {sparkRep},
         null,
         null,
-        Collections.emptyMap());
+        ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
 
     try {
       Assertions.assertDoesNotThrow(
@@ -671,7 +670,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
         new SQLRepresentation[] {sparkRep},
         getCatalogName(),
         schemaName,
-        Collections.emptyMap());
+        ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
 
     try {
       Set<String> tableNames = listTableNames(schemaName);

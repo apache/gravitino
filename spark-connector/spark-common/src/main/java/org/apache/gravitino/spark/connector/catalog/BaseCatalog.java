@@ -324,7 +324,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       return gravitinoCatalogClient
           .asViewCatalog()
           .viewExists(NameIdentifier.of(getDatabase(ident), ident.name()));
-    } catch (UnsupportedOperationException | ForbiddenException e) {
+    } catch (UnsupportedOperationException e) {
+      return false;
+    } catch (ForbiddenException e) {
+      // Same rationale as the table check above: lacking LOAD_VIEW privilege is treated as
+      // non-existence so that CREATE TABLE IF NOT EXISTS can proceed.
       return false;
     }
   }
@@ -440,24 +444,19 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
    * @throws NoSuchTableException if no view exists or views are not supported by this catalog
    */
   protected Table loadViewAsTable(Identifier ident) throws NoSuchTableException {
+    View gravitinoView;
     try {
-      View gravitinoView =
+      gravitinoView =
           gravitinoCatalogClient
               .asViewCatalog()
               .loadView(NameIdentifier.of(getDatabase(ident), ident.name()));
-      // Load the Kyuubi HiveTable for the view's HMS entry (VIRTUAL_VIEW) to reuse its
-      // catalogTable metadata when constructing SparkHiveView's parent HiveTable.
-      Table sparkTable = loadSparkTable(ident);
-      return createSparkView(ident, gravitinoView, sparkTable);
     } catch (NoSuchViewException | UnsupportedOperationException e) {
       throw new NoSuchTableException(ident);
-    } catch (RuntimeException e) {
-      if (e.getCause() instanceof NoSuchTableException) {
-        // loadSparkTable found no HMS entry for the view identifier
-        throw new NoSuchTableException(ident);
-      }
-      throw e;
     }
+    // Call sparkCatalog.loadTable directly to surface NoSuchTableException as checked,
+    // avoiding the RuntimeException wrapping in loadSparkTable.
+    Table sparkTable = sparkCatalog.loadTable(ident);
+    return createSparkView(ident, gravitinoView, sparkTable);
   }
 
   /**
