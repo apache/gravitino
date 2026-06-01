@@ -66,7 +66,6 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
-import org.apache.gravitino.storage.relational.EntityChangeLogPoller;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -653,9 +652,10 @@ public class TestCatalogManager {
     Assertions.assertNotNull(catalogManager.loadCatalogAndWrap(ident));
     Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
 
-    // registerToPoller enables trackLocalMutations; use a mock so we don't need a live DB.
-    EntityChangeLogPoller mockPoller = Mockito.mock(EntityChangeLogPoller.class);
-    catalogManager.registerToPoller(mockPoller);
+    // Enable local-mutation tracking, which a CatalogManager backed by a change-log-aware store
+    // would have turned on in its constructor. The in-memory store used here does not support a
+    // change log, so set it explicitly.
+    catalogManager.setTrackLocalMutations(true);
     catalogManager.markLocalMutation(ident);
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);

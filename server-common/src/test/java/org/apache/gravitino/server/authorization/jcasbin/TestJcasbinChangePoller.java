@@ -31,7 +31,7 @@ import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Tests for {@link JcasbinChangePoller} static helpers. */
+/** Tests for {@link JcasbinChangeListener} static helpers. */
 public class TestJcasbinChangePoller {
 
   @Test
@@ -41,30 +41,30 @@ public class TestJcasbinChangePoller {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> new JcasbinChangePoller(metadataIdCache, ownerRelCache, 0));
+        () -> new JcasbinChangeListener(metadataIdCache, ownerRelCache, 0));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> new JcasbinChangePoller(metadataIdCache, ownerRelCache, -1));
+        () -> new JcasbinChangeListener(metadataIdCache, ownerRelCache, -1));
   }
 
   @Test
   void testChangeLogFullNameStripsLeadingMetalakeForChildTypes() {
     MetadataObject catalog =
-        JcasbinChangePoller.metadataObjectFromChangeLog(
+        JcasbinChangeListener.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1", MetadataObject.Type.CATALOG);
     Assertions.assertEquals(
         key("ml1", "CATALOG", "cat1", ""),
         JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", catalog));
 
     MetadataObject schema =
-        JcasbinChangePoller.metadataObjectFromChangeLog(
+        JcasbinChangeListener.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1.sch1", MetadataObject.Type.SCHEMA);
     Assertions.assertEquals(
         key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", ""),
         JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", schema));
 
     MetadataObject table =
-        JcasbinChangePoller.metadataObjectFromChangeLog(
+        JcasbinChangeListener.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1.sch1.tbl1", MetadataObject.Type.TABLE);
     Assertions.assertEquals(
         key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", ""),
@@ -74,7 +74,8 @@ public class TestJcasbinChangePoller {
   @Test
   void testChangeLogFullNameForMetalakeKeepsItself() {
     MetadataObject metalake =
-        JcasbinChangePoller.metadataObjectFromChangeLog("ml1", "ml1", MetadataObject.Type.METALAKE);
+        JcasbinChangeListener.metadataObjectFromChangeLog(
+            "ml1", "ml1", MetadataObject.Type.METALAKE);
     Assertions.assertEquals(
         key("ml1", "METALAKE", ""),
         JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
@@ -85,7 +86,7 @@ public class TestJcasbinChangePoller {
     RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
     RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
 
-    JcasbinChangePoller poller = new JcasbinChangePoller(metadataIdCache, ownerRelCache, 1);
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
     poller.onEntityChange(
         List.of(
             change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"),
@@ -103,9 +104,9 @@ public class TestJcasbinChangePoller {
 
   @Test
   void testPollCursorAdvancementIsSynchronized() throws NoSuchMethodException {
-    Method pollOwnerChanges = JcasbinChangePoller.class.getDeclaredMethod("pollOwnerChanges");
+    Method pollOwnerChanges = JcasbinChangeListener.class.getDeclaredMethod("pollOwnerChanges");
     Method onEntityChange =
-        JcasbinChangePoller.class.getDeclaredMethod("onEntityChange", List.class);
+        JcasbinChangeListener.class.getDeclaredMethod("onEntityChange", List.class);
 
     Assertions.assertTrue(Modifier.isSynchronized(pollOwnerChanges.getModifiers()));
     Assertions.assertTrue(Modifier.isSynchronized(onEntityChange.getModifiers()));

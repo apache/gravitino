@@ -19,8 +19,6 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -103,8 +101,6 @@ import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.storage.relational.EntityChangeLogPoller;
-import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
 import org.slf4j.Logger;
@@ -122,8 +118,6 @@ public class GravitinoEnv {
   private boolean manageFullComponents = true;
 
   private EntityStore entityStore;
-
-  private EntityChangeLogPoller entityChangeLogPoller;
 
   private CatalogDispatcher catalogDispatcher;
 
@@ -443,16 +437,6 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the global entity change log poller if the current entity store supports it.
-   *
-   * @return the global entity change log poller, or null when it is not available
-   */
-  @Nullable
-  public EntityChangeLogPoller entityChangeLogPoller() {
-    return entityChangeLogPoller;
-  }
-
-  /**
    * Get The GravitinoAuthorizer
    *
    * @return the GravitinoAuthorizer instance
@@ -483,9 +467,6 @@ public class GravitinoEnv {
     metricsSystem.start();
     eventListenerManager.start();
     if (manageFullComponents) {
-      if (entityChangeLogPoller != null) {
-        entityChangeLogPoller.start();
-      }
       auxServiceManager.serviceStart();
     }
   }
@@ -493,14 +474,6 @@ public class GravitinoEnv {
   /** Shutdown the Gravitino environment. */
   public void shutdown() {
     LOG.info("Shutting down Gravitino Environment...");
-
-    if (entityChangeLogPoller != null) {
-      try {
-        entityChangeLogPoller.close();
-      } catch (Exception e) {
-        LOG.warn("Failed to close EntityChangeLogPoller.", e);
-      }
-    }
 
     if (entityStore != null) {
       try {
@@ -591,20 +564,9 @@ public class GravitinoEnv {
     // Create and initialize Catalog related modules, the operation chain is:
     // CatalogHookDispatcher -> CatalogEventDispatcher -> CatalogNormalizeDispatcher ->
     // CatalogManager
+    // CatalogManager registers its own change-log listener with the entity store (when the store
+    // supports it), so no poller wiring is needed here.
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    this.entityChangeLogPoller = null;
-    if (entityStore instanceof RelationalEntityStore) {
-      this.entityChangeLogPoller =
-          new EntityChangeLogPoller(
-              config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
-              TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
-              TimeUnit.SECONDS.toMillis(
-                  config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
-      // Registration and local-mutation tracking are encapsulated in CatalogManager so that
-      // CatalogChangeLogListener remains an implementation detail of that class rather than
-      // being wired externally here.
-      catalogManager.registerToPoller(entityChangeLogPoller);
-    }
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);
     CatalogEventDispatcher catalogEventDispatcher =

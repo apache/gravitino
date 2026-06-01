@@ -35,7 +35,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * falls back to a shared {@link GravitinoCache} on a request miss, and finally issues a single DB
  * query on a cache miss. A successful DB fetch populates both tiers so subsequent calls — in this
  * request and later ones — hit the cache. The two underlying caches are invalidated externally by
- * the global entity change log poller, {@link JcasbinChangePoller} (owner changes), and by the
+ * the global entity change log poller, {@link JcasbinChangeListener} (owner changes), and by the
  * {@link org.apache.gravitino.authorization.GravitinoAuthorizer#handleMetadataOwnerChange} / {@link
  * org.apache.gravitino.authorization.GravitinoAuthorizer#handleEntityNameIdMappingChange} hooks
  * (local mutations).

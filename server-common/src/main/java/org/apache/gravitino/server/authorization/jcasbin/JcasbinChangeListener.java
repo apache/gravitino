@@ -52,9 +52,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Other Gravitino nodes therefore observe ALTER/DROP and owner changes within one poll interval.
  */
-public class JcasbinChangePoller implements EntityChangeLogListener, AutoCloseable {
+public class JcasbinChangeListener implements EntityChangeLogListener, AutoCloseable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JcasbinChangePoller.class);
+  private static final Logger LOG = LoggerFactory.getLogger(JcasbinChangeListener.class);
 
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;
@@ -74,7 +74,7 @@ public class JcasbinChangePoller implements EntityChangeLogListener, AutoCloseab
    * @param ownerRelCache the owner cache to invalidate on owner changes
    * @param pollIntervalSecs interval between successive polling cycles
    */
-  public JcasbinChangePoller(
+  public JcasbinChangeListener(
       GravitinoCache<String, Long> metadataIdCache,
       GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache,
       long pollIntervalSecs) {

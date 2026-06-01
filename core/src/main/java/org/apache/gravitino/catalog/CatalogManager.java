@@ -29,6 +29,7 @@ import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -105,7 +106,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.storage.relational.EntityChangeLogPoller;
+import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -338,6 +339,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             .setNameFormat("catalog-cleaner-%d")
                             .build())))
             .build();
+
+    // If the entity store maintains a change log, register a listener that invalidates this
+    // manager's local catalog cache from cross-node changes, and enable local-mutation tracking so
+    // changes made by this node are not redundantly re-invalidated. Registration is the last step
+    // of
+    // the constructor so the listener never sees a half-initialized manager (catalogCache and
+    // localMutationCounts are already set). CatalogChangeLogListener stays an implementation detail
+    // of this class rather than being wired externally.
+    if (store instanceof SupportsEntityChangeLog) {
+      this.trackLocalMutations = true;
+      ((SupportsEntityChangeLog) store)
+          .registerEntityChangeLogListener(new CatalogChangeLogListener(this));
+    }
   }
 
   /**
@@ -401,16 +415,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return consumed[0];
   }
 
-  /**
-   * Registers this {@link CatalogManager} as a listener on the given {@link EntityChangeLogPoller}
-   * and enables local-mutation tracking. This is the preferred wiring point because {@link
-   * CatalogChangeLogListener} is an implementation detail of this class.
-   *
-   * @param poller the global entity-change-log poller to register with
-   */
-  public void registerToPoller(EntityChangeLogPoller poller) {
-    this.trackLocalMutations = true;
-    poller.registerListener(new CatalogChangeLogListener(this));
+  @VisibleForTesting
+  void setTrackLocalMutations(boolean trackLocalMutations) {
+    this.trackLocalMutations = trackLocalMutations;
   }
 
   /**
