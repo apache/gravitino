@@ -106,7 +106,7 @@ public class TestIcebergRESTUtils {
     TableMetadata tableMetadata = mock(TableMetadata.class);
     when(tableMetadata.location()).thenReturn("s3://bucket/t/");
     org.apache.iceberg.rest.credentials.Credential credential =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
             "my_catalog", table, new S3TokenCredential("k", "s", "t", 99L), tableMetadata);
     Assertions.assertEquals(
         "v1/my_catalog/namespaces/ns/tables/tbl/credentials",
@@ -114,13 +114,13 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToRestCredential() {
+  void testToRESTCredential() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     String refreshPath = "v1/cat/namespaces/ns/tables/tbl/credentials";
     TableMetadata metadataWithSlash = mock(TableMetadata.class);
     when(metadataWithSlash.location()).thenReturn("s3://bucket/t/");
     org.apache.iceberg.rest.credentials.Credential credentialWithSlash =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
             "cat", table, new S3TokenCredential("k", "s", "t", 99L), metadataWithSlash);
     Assertions.assertEquals("s3://bucket/t/", credentialWithSlash.prefix());
     Assertions.assertEquals(
@@ -131,18 +131,18 @@ public class TestIcebergRESTUtils {
     TableMetadata metadataWithoutSlash = mock(TableMetadata.class);
     when(metadataWithoutSlash.location()).thenReturn("s3://bucket/path/to/table");
     org.apache.iceberg.rest.credentials.Credential credentialWithoutSlash =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
             "cat", table, new S3TokenCredential("k", "s", "t", 99L), metadataWithoutSlash);
     Assertions.assertEquals("s3://bucket/path/to/table/", credentialWithoutSlash.prefix());
   }
 
   @Test
-  void testToRestCredentialForS3Token() {
+  void testToRESTCredentialForS3Token() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     TableMetadata tableMetadata = mock(TableMetadata.class);
     when(tableMetadata.location()).thenReturn("s3://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
                 "aws", table, new S3TokenCredential("key", "secret", "token", 1234L), tableMetadata)
             .config();
 
@@ -153,12 +153,12 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToRestCredentialForAwsIrsa() {
+  void testToRESTCredentialForAwsIrsa() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     TableMetadata tableMetadata = mock(TableMetadata.class);
     when(tableMetadata.location()).thenReturn("s3://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
                 "aws", table, new AwsIrsaCredential("key", "secret", "token", 4321L), tableMetadata)
             .config();
 
@@ -169,12 +169,12 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToRestCredentialConfigIsUnmodifiable() {
+  void testToRESTCredentialConfigIsUnmodifiable() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     TableMetadata tableMetadata = mock(TableMetadata.class);
     when(tableMetadata.location()).thenReturn("s3://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
                 "aws", table, new S3TokenCredential("k", "s", "t", 99L), tableMetadata)
             .config();
 
@@ -182,12 +182,12 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToRestCredentialForGcsToken() {
+  void testToRESTCredentialForGcsToken() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     TableMetadata tableMetadata = mock(TableMetadata.class);
     when(tableMetadata.location()).thenReturn("gs://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
                 "gcs", table, new GCSTokenCredential("gcs-token", 5678L), tableMetadata)
             .config();
 
@@ -198,12 +198,12 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToRestCredentialForOssToken() {
+  void testToRESTCredentialForOssToken() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     TableMetadata tableMetadata = mock(TableMetadata.class);
     when(tableMetadata.location()).thenReturn("oss://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
                 "oss",
                 table,
                 new OSSTokenCredential("key", "secret", "oss-token", 9012L),
@@ -217,12 +217,12 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToRestCredentialForAdlsToken() {
+  void testToRESTCredentialForAdlsToken() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     TableMetadata tableMetadata = mock(TableMetadata.class);
     when(tableMetadata.location()).thenReturn("abfss://container@account.dfs.core.windows.net/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
                 "adls",
                 table,
                 new ADLSTokenCredential("storageacct", "sas-token", 3456L),
@@ -236,12 +236,12 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToRestCredentialOmitsStaticSecretKey() {
+  void testToRESTCredentialOmitsStaticSecretKey() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     TableMetadata tableMetadata = mock(TableMetadata.class);
     when(tableMetadata.location()).thenReturn("s3://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
                 "aws", table, new S3SecretKeyCredential("key", "secret"), tableMetadata)
             .config();
 

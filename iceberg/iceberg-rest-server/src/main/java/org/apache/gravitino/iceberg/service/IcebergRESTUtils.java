@@ -111,7 +111,7 @@ public class IcebergRESTUtils {
    * @param tableMetadata table metadata used to derive the storage prefix
    * @return Iceberg REST credential with prefix and config
    */
-  public static org.apache.iceberg.rest.credentials.Credential toRestCredential(
+  public static org.apache.iceberg.rest.credentials.Credential toRESTCredential(
       String catalogName,
       TableIdentifier tableIdentifier,
       Credential credential,
@@ -119,20 +119,20 @@ public class IcebergRESTUtils {
     Map<String, String> config =
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
 
-    String refreshProperty = null;
+    String refreshEndpointProp = null;
     if (credential instanceof GCSTokenCredential) {
-      refreshProperty = GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT;
+      refreshEndpointProp = GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT;
     } else if (credential instanceof ADLSTokenCredential) {
-      refreshProperty = ADLS_REFRESH_CREDENTIALS_ENDPOINT;
+      refreshEndpointProp = ADLS_REFRESH_CREDENTIALS_ENDPOINT;
     } else if (credential instanceof S3TokenCredential
         || credential instanceof AwsIrsaCredential
         || credential instanceof OSSTokenCredential) {
-      refreshProperty = CLIENT_REFRESH_CREDENTIALS_ENDPOINT;
+      refreshEndpointProp = CLIENT_REFRESH_CREDENTIALS_ENDPOINT;
     }
 
-    if (refreshProperty != null) {
+    if (refreshEndpointProp != null) {
       config.put(
-          refreshProperty,
+          refreshEndpointProp,
           String.format(
               "v1/%s/namespaces/%s/tables/%s/credentials",
               RESTUtil.encodeString(catalogName),

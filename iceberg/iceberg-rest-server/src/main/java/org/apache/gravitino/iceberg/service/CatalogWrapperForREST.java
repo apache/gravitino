@@ -203,7 +203,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       Credential credential = getCredential(loadTableResponse.tableMetadata(), privilege);
       return ImmutableLoadCredentialsResponse.builder()
           .addCredentials(
-              IcebergRESTUtils.toRestCredential(
+              IcebergRESTUtils.toRESTCredential(
                   catalogCredentialManager.catalogName(),
                   identifier,
                   credential,
@@ -319,7 +319,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     // Merge temporary credential fields as Iceberg client config entries in the load-table
     // response.
     Map<String, String> credentialConfig =
-        IcebergRESTUtils.toRestCredential(
+        IcebergRESTUtils.toRESTCredential(
                 catalogCredentialManager.catalogName(),
                 tableIdentifier,
                 credential,
