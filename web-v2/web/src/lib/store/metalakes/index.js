@@ -879,6 +879,7 @@ export const fetchSchemas = createAsyncThunk(
 
       if (isCanceledRequest) {
         const catalogKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
+
         const parentKey = parentSchema
           ? `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${parentSchema}}}`
           : catalogKey

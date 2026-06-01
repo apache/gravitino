@@ -24,6 +24,7 @@ import { Tooltip, Dropdown } from 'antd'
 import Tags from '@/components/CustomTags'
 import Policies from '@/components/PolicyTag'
 import Icons from '@/components/Icons'
+
 export function buildSchemaColumns({
   currentMetalake,
   catalog,
