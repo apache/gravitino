@@ -21,7 +21,6 @@ package org.apache.gravitino.spark.connector.hive;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -34,10 +33,7 @@ import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.connector.read.Batch;
-import org.apache.spark.sql.connector.read.InputPartition;
-import org.apache.spark.sql.connector.read.PartitionReader;
-import org.apache.spark.sql.connector.read.PartitionReaderFactory;
+import org.apache.spark.sql.connector.read.LocalScan;
 import org.apache.spark.sql.connector.read.Scan;
 import org.apache.spark.sql.connector.read.ScanBuilder;
 import org.apache.spark.sql.types.DataTypes;
@@ -54,9 +50,8 @@ import org.slf4j.LoggerFactory;
  * the view's SQL (spark dialect preferred, hive as fallback) instead of using Kyuubi's file-based
  * scan, which returns empty results for VIRTUAL_VIEW entries.
  *
- * <p><b>Note:</b> View results are materialized on the driver via {@code executeCollect()}. This is
- * intentional to avoid executor-side SparkSession access, but limits scalability to views whose
- * results fit in driver memory.
+ * <p>Uses {@link LocalScan} so Spark executes the view on the driver without serializing rows to
+ * executors.
  */
 public class SparkHiveView extends HiveTable {
 
@@ -91,8 +86,14 @@ public class SparkHiveView extends HiveTable {
   @Override
   @SuppressWarnings("deprecation")
   public StructType schema() {
+    org.apache.gravitino.rel.Column[] columns = gravitinoView.columns();
+    if (columns.length == 0) {
+      // View API allows an empty column array when the output schema is unknown;
+      // fall back to the HMS-derived schema from the parent HiveTable.
+      return super.schema();
+    }
     List<StructField> fields =
-        Arrays.stream(gravitinoView.columns())
+        Arrays.stream(columns)
             .map(
                 column -> {
                   String comment = column.comment();
@@ -148,10 +149,10 @@ public class SparkHiveView extends HiveTable {
   }
 
   /**
-   * A ScanBuilder that executes the view's SQL via SparkSession and returns the resulting rows.
-   * This is used for views in V2 catalogs where Kyuubi's file-based scan cannot expand the view.
+   * A ScanBuilder that executes the view's SQL via SparkSession using {@link LocalScan}. Spark
+   * treats LocalScan results as driver-local data and never serializes rows to executors.
    */
-  private static class ViewScanBuilder implements ScanBuilder, Scan, Batch, PartitionReaderFactory {
+  private static class ViewScanBuilder implements ScanBuilder, Scan, LocalScan {
 
     private final SparkSession spark;
     private final String viewSql;
@@ -174,57 +175,12 @@ public class SparkHiveView extends HiveTable {
     }
 
     @Override
-    public Batch toBatch() {
-      return this;
-    }
-
-    @Override
-    public InputPartition[] planInputPartitions() {
+    public InternalRow[] rows() {
       try {
-        InternalRow[] rows = spark.sql(viewSql).queryExecution().executedPlan().executeCollect();
-        return new InputPartition[] {new ViewPartition(rows)};
+        return spark.sql(viewSql).queryExecution().executedPlan().executeCollect();
       } catch (RuntimeException e) {
         throw new RuntimeException(
             String.format("Failed to execute view SQL [%s]: %s", viewSql, e.getMessage()), e);
-      }
-    }
-
-    @Override
-    public PartitionReaderFactory createReaderFactory() {
-      return this;
-    }
-
-    @Override
-    public PartitionReader<InternalRow> createReader(InputPartition partition) {
-      InternalRow[] rows = ((ViewPartition) partition).rows;
-      Iterator<InternalRow> iter = Arrays.asList(rows).iterator();
-      return new PartitionReader<InternalRow>() {
-        private InternalRow current;
-
-        @Override
-        public boolean next() {
-          if (iter.hasNext()) {
-            current = iter.next();
-            return true;
-          }
-          return false;
-        }
-
-        @Override
-        public InternalRow get() {
-          return current;
-        }
-
-        @Override
-        public void close() {}
-      };
-    }
-
-    private static class ViewPartition implements InputPartition {
-      final InternalRow[] rows;
-
-      ViewPartition(InternalRow[] rows) {
-        this.rows = rows;
       }
     }
   }
