@@ -59,7 +59,6 @@ dependencies {
   implementation(libs.hadoop3.shaded.protobuf)
   implementation(libs.commons.configuration2)
   implementation(libs.re2j)
-  implementation(libs.htrace.core4)
   implementation(libs.slf4j.api)
   implementation(libs.woodstox.core)
 
@@ -131,7 +130,6 @@ dependencies {
   testImplementation(libs.hadoop3.shaded.protobuf)
   testImplementation(libs.commons.configuration2)
   testImplementation(libs.re2j)
-  testImplementation(libs.htrace.core4)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
