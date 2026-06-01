@@ -92,13 +92,16 @@ jobs:
           # MySQL JDBC driver: the entity store needs the connector in libs/, not
           # only under catalogs/jdbc-mysql/libs/ (which is for the JDBC catalog
           # backend, not the entity store).
-          JDBC_JAR=distribution/package/libs/mysql-connector-java-8.0.33.jar
+          # mysql-connector-java was renamed to mysql-connector-j starting with 8.0.31
+          # (new Maven group: com.mysql). Use the new coordinates to match the version
+          # declared in gradle/libs.versions.toml.
+          JDBC_JAR=distribution/package/libs/mysql-connector-j-8.0.33.jar
           curl -fsSL \
-            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.33/mysql-connector-java-8.0.33.jar \
+            https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar \
             -o "$JDBC_JAR"
           # Verify integrity against Maven Central's published SHA-1.
           EXPECTED_SHA1="$(curl -fsSL \
-            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.33/mysql-connector-java-8.0.33.jar.sha1)"
+            https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar.sha1)"
           echo "${EXPECTED_SHA1}  ${JDBC_JAR}" | sha1sum --check
 
           # Second instance is a full copy with its own conf/, logs/, data/.
