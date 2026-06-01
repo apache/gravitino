@@ -31,7 +31,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogDispatcher;
-import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.lance.common.config.LanceConfig;
@@ -256,7 +255,7 @@ public class TestGravitinoLanceNamespaceWrapper {
   }
 
   @Test
-  public void testCreateCatalogFetcherUsesHttpClientInStandaloneMode() {
+  public void testCreateCatalogOperatorUsesHttpClientInStandaloneMode() {
     LanceConfig lanceConfig =
         new LanceConfig(
             ImmutableMap.of(
@@ -265,19 +264,19 @@ public class TestGravitinoLanceNamespaceWrapper {
                 LanceConfig.INTERNAL_AUX_MODE.getKey(), "false"));
     GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig);
 
-    GravitinoLanceNamespaceWrapper.CatalogFetcher fetcher =
-        wrapper.createCatalogFetcher("test_metalake");
+    GravitinoLanceNamespaceWrapper.CatalogOperator operator =
+        wrapper.createCatalogOperator("test_metalake");
 
-    Assertions.assertEquals("HttpCatalogFetcher", fetcher.getClass().getSimpleName());
-    Assertions.assertDoesNotThrow(fetcher::close);
+    Assertions.assertEquals("HttpCatalogOperator", operator.getClass().getSimpleName());
+    Assertions.assertDoesNotThrow(operator::close);
   }
 
   @Test
-  public void testLoadAndValidateLakehouseCatalogUsesCatalogFetcher() {
+  public void testLoadAndValidateLakehouseCatalogUsesCatalogOperator() {
     GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper();
     Catalog expectedCatalog = createCatalogProxy(Catalog.Type.RELATIONAL, "lakehouse-generic");
-    wrapper.setCatalogFetcher(
-        new GravitinoLanceNamespaceWrapper.CatalogFetcher() {
+    wrapper.setCatalogOperator(
+        new GravitinoLanceNamespaceWrapper.CatalogOperator() {
           @Override
           public Catalog[] listCatalogsInfo() {
             return new Catalog[0];
@@ -344,8 +343,6 @@ public class TestGravitinoLanceNamespaceWrapper {
             new Class<?>[] {CatalogDispatcher.class},
             (proxy, method, args) -> null),
         true);
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "catalogManager", allocateCatalogManager(), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
 
     LanceConfig lanceConfig =
@@ -403,8 +400,6 @@ public class TestGravitinoLanceNamespaceWrapper {
             new Class<?>[] {CatalogDispatcher.class},
             (proxy, method, args) -> null),
         true);
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "catalogManager", allocateCatalogManager(), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
 
     LanceConfig lanceConfig =
@@ -444,16 +439,6 @@ public class TestGravitinoLanceNamespaceWrapper {
             Table.class.getClassLoader(),
             new Class<?>[] {Table.class},
             (proxy, method, args) -> null);
-  }
-
-  private CatalogManager allocateCatalogManager() throws Exception {
-    Object unsafe =
-        FieldUtils.readDeclaredStaticField(Class.forName("sun.misc.Unsafe"), "theUnsafe", true);
-    return (CatalogManager)
-        unsafe
-            .getClass()
-            .getMethod("allocateInstance", Class.class)
-            .invoke(unsafe, CatalogManager.class);
   }
 
   private Catalog createCatalogProxy(Catalog.Type type, String provider) {
