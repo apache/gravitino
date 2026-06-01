@@ -22,13 +22,10 @@ package org.apache.gravitino.iceberg.service;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.ADLSTokenCredential;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -113,6 +110,7 @@ public class TestIcebergRESTUtils {
   @Test
   void testToRestCredential() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    String refreshPath = "v1/cat/namespaces/ns/tables/tbl/credentials";
     TableMetadata metadataWithSlash = mock(TableMetadata.class);
     when(metadataWithSlash.location()).thenReturn("s3://bucket/t/");
     org.apache.iceberg.rest.credentials.Credential credentialWithSlash =
@@ -121,6 +119,8 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals("s3://bucket/t/", credentialWithSlash.prefix());
     Assertions.assertEquals(
         "99", credentialWithSlash.config().get("s3.session-token-expires-at-ms"));
+    Assertions.assertEquals(
+        refreshPath, credentialWithSlash.config().get("client.refresh-credentials-endpoint"));
 
     TableMetadata metadataWithoutSlash = mock(TableMetadata.class);
     when(metadataWithoutSlash.location()).thenReturn("s3://bucket/path/to/table");
@@ -131,71 +131,60 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testAppendRefreshEndpointForS3Token() {
+  void testToClientCredentialConfigForS3Token() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     Map<String, String> config =
-        new HashMap<>(
-            CredentialPropertyUtils.toIcebergProperties(
-                new S3TokenCredential("key", "secret", "token", 1234L)));
-    IcebergRESTUtils.appendRefreshEndpoint(
-        config,
-        new S3TokenCredential("key", "secret", "token", 1234L),
-        "v1/aws/namespaces/ns/tables/tbl/credentials");
+        IcebergRESTUtils.toClientCredentialConfig(
+            "aws", table, new S3TokenCredential("key", "secret", "token", 1234L));
 
     Assertions.assertEquals(
         "v1/aws/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergRESTUtils.S3_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get("client.refresh-credentials-endpoint"));
   }
 
   @Test
-  void testAppendRefreshEndpointForGcsToken() {
-    Credential gcsToken = new GCSTokenCredential("gcs-token", 5678L);
+  void testToClientCredentialConfigForGcsToken() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     Map<String, String> config =
-        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(gcsToken));
-    IcebergRESTUtils.appendRefreshEndpoint(
-        config, gcsToken, "v1/gcs/namespaces/ns/tables/tbl/credentials");
+        IcebergRESTUtils.toClientCredentialConfig(
+            "gcs", table, new GCSTokenCredential("gcs-token", 5678L));
 
     Assertions.assertEquals(
         "v1/gcs/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergRESTUtils.GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get("gcs.oauth2.refresh-credentials-endpoint"));
   }
 
   @Test
-  void testAppendRefreshEndpointForOssToken() {
-    Credential ossToken = new OSSTokenCredential("key", "secret", "oss-token", 9012L);
+  void testToClientCredentialConfigForOssToken() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     Map<String, String> config =
-        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(ossToken));
-    IcebergRESTUtils.appendRefreshEndpoint(
-        config, ossToken, "v1/oss/namespaces/ns/tables/tbl/credentials");
+        IcebergRESTUtils.toClientCredentialConfig(
+            "oss", table, new OSSTokenCredential("key", "secret", "oss-token", 9012L));
 
     Assertions.assertEquals(
         "v1/oss/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergRESTUtils.OSS_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get("client.refresh-credentials-endpoint"));
   }
 
   @Test
-  void testAppendRefreshEndpointForAdlsToken() {
-    Credential adlsToken = new ADLSTokenCredential("storageacct", "sas-token", 3456L);
+  void testToClientCredentialConfigForAdlsToken() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     Map<String, String> config =
-        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(adlsToken));
-    IcebergRESTUtils.appendRefreshEndpoint(
-        config, adlsToken, "v1/adls/namespaces/ns/tables/tbl/credentials");
+        IcebergRESTUtils.toClientCredentialConfig(
+            "adls", table, new ADLSTokenCredential("storageacct", "sas-token", 3456L));
 
     Assertions.assertEquals(
         "v1/adls/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergRESTUtils.ADLS_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get("adls.refresh-credentials-endpoint"));
   }
 
   @Test
-  void testAppendRefreshEndpointOmitsStaticSecretKey() {
+  void testToClientCredentialConfigOmitsStaticSecretKey() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
     Map<String, String> config =
-        new HashMap<>(
-            CredentialPropertyUtils.toIcebergProperties(
-                new S3SecretKeyCredential("key", "secret")));
-    IcebergRESTUtils.appendRefreshEndpoint(
-        config,
-        new S3SecretKeyCredential("key", "secret"),
-        "v1/aws/namespaces/ns/tables/tbl/credentials");
+        IcebergRESTUtils.toClientCredentialConfig(
+            "aws", table, new S3SecretKeyCredential("key", "secret"));
 
-    Assertions.assertFalse(config.containsKey(IcebergRESTUtils.S3_REFRESH_CREDENTIALS_ENDPOINT));
+    Assertions.assertFalse(config.containsKey("client.refresh-credentials-endpoint"));
   }
 }

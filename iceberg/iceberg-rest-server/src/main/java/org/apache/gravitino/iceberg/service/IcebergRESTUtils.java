@@ -19,7 +19,6 @@
 package org.apache.gravitino.iceberg.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -75,18 +74,14 @@ public class IcebergRESTUtils {
 
   public static final String SNAPSHOT_REFS = "refs";
 
-  @VisibleForTesting
-  static final String S3_REFRESH_CREDENTIALS_ENDPOINT = "client.refresh-credentials-endpoint";
+  private static final String CLIENT_REFRESH_CREDENTIALS_ENDPOINT =
+      "client.refresh-credentials-endpoint";
 
-  @VisibleForTesting
-  static final String OSS_REFRESH_CREDENTIALS_ENDPOINT = "client.refresh-credentials-endpoint";
-
-  @VisibleForTesting
-  static final String GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
+  private static final String GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
       "gcs.oauth2.refresh-credentials-endpoint";
 
-  @VisibleForTesting
-  static final String ADLS_REFRESH_CREDENTIALS_ENDPOINT = "adls.refresh-credentials-endpoint";
+  private static final String ADLS_REFRESH_CREDENTIALS_ENDPOINT =
+      "adls.refresh-credentials-endpoint";
 
   /** Snapshot modes for the Iceberg loadTable endpoint. */
   public enum SnapshotMode {
@@ -123,45 +118,23 @@ public class IcebergRESTUtils {
   }
 
   /**
-   * Appends the table-scoped refresh endpoint to {@code config} when the credential type supports
-   * refresh.
+   * Builds Iceberg client config for a vended credential, including the table-scoped refresh
+   * endpoint when the credential type supports refresh.
    *
-   * <p>Callers should start from {@link CredentialPropertyUtils#toIcebergProperties(Credential)}
-   * and supply the relative credentials path from the Iceberg REST catalog (for example {@code
-   * v1/{catalog}/namespaces/{ns}/tables/{table}/credentials}).
-   *
-   * @param config mutable Iceberg client config map
+   * @param catalogName IRC catalog name used in the refresh path
+   * @param tableIdentifier table receiving the credential
    * @param credential Gravitino credential to vend
-   * @param refreshEndpointPath relative path for the table credentials refresh endpoint
+   * @return Iceberg client config map
    */
-  public static void appendRefreshEndpoint(
-      Map<String, String> config, Credential credential, String refreshEndpointPath) {
-    refreshEndpointProperty(credential)
-        .ifPresent(property -> config.put(property, refreshEndpointPath));
-  }
-
-  /**
-   * Iceberg catalog property name for the refresh endpoint, if this credential type expires and
-   * supports catalog refresh.
-   *
-   * @param credential Gravitino credential
-   * @return refresh-endpoint property key, or empty when refresh is not applicable
-   */
-  @VisibleForTesting
-  static Optional<String> refreshEndpointProperty(Credential credential) {
-    if (credential instanceof GCSTokenCredential) {
-      return Optional.of(GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT);
+  public static Map<String, String> toClientCredentialConfig(
+      String catalogName, TableIdentifier tableIdentifier, Credential credential) {
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+    String refreshProperty = refreshEndpointProperty(credential);
+    if (refreshProperty != null) {
+      config.put(refreshProperty, tableCredentialsPath(catalogName, tableIdentifier));
     }
-    if (credential instanceof ADLSTokenCredential) {
-      return Optional.of(ADLS_REFRESH_CREDENTIALS_ENDPOINT);
-    }
-    if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
-      return Optional.of(S3_REFRESH_CREDENTIALS_ENDPOINT);
-    }
-    if (credential instanceof OSSTokenCredential) {
-      return Optional.of(OSS_REFRESH_CREDENTIALS_ENDPOINT);
-    }
-    return Optional.empty();
+    return config;
   }
 
   /**
@@ -179,9 +152,7 @@ public class IcebergRESTUtils {
       TableIdentifier tableIdentifier,
       Credential credential,
       TableMetadata tableMetadata) {
-    Map<String, String> config =
-        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
-    appendRefreshEndpoint(config, credential, tableCredentialsPath(catalogName, tableIdentifier));
+    Map<String, String> config = toClientCredentialConfig(catalogName, tableIdentifier, credential);
     String prefix = Strings.CS.appendIfMissing(tableMetadata.location(), "/");
     return new org.apache.iceberg.rest.credentials.Credential() {
       @Override
@@ -376,6 +347,22 @@ public class IcebergRESTUtils {
       }
     }
     return headers;
+  }
+
+  private static String refreshEndpointProperty(Credential credential) {
+    if (credential instanceof GCSTokenCredential) {
+      return GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT;
+    }
+    if (credential instanceof ADLSTokenCredential) {
+      return ADLS_REFRESH_CREDENTIALS_ENDPOINT;
+    }
+    if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
+      return CLIENT_REFRESH_CREDENTIALS_ENDPOINT;
+    }
+    if (credential instanceof OSSTokenCredential) {
+      return CLIENT_REFRESH_CREDENTIALS_ENDPOINT;
+    }
+    return null;
   }
 
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
