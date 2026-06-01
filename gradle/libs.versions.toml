@@ -47,7 +47,6 @@ hadoop3-aliyun = "3.3.6"
 hadoop3-thirdparty = "1.1.1"
 hadoop-minikdc = "3.3.6"
 re2j = "1.7"
-htrace-core4 = "4.1.0-incubating"
 httpclient = "4.4.1"
 httpclient5 = "5.4.4"
 httpcore5 = "5.3.4"
@@ -238,7 +237,6 @@ hadoop3-abs = { group = "org.apache.hadoop", name = "hadoop-azure", version.ref 
 hadoop3-shaded-guava = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-guava", version.ref = "hadoop3-thirdparty" }
 hadoop3-shaded-protobuf = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-protobuf_3_7", version.ref = "hadoop3-thirdparty" }
 re2j = { group = "com.google.re2j", name = "re2j", version.ref = "re2j" }
-htrace-core4 = { group = "org.apache.htrace", name = "htrace-core4", version.ref = "htrace-core4" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }
