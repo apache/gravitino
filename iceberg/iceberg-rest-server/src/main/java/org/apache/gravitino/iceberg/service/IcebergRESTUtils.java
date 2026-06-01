@@ -134,9 +134,18 @@ public class IcebergRESTUtils {
       TableMetadata tableMetadata) {
     Map<String, String> config =
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
-    String refreshProperty = refreshEndpointProperty(credential);
-    if (refreshProperty != null) {
-      config.put(refreshProperty, tableCredentialsPath(catalogName, tableIdentifier));
+    if (credential instanceof GCSTokenCredential) {
+      config.put(
+          GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT,
+          tableCredentialsPath(catalogName, tableIdentifier));
+    } else if (credential instanceof ADLSTokenCredential) {
+      config.put(
+          ADLS_REFRESH_CREDENTIALS_ENDPOINT, tableCredentialsPath(catalogName, tableIdentifier));
+    } else if (credential instanceof S3TokenCredential
+        || credential instanceof AwsIrsaCredential
+        || credential instanceof OSSTokenCredential) {
+      config.put(
+          CLIENT_REFRESH_CREDENTIALS_ENDPOINT, tableCredentialsPath(catalogName, tableIdentifier));
     }
     String prefix = Strings.CS.appendIfMissing(tableMetadata.location(), "/");
     return new org.apache.iceberg.rest.credentials.Credential() {
@@ -332,21 +341,6 @@ public class IcebergRESTUtils {
       }
     }
     return headers;
-  }
-
-  private static String refreshEndpointProperty(Credential credential) {
-    if (credential instanceof GCSTokenCredential) {
-      return GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT;
-    }
-    if (credential instanceof ADLSTokenCredential) {
-      return ADLS_REFRESH_CREDENTIALS_ENDPOINT;
-    }
-    if (credential instanceof S3TokenCredential
-        || credential instanceof AwsIrsaCredential
-        || credential instanceof OSSTokenCredential) {
-      return CLIENT_REFRESH_CREDENTIALS_ENDPOINT;
-    }
-    return null;
   }
 
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
