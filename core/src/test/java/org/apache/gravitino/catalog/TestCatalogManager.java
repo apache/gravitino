@@ -35,9 +35,11 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -65,6 +67,10 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
+import org.apache.gravitino.storage.relational.EntityChangeLogListener;
+import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -605,6 +611,156 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testCatalogChangeLogListenerInvalidatesCatalogCacheForRemoteChange() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "change_log_catalog");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertNotNull(catalogManager.loadCatalogAndWrap(ident));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+    listener.onEntityChange(
+        List.of(
+            new EntityChangeRecord(
+                1L, "metalake", "CATALOG", "metalake.change_log_catalog", OperateType.ALTER, 0L)));
+
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+  }
+
+  @Test
+  void testCatalogChangeLogListenerSkipsInvalidationForLocalMutation() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "change_log_local");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertNotNull(catalogManager.loadCatalogAndWrap(ident));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+
+    // Enable local-mutation tracking, which a CatalogManager backed by a change-log-aware store
+    // would have turned on in its constructor. The in-memory store used here does not support a
+    // change log, so set it explicitly.
+    catalogManager.setTrackLocalMutations(true);
+    catalogManager.markLocalMutation(ident);
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+    listener.onEntityChange(
+        List.of(
+            new EntityChangeRecord(
+                1L, "metalake", "CATALOG", "metalake.change_log_local", OperateType.ALTER, 0L)));
+
+    Assertions.assertNotNull(
+        catalogManager.getCatalogCache().getIfPresent(ident),
+        "Cache should NOT be invalidated for local mutations");
+  }
+
+  @Test
+  void testCatalogChangeLogListenerSkipsBadRecordAndStillProcessesLaterValidChange()
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "change_log_batch");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertNotNull(catalogManager.loadCatalogAndWrap(ident));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+    listener.onEntityChange(
+        List.of(
+            new EntityChangeRecord(
+                1L, "metalake", null, "metalake.change_log_batch", OperateType.ALTER, 0L),
+            new EntityChangeRecord(
+                2L, "metalake", "CATALOG", "metalake.change_log_batch", OperateType.ALTER, 0L)));
+
+    Assertions.assertNull(
+        catalogManager.getCatalogCache().getIfPresent(ident),
+        "Cache should still be invalidated by the later valid record");
+  }
+
+  @Test
+  void testCloseUnregistersCatalogChangeLogListener() {
+    ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
+    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+
+    EntityChangeLogListener registeredListener = store.listener.get();
+    Assertions.assertNotNull(registeredListener);
+
+    manager.close();
+
+    Assertions.assertSame(registeredListener, store.unregisteredListener.get());
+  }
+
+  @Test
+  void testDropCatalogDoesNotMarkLocalMutationWhenStoreReturnsFalse() throws Exception {
+    ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+
+    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+    NameIdentifier ident = NameIdentifier.of("metalake", "delete_returns_false");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    store.returnFalseForCatalogDelete = true;
+
+    Assertions.assertFalse(manager.dropCatalog(ident, true));
+    Assertions.assertNotNull(manager.loadCatalogAndWrap(ident));
+    Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
+
+    store
+        .listener
+        .get()
+        .onEntityChange(
+            List.of(
+                new EntityChangeRecord(
+                    1L,
+                    "metalake",
+                    "CATALOG",
+                    "metalake.delete_returns_false",
+                    OperateType.ALTER,
+                    0L)));
+
+    Assertions.assertNull(manager.getCatalogCache().getIfPresent(ident));
+    manager.close();
+  }
+
+  @Test
   public void testDropCatalogSkipsImportedSchemas() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
     Map<String, String> props =
@@ -659,6 +815,33 @@ public class TestCatalogManager {
 
     // Imported schema (no StringIdentifier in external catalog properties) should not block drop.
     Assertions.assertTrue(catalogManager.dropCatalog(ident));
+  }
+
+  private static class ChangeLogAwareEntityStore extends InMemoryEntityStore
+      implements SupportsEntityChangeLog {
+    private final AtomicReference<EntityChangeLogListener> listener = new AtomicReference<>();
+    private final AtomicReference<EntityChangeLogListener> unregisteredListener =
+        new AtomicReference<>();
+    private boolean returnFalseForCatalogDelete;
+
+    @Override
+    public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
+        throws IOException {
+      if (returnFalseForCatalogDelete && entityType == EntityType.CATALOG) {
+        return false;
+      }
+      return super.delete(ident, entityType, cascade);
+    }
+
+    @Override
+    public void registerEntityChangeLogListener(EntityChangeLogListener listener) {
+      this.listener.set(listener);
+    }
+
+    @Override
+    public void unregisterEntityChangeLogListener(EntityChangeLogListener listener) {
+      this.unregisteredListener.set(listener);
+    }
   }
 
   @Test
