@@ -29,7 +29,7 @@ The following table outlines the tested compatibility between Gravitino versions
 - These version entries show which versions are expected to work together.
 - For Gravitino 1.3.0, the explicitly verified release versions are
   `lance-spark` {0.2.0, 0.4.0} and `lance-ray` {0.3.0, 0.4.2}. `lance-ray`
-  0.2.0 can be used only with the conditions described below.
+  0.2.0 is conditionally supported only with the conditions described below.
 
 - **`lance-spark` 0.1.0 and 0.1.1 are not supported on Gravitino 1.3.0.**
   Those bundles create tables by calling the legacy
