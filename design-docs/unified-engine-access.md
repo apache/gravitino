@@ -1,15 +1,23 @@
----
-title: "Design: Engine-native Catalog Access Mode for Gravitino Connectors"
-slug: /unified-engine-access
-keywords:
-  - unified engine access
-  - spark connector
-  - lance
-  - iceberg
-  - engine-access-mode
-  - native catalog
-license: "This software is licensed under the Apache License version 2."
----
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+
+# Design: Engine-native Catalog Access Mode for Gravitino Connectors
 
 ## Background
 
@@ -100,9 +108,11 @@ If no provider-level configuration is set, `auto` is used.
 | Other catalogs | Preserves the existing Gravitino connector behavior. |
 
 No new native-specific catalog properties are added. The engine connector derives the native
-configuration from the existing `provider` and catalog properties, for example: Iceberg uses
-`catalog-backend`, `uri`, `warehouse`, and `data-access`; v1 Lance uses `format`,
-`namespace-backend`, `uri`, and `location`.
+configuration from the existing `provider` and catalog properties where possible. For Iceberg, the
+Spark native catalog connects to the Gravitino Iceberg REST server; the Iceberg REST server then
+uses the Gravitino catalog's existing backend properties, such as `catalog-backend`, `uri`,
+`warehouse`, and `data-access`, through `dynamic-config-provider`. For v1 Lance, Spark native
+registration uses `format`, `namespace-backend`, `uri`, and `location`.
 
 ## Catalog Examples
 
@@ -113,21 +123,25 @@ name = iceberg
 type = RELATIONAL
 provider = lakehouse-iceberg
 
-catalog-backend = rest
-uri = http://127.0.0.1:9001/iceberg/
+catalog-backend = jdbc
+uri = jdbc:postgresql://127.0.0.1:5432
 warehouse = iceberg
 data-access = vended-credentials
 ```
 
 Notes:
 
-1. `catalog-backend=rest` indicates the Iceberg catalog backend is an Iceberg REST catalog.
-2. `uri` is the Iceberg REST endpoint; it is also used by the Spark connector to generate the
-   Iceberg Spark catalog `uri`.
-3. `warehouse` selects the target catalog inside the Iceberg REST server when the REST server
-   supports multiple catalogs. If it is not set, the Spark connector uses the Gravitino catalog
-   name as the REST catalog selector.
-4. `data-access=vended-credentials` carries the existing Iceberg REST semantics and is used by the
+1. `catalog-backend` and `uri` describe the underlying Iceberg catalog backend managed by
+   Gravitino. For example, `uri` may be a JDBC URL for a JDBC Iceberg catalog, a Hive Metastore URI
+   for a Hive Iceberg catalog, or an upstream Iceberg REST endpoint for a REST-backed Iceberg
+   catalog.
+2. These backend properties are consumed by the Gravitino Iceberg REST server when it runs with
+   `dynamic-config-provider`. They are not necessarily valid Spark Iceberg REST client properties.
+3. Spark native Iceberg access uses the Gravitino Iceberg REST server address as
+   `spark.sql.catalog.<catalog>.uri`.
+4. `warehouse` in the Spark Iceberg REST client selects the target catalog inside the Gravitino
+   Iceberg REST server. The Spark connector uses the Gravitino catalog name as this selector.
+5. `data-access=vended-credentials` carries the existing Iceberg REST semantics and is used by the
    engine connector to automatically inject the Iceberg REST credential delegation header.
 
 ### Lance
@@ -183,6 +197,7 @@ Optional overrides:
 ```text
 spark.sql.gravitino.lakehouse-iceberg.engine-access-mode=native
 spark.sql.gravitino.lakehouse-generic.engine-access-mode=native
+spark.sql.gravitino.iceberg-rest.uri=http://127.0.0.1:9001/iceberg/
 spark.sql.gravitino.enableIcebergSupport=true
 spark.sql.gravitino.enableLanceSupport=true
 ```
@@ -234,36 +249,42 @@ Iceberg native is registered only when explicitly set to native:
 spark.sql.gravitino.enableIcebergSupport = true
 provider = lakehouse-iceberg
 spark.sql.gravitino.lakehouse-iceberg.engine-access-mode = native
-catalog-backend = rest
+spark.sql.gravitino.iceberg-rest.uri = http://127.0.0.1:9001/iceberg/
 ```
 
-The first phase defines only the `catalog-backend=rest` to Spark Iceberg REST catalog translation.
-If the Iceberg native connector gains support for additional backends in the future, those can be
-added as further translation rules under the same provider-level access mode.
+The first phase routes Spark native Iceberg access through the Gravitino Iceberg REST server. The
+Spark connector does not use the Gravitino Iceberg catalog's `uri` as the Spark Iceberg REST client
+`uri`, because that catalog property may describe the underlying backend, such as a JDBC URL or Hive
+Metastore URI. Instead, `spark.sql.gravitino.iceberg-rest.uri` identifies the Gravitino Iceberg REST
+server endpoint.
+
+If `spark.sql.gravitino.iceberg-rest.uri` is not set when Iceberg native mode is requested, the
+Spark connector fails fast with an invalid configuration error. It should not guess the Iceberg REST
+endpoint from the Gravitino server URI because standalone and auxiliary Iceberg REST deployments can
+use different addresses.
 
 Generated configuration:
 
 ```text
 spark.sql.catalog.<catalog>=org.apache.iceberg.spark.SparkCatalog
 spark.sql.catalog.<catalog>.type=rest
-spark.sql.catalog.<catalog>.uri=<uri>
-spark.sql.catalog.<catalog>.warehouse=<rest-catalog-selector>
+spark.sql.catalog.<catalog>.uri=<gravitino-iceberg-rest-uri>
+spark.sql.catalog.<catalog>.warehouse=<gravitino-catalog-name>
 spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials
 ```
 
-`warehouse` is important when the Iceberg REST server manages multiple catalogs. The Spark connector
-registers one Spark catalog for each Gravitino Iceberg catalog. If several Gravitino Iceberg
-catalogs point to the same Iceberg REST server URI, each generated Spark catalog uses the same
-`uri` but a different `warehouse` value to select the target catalog inside that REST server.
+`warehouse` is important when the Gravitino Iceberg REST server manages multiple catalogs. The REST
+server with `dynamic-config-provider` loads Iceberg catalog configurations from Gravitino and
+registers them by Gravitino catalog name. Spark then selects the target REST-server catalog by
+setting the Iceberg REST client `warehouse` parameter to the Gravitino catalog name.
 
-For Gravitino Iceberg REST server with `dynamic-config-provider`, the REST server registers
-Gravitino Iceberg catalogs by catalog name, and Iceberg clients select one with the Spark Iceberg
-REST `warehouse` parameter. Therefore the generated `warehouse` should be:
+This means the Spark-generated `uri` is the same Gravitino Iceberg REST server endpoint for all
+Gravitino Iceberg catalogs, while `warehouse` changes per catalog. The Gravitino catalog property
+`warehouse` remains an underlying Iceberg backend property consumed by the Gravitino Iceberg REST
+server; it is not used as the Spark Iceberg REST catalog selector in this dynamic-provider path.
 
-1. The Gravitino catalog property `warehouse`, if it is set for the REST backend.
-2. Otherwise, the Gravitino catalog name, which matches the dynamic-config-provider catalog name.
-
-Example with two Gravitino Iceberg catalogs backed by the same Iceberg REST endpoint:
+Example with two Gravitino Iceberg catalogs accessed through the same Gravitino Iceberg REST
+endpoint:
 
 ```text
 spark.sql.catalog.iceberg_prod=org.apache.iceberg.spark.SparkCatalog
