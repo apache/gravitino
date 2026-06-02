@@ -450,7 +450,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           gravitinoCatalogClient
               .asViewCatalog()
               .loadView(NameIdentifier.of(getDatabase(ident), ident.name()));
-    } catch (NoSuchViewException | UnsupportedOperationException e) {
+    } catch (NoSuchViewException | UnsupportedOperationException | ForbiddenException e) {
       throw new NoSuchTableException(ident);
     }
     // Call sparkCatalog.loadTable directly to surface NoSuchTableException as checked,

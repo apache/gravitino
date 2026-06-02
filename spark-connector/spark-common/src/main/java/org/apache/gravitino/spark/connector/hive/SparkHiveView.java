@@ -176,6 +176,8 @@ public class SparkHiveView extends HiveTable {
 
     @Override
     public InternalRow[] rows() {
+      // WARNING: executeCollect() materializes the entire result set to driver memory.
+      // Suitable only for small/bounded views; large result sets may cause OutOfMemoryError.
       try {
         return spark.sql(viewSql).queryExecution().executedPlan().executeCollect();
       } catch (RuntimeException e) {

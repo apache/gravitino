@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -119,6 +120,14 @@ class HiveViewCatalogOperations implements ViewCatalog {
       Map<String, String> params =
           Maps.newHashMap(properties == null ? ImmutableMap.of() : properties);
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
+      if (Dialects.SPARK.equalsIgnoreCase(sqlRepresentation.dialect())) {
+        Preconditions.checkArgument(
+            params.containsKey(HiveView.SPARK_VERSION_KEY),
+            "Spark dialect view '%s' requires property '%s' to be set; "
+                + "without it the view silently round-trips as Hive dialect on reload",
+            ident,
+            HiveView.SPARK_VERSION_KEY);
+      }
       if (defaultCatalog != null) {
         params.put(HiveView.SPARK_DEFAULT_CATALOG_KEY, defaultCatalog);
       }
@@ -369,7 +378,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
         Maps.newHashMap(properties != null ? properties : ImmutableMap.of());
     String representationSql = viewOriginalText;
     String detectedDialect = HiveView.detectDialect(representationSql, params);
-    switch (detectedDialect.toLowerCase(java.util.Locale.ROOT)) {
+    switch (detectedDialect.toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
       case Dialects.FLINK:
       case Dialects.SPARK:
@@ -417,7 +426,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
         firstRepresentation == null ? "null" : firstRepresentation.getClass().getSimpleName());
 
     SQLRepresentation selected = (SQLRepresentation) firstRepresentation;
-    switch (selected.dialect().toLowerCase(java.util.Locale.ROOT)) {
+    switch (selected.dialect().toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
       case Dialects.FLINK:
         Preconditions.checkArgument(
@@ -441,7 +450,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
-    switch (representation.dialect().toLowerCase(java.util.Locale.ROOT)) {
+    switch (representation.dialect().toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
       case Dialects.FLINK:
       case Dialects.SPARK:

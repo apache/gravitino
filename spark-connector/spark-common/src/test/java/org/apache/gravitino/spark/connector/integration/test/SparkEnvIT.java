@@ -84,6 +84,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     return true;
   }
 
+  /** Returns the Gravitino {@link Catalog} for the catalog under test. */
+  protected Catalog getGravitinoCatalog() {
+    return client.loadMetalake(metalakeName).loadCatalog(getCatalogName());
+  }
+
   @Override
   protected SparkSession getSparkSession() {
     Assertions.assertNotNull(sparkSession);

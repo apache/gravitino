@@ -566,8 +566,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     createSimpleTable(tableName);
     sql(String.format("INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3)", tableName));
 
-    ViewCatalog viewCatalog =
-        client.loadMetalake("test").loadCatalog(getCatalogName()).asViewCatalog();
+    ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
     NameIdentifier viewIdent = NameIdentifier.of(schemaName, viewName);
     if (viewCatalog.viewExists(viewIdent)) {
       viewCatalog.dropView(viewIdent);
@@ -612,8 +611,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     String viewName = "test_view_exists";
     String schemaName = getDefaultDatabase();
 
-    ViewCatalog viewCatalog =
-        client.loadMetalake("test").loadCatalog(getCatalogName()).asViewCatalog();
+    ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
     NameIdentifier viewIdent = NameIdentifier.of(schemaName, viewName);
     if (viewCatalog.viewExists(viewIdent)) {
       viewCatalog.dropView(viewIdent);
@@ -650,8 +648,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
 
-    ViewCatalog viewCatalog =
-        client.loadMetalake("test").loadCatalog(getCatalogName()).asViewCatalog();
+    ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
     NameIdentifier viewIdent = NameIdentifier.of(schemaName, viewName);
     if (viewCatalog.viewExists(viewIdent)) {
       viewCatalog.dropView(viewIdent);
