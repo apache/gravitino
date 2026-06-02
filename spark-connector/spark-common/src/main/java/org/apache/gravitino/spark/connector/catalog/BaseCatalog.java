@@ -304,20 +304,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }
 
-  /**
-   * Returns true if a table <b>or a view</b> with the given identifier exists in Gravitino.
-   *
-   * <p>The check is performed in two steps: first the table catalog is queried, then — if no table
-   * is found — the view catalog is queried. This allows Spark to discover Gravitino views via
-   * {@code DESCRIBE TABLE} and {@code SELECT} without requiring full {@code ViewCatalog} support.
-   *
-   * <p>{@link org.apache.gravitino.exceptions.ForbiddenException} (missing {@code LOAD_TABLE} or
-   * {@code LOAD_VIEW} privilege) is treated as non-existence so that {@code CREATE TABLE IF NOT
-   * EXISTS} can proceed when the caller only holds {@code CREATE_TABLE} privilege. See <a
-   * href="https://github.com/apache/gravitino/issues/9180">issue #9180</a>.
-   */
   @Override
   public boolean tableExists(Identifier ident) {
+    // Gravitino uses loadTable() to verify table existence, which requires LOAD_TABLE privilege.
+    // For CREATE TABLE IF NOT EXISTS operations, users may only have CREATE_TABLE privilege.
+    // When ForbiddenException is thrown (lacking LOAD_TABLE privilege), we return false to allow
+    // the CREATE TABLE operation to proceed.
+    // See: https://github.com/apache/gravitino/issues/9180
     try {
       loadGravitinoTable(ident);
       return true;
