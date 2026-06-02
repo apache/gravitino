@@ -17,174 +17,11 @@
   under the License.
 -->
 
-# Design: Engine-native Catalog Access Mode for Gravitino Connectors
+# Design: Spark REST Catalog Automatic Registration
 
-## Background
+## Problem
 
-Gravitino can manage multiple lakehouse catalogs and lets compute engines access the underlying table
-data in various ways. For example, Spark can access some catalogs through the Gravitino Spark
-connector, or access Iceberg/Lance tables directly through the Iceberg REST catalog or Lance REST
-Namespace.
-
-In mixed Iceberg-and-Lance query scenarios, the Spark side still requires users to maintain several
-sets of configuration manually:
-
-```text
-spark.sql.gravitino.uri=http://127.0.0.1:8090
-spark.sql.gravitino.metalake=test
-
-spark.sql.catalog.iceberg_rest=org.apache.iceberg.spark.SparkCatalog
-spark.sql.catalog.iceberg_rest.type=rest
-spark.sql.catalog.iceberg_rest.uri=http://127.0.0.1:9001/iceberg/
-
-spark.sql.catalog.lance=org.lance.spark.LanceNamespaceSparkCatalog
-spark.sql.catalog.lance.impl=rest
-spark.sql.catalog.lance.uri=http://127.0.0.1:9101/lance
-spark.sql.catalog.lance.parent=lance_catalog
-```
-
-This creates several problems:
-
-1. Users must understand Gravitino catalogs, the Iceberg REST catalog, the Lance REST Namespace,
-   and the catalog configuration of each engine simultaneously.
-2. Every time a Gravitino catalog is added or modified, the configuration on the Spark, Flink,
-   Trino, and other engine sides must be updated in sync.
-3. Each engine independently duplicates the translation work from catalog properties to engine
-   catalog configuration.
-4. The value of Gravitino as a unified metadata entry point is diminished.
-
-This design takes a lightweight approach: no new discovery REST API is introduced; the engine side
-declares the access strategy per catalog provider, and native connector configuration is
-automatically derived from the catalog's existing properties by each engine connector.
-
-## Goals
-
-1. Users only need to configure the Gravitino server address and metalake.
-2. Spark can automatically discover and register Iceberg catalogs and Lance native catalogs.
-3. The same semantics can be extended to Flink, Trino, Doris, Daft, and other engines.
-4. Support controlling the access mode per catalog provider: use the Gravitino connector/API or
-   the engine's native connector.
-5. The access mode is configured on the engine side per catalog provider; native connector
-   configuration reuses the catalog's existing properties.
-6. In the first phase, no new discovery REST API is introduced; the existing
-   `listCatalogsInfo()` / `loadCatalog()` calls are reused.
-
-## Non-Goals
-
-1. In the first phase, full Lance support across all engines is not required simultaneously.
-
-## Core Design
-
-A new engine-side, provider-level access mode configuration is introduced:
-
-```text
-spark.sql.gravitino.<provider>.engine-access-mode = auto | gravitino | native
-```
-
-The semantics are:
-
-| Value       | Meaning |
-|-------------|---------|
-| `auto`      | Default. The Gravitino connector automatically selects the access method based on whether the current engine has a Gravitino connector for the given provider. If a Gravitino connector exists for the provider, it falls back to `gravitino`; otherwise it falls back to `native`. |
-| `gravitino` | Force the use of the Gravitino connector/API. |
-| `native`    | Force the use of the engine's native connector/catalog, for example Spark Iceberg `SparkCatalog`, Spark Lance `LanceNamespaceSparkCatalog`, Trino/Doris native Iceberg catalog, or Lance REST Namespace. |
-
-### Access Mode Selection
-
-The engine connector reads the corresponding configuration based on the catalog provider, for
-example:
-
-```text
-spark.sql.gravitino.lakehouse-iceberg.engine-access-mode=native
-spark.sql.gravitino.lakehouse-generic.engine-access-mode=native
-```
-
-If no provider-level configuration is set, `auto` is used.
-
-| Catalog       | `auto` rule |
-|---------------|-------------|
-| Iceberg       | Defaults to `gravitino`, preserving the existing Gravitino Spark connector behavior. Switches to an Iceberg native catalog only when `spark.sql.gravitino.lakehouse-iceberg.engine-access-mode=native` is set explicitly. |
-| Lance         | Defaults to `native`, because there is currently no Lance Gravitino connector. If the conversion to a Lance native catalog fails, an `UnsupportedException` is thrown immediately. |
-| Other catalogs | Preserves the existing Gravitino connector behavior. |
-
-No new native-specific catalog properties are added. The engine connector derives the native
-configuration from the existing `provider` and catalog properties where possible. For Iceberg, the
-Spark native catalog connects to the Gravitino Iceberg REST server; the Iceberg REST server then
-uses the Gravitino catalog's existing backend properties, such as `catalog-backend`, `uri`,
-`warehouse`, and `data-access`, through `dynamic-config-provider`. For v1 Lance, Spark native
-registration uses `format`, `namespace-backend`, `uri`, and `location`.
-
-## Catalog Examples
-
-### Iceberg
-
-```text
-name = iceberg
-type = RELATIONAL
-provider = lakehouse-iceberg
-
-catalog-backend = jdbc
-uri = jdbc:postgresql://127.0.0.1:5432
-warehouse = iceberg
-data-access = vended-credentials
-```
-
-Notes:
-
-1. `catalog-backend` and `uri` describe the underlying Iceberg catalog backend managed by
-   Gravitino. For example, `uri` may be a JDBC URL for a JDBC Iceberg catalog, a Hive Metastore URI
-   for a Hive Iceberg catalog, or an upstream Iceberg REST endpoint for a REST-backed Iceberg
-   catalog.
-2. These backend properties are consumed by the Gravitino Iceberg REST server when it runs with
-   `dynamic-config-provider`. They are not necessarily valid Spark Iceberg REST client properties.
-3. Spark native Iceberg access uses the Gravitino Iceberg REST server address as
-   `spark.sql.catalog.<catalog>.uri`.
-4. `warehouse` in the Spark Iceberg REST client selects the target catalog inside the Gravitino
-   Iceberg REST server. The Spark connector uses the Gravitino catalog name as this selector.
-5. `data-access=vended-credentials` carries the existing Iceberg REST semantics and is used by the
-   engine connector to automatically inject the Iceberg REST credential delegation header.
-
-### Lance
-
-The first phase expresses Lance catalogs with the existing `lakehouse-generic + format=lance`
-convention. A dedicated `lakehouse-lance` provider can be discussed later, but it is not required
-for the v1 Spark-native registration path.
-
-Example:
-
-```text
-name = lance_catalog
-type = RELATIONAL
-provider = lakehouse-generic
-
-format = lance
-namespace-backend = rest
-uri = http://127.0.0.1:9101/lance
-location = s3://contacts/raw/lance
-```
-
-Notes:
-
-1. `format=lance` identifies the generic catalog as a Lance catalog for v1 Spark-native
-   registration.
-2. `namespace-backend=rest` indicates the Lance catalog uses the Lance REST Namespace protocol.
-3. `uri` is the Lance REST endpoint; it is also used by the Spark connector to generate the Lance
-   Spark catalog `uri`.
-4. The Lance Spark connector `parent` parameter defaults to the Gravitino catalog name.
-
-:::note
-The use of `type = RELATIONAL` for Lance catalogs is an open question. Lance tables support
-columnar/vector storage semantics, which may not cover all relational SQL operations. Community
-input is welcome on whether a new catalog type (e.g. `LAKEHOUSE`) or a more relaxed interpretation
-of `RELATIONAL` is appropriate here.
-:::
-
-Only `format=lance` and `namespace-backend=rest` participate in v1 Spark-native Lance registration.
-Other generic catalog formats are ignored by Lance registration.
-
-## Spark Design
-
-Users only configure:
+Spark users can already connect to Gravitino with a small amount of configuration:
 
 ```text
 spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin
@@ -192,99 +29,8 @@ spark.sql.gravitino.uri=http://127.0.0.1:8090
 spark.sql.gravitino.metalake=test
 ```
 
-Optional overrides:
-
-```text
-spark.sql.gravitino.lakehouse-iceberg.engine-access-mode=native
-spark.sql.gravitino.lakehouse-generic.engine-access-mode=native
-spark.sql.gravitino.iceberg-rest.uri=http://127.0.0.1:9001/iceberg/
-spark.sql.gravitino.enableIcebergSupport=true
-spark.sql.gravitino.enableLanceSupport=true
-```
-
-The Spark connector then automatically registers Iceberg and Lance catalogs based on the switches.
-Under `auto`, Iceberg uses the Gravitino catalog by default; Lance uses the native catalog.
-
-`spark.sql.gravitino.enableLanceSupport` defaults to `false` to avoid loading Lance catalogs or
-extensions when the user has not explicitly included the Lance Spark connector dependency.
-
-### Driver Plugin Behavior
-
-`GravitinoDriverPlugin` at startup:
-
-1. Reads `spark.sql.gravitino.uri` and `spark.sql.gravitino.metalake`.
-2. Calls the existing Gravitino client `listCatalogsInfo()`.
-   - If the Gravitino server is unreachable at startup, catalog registration is skipped and
-     no exception is thrown; access failures will surface when the catalog is first used.
-3. For each `RELATIONAL` catalog, reads `provider` and `properties`.
-4. Decides whether to process Iceberg/Lance catalogs based on
-   `spark.sql.gravitino.enableIcebergSupport` and `spark.sql.gravitino.enableLanceSupport`.
-5. Reads the engine-side access-mode configuration for the catalog provider; defaults to `auto` if
-   not configured.
-6. Decides whether to register a Gravitino catalog or a native catalog based on the final access
-   mode.
-7. Injects the necessary Spark SQL extensions based on the enabled support flags and the final
-   registered catalog type.
-
-### Registration Rules
-
-#### Access Mode and Enable Flag Interaction
-
-The following table describes the combined behavior of `enable*` flags and `engine-access-mode`:
-
-| `enableIcebergSupport` | `engine-access-mode` | Result |
-|------------------------|----------------------|--------|
-| `false` (default)      | any                  | Iceberg catalog is not registered; no Iceberg extensions injected. |
-| `true`                 | `auto` / `gravitino` | Existing Gravitino Spark connector behavior; Iceberg extensions injected only if already needed. |
-| `true`                 | `native`             | Native Iceberg Spark catalog registered; Iceberg extensions injected. |
-
-The same logic applies to `enableLanceSupport` / `lakehouse-generic` catalogs with
-`format=lance`.
-
-#### Iceberg native
-
-Iceberg native is registered only when explicitly set to native:
-
-```text
-spark.sql.gravitino.enableIcebergSupport = true
-provider = lakehouse-iceberg
-spark.sql.gravitino.lakehouse-iceberg.engine-access-mode = native
-spark.sql.gravitino.iceberg-rest.uri = http://127.0.0.1:9001/iceberg/
-```
-
-The first phase routes Spark native Iceberg access through the Gravitino Iceberg REST server. The
-Spark connector does not use the Gravitino Iceberg catalog's `uri` as the Spark Iceberg REST client
-`uri`, because that catalog property may describe the underlying backend, such as a JDBC URL or Hive
-Metastore URI. Instead, `spark.sql.gravitino.iceberg-rest.uri` identifies the Gravitino Iceberg REST
-server endpoint.
-
-If `spark.sql.gravitino.iceberg-rest.uri` is not set when Iceberg native mode is requested, the
-Spark connector fails fast with an invalid configuration error. It should not guess the Iceberg REST
-endpoint from the Gravitino server URI because standalone and auxiliary Iceberg REST deployments can
-use different addresses.
-
-Generated configuration:
-
-```text
-spark.sql.catalog.<catalog>=org.apache.iceberg.spark.SparkCatalog
-spark.sql.catalog.<catalog>.type=rest
-spark.sql.catalog.<catalog>.uri=<gravitino-iceberg-rest-uri>
-spark.sql.catalog.<catalog>.warehouse=<gravitino-catalog-name>
-spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials
-```
-
-`warehouse` is important when the Gravitino Iceberg REST server manages multiple catalogs. The REST
-server with `dynamic-config-provider` loads Iceberg catalog configurations from Gravitino and
-registers them by Gravitino catalog name. Spark then selects the target REST-server catalog by
-setting the Iceberg REST client `warehouse` parameter to the Gravitino catalog name.
-
-This means the Spark-generated `uri` is the same Gravitino Iceberg REST server endpoint for all
-Gravitino Iceberg catalogs, while `warehouse` changes per catalog. The Gravitino catalog property
-`warehouse` remains an underlying Iceberg backend property consumed by the Gravitino Iceberg REST
-server; it is not used as the Spark Iceberg REST catalog selector in this dynamic-provider path.
-
-Example with two Gravitino Iceberg catalogs accessed through the same Gravitino Iceberg REST
-endpoint:
+However, when users want Spark to access Iceberg or Lance through their REST protocols, they still
+need to hand-write Spark catalog configuration for each catalog:
 
 ```text
 spark.sql.catalog.iceberg_prod=org.apache.iceberg.spark.SparkCatalog
@@ -292,131 +38,278 @@ spark.sql.catalog.iceberg_prod.type=rest
 spark.sql.catalog.iceberg_prod.uri=http://127.0.0.1:9001/iceberg/
 spark.sql.catalog.iceberg_prod.warehouse=iceberg_prod
 
-spark.sql.catalog.iceberg_audit=org.apache.iceberg.spark.SparkCatalog
-spark.sql.catalog.iceberg_audit.type=rest
-spark.sql.catalog.iceberg_audit.uri=http://127.0.0.1:9001/iceberg/
-spark.sql.catalog.iceberg_audit.warehouse=iceberg_audit
-```
-
-`header.X-Iceberg-Access-Delegation` is injected automatically only when the catalog has
-`data-access=vended-credentials` set. Other credential scenarios are covered in the
-[Credential Design](#credential-design) section.
-
-#### Lance native
-
-Lance native is registered under `auto` or when explicitly set to native:
-
-```text
-spark.sql.gravitino.enableLanceSupport = true
-provider = lakehouse-generic
-format = lance
-spark.sql.gravitino.lakehouse-generic.engine-access-mode = native or auto
-namespace-backend = rest
-```
-
-Generated configuration:
-
-```text
-spark.sql.catalog.<catalog>=org.lance.spark.LanceNamespaceSparkCatalog
-spark.sql.catalog.<catalog>.impl=rest
-spark.sql.catalog.<catalog>.uri=<uri>
-spark.sql.catalog.<catalog>.parent=<catalog>
-```
-
-The Lance Spark connector `parent` parameter selects the target catalog in the Lance REST Namespace.
-For multiple Gravitino Lance catalogs backed by the same Lance REST server, the Spark connector
-registers one Spark catalog for each Gravitino catalog, reuses the same `uri`, and sets a different
-`parent` value. By default, `parent` is the Gravitino catalog name.
-
-Example with two Gravitino Lance catalogs backed by the same Lance REST endpoint:
-
-```text
 spark.sql.catalog.lance_vectors=org.lance.spark.LanceNamespaceSparkCatalog
 spark.sql.catalog.lance_vectors.impl=rest
 spark.sql.catalog.lance_vectors.uri=http://127.0.0.1:9101/lance
 spark.sql.catalog.lance_vectors.parent=lance_vectors
+```
 
-spark.sql.catalog.lance_archive=org.lance.spark.LanceNamespaceSparkCatalog
-spark.sql.catalog.lance_archive.impl=rest
+This duplicates information already managed by Gravitino and forces users to update Spark
+configuration whenever Gravitino catalogs change.
+
+## Goal
+
+The Gravitino Spark connector should register Spark REST catalogs automatically for supported
+Gravitino catalogs. The user-facing goal is simple: Gravitino remains the catalog inventory, and
+Spark derives the Iceberg/Lance REST catalog configuration from that inventory.
+
+V1 scope is Spark only.
+
+Non-goals in V1:
+
+1. Do not introduce a generic access-mode framework.
+2. Do not introduce a dedicated Lance catalog provider.
+3. Do not change the Gravitino REST API contract.
+
+## Supported Catalogs
+
+This design supports the following Gravitino catalog providers in V1:
+
+| Gravitino catalog provider | Extra catalog constraints    | Default Spark registration                | REST catalog registration                                         |
+|----------------------------|------------------------------|-------------------------------------------|-------------------------------------------------------------------|
+| `lakehouse-iceberg`        | None                         | Existing Gravitino Spark catalog behavior | Enabled only when `spark.sql.gravitino.iceberg.enableRestAccess=true` |
+| `lakehouse-generic`        | Catalog-level `format=lance` | Existing behavior                         | Enabled only when `spark.sql.gravitino.lance.enableRestAccess=true` |
+| Other providers            | None                         | Existing behavior                         | Not supported in V1                                               |
+
+For `lakehouse-generic + format=lance`, `format=lance` is interpreted as a catalog-level marker only
+for Lance REST catalog registration. This does not change the existing behavior of other generic
+catalogs. When the marker is present, the catalog is treated as a Lance catalog, and tables under
+this catalog must be Lance tables. Generic catalogs without catalog-level `format=lance` are ignored
+by Lance REST catalog registration. Because there is no Lance Gravitino Spark catalog in V1, Lance
+only supports REST catalog registration.
+
+## Spark Configuration
+
+Iceberg REST catalog registration is disabled by default to preserve existing Gravitino Spark
+connector behavior. Users enable it with:
+
+```text
+spark.sql.gravitino.iceberg.enableRestAccess=true
+```
+
+Lance REST catalog registration is disabled by default because registration needs to load Lance
+Spark catalog and extension classes, and users may not have the Lance Spark runtime on the
+classpath. Users explicitly enable Lance REST access with:
+
+```text
+spark.sql.gravitino.lance.enableRestAccess=true
+```
+
+When Lance REST access is enabled, the Spark connector registers REST catalogs for
+`lakehouse-generic + format=lance` catalogs.
+
+Optional REST service URI overrides:
+
+| Configuration | Default |
+|---------------|---------|
+| `spark.sql.gravitino.iceberg.restUri` | Inferred from `spark.sql.gravitino.uri` |
+| `spark.sql.gravitino.lance.restUri` | Inferred from `spark.sql.gravitino.uri` |
+
+The Iceberg switch applies to all Gravitino Iceberg catalogs visible to the Spark connector in V1.
+Per-catalog REST registration override is future work.
+
+## Registration Precedence
+
+For each Spark catalog name, the connector should register exactly one Spark catalog implementation.
+When `spark.sql.gravitino.iceberg.enableRestAccess=true`, REST catalog registration replaces the
+existing Gravitino Spark catalog registration for matching `lakehouse-iceberg` catalogs and keeps the
+same Spark catalog name.
+
+This is an explicit opt-in behavior change. Users who do not set
+`spark.sql.gravitino.iceberg.enableRestAccess=true` keep the existing Gravitino Spark catalog
+behavior.
+
+## REST URI Resolution
+
+Spark needs the REST service URI for REST catalog registration. The URI is resolved in this
+order:
+
+1. Use the explicit Spark-side override if configured:
+   - `spark.sql.gravitino.iceberg.restUri`
+   - `spark.sql.gravitino.lance.restUri`
+2. Otherwise infer the endpoint from `spark.sql.gravitino.uri` using the default Gravitino auxiliary
+   service layout.
+
+Default inference reuses only the scheme and host from `spark.sql.gravitino.uri`. It replaces the
+port and path with the REST service defaults:
+
+| REST service | Default port | Default path |
+|--------------|--------------|--------------|
+| Gravitino Iceberg REST server | `9001` | `/iceberg/` |
+| Lance REST service | `9101` | `/lance` |
+
+For example, `spark.sql.gravitino.uri=http://gravitino.example.com:8090` infers:
+
+```text
+spark.sql.gravitino.iceberg.restUri=http://gravitino.example.com:9001/iceberg/
+spark.sql.gravitino.lance.restUri=http://gravitino.example.com:9101/lance
+```
+
+When the connector infers a REST URI, it should log a warning with the inferred URI and the source
+`spark.sql.gravitino.uri`. Deployments with a different host, port, path, protocol, or gateway must
+configure the explicit override. Production deployments should prefer explicit `restUri`
+configuration over inference.
+
+## Iceberg Mapping
+
+This mapping requires the Gravitino Iceberg REST server to expose catalog names that match Gravitino
+catalog names. With `dynamic-config-provider`, this is the intended behavior because the REST server
+loads catalog configuration from Gravitino and registers catalogs by Gravitino catalog name. With
+`static-config-provider`, users must manually configure REST-server catalog names to match the
+corresponding Gravitino catalog names.
+
+For a Gravitino Iceberg catalog:
+
+```text
+name = iceberg_prod
+type = RELATIONAL
+provider = lakehouse-iceberg
+
+catalog-backend = jdbc
+uri = jdbc:postgresql://127.0.0.1:5432
+warehouse = s3://warehouse/iceberg_prod
+data-access = vended-credentials
+```
+
+The Gravitino catalog properties describe the backend used by Gravitino Iceberg REST server. For
+example, `uri` may be a JDBC URL, Hive Metastore URI, or upstream Iceberg REST URI. Spark should not
+use this catalog property as the Iceberg REST client URI.
+
+Generated Spark configuration:
+
+```text
+spark.sql.catalog.iceberg_prod=org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.iceberg_prod.type=rest
+spark.sql.catalog.iceberg_prod.uri=<resolved-iceberg-rest-uri>
+spark.sql.catalog.iceberg_prod.warehouse=iceberg_prod
+```
+
+If the Gravitino Iceberg catalog has `data-access=vended-credentials`, Spark also generates:
+
+```text
+spark.sql.catalog.iceberg_prod.header.X-Iceberg-Access-Delegation=vended-credentials
+```
+
+Multiple Gravitino Iceberg catalogs can share the same Gravitino Iceberg REST server URI. Spark
+registers one Spark catalog per Gravitino catalog and uses `warehouse=<gravitino-catalog-name>` to
+select the target catalog inside the Iceberg REST server:
+
+```text
+spark.sql.catalog.iceberg_prod.uri=http://127.0.0.1:9001/iceberg/
+spark.sql.catalog.iceberg_prod.warehouse=iceberg_prod
+
+spark.sql.catalog.iceberg_audit.uri=http://127.0.0.1:9001/iceberg/
+spark.sql.catalog.iceberg_audit.warehouse=iceberg_audit
+```
+
+The recommended Iceberg REST server configuration is `dynamic-config-provider`, where the REST
+server loads Iceberg catalog configurations from Gravitino and registers them by Gravitino catalog
+name. `static-config-provider` can also work, but users must configure each REST-server catalog
+using the same name as the corresponding Gravitino catalog; otherwise
+`warehouse=<gravitino-catalog-name>` will not resolve to the intended backend catalog. Spark cannot
+detect this mismatch reliably, so incorrect REST-server catalog naming may route requests to the
+wrong catalog.
+
+## Lance Mapping
+
+For a Gravitino generic catalog used as a Lance catalog:
+
+```text
+name = lance_vectors
+type = RELATIONAL
+provider = lakehouse-generic
+
+format = lance
+location = s3://warehouse/lance_vectors
+```
+
+Generated Spark configuration:
+
+```text
+spark.sql.catalog.lance_vectors=org.lance.spark.LanceNamespaceSparkCatalog
+spark.sql.catalog.lance_vectors.impl=rest
+spark.sql.catalog.lance_vectors.uri=<resolved-lance-rest-uri>
+spark.sql.catalog.lance_vectors.parent=lance_vectors
+```
+
+Multiple Gravitino Lance catalogs can share the same Lance REST service URI. Spark registers one
+Spark catalog per Gravitino catalog and uses `parent=<gravitino-catalog-name>` to select the target
+catalog in the Lance REST Namespace:
+
+```text
+spark.sql.catalog.lance_vectors.uri=http://127.0.0.1:9101/lance
+spark.sql.catalog.lance_vectors.parent=lance_vectors
+
 spark.sql.catalog.lance_archive.uri=http://127.0.0.1:9101/lance
 spark.sql.catalog.lance_archive.parent=lance_archive
 ```
 
-### Spark Extensions
+## Spark Extensions
 
-The Spark connector injects extensions based on the enable flags and the final registered catalog
-type:
+The Spark connector injects extensions based on the generated Spark catalog type:
 
 ```text
 org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
 org.lance.spark.extensions.LanceSparkSessionExtensions
 ```
 
-If `spark.sql.gravitino.enableIcebergSupport=false`, no Iceberg catalog is loaded and no Iceberg
-extensions are injected. If `spark.sql.gravitino.enableLanceSupport=false`, no Lance catalog is
-loaded and no Lance extensions are injected.
+Existing deduplication logic can be reused when users also set extensions manually.
 
-Existing deduplication logic can be reused to avoid duplicate extension registration when users
-also set extensions manually.
+## Credentials
 
-## Multi-Engine Extensibility
+Iceberg REST catalog access has two credential paths.
 
-This design does not expand on the concrete implementations for other engines in the first phase.
-Architecturally, the provider-level `engine-access-mode` describes a universal selection semantic
-for choosing between catalog-provider-to-engine-native access configurations. Each engine only
-needs to perform three steps in its own Gravitino connector, catalog adapter, or helper layer:
+If the Gravitino Iceberg catalog has `data-access=vended-credentials`, Spark does not fetch storage
+credentials such as AK/SK itself. Instead, Spark injects:
 
-1. Read the Gravitino catalog's `provider`, catalog properties, and engine-side provider-level
-   access mode configuration.
-2. Decide based on engine capability whether to use Gravitino access or engine-native access.
-3. Translate catalog properties into that engine's own catalog/connector configuration.
+```text
+spark.sql.catalog.<catalog>.header.X-Iceberg-Access-Delegation=vended-credentials
+```
 
-This design can therefore be extended to Flink, Trino, Doris, Daft, and other engines. Flink and
-Trino can reuse these semantics in their respective catalog adapter/connector configuration
-translation layers; Doris can translate Gravitino catalog properties into Doris external catalog
-configuration; Daft can translate Gravitino catalog properties into PyIceberg/Lance reader
-configuration in a Python helper or session attach layer.
+The Gravitino Iceberg REST server then performs credential vending during Iceberg REST table access.
 
-## Credential Design
+If `data-access=vended-credentials` is not set, Spark does not inject the delegation header. In that
+case, Spark still needs storage access configuration, such as AK/SK and storage-related parameters.
+The Spark connector should obtain those credentials and storage parameters from the existing
+Gravitino credential/catalog configuration path and translate them into the Spark REST catalog
+configuration required by Iceberg. The V1 translation should cover the storage properties required
+by current Gravitino Iceberg catalogs, including object store credentials, endpoint, region, path
+style access, and other storage-specific options that the Iceberg Spark REST catalog must receive
+to read and write table data without credential vending.
 
-This design reuses Gravitino's existing credential capabilities. The recommended paths are:
+The V1 S3-compatible storage mapping is:
 
-| Scenario | Behavior |
-|----------|----------|
-| Iceberg REST catalog with `data-access=vended-credentials` | The Spark native Iceberg catalog automatically sets `header.X-Iceberg-Access-Delegation=vended-credentials`; the Iceberg REST server performs credential vending during table access requests. |
-| `data-access` not set, or non-Iceberg-REST native access | The Gravitino connector calls the Gravitino catalog credential API to obtain a credential and translates it into the current engine connector's required configuration. |
-| Credential unavailable | No credential is issued; the engine relies on permissions already present in the runtime environment. |
+| Gravitino credential or storage information | Spark Iceberg REST catalog configuration |
+|---------------------------------------------|------------------------------------------|
+| Access key ID | `spark.sql.catalog.<catalog>.s3.access-key-id` |
+| Secret access key | `spark.sql.catalog.<catalog>.s3.secret-access-key` |
+| Session token, if present | `spark.sql.catalog.<catalog>.s3.session-token` |
+| Endpoint | `spark.sql.catalog.<catalog>.s3.endpoint` |
+| Region | `spark.sql.catalog.<catalog>.s3.region` |
+| Path-style access flag | `spark.sql.catalog.<catalog>.s3.path-style-access` |
 
-Reading static storage credentials from catalog properties is only a historical-compatibility or
-testing mechanism, not a recommended design path. It should be phased out over time to avoid
-long-lived secrets persisting in catalog properties.
+Other object store or file system options should follow the same rule: translate the existing
+Gravitino credential/catalog information into the corresponding Iceberg Spark catalog property for
+the generated Spark catalog name.
 
-Lance REST credential vending needs to be addressed in a future iteration. In Lance native access,
-credentials should also be fetched preferentially via the Gravitino catalog credential API.
+Lance REST catalog registration has no additional credential parameter in V1.
 
-## Open Questions
+## Governance
 
-1. Should a future version introduce a dedicated `lakehouse-lance` provider after the v1
-   `lakehouse-generic + format=lance` path is validated?
-2. Should native access be restricted to REST catalog backends only? This document favors leaving
-   that choice to the user, but the documentation must make clear that native access can bypass
-   Gravitino's authorization, auditing, and governance systems.
+Spark REST catalog access talks to the Gravitino-managed Iceberg or Lance REST service after
+registration. In this design, REST catalog access does not bypass Gravitino governance as long as
+those REST services enforce Gravitino authorization and audit policy. The implementation should keep
+the REST service as the governance enforcement point instead of routing Spark directly to unmanaged
+backend catalogs.
 
-## Summary
+## Limitations and Future Work
 
-This proposal introduces only engine-side, provider-level access mode configuration — for example
-`spark.sql.gravitino.lakehouse-iceberg.engine-access-mode=auto|gravitino|native` — and derives
-native connector configuration from the catalog's existing properties. On the Spark side,
-`spark.sql.gravitino.enableIcebergSupport` and `spark.sql.gravitino.enableLanceSupport` control
-whether Iceberg/Lance catalogs and the corresponding Spark extensions are loaded. Under `auto`,
-Iceberg preserves the existing Gravitino connector behavior; Lance defaults to native because there
-is currently no Lance Gravitino connector.
-
-This approach is simple to implement, compatible with the existing Gravitino API, and well-suited
-for validating the Spark scenario first. The same provider-level access mode semantics can later be
-extended to Flink, Trino, Doris, Daft, and other engines without changing the core model.
-
-Users should be aware that native access delegates actual operations to the engine's native
-connector; Gravitino's authorization, auditing, and governance capabilities may be bypassed if the 
-catalog backend is not REST. Native mode should be enabled deliberately and with full understanding 
-of these trade-offs.
+1. V1 is Spark only.
+2. Iceberg REST catalog registration is controlled by
+   `spark.sql.gravitino.iceberg.enableRestAccess` and applies to all Gravitino Iceberg catalogs
+   visible to the Spark connector. Per-catalog override is future work.
+3. Lance REST catalog registration requires `spark.sql.gravitino.lance.enableRestAccess=true` and
+   `lakehouse-generic + format=lance`.
+4. V1 supports `lakehouse-iceberg` and `lakehouse-generic + format=lance` only.
+5. A dedicated `lakehouse-lance` provider can be discussed after the
+   `lakehouse-generic + format=lance` path is validated.
