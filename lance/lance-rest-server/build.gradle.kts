@@ -28,13 +28,34 @@ val scalaVersion: String =
   project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
-val lanceSparkBundleVersion = "0.4.0"
+// Comma-separated list of lance-spark-bundle versions to test against.
+// The default is the latest supported version; the integration test matrix
+// (`:lance:lance-rest-server:lanceSparkMatrixTest`) covers every version in
+// this list. Override via `-PlanceSparkBundleVersions=0.2.0,0.4.0`.
+val lanceSparkBundleVersions: List<String> =
+  ((project.properties["lanceSparkBundleVersions"] as? String) ?: "0.4.0")
+    .split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+if (lanceSparkBundleVersions.isEmpty()) {
+  throw GradleException("lanceSparkBundleVersions must contain at least one version")
+}
+val primaryLanceSparkBundleVersion: String = lanceSparkBundleVersions.first()
 val lanceSparkBundleJarPathProperty = "gravitino.lance.spark.bundle.jar"
-val lanceSparkBundleDir = layout.buildDirectory.dir("lance-spark-bundle")
-val lanceSparkBundle by configurations.creating {
-  isCanBeConsumed = false
-  isCanBeResolved = true
-  isTransitive = false
+
+fun lanceSparkBundleConfigName(version: String): String =
+  "lanceSparkBundle_" + version.replace(".", "_").replace("-", "_")
+fun lanceSparkBundleDirFor(version: String) =
+  layout.buildDirectory.dir("lance-spark-bundle/$version")
+fun lanceSparkPrepareTaskName(version: String): String =
+  "prepareLanceSparkBundle_" + version.replace(".", "_").replace("-", "_")
+fun lanceSparkTestTaskName(version: String): String =
+  "testLanceSparkBundle_" + version.replace(".", "_").replace("-", "_")
+
+lanceSparkBundleVersions.forEach { version ->
+  configurations.create(lanceSparkBundleConfigName(version)) {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+  }
 }
 
 dependencies {
@@ -84,10 +105,12 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.lance)
 
-  add(
-    lanceSparkBundle.name,
-    "org.lance:lance-spark-bundle-3.5_2.12:$lanceSparkBundleVersion"
-  )
+  lanceSparkBundleVersions.forEach { version ->
+    add(
+      lanceSparkBundleConfigName(version),
+      "org.lance:lance-spark-bundle-3.5_2.12:$version"
+    )
+  }
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
@@ -123,10 +146,17 @@ tasks {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }
-  val prepareLanceSparkBundle by registering(Sync::class) {
-    from(lanceSparkBundle)
-    into(lanceSparkBundleDir)
+  // One Sync task per lance-spark-bundle version. Each task lays down its
+  // bundle jar under build/lance-spark-bundle/<version>/ so per-version Test
+  // tasks pick up the right jar without colliding.
+  lanceSparkBundleVersions.forEach { version ->
+    register<Sync>(lanceSparkPrepareTaskName(version)) {
+      from(configurations.getByName(lanceSparkBundleConfigName(version)))
+      into(lanceSparkBundleDirFor(version))
+    }
   }
+  val primaryPrepareLanceSparkBundle =
+    named(lanceSparkPrepareTaskName(primaryLanceSparkBundleVersion))
 
   jar {
     finalizedBy(copyDepends)
@@ -157,13 +187,14 @@ tasks {
   }
 
   test {
-    dependsOn(prepareLanceSparkBundle)
+    dependsOn(primaryPrepareLanceSparkBundle)
 
+    val primaryBundleDir = lanceSparkBundleDirFor(primaryLanceSparkBundleVersion)
     doFirst {
       val bundleJar =
-        lanceSparkBundleDir.get().asFile.listFiles()?.singleOrNull { it.extension == "jar" }
+        primaryBundleDir.get().asFile.listFiles()?.singleOrNull { it.extension == "jar" }
           ?: throw GradleException(
-            "Expected exactly one Lance Spark bundle jar in ${lanceSparkBundleDir.get().asFile}"
+            "Expected exactly one Lance Spark bundle jar in ${primaryBundleDir.get().asFile}"
           )
       systemProperty(lanceSparkBundleJarPathProperty, bundleJar.absolutePath)
     }
@@ -171,6 +202,74 @@ tasks {
     val testMode = project.properties["testMode"] as? String ?: "embedded"
     if (testMode == "embedded") {
       dependsOn(":catalogs:catalog-lakehouse-generic:jar")
+    }
+  }
+
+  // Per-version Test task that only runs LanceSparkRESTServiceIT against a
+  // specific lance-spark-bundle. Each task downloads its bundle through the
+  // matching Sync task and points the IT JVM at it via system property.
+  lanceSparkBundleVersions.forEach { version ->
+    register<Test>(lanceSparkTestTaskName(version)) {
+      group = "verification"
+      description =
+        "Run LanceSparkRESTServiceIT against lance-spark-bundle $version"
+
+      dependsOn(named(lanceSparkPrepareTaskName(version)))
+      dependsOn(named("jar"))
+      val versionTestMode = project.properties["testMode"] as? String ?: "embedded"
+      if (versionTestMode == "embedded") {
+        dependsOn(":catalogs:catalog-lakehouse-generic:jar")
+      }
+
+      testClassesDirs = sourceSets["test"].output.classesDirs
+      classpath = sourceSets["test"].runtimeClasspath
+      useJUnitPlatform()
+      filter { includeTestsMatching("*LanceSparkRESTServiceIT*") }
+
+      val versionBundleDir = lanceSparkBundleDirFor(version)
+      doFirst {
+        val bundleJar =
+          versionBundleDir.get().asFile.listFiles()?.singleOrNull { it.extension == "jar" }
+            ?: throw GradleException(
+              "Expected exactly one Lance Spark bundle jar in " +
+                "${versionBundleDir.get().asFile} for version $version"
+            )
+        systemProperty(lanceSparkBundleJarPathProperty, bundleJar.absolutePath)
+        println("[lance-spark-matrix] running IT against bundle $version -> ${bundleJar.name}")
+      }
+
+      // Send per-version reports to a separate directory so a matrix run
+      // doesn't overwrite results across versions.
+      val versionSlug = version.replace(".", "_").replace("-", "_")
+      reports {
+        html.outputLocation.set(
+          layout.buildDirectory.dir("reports/lance-spark-matrix/$versionSlug")
+        )
+        junitXml.outputLocation.set(
+          layout.buildDirectory.dir("test-results/lance-spark-matrix/$versionSlug")
+        )
+      }
+    }
+  }
+
+  register("lanceSparkMatrixTest") {
+    group = "verification"
+    description =
+      "Run LanceSparkRESTServiceIT against every version in -PlanceSparkBundleVersions " +
+      "(default: $primaryLanceSparkBundleVersion). Reports land under " +
+      "build/reports/lance-spark-matrix/<version>/."
+    dependsOn(
+      lanceSparkBundleVersions.map { named(lanceSparkTestTaskName(it)) }
+    )
+  }
+
+  // Force serial execution: each version spins up an embedded MiniGravitino on a
+  // dynamically chosen port. findAvailablePort is a scan, not an atomic OS-level
+  // reservation (TOCTOU), so concurrent tasks can race to bind the same port and
+  // produce intermittent "address already in use" failures under --parallel.
+  lanceSparkBundleVersions.zipWithNext { a, b ->
+    named(lanceSparkTestTaskName(b)) {
+      mustRunAfter(named(lanceSparkTestTaskName(a)))
     }
   }
 }
