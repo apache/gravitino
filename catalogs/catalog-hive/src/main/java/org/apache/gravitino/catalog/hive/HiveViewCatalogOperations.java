@@ -458,11 +458,10 @@ class HiveViewCatalogOperations implements ViewCatalog {
         return selected;
       case Dialects.SPARK:
         Preconditions.checkArgument(
-            properties.containsKey(HiveView.SPARK_VERSION_KEY),
-            "Spark dialect view '%s' requires property '%s' to be set; "
+            HiveView.hasSparkMarker(properties),
+            "Spark dialect view '%s' requires property 'spark.sql.create.version' to be set; "
                 + "without it the view silently round-trips as Hive dialect on reload",
-            ident,
-            HiveView.SPARK_VERSION_KEY);
+            ident);
         return selected;
       default:
         // TODO(design-docs/gravitino-logical-view-management.md): support creating trino HMS views.
