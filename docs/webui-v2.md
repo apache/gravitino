@@ -12,9 +12,9 @@ This document outlines how users can manage metadata within Apache Gravitino usi
 
 [Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`. By default, it is [http://localhost:8090](http://localhost:8090).
 
-## UI Version 1.2.0 — Web V2 introduced
+## UI Version 1.3.0 — Web V2 introduced
 
-Starting with version 1.2.0, Gravitino introduces Web V2. By default, leave `GRAVITINO_USE_WEB_V1` unset (or set it to `false`) to use Web V2. Set `GRAVITINO_USE_WEB_V1=true` only when you want to force Web V1. If you want to force Web V1 from the server env file, set the following environment variable in `conf/gravitino-env.sh` before starting the server:
+Starting with version 1.3.0, Gravitino introduces Web V2. By default, leave `GRAVITINO_USE_WEB_V1` unset (or set it to `false`) to use Web V2. To force Web V1, set the following environment variable in `conf/gravitino-env.sh` before starting the server:
 
 ```bash
 # In <path-to-gravitino>/conf/gravitino-env.sh
