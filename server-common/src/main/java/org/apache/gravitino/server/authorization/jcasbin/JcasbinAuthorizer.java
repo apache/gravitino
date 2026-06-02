@@ -58,6 +58,7 @@ import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
@@ -97,14 +98,13 @@ import org.slf4j.LoggerFactory;
  *       correctness — TTL eviction only bounds memory. User/group role snapshots use write-based
  *       TTLs through {@link CaffeineGravitinoCache}; loaded role policies use access-based TTLs
  *       through {@link JcasbinLoadedRolesCache}.
- *   <li><b>Eventual-consistency caches</b> — {@link #metadataIdCache} and {@link #ownerRelCache}. A
- *       single background poller ({@link #changePoller}) drains {@code entity_change_log} and
- *       {@code owner_meta} change rows since a high-water-mark cursor and invalidates the affected
- *       keys. Other Gravitino nodes therefore observe ALTER/DROP and owner changes within one poll
- *       interval.
+ *   <li><b>Eventual-consistency caches</b> — {@link #metadataIdCache} and {@link #ownerRelCache}.
+ *       The global entity change log poller dispatches {@code entity_change_log} batches to {@link
+ *       #changePoller}, while {@link #changePoller} polls {@code owner_meta}. Other Gravitino nodes
+ *       therefore observe ALTER/DROP and owner changes within one poll interval.
  * </ol>
  *
- * <p>The pollers are best-effort and intentionally cheap; see {@link JcasbinChangePoller} for the
+ * <p>The pollers are best-effort and intentionally cheap; see {@link JcasbinChangeListener} for the
  * contracts they rely on (most notably that {@code entity_change_log.full_name} is the pre-mutation
  * name).
  *
@@ -159,7 +159,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private JcasbinAuthorizationLookups lookups;
 
   /** Background HA invalidator for {@link #metadataIdCache} and {@link #ownerRelCache}. */
-  private JcasbinChangePoller changePoller;
+  private JcasbinChangeListener changePoller;
 
   @Override
   public void initialize() {
@@ -200,7 +200,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     metadataIdCache = new CaffeineGravitinoCache<>(ttlMs, metadataIdCacheSize);
     ownerRelCache = new CaffeineGravitinoCache<>(ttlMs, ownerCacheSize);
     lookups = new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
-    changePoller = new JcasbinChangePoller(metadataIdCache, ownerRelCache, pollIntervalSecs);
+    changePoller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, pollIntervalSecs);
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    if (entityStore instanceof SupportsEntityChangeLog) {
+      ((SupportsEntityChangeLog) entityStore).registerEntityChangeLogListener(changePoller);
+    }
     changePoller.start();
   }
 
@@ -553,6 +557,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public void close() throws IOException {
     if (changePoller != null) {
+      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+      if (entityStore instanceof SupportsEntityChangeLog) {
+        ((SupportsEntityChangeLog) entityStore).unregisterEntityChangeLogListener(changePoller);
+      }
       changePoller.close();
     }
     if (userRoleCache != null) {
