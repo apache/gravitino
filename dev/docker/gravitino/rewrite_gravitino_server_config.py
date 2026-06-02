@@ -38,7 +38,7 @@ env_map = {
     "GRAVITINO_AUTHORIZATION_ENABLE": "authorization.enable",
     "GRAVITINO_AUTHORIZATION_SERVICE_ADMINS": "authorization.serviceAdmins",
     "GRAVITINO_AUX_SERVICE_NAMES": "auxService.names",
-    # Iceberg REST auxiliary service - short names
+    # Iceberg REST auxiliary service
     # Credentials
     "GRAVITINO_CREDENTIAL_PROVIDERS": "iceberg-rest.credential-providers",
     # GCS
