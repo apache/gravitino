@@ -94,6 +94,8 @@ The result is a privilege model where granting `SELECT_VIEW` to a user has visib
 
 4. **Materialized Views and Temporary Views**: Out of scope per the parent design (only logical views are in scope).
 
+5. **Identity Mapping between Gravitino and Databases**: This implementation will not manage the identity alignment between Gravitino's user principal and the database's user principal.
+
 ---
 
 ## Proposal
@@ -228,10 +230,10 @@ The enforcement mode is determined by the storage path the query takes through t
 
 **Pass-through mode** applies only when the query traverses the data engine's native view machinery — specifically, the native-dialect path against HMS or a JDBC data engine that itself supports a security mode (MySQL `SQL SECURITY`, Postgres `security_invoker`, etc.):
 
-- Gravitino translates `createView` / `alterView` to the data engine's native DDL with the appropriate security clause (e.g., `CREATE DEFINER='<mapped>'@'%' VIEW … SQL SECURITY DEFINER` for MySQL; `ALTER VIEW … SQL SECURITY INVOKER` for an alter that toggles the mode).
+- Gravitino translates `createView` / `alterView` to the data engine's native DDL with the appropriate security clause (e.g., `CREATE DEFINER='<user-id>'@'%' VIEW … SQL SECURITY DEFINER` for MySQL; `ALTER VIEW … SQL SECURITY INVOKER` for an alter that toggles the mode).
 - The data engine enforces `securityMode` natively at query execution time.
 - Gravitino stores `securityMode` as metadata for visibility/audit but is **not** in the SELECT execution path.
-- Identity mapping (Gravitino principal ↔ data engine user) is operator-configured per catalog (see Identity Mapping below).
+- In this implementation, Gravitino will **validate the user identity at the metadata level** and directly use the user ID for data engine level query execution.
 
 **Gravitino-managed mode** applies in every other case, which covers the two distinct scenarios the parent doc surfaces:
 
@@ -281,23 +283,6 @@ Two consequences of this design:
 2. **INVOKER's accuracy depends on the cell**:
    - **Pass-through cells** (native-dialect path to MySQL/Postgres/HMS): the data engine enforces with whatever identity the connector's JDBC/Thrift connection uses. Identity propagation between connector and data engine is a connector / deployment concern outside this design — typically per-user JDBC credentials, proxy authentication, or Kerberos delegation.
    - **Gravitino-managed cells** (data lakes, or non-native dialect on a JDBC data engine): Gravitino enforces using session identity. Accurate per-user on Trino with `forwardUser`; degraded to service-identity enforcement on Spark/Flink today. The degradation is principled — INVOKER means "whoever Gravitino sees as the caller" — and matches deployment reality, since operators today grant `spark_svc` / `flink_svc` the privileges they want Spark/Flink jobs to have. When per-session forwarding lands in those connectors, INVOKER becomes per-user automatically with no design changes here.
-
----
-
-#### Identity Mapping (Pass-through Mode Only)
-
-Pass-through mode bridges two identity namespaces:
-
-- **Gravitino**: the view owner is a Gravitino principal (e.g., `bob@corp`).
-- **Data engine**: the DEFINER user is a backend-native principal (e.g., MySQL's `bob_mysql@%`, HMS's Kerberos principal).
-
-Operators configure a mapping per catalog via catalog properties:
-
-```
-gravitino.identity-mapping.<gravitino-principal> = <data-engine-user>
-```
-
-When Gravitino's catalog plugin issues data-engine DDL that embeds an identity (e.g., `CREATE DEFINER='bob_mysql'@'%' VIEW … SQL SECURITY DEFINER`), it consults this mapping. In Gravitino-managed mode no mapping is needed; the Gravitino principal is the authority.
 
 ---
 
