@@ -259,7 +259,7 @@ Gravitino provides a default implementation to log basic audit information to a 
 
 #### Audit log formatter
 
-The `Formatter` interface transforms an `Event` into an `AuditLog`. `SimpleFormatterV2` is the default implementation and requires no extra configuration. It produces a tab-separated line with the following fields: timestamp, user, operation type, identifier, operation status, event source, remote address, and custom info.
+The `Formatter` interface transforms an `Event` into an `AuditLog`. `SimpleFormatterV2` is the default implementation. `JsonAuditFormatter` is also available when structured JSON output is required. It emits one JSON object per line, serializes `customInfo`, and formats `timestamp` as ISO 8601 with millisecond precision and zone offset. Both simple and JSON formatters mask sensitive values such as `Authorization`, `Cookie`, `X-Amz-Security-Token`, `s3.access-key-id`, and `jdbc-password`.
 
 #### Audit log writer
 
