@@ -461,7 +461,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (!shouldBackfillCredential()) {
       return properties;
     }
-    return propertiesWithCredentialProviders();
+    Map<String, String> result = Maps.newHashMap(properties);
+    result.putAll(propertiesWithCredentialProviders());
+    return result;
   }
 
   /**
