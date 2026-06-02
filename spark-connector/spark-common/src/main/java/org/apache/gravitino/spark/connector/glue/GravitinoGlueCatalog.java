@@ -142,15 +142,6 @@ public class GravitinoGlueCatalog extends BaseCatalog {
           sparkTypeConverter);
     }
 
-    Preconditions.checkArgument(
-        sparkTable instanceof HiveTable,
-        "Glue table %s expected HiveTable from HiveTableCatalog, got %s",
-        identifier,
-        sparkTable.getClass().getName());
-    Preconditions.checkArgument(
-        sparkHiveCatalog instanceof HiveTableCatalog,
-        "Glue catalog expected HiveTableCatalog, got %s",
-        sparkHiveCatalog.getClass().getName());
     return new SparkHiveTable(
         identifier,
         gravitinoTable,

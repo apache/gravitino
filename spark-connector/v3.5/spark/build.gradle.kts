@@ -145,6 +145,16 @@ dependencies {
   }
 
   testImplementation(libs.awaitility)
+  // Iceberg's GlueCatalog references several AWS SDK modules at runtime; must be on test classpath
+  testImplementation(libs.aws.dynamodb)
+  testImplementation(libs.aws.glue)
+  testImplementation(libs.aws.kms)
+  testImplementation(libs.aws.s3)
+  testImplementation(libs.aws.sts)
+  testImplementation(libs.hadoop3.aws)
+  // hadoop-aws declares hadoop-client-api as provided; add it explicitly so S3AFileSystem can load
+  // org.apache.hadoop.fs.impl.prefetch.PrefetchingStatistics (added in 3.3.5) at runtime.
+  testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hive2.common) {
     exclude("com.sun.jersey")
     exclude("org.apache.curator")
@@ -183,16 +193,6 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
-  // Iceberg's GlueCatalog references several AWS SDK modules at runtime; must be on test classpath
-  testImplementation(libs.aws.dynamodb)
-  testImplementation(libs.aws.glue)
-  testImplementation(libs.aws.kms)
-  testImplementation(libs.aws.s3)
-  testImplementation(libs.aws.sts)
-  testImplementation(libs.hadoop3.aws)
-  // hadoop-aws declares hadoop-client-api as provided; add it explicitly so S3AFileSystem can load
-  // org.apache.hadoop.fs.impl.prefetch.PrefetchingStatistics (added in 3.3.5) at runtime.
-  testImplementation(libs.hadoop3.client.api)
 
   // org.apache.iceberg.rest.RESTSerializers#registerAll(ObjectMapper) has different method signature for iceberg-core and iceberg-spark-runtime package, we must make sure iceberg-core is in front to start up MiniGravitino server.
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")

@@ -68,10 +68,7 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
   private String s3AccessKey;
   private String s3SecretKey;
   private String s3Endpoint;
-  private String s3BucketName = S3_BUCKET_NAME;
-
-  protected static final String S3_BUCKET_NAME = "ice-glue-test-01";
-  protected static final int DEFAULT_GRAVITINO_PORT = 8090;
+  private String s3BucketName;
 
   @Override
   protected SparkSession getSparkSession() {
@@ -84,40 +81,21 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
    */
   @BeforeAll
   protected void startUp() throws Exception {
+    Preconditions.checkArgument(s3BucketName != null, "s3BucketName must be set before startUp()");
+    Preconditions.checkArgument(s3AccessKey != null, "s3AccessKey must be set before startUp()");
+    Preconditions.checkArgument(s3SecretKey != null, "s3SecretKey must be set before startUp()");
     warehouse = "s3a://" + s3BucketName + "/warehouse";
     hiveMetastoreUri = null;
     hdfs = null;
 
-    int gravitinoPort;
-    boolean serverWasStartedByThisClass = false;
-    if (serverConfig != null) {
-      // Gravitino server already started by an external process (e.g., real AWS integration
-      // test environment). Use existing config.
-      gravitinoPort = getGravitinoServerPort();
-    } else {
-      // Start the embedded Gravitino server. SparkEnvIT.startIntegrationTest() is an empty
-      // @BeforeAll override that prevents JUnit from auto-invoking BaseIT.startIntegrationTest().
-      // We call startServer() directly (a non-@BeforeAll method) to avoid the virtual-dispatch
-      // problem that would occur with reflection + Method.invoke().
-      try {
-        startServer();
-        gravitinoPort = getGravitinoServerPort();
-        serverWasStartedByThisClass = true;
-      } catch (Exception e) {
-        LOG.warn(
-            "Failed to start embedded Gravitino, assuming externally-provided server on port {}. Reason: {}",
-            DEFAULT_GRAVITINO_PORT,
-            e.getMessage());
-        gravitinoPort = DEFAULT_GRAVITINO_PORT;
-      }
-    }
+    // Start the embedded Gravitino server. SparkEnvIT.startIntegrationTest() is an empty
+    // @BeforeAll override that prevents JUnit from auto-invoking BaseIT.startIntegrationTest().
+    // We call startServer() directly (a non-@BeforeAll method) to avoid the virtual-dispatch
+    // problem that would occur with reflection + Method.invoke().
+    startServer();
+    int gravitinoPort = getGravitinoServerPort();
     String gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
-    // Only initialize metalake and catalog if this class started Gravitino itself.
-    // For externally-provided Gravitino (e.g., real AWS tests), metalake and catalog
-    // must already exist.
-    if (serverWasStartedByThisClass) {
-      initMetalakeAndCatalogs();
-    }
+    initMetalakeAndCatalogs();
     initSparkEnv(gravitinoUri);
     // Create the default database in the Glue catalog so that tests can USE it.
     // Note: SparkCommonIT.initDefaultDatabase() is package-private and cannot be @Override'd

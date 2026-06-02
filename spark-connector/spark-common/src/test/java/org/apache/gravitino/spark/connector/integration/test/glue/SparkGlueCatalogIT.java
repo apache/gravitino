@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.glue;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,9 +45,9 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   private static final Logger LOG = LoggerFactory.getLogger(SparkGlueCatalogIT.class);
 
   private String glueEndpoint;
-  private String awsRegion = "us-east-1";
-  private String awsAccessKeyId = "test";
-  private String awsSecretAccessKey = "test";
+  private String awsRegion;
+  private String awsAccessKeyId;
+  private String awsSecretAccessKey;
 
   @Override
   protected String getCatalogName() {
@@ -59,6 +61,12 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
 
   @Override
   protected Map<String, String> getCatalogConfigs() {
+    Preconditions.checkArgument(
+        awsRegion != null, "awsRegion must be set before getCatalogConfigs()");
+    Preconditions.checkArgument(
+        awsAccessKeyId != null, "awsAccessKeyId must be set before getCatalogConfigs()");
+    Preconditions.checkArgument(
+        awsSecretAccessKey != null, "awsSecretAccessKey must be set before getCatalogConfigs()");
     Map<String, String> catalogProperties = new java.util.HashMap<>();
     catalogProperties.put(GlueConstants.AWS_REGION, awsRegion);
     catalogProperties.put(GlueConstants.AWS_ACCESS_KEY_ID, awsAccessKeyId);
@@ -232,22 +240,10 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
     checkTableReadWrite(getTableInfo(tableName));
   }
 
-  /**
-   * Overrides base class: skip this test due to a known issue where ALTER TABLE RENAME fails for
-   * non-Iceberg (PARQUET) tables via the Glue catalog path. The rename operation triggers
-   * tableExists() which calls tableCatalog.loadTable() → GravitinoGlueCatalog.loadTable() →
-   * loadSparkTable() → HiveTableCatalog.loadTable(ident), but the table lookup may fail because
-   * Derby and Glue are out of sync for renamed tables. This requires further investigation into the
-   * HiveTableCatalog.loadTable() behavior and the renameTable dispatch chain in
-   * RenameTableExec.apply().
-   */
+  @Disabled("Glue does not support table rename for non-Iceberg tables")
   @Test
   @Override
-  protected void testRenameTable() {
-    // Skipped pending investigation. Rename logic in Glue backend works at the REST API level
-    // (GlueCatalogOperations.alterTable), but the Spark catalog path for non-Iceberg tables needs
-    // verification of how Derby/Hive metastore tracks renamed tables.
-  }
+  protected void testRenameTable() {}
 
   // -------------------------------------------------------------------------
   // Test mixed table types (Hive format + Iceberg format)

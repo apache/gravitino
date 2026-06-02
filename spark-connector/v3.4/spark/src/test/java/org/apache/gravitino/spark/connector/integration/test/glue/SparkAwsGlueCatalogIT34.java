@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.glue;
 
-import java.io.IOException;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -32,8 +30,8 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
  * <ul>
  *   <li>{@code AWS_ACCESS_KEY_ID}
  *   <li>{@code AWS_SECRET_ACCESS_KEY}
- *   <li>{@code AWS_DEFAULT_REGION} (optional, defaults to us-east-1)
- *   <li>{@code S3_BUCKET_NAME} (optional, uses default bucket if not set)
+ *   <li>{@code AWS_DEFAULT_REGION}
+ *   <li>{@code AWS_S3_TEST_BUCKET}
  * </ul>
  */
 @EnabledIfEnvironmentVariable(named = "AWS_ACCESS_KEY_ID", matches = ".+")
@@ -44,37 +42,17 @@ public class SparkAwsGlueCatalogIT34 extends SparkGlueCatalogIT {
   protected void startUp() throws Exception {
     String accessKeyId = System.getenv("AWS_ACCESS_KEY_ID");
     String secretAccessKey = System.getenv("AWS_SECRET_ACCESS_KEY");
-    String bucketName = System.getenv("S3_BUCKET_NAME");
-    if (bucketName == null) {
-      bucketName = S3_BUCKET_NAME;
-    }
-
     // For real AWS, use default Glue endpoint (no custom endpoint)
     // AWS SDK will use the standard endpoint for the given region
     setGlueEndpoint(null);
     setAwsCredentials(accessKeyId, secretAccessKey);
-
-    // Set AWS region from environment variable
-    String awsRegion = System.getenv("AWS_DEFAULT_REGION");
-    if (awsRegion != null) {
-      setAwsRegion(awsRegion);
-    }
-
+    setAwsRegion(System.getenv("AWS_DEFAULT_REGION"));
     // For real AWS, S3 credentials are the same as Glue credentials
     // Use default S3 endpoint (derived from region)
     setS3Credentials(null, accessKeyId, secretAccessKey);
-
-    // Override the default S3 bucket with user-specified bucket.
-    // This must be set BEFORE calling super.startUp() because the warehouse
-    // path is derived from the bucket name at the top of startUp().
-    setS3BucketName(bucketName);
+    // Must be set BEFORE calling super.startUp() because the warehouse path is derived from it.
+    setS3BucketName(System.getenv("AWS_S3_TEST_BUCKET"));
 
     super.startUp();
-  }
-
-  @AfterAll
-  @Override
-  protected void stop() throws IOException, InterruptedException {
-    super.stop();
   }
 }
