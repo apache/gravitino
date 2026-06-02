@@ -20,9 +20,6 @@
 package org.apache.gravitino.spark.connector.glue;
 
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -36,21 +33,11 @@ import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
-import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
-import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
-import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.apache.spark.sql.connector.catalog.Identifier;
-import org.apache.spark.sql.connector.catalog.SupportsNamespaces;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
-import org.apache.spark.sql.connector.expressions.Transform;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Gravitino Glue catalog implementation for Apache Spark.
@@ -58,21 +45,20 @@ import org.slf4j.LoggerFactory;
  * <p>This catalog handles mixed table types stored in AWS Glue Data Catalog:
  *
  * <ul>
- *   <li>Non-Iceberg tables (Hive, Delta, Parquet): routed to HiveTableCatalog for I/O
- *   <li>Iceberg tables: routed to Iceberg's GlueCatalog for I/O
+ *   <li>Non-Iceberg tables (Hive, Delta, Parquet): routed to {@link HiveTableCatalog} backed by the
+ *       AWS Glue Data Catalog Hive client ({@code AWSGlueDataCatalogHiveClientFactory})
+ *   <li>Iceberg tables: routed to Iceberg's {@link SparkCatalog} (GlueCatalog) for I/O
  * </ul>
  *
  * <p>Table routing is based on the {@code table-format} property in Glue table parameters. Tables
  * with {@code table-format=ICEBERG} are delegated to the Iceberg backend.
  *
- * <p>Derby sync: Gravitino creates/modifies tables in AWS Glue. HiveTableCatalog (used as
- * sparkCatalog) uses an embedded Derby metastore for metadata validation. We must keep Derby in
- * sync with Glue for loadSparkTable() to succeed. Derby is populated lazily on createTable() and
- * loadTable(), and cleaned up on dropTable()/purgeTable()/renameTable().
+ * <p>{@link HiveTableCatalog} is configured with {@code hive.metastore.client.factory.class} set to
+ * {@code AWSGlueDataCatalogHiveClientFactory}, which replaces the embedded Derby metastore with a
+ * direct AWS Glue API connection. This means no local Derby sync is required and the catalog works
+ * correctly across multiple concurrent Spark applications sharing the same Glue catalog.
  */
 public class GravitinoGlueCatalog extends BaseCatalog {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoGlueCatalog.class);
 
   // Lazily initialized Iceberg GlueCatalog for Iceberg tables
   private volatile SparkCatalog icebergGlueCatalog;
@@ -107,10 +93,10 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   }
 
   /**
-   * Routes Spark table loading to the correct backend after Gravitino creates the table.
+   * Routes Spark table loading to the correct backend.
    *
-   * <p>Iceberg tables are loaded from the Iceberg GlueCatalog; they are never registered in Derby.
-   * Hive tables are loaded from Derby, syncing from Glue first if the entry is missing.
+   * <p>Iceberg tables are loaded from the Iceberg GlueCatalog. Non-Iceberg tables are loaded
+   * directly from {@link HiveTableCatalog}, which reads from Glue via the factory client.
    */
   @Override
   protected Table loadSparkTable(Identifier ident) {
@@ -119,61 +105,11 @@ public class GravitinoGlueCatalog extends BaseCatalog {
       if (isIcebergTable(gravitinoTable)) {
         return loadIcebergSparkTable(ident, getOrCreateIcebergGlueCatalog());
       }
-      syncNamespaceToDerby(ident.namespace());
-      try {
-        return sparkCatalog.loadTable(ident);
-      } catch (NoSuchTableException e) {
-        syncTableToDerby(ident, gravitinoTable);
-        return sparkCatalog.loadTable(ident);
-      }
+      return sparkCatalog.loadTable(ident);
     } catch (NoSuchTableException e) {
       throw new RuntimeException(
           String.format("Failed to load spark table: %s.%s", getDatabase(ident), ident.name()), e);
     }
-  }
-
-  /**
-   * Overrides dropTable to also remove the table from Derby. Without this, Derby accumulates stale
-   * entries that cause TableAlreadyExistsException on the next createTable call for the same name.
-   * Iceberg tables are never registered in Derby, so Derby cleanup is skipped for them.
-   */
-  @Override
-  public boolean dropTable(Identifier ident) {
-    try {
-      if (!isIcebergTable(loadGravitinoTable(ident))) {
-        dropFromDerby(ident);
-      }
-    } catch (NoSuchTableException e) {
-      return false;
-    }
-    return super.dropTable(ident);
-  }
-
-  /**
-   * Overrides purgeTable to also remove the table from Derby. Iceberg tables are never registered
-   * in Derby, so Derby cleanup is skipped for them.
-   */
-  @Override
-  public boolean purgeTable(Identifier ident) {
-    try {
-      if (!isIcebergTable(loadGravitinoTable(ident))) {
-        dropFromDerby(ident);
-      }
-    } catch (NoSuchTableException e) {
-      return false;
-    }
-    return super.purgeTable(ident);
-  }
-
-  /**
-   * Overrides renameTable to keep Derby in sync after the Gravitino rename. The old Derby entry is
-   * dropped eagerly; the new entry is synced lazily on the next loadTable call.
-   */
-  @Override
-  public void renameTable(Identifier oldIdent, Identifier newIdent)
-      throws NoSuchTableException, TableAlreadyExistsException {
-    super.renameTable(oldIdent, newIdent);
-    dropFromDerby(oldIdent);
   }
 
   /**
@@ -315,103 +251,5 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   private Table loadIcebergSparkTable(Identifier identifier, SparkCatalog icebergCatalog)
       throws NoSuchTableException {
     return icebergCatalog.loadTable(identifier);
-  }
-
-  /** Creates the namespace in Derby if it does not already exist. */
-  private void syncNamespaceToDerby(String[] namespace) {
-    if (!(sparkCatalog instanceof SupportsNamespaces)) {
-      LOG.warn(
-          "sparkCatalog {} does not implement SupportsNamespaces; "
-              + "skipping Derby namespace sync for {}. Derby createTable may fail.",
-          sparkCatalog.getClass().getName(),
-          Arrays.toString(namespace));
-      return;
-    }
-    SupportsNamespaces ns = (SupportsNamespaces) sparkCatalog;
-    try {
-      ns.loadNamespaceMetadata(namespace);
-    } catch (NoSuchNamespaceException e) {
-      try {
-        ns.createNamespace(namespace, Collections.emptyMap());
-      } catch (NamespaceAlreadyExistsException ex) {
-        // Created concurrently — OK.
-      }
-    }
-  }
-
-  /**
-   * Creates a Derby entry from an already-loaded Gravitino table. Called when loadTable() detects
-   * the table is missing from Derby (e.g., after a JVM restart or against a pre-populated catalog).
-   * The caller supplies the Gravitino table to avoid a redundant load and eliminate the TOCTOU
-   * window that would exist if we re-fetched it here.
-   *
-   * @param ident the table identifier
-   * @param gravitinoTable the Gravitino table metadata
-   */
-  private void syncTableToDerby(Identifier ident, org.apache.gravitino.rel.Table gravitinoTable) {
-    SparkTypeConverter typeConverter = getSparkTypeConverter();
-    SparkTransformConverter transformConverter = getSparkTransformConverter();
-
-    StructField[] fields =
-        Arrays.stream(gravitinoTable.columns())
-            .map(
-                col ->
-                    DataTypes.createStructField(
-                        col.name(), typeConverter.toSparkType(col.dataType()), col.nullable()))
-            .toArray(StructField[]::new);
-    StructType schema = new StructType(fields);
-
-    Transform[] sparkPartitions =
-        transformConverter.toSparkTransform(gravitinoTable.partitioning(), null, null);
-
-    Map<String, String> props = new HashMap<>();
-    Map<String, String> gravitinoProps = gravitinoTable.properties();
-    String location = gravitinoProps.get(GlueConstants.LOCATION);
-    if (location != null) {
-      props.put(TableCatalog.PROP_LOCATION, location);
-    }
-    String inputFormat = gravitinoProps.get(GlueConstants.INPUT_FORMAT_CLASS);
-    if (inputFormat != null) {
-      props.put("hive.input-format", inputFormat);
-    }
-    String outputFormat = gravitinoProps.get(GlueConstants.OUTPUT_FORMAT);
-    if (outputFormat != null) {
-      props.put("hive.output-format", outputFormat);
-    }
-    String serdeLib = gravitinoProps.get(GlueConstants.SERDE_LIB);
-    if (serdeLib != null) {
-      props.put("hive.serde", serdeLib);
-    }
-
-    syncNamespaceToDerby(ident.namespace());
-    try {
-      sparkCatalog.createTable(ident, schema, sparkPartitions, props);
-    } catch (TableAlreadyExistsException e) {
-      // Race: another thread created it first — OK.
-    } catch (NoSuchNamespaceException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to create Derby entry for %s.%s: namespace sync failed.",
-              getDatabase(ident), ident.name()),
-          e);
-    }
-  }
-
-  /**
-   * Removes the table from Derby. Used during drop/purge/rename to avoid stale entries. Failures
-   * are logged at WARN because a stale Derby entry will cause the next createTable to fail with
-   * TableAlreadyExistsException.
-   */
-  void dropFromDerby(Identifier ident) {
-    try {
-      sparkCatalog.invalidateTable(ident);
-      sparkCatalog.dropTable(ident);
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to remove table {} from Derby local metastore. "
-              + "A subsequent createTable with the same name may fail with TableAlreadyExistsException.",
-          ident,
-          e);
-    }
   }
 }

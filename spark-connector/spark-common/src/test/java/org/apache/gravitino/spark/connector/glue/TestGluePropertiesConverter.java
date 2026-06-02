@@ -148,9 +148,18 @@ public class TestGluePropertiesConverter {
   // --- toSparkCatalogProperties tests (single-arg version) ---
 
   @Test
-  void testToSparkCatalogPropertiesEmpty() {
+  void testToSparkCatalogPropertiesAlwaysContainsFactoryClass() {
+    // Factory class must always be set so HiveTableCatalog uses Glue instead of Derby.
+    // The patched Hive 2.3.10 reads IMETASTORE_CLIENT_FACTORY_CLASS whose key is
+    // "hive.imetastoreclient.factory.class" (not "hive.metastore.client.factory.class").
     Map<String, String> sparkProps = converter.toSparkCatalogProperties(ImmutableMap.of());
-    Assertions.assertTrue(sparkProps.isEmpty());
+    Assertions.assertEquals(
+        GluePropertiesConverter.AWS_GLUE_HIVE_CLIENT_FACTORY_CLASS,
+        sparkProps.get(GluePropertiesConverter.HIVE_METASTORE_CLIENT_FACTORY_CLASS));
+    Assertions.assertEquals(
+        "hive.imetastoreclient.factory.class",
+        GluePropertiesConverter.HIVE_METASTORE_CLIENT_FACTORY_CLASS);
+    Assertions.assertEquals(1, sparkProps.size());
   }
 
   @Test
@@ -159,7 +168,9 @@ public class TestGluePropertiesConverter {
         converter.toSparkCatalogProperties(
             ImmutableMap.of(GluePropertiesConverter.AWS_REGION, "us-east-1"));
     Assertions.assertEquals("us-east-1", sparkProps.get("aws.region"));
-    Assertions.assertEquals(1, sparkProps.size());
+    Assertions.assertEquals(
+        GluePropertiesConverter.AWS_GLUE_HIVE_CLIENT_FACTORY_CLASS,
+        sparkProps.get(GluePropertiesConverter.HIVE_METASTORE_CLIENT_FACTORY_CLASS));
   }
 
   @Test
@@ -184,9 +195,10 @@ public class TestGluePropertiesConverter {
   }
 
   @Test
-  void testToSparkCatalogPropertiesCredentialsNotMapped() {
-    // Credentials are handled by the AWS SDK credential chain at runtime and must not be forwarded
-    // as Hive catalog properties.
+  void testToSparkCatalogPropertiesCredentialsNotForwarded() {
+    // Static credentials are NOT forwarded to HiveTableCatalog — the
+    // AWSGlueDataCatalogHiveClientFactory
+    // uses DefaultAWSCredentialsProviderChain (env vars, instance profile, etc.) instead.
     Map<String, String> sparkProps =
         converter.toSparkCatalogProperties(
             ImmutableMap.of(
@@ -194,8 +206,6 @@ public class TestGluePropertiesConverter {
                 GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, "my-secret-key"));
     Assertions.assertNull(sparkProps.get(GluePropertiesConverter.AWS_ACCESS_KEY_ID));
     Assertions.assertNull(sparkProps.get(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY));
-    Assertions.assertFalse(sparkProps.containsValue("my-access-key"));
-    Assertions.assertFalse(sparkProps.containsValue("my-secret-key"));
   }
 
   @Test

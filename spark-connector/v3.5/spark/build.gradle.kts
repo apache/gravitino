@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import java.net.URI
+
 plugins {
   `maven-publish`
   id("java")
@@ -25,6 +27,51 @@ plugins {
 
 repositories {
   mavenCentral()
+}
+
+val glueHiveJarsDir = "$buildDir/tmp/glue-hive-jars"
+val glueLibsBase =
+  "https://raw.githubusercontent.com/datastrato/spark-hive-glue-libs/main/spark3/glue-3.4.0"
+val mavenCentral = "https://repo1.maven.org/maven2"
+
+// Jars for Spark's IsolatedClientLoader: patched Hive 2.3.10 + Glue datacatalog client.
+// aws-java-sdk-glue 1.12.31 requires PropertyNamingStrategy$PascalCaseStrategy which was
+// removed in Jackson 2.12. Jackson 2.11.x is included here so the isolated classloader
+// uses a compatible version instead of the app-level Jackson bundled with Spark (2.14+).
+val glueHiveJarDownloads =
+  mapOf(
+    "aws-glue-datacatalog-spark-client-3.4.0.jar" to
+      "$glueLibsBase/aws-glue-datacatalog-spark-client-3.4.0.jar",
+    "aws-java-sdk-core-1.12.31.jar" to "$glueLibsBase/aws-java-sdk-core-1.12.31.jar",
+    "aws-java-sdk-glue-1.12.31.jar" to "$glueLibsBase/aws-java-sdk-glue-1.12.31.jar",
+    "hive-common-2.3.10.jar" to "$glueLibsBase/hive-common-2.3.10.jar",
+    "hive-exec-2.3.10.jar" to "$glueLibsBase/hive-exec-2.3.10.jar",
+    "hive-metastore-2.3.10.jar" to "$glueLibsBase/hive-metastore-2.3.10.jar",
+    "hive-serde-2.3.10.jar" to "$glueLibsBase/hive-serde-2.3.10.jar",
+    "hive-shims-2.3.10.jar" to "$glueLibsBase/hive-shims-2.3.10.jar",
+    "jmespath-java-1.12.31.jar" to "$glueLibsBase/jmespath-java-1.12.31.jar",
+    "jackson-core-2.12.3.jar" to "$glueLibsBase/jackson-core-2.12.3.jar",
+    "jackson-databind-2.12.3.jar" to "$glueLibsBase/jackson-databind-2.12.3.jar",
+    "jackson-annotations-2.12.3.jar" to "$glueLibsBase/jackson-annotations-2.12.3.jar",
+    "jackson-dataformat-cbor-2.12.3.jar" to "$glueLibsBase/jackson-dataformat-cbor-2.12.3.jar"
+  )
+
+val downloadGlueHiveJars by
+tasks.registering {
+  outputs.dir(glueHiveJarsDir)
+  doLast {
+    val outputDir = file(glueHiveJarsDir)
+    outputDir.mkdirs()
+    glueHiveJarDownloads.forEach { (jarName, url) ->
+      val dest = outputDir.resolve(jarName)
+      if (!dest.exists()) {
+        logger.lifecycle("Downloading $jarName ...")
+        URI(url).toURL().openStream().use { input ->
+          dest.outputStream().use { output -> input.copyTo(output) }
+        }
+      }
+    }
+  }
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
@@ -137,6 +184,7 @@ dependencies {
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   // Iceberg's GlueCatalog references several AWS SDK modules at runtime; must be on test classpath
+  testImplementation(libs.aws.dynamodb)
   testImplementation(libs.aws.glue)
   testImplementation(libs.aws.kms)
   testImplementation(libs.aws.s3)
@@ -184,6 +232,8 @@ tasks.test {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
+    dependsOn(downloadGlueHiveJars)
+    jvmArgs("-Dglue.hive-jars-dir=$glueHiveJarsDir")
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")

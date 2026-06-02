@@ -90,6 +90,21 @@ public class GluePropertiesConverter implements PropertiesConverter {
 
   private static final String SPARK_PROVIDER_ICEBERG = "iceberg";
 
+  /**
+   * Hive config key that activates the AWS Glue Data Catalog as the Hive metastore client.
+   *
+   * <p>Note: the patched Hive 2.3.10 (HIVE-12679) uses the ConfVar {@code
+   * IMETASTORE_CLIENT_FACTORY_CLASS} whose string key is {@code
+   * hive.imetastoreclient.factory.class} — not the commonly documented {@code
+   * hive.metastore.client.factory.class}.
+   */
+  public static final String HIVE_METASTORE_CLIENT_FACTORY_CLASS =
+      "hive.imetastoreclient.factory.class";
+
+  /** AWS Glue Data Catalog Hive client factory class name. */
+  public static final String AWS_GLUE_HIVE_CLIENT_FACTORY_CLASS =
+      "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory";
+
   /** Maps Gravitino property keys to Spark HiveTableCatalog property keys. */
   private static final Map<String, String> GRAVITINO_TO_SPARK_KEYS =
       ImmutableMap.of(
@@ -122,13 +137,20 @@ public class GluePropertiesConverter implements PropertiesConverter {
   /**
    * Transform Gravitino Glue catalog properties to Spark catalog properties for HiveTableCatalog.
    *
-   * <p>For Glue-backed Hive tables, Spark uses the AWS SDK directly through the Hive metastore
-   * compatibility layer. The properties are passed through to enable Glue API access.
+   * <p>Sets {@code hive.imetastoreclient.factory.class} to {@link
+   * #AWS_GLUE_HIVE_CLIENT_FACTORY_CLASS}, replacing the embedded Derby metastore with a direct Glue
+   * API connection. This eliminates Derby and makes the catalog work correctly across multiple
+   * Spark applications.
+   *
+   * <p>AWS credentials are read via the default AWS credential chain (environment variables,
+   * instance profile, etc.) inside the isolated Hive classloader. The static credentials in
+   * Gravitino catalog properties are used by the Iceberg GlueCatalog path instead.
    */
   @Override
   public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {
     Preconditions.checkArgument(properties != null, "Glue Catalog properties should not be null");
     HashMap<String, String> all = new HashMap<>();
+    all.put(HIVE_METASTORE_CLIENT_FACTORY_CLASS, AWS_GLUE_HIVE_CLIENT_FACTORY_CLASS);
     GRAVITINO_TO_SPARK_KEYS.forEach(
         (gravitinoKey, sparkKey) -> {
           String value = properties.get(gravitinoKey);

@@ -18,8 +18,13 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.glue;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
@@ -328,6 +333,53 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
       // determine the correct AWS partition and endpoint without an explicit URL.
       sparkConf.set("spark.hadoop.fs.s3a.endpoint.region", awsRegion);
     }
+    String glueHiveJarsDir = System.getProperty("glue.hive-jars-dir");
+    Preconditions.checkNotNull(
+        glueHiveJarsDir,
+        "System property glue.hive-jars-dir not set. "
+            + "Download jars from https://github.com/datastrato/spark-hive-glue-libs "
+            + "and set -Dglue.hive-jars-dir=<path> or run via Gradle test task.");
+    String hiveJars;
+    try (Stream<java.nio.file.Path> stream = Files.list(Paths.get(glueHiveJarsDir))) {
+      hiveJars =
+          stream
+              .filter(p -> p.toString().endsWith(".jar"))
+              .map(java.nio.file.Path::toString)
+              .collect(Collectors.joining(","));
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Failed to list jars in glue.hive-jars-dir: " + glueHiveJarsDir, e);
+    }
+    Preconditions.checkState(
+        !hiveJars.isEmpty(), "No jars found in glue.hive-jars-dir: %s", glueHiveJarsDir);
+    // IsolatedClientLoader uses the platform classloader as parent (not context classloader).
+    // Classes not in the execJars path must be explicitly added to sharedPrefixes so they are
+    // delegated to the context classloader (test runtime classpath).
+    // Note: com.amazonaws is NOT shared — it must stay in the isolated classloader alongside
+    // the patched Hive so the factory class can access HiveMetaStoreClientFactory.
+    String sharedPrefixes =
+        String.join(
+            ",",
+            "com.mysql.jdbc",
+            "org.postgresql",
+            "com.microsoft.sqlserver.jdbc",
+            "org.apache.thrift",
+            "org.apache.commons",
+            "org.slf4j",
+            "org.apache.log4j",
+            "com.google.protobuf",
+            "com.google.common",
+            "javax.jdo",
+            "org.datanucleus",
+            "org.apache.derby",
+            "org.antlr",
+            "org.apache.http");
+    sparkConf
+        .set("spark.sql.hive.metastore.version", "2.3.10")
+        .set("spark.sql.hive.metastore.jars", "path")
+        .set("spark.sql.hive.metastore.jars.path", hiveJars)
+        .set("spark.sql.hive.metastore.sharedPrefixes", sharedPrefixes);
+
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
