@@ -129,6 +129,7 @@ dependencies {
   testImplementation(libs.caffeine)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.testcontainers)
   testImplementation(libs.woodstox.core)
 
