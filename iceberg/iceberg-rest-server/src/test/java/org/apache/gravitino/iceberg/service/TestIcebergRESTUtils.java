@@ -210,10 +210,11 @@ public class TestIcebergRESTUtils {
                 tableMetadata)
             .config();
 
-    Assertions.assertEquals(
-        "v1/oss/namespaces/ns/tables/tbl/credentials",
-        config.get("client.refresh-credentials-endpoint"));
+    Assertions.assertFalse(config.containsKey("client.refresh-credentials-endpoint"));
     Assertions.assertEquals("9012", config.get("client.security-token-expires-at-ms"));
+    Assertions.assertEquals("key", config.get("client.access-key-id"));
+    Assertions.assertEquals("secret", config.get("client.access-key-secret"));
+    Assertions.assertEquals("oss-token", config.get("client.security-token"));
   }
 
   @Test

@@ -105,6 +105,13 @@ public class IcebergRESTUtils {
    * Builds an Iceberg REST {@link org.apache.iceberg.rest.credentials.Credential} for load-table,
    * scan-plan, or credentials API responses.
    *
+   * <p>Refresh credential endpoints are added only for credential types whose Iceberg client
+   * modules support vended credential refresh: S3 ({@link S3TokenCredential}, {@link
+   * AwsIrsaCredential}), GCS ({@link GCSTokenCredential}), and ADLS ({@link ADLSTokenCredential}).
+   * OSS temporary credentials ({@link OSSTokenCredential}) are omitted because Iceberg's Aliyun OSS
+   * FileIO does not consume {@code client.refresh-credentials-endpoint}; only the initial STS
+   * properties are returned.
+   *
    * @param catalogName IRC catalog name used in the refresh path
    * @param tableIdentifier table receiving the credential
    * @param credential Gravitino credential to vend
@@ -124,9 +131,7 @@ public class IcebergRESTUtils {
       refreshEndpointProp = GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT;
     } else if (credential instanceof ADLSTokenCredential) {
       refreshEndpointProp = ADLS_REFRESH_CREDENTIALS_ENDPOINT;
-    } else if (credential instanceof S3TokenCredential
-        || credential instanceof AwsIrsaCredential
-        || credential instanceof OSSTokenCredential) {
+    } else if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
       refreshEndpointProp = CLIENT_REFRESH_CREDENTIALS_ENDPOINT;
     }
 
