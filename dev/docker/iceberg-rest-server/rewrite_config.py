@@ -19,17 +19,20 @@
 import os
 
 env_map = {
-    "GRAVITINO_IO_IMPL": "io-impl",
+    # Catalog
+    "GRAVITINO_ICEBERG_REST_HTTP_PORT": "httpPort",
     "GRAVITINO_URI": "uri",
-    "GRAVITINO_CATALOG_BACKEND" : "catalog-backend",
+    "GRAVITINO_IO_IMPL": "io-impl",
+    "GRAVITINO_CATALOG_BACKEND": "catalog-backend",
     "GRAVITINO_JDBC_DRIVER": "jdbc-driver",
     "GRAVITINO_JDBC_USER": "jdbc-user",
     "GRAVITINO_JDBC_PASSWORD": "jdbc-password",
     "GRAVITINO_WAREHOUSE": "warehouse",
-    "GRAVITINO_CREDENTIAL_PROVIDER_TYPE": "credential-providers",
+    # Credentials
     "GRAVITINO_CREDENTIAL_PROVIDERS": "credential-providers",
-    "GRAVITINO_GCS_CREDENTIAL_FILE_PATH": "gcs-service-account-file",
+    # GCS
     "GRAVITINO_GCS_SERVICE_ACCOUNT_FILE": "gcs-service-account-file",
+    # S3
     "GRAVITINO_S3_ACCESS_KEY": "s3-access-key-id",
     "GRAVITINO_S3_SECRET_KEY": "s3-secret-access-key",
     "GRAVITINO_S3_ENDPOINT": "s3-endpoint",
@@ -37,18 +40,19 @@ env_map = {
     "GRAVITINO_S3_PATH_STYLE_ACCESS": "s3-path-style-access",
     "GRAVITINO_S3_ROLE_ARN": "s3-role-arn",
     "GRAVITINO_S3_EXTERNAL_ID": "s3-external-id",
+    # Azure
     "GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME": "azure-storage-account-name",
     "GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY": "azure-storage-account-key",
     "GRAVITINO_AZURE_TENANT_ID": "azure-tenant-id",
     "GRAVITINO_AZURE_CLIENT_ID": "azure-client-id",
     "GRAVITINO_AZURE_CLIENT_SECRET": "azure-client-secret",
+    # OSS
     "GRAVITINO_OSS_ACCESS_KEY": "oss-access-key-id",
     "GRAVITINO_OSS_SECRET_KEY": "oss-secret-access-key",
     "GRAVITINO_OSS_ENDPOINT": "oss-endpoint",
     "GRAVITINO_OSS_REGION": "oss-region",
     "GRAVITINO_OSS_ROLE_ARN": "oss-role-arn",
     "GRAVITINO_OSS_EXTERNAL_ID": "oss-external-id",
-    "GRAVITINO_ICEBERG_REST_HTTP_PORT": "httpPort",
 }
 
 init_config = {

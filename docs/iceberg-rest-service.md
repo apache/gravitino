@@ -685,8 +685,9 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 
 | Environment variables                  | Configuration items                                 | Since version    |
 |----------------------------------------|-----------------------------------------------------|------------------|
-| `GRAVITINO_IO_IMPL`                    | `gravitino.iceberg-rest.io-impl`                    | 0.7.0-incubating |
+| `GRAVITINO_ICEBERG_REST_HTTP_PORT`     | `gravitino.iceberg-rest.httpPort`                   | 1.1.0            |
 | `GRAVITINO_URI`                        | `gravitino.iceberg-rest.uri`                        | 0.7.0-incubating |
+| `GRAVITINO_IO_IMPL`                    | `gravitino.iceberg-rest.io-impl`                    | 0.7.0-incubating |
 | `GRAVITINO_CATALOG_BACKEND`            | `gravitino.iceberg-rest.catalog-backend`            | 1.0.0            |
 | `GRAVITINO_JDBC_DRIVER`                | `gravitino.iceberg-rest.jdbc-driver`                | 0.9.0-incubating |
 | `GRAVITINO_JDBC_USER`                  | `gravitino.iceberg-rest.jdbc-user`                  | 0.9.0-incubating |
@@ -698,10 +699,10 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 | `GRAVITINO_S3_SECRET_KEY`              | `gravitino.iceberg-rest.s3-secret-access-key`       | 0.7.0-incubating |
 | `GRAVITINO_S3_ENDPOINT`                | `gravitino.iceberg-rest.s3-endpoint`                | 0.9.0-incubating |
 | `GRAVITINO_S3_REGION`                  | `gravitino.iceberg-rest.s3-region`                  | 0.7.0-incubating |
+| `GRAVITINO_S3_PATH_STYLE_ACCESS`       | `gravitino.iceberg-rest.s3-path-style-access`       | 1.0.0            |
 | `GRAVITINO_S3_ROLE_ARN`                | `gravitino.iceberg-rest.s3-role-arn`                | 0.7.0-incubating |
 | `GRAVITINO_S3_EXTERNAL_ID`             | `gravitino.iceberg-rest.s3-external-id`             | 0.7.0-incubating |
 | `GRAVITINO_S3_TOKEN_SERVICE_ENDPOINT`  | `gravitino.iceberg-rest.s3-token-service-endpoint`  | 0.8.0-incubating |
-| `GRAVITINO_S3_PATH_STYLE_ACCESS`       | `gravitino.iceberg-rest.s3-path-style-access`       | 1.0.0            |
 | `GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME` | `gravitino.iceberg-rest.azure-storage-account-name` | 0.8.0-incubating |
 | `GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY`  | `gravitino.iceberg-rest.azure-storage-account-key`  | 0.8.0-incubating |
 | `GRAVITINO_AZURE_TENANT_ID`            | `gravitino.iceberg-rest.azure-tenant-id`            | 0.8.0-incubating |
@@ -713,7 +714,6 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 | `GRAVITINO_OSS_REGION`                 | `gravitino.iceberg-rest.oss-region`                 | 0.8.0-incubating |
 | `GRAVITINO_OSS_ROLE_ARN`               | `gravitino.iceberg-rest.oss-role-arn`               | 0.8.0-incubating |
 | `GRAVITINO_OSS_EXTERNAL_ID`            | `gravitino.iceberg-rest.oss-external-id`            | 0.8.0-incubating |
-| `GRAVITINO_ICEBERG_REST_HTTP_PORT`     | `gravitino.iceberg-rest.httpPort`                   | 1.1.0            |
 
 The below environment is deprecated, please use the corresponding configuration items instead.
 

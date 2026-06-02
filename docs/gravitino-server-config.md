@@ -464,7 +464,10 @@ The Gravitino server Docker image starts Iceberg REST as an auxiliary service by
 The following environment variables configure the `gravitino.iceberg-rest.*` entries in
 `gravitino.conf`. Each row lists a short environment variable name and a long
 `GRAVITINO_ICEBERG_REST_*` environment variable name for the same configuration key. If both
-names are set, the long name takes precedence.
+names are set, the long name takes precedence. The following configuration keys only support
+long `GRAVITINO_ICEBERG_REST_*` environment variable names in the Gravitino server Docker
+image: `host`, `httpPort`, `uri`, `classpath`, `io-impl`, `catalog-backend`, `warehouse`,
+`jdbc-driver`, `jdbc-user`, and `jdbc-password`.
 
 In the **Gravitino server Docker image**, five long `GRAVITINO_ICEBERG_REST_*` variables
 have been supported since `1.0.0`. All short-name aliases and the remaining long-name
@@ -473,20 +476,18 @@ column shows when each alias became available.
 
 | Environment Variables                                                                        | Configuration Key                                   | Default Value                                        | Since Version (short / long) |
 |----------------------------------------------------------------------------------------------|-----------------------------------------------------|------------------------------------------------------|------------------------------|
-| `GRAVITINO_REST_CLASSPATH` / `GRAVITINO_ICEBERG_REST_CLASSPATH`                              | `gravitino.iceberg-rest.classpath`                  | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.3.0 / 1.0.0                |
-| `GRAVITINO_HOST` / `GRAVITINO_ICEBERG_REST_HOST`                                             | `gravitino.iceberg-rest.host`                       | `0.0.0.0`                                            | 1.3.0 / 1.0.0                |
-| `GRAVITINO_HTTP_PORT` / `GRAVITINO_ICEBERG_REST_HTTP_PORT`                                   | `gravitino.iceberg-rest.httpPort`                   | `9001`                                               | 1.3.0 / 1.0.0                |
-| `GRAVITINO_CATALOG_BACKEND` / `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                       | `gravitino.iceberg-rest.catalog-backend`            | `memory`                                             | 1.3.0 / 1.0.0                |
-| `GRAVITINO_WAREHOUSE` / `GRAVITINO_ICEBERG_REST_WAREHOUSE`                                   | `gravitino.iceberg-rest.warehouse`                  | `/tmp/`                                              | 1.3.0 / 1.0.0                |
-| `GRAVITINO_IO_IMPL` / `GRAVITINO_ICEBERG_REST_IO_IMPL`                                       | `gravitino.iceberg-rest.io-impl`                    | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_URI` / `GRAVITINO_ICEBERG_REST_URI`                                               | `gravitino.iceberg-rest.uri`                        | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_JDBC_DRIVER` / `GRAVITINO_ICEBERG_REST_JDBC_DRIVER`                               | `gravitino.iceberg-rest.jdbc-driver`                | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_JDBC_USER` / `GRAVITINO_ICEBERG_REST_JDBC_USER`                                   | `gravitino.iceberg-rest.jdbc-user`                  | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_JDBC_PASSWORD` / `GRAVITINO_ICEBERG_REST_JDBC_PASSWORD`                           | `gravitino.iceberg-rest.jdbc-password`              | (none)                                               | 1.3.0 / 1.3.0                |
+| `GRAVITINO_ICEBERG_REST_HOST`                                                                | `gravitino.iceberg-rest.host`                       | `0.0.0.0`                                            | 1.0.0                        |
+| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                                                           | `gravitino.iceberg-rest.httpPort`                   | `9001`                                               | 1.0.0                        |
+| `GRAVITINO_ICEBERG_REST_URI`                                                                 | `gravitino.iceberg-rest.uri`                        | (none)                                               | 1.3.0                        |
+| `GRAVITINO_ICEBERG_REST_CLASSPATH`                                                           | `gravitino.iceberg-rest.classpath`                  | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.0.0                        |
+| `GRAVITINO_ICEBERG_REST_IO_IMPL`                                                             | `gravitino.iceberg-rest.io-impl`                    | (none)                                               | 1.3.0                        |
+| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                                                     | `gravitino.iceberg-rest.catalog-backend`            | `memory`                                             | 1.0.0                        |
+| `GRAVITINO_ICEBERG_REST_JDBC_DRIVER`                                                         | `gravitino.iceberg-rest.jdbc-driver`                | (none)                                               | 1.3.0                        |
+| `GRAVITINO_ICEBERG_REST_JDBC_USER`                                                           | `gravitino.iceberg-rest.jdbc-user`                  | (none)                                               | 1.3.0                        |
+| `GRAVITINO_ICEBERG_REST_JDBC_PASSWORD`                                                       | `gravitino.iceberg-rest.jdbc-password`              | (none)                                               | 1.3.0                        |
+| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                                                           | `gravitino.iceberg-rest.warehouse`                  | `/tmp/`                                              | 1.0.0                        |
 | `GRAVITINO_CREDENTIAL_PROVIDERS` / `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`             | `gravitino.iceberg-rest.credential-providers`       | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE` / `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDER_TYPE`     | `gravitino.iceberg-rest.credential-providers`       | (none)                                               | 1.3.0 / 1.3.0                |
 | `GRAVITINO_GCS_SERVICE_ACCOUNT_FILE` / `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE`     | `gravitino.iceberg-rest.gcs-service-account-file`   | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH` / `GRAVITINO_ICEBERG_REST_GCS_CREDENTIAL_FILE_PATH`     | `gravitino.iceberg-rest.gcs-service-account-file`   | (none)                                               | 1.3.0 / 1.3.0                |
 | `GRAVITINO_S3_ACCESS_KEY` / `GRAVITINO_ICEBERG_REST_S3_ACCESS_KEY`                           | `gravitino.iceberg-rest.s3-access-key-id`           | (none)                                               | 1.3.0 / 1.3.0                |
 | `GRAVITINO_S3_SECRET_KEY` / `GRAVITINO_ICEBERG_REST_S3_SECRET_KEY`                           | `gravitino.iceberg-rest.s3-secret-access-key`       | (none)                                               | 1.3.0 / 1.3.0                |
 | `GRAVITINO_S3_ENDPOINT` / `GRAVITINO_ICEBERG_REST_S3_ENDPOINT`                               | `gravitino.iceberg-rest.s3-endpoint`                | (none)                                               | 1.3.0 / 1.3.0                |
@@ -544,8 +545,8 @@ To configure the auxiliary Iceberg REST service with local storage:
 docker run --rm -d \
   -p 8090:8090 \
   -p 9001:9001 \
-  -e GRAVITINO_WAREHOUSE=/tmp/warehouse/ \
-  -e GRAVITINO_HTTP_PORT=9001 \
+  -e GRAVITINO_ICEBERG_REST_WAREHOUSE=/tmp/warehouse/ \
+  -e GRAVITINO_ICEBERG_REST_HTTP_PORT=9001 \
   apache/gravitino:<tag>
 ```
 
