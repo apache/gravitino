@@ -430,6 +430,15 @@ class HiveViewCatalogOperations implements ViewCatalog {
     SQLRepresentation selected = (SQLRepresentation) firstRepresentation;
     switch (selected.dialect().toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
+        Preconditions.checkArgument(
+            defaultCatalog == null && defaultSchema == null,
+            "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
+                + "defaultCatalog=%s, defaultSchema=%s for view %s",
+            selected.dialect(),
+            defaultCatalog,
+            defaultSchema,
+            ident);
+        return selected;
       case Dialects.FLINK:
         Preconditions.checkArgument(
             defaultCatalog == null && defaultSchema == null,
@@ -439,15 +448,13 @@ class HiveViewCatalogOperations implements ViewCatalog {
             defaultCatalog,
             defaultSchema,
             ident);
-        if (Dialects.FLINK.equalsIgnoreCase(selected.dialect())) {
-          Preconditions.checkArgument(
-              properties.keySet().stream()
-                  .anyMatch(k -> k.startsWith(HiveView.FLINK_PROPERTY_PREFIX)),
-              "Flink dialect view '%s' requires at least one property with prefix '%s' to be set; "
-                  + "without it the view silently round-trips as Hive dialect on reload",
-              ident,
-              HiveView.FLINK_PROPERTY_PREFIX);
-        }
+        Preconditions.checkArgument(
+            properties.keySet().stream()
+                .anyMatch(k -> k.startsWith(HiveView.FLINK_PROPERTY_PREFIX)),
+            "Flink dialect view '%s' requires at least one property with prefix '%s' to be set; "
+                + "without it the view silently round-trips as Hive dialect on reload",
+            ident,
+            HiveView.FLINK_PROPERTY_PREFIX);
         return selected;
       case Dialects.SPARK:
         Preconditions.checkArgument(
