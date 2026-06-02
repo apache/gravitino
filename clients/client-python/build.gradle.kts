@@ -242,7 +242,7 @@ tasks {
   // Run tests/integration/test_lance_ray.py against multiple lance-ray
   // versions. Each version is exercised inside its own venv under
   // build/lance-ray-matrix/.venv-<version>/ (cached across runs).
-  // Override the matrix with `-PlanceRayVersions=0.4.2,0.4.1,0.4.0`.
+  // Override the matrix with `-PlanceRayVersions=0.4.2,0.3.0`.
   // Override the bootstrap interpreter with `-PlanceRayPython=/path/to/python`.
   register("lanceRayMatrixTest") {
     group = "verification"
