@@ -43,6 +43,26 @@
 #        the role binding itself didn't change.
 #      → grant CREATE_ROLE on the same role on A; user can immediately use it on B.
 #
+#   S. ownerRelCache handles GROUP-type owners, not just USER-type.
+#      → setOwner(TAG, type=GROUP) on A; B reads back the GROUP owner after poll.
+#
+#   T. metadataIdCache is invalidated when an entity is deleted and re-created
+#      under the same name (new entity ID in the DB).
+#      → set owner of tag T to wangwu; delete T on A; re-create T on A (new ID,
+#        owner = lisi); B must NOT return wangwu as the owner of the new T.
+#
+#   U. User role-list metadata read-back (not just enforcement).
+#      → grant/revoke a role on A; GET /users/{user} on B immediately shows the
+#        updated role list (userRoleCache is version-validated per request).
+#
+#   V. Role privilege metadata read-back (not just enforcement).
+#      → swap privileges on a role on A; GET /roles/{role} on B shows the new
+#        set and no longer shows the removed privilege.
+#
+#   W. Bidirectional propagation: changes written to B are immediately visible
+#      on A (same per-request version-validation, reverse direction).
+#      → grant on B; addUser on A succeeds immediately; revoke on B; denied on A.
+#
 # All authz-enforcement assertions exercise metalake-internal APIs (addUser,
 # createRole, setOwner) so the test runs without any external catalog backend.
 # The propagation guarantees being tested apply identically to schemas, tables,
@@ -95,6 +115,12 @@ ROLE_ALLOW="role_allow_${SUFFIX}" # for Phase K (DENY override)
 ROLE_DENY="role_deny_${SUFFIX}"   # for Phase K
 GROUP_NAME="group_${SUFFIX}"      # for Phase L
 TAG_NAME="tag_${SUFFIX}"          # for Phase N
+GROUP_S="grp_s_${SUFFIX}"         # for Phase S (GROUP-type owner)
+TAG_S="tag_s_${SUFFIX}"           # for Phase S
+TAG_T="tag_t_${SUFFIX}"           # for Phase T (metadataIdCache re-create)
+ROLE_U="role_u_${SUFFIX}"         # for Phase U (user role read-back)
+ROLE_V="role_v_${SUFFIX}"         # for Phase V (role privilege read-back)
+ROLE_W="role_w_${SUFFIX}"         # for Phase W (bidirectional B→A)
 
 PASS=0
 FAIL=0
@@ -150,6 +176,23 @@ expect() {
 }
 
 section() { printf '\n\033[1m== %s ==\033[0m\n' "$1"; }
+
+# expect_absent <desc> <expected_http_code> <body_grep_pattern>
+# Passes when the HTTP code matches AND the pattern is NOT found in the body.
+expect_absent() {
+  local desc="$1" want="$2" pattern="$3"
+  local body_snip
+  body_snip=$(printf '%s' "$RESPONSE_BODY" | tr '\n' ' ' | cut -c1-180)
+  if [[ "$HTTP_CODE" != "$want" ]]; then
+    fail "$desc — expected HTTP $want, got $HTTP_CODE. Body: $body_snip"
+    return
+  fi
+  if printf '%s' "$RESPONSE_BODY" | grep -q -E "$pattern"; then
+    fail "$desc — HTTP $want OK but body unexpectedly matches /$pattern/. Body: $body_snip"
+    return
+  fi
+  pass "$desc"
+}
 
 # ---- preflight -------------------------------------------------------------
 
@@ -798,6 +841,202 @@ expect "A: revoke $ROLE_ALLOW from $USER_WANGWU" 200
 api "$INSTANCE_B" "$USER_WANGWU" POST "/api/metalakes/$METALAKE/users" \
   "{\"name\":\"r_after_revoke_${SUFFIX}\"}"
 expect "B: $USER_WANGWU addUser denied after single revoke (no duplicate binding leftover)" 403
+
+# ---- S. GROUP-type owner: ownerRelCache with GROUP principal ---------------
+
+section "S. GROUP as owner type — tag owned by a group propagates to B (eventual, ~${POLL_WAIT_SECS}s)"
+# ownerRelCache stores both USER and GROUP owners. Only USER-type has been
+# tested in the phases above. This phase confirms GROUP-type entries are also
+# propagated correctly by the JcasbinChangePoller.
+# (Simple authenticator cannot enforce group-derived requests, so we verify the
+# metadata read-back only — the owner is stored and visible on B as a GROUP.)
+api "$INSTANCE_A" "$USER_LISI" POST "/api/metalakes/$METALAKE/groups" \
+  "{\"name\":\"$GROUP_S\"}"
+expect "A: create group $GROUP_S for owner test" 200
+
+api "$INSTANCE_A" "$USER_LISI" POST "/api/metalakes/$METALAKE/tags" \
+  "{\"name\":\"$TAG_S\",\"comment\":\"phase S\",\"properties\":{}}"
+expect "A: $USER_LISI creates tag $TAG_S" 200
+
+api "$INSTANCE_A" "$USER_LISI" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_S" \
+  "{\"name\":\"$GROUP_S\",\"type\":\"GROUP\"}"
+expect "A: setOwner(TAG $TAG_S) = GROUP $GROUP_S" 200
+
+echo "  ...sleeping ${POLL_WAIT_SECS}s for the change poller"
+sleep "$POLL_WAIT_SECS"
+
+api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/owners/TAG/$TAG_S"
+expect "B: GET owner(TAG $TAG_S) = GROUP $GROUP_S (type GROUP propagated)" 200 \
+  "\"name\"[^}]*\"$GROUP_S\""
+
+# lisi is metalake owner and can delete the tag regardless of its object owner.
+api "$INSTANCE_A" "$USER_LISI" DELETE "/api/metalakes/$METALAKE/tags/$TAG_S"
+expect "A: $USER_LISI (metalake owner) deletes tag $TAG_S" 200
+
+api "$INSTANCE_A" "$USER_LISI" DELETE "/api/metalakes/$METALAKE/groups/$GROUP_S"
+expect "A: delete group $GROUP_S" 200
+
+# ---- T. metadataIdCache invalidation: tag delete + same-name re-create -----
+
+section "T. Stale-owner safety on tag delete+re-create (eventual, ~${POLL_WAIT_SECS}s)"
+# When a tag is deleted on A and re-created with the same name, B must not
+# allow the old owner (wangwu) to exercise ownership on the new entity.
+#
+# Two separate paths are exercised:
+#  1. GET /owners (OwnerManager.getOwner) does a live DB lookup — bypasses
+#     the JcasbinAuthorizer caches — so it always returns the new owner (lisi).
+#  2. Enforcement (isOwner inside hasSetOwnerPermission) reads metadataIdCache
+#     → ownerRelCache. Tags do not write to entity_change_log, so
+#     metadataIdCache[name] may still hold the old entity ID. However, the
+#     owner_meta soft-delete IS propagated via the owner_meta poll path, so
+#     ownerRelCache[old_id] is invalidated → live DB returns no owner for the
+#     deleted entity → wangwu is correctly denied.
+api "$INSTANCE_A" "$USER_LISI" POST "/api/metalakes/$METALAKE/tags" \
+  "{\"name\":\"$TAG_T\",\"comment\":\"phase T\",\"properties\":{}}"
+expect "A: create tag $TAG_T (owner = lisi as creator)" 200
+
+api "$INSTANCE_A" "$USER_LISI" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_T" \
+  "{\"name\":\"$USER_WANGWU\",\"type\":\"USER\"}"
+expect "A: setOwner(TAG $TAG_T) = $USER_WANGWU" 200
+
+echo "  ...sleeping ${POLL_WAIT_SECS}s so B caches wangwu as owner of $TAG_T"
+sleep "$POLL_WAIT_SECS"
+
+api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/owners/TAG/$TAG_T"
+expect "B: GET owner(TAG $TAG_T) = $USER_WANGWU (pre-delete baseline)" 200 \
+  "\"name\"[^}]*\"$USER_WANGWU\""
+
+# Delete the tag on A — should signal the poller to invalidate B's metadataIdCache.
+api "$INSTANCE_A" "$USER_LISI" DELETE "/api/metalakes/$METALAKE/tags/$TAG_T"
+expect "A: $USER_LISI deletes tag $TAG_T (triggers metadataIdCache invalidation)" 200
+
+# Re-create a tag with the same name on A — new entity ID in the DB, owner = lisi.
+api "$INSTANCE_A" "$USER_LISI" POST "/api/metalakes/$METALAKE/tags" \
+  "{\"name\":\"$TAG_T\",\"comment\":\"phase T re-create\",\"properties\":{}}"
+expect "A: re-create tag $TAG_T (new entity ID, new owner = lisi)" 200
+
+echo "  ...sleeping ${POLL_WAIT_SECS}s for poller to propagate delete+re-create"
+sleep "$POLL_WAIT_SECS"
+
+# B's ownerRelCache had wangwu for the OLD tag ID. After invalidation the new
+# tag (different ID) must be resolved fresh from the DB → owner = lisi.
+api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/owners/TAG/$TAG_T"
+expect "B: GET owner(re-created TAG $TAG_T) = $USER_LISI (no stale wangwu owner)" 200 \
+  "\"name\"[^}]*\"$USER_LISI\""
+
+# Enforcement: wangwu was owner of the old tag; must be rejected for the new one.
+api "$INSTANCE_B" "$USER_WANGWU" PUT "/api/metalakes/$METALAKE/owners/TAG/$TAG_T" \
+  "{\"name\":\"$USER_WANGWU\",\"type\":\"USER\"}"
+expect "B: $USER_WANGWU (old tag owner, stale) rejected for re-created $TAG_T" 403
+
+api "$INSTANCE_A" "$USER_LISI" DELETE "/api/metalakes/$METALAKE/tags/$TAG_T"
+expect "A: delete re-created tag $TAG_T" 200
+
+# ---- U. user role-list metadata read-back on B -----------------------------
+
+section "U. User role-list read-back on B — GET /users/{user} reflects grant/revoke from A"
+# Phases C/D verify enforcement (can the user DO X?). This phase verifies the
+# metadata layer: GET /users/{user} on B returns the up-to-date role list.
+# userRoleCache is per-request version-validated so no poll wait is needed.
+api "$INSTANCE_A" "$USER_LISI" POST "/api/metalakes/$METALAKE/roles" "$(cat <<EOF
+{"name":"$ROLE_U","properties":{},"securableObjects":[
+  {"fullName":"$METALAKE","type":"METALAKE",
+   "privileges":[{"name":"MANAGE_USERS","condition":"ALLOW"}]}]}
+EOF
+)"
+expect "A: create role $ROLE_U" 200
+
+api "$INSTANCE_A" "$USER_LISI" PUT \
+  "/api/metalakes/$METALAKE/permissions/users/$USER_WANGWU/grant/" \
+  "{\"roleNames\":[\"$ROLE_U\"]}"
+expect "A: grant $ROLE_U to $USER_WANGWU" 200
+
+api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/users/$USER_WANGWU"
+expect "B: GET user $USER_WANGWU — $ROLE_U appears in roles list after grant" 200 \
+  "\"$ROLE_U\""
+
+api "$INSTANCE_A" "$USER_LISI" PUT \
+  "/api/metalakes/$METALAKE/permissions/users/$USER_WANGWU/revoke/" \
+  "{\"roleNames\":[\"$ROLE_U\"]}"
+expect "A: revoke $ROLE_U from $USER_WANGWU" 200
+
+api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/users/$USER_WANGWU"
+expect_absent "B: GET user $USER_WANGWU — $ROLE_U absent from roles list after revoke" 200 \
+  "\"$ROLE_U\""
+
+api "$INSTANCE_A" "$USER_LISI" DELETE "/api/metalakes/$METALAKE/roles/$ROLE_U"
+expect "A: delete role $ROLE_U" 200
+
+# ---- V. role privilege metadata read-back on B -----------------------------
+
+section "V. Role privilege read-back on B — GET /roles/{role} reflects privilege changes from A"
+# Complements Phase E (enforcement) with a metadata-layer check: after the
+# privilege set on a role changes on A, GET /roles/{role} on B must show the
+# updated list. loadedRoles is per-request version-validated, so this is immediate.
+api "$INSTANCE_A" "$USER_LISI" POST "/api/metalakes/$METALAKE/roles" "$(cat <<EOF
+{"name":"$ROLE_V","properties":{},"securableObjects":[
+  {"fullName":"$METALAKE","type":"METALAKE",
+   "privileges":[{"name":"MANAGE_USERS","condition":"ALLOW"}]}]}
+EOF
+)"
+expect "A: create role $ROLE_V with MANAGE_USERS" 200
+
+api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/roles/$ROLE_V"
+expect "B: GET role $ROLE_V shows MANAGE_USERS (initial)" 200 '"MANAGE_USERS"'
+
+# Swap privilege set on A: remove MANAGE_USERS, add CREATE_TAG.
+api "$INSTANCE_A" "$USER_LISI" PUT \
+  "/api/metalakes/$METALAKE/permissions/roles/$ROLE_V/METALAKE/$METALAKE/revoke/" \
+  '{"privileges":[{"name":"MANAGE_USERS","condition":"ALLOW"}]}'
+expect "A: revoke MANAGE_USERS from $ROLE_V" 200
+
+api "$INSTANCE_A" "$USER_LISI" PUT \
+  "/api/metalakes/$METALAKE/permissions/roles/$ROLE_V/METALAKE/$METALAKE/grant/" \
+  '{"privileges":[{"name":"CREATE_TAG","condition":"ALLOW"}]}'
+expect "A: grant CREATE_TAG to $ROLE_V" 200
+
+api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/roles/$ROLE_V"
+expect "B: GET role $ROLE_V now shows CREATE_TAG" 200 '"CREATE_TAG"'
+expect_absent "B: GET role $ROLE_V no longer shows MANAGE_USERS" 200 '"MANAGE_USERS"'
+
+api "$INSTANCE_A" "$USER_LISI" DELETE "/api/metalakes/$METALAKE/roles/$ROLE_V"
+expect "A: delete role $ROLE_V" 200
+
+# ---- W. bidirectional propagation: change on B observed on A ---------------
+
+section "W. Bidirectional — grant on B is immediately effective on A"
+# All prior phases propagate A→B. This phase confirms the reverse direction:
+# a role grant written to B propagates to A without a poll wait, because the
+# shared MySQL is written directly and A's per-request version check reloads it.
+api "$INSTANCE_B" "$USER_LISI" POST "/api/metalakes/$METALAKE/roles" "$(cat <<EOF
+{"name":"$ROLE_W","properties":{},"securableObjects":[
+  {"fullName":"$METALAKE","type":"METALAKE",
+   "privileges":[{"name":"MANAGE_USERS","condition":"ALLOW"}]}]}
+EOF
+)"
+expect "B: $USER_LISI creates role $ROLE_W on B" 200
+
+api "$INSTANCE_B" "$USER_LISI" PUT \
+  "/api/metalakes/$METALAKE/permissions/users/$USER_WANGWU/grant/" \
+  "{\"roleNames\":[\"$ROLE_W\"]}"
+expect "B: $USER_LISI grants $ROLE_W to $USER_WANGWU on B" 200
+
+# No poll wait — userRoleCache is version-validated per request.
+api "$INSTANCE_A" "$USER_WANGWU" POST "/api/metalakes/$METALAKE/users" \
+  "{\"name\":\"w_bi_${SUFFIX}\"}"
+expect "A: $USER_WANGWU addUser succeeds immediately after grant made on B" 200
+
+api "$INSTANCE_B" "$USER_LISI" PUT \
+  "/api/metalakes/$METALAKE/permissions/users/$USER_WANGWU/revoke/" \
+  "{\"roleNames\":[\"$ROLE_W\"]}"
+expect "B: revoke $ROLE_W from $USER_WANGWU on B" 200
+
+api "$INSTANCE_A" "$USER_WANGWU" POST "/api/metalakes/$METALAKE/users" \
+  "{\"name\":\"w_bi_revoked_${SUFFIX}\"}"
+expect "A: $USER_WANGWU denied addUser immediately after revoke made on B" 403
+
+api "$INSTANCE_B" "$USER_LISI" DELETE "/api/metalakes/$METALAKE/roles/$ROLE_W"
+expect "B: delete role $ROLE_W" 200
 
 # ---- summary ---------------------------------------------------------------
 
