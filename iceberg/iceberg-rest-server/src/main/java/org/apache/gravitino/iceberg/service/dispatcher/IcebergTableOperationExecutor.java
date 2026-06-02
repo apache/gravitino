@@ -27,13 +27,17 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJob;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -51,15 +55,22 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperationExecutor.class);
 
-  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+  private final IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+  private final Optional<IcebergCleanupManager> cleanupManager;
 
-  public IcebergTableOperationExecutor(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+  public IcebergTableOperationExecutor(
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager,
+      Optional<IcebergCleanupManager> cleanupManager) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
+    this.cleanupManager = cleanupManager;
   }
 
   @Override
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
+    IcebergCleanupHelper.rejectIfBeingPurged(
+        cleanupManager, context.catalogName(), namespace, createTableRequest.name());
+
     String authenticatedUser = context.userName();
     if (!AuthConstants.ANONYMOUS_USER.equals(authenticatedUser)) {
       String existingOwner = createTableRequest.properties().get(IcebergConstants.OWNER);
@@ -110,15 +121,38 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
-    if (purgeRequested) {
-      icebergCatalogWrapperManager
-          .getCatalogWrapper(context.catalogName())
-          .purgeTable(tableIdentifier);
-    } else {
-      icebergCatalogWrapperManager
-          .getCatalogWrapper(context.catalogName())
-          .dropTable(tableIdentifier);
+    IcebergCatalogWrapper wrapper =
+        icebergCatalogWrapperManager.getCatalogWrapper(context.catalogName());
+    if (!purgeRequested) {
+      wrapper.dropTable(tableIdentifier);
+      return;
     }
+
+    // Async cleanup is opt-in per request and only wired in auxiliary mode; otherwise purge inline.
+    if (!context.asyncPurge()) {
+      wrapper.purgeTable(tableIdentifier);
+      return;
+    }
+
+    cleanupManager.ifPresentOrElse(
+        manager -> {
+          // Read the metadata location before dropping the catalog entry, then enqueue the job. The
+          // job deletes only files reachable from this old metadata, so a table recreated at the
+          // same name (with fresh metadata) is never touched.
+          TableMetadata metadata = wrapper.loadTableMetadata(tableIdentifier);
+          wrapper.dropTable(tableIdentifier);
+          manager.addJob(
+              new IcebergCleanupJob(
+                  0L,
+                  IcebergCleanupHelper.catalogId(context.catalogName()),
+                  tableIdentifier.namespace().toString(),
+                  tableIdentifier.name(),
+                  metadata.metadataFileLocation(),
+                  wrapper.fileIOImpl(),
+                  wrapper.fileIOProperties(),
+                  context.userName()));
+        },
+        () -> wrapper.purgeTable(tableIdentifier));
   }
 
   @Override
