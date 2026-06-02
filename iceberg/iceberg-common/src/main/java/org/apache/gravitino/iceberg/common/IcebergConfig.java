@@ -319,6 +319,62 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_WORKER_THREADS =
+      new ConfigBuilder("async-cleanup.worker-threads")
+          .doc("Worker pool size per server (concurrent async cleanup jobs).")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(2);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_DELETE_THREADS =
+      new ConfigBuilder("async-cleanup.delete-threads")
+          .doc("Server-wide file-delete pool size, shared across all cleanup jobs.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(4);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_DELETE_BATCH_SIZE =
+      new ConfigBuilder("async-cleanup.delete-batch-size")
+          .doc("Files per bulk-delete batch handed to the delete executor.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_POLL_INTERVAL_SECS =
+      new ConfigBuilder("async-cleanup.poll-interval-secs")
+          .doc("Worker poll interval in seconds; also the retry interval.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(5);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_HEARTBEAT_TIMEOUT_SECS =
+      new ConfigBuilder("async-cleanup.heartbeat-timeout-secs")
+          .doc("Age in seconds after which a stale-heartbeat job can be taken over by a worker.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(300);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_MAX_ATTEMPTS =
+      new ConfigBuilder("async-cleanup.max-attempts")
+          .doc("Number of attempts before a cleanup job is marked FAILED.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(5);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_RETENTION_HOURS =
+      new ConfigBuilder("async-cleanup.retention-hours")
+          .doc("How long finished (SUCCEEDED/FAILED) cleanup rows are retained before pruning.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(720);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }

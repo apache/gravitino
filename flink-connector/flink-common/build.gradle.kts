@@ -40,6 +40,12 @@ val scalaVersion: String = "2.12"
 val artifactName = "${rootProject.name}-flink-common"
 
 dependencies {
+  // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
+  constraints {
+    compileOnly(libs.thrift)
+    testImplementation(libs.thrift)
+  }
+
   implementation(project(":catalogs:catalog-common")) {
     exclude("org.apache.logging.log4j")
   }

@@ -77,6 +77,10 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
+
+  constraints {
+    implementation(libs.gson)
+  }
   implementation(libs.commons.lang3)
   implementation(libs.lance.namespace.core) {
     exclude(group = "org.lance", module = "lance-core")

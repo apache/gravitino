@@ -204,6 +204,7 @@ public class TestTagEvent {
     Assertions.assertEquals(ListMetadataObjectsForTagEvent.class, postevent.getClass());
     Assertions.assertEquals(OperationType.LIST_METADATA_OBJECTS_FOR_TAG, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(1, ((ListMetadataObjectsForTagEvent) postevent).resultCount());
   }
 
   @Test
@@ -227,6 +228,7 @@ public class TestTagEvent {
     Assertions.assertEquals(ListTagsForMetadataObjectEvent.class, postevent.getClass());
     Assertions.assertEquals(OperationType.LIST_TAGS_FOR_METADATA_OBJECT, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(2, ((ListTagsForMetadataObjectEvent) postevent).resultCount());
   }
 
   @Test
@@ -252,6 +254,7 @@ public class TestTagEvent {
     Assertions.assertEquals(
         OperationType.LIST_TAGS_INFO_FOR_METADATA_OBJECT, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(2, ((ListTagsInfoForMetadataObjectEvent) postevent).resultCount());
   }
 
   @Test
@@ -513,6 +516,38 @@ public class TestTagEvent {
     Assertions.assertEquals(
         OperationType.ASSOCIATE_TAGS_FOR_METADATA_OBJECT, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListMetadataObjectsForTagEventDeprecatedConstructor() {
+    ListMetadataObjectsForTagEvent event =
+        new ListMetadataObjectsForTagEvent("user", "metalake", "tag");
+    Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListTagsForMetadataObjectEventDeprecatedConstructor() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    ListTagsForMetadataObjectEvent event =
+        new ListTagsForMetadataObjectEvent("user", "metalake", metadataObject);
+    Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListTagsInfoForMetadataObjectEventDeprecatedConstructor() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    ListTagsInfoForMetadataObjectEvent event =
+        new ListTagsInfoForMetadataObjectEvent("user", "metalake", metadataObject);
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   private Tag mockTag() {

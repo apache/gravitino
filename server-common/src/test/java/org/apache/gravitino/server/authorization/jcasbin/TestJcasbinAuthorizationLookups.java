@@ -18,6 +18,12 @@
  */
 package org.apache.gravitino.server.authorization.jcasbin;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
@@ -25,9 +31,12 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 /** Tests for {@link JcasbinAuthorizationLookups}. */
 public class TestJcasbinAuthorizationLookups {
@@ -37,7 +46,7 @@ public class TestJcasbinAuthorizationLookups {
     MetadataObject table =
         MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.TABLE);
     CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
-    CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>(Optional.empty());
+    CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>();
     JcasbinAuthorizationLookups lookups =
         new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
     AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
@@ -53,17 +62,59 @@ public class TestJcasbinAuthorizationLookups {
   }
 
   @Test
-  void testResolveOwnerIdUsesAtomicSharedCacheAndRequestDedup() {
+  void testResolveOwnerIdCachesPositiveOwnerInSharedCache() {
     CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
-    CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>(Optional.empty());
+    CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>();
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
+    OwnerMetaMapper ownerMetaMapper = mock(OwnerMetaMapper.class);
+    OwnerInfo ownerInfo = new OwnerInfo(10L, "USER");
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(
+            100L, MetadataObject.Type.TABLE.name()))
+        .thenReturn(ownerInfo);
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      sessionUtils
+          .when(() -> SessionUtils.getWithoutCommit(any(), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<OwnerMetaMapper, OwnerInfo> function = invocation.getArgument(1);
+                return function.apply(ownerMetaMapper);
+              });
+
+      Assertions.assertEquals(
+          Optional.of(ownerInfo),
+          lookups.resolveOwnerId(
+              100L, MetadataObject.Type.TABLE, new AuthorizationRequestContext()));
+      Assertions.assertEquals(
+          Optional.of(ownerInfo),
+          lookups.resolveOwnerId(
+              100L, MetadataObject.Type.TABLE, new AuthorizationRequestContext()));
+    }
+
+    Assertions.assertEquals(2, ownerRelCache.getCount);
+    Assertions.assertEquals(0, ownerRelCache.getIfPresentCount);
+    Assertions.assertEquals(1, ownerRelCache.putCount);
+    verify(ownerMetaMapper)
+        .selectOwnerByMetadataObjectIdAndType(100L, MetadataObject.Type.TABLE.name());
+  }
+
+  @Test
+  void testResolveOwnerIdDoesNotCacheMissingOwnerInSharedCache() {
+    CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
+    CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>();
     JcasbinAuthorizationLookups lookups =
         new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
     AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
 
-    Assertions.assertFalse(
-        lookups.resolveOwnerId(100L, MetadataObject.Type.TABLE, requestContext).isPresent());
-    Assertions.assertFalse(
-        lookups.resolveOwnerId(100L, MetadataObject.Type.TABLE, requestContext).isPresent());
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      sessionUtils.when(() -> SessionUtils.getWithoutCommit(any(), any())).thenReturn(null);
+
+      Assertions.assertFalse(
+          lookups.resolveOwnerId(100L, MetadataObject.Type.TABLE, requestContext).isPresent());
+      Assertions.assertFalse(
+          lookups.resolveOwnerId(100L, MetadataObject.Type.TABLE, requestContext).isPresent());
+    }
 
     Assertions.assertEquals(1, ownerRelCache.getCount);
     Assertions.assertEquals(0, ownerRelCache.getIfPresentCount);
@@ -72,9 +123,14 @@ public class TestJcasbinAuthorizationLookups {
 
   private static class CountingCache<K, V> implements GravitinoCache<K, V> {
     private final V value;
+    private Optional<V> cachedValue = Optional.empty();
     private int getCount;
     private int getIfPresentCount;
     private int putCount;
+
+    private CountingCache() {
+      this.value = null;
+    }
 
     private CountingCache(V value) {
       this.value = value;
@@ -83,18 +139,29 @@ public class TestJcasbinAuthorizationLookups {
     @Override
     public Optional<V> getIfPresent(K key) {
       getIfPresentCount++;
-      return Optional.empty();
+      return cachedValue;
     }
 
     @Override
     public V get(K key, Function<K, V> loader) {
       getCount++;
-      return value;
+      if (cachedValue.isPresent()) {
+        return cachedValue.get();
+      }
+      if (value != null) {
+        cachedValue = Optional.of(value);
+        return value;
+      }
+      V loaded = loader.apply(key);
+      putCount++;
+      cachedValue = Optional.of(loaded);
+      return loaded;
     }
 
     @Override
     public void put(K key, V value) {
       putCount++;
+      cachedValue = Optional.of(value);
     }
 
     @Override

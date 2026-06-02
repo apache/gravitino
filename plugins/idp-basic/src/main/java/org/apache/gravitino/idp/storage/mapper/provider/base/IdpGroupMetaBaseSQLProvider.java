@@ -20,6 +20,8 @@
 package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -32,6 +34,21 @@ public class IdpGroupMetaBaseSQLProvider {
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " WHERE group_name = #{groupName} AND deleted_at = 0";
+  }
+
+  public String selectIdpGroupWithUsers(@Param("groupName") String groupName) {
+    return "SELECT g.group_name as name,"
+        + " COALESCE(JSON_ARRAYAGG(u.user_name), JSON_ARRAY()) as usernames"
+        + " FROM "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g LEFT JOIN "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r ON r.group_id = g.group_id AND r.deleted_at = 0"
+        + " LEFT JOIN "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u ON u.user_id = r.user_id AND u.deleted_at = 0"
+        + " WHERE g.group_name = #{groupName} AND g.deleted_at = 0"
+        + " GROUP BY g.group_id, g.group_name";
   }
 
   public String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {

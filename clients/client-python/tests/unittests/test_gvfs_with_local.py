@@ -197,6 +197,25 @@ class TestLocalFilesystem(unittest.TestCase):
         if current_user is not None:
             os.environ["user.name"] = current_user
 
+    def test_basic_auth(self, *mock_methods):
+        options = {
+            GVFSConfig.AUTH_TYPE: GVFSConfig.BASIC_AUTH_TYPE,
+            GVFSConfig.BASIC_USERNAME: "admin",
+            GVFSConfig.BASIC_PASSWORD: "YourSecureGravitinoPassword",
+        }
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri=self._server_uri,
+            metalake_name=self._metalake_name,
+            options=options,
+            skip_instance_cache=True,
+        )
+        client = fs._operations._get_gravitino_client()
+        token = client._rest_client.auth_data_provider.get_token_data()
+        token_string = base64.b64decode(
+            token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
+        ).decode("utf-8")
+        self.assertEqual("admin:YourSecureGravitinoPassword", token_string)
+
     def test_oauth2_auth(self, *mock_methods):
         fs_options = {
             GVFSConfig.AUTH_TYPE: GVFSConfig.OAUTH2_AUTH_TYPE,

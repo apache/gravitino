@@ -50,7 +50,7 @@ JAVA_OPTS+=" -Dfile.encoding=UTF-8"
 JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITINO_CONF_DIR}/log4j2.properties"
 JAVA_OPTS+=" -Dgravitino.log.path=${GRAVITINO_LOG_DIR} ${GRAVITINO_MEM}"
 JAVA_OPTS+=" -Dgravitino.server.name=${GRAVITINO_LOG_NAME}"
-if [ "$JVM_VERSION" -eq 17 ]; then
+if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" -XX:+IgnoreUnrecognizedVMOptions"
   JAVA_OPTS+=" --add-opens java.base/java.io=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.base/java.lang.invoke=ALL-UNNAMED"

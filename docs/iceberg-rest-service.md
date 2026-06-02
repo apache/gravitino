@@ -19,7 +19,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 
 ### Capabilities
 
-- Supports the Apache Iceberg REST API defined in Iceberg 1.10, and supports most namespace, table and view interfaces. The following interfaces are not implemented yet:
+- Supports the Apache Iceberg REST API defined in Iceberg 1.11, and supports most namespace, table and view interfaces. The following interfaces are not implemented yet:
   - multi table transaction
   - pagination
   - register view
@@ -119,6 +119,7 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 | `gravitino.iceberg-rest.jdbc-initialize`      | Whether to initialize the meta tables when creating the JDBC catalog.                                                                                                                                                                                  | `true`                  | No       | 0.2.0         |
 | `gravitino.iceberg-rest.jdbc-driver`          | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                                                                                                                                               | (none)                  | Yes      | 0.3.0         |
 | `gravitino.iceberg-rest.jdbc-schema-version`  | The schema version of the JDBC catalog. Defaults to `V1` to enable view support. Set to `V0` only if you need to opt out of view support. Once the underlying database is migrated to V1, this property is no longer required on subsequent restarts.  | `V1`                    | No       | 1.2.0         |
+| `gravitino.iceberg-rest.jdbc.strict-mode`     | Whether the JDBC catalog runs in strict mode. Defaults to `true` so that creating a table or view in a namespace that does not exist fails with `NoSuchNamespace` (HTTP 404), matching the Iceberg REST specification. Set to `false` to restore the legacy behavior of implicitly creating the namespace.  | `true`                  | No       | 1.3.0         |
 
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
@@ -310,7 +311,7 @@ Please refer the following configuration If you are using Spark to access Iceber
 
 ```shell
 ./bin/spark-sql -v \
---conf spark.jars=/Users/fanng/deploy/demo/jars/iceberg-spark-runtime-3.5_2.12-1.10.0.jar \
+--conf spark.jars=/Users/fanng/deploy/demo/jars/iceberg-spark-runtime-3.5_2.12-1.11.0.jar \
 --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
 --conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog \
 --conf spark.sql.catalog.rest.rest.auth.type=oauth2 \
@@ -520,7 +521,7 @@ View operations are supported when using the JDBC catalog backend with schema ve
 
 ### Other Apache Iceberg catalog properties
 
-You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.10.0/configuration/#catalog-properties).
+You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.11.0/configuration/#catalog-properties).
 The `clients` property for example:
 
 | Configuration item               | Description                          | Default value | Required |
@@ -576,6 +577,8 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 
 Gravitino caches scan plan results to speed up repeated queries with identical parameters. The cache uses snapshot ID as part of the cache key, so queries against different snapshots will not use stale cached data.
 
+Plan scan responses follow the Iceberg 1.11 REST API: completed plans return structured `file-scan-tasks` only. Legacy `plan-tasks` JSON strings (used by some Iceberg 1.9.x–1.10.x clients) are not emitted.
+
 | Configuration item                                         | Description                                              | Default value | Required | Since Version |
 |------------------------------------------------------------|----------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.scan-plan-cache-impl`              | The implementation of the scan plan cache.               | (none)        | No       | 1.2.0         |
@@ -591,6 +594,55 @@ Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.Loca
 | Configuration item                          | Description                                                  | Default value | Required | Since Version    |
 |---------------------------------------------|--------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.extension-packages` | Comma-separated list of Iceberg REST API packages to expand. | (none)        | No       | 0.7.0-incubating |
+
+### Health check endpoints
+
+The Iceberg REST server exposes three health check endpoints following the same [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics as the main Gravitino server. All endpoints are exempt from authentication. The readiness probe checks whether the `IcebergCatalogWrapperManager` has been initialized — it performs no I/O and has no configurable timeout.
+
+| Endpoint                     | Description                                                                                                                | HTTP status |
+|------------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /iceberg/health/live`   | Liveness probe. Returns 200 as long as the HTTP server thread can respond.                                                 | 200         |
+| `GET /iceberg/health/ready`  | Readiness probe. Returns 200 when the catalog wrapper manager is initialized; 503 when initialization is not yet complete. | 200 / 503   |
+| `GET /iceberg/health`        | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                              | 200 / 503   |
+
+Root-level aliases are also available for global traffic managers that require probes at well-known root paths:
+
+| Alias               | Forwards to                 |
+|---------------------|-----------------------------|
+| `GET /health`       | `GET /iceberg/health`       |
+| `GET /health/live`  | `GET /iceberg/health/live`  |
+| `GET /health/ready` | `GET /iceberg/health/ready` |
+| `GET /health.html`  | `GET /iceberg/health`       |
+
+**Response format:**
+
+All endpoints return a JSON body with the same shape as the main Gravitino server. The `code` field is always `0`. `status` is `UP` or `DOWN`. Liveness reports `httpServer` and readiness reports `catalogWrapperManager`.
+
+Healthy response (HTTP 200):
+
+```json
+{
+  "code": 0,
+  "status": "UP",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "catalogWrapperManager", "status": "UP", "details": {} }
+  ]
+}
+```
+
+Unhealthy response (HTTP 503):
+
+```json
+{
+  "code": 0,
+  "status": "DOWN",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "catalogWrapperManager", "status": "DOWN", "details": { "reason": "catalog wrapper manager not initialized" } }
+  ]
+}
+```
 
 ### Memory settings
 

@@ -128,9 +128,9 @@ public class TestIcebergConfig extends IcebergTestBase {
 
   @Test
   public void testConfigScanPlanEndpointPathIsNamespaceScoped() {
-    // Iceberg 1.10.1's Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN advertises the wrong path
-    // (missing namespaces/{namespace}) — fixed in apache/iceberg#14120 (targeting 1.11.x).
-    // This test guards against regressing to the broken path after an Iceberg upgrade.
+    // Iceberg 1.11+ advertises the namespace-scoped scan plan path via
+    // Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN. This test guards against regressing to the broken
+    // path that existed in Iceberg 1.10.1 (apache/iceberg#14120).
     Response resp = getConfigClientBuilder().get();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 

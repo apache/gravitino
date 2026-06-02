@@ -19,21 +19,30 @@
 
 package org.apache.gravitino.iceberg.common.utils;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestIcebergCatalogUtil {
+
+  @TempDir private Path warehouse;
 
   @Test
   void testLoadCatalog() {
@@ -115,6 +124,48 @@ public class TestIcebergCatalogUtil {
     Assertions.assertFalse(
         ((JdbcCatalogWithMetadataLocationSupport) catalog).supportsViewsWithSchemaVersion(),
         "Explicitly configured V0 schema should not be overridden to V1");
+  }
+
+  @Test
+  void testJdbcCatalogDefaultStrictModeRejectsImplicitNamespace() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(
+        CatalogProperties.URI, "jdbc:sqlite:file:strict_default?mode=memory&cache=shared");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, warehouse.toString());
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    // jdbc.strict-mode is intentionally not set; default should be true
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    TableIdentifier identifier = TableIdentifier.of(Namespace.of("absent_ns"), "t");
+    // Strict mode must reject creating a table in a namespace that does not exist.
+    Assertions.assertThrows(
+        NoSuchNamespaceException.class, () -> catalog.createTable(identifier, schema));
+  }
+
+  @Test
+  void testJdbcCatalogExplicitStrictModeDisabledAllowsImplicitNamespace() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(
+        CatalogProperties.URI, "jdbc:sqlite:file:strict_disabled?mode=memory&cache=shared");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, warehouse.toString());
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    // Explicitly disable strict mode; loadJdbcCatalog must not override it back to true.
+    properties.put(IcebergConstants.ICEBERG_JDBC_STRICT_MODE, "false");
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    TableIdentifier identifier = TableIdentifier.of(Namespace.of("implicit_ns"), "t");
+    // With strict mode disabled the namespace is created implicitly, so this must succeed.
+    Assertions.assertNotNull(catalog.createTable(identifier, schema));
   }
 
   @Test

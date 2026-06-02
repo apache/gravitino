@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
@@ -46,8 +47,8 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
   }
 
   @Override
-  public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
-      throws Exception {
+  public Map<String, String> buildInternalConnectorConfig(
+      GravitinoCatalog catalog, Credential[] credentials) throws Exception {
     Map<String, String> config = new HashMap<>();
     String metastoreUri = catalog.getRequiredProperty("metastore.uris");
     Map<String, String> trinoProperty =

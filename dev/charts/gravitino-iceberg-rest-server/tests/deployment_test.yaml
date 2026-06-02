@@ -1,0 +1,225 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino iceberg rest server deployment
+templates:
+  - deployment.yaml
+  - configmap.yaml
+tests:
+  - it: renders the default deployment
+    template: deployment.yaml
+    release:
+      name: iceberg-rest
+      namespace: iceberg-system
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: iceberg-rest-gravitino-iceberg-rest-server-helm
+      - equal:
+          path: metadata.namespace
+          value: iceberg-system
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.selector.matchLabels.release
+          value: iceberg-rest
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: default
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: apache/gravitino-iceberg-rest:1.3.0-SNAPSHOT
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GRAVITINO_HOME
+            value: /opt/gravitino-iceberg-rest-server
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SKIP_CONFIG_REWRITE
+            value: "true"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: http
+            containerPort: 9001
+            protocol: TCP
+          any: true
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /iceberg/v1/config
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /iceberg/v1/config
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: iceberg-rest-server-config
+            configMap:
+              name: iceberg-rest-gravitino-iceberg-rest-server-helm
+          any: true
+
+  - it: renders pod customization, templated env, and scheduling options
+    template: deployment.yaml
+    release:
+      name: custom-iceberg-rest
+    set:
+      replicas: 3
+      image:
+        repository: registry.example.com/gravitino-iceberg-rest
+        tag: test-tag
+        pullPolicy: Always
+        pullSecrets:
+          - name: registry-secret
+      serviceAccount:
+        create: true
+        name: iceberg-rest-sa
+      podLabels:
+        app.kubernetes.io/part-of: gravitino
+      podAnnotations:
+        prometheus.io/scrape: "true"
+      envWithTpl:
+        - name: RELEASE_NAME
+          value: "{{ .Release.Name }}"
+      envFrom:
+        - configMapRef:
+            name: iceberg-rest-env
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: metadata
+          effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: iceberg-rest-sa
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: registry-secret
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.com/gravitino-iceberg-rest:test-tag
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/part-of"]
+          value: gravitino
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RELEASE_NAME
+            value: custom-iceberg-rest
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: iceberg-rest-env
+      - equal:
+          path: spec.template.spec.nodeSelector["kubernetes.io/os"]
+          value: linux
+      - contains:
+          path: spec.template.spec.tolerations
+          content:
+            key: dedicated
+            operator: Equal
+            value: metadata
+            effect: NoSchedule
+          any: true
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: kubernetes.io/arch
+
+  - it: renders security contexts, resources, and custom probes
+    template: deployment.yaml
+    set:
+      podSecurityContext:
+        fsGroup: 1000
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 2Gi
+      livenessProbe:
+        httpGet:
+          path: /custom/live
+          port: http
+        initialDelaySeconds: 30
+        timeoutSeconds: 3
+      readinessProbe:
+        httpGet:
+          path: /custom/ready
+          port: http
+        initialDelaySeconds: 10
+        timeoutSeconds: 2
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 1000
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsUser
+          value: 2000
+      - contains:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          content: ALL
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: 1Gi
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: "2"
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /custom/live
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /custom/ready
