@@ -461,52 +461,47 @@ These variables override the corresponding entries in `gravitino.conf` at startu
 ### Iceberg REST auxiliary service environment variables
 
 The Gravitino server Docker image starts Iceberg REST as an auxiliary service by default.
-The following environment variables configure the `gravitino.iceberg-rest.*` entries in
-`gravitino.conf`. Each row lists a short environment variable name and a long
-`GRAVITINO_ICEBERG_REST_*` environment variable name for the same configuration key. If both
-names are set, the long name takes precedence. The following configuration keys only support
-long `GRAVITINO_ICEBERG_REST_*` environment variable names in the Gravitino server Docker
-image: `host`, `httpPort`, `uri`, `classpath`, `io-impl`, `catalog-backend`, `warehouse`,
-`jdbc-driver`, `jdbc-user`, and `jdbc-password`.
+The following `GRAVITINO_ICEBERG_REST_*` environment variables configure the
+`gravitino.iceberg-rest.*` entries in `gravitino.conf`. The standalone Iceberg REST Docker
+image uses the same variable names.
 
-In the **Gravitino server Docker image**, five long `GRAVITINO_ICEBERG_REST_*` variables
-have been supported since `1.0.0`. All short-name aliases and the remaining long-name
-variables in this table are supported starting from `1.3.0`. The `Since Version (short / long)`
-column shows when each alias became available.
+In the **Gravitino server Docker image**, five `GRAVITINO_ICEBERG_REST_*` variables have been
+supported since `1.0.0`. The remaining variables in this table are supported starting from
+`1.3.0`.
 
-| Environment Variables                                                                        | Configuration Key                                   | Default Value                                        | Since Version (short / long) |
-|----------------------------------------------------------------------------------------------|-----------------------------------------------------|------------------------------------------------------|------------------------------|
-| `GRAVITINO_ICEBERG_REST_HOST`                                                                | `gravitino.iceberg-rest.host`                       | `0.0.0.0`                                            | 1.0.0                        |
-| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                                                           | `gravitino.iceberg-rest.httpPort`                   | `9001`                                               | 1.0.0                        |
-| `GRAVITINO_ICEBERG_REST_URI`                                                                 | `gravitino.iceberg-rest.uri`                        | (none)                                               | 1.3.0                        |
-| `GRAVITINO_ICEBERG_REST_CLASSPATH`                                                           | `gravitino.iceberg-rest.classpath`                  | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.0.0                        |
-| `GRAVITINO_ICEBERG_REST_IO_IMPL`                                                             | `gravitino.iceberg-rest.io-impl`                    | (none)                                               | 1.3.0                        |
-| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                                                     | `gravitino.iceberg-rest.catalog-backend`            | `memory`                                             | 1.0.0                        |
-| `GRAVITINO_ICEBERG_REST_JDBC_DRIVER`                                                         | `gravitino.iceberg-rest.jdbc-driver`                | (none)                                               | 1.3.0                        |
-| `GRAVITINO_ICEBERG_REST_JDBC_USER`                                                           | `gravitino.iceberg-rest.jdbc-user`                  | (none)                                               | 1.3.0                        |
-| `GRAVITINO_ICEBERG_REST_JDBC_PASSWORD`                                                       | `gravitino.iceberg-rest.jdbc-password`              | (none)                                               | 1.3.0                        |
-| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                                                           | `gravitino.iceberg-rest.warehouse`                  | `/tmp/`                                              | 1.0.0                        |
-| `GRAVITINO_CREDENTIAL_PROVIDERS` / `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`             | `gravitino.iceberg-rest.credential-providers`       | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_GCS_SERVICE_ACCOUNT_FILE` / `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE`     | `gravitino.iceberg-rest.gcs-service-account-file`   | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_S3_ACCESS_KEY` / `GRAVITINO_ICEBERG_REST_S3_ACCESS_KEY`                           | `gravitino.iceberg-rest.s3-access-key-id`           | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_S3_SECRET_KEY` / `GRAVITINO_ICEBERG_REST_S3_SECRET_KEY`                           | `gravitino.iceberg-rest.s3-secret-access-key`       | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_S3_ENDPOINT` / `GRAVITINO_ICEBERG_REST_S3_ENDPOINT`                               | `gravitino.iceberg-rest.s3-endpoint`                | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_S3_REGION` / `GRAVITINO_ICEBERG_REST_S3_REGION`                                   | `gravitino.iceberg-rest.s3-region`                  | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_S3_PATH_STYLE_ACCESS` / `GRAVITINO_ICEBERG_REST_S3_PATH_STYLE_ACCESS`             | `gravitino.iceberg-rest.s3-path-style-access`       | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_S3_ROLE_ARN` / `GRAVITINO_ICEBERG_REST_S3_ROLE_ARN`                               | `gravitino.iceberg-rest.s3-role-arn`                | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_S3_EXTERNAL_ID` / `GRAVITINO_ICEBERG_REST_S3_EXTERNAL_ID`                         | `gravitino.iceberg-rest.s3-external-id`             | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_S3_TOKEN_SERVICE_ENDPOINT` / `GRAVITINO_ICEBERG_REST_S3_TOKEN_SERVICE_ENDPOINT`   | `gravitino.iceberg-rest.s3-token-service-endpoint`  | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME` / `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_NAME` | `gravitino.iceberg-rest.azure-storage-account-name` | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY` / `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_KEY`   | `gravitino.iceberg-rest.azure-storage-account-key`  | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_AZURE_TENANT_ID` / `GRAVITINO_ICEBERG_REST_AZURE_TENANT_ID`                       | `gravitino.iceberg-rest.azure-tenant-id`            | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_AZURE_CLIENT_ID` / `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_ID`                       | `gravitino.iceberg-rest.azure-client-id`            | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_AZURE_CLIENT_SECRET` / `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_SECRET`               | `gravitino.iceberg-rest.azure-client-secret`        | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_OSS_ACCESS_KEY` / `GRAVITINO_ICEBERG_REST_OSS_ACCESS_KEY`                         | `gravitino.iceberg-rest.oss-access-key-id`          | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_OSS_SECRET_KEY` / `GRAVITINO_ICEBERG_REST_OSS_SECRET_KEY`                         | `gravitino.iceberg-rest.oss-secret-access-key`      | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_OSS_ENDPOINT` / `GRAVITINO_ICEBERG_REST_OSS_ENDPOINT`                             | `gravitino.iceberg-rest.oss-endpoint`               | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_OSS_REGION` / `GRAVITINO_ICEBERG_REST_OSS_REGION`                                 | `gravitino.iceberg-rest.oss-region`                 | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_OSS_ROLE_ARN` / `GRAVITINO_ICEBERG_REST_OSS_ROLE_ARN`                             | `gravitino.iceberg-rest.oss-role-arn`               | (none)                                               | 1.3.0 / 1.3.0                |
-| `GRAVITINO_OSS_EXTERNAL_ID` / `GRAVITINO_ICEBERG_REST_OSS_EXTERNAL_ID`                       | `gravitino.iceberg-rest.oss-external-id`            | (none)                                               | 1.3.0 / 1.3.0                |
+| Environment Variable                                                     | Configuration Key                                   | Default Value                                        | Since Version |
+|--------------------------------------------------------------------------|-----------------------------------------------------|------------------------------------------------------|---------------|
+| `GRAVITINO_ICEBERG_REST_HOST`                                            | `gravitino.iceberg-rest.host`                       | `0.0.0.0`                                            | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                                       | `gravitino.iceberg-rest.httpPort`                   | `9001`                                               | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_URI`                                             | `gravitino.iceberg-rest.uri`                        | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_CLASSPATH`                                       | `gravitino.iceberg-rest.classpath`                  | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_IO_IMPL`                                         | `gravitino.iceberg-rest.io-impl`                    | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                                 | `gravitino.iceberg-rest.catalog-backend`            | `memory`                                             | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_JDBC_DRIVER`                                     | `gravitino.iceberg-rest.jdbc-driver`                | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_JDBC_USER`                                       | `gravitino.iceberg-rest.jdbc-user`                  | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_JDBC_PASSWORD`                                   | `gravitino.iceberg-rest.jdbc-password`              | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                                       | `gravitino.iceberg-rest.warehouse`                  | `/tmp/`                                              | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`                            | `gravitino.iceberg-rest.credential-providers`       | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE`                        | `gravitino.iceberg-rest.gcs-service-account-file`   | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_ACCESS_KEY`                                   | `gravitino.iceberg-rest.s3-access-key-id`           | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_SECRET_KEY`                                   | `gravitino.iceberg-rest.s3-secret-access-key`       | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_ENDPOINT`                                     | `gravitino.iceberg-rest.s3-endpoint`                | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_REGION`                                       | `gravitino.iceberg-rest.s3-region`                  | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_PATH_STYLE_ACCESS`                            | `gravitino.iceberg-rest.s3-path-style-access`       | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_ROLE_ARN`                                     | `gravitino.iceberg-rest.s3-role-arn`                | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_EXTERNAL_ID`                                 | `gravitino.iceberg-rest.s3-external-id`             | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_TOKEN_SERVICE_ENDPOINT`                       | `gravitino.iceberg-rest.s3-token-service-endpoint`  | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_NAME`                      | `gravitino.iceberg-rest.azure-storage-account-name` | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_KEY`                       | `gravitino.iceberg-rest.azure-storage-account-key`  | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_TENANT_ID`                                 | `gravitino.iceberg-rest.azure-tenant-id`            | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_ID`                                 | `gravitino.iceberg-rest.azure-client-id`            | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_SECRET`                             | `gravitino.iceberg-rest.azure-client-secret`        | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_ACCESS_KEY`                                  | `gravitino.iceberg-rest.oss-access-key-id`          | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_SECRET_KEY`                                  | `gravitino.iceberg-rest.oss-secret-access-key`      | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_ENDPOINT`                                    | `gravitino.iceberg-rest.oss-endpoint`               | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_REGION`                                     | `gravitino.iceberg-rest.oss-region`                 | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_ROLE_ARN`                                    | `gravitino.iceberg-rest.oss-role-arn`               | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_EXTERNAL_ID`                                 | `gravitino.iceberg-rest.oss-external-id`            | (none)                                               | 1.3.0         |
 
 :::note
 The Gravitino server Docker image bundles MySQL and PostgreSQL JDBC drivers under

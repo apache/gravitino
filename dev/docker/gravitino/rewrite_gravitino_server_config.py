@@ -39,33 +39,6 @@ env_map = {
     "GRAVITINO_AUTHORIZATION_SERVICE_ADMINS": "authorization.serviceAdmins",
     "GRAVITINO_AUX_SERVICE_NAMES": "auxService.names",
     # Iceberg REST auxiliary service
-    # Credentials
-    "GRAVITINO_CREDENTIAL_PROVIDERS": "iceberg-rest.credential-providers",
-    # GCS
-    "GRAVITINO_GCS_SERVICE_ACCOUNT_FILE": "iceberg-rest.gcs-service-account-file",
-    # S3
-    "GRAVITINO_S3_ACCESS_KEY": "iceberg-rest.s3-access-key-id",
-    "GRAVITINO_S3_SECRET_KEY": "iceberg-rest.s3-secret-access-key",
-    "GRAVITINO_S3_ENDPOINT": "iceberg-rest.s3-endpoint",
-    "GRAVITINO_S3_REGION": "iceberg-rest.s3-region",
-    "GRAVITINO_S3_PATH_STYLE_ACCESS": "iceberg-rest.s3-path-style-access",
-    "GRAVITINO_S3_ROLE_ARN": "iceberg-rest.s3-role-arn",
-    "GRAVITINO_S3_EXTERNAL_ID": "iceberg-rest.s3-external-id",
-    "GRAVITINO_S3_TOKEN_SERVICE_ENDPOINT": "iceberg-rest.s3-token-service-endpoint",
-    # Azure
-    "GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME": "iceberg-rest.azure-storage-account-name",
-    "GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY": "iceberg-rest.azure-storage-account-key",
-    "GRAVITINO_AZURE_TENANT_ID": "iceberg-rest.azure-tenant-id",
-    "GRAVITINO_AZURE_CLIENT_ID": "iceberg-rest.azure-client-id",
-    "GRAVITINO_AZURE_CLIENT_SECRET": "iceberg-rest.azure-client-secret",
-    # OSS
-    "GRAVITINO_OSS_ACCESS_KEY": "iceberg-rest.oss-access-key-id",
-    "GRAVITINO_OSS_SECRET_KEY": "iceberg-rest.oss-secret-access-key",
-    "GRAVITINO_OSS_ENDPOINT": "iceberg-rest.oss-endpoint",
-    "GRAVITINO_OSS_REGION": "iceberg-rest.oss-region",
-    "GRAVITINO_OSS_ROLE_ARN": "iceberg-rest.oss-role-arn",
-    "GRAVITINO_OSS_EXTERNAL_ID": "iceberg-rest.oss-external-id",
-    # Iceberg REST auxiliary service - long names (take precedence over short names)
     # Catalog
     "GRAVITINO_ICEBERG_REST_HOST": "iceberg-rest.host",
     "GRAVITINO_ICEBERG_REST_HTTP_PORT": "iceberg-rest.httpPort",

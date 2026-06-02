@@ -683,44 +683,45 @@ docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
 
 Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, please refer to [storage section](#storage) for more details.
 
-| Environment variables                  | Configuration items                                 | Since version    |
-|----------------------------------------|-----------------------------------------------------|------------------|
-| `GRAVITINO_ICEBERG_REST_HTTP_PORT`     | `gravitino.iceberg-rest.httpPort`                   | 1.1.0            |
-| `GRAVITINO_URI`                        | `gravitino.iceberg-rest.uri`                        | 0.7.0-incubating |
-| `GRAVITINO_IO_IMPL`                    | `gravitino.iceberg-rest.io-impl`                    | 0.7.0-incubating |
-| `GRAVITINO_CATALOG_BACKEND`            | `gravitino.iceberg-rest.catalog-backend`            | 1.0.0            |
-| `GRAVITINO_JDBC_DRIVER`                | `gravitino.iceberg-rest.jdbc-driver`                | 0.9.0-incubating |
-| `GRAVITINO_JDBC_USER`                  | `gravitino.iceberg-rest.jdbc-user`                  | 0.9.0-incubating |
-| `GRAVITINO_JDBC_PASSWORD`              | `gravitino.iceberg-rest.jdbc-password`              | 0.9.0-incubating |
-| `GRAVITINO_WAREHOUSE`                  | `gravitino.iceberg-rest.warehouse`                  | 0.7.0-incubating |
-| `GRAVITINO_CREDENTIAL_PROVIDERS`       | `gravitino.iceberg-rest.credential-providers`       | 0.8.0-incubating |
-| `GRAVITINO_GCS_SERVICE_ACCOUNT_FILE`   | `gravitino.iceberg-rest.gcs-service-account-file`   | 0.8.0-incubating |
-| `GRAVITINO_S3_ACCESS_KEY`              | `gravitino.iceberg-rest.s3-access-key-id`           | 0.7.0-incubating |
-| `GRAVITINO_S3_SECRET_KEY`              | `gravitino.iceberg-rest.s3-secret-access-key`       | 0.7.0-incubating |
-| `GRAVITINO_S3_ENDPOINT`                | `gravitino.iceberg-rest.s3-endpoint`                | 0.9.0-incubating |
-| `GRAVITINO_S3_REGION`                  | `gravitino.iceberg-rest.s3-region`                  | 0.7.0-incubating |
-| `GRAVITINO_S3_PATH_STYLE_ACCESS`       | `gravitino.iceberg-rest.s3-path-style-access`       | 1.0.0            |
-| `GRAVITINO_S3_ROLE_ARN`                | `gravitino.iceberg-rest.s3-role-arn`                | 0.7.0-incubating |
-| `GRAVITINO_S3_EXTERNAL_ID`             | `gravitino.iceberg-rest.s3-external-id`             | 0.7.0-incubating |
-| `GRAVITINO_S3_TOKEN_SERVICE_ENDPOINT`  | `gravitino.iceberg-rest.s3-token-service-endpoint`  | 0.8.0-incubating |
-| `GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME` | `gravitino.iceberg-rest.azure-storage-account-name` | 0.8.0-incubating |
-| `GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY`  | `gravitino.iceberg-rest.azure-storage-account-key`  | 0.8.0-incubating |
-| `GRAVITINO_AZURE_TENANT_ID`            | `gravitino.iceberg-rest.azure-tenant-id`            | 0.8.0-incubating |
-| `GRAVITINO_AZURE_CLIENT_ID`            | `gravitino.iceberg-rest.azure-client-id`            | 0.8.0-incubating |
-| `GRAVITINO_AZURE_CLIENT_SECRET`        | `gravitino.iceberg-rest.azure-client-secret`        | 0.8.0-incubating |
-| `GRAVITINO_OSS_ACCESS_KEY`             | `gravitino.iceberg-rest.oss-access-key-id`          | 0.8.0-incubating |
-| `GRAVITINO_OSS_SECRET_KEY`             | `gravitino.iceberg-rest.oss-secret-access-key`      | 0.8.0-incubating |
-| `GRAVITINO_OSS_ENDPOINT`               | `gravitino.iceberg-rest.oss-endpoint`               | 0.8.0-incubating |
-| `GRAVITINO_OSS_REGION`                 | `gravitino.iceberg-rest.oss-region`                 | 0.8.0-incubating |
-| `GRAVITINO_OSS_ROLE_ARN`               | `gravitino.iceberg-rest.oss-role-arn`               | 0.8.0-incubating |
-| `GRAVITINO_OSS_EXTERNAL_ID`            | `gravitino.iceberg-rest.oss-external-id`            | 0.8.0-incubating |
+| Environment Variable                                                     | Configuration items                                 | Since version    |
+|--------------------------------------------------------------------------|-----------------------------------------------------|------------------|
+| `GRAVITINO_ICEBERG_REST_HOST`                                            | `gravitino.iceberg-rest.host`                       | 0.2.0            |
+| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                                       | `gravitino.iceberg-rest.httpPort`                   | 1.1.0            |
+| `GRAVITINO_ICEBERG_REST_URI`                                             | `gravitino.iceberg-rest.uri`                        | 0.7.0-incubating |
+| `GRAVITINO_ICEBERG_REST_IO_IMPL`                                         | `gravitino.iceberg-rest.io-impl`                    | 0.7.0-incubating |
+| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                                 | `gravitino.iceberg-rest.catalog-backend`            | 1.0.0            |
+| `GRAVITINO_ICEBERG_REST_JDBC_DRIVER`                                     | `gravitino.iceberg-rest.jdbc-driver`                | 0.9.0-incubating |
+| `GRAVITINO_ICEBERG_REST_JDBC_USER`                                       | `gravitino.iceberg-rest.jdbc-user`                  | 0.9.0-incubating |
+| `GRAVITINO_ICEBERG_REST_JDBC_PASSWORD`                                   | `gravitino.iceberg-rest.jdbc-password`              | 0.9.0-incubating |
+| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                                       | `gravitino.iceberg-rest.warehouse`                  | 0.7.0-incubating |
+| `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`                            | `gravitino.iceberg-rest.credential-providers`       | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE`                        | `gravitino.iceberg-rest.gcs-service-account-file`   | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_S3_ACCESS_KEY`                                   | `gravitino.iceberg-rest.s3-access-key-id`           | 0.7.0-incubating |
+| `GRAVITINO_ICEBERG_REST_S3_SECRET_KEY`                                   | `gravitino.iceberg-rest.s3-secret-access-key`       | 0.7.0-incubating |
+| `GRAVITINO_ICEBERG_REST_S3_ENDPOINT`                                     | `gravitino.iceberg-rest.s3-endpoint`                | 0.9.0-incubating |
+| `GRAVITINO_ICEBERG_REST_S3_REGION`                                       | `gravitino.iceberg-rest.s3-region`                  | 0.7.0-incubating |
+| `GRAVITINO_ICEBERG_REST_S3_PATH_STYLE_ACCESS`                            | `gravitino.iceberg-rest.s3-path-style-access`       | 1.0.0            |
+| `GRAVITINO_ICEBERG_REST_S3_ROLE_ARN`                                     | `gravitino.iceberg-rest.s3-role-arn`                | 0.7.0-incubating |
+| `GRAVITINO_ICEBERG_REST_S3_EXTERNAL_ID`                                 | `gravitino.iceberg-rest.s3-external-id`             | 0.7.0-incubating |
+| `GRAVITINO_ICEBERG_REST_S3_TOKEN_SERVICE_ENDPOINT`                       | `gravitino.iceberg-rest.s3-token-service-endpoint`  | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_NAME`                      | `gravitino.iceberg-rest.azure-storage-account-name` | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_KEY`                       | `gravitino.iceberg-rest.azure-storage-account-key`  | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_AZURE_TENANT_ID`                                 | `gravitino.iceberg-rest.azure-tenant-id`            | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_ID`                                 | `gravitino.iceberg-rest.azure-client-id`            | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_SECRET`                             | `gravitino.iceberg-rest.azure-client-secret`        | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_OSS_ACCESS_KEY`                                  | `gravitino.iceberg-rest.oss-access-key-id`          | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_OSS_SECRET_KEY`                                  | `gravitino.iceberg-rest.oss-secret-access-key`      | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_OSS_ENDPOINT`                                    | `gravitino.iceberg-rest.oss-endpoint`               | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_OSS_REGION`                                     | `gravitino.iceberg-rest.oss-region`                 | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_OSS_ROLE_ARN`                                    | `gravitino.iceberg-rest.oss-role-arn`               | 0.8.0-incubating |
+| `GRAVITINO_ICEBERG_REST_OSS_EXTERNAL_ID`                                 | `gravitino.iceberg-rest.oss-external-id`            | 0.8.0-incubating |
 
 The below environment is deprecated, please use the corresponding configuration items instead.
 
-| Deprecated Environment variables     | New environment variables            | Since version    | Deprecated version |
-|--------------------------------------|--------------------------------------|------------------|--------------------|
-| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE` | `GRAVITINO_CREDENTIAL_PROVIDERS`     | 0.7.0-incubating | 0.8.0-incubating   |
-| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH` | `GRAVITINO_GCS_SERVICE_ACCOUNT_FILE` | 0.7.0-incubating | 0.8.0-incubating   |
+| Deprecated Environment variables     | New environment variables                         | Since version    | Deprecated version |
+|--------------------------------------|---------------------------------------------------|------------------|--------------------|
+| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE` | `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`     | 0.7.0-incubating | 0.8.0-incubating   |
+| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH` | `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE` | 0.7.0-incubating | 0.8.0-incubating   |
 
 Or build it manually to add custom configuration or logics:
 
