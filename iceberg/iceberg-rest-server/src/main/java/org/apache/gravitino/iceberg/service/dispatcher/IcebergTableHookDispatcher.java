@@ -45,8 +45,12 @@ import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class IcebergTableHookDispatcher implements IcebergTableOperationDispatcher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergTableHookDispatcher.class);
 
   private final IcebergTableOperationDispatcher dispatcher;
   private String metalake;
@@ -92,23 +96,10 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
     dispatcher.dropTable(context, tableIdentifier, purgeRequested);
-    EntityStore store = GravitinoEnv.getInstance().entityStore();
-    try {
-      if (store != null) {
-        // Delete the entity for the dropped table.
-        store.delete(
-            IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake,
-                context.catalogName(),
-                tableIdentifier,
-                HierarchicalSchemaUtil.schemaSeparator()),
-            Entity.EntityType.TABLE);
-      }
-    } catch (NoSuchEntityException ignore) {
-      // Ignore if the table entity does not exist.
-    } catch (IOException ioe) {
-      throw new RuntimeException("io exception when deleting table entity", ioe);
-    }
+    // Reconcile against Iceberg backend state — without a distributed TreeLock,
+    // another node may recreate the same table between the drop above and the
+    // EntityStore delete, leaving a stale Gravitino entity if we blindly delete.
+    bestEffortReconcileTableEntity(context, tableIdentifier);
   }
 
   @Override
@@ -165,6 +156,12 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     } catch (IOException ioe) {
       throw new RuntimeException("io exception when renaming table entity", ioe);
     }
+
+    // IRC rename can race with another node's drop/create on either name.
+    // Reconcile both ends against the Iceberg backend so we don't leave a
+    // stale entity on the source or miss importing a re-created destination.
+    bestEffortReconcileTableEntity(context, renameTableRequest.source());
+    bestEffortReconcileTableEntity(context, renameTableRequest.destination());
   }
 
   @Override
@@ -205,15 +202,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
-    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
-    if (tableDispatcher != null) {
-      tableDispatcher.loadTable(
-          IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake,
-              context.catalogName(),
-              TableIdentifier.of(namespace, tableName),
-              HierarchicalSchemaUtil.schemaSeparator()));
-    }
+    importTableEntity(context.catalogName(), namespace, tableName);
     IcebergOwnershipUtils.setTableOwner(
         metalake,
         context.catalogName(),
@@ -221,5 +210,65 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         tableName,
         context.userName(),
         GravitinoEnv.getInstance().ownerDispatcher());
+  }
+
+  private void importTableEntity(String catalogName, Namespace namespace, String tableName) {
+    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
+    if (tableDispatcher != null) {
+      tableDispatcher.loadTable(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake,
+              catalogName,
+              TableIdentifier.of(namespace, tableName),
+              HierarchicalSchemaUtil.schemaSeparator()));
+    }
+  }
+
+  private void reconcileTableEntity(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    // IRC requests can be served by different Gravitino nodes. Without a distributed TreeLock,
+    // another node may drop or recreate the same Iceberg table between the backend operation and
+    // this hook's EntityStore mutation. Reconcile the local Gravitino entity with the Iceberg
+    // backend state to avoid leaving stale/orphan table metadata in multi-node deployments.
+    if (dispatcher.tableExists(context, tableIdentifier)) {
+      importTableEntity(context.catalogName(), tableIdentifier.namespace(), tableIdentifier.name());
+      return;
+    }
+
+    deleteTableEntity(context.catalogName(), tableIdentifier);
+
+    if (dispatcher.tableExists(context, tableIdentifier)) {
+      importTableEntity(context.catalogName(), tableIdentifier.namespace(), tableIdentifier.name());
+    }
+  }
+
+  private void bestEffortReconcileTableEntity(
+      IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    try {
+      reconcileTableEntity(context, tableIdentifier);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to reconcile Gravitino table entity after the Iceberg backend operation "
+              + "succeeded. catalog={}, table={}",
+          context.catalogName(),
+          tableIdentifier,
+          e);
+    }
+  }
+
+  private void deleteTableEntity(String catalogName, TableIdentifier tableIdentifier) {
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    try {
+      if (store != null) {
+        store.delete(
+            IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                metalake, catalogName, tableIdentifier, HierarchicalSchemaUtil.schemaSeparator()),
+            Entity.EntityType.TABLE);
+      }
+    } catch (NoSuchEntityException ignore) {
+      // Ignore if the table entity does not exist.
+    } catch (IOException ioe) {
+      throw new RuntimeException("io exception when deleting table entity", ioe);
+    }
   }
 }
