@@ -320,6 +320,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
       if (!tableDropped && !viewDropped && !ignoreIfNotExists) {
         throw new TableNotExistException(catalogName(), tablePath);
       }
+      // Invalidate native catalog cache after successful DDL
+      invalidateTable(tablePath);
     } catch (TableNotExistException e) {
       throw e;
     } catch (Exception e) {
@@ -336,6 +338,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
     try {
       catalog().asTableCatalog().alterTable(srcIdent, TableChange.rename(newTableName));
+      // Invalidate native catalog cache after successful rename
+      invalidateTable(tablePath);
       return;
     } catch (NoSuchTableException ignored) {
       // source is not a table, try as a view below
@@ -510,6 +514,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
       catalog()
           .asTableCatalog()
           .alterTable(identifier, getGravitinoTableChanges(existingTable, newTable));
+      // Invalidate native catalog cache after successful alter
+      invalidateTable(tablePath);
     }
   }
 
@@ -556,6 +562,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
       }
     } else {
       catalog().asTableCatalog().alterTable(identifier, getGravitinoTableChanges(tableChanges));
+      // Invalidate native catalog cache after successful alter
+      invalidateTable(tablePath);
     }
   }
 
@@ -714,6 +722,40 @@ public abstract class BaseCatalog extends AbstractCatalog {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Invalidates cached table metadata in the native Flink catalog after DDL operations.
+   *
+   * <p>Connectors that maintain an internal native catalog cache (e.g. Paimon's {@code
+   * CachingCatalog}) must override {@link #invalidateNativeTableCache} to clear stale entries. This
+   * method calls {@code invalidateNativeTableCache} with a best-effort approach — failures are
+   * logged at DEBUG level and do not abort the DDL. It is always called <em>after</em> the
+   * Gravitino DDL has succeeded, so the cache is only evicted once the source of truth has already
+   * been updated.
+   *
+   * @param tablePath the table whose native cache entry should be dropped
+   */
+  public void invalidateTable(ObjectPath tablePath) {
+    try {
+      invalidateNativeTableCache(tablePath);
+    } catch (Exception e) {
+      LOG.debug(
+          "Failed to invalidate native catalog cache for table {} in catalog {}",
+          tablePath,
+          catalogName(),
+          e);
+    }
+  }
+
+  /**
+   * Invalidates the native catalog cache for the given table. Default is a no-op.
+   *
+   * <p>Subclasses with an internal native catalog that caches table metadata (e.g. Paimon, Iceberg)
+   * should override this method to evict the stale entry after a DDL operation completes.
+   *
+   * @param tablePath the table whose native cache entry should be dropped
+   */
+  protected void invalidateNativeTableCache(ObjectPath tablePath) {}
+
   protected CatalogBaseTable toFlinkTable(Table table, ObjectPath tablePath) {
     org.apache.flink.table.api.Schema.Builder builder = buildSchemaFromColumns(table.columns());
     Optional<List<String>> flinkPrimaryKey = getFlinkPrimaryKey(table);
@@ -727,6 +769,28 @@ public abstract class BaseCatalog extends AbstractCatalog {
     CatalogTable baseTable =
         newCatalogTable(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
     return enrichCatalogTable(baseTable, tablePath);
+  }
+
+  /**
+   * Hook for subclasses to enrich or replace the plain {@link CatalogTable} built from Gravitino
+   * metadata with a connector-native representation.
+   *
+   * <p>The default implementation returns the table unchanged. Connector-specific subclasses (e.g.
+   * {@code GravitinoPaimonCatalog}) can override this method to return a native table object that
+   * carries additional runtime context required by the underlying engine — for example, Paimon's
+   * {@code DataCatalogTable} with a non-null {@code CatalogEnvironment} that enables {@code
+   * AddPartitionCommitCallback} registration on write.
+   *
+   * <p>This hook is called <em>after</em> Gravitino authorization has already been enforced in
+   * {@link #getTable(ObjectPath)}, so implementations do not need to repeat auth checks.
+   *
+   * @param table the plain {@link CatalogTable} built from Gravitino metadata
+   * @param tablePath the object path of the table
+   * @return the (possibly enriched) {@link CatalogBaseTable} to return to Flink
+   * @throws CatalogException if enrichment fails due to a catalog-level error
+   */
+  protected CatalogBaseTable enrichCatalogTable(CatalogTable table, ObjectPath tablePath) {
+    return table;
   }
 
   protected CatalogTable newCatalogTable(
@@ -1028,28 +1092,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return new Representation[] {
       SQLRepresentation.builder().withDialect(dialect).withSql(sql).build()
     };
-  }
-
-  /**
-   * Hook for subclasses to enrich or replace the plain {@link CatalogTable} built from Gravitino
-   * metadata with a connector-native representation.
-   *
-   * <p>The default implementation returns the table unchanged. Connector-specific subclasses (e.g.
-   * {@code GravitinoPaimonCatalog}) can override this method to return a native table object that
-   * carries additional runtime context required by the underlying engine — for example, Paimon's
-   * {@code DataCatalogTable} with a non-null {@code CatalogEnvironment} that enables {@code
-   * AddPartitionCommitCallback} registration on write.
-   *
-   * <p>This hook is called <em>after</em> Gravitino authorization has already been enforced in
-   * {@link #getTable(ObjectPath)}, so implementations do not need to repeat auth checks.
-   *
-   * @param table the plain {@link CatalogTable} built from Gravitino metadata
-   * @param tablePath the object path of the table
-   * @return the (possibly enriched) {@link CatalogBaseTable} to return to Flink
-   * @throws CatalogException if enrichment fails due to a catalog-level error
-   */
-  public CatalogBaseTable enrichCatalogTable(CatalogTable table, ObjectPath tablePath) {
-    return table;
   }
 
   protected Catalog catalog() {
