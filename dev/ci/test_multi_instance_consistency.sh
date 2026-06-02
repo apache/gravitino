@@ -951,7 +951,7 @@ api "$INSTANCE_A" "$USER_LISI" PUT \
   "{\"roleNames\":[\"$ROLE_U\"]}"
 expect "A: grant $ROLE_U to $USER_WANGWU" 200
 
-api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/users/$USER_WANGWU"
+api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/users/$USER_WANGWU"
 expect "B: GET user $USER_WANGWU — $ROLE_U appears in roles list after grant" 200 \
   "\"$ROLE_U\""
 
@@ -960,7 +960,7 @@ api "$INSTANCE_A" "$USER_LISI" PUT \
   "{\"roleNames\":[\"$ROLE_U\"]}"
 expect "A: revoke $ROLE_U from $USER_WANGWU" 200
 
-api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/users/$USER_WANGWU"
+api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/users/$USER_WANGWU"
 expect_absent "B: GET user $USER_WANGWU — $ROLE_U absent from roles list after revoke" 200 \
   "\"$ROLE_U\""
 
@@ -981,7 +981,7 @@ EOF
 )"
 expect "A: create role $ROLE_V with MANAGE_USERS" 200
 
-api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/roles/$ROLE_V"
+api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/roles/$ROLE_V"
 expect "B: GET role $ROLE_V shows MANAGE_USERS (initial)" 200 '"MANAGE_USERS"'
 
 # Swap privilege set on A: remove MANAGE_USERS, add CREATE_TAG.
@@ -995,7 +995,7 @@ api "$INSTANCE_A" "$USER_LISI" PUT \
   '{"privileges":[{"name":"CREATE_TAG","condition":"ALLOW"}]}'
 expect "A: grant CREATE_TAG to $ROLE_V" 200
 
-api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/roles/$ROLE_V"
+api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/roles/$ROLE_V"
 expect "B: GET role $ROLE_V now shows CREATE_TAG" 200 '"CREATE_TAG"'
 expect_absent "B: GET role $ROLE_V no longer shows MANAGE_USERS" 200 '"MANAGE_USERS"'
 
