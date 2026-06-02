@@ -75,6 +75,8 @@ import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.auth.AuthProperties;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -552,8 +554,9 @@ public class TestCatalogWrapperForREST {
                 IcebergConstants.WAREHOUSE,
                 "s3://remote/warehouse"));
 
-    Map<String, String> configToClients =
-        CatalogWrapperForREST.buildCatalogConfigToClients(config, restCatalog);
+    // FederatedCatalogWrapper sources the client config from the remote RESTCatalog's properties().
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, restCatalog);
+    Map<String, String> configToClients = wrapper.buildCatalogConfigToClients();
 
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
@@ -570,33 +573,30 @@ public class TestCatalogWrapperForREST {
             ImmutableMap.of(
                 IcebergConstants.CATALOG_BACKEND,
                 "hive",
+                IcebergConstants.URI,
+                "thrift://hive-metastore:9083",
                 IcebergConstants.IO_IMPL,
                 ResolvingFileIO.class.getName(),
                 IcebergConstants.WAREHOUSE,
                 "s3://bucket/warehouse"));
-    Catalog catalog = mock(Catalog.class);
 
-    Map<String, String> configToClients =
-        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog);
+    // Base CatalogWrapperForREST sources the client config from static catalog configuration.
+    CatalogWrapperForREST wrapper = new CatalogWrapperForREST("test", config);
+    Map<String, String> configToClients = wrapper.buildCatalogConfigToClients();
 
     Assertions.assertEquals(
         ResolvingFileIO.class.getName(), configToClients.get(IcebergConstants.IO_IMPL));
   }
 
   @Test
-  void testNonRESTCatalogClientConfig() {
-    Catalog catalog = mock(Catalog.class);
-    IcebergConfig config =
-        new IcebergConfig(
+  void testNonRestCatalogClientConfig() {
+    Map<String, String> configToClients =
+        CatalogWrapperForREST.filterCatalogConfigForClients(
             ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "hive",
                 IcebergConstants.URI,
                 "thrift://hive-metastore:9083",
                 IcebergConstants.IO_IMPL,
                 "org.apache.iceberg.aws.s3.S3FileIO"));
-    Map<String, String> configToClients =
-        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog);
     Assertions.assertFalse(configToClients.containsKey(IcebergConstants.URI));
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
@@ -605,18 +605,83 @@ public class TestCatalogWrapperForREST {
 
   @Test
   void testCatalogClientConfigRejectsBadDataAccess() {
-    Catalog catalog = mock(Catalog.class);
+    Map<String, String> source =
+        ImmutableMap.of(IcebergConstants.ICEBERG_ACCESS_DELEGATION, "invalid-mode");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CatalogWrapperForREST.filterCatalogConfigForClients(source));
+  }
+
+  @Test
+  void testCreateReturnsFederatedWrapperForRestBackend() {
     IcebergConfig config =
         new IcebergConfig(
             ImmutableMap.of(
                 IcebergConstants.CATALOG_BACKEND,
-                "hive",
-                IcebergConstants.ICEBERG_ACCESS_DELEGATION,
-                "invalid-mode"));
+                "rest",
+                IcebergConstants.URI,
+                "http://localhost:8181"));
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog));
+    CatalogWrapperForREST wrapper = CatalogWrapperForREST.create("test", config);
+
+    Assertions.assertInstanceOf(FederatedCatalogWrapper.class, wrapper);
+  }
+
+  @Test
+  void testCreateReturnsBaseWrapperForNonRestBackend() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+
+    CatalogWrapperForREST wrapper = CatalogWrapperForREST.create("test", config);
+
+    Assertions.assertFalse(wrapper instanceof FederatedCatalogWrapper);
+    Assertions.assertEquals(CatalogWrapperForREST.class, wrapper.getClass());
+  }
+
+  @Test
+  void testFederatedRegisterTableIncludesFileIo() {
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    BaseTable table = mock(BaseTable.class);
+    TableOperations ops = mock(TableOperations.class);
+    FileIO fileIO = mock(FileIO.class);
+    when(catalog.registerTable(any(TableIdentifier.class), anyString())).thenReturn(table);
+    when(table.operations()).thenReturn(ops);
+    when(ops.current()).thenReturn(minimalTableMetadataForStagedCreateTest());
+    when(table.io()).thenReturn(fileIO);
+    when(fileIO.properties())
+        .thenReturn(
+            ImmutableMap.of(
+                IcebergConstants.IO_IMPL,
+                "org.apache.iceberg.aws.s3.S3FileIO",
+                IcebergConstants.ICEBERG_S3_ENDPOINT,
+                "http://localhost:9000"));
+
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
+
+    RegisterTableRequest request =
+        ImmutableRegisterTableRequest.builder()
+            .name("tbl")
+            .metadataLocation("s3://bucket/warehouse/tbl/metadata/v1.metadata.json")
+            .build();
+
+    LoadTableResponse response = wrapper.registerTable(Namespace.of("db"), request, false);
+
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
+    Assertions.assertEquals(
+        "http://localhost:9000", response.config().get(IcebergConstants.ICEBERG_S3_ENDPOINT));
   }
 
   @Test
@@ -969,7 +1034,9 @@ public class TestCatalogWrapperForREST {
     }
   }
 
-  private static class StaticCatalogWrapperForREST extends CatalogWrapperForREST {
+  // Extends FederatedCatalogWrapper so table operations route through the federation-aware
+  // *Internal paths (FileIO extraction) against the injected catalog.
+  private static class StaticCatalogWrapperForREST extends FederatedCatalogWrapper {
     private final Catalog catalog;
 
     StaticCatalogWrapperForREST(String catalogName, IcebergConfig config, Catalog catalog) {

@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
@@ -142,14 +143,32 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     this.scanPlanCache = loadScanPlanCache(config);
   }
 
+  /**
+   * Creates a wrapper for the given Iceberg catalog configuration.
+   *
+   * <p>When the underlying catalog backend is a federated Iceberg REST catalog (backend {@code
+   * rest}), a {@link FederatedCatalogWrapper} is returned so federation-aware behavior (FileIO
+   * property extraction, remote credential vending, remote {@code /v1/config} defaults) is applied
+   * through polymorphic dispatch rather than scattered {@code instanceof} checks. All other
+   * backends use the base {@link CatalogWrapperForREST}.
+   *
+   * @param catalogName the catalog name.
+   * @param config the Iceberg catalog configuration.
+   * @return a {@link CatalogWrapperForREST} (or {@link FederatedCatalogWrapper}) for the catalog.
+   */
+  public static CatalogWrapperForREST create(String catalogName, IcebergConfig config) {
+    IcebergCatalogBackend backend =
+        IcebergCatalogBackend.valueOf(
+            config.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
+    if (backend == IcebergCatalogBackend.REST) {
+      return new FederatedCatalogWrapper(catalogName, config);
+    }
+    return new CatalogWrapperForREST(catalogName, config);
+  }
+
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
-    LoadTableResponse loadTableResponse;
-    if (isRESTCatalog()) {
-      loadTableResponse = createTableInternal(namespace, request);
-    } else {
-      loadTableResponse = super.createTable(namespace, request);
-    }
+    LoadTableResponse loadTableResponse = super.createTable(namespace, request);
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(
           TableIdentifier.of(namespace, request.name()),
@@ -161,12 +180,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
-    LoadTableResponse loadTableResponse;
-    if (isRESTCatalog()) {
-      loadTableResponse = loadTableInternal(identifier);
-    } else {
-      loadTableResponse = super.loadTable(identifier);
-    }
+    LoadTableResponse loadTableResponse = super.loadTable(identifier);
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(identifier, loadTableResponse, privilege);
     }
@@ -186,16 +200,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           CredentialPrivilege.WRITE);
     }
     return loadTableResponse;
-  }
-
-  @Override
-  public LoadTableResponse updateTable(
-      TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
-    if (isRESTCatalog()) {
-      return tableUpdateInternal(tableIdentifier, updateTableRequest);
-    } else {
-      return super.updateTable(tableIdentifier, updateTableRequest);
-    }
   }
 
   /**
@@ -313,7 +317,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     synchronized (catalogConfigToClientsLock) {
       if (catalogConfigToClients == null) {
-        catalogConfigToClients = buildCatalogConfigToClients(getIcebergConfig(), getCatalog());
+        catalogConfigToClients = buildCatalogConfigToClients();
       }
       return catalogConfigToClients;
     }
@@ -322,29 +326,35 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   /**
    * Builds properties exposed to Iceberg clients via the IRC {@code /v1/config} defaults.
    *
-   * <p>For {@link RESTCatalog}, uses {@link RESTCatalog#properties()} so defaults reflect the
-   * remote catalog's config response merged with client properties (after REST handshake), not only
-   * static Gravitino catalog configuration.
+   * <p>The base implementation uses the static Gravitino catalog configuration as the property
+   * source. {@link FederatedCatalogWrapper} overrides this to use {@code RESTCatalog.properties()}
+   * so defaults reflect the remote catalog's config response merged with client properties (after
+   * REST handshake).
    *
    * <p>{@link IcebergConstants#IO_IMPL} is passed through when present (e.g. Iceberg {@link
    * org.apache.iceberg.io.ResolvingFileIO}), so clients multiplex by URI scheme without server-side
    * rewriting per table.
+   *
+   * @return the immutable, filtered properties exposed to Iceberg clients.
    */
   @VisibleForTesting
-  static Map<String, String> buildCatalogConfigToClients(IcebergConfig config, Catalog catalog) {
-    Map<String, String> sourceProps;
-    if (catalog instanceof RESTCatalog) {
-      Map<String, String> merged = ((RESTCatalog) catalog).properties();
-      sourceProps = merged != null ? new HashMap<>(merged) : new HashMap<>();
-    } else {
-      sourceProps = new HashMap<>(config.getIcebergCatalogProperties());
-    }
+  Map<String, String> buildCatalogConfigToClients() {
+    return filterCatalogConfigForClients(getIcebergConfig().getIcebergCatalogProperties());
+  }
 
+  /**
+   * Keeps only the client-facing catalog properties and validates the data-access property.
+   *
+   * @param sourceProps the candidate properties to filter.
+   * @return the immutable, filtered properties exposed to Iceberg clients.
+   */
+  protected static Map<String, String> filterCatalogConfigForClients(
+      Map<String, String> sourceProps) {
     Map<String, String> filtered =
-        MapUtils.getFilteredMap(sourceProps, key -> catalogPropertiesToClientKeys.contains(key));
-    filtered = new HashMap<>(filtered);
+        new HashMap<>(
+            MapUtils.getFilteredMap(
+                sourceProps, key -> catalogPropertiesToClientKeys.contains(key)));
     validateAndNormalizeDataAccessProperty(filtered);
-
     return Collections.unmodifiableMap(filtered);
   }
 
@@ -434,11 +444,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   protected boolean shouldGenerateCredential(
       LoadTableResponse loadTableResponse, boolean requestCredential) {
     if (!requestCredential) {
-      return false;
-    }
-
-    // RESTCatalog will fetch credential from the remote catalog instead of generating credential
-    if (getCatalog() instanceof RESTCatalog) {
       return false;
     }
 
@@ -731,7 +736,15 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
   }
 
-  private LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
+  /**
+   * Federation-aware {@code createTable}: creates the table on the underlying (remote) catalog and
+   * extracts client-facing FileIO/credential properties from {@code table.io()}.
+   *
+   * @param namespace the table namespace.
+   * @param request the create-table request.
+   * @return the load-table response including FileIO-derived client config.
+   */
+  protected LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
     Catalog loadedCatalog = getCatalog();
 
     request.validate();
@@ -831,7 +844,45 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         .build();
   }
 
-  private LoadTableResponse tableUpdateInternal(TableIdentifier ident, UpdateTableRequest request) {
+  /**
+   * Federation-aware {@code registerTable}: registers the existing table metadata on the underlying
+   * (remote) catalog and extracts client-facing FileIO/credential properties from {@code
+   * table.io()}, mirroring {@link #loadTableInternal(TableIdentifier)}.
+   *
+   * @param namespace the table namespace.
+   * @param request the register-table request.
+   * @return the load-table response including FileIO-derived client config.
+   */
+  protected LoadTableResponse registerTableInternal(
+      Namespace namespace, RegisterTableRequest request) {
+    TableIdentifier ident = TableIdentifier.of(namespace, request.name());
+    Table table = getCatalog().registerTable(ident, request.metadataLocation());
+
+    if (table instanceof BaseTable) {
+      Map<String, String> properties = retrieveFileIOProperties(table.io());
+      return LoadTableResponse.builder()
+          .withTableMetadata(((BaseTable) table).operations().current())
+          .addAllConfig(
+              MapUtils.getFilteredMap(
+                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
+          // Keep only credential fields from FileIO properties before returning them to the client.
+          .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
+          .build();
+    }
+
+    throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
+  }
+
+  /**
+   * Federation-aware {@code updateTable}: applies the update against the underlying (remote)
+   * catalog, including the staged-create path used by federated table creation.
+   *
+   * @param ident the table identifier.
+   * @param request the update-table request.
+   * @return the load-table response with the updated metadata.
+   */
+  protected LoadTableResponse tableUpdateInternal(
+      TableIdentifier ident, UpdateTableRequest request) {
     if (isCreate(request)) {
       // this is a hacky way to get TableOperations for an uncommitted table
       Optional<Integer> formatVersion =
@@ -877,7 +928,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
   }
 
-  private LoadTableResponse loadTableInternal(TableIdentifier ident) {
+  /**
+   * Federation-aware {@code loadTable}: loads the table from the underlying (remote) catalog and
+   * extracts client-facing FileIO/credential properties from {@code table.io()}.
+   *
+   * @param ident the table identifier.
+   * @return the load-table response including FileIO-derived client config.
+   */
+  protected LoadTableResponse loadTableInternal(TableIdentifier ident) {
     Table table = getCatalog().loadTable(ident);
 
     if (table instanceof BaseTable) {
