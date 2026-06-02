@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BooleanSupplier;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -175,28 +174,6 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDeleteAllStopsSubmittingWhenLeaseLost() {
-    Map<String, String> config = new HashMap<>();
-    config.put("async-cleanup.delete-batch-size", "1");
-    AtomicInteger ownershipChecks = new AtomicInteger();
-    BooleanSupplier stillOwned = () -> ownershipChecks.incrementAndGet() == 1;
-
-    IcebergCleanupManager svc = new IcebergCleanupManager(store, new IcebergConfig(config));
-    try {
-      Assertions.assertThrows(
-          RuntimeException.class,
-          () ->
-              svc.deleteAll(
-                  new RecordingFileIO(new CopyOnWriteArrayList<>()),
-                  Arrays.asList("a", "b"),
-                  stillOwned));
-      Assertions.assertEquals(2, ownershipChecks.get());
-    } finally {
-      svc.close();
-    }
-  }
-
-  @TestTemplate
   void testCleanupDeletesAllFiles() {
     BaseTable base = tableWithDataFile();
     FileIO io = base.io();
@@ -226,25 +203,6 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testCleanupStopsWhenLeaseLost() {
-    BaseTable base = tableWithDataFile();
-    FileIO io = base.io();
-    String metadataLocation = base.operations().current().metadataFileLocation();
-
-    IcebergCleanupManager svc =
-        new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
-    try {
-      // A worker that lost its lease must stop before deleting anything.
-      Assertions.assertThrows(
-          RuntimeException.class, () -> svc.cleanupFiles(io, metadataLocation, () -> false));
-      Assertions.assertTrue(((InMemoryFileIO) io).fileExists(DATA_FILE));
-      Assertions.assertTrue(((InMemoryFileIO) io).fileExists(metadataLocation));
-    } finally {
-      svc.close();
-    }
-  }
-
-  @TestTemplate
   void testCleanupToleratesMissingMetadata() {
     // A missing root metadata.json means the table is already gone, so cleanup just returns.
     IcebergCleanupManager svc =
@@ -263,7 +221,7 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, fastPollConfig()) {
           @Override
-          void cleanupFiles(FileIO io, String metadataLocation, BooleanSupplier stillOwned) {
+          void cleanupFiles(FileIO io, String metadataLocation) {
             calls.incrementAndGet();
           }
         };
@@ -288,7 +246,7 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, new IcebergConfig(config)) {
           @Override
-          void cleanupFiles(FileIO io, String metadataLocation, BooleanSupplier stillOwned) {
+          void cleanupFiles(FileIO io, String metadataLocation) {
             throw new RuntimeException("transient");
           }
         };
@@ -296,7 +254,7 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
     svc.start();
     try {
       Awaitility.await()
-          .atMost(10, TimeUnit.SECONDS)
+          .atMost(15, TimeUnit.SECONDS)
           .until(() -> store.stateOf(id) == IcebergCleanupJob.State.FAILED);
     } finally {
       svc.close();

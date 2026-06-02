@@ -125,6 +125,16 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
   }
 
   @TestTemplate
+  void testRecordFailureAtMaxAttemptsMarksFailed() {
+    long id = store.addJob(sampleJob());
+    long heartbeat = System.currentTimeMillis();
+    store.takePendingJob(heartbeat, 300_000L, 10);
+
+    Assertions.assertTrue(store.recordFailure(id, "boom", 1, heartbeat));
+    Assertions.assertEquals(IcebergCleanupJob.State.FAILED, store.stateOf(id));
+  }
+
+  @TestTemplate
   void testTerminalUpdateNeedsOwnership() {
     long id = store.addJob(sampleJob());
     long now = System.currentTimeMillis();

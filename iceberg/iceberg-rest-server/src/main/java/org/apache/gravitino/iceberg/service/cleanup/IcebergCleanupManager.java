@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.cleanup;
 
-import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Iterators;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,7 +39,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BooleanSupplier;
+import java.util.function.LongPredicate;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogUtil;
@@ -74,6 +74,8 @@ public class IcebergCleanupManager implements AutoCloseable {
   private final long heartbeatTimeoutMs;
   private final long retentionMs;
   private final ThreadPoolExecutor deleteExecutor;
+  // Heartbeat token per job this manager currently owns, keyed by id. The scheduler renews it and a
+  // worker reads it for the terminal CAS; refreshHeartbeats drops the entry once a peer reclaims.
   private final Map<Long, Long> ownedHeartbeats = new ConcurrentHashMap<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
@@ -97,6 +99,9 @@ public class IcebergCleanupManager implements AutoCloseable {
         config.get(IcebergConfig.ASYNC_CLEANUP_HEARTBEAT_TIMEOUT_SECS) * 1000L;
     this.maxAttempts = config.get(IcebergConfig.ASYNC_CLEANUP_MAX_ATTEMPTS);
     this.retentionMs = config.get(IcebergConfig.ASYNC_CLEANUP_RETENTION_HOURS) * 3_600_000L;
+    // Scan more candidates than workers so a claim that loses its CAS still has other rows to try
+    // in the same poll. workerThreads * 4 gives that headroom; the floor of 8 keeps the window
+    // useful when only one or two worker threads are configured.
     this.candidateWindow = Math.max(8, workerThreads * 4);
     this.deleteExecutor =
         new ThreadPoolExecutor(
@@ -144,7 +149,7 @@ public class IcebergCleanupManager implements AutoCloseable {
 
     // We submit exactly workerThreads loops, so the queue is never used; it is bounded only to
     // avoid Executors.newFixedThreadPool's unbounded queue.
-    workers =
+    this.workers =
         new ThreadPoolExecutor(
             workerThreads,
             workerThreads,
@@ -157,7 +162,7 @@ public class IcebergCleanupManager implements AutoCloseable {
     }
 
     // One scheduler thread runs both periodic tasks: heartbeat renewal and row pruning.
-    scheduler = Executors.newScheduledThreadPool(1, daemon("iceberg-cleanup-heartbeat-prune"));
+    this.scheduler = Executors.newScheduledThreadPool(1, daemon("iceberg-cleanup-heartbeat-prune"));
     long heartbeatIntervalMs = heartbeatTimeoutMs / 3L;
     scheduler.scheduleAtFixedRate(
         this::refreshHeartbeats, heartbeatIntervalMs, heartbeatIntervalMs, TimeUnit.MILLISECONDS);
@@ -176,23 +181,17 @@ public class IcebergCleanupManager implements AutoCloseable {
     }
     if (workers != null) {
       workers.shutdownNow();
-      try {
-        workers.awaitTermination(5, TimeUnit.SECONDS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
+      awaitTermination(workers);
     }
     deleteExecutor.shutdownNow();
+    // Wait for in-flight delete batches to observe the interrupt and stop, matching the workers
+    // above, so close() does not return while file deletions are still running on a dying pool.
+    awaitTermination(deleteExecutor);
     // The job store is backed by the entity store's shared relational backend, which owns the
     // connection pool lifecycle, so there is nothing to close here.
   }
 
-  @VisibleForTesting
   void cleanupFiles(FileIO io, String metadataLocation) {
-    cleanupFiles(io, metadataLocation, () -> true);
-  }
-
-  void cleanupFiles(FileIO io, String metadataLocation, BooleanSupplier stillOwned) {
     TableMetadata metadata;
     try {
       metadata = TableMetadataParser.read(io, metadataLocation);
@@ -212,71 +211,45 @@ public class IcebergCleanupManager implements AutoCloseable {
     //
     // Data files are the only huge level, so they are streamed and deleted one manifest at a time
     // rather than all collected first; only the smaller manifest/list/metadata paths are held.
-    //
-    // deleteAll checks ownership before each delete batch. Because each dependency level is
-    // deleted through deleteAll, a reclaimed worker stops before submitting more file deletes.
     Set<String> manifests = new LinkedHashSet<>();
-    deleteDataFiles(io, metadata, manifests, stillOwned);
-    deleteAll(io, manifests, stillOwned);
-    deleteAll(io, ReachableFileUtil.manifestListLocations(table), stillOwned);
-    deleteAll(io, ReachableFileUtil.statisticsFilesLocations(table), stillOwned);
+    deleteDataFiles(io, metadata, manifests);
+    deleteAll(io, manifests);
+    deleteAll(io, ReachableFileUtil.manifestListLocations(table));
+    deleteAll(io, ReachableFileUtil.statisticsFilesLocations(table));
 
     // metadataFileLocations includes the current metadata.json; drop it so it is deleted last.
     Set<String> ancestorMetadata =
         new LinkedHashSet<>(ReachableFileUtil.metadataFileLocations(table, true));
     ancestorMetadata.remove(metadataLocation);
-    deleteAll(io, ancestorMetadata, stillOwned);
-    deleteAll(io, Collections.singletonList(metadataLocation), stillOwned);
+    deleteAll(io, ancestorMetadata);
+    deleteAll(io, Collections.singletonList(metadataLocation));
   }
 
   void deleteAll(FileIO io, Iterable<String> files) {
-    deleteAll(io, files, () -> true);
-  }
-
-  void deleteAll(FileIO io, Iterable<String> files, BooleanSupplier stillOwned) {
     // Callers pass one manifest's files at a time (or a small fixed list), so futures stay small;
     // CallerRunsPolicy on deleteExecutor also throttles submission when the pool is saturated.
     List<Future<?>> futures = new ArrayList<>();
-    try {
-      Iterators.partition(files.iterator(), deleteBatchSize)
-          .forEachRemaining(
-              batch -> {
-                requireOwnership(stillOwned);
+    Iterators.partition(files.iterator(), deleteBatchSize)
+        .forEachRemaining(
+            batch ->
                 futures.add(
                     deleteExecutor.submit(
-                        () -> CatalogUtil.deleteFiles(io, batch, "cleanup", true)));
-              });
+                        () -> CatalogUtil.deleteFiles(io, batch, "cleanup", true))));
 
-      for (Future<?> future : futures) {
-        requireOwnership(stillOwned);
-        try {
-          future.get();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new RuntimeException("Interrupted during bulk delete", e);
-        } catch (ExecutionException e) {
-          if (hasCause(e, NotFoundException.class)) {
-            LOG.debug("Ignoring already-deleted file during async cleanup", e);
-            continue;
-          }
-          throw new RuntimeException("Bulk delete batch failed", e);
+    for (Future<?> future : futures) {
+      try {
+        future.get();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted during bulk delete", e);
+      } catch (ExecutionException e) {
+        if (Throwables.getCausalChain(e).stream().anyMatch(NotFoundException.class::isInstance)) {
+          LOG.debug("Ignoring already-deleted file during async cleanup", e);
+          continue;
         }
+        throw new RuntimeException("Bulk delete batch failed", e);
       }
-    } catch (OwnershipLostException e) {
-      futures.forEach(future -> future.cancel(true));
-      throw e;
     }
-  }
-
-  private static boolean hasCause(Throwable throwable, Class<? extends Throwable> type) {
-    Throwable current = throwable;
-    while (current != null) {
-      if (type.isInstance(current)) {
-        return true;
-      }
-      current = current.getCause();
-    }
-    return false;
   }
 
   private void workerLoop() {
@@ -305,46 +278,45 @@ public class IcebergCleanupManager implements AutoCloseable {
   }
 
   private void runJob(IcebergCleanupJob job) {
+    long id = job.id();
     try {
       FileIO io = CatalogUtil.loadFileIO(job.fileIOImpl(), job.fileIOProperties(), null);
-      cleanupFiles(io, job.metadataLocation(), () -> ownsJob(job.id()));
-      // markSucceeded/recordFailure CAS on our heartbeat token, so a worker that lost its lease
-      // cannot change a job a peer reclaimed. A null token means we already lost it; skip the call.
-      // If a heartbeat refresh bumps the token between this read and the CAS, the CAS just no-ops
-      // and the job is reclaimed and re-run later (which finds the files gone) -- harmless.
-      Long heartbeat = ownedHeartbeats.get(job.id());
-      if (heartbeat != null) {
-        store.markSucceeded(job.id(), heartbeat);
-      }
-    } catch (OwnershipLostException lost) {
-      // A peer reclaimed the job mid-run; leave it to the new owner without marking it.
-      LOG.warn("Lost ownership of cleanup job {} mid-run; leaving it to the new owner", job.id());
+      cleanupFiles(io, job.metadataLocation());
+      finishJob(id, heartbeat -> store.markSucceeded(id, heartbeat));
     } catch (RuntimeException e) {
-      LOG.warn("Cleanup job {} failed transiently; will retry", job.id(), e);
-      Long heartbeat = ownedHeartbeats.get(job.id());
-      if (heartbeat != null) {
-        store.recordFailure(job.id(), e.getMessage(), maxAttempts, heartbeat);
-      }
+      LOG.warn("Cleanup job {} failed transiently; will retry", id, e);
+      finishJob(id, heartbeat -> store.recordFailure(id, e.getMessage(), maxAttempts, heartbeat));
     } finally {
-      ownedHeartbeats.remove(job.id());
+      ownedHeartbeats.remove(id);
+    }
+  }
+
+  // markSucceeded/recordFailure CAS on the heartbeat token, so a worker whose lease a peer
+  // reclaimed cannot overwrite the job the peer now owns. A null token means a refresh already
+  // saw the takeover, so we skip. A failed CAS just leaves the row RUNNING to be reclaimed and
+  // re-run (which finds the files gone and succeeds); we log it so the reclaim is observable.
+  private void finishJob(long id, LongPredicate terminalUpdate) {
+    Long heartbeat = ownedHeartbeats.get(id);
+    if (heartbeat != null && !terminalUpdate.test(heartbeat)) {
+      LOG.warn("Could not finish cleanup job {}; it will be reclaimed and re-run", id);
     }
   }
 
   private void refreshHeartbeats() {
     long now = System.currentTimeMillis();
-    List<Map.Entry<Long, Long>> heartbeats = new ArrayList<>(ownedHeartbeats.entrySet());
-    for (Map.Entry<Long, Long> entry : heartbeats) {
+    for (Map.Entry<Long, Long> entry : new ArrayList<>(ownedHeartbeats.entrySet())) {
+      long id = entry.getKey();
       try {
-        if (store.heartbeat(entry.getKey(), entry.getValue(), now)) {
-          ownedHeartbeats.put(entry.getKey(), now);
+        if (store.heartbeat(id, entry.getValue(), now)) {
+          ownedHeartbeats.put(id, now);
         } else {
-          LOG.warn("Lost ownership of cleanup job {}", entry.getKey());
-          ownedHeartbeats.remove(entry.getKey());
+          LOG.warn("Lost ownership of cleanup job {}", id);
+          ownedHeartbeats.remove(id);
         }
       } catch (Throwable t) {
         // scheduleAtFixedRate stops a task forever if it throws, so never let one escape: a bad job
         // must not stop heartbeat renewal for the whole process.
-        LOG.warn("Heartbeat update failed for job {}", entry.getKey(), t);
+        LOG.warn("Heartbeat update failed for job {}", id, t);
       }
     }
   }
@@ -360,8 +332,7 @@ public class IcebergCleanupManager implements AutoCloseable {
 
   // Streams each manifest's data files to deleteAll (one manifest's paths in memory at a time) and
   // collects the manifest paths into `manifests` for the caller to delete next.
-  private void deleteDataFiles(
-      FileIO io, TableMetadata metadata, Set<String> manifests, BooleanSupplier stillOwned) {
+  private void deleteDataFiles(FileIO io, TableMetadata metadata, Set<String> manifests) {
     for (Snapshot snapshot : metadata.snapshots()) {
       List<ManifestFile> snapshotManifests;
       try {
@@ -379,7 +350,7 @@ public class IcebergCleanupManager implements AutoCloseable {
         try (CloseableIterable<String> paths =
             ManifestFiles.readPaths(manifest, io, metadata.specsById())) {
           // deleteAll pulls this lazy iterable in batches, so only one batch is held at a time.
-          deleteAll(io, paths, stillOwned);
+          deleteAll(io, paths);
         } catch (NotFoundException manifestGone) {
           // Manifests are deleted after their data files, so a missing one has no data files left.
           LOG.debug("Manifest {} already gone; skipping", manifest.path());
@@ -390,15 +361,11 @@ public class IcebergCleanupManager implements AutoCloseable {
     }
   }
 
-  private boolean ownsJob(long id) {
-    // We own the job while it is in ownedHeartbeats; refreshHeartbeats drops it once a peer
-    // reclaims it. Also false while closing, so an in-flight cleanup stops promptly on shutdown.
-    return running.get() && ownedHeartbeats.containsKey(id);
-  }
-
-  private void requireOwnership(BooleanSupplier stillOwned) {
-    if (!stillOwned.getAsBoolean()) {
-      throw new OwnershipLostException();
+  private static void awaitTermination(ExecutorService pool) {
+    try {
+      pool.awaitTermination(5, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -417,7 +384,4 @@ public class IcebergCleanupManager implements AutoCloseable {
       return thread;
     };
   }
-
-  /** Thrown to stop a cleanup early when the worker has lost its heartbeat lease. */
-  private static final class OwnershipLostException extends RuntimeException {}
 }
