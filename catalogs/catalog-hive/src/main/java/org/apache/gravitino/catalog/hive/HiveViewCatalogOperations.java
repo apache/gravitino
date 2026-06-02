@@ -127,6 +127,13 @@ class HiveViewCatalogOperations implements ViewCatalog {
                 + "without it the view silently round-trips as Hive dialect on reload",
             ident,
             HiveView.SPARK_VERSION_KEY);
+      } else if (Dialects.FLINK.equalsIgnoreCase(sqlRepresentation.dialect())) {
+        Preconditions.checkArgument(
+            params.keySet().stream().anyMatch(k -> k.startsWith(HiveView.FLINK_PROPERTY_PREFIX)),
+            "Flink dialect view '%s' requires at least one property with prefix '%s' to be set; "
+                + "without it the view silently round-trips as Hive dialect on reload",
+            ident,
+            HiveView.FLINK_PROPERTY_PREFIX);
       }
       if (defaultCatalog != null) {
         params.put(HiveView.SPARK_DEFAULT_CATALOG_KEY, defaultCatalog);
