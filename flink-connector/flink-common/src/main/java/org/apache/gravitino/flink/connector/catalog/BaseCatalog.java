@@ -310,7 +310,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
 
     try {
-      boolean tableDropped = catalog().asTableCatalog().dropTable(ident);
+      boolean tableDropped = dropTableEntry(ident);
       boolean viewDropped = false;
       try {
         viewDropped = catalog().asViewCatalog().dropView(ident);
@@ -325,6 +325,15 @@ public abstract class BaseCatalog extends AbstractCatalog {
     } catch (Exception e) {
       throw new CatalogException(e);
     }
+  }
+
+  /**
+   * Drops the table entry. Subclasses may override to use a different drop strategy (e.g., purge).
+   *
+   * @return {@code true} if the table existed and was dropped.
+   */
+  protected boolean dropTableEntry(NameIdentifier ident) {
+    return catalog().asTableCatalog().dropTable(ident);
   }
 
   @Override

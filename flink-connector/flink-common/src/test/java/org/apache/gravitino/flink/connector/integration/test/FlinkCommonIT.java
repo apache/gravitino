@@ -48,12 +48,16 @@ import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
@@ -845,14 +849,12 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                   viewName, tableName),
               ResultKind.SUCCESS);
 
-          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
-          org.apache.gravitino.rel.View view =
-              viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+          ViewCatalog viewCatalog = catalog.asViewCatalog();
+          View view = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
           Assertions.assertEquals(viewName, view.name());
           Assertions.assertEquals("view comment", view.comment());
           Assertions.assertEquals(1, view.representations().length);
-          Assertions.assertInstanceOf(
-              org.apache.gravitino.rel.SQLRepresentation.class, view.representations()[0]);
+          Assertions.assertInstanceOf(SQLRepresentation.class, view.representations()[0]);
 
           Optional<org.apache.flink.table.catalog.Catalog> flinkCatalog =
               tableEnv.getCatalog(catalog.name());
@@ -861,7 +863,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             CatalogBaseTable flinkTable =
                 flinkCatalog.get().getTable(new ObjectPath(schemaName, viewName));
             Assertions.assertEquals(CatalogBaseTable.TableKind.VIEW, flinkTable.getTableKind());
-          } catch (org.apache.flink.table.catalog.exceptions.TableNotExistException e) {
+          } catch (TableNotExistException e) {
             Assertions.fail("view should exist in Flink catalog: " + e.getMessage());
           }
         },
@@ -892,9 +894,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           Assertions.assertTrue(views.contains(view2), "view2 not found in SHOW VIEWS");
           Assertions.assertFalse(views.contains(tableName), "table should not appear in listViews");
 
-          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
-          NameIdentifier[] gravitinoViews =
-              viewCatalog.listViews(org.apache.gravitino.Namespace.of(schemaName));
+          ViewCatalog viewCatalog = catalog.asViewCatalog();
+          NameIdentifier[] gravitinoViews = viewCatalog.listViews(Namespace.of(schemaName));
           List<String> gravitinoViewNames =
               Arrays.stream(gravitinoViews).map(NameIdentifier::name).collect(Collectors.toList());
           Assertions.assertTrue(gravitinoViewNames.contains(view1));
@@ -919,7 +920,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           TestUtils.assertTableResult(
               sql("CREATE VIEW %s AS SELECT id FROM %s", viewName, tableName), ResultKind.SUCCESS);
 
-          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
+          ViewCatalog viewCatalog = catalog.asViewCatalog();
           Assertions.assertTrue(
               viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)),
               "view should exist before drop");
@@ -953,7 +954,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           TestUtils.assertTableResult(
               sql("ALTER VIEW %s RENAME TO %s", viewName, newViewName), ResultKind.SUCCESS);
 
-          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
+          ViewCatalog viewCatalog = catalog.asViewCatalog();
           Assertions.assertFalse(
               viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)),
               "old view name should not exist");
@@ -984,12 +985,10 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               sql("ALTER VIEW %s AS SELECT id, name FROM %s", viewName, tableName),
               ResultKind.SUCCESS);
 
-          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
-          org.apache.gravitino.rel.View view =
-              viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+          ViewCatalog viewCatalog = catalog.asViewCatalog();
+          View view = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
           Assertions.assertEquals(1, view.representations().length);
-          org.apache.gravitino.rel.SQLRepresentation rep =
-              (org.apache.gravitino.rel.SQLRepresentation) view.representations()[0];
+          SQLRepresentation rep = (SQLRepresentation) view.representations()[0];
           Assertions.assertTrue(
               rep.sql().contains("name") && rep.sql().contains("id"),
               "updated view SQL should select both id and name columns");
@@ -1047,7 +1046,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               sql("CREATE VIEW IF NOT EXISTS %s AS SELECT id FROM %s", viewName, tableName),
               ResultKind.SUCCESS);
 
-          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
+          ViewCatalog viewCatalog = catalog.asViewCatalog();
           Assertions.assertTrue(viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)));
         },
         true);

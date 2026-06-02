@@ -28,9 +28,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.table.catalog.AbstractCatalog;
-import org.apache.flink.table.catalog.ObjectPath;
-import org.apache.flink.table.catalog.exceptions.CatalogException;
-import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.NameIdentifier;
@@ -74,22 +71,8 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   }
 
   @Override
-  public void dropTable(ObjectPath tablePath, boolean ignoreIfNotExists)
-      throws TableNotExistException, CatalogException {
-    NameIdentifier identifier =
-        NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
-    boolean tableDropped = catalog().asTableCatalog().purgeTable(identifier);
-    boolean viewDropped = false;
-    if (!tableDropped) {
-      try {
-        viewDropped = catalog().asViewCatalog().dropView(identifier);
-      } catch (UnsupportedOperationException ignored) {
-        // catalog does not support views
-      }
-    }
-    if (!tableDropped && !viewDropped && !ignoreIfNotExists) {
-      throw new TableNotExistException(catalogName(), tablePath);
-    }
+  protected boolean dropTableEntry(NameIdentifier ident) {
+    return catalog().asTableCatalog().purgeTable(ident);
   }
 
   @Override
