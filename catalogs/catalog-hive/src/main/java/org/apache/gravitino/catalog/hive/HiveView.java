@@ -52,7 +52,7 @@ import org.apache.gravitino.rel.View;
 @ToString
 public class HiveView implements View {
 
-  private static final String SPARK_VERSION_KEY = "spark.sql.create.version";
+  static final String SPARK_VERSION_KEY = "spark.sql.create.version";
   static final String SPARK_DEFAULT_CATALOG_KEY = "gravitino.view.default.catalog";
   static final String SPARK_DEFAULT_SCHEMA_KEY = "gravitino.view.default.schema";
   static final String FLINK_PROPERTY_PREFIX = "flink.";
@@ -132,14 +132,6 @@ public class HiveView implements View {
       return Dialects.FLINK;
     }
     return Dialects.HIVE;
-  }
-
-  /**
-   * Returns true if {@code properties} contains the Spark dialect marker key {@code
-   * spark.sql.create.version}, which {@link #detectDialect} requires to identify a view as Spark.
-   */
-  static boolean hasSparkMarker(Map<String, String> properties) {
-    return properties.containsKey(SPARK_VERSION_KEY);
   }
 
   /** Builder for {@link HiveView}. */
