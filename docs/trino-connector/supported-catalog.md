@@ -11,6 +11,7 @@ The catalogs currently supported by the Apache Gravitino Trino connector are as 
 - [Iceberg](catalog-iceberg.md)
 - [MySQL](catalog-mysql.md)
 - [PostgreSQL](catalog-postgresql.md)
+- [AWS Glue](catalog-glue.md)
 
 ## Create catalog
 
@@ -25,7 +26,7 @@ create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHA
 ```
 
 - CATALOG: The catalog name to be created.
-- PROVIDER: The catalog provider, currently only supports `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`.
+- PROVIDER: The catalog provider, currently only supports `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`, `glue`.
 - PROPERTIES: The properties of the catalog.
 - IGNORE_EXIST: The flag to ignore the error if the catalog already exists. It's optional, the default value is `false`.
 
@@ -34,6 +35,7 @@ The type of catalog properties reference:
 - [Iceberg catalog](../lakehouse-iceberg-catalog.md#catalog-properties)
 - [MySQL catalog](../jdbc-mysql-catalog.md#catalog-properties)
 - [PostgreSQL catalog](../jdbc-postgresql-catalog.md#catalog-properties)
+- [AWS Glue catalog](../aws-glue-catalog.md#catalog-properties)
 
 
 Drop catalog:
