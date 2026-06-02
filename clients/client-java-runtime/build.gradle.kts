@@ -41,6 +41,14 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
+  // Exclude server-side JDBC pooling utilities. These classes reference commons-dbcp2 which is
+  // declared compileOnly in :common and therefore never bundled here. Including them produces a
+  // broken relocated reference (BasicDataSource renamed to the shaded package, but the actual
+  // shaded class absent). Connector runtime JARs placed on Spark/Flink/Hadoop classpaths would
+  // then shadow the working copy in gravitino-jobs.jar via parent-first class delegation, causing
+  // NoClassDefFoundError at runtime. See https://github.com/apache/gravitino/issues/10508
+  exclude("org/apache/gravitino/utils/jdbc/**")
+
   // Relocate dependencies to avoid conflicts
   relocate("com.google", "org.apache.gravitino.shaded.com.google")
   relocate("com.fasterxml", "org.apache.gravitino.shaded.com.fasterxml")

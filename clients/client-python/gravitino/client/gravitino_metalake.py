@@ -21,6 +21,7 @@ from typing import Dict, List, Optional
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
+from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.authorization.role import Role
 from gravitino.api.authorization.securable_objects import SecurableObject
 from gravitino.api.authorization.user import User
@@ -53,6 +54,10 @@ from gravitino.dto.requests.tag_updates_request import TagUpdatesRequest
 from gravitino.dto.requests.user_add_request import UserAddRequest
 from gravitino.dto.requests.group_add_request import GroupAddRequest
 from gravitino.dto.requests.role_create_request import RoleCreateRequest
+from gravitino.dto.requests.privilege_grant_request import PrivilegeGrantRequest
+from gravitino.dto.requests.privilege_revoke_request import PrivilegeRevokeRequest
+from gravitino.dto.requests.role_grant_request import RoleGrantRequest
+from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
@@ -85,6 +90,9 @@ from gravitino.dto.responses.role_response import (
 )
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.exceptions.handlers.group_error_handler import GROUP_ERROR_HANDLER
+from gravitino.exceptions.handlers.permission_error_handler import (
+    PERMISSION_ERROR_HANDLER,
+)
 from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
 from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLER
@@ -125,6 +133,16 @@ class GravitinoMetalake(
     API_METALAKES_GROUP_PATH = "api/metalakes/{}/groups/{}"
     API_METALAKES_ROLES_PATH = "api/metalakes/{}/roles"
     API_METALAKES_ROLE_PATH = "api/metalakes/{}/roles/{}"
+    API_PERMISSIONS_USER_GRANT_PATH = "api/metalakes/{}/permissions/users/{}/grant"
+    API_PERMISSIONS_USER_REVOKE_PATH = "api/metalakes/{}/permissions/users/{}/revoke"
+    API_PERMISSIONS_GROUP_GRANT_PATH = "api/metalakes/{}/permissions/groups/{}/grant"
+    API_PERMISSIONS_GROUP_REVOKE_PATH = "api/metalakes/{}/permissions/groups/{}/revoke"
+    API_PERMISSIONS_ROLE_GRANT_PATH = (
+        "api/metalakes/{}/permissions/roles/{}/{}/{}/grant"
+    )
+    API_PERMISSIONS_ROLE_REVOKE_PATH = (
+        "api/metalakes/{}/permissions/roles/{}/{}/{}/revoke"
+    )
 
     def __init__(self, metalake: MetalakeDTO = None, client: HTTPClient = None):
         super().__init__(
@@ -1116,3 +1134,205 @@ class GravitinoMetalake(
         resp = RoleNamesListResponse.from_json(response.body, infer_missing=True)
         resp.validate()
         return resp.names()
+
+    def grant_roles_to_user(self, role_names: List[str], user_name: str) -> User:
+        """Grant roles to a user.
+
+        Args:
+            role_names: The names of the roles to grant.
+            user_name: The name of the user.
+
+        Returns:
+            The updated User object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchUserException: If the user does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        Precondition.check_string_not_empty(
+            user_name, "user name must not be null or empty"
+        )
+        req = RoleGrantRequest(role_names)
+        req.validate()
+        url = self.API_PERMISSIONS_USER_GRANT_PATH.format(
+            encode_string(self.name()), encode_string(user_name)
+        )
+        response = self.rest_client.put(
+            url, json=req, error_handler=PERMISSION_ERROR_HANDLER
+        )
+        resp = UserResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.user()
+
+    def revoke_roles_from_user(self, role_names: List[str], user_name: str) -> User:
+        """Revoke roles from a user.
+
+        Args:
+            role_names: The names of the roles to revoke.
+            user_name: The name of the user.
+
+        Returns:
+            The updated User object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchUserException: If the user does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        Precondition.check_string_not_empty(
+            user_name, "user name must not be null or empty"
+        )
+        req = RoleRevokeRequest(role_names)
+        req.validate()
+        url = self.API_PERMISSIONS_USER_REVOKE_PATH.format(
+            encode_string(self.name()), encode_string(user_name)
+        )
+        response = self.rest_client.put(
+            url, json=req, error_handler=PERMISSION_ERROR_HANDLER
+        )
+        resp = UserResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.user()
+
+    def grant_roles_to_group(self, role_names: List[str], group_name: str) -> Group:
+        """Grant roles to a group.
+
+        Args:
+            role_names: The names of the roles to grant.
+            group_name: The name of the group.
+
+        Returns:
+            The updated Group object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchGroupException: If the group does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        Precondition.check_string_not_empty(
+            group_name, "group name must not be null or empty"
+        )
+        req = RoleGrantRequest(role_names)
+        req.validate()
+        url = self.API_PERMISSIONS_GROUP_GRANT_PATH.format(
+            encode_string(self.name()), encode_string(group_name)
+        )
+        response = self.rest_client.put(
+            url, json=req, error_handler=PERMISSION_ERROR_HANDLER
+        )
+        resp = GroupResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.group()
+
+    def revoke_roles_from_group(self, role_names: List[str], group_name: str) -> Group:
+        """Revoke roles from a group.
+
+        Args:
+            role_names: The names of the roles to revoke.
+            group_name: The name of the group.
+
+        Returns:
+            The updated Group object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchGroupException: If the group does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        Precondition.check_string_not_empty(
+            group_name, "group name must not be null or empty"
+        )
+        req = RoleRevokeRequest(role_names)
+        req.validate()
+        url = self.API_PERMISSIONS_GROUP_REVOKE_PATH.format(
+            encode_string(self.name()), encode_string(group_name)
+        )
+        response = self.rest_client.put(
+            url, json=req, error_handler=PERMISSION_ERROR_HANDLER
+        )
+        resp = GroupResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.group()
+
+    def grant_privileges_to_role(
+        self,
+        role_name: str,
+        securable_object: SecurableObject,
+        privileges: List[Privilege],
+    ) -> Role:
+        """Grant privileges to a role on a securable object.
+
+        Args:
+            role_name: The name of the role.
+            securable_object: The securable object.
+            privileges: The privileges to grant.
+
+        Returns:
+            The updated Role object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+            NoSuchMetadataObjectException: If the securable object does not exist.
+            IllegalPrivilegeException: If a privilege is invalid.
+        """
+        Precondition.check_string_not_empty(
+            role_name, "role name must not be null or empty"
+        )
+        privilege_dtos = [DTOConverters.to_privilege_dto(p) for p in privileges]
+        req = PrivilegeGrantRequest(privilege_dtos)
+        req.validate()
+        url = self.API_PERMISSIONS_ROLE_GRANT_PATH.format(
+            encode_string(self.name()),
+            encode_string(role_name),
+            encode_string(securable_object.type().name.lower()),
+            encode_string(securable_object.full_name()),
+        )
+        response = self.rest_client.put(
+            url, json=req, error_handler=PERMISSION_ERROR_HANDLER
+        )
+        resp = RoleResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.role()
+
+    def revoke_privileges_from_role(
+        self,
+        role_name: str,
+        securable_object: SecurableObject,
+        privileges: List[Privilege],
+    ) -> Role:
+        """Revoke privileges from a role on a securable object.
+
+        Args:
+            role_name: The name of the role.
+            securable_object: The securable object.
+            privileges: The privileges to revoke.
+
+        Returns:
+            The updated Role object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+            NoSuchMetadataObjectException: If the securable object does not exist.
+            IllegalPrivilegeException: If a privilege is invalid.
+        """
+        Precondition.check_string_not_empty(
+            role_name, "role name must not be null or empty"
+        )
+        privilege_dtos = [DTOConverters.to_privilege_dto(p) for p in privileges]
+        req = PrivilegeRevokeRequest(privilege_dtos)
+        req.validate()
+        url = self.API_PERMISSIONS_ROLE_REVOKE_PATH.format(
+            encode_string(self.name()),
+            encode_string(role_name),
+            encode_string(securable_object.type().name.lower()),
+            encode_string(securable_object.full_name()),
+        )
+        response = self.rest_client.put(
+            url, json=req, error_handler=PERMISSION_ERROR_HANDLER
+        )
+        resp = RoleResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.role()

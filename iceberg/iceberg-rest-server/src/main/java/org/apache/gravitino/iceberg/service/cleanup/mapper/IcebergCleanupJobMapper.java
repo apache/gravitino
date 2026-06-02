@@ -53,14 +53,16 @@ public interface IcebergCleanupJobMapper {
       @Param("id") long id,
       @Param("state") String state,
       @Param("reason") String reason,
-      @Param("now") long now);
+      @Param("now") long now,
+      @Param("heartbeat") long heartbeat);
 
   @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "recordFailure")
   int recordFailure(
       @Param("id") long id,
       @Param("reason") String reason,
       @Param("maxAttempts") int maxAttempts,
-      @Param("now") long now);
+      @Param("now") long now,
+      @Param("heartbeat") long heartbeat);
 
   @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "heartbeat")
   int heartbeat(
