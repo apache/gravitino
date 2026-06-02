@@ -57,6 +57,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.MetadataUpdate;
@@ -81,8 +82,16 @@ import org.apache.iceberg.inmemory.InMemoryFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.ErrorHandlers;
+import org.apache.iceberg.rest.HTTPClient;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.rest.RESTClient;
+import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.ResourcePaths;
+import org.apache.iceberg.rest.auth.AuthManager;
+import org.apache.iceberg.rest.auth.AuthManagers;
+import org.apache.iceberg.rest.auth.AuthSession;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
@@ -198,6 +207,15 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    */
   public LoadCredentialsResponse getTableCredentials(
       TableIdentifier identifier, CredentialPrivilege privilege) {
+    if (isRESTCatalog()) {
+      return restTableCredentials((RESTCatalog) getCatalog(), identifier);
+    } else {
+      return localTableCredentials(identifier, privilege);
+    }
+  }
+
+  private LoadCredentialsResponse localTableCredentials(
+      TableIdentifier identifier, CredentialPrivilege privilege) {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
       Credential credential = getCredential(loadTableResponse.tableMetadata(), privilege);
@@ -211,6 +229,39 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           .build();
     } catch (ServiceUnavailableException e) {
       LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);
+      return ImmutableLoadCredentialsResponse.builder().build();
+    }
+  }
+
+  private static LoadCredentialsResponse restTableCredentials(
+      RESTCatalog restCatalog, TableIdentifier identifier) {
+    try {
+      Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
+      String credentialsPath =
+          ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials";
+
+      try (AuthManager authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
+          RESTClient client =
+              HTTPClient.builder(properties)
+                  .uri(properties.get(CatalogProperties.URI))
+                  .withHeaders(RESTUtil.configHeaders(properties))
+                  .build();
+          AuthSession authSession = authManager.catalogSession(client, properties)) {
+        return client
+            .withAuthSession(authSession)
+            .get(
+                credentialsPath,
+                LoadCredentialsResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.tableErrorHandler());
+      }
+    } catch (NoSuchTableException e) {
+      throw e;
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to load table credentials from REST catalog backend for table: {}",
+          identifier,
+          e);
       return ImmutableLoadCredentialsResponse.builder().build();
     }
   }

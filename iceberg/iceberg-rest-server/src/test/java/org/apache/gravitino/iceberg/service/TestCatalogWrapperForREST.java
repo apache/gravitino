@@ -29,6 +29,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.sun.net.httpserver.HttpServer;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -38,8 +42,12 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.iceberg.BaseTransaction;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -51,12 +59,17 @@ import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.rest.auth.AuthProperties;
+import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -99,6 +112,192 @@ public class TestCatalogWrapperForREST {
         CatalogWrapperForREST.isLocalOrHdfsLocation("abfs://container@account/warehouse"));
     Assertions.assertFalse(CatalogWrapperForREST.isLocalOrHdfsLocation(""));
     Assertions.assertFalse(CatalogWrapperForREST.isLocalOrHdfsLocation("   "));
+  }
+
+  @Test
+  void testRestTableCredentials() throws Exception {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    String expectedPath = "/v1/upstream/namespaces/db/tables/tbl/credentials";
+    String upstreamJson =
+        "{\"storage-credentials\":[{\"prefix\":\"s3://upstream/db/tbl/\",\"config\":{"
+            + "\"s3.access-key-id\":\"upstream-key\","
+            + "\"s3.secret-access-key\":\"upstream-secret\","
+            + "\"s3.session-token\":\"upstream-token\"}}]}";
+
+    AtomicReference<String> requestPath = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestPath.set(exchange.getRequestURI().getPath());
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      LoadCredentialsResponse response =
+          wrapper.getTableCredentials(table, CredentialPrivilege.READ);
+
+      Assertions.assertEquals(expectedPath, requestPath.get());
+      Assertions.assertEquals(1, response.credentials().size());
+      Credential credential = response.credentials().get(0);
+      Assertions.assertEquals("s3://upstream/db/tbl/", credential.prefix());
+      Assertions.assertEquals("upstream-key", credential.config().get("s3.access-key-id"));
+      Assertions.assertEquals("upstream-secret", credential.config().get("s3.secret-access-key"));
+      Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void testRestTableCredentialsOnFailure() throws Exception {
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          exchange.sendResponseHeaders(500, -1);
+          exchange.close();
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      LoadCredentialsResponse response =
+          wrapper.getTableCredentials(
+              TableIdentifier.of(Namespace.of("db"), "tbl"), CredentialPrivilege.READ);
+
+      Assertions.assertTrue(response.credentials().isEmpty());
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void testRestTableCredentialsNoSuchTable() throws Exception {
+    String errorJson =
+        "{\"error\":{\"message\":\"Table not found\",\"type\":\"NoSuchTableException\","
+            + "\"code\":404,\"stack\":[]}}";
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          byte[] body = errorJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(404, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      Assertions.assertThrows(
+          NoSuchTableException.class,
+          () ->
+              wrapper.getTableCredentials(
+                  TableIdentifier.of(Namespace.of("db"), "missing"), CredentialPrivilege.READ));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void testLocalTableCredentials() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse",
+                CredentialConstants.CREDENTIAL_PROVIDERS,
+                DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE));
+
+    CatalogWrapperForREST wrapper = new CatalogWrapperForREST("local-catalog", config);
+    Namespace namespace = Namespace.of("db");
+    Catalog catalog = wrapper.getCatalog();
+    ((SupportsNamespaces) catalog).createNamespace(namespace);
+    TableIdentifier table = TableIdentifier.of(namespace, "tbl");
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    catalog.createTable(
+        table,
+        schema,
+        PartitionSpec.unpartitioned(),
+        "s3://bucket/wh/db/tbl",
+        Collections.emptyMap());
+
+    LoadCredentialsResponse response = wrapper.getTableCredentials(table, CredentialPrivilege.READ);
+
+    Assertions.assertEquals(1, response.credentials().size());
+    Assertions.assertEquals("s3://bucket/wh/db/tbl/", response.credentials().get(0).prefix());
   }
 
   @Test
