@@ -50,8 +50,12 @@ import org.slf4j.LoggerFactory;
  * the view's SQL (spark dialect preferred, hive as fallback) instead of using Kyuubi's file-based
  * scan, which returns empty results for VIRTUAL_VIEW entries.
  *
- * <p>Uses {@link LocalScan} so Spark executes the view on the driver without serializing rows to
- * executors.
+ * <p>Uses {@link LocalScan} to materialize view results on the driver. This is a known limitation:
+ * the proper fix (expanding the view SQL into the query plan at analysis time) requires Spark's V2
+ * catalog framework to route view operations to named catalogs, which Spark does not yet support —
+ * {@code ResolveSessionCatalog} unconditionally throws for any non-session catalog view. Until
+ * Spark adds that support, driver-side materialization via {@code executeCollect()} is the only
+ * viable approach. <b>This implementation is suitable only for small/bounded views.</b>
  */
 public class SparkHiveView extends HiveTable {
 
@@ -176,8 +180,7 @@ public class SparkHiveView extends HiveTable {
 
     @Override
     public InternalRow[] rows() {
-      // WARNING: executeCollect() materializes the entire result set to driver memory.
-      // Suitable only for small/bounded views; large result sets may cause OutOfMemoryError.
+      // executeCollect() pulls all rows to driver memory — see class-level Javadoc for why.
       try {
         return spark.sql(viewSql).queryExecution().executedPlan().executeCollect();
       } catch (RuntimeException e) {
