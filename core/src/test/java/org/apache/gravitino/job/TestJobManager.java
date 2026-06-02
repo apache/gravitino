@@ -921,26 +921,34 @@ public class TestJobManager {
     Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
 
     // Loopback address
-    Assertions.assertThrows(
-        RuntimeException.class,
-        () -> JobManager.fetchFileFromUri("http://127.0.0.1:8090/configs", stagingDir, 1000));
+    RuntimeException e1 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> JobManager.fetchFileFromUri("http://127.0.0.1:8090/configs", stagingDir, 1000));
+    Assertions.assertTrue(e1.getCause().getMessage().contains("SSRF prevention"));
 
     // AWS / GCP / Azure cloud-metadata endpoint (link-local 169.254.x.x)
-    Assertions.assertThrows(
-        RuntimeException.class,
-        () ->
-            JobManager.fetchFileFromUri(
-                "http://169.254.169.254/latest/meta-data/", stagingDir, 1000));
+    RuntimeException e2 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                JobManager.fetchFileFromUri(
+                    "http://169.254.169.254/latest/meta-data/", stagingDir, 1000));
+    Assertions.assertTrue(e2.getCause().getMessage().contains("SSRF prevention"));
 
     // RFC-1918 private range
-    Assertions.assertThrows(
-        RuntimeException.class,
-        () -> JobManager.fetchFileFromUri("http://192.168.1.1/", stagingDir, 1000));
+    RuntimeException e3 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> JobManager.fetchFileFromUri("http://192.168.1.1/", stagingDir, 1000));
+    Assertions.assertTrue(e3.getCause().getMessage().contains("SSRF prevention"));
 
     // Alibaba Cloud / Oracle Cloud metadata endpoint
-    Assertions.assertThrows(
-        RuntimeException.class,
-        () -> JobManager.fetchFileFromUri("http://100.100.100.200/", stagingDir, 1000));
+    RuntimeException e4 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> JobManager.fetchFileFromUri("http://100.100.100.200/", stagingDir, 1000));
+    Assertions.assertTrue(e4.getCause().getMessage().contains("SSRF prevention"));
   }
 
   @Test
@@ -979,6 +987,11 @@ public class TestJobManager {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> JobManager.validateRemoteUri(new URI("http://localhost/")));
+
+    // IPv6 Unique Local Address (RFC 4193): fc00::/7
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.validateRemoteUri(new URI("http://[fd00::1]/")));
   }
 
   @Test

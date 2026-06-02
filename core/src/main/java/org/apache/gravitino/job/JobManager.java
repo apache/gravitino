@@ -834,8 +834,14 @@ public class JobManager implements JobOperationDispatcher {
 
   /**
    * Resolves the host in the given URI and rejects addresses that should not be reachable from the
-   * server (loopback, link-local, RFC-1918 private ranges, cloud metadata endpoints). This is a
-   * defence-in-depth measure against Server-Side Request Forgery (SSRF).
+   * server (loopback, link-local, RFC-1918 private ranges, IPv6 ULA, cloud metadata endpoints).
+   * This is a defence-in-depth measure against Server-Side Request Forgery (SSRF).
+   *
+   * <p><b>Note on DNS TOCTOU:</b> This method resolves the hostname once at validation time. {@code
+   * FileUtils.copyURLToFile()} will re-resolve it when opening the connection, so a precisely-timed
+   * DNS-rebinding attack could theoretically bypass this check. Complete protection against DNS
+   * rebinding requires network-level egress controls (e.g. firewall rules) in addition to this
+   * application-layer validation.
    */
   @VisibleForTesting
   static void validateRemoteUri(URI uri) throws IOException {
@@ -864,13 +870,17 @@ public class JobManager implements JobOperationDispatcher {
         || address.isAnyLocalAddress()) {
       return true;
     }
-    // Alibaba Cloud / Oracle Cloud metadata endpoint: 100.100.100.200
     byte[] b = address.getAddress();
-    return b.length == 4
+    // Alibaba Cloud / Oracle Cloud metadata endpoint: 100.100.100.200
+    if (b.length == 4
         && (b[0] & 0xFF) == 100
         && (b[1] & 0xFF) == 100
         && (b[2] & 0xFF) == 100
-        && (b[3] & 0xFF) == 200;
+        && (b[3] & 0xFF) == 200) {
+      return true;
+    }
+    // IPv6 Unique Local Addresses (RFC 4193): fc00::/7 — not covered by isSiteLocalAddress()
+    return b.length == 16 && ((b[0] & 0xFE) == 0xFC);
   }
 
   @VisibleForTesting
