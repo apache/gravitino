@@ -32,7 +32,7 @@ pyjwt[crypto]==2.11.0
 jwcrypto==1.5.6
 sphinx==7.1.2
 furo==2024.8.6
-banks==2.4.1
+banks==2.4.2
 
 # Lance integration deps. Pinned so the default integration test runs against
 # a single, known-good (server-side `lance-namespace-core` 0.7.5+) combination.
