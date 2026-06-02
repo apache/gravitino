@@ -35,12 +35,16 @@ public interface SupportsEntityChangeLog {
    *
    * @param listener the listener to register
    */
-  void registerEntityChangeLogListener(EntityChangeLogListener listener);
+  default void registerEntityChangeLogListener(EntityChangeLogListener listener) {
+    // default no-op implementation since not all stores will support this capability
+  }
 
   /**
    * Unregisters a previously registered listener.
    *
    * @param listener the listener to unregister
    */
-  void unregisterEntityChangeLogListener(EntityChangeLogListener listener);
+  default void unregisterEntityChangeLogListener(EntityChangeLogListener listener) {
+    // default no-op implementation since not all stores will support this capability
+  }
 }
