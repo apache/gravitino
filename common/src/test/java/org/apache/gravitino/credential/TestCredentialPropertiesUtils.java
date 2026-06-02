@@ -84,19 +84,14 @@ public class TestCredentialPropertiesUtils {
     Map<String, String> icebergProperties =
         CredentialPropertyUtils.toIcebergProperties(adlsTokenCredential);
 
-    String sasTokenKey =
-        String.format(
-            "%s.%s.%s",
-            CredentialPropertyUtils.ICEBERG_ADLS_TOKEN,
-            storageAccountName,
-            ADLSTokenCredential.ADLS_DOMAIN);
+    String adlsHost = storageAccountName + "." + ADLSTokenCredential.ADLS_DOMAIN;
+    String sasTokenKey = CredentialPropertyUtils.ICEBERG_ADLS_TOKEN + "." + adlsHost;
 
     Map<String, String> expectedProperties =
         ImmutableMap.of(
             sasTokenKey,
             sasToken,
-            CredentialPropertyUtils.ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX
-                + storageAccountName,
+            CredentialPropertyUtils.ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsHost,
             String.valueOf(expireTimeInMS));
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }

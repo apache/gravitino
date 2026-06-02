@@ -232,7 +232,8 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals(
         "v1/adls/namespaces/ns/tables/tbl/credentials",
         config.get("adls.refresh-credentials-endpoint"));
-    Assertions.assertEquals("3456", config.get("adls.sas-token-expires-at-ms.storageacct"));
+    Assertions.assertEquals(
+        "3456", config.get("adls.sas-token-expires-at-ms.storageacct.dfs.core.windows.net"));
   }
 
   @Test

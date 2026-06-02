@@ -108,15 +108,13 @@ public class CredentialPropertyUtils {
   public static Map<String, String> toIcebergProperties(Credential credential) {
     if (credential instanceof ADLSTokenCredential) {
       ADLSTokenCredential adlsCredential = (ADLSTokenCredential) credential;
-      String sasTokenKey =
-          String.format(
-              "%s.%s.%s",
-              ICEBERG_ADLS_TOKEN, adlsCredential.accountName(), ADLSTokenCredential.ADLS_DOMAIN);
+      String adlsHost = adlsCredential.accountName() + "." + ADLSTokenCredential.ADLS_DOMAIN;
 
       Map<String, String> icebergADLSCredentialProperties = new HashMap<>();
-      icebergADLSCredentialProperties.put(sasTokenKey, adlsCredential.sasToken());
       icebergADLSCredentialProperties.put(
-          ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsCredential.accountName(),
+          ICEBERG_ADLS_TOKEN + "." + adlsHost, adlsCredential.sasToken());
+      icebergADLSCredentialProperties.put(
+          ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsHost,
           String.valueOf(adlsCredential.expireTimeInMs()));
       return icebergADLSCredentialProperties;
     }
