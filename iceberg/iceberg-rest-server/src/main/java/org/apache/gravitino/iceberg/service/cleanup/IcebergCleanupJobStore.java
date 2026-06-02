@@ -93,52 +93,40 @@ public class IcebergCleanupJobStore {
   }
 
   /**
-   * Marks a RUNNING job SUCCEEDED.
+   * Marks a RUNNING job SUCCEEDED, only if the caller still owns it.
    *
    * @param id job id
-   * @return {@code true} iff the row was still RUNNING and was updated (i.e. the caller still owned
-   *     the job)
+   * @param heartbeat the caller's heartbeat token; the update applies only if the row's {@code
+   *     heartbeat_at} still matches, so a reclaimed worker cannot flip a job a peer now owns
+   * @return {@code true} iff the row was updated (still RUNNING and owned by the caller)
    */
-  public boolean markSucceeded(long id) {
+  public boolean markSucceeded(long id, long heartbeat) {
     long now = System.currentTimeMillis();
     return SessionUtils.doWithCommitAndFetchResult(
             IcebergCleanupJobMapper.class,
-            mapper -> mapper.markFinished(id, IcebergCleanupJob.State.SUCCEEDED.name(), null, now))
+            mapper ->
+                mapper.markFinished(
+                    id, IcebergCleanupJob.State.SUCCEEDED.name(), null, now, heartbeat))
         > 0;
   }
 
   /**
-   * Marks a RUNNING job FAILED immediately.
-   *
-   * @param id job id
-   * @param reason failure text
-   * @return {@code true} iff the row was still RUNNING and was updated (i.e. the caller still owned
-   *     the job)
-   */
-  public boolean markFailed(long id, String reason) {
-    long now = System.currentTimeMillis();
-    String err = truncate(reason);
-    return SessionUtils.doWithCommitAndFetchResult(
-            IcebergCleanupJobMapper.class,
-            mapper -> mapper.markFinished(id, IcebergCleanupJob.State.FAILED.name(), err, now))
-        > 0;
-  }
-
-  /**
-   * Records a transient failure: {@code attempts++}, then FAILED at the ceiling else PENDING.
+   * Records a transient failure, only if the caller still owns the job: {@code attempts++}, then
+   * FAILED at the ceiling else PENDING.
    *
    * @param id job id
    * @param reason failure text
    * @param maxAttempts ceiling from config
-   * @return {@code true} iff the row was still RUNNING and was updated (i.e. the caller still owned
-   *     the job)
+   * @param heartbeat the caller's heartbeat token; the update applies only if the row's {@code
+   *     heartbeat_at} still matches, so a reclaimed worker cannot disturb a job a peer now owns
+   * @return {@code true} iff the row was updated (still RUNNING and owned by the caller)
    */
-  public boolean recordFailure(long id, String reason, int maxAttempts) {
+  public boolean recordFailure(long id, String reason, int maxAttempts, long heartbeat) {
     long now = System.currentTimeMillis();
     String err = truncate(reason);
     return SessionUtils.doWithCommitAndFetchResult(
             IcebergCleanupJobMapper.class,
-            mapper -> mapper.recordFailure(id, err, maxAttempts, now))
+            mapper -> mapper.recordFailure(id, err, maxAttempts, now, heartbeat))
         > 0;
   }
 

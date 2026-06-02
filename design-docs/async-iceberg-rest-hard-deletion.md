@@ -19,12 +19,12 @@
 
 # Design: Asynchronous Hard Deletion for the Gravitino Iceberg REST Server
 
-| Field    | Value                                                   |
-| -------- | ------------------------------------------------------- |
-| Status   | Complete                                                |
-| Authors  | @roryqi                                                 |
-| Created  | 2026-05-19                                              |
-| Module   | `iceberg/iceberg-rest-server`, `iceberg/iceberg-common` |
+| Field   | Value                                                   |
+| ------- | ------------------------------------------------------- |
+| Status  | Complete                                                |
+| Authors | @roryqi                                                 |
+| Created | 2026-05-19                                              |
+| Module  | `iceberg/iceberg-rest-server`, `iceberg/iceberg-common` |
 
 ---
 
@@ -98,14 +98,14 @@ simpler design with a smaller bug surface. We chose a single async
 implementation gated behind a per-request opt-in, with synchronous deletion
 as the default.
 
-| Approach                                                    | Pros                                                                                     | Cons                                                                                             | Decision                                                                |
-|-------------------------------------------------------------|------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| Synchronous only (status quo)                               | Simplest; strongest "deleted means gone" guarantee                                       | Exceeds HTTP timeouts, saturates Jetty, no retry/audit on large tables                           | **Rejected** — the problem we are solving                               |
-| Pluggable `IcebergPurger` SPI                               | Extensible without code changes                                                          | Real added surface (SPI, discovery factory, context) with **no** second implementation in flight | **Rejected** — revisit when a second implementation has a real customer |
-| Reuse `RelationalGarbageCollector`                          | Proven worker/scheduling pattern                                                         | Different IO surface (object store vs. JDBC) and failure model                                   | **Rejected** — share patterns, not code                                 |
-| External job system (Quartz / Temporal)                     | Mature scheduling, retries, observability                                                | Heavy operational burden on every operator                                                       | **Rejected** — disproportionate for one workload                        |
-| Enumerate files at enqueue time                             | Worker needs no metadata re-read                                                         | Slow on large tables (defeats the latency goal), bloats job rows                                 | **Rejected** — store `metadata_location`, re-read at run time           |
-| Object-store job markers (no DB table)                      | No schema / migration                                                                    | Hand-rolled lease + renewal, no indexed scheduling, fragments per-bucket                         | **Rejected** — higher net complexity (see below)                        |
+| Approach                                                             | Pros                                                                                     | Cons                                                                                             | Decision                                                                |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Synchronous only (status quo)                                        | Simplest; strongest "deleted means gone" guarantee                                       | Exceeds HTTP timeouts, saturates Jetty, no retry/audit on large tables                           | **Rejected** — the problem we are solving                               |
+| Pluggable `IcebergPurger` SPI                                        | Extensible without code changes                                                          | Real added surface (SPI, discovery factory, context) with **no** second implementation in flight | **Rejected** — revisit when a second implementation has a real customer |
+| Reuse `RelationalGarbageCollector`                                   | Proven worker/scheduling pattern                                                         | Different IO surface (object store vs. JDBC) and failure model                                   | **Rejected** — share patterns, not code                                 |
+| External job system (Quartz / Temporal)                              | Mature scheduling, retries, observability                                                | Heavy operational burden on every operator                                                       | **Rejected** — disproportionate for one workload                        |
+| Enumerate files at enqueue time                                      | Worker needs no metadata re-read                                                         | Slow on large tables (defeats the latency goal), bloats job rows                                 | **Rejected** — store `metadata_location`, re-read at run time           |
+| Object-store job markers (no DB table)                               | No schema / migration                                                                    | Hand-rolled lease + renewal, no indexed scheduling, fragments per-bucket                         | **Rejected** — higher net complexity (see below)                        |
 | **JDBC job table + worker pool, async opt-in (synchronous default)** | Smallest bug surface; restart-safe and cluster-safe via CAS claim; one code path to test | No built-in extension point                                                                      | **Chosen**                                                              |
 
 **Why not an S3-only control plane?** Conditional writes (`If-None-Match`)
@@ -183,21 +183,22 @@ public void dropTable(IcebergRequestContext ctx, TableIdentifier id,
 
   TableMetadata metadata = w.loadTableMetadata(id);
   w.dropTable(id);                          // metadata-only drop in the catalog
-  purgeJobStore.enqueue(
-      IcebergPurgeJob.builder()
-          .catalogName(ctx.catalogName())
-          .tableIdentifier(id)
-          .metadataLocation(metadata.metadataFileLocation())
-          .fileIoImpl(w.fileIoImpl())
-          .fileIoProperties(w.fileIoProperties())
-          .createdBy(ctx.userPrincipal())
-          .build());
+  cleanupManager.addJob(
+      new IcebergCleanupJob(
+          0L,                               // id assigned by IdGenerator at enqueue
+          catalogId,                        // resolved catalog entity id
+          id.namespace().toString(),
+          id.name(),
+          metadata.metadataFileLocation(),
+          w.fileIOImpl(),
+          w.fileIOProperties(),
+          ctx.userPrincipal()));
 }
 ```
 
 Order matters on the async path: load metadata location → drop catalog
 entry → enqueue the job. A cleanup job exists only for a table already gone
-from the catalog. `fileIoProperties` is captured at enqueue time so the
+from the catalog. `fileIOProperties` is captured at enqueue time so the
 worker can reconstruct `FileIO` even if the catalog is later reconfigured.
 The enqueued row also serves as the **tombstone** that blocks name reuse
 while the files still exist (§5.7).
@@ -217,33 +218,57 @@ already terminal, so it is consistent with the §5.7 tombstone table.
 
 ```sql
 CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
-  `id`                BIGINT(20)    UNSIGNED NOT NULL AUTO_INCREMENT,
-  `metalake_name`     VARCHAR(128)  NOT NULL,
-  `catalog_name`      VARCHAR(128)  NOT NULL,
-  `namespace`         VARCHAR(512)  NOT NULL,
-  `table_name`        VARCHAR(256)  NOT NULL,
-  `metadata_location` VARCHAR(1024) NOT NULL,
-  `file_io_impl`      VARCHAR(256)  NOT NULL,
-  `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON',
+  `id`                BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique cleanup job id',
+  `catalog_id`        BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique id of the owning catalog, stable across catalog rename',
+  `namespace`         VARCHAR(512)  NOT NULL COMMENT 'namespace of the table to be cleaned up',
+  `table_name`        VARCHAR(256)  NOT NULL COMMENT 'name of the table to be cleaned up',
+  `metadata_location` MEDIUMTEXT   NOT NULL COMMENT 'location of the table metadata file to purge',
+  `file_io_impl`      VARCHAR(256)  NOT NULL COMMENT 'FileIO implementation class used to access the table files',
+  `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON-encoded FileIO properties',
   `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|FAILED',
-  `attempts`          INT(10)       NOT NULL DEFAULT 0,
-  `last_error`        VARCHAR(2048) NULL COMMENT 'truncated reason for the most recent failure; NULL until a job fails',
-  `heartbeat_at`      BIGINT(20)    NULL COMMENT 'last heartbeat from the worker; NULL when unclaimed',
+  `attempts`          INT(10)       NOT NULL DEFAULT 0 COMMENT 'number of processing attempts made so far',
+  `last_error`        VARCHAR(2048) NULL COMMENT 'truncated reason for the most recent failure, NULL until a job fails',
+  `heartbeat_at`      BIGINT(20)    NOT NULL DEFAULT 0 COMMENT 'last heartbeat from the worker, 0 when not running',
   `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
-  `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change; drives poll ordering and terminal-row pruning',
+  `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`),
   KEY `idx_state_updated` (`state`, `updated_at`),
-  KEY `idx_object` (`catalog_name`, `namespace`, `table_name`, `state`)
-) ENGINE=InnoDB;
+  KEY `idx_object` (`catalog_id`, `namespace`(255), `table_name`(128), `state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table cleanup jobs';
 ```
 
 We store only `metadata_location`, not the file list — enumeration is slow
 on large tables, and `TableMetadataParser.read(io, location)` rebuilds the
 snapshot graph deterministically when the worker runs.
 
+Row `id` is **not** a DB `AUTO_INCREMENT` column: the server allocates it from
+Gravitino's `IdGenerator` at enqueue time, and every timestamp (`heartbeat_at`,
+`updated_at`) is supplied by the application rather than the database. This keeps
+one parameterized set of `INSERT` / `UPDATE` statements portable across H2,
+MySQL, and PostgreSQL, served by a single shared SQL provider (§5.5).
+The object is keyed by `catalog_id`, not by metalake/catalog *names*. Async
+cleanup only runs when the Iceberg REST server is embedded in Gravitino (the job
+store reuses the entity store's relational backend), so a real catalog entity —
+and its id — always exists, and the request thread reads it for free:
+`catalogDispatcher.loadCatalog(...)` returns the `BaseCatalog`, whose
+`CatalogEntity` is already in memory, so `catalog.entity().id()` needs no extra
+entity-store round trip. `catalog_id` is globally unique (it is
+`catalog_meta`'s primary key), so it identifies the catalog without scoping by
+metalake, and it is **stable across catalog rename**: a rename mid-cleanup would
+leave a name-keyed tombstone stranded while the physical warehouse prefix is
+unchanged, but the id-keyed tombstone still matches. The leaf `namespace` and
+`table_name` stay as strings — the table is already dropped at enqueue, so there
+is no table entity/id to reference. `catalog_id` indexes in full, while
+`namespace` and `table_name` are prefix-indexed on MySQL (`namespace(255)`,
+`table_name(128)` — table names also cap at 128) to keep `idx_object` within
+MySQL's 3072-byte index key-length limit. The job store reuses the entity
+store's relational backend —
+its connection pool, transaction management, and per-backend dispatch — instead
+of opening its own JDBC connections.
+
 A single column drives retries: `attempts` counts failures so the worker
 gives up at the retry ceiling. A failed job returns to `PENDING` and is
-re-claimed on a later poll, so the poll cadence (`poll-interval-ms`,
+re-claimed on a later poll, so the poll cadence (`poll-interval-secs`,
 §5.10) is the retry interval — no separate scheduling column is needed. The
 ceiling is a config (`max-attempts`, §5.10), not a per-row `max_attempts`
 column, since it is the same for every job.
@@ -268,7 +293,7 @@ polls. Capacity-gating is therefore by construction — no central scheduler
 claims jobs ahead of the threads, the pool never holds a claimed-but-unstarted
 job, and a `RUNNING` row always maps to a thread actively deleting files (its
 heartbeat reflects real progress, not a job idling in a queue). A poll that
-finds nothing claimable waits `poll-interval-ms` and retries. `worker-threads`
+finds nothing claimable waits `poll-interval-secs` and retries. `worker-threads`
 thus bounds the concurrent jobs per server; there is no separate claim-batch
 size.
 
@@ -287,59 +312,90 @@ first row it wins:
 -- a free thread reads a small candidate window
 SELECT id FROM iceberg_cleanup_job
  WHERE state = 'PENDING'
-    OR (state = 'RUNNING'
-        AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout))
+    OR (state = 'RUNNING' AND heartbeat_at < :now - :heartbeatTimeout)
  ORDER BY updated_at LIMIT :window;
 
 -- claim one candidate; the row is ours only if affected_rows = 1
 UPDATE iceberg_cleanup_job
-   SET state='RUNNING', heartbeat_at=:now
+   SET state='RUNNING', heartbeat_at=:now, updated_at=:now
  WHERE id=:id
    AND ( state='PENDING'
-      OR (state='RUNNING'
-          AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)) );
+      OR (state='RUNNING' AND heartbeat_at < :now - :heartbeatTimeout) );
 ```
 
 A loser sees `affected_rows = 0` and tries the next id in its window. The
 window is a small constant that only gives a CAS loser alternatives — not a
-capacity control, since a free thread still claims exactly one job. Where
-`SELECT … FOR UPDATE SKIP LOCKED` is available (MySQL 8+, PostgreSQL) the
-worker uses it to cut contention up front; the CAS form is the portable
-fallback (H2, older MySQL). `SKIP LOCKED` is purely an optimization — the
-claiming `UPDATE` is the serialization point, so two replicas can never claim
-the same job. We do not use DB-specific advisory locks.
+capacity control, since a free thread still claims exactly one job. The same
+portable CAS runs on **every** backend: H2, MySQL, and PostgreSQL share one SQL
+provider, so we do **not** use `SELECT … FOR UPDATE SKIP LOCKED` or DB-specific
+advisory locks. The claiming `UPDATE` is the serialization point, so two
+replicas can never claim the same job; a backend that ever needs a divergent
+statement can register its own provider without touching the rest of the design.
 
 **Worker loop (one free thread):**
 
 1. **Poll & claim.** Read the candidate window above and CAS the first
    winnable row to `RUNNING` with a fresh `heartbeat_at`. If nothing is
-   claimable, wait `poll-interval-ms` and repeat.
-2. **Load metadata.** `TableMetadataParser.read(io, metadata_location)`. A
-   transient failure releases the job for retry; a terminal one fails it
+   claimable, wait `poll-interval-secs` and repeat.
+2. **Load metadata.** `TableMetadataParser.read(io, metadata_location)`. The
+   root `metadata.json` is the only file whose absence means "the table is
+   already gone": a `NotFoundException` here completes the job (a prior attempt
+   already deleted it). Any other failure (e.g. corrupt/unreadable metadata)
+   releases the job for retry, failing it once `attempts` hits the ceiling
    (§5.6).
-3. **Stream & delete.** Walk the snapshot graph lazily, group reachable files
-   into batches of `delete-batch-size`, and hand each batch to the shared
-   `deleteExecutor` for a **bulk** delete; `NotFoundException` counts as
-   deleted. The worker thread itself never issues the storage call directly,
-   and a *separate* background task keeps `heartbeat_at` fresh throughout
-   (see "Heartbeat is decoupled from deletion" below).
+3. **Delete leaves before parents.** Walk the snapshot graph and delete one
+   dependency level at a time — data files → manifests → manifest lists →
+   statistics → ancestor metadata → the root `metadata.json` **last** — only
+   advancing once the current level is fully gone. Within a level, files are
+   independent: group them into batches of `delete-batch-size` and hand each to
+   the shared `deleteExecutor` for a **bulk** delete; `NotFoundException` counts
+   as deleted. Leaf-first ordering keeps every crash recoverable: the root
+   pointer (and the manifests/manifest lists above any leaf still on disk)
+   survives, so a retry re-enumerates and finishes. Deleting a parent first
+   would strand its children — and a `metadata.json` removed early would be
+   misread as "table already gone", leaking everything beneath it. The worker
+   thread itself never issues the storage call directly, and a *separate*
+   background task keeps `heartbeat_at` fresh throughout (see "Heartbeat is
+   decoupled from deletion" below).
 4. **Finish.** Once every reachable file is gone the job is `SUCCEEDED`
    (§5.6). The thread then loops back to step 1.
 
-Execution mirrors `CatalogHandlers.purgeTable`, but **streams** the
-reachable files instead of materializing them. A large table can reference
-millions of data files, so the worker walks the snapshot graph lazily and
-deletes them **in bulk batches**, never one file at a time:
+Execution mirrors `CatalogHandlers.purgeTable`, deleting **in bulk batches**
+and never one file at a time. To keep every crash recoverable it deletes one
+dependency level at a time — leaves first, the root `metadata.json` last — and
+each `deleteAll` blocks until its level is fully gone before the next begins.
+Data files are the only unbounded level, so they are streamed and deleted one
+manifest at a time rather than collected up front — a million-file table never
+materializes its whole path set; only the far smaller manifest, manifest-list
+and metadata path lists are held at once:
 
 ```java
 TableMetadata meta = TableMetadataParser.read(io, job.metadataLocation());
-try (CloseableIterable<String> files = reachableFiles(meta)) {  // lazy, not materialized
-  Iterators.partition(files.iterator(), deleteBatchSize)        // bounded batches
+Set<String> manifests = new LinkedHashSet<>();
+for (Snapshot s : meta.snapshots()) {
+  for (ManifestFile m : s.allManifests(io)) {
+    if (!manifests.add(m.path())) continue;                  // dedup shared manifests
+    try (CloseableIterable<String> dataFiles =               // lazy, one batch resident at a time
+        ManifestFiles.readPaths(m, io, meta.specsById())) {
+      deleteAll(io, dataFiles);                              // leaves: streamed, then deleted
+    }
+  }
+}
+deleteAll(io, manifests);                                    // then their manifests
+deleteAll(io, ReachableFileUtil.manifestListLocations(table));
+deleteAll(io, ReachableFileUtil.statisticsFilesLocations(table));
+deleteAll(io, ancestorMetadata);                             // older metadata.json
+deleteAll(io, List.of(job.metadataLocation()));              // root pointer, deleted last
+
+// deleteAll: bulk-batch the (possibly lazy) iterable, then await it
+void deleteAll(FileIO io, Iterable<String> files) {
+  Iterators.partition(files.iterator(), deleteBatchSize)     // bounded batches
       .forEachRemaining(batch ->
-          deleteExecutor.execute(() ->
+          futures.add(deleteExecutor.submit(() ->
               // SupportsBulkOperations.deleteFiles when the FileIO supports it
               // (e.g. S3FileIO's batch-delete API), else concurrent per-file
-              CatalogUtil.deleteFiles(io, batch, "cleanup", /* bulk */ true)));
+              CatalogUtil.deleteFiles(io, batch, "cleanup", /* bulk */ true))));
+  awaitAll(futures);                                         // NotFoundException counts as deleted
 }
 ```
 
@@ -417,19 +473,20 @@ rows age out for reclaim.
 
 Per-file failures are logged but do not fail the whole job — the
 synchronous purge has the same "best effort" stance. A job fails only if the
-**metadata phase** fails. `NotFoundException` from `deleteFile` counts as
-success. A transient failure goes back to `PENDING` and is retried when a
-free thread next polls (§5.5), incrementing `attempts` each time; when `attempts`
-reaches `max-attempts` the job goes to `FAILED` instead of `PENDING`. A
-clearly terminal failure skips the retries and goes straight to `FAILED`.
+**metadata phase** fails. A `NotFoundException` counts as success rather than a
+failure: a missing root `metadata.json` means the table is already gone, and a
+missing data file, manifest, or manifest list (from `deleteFile` or while
+enumerating reachable files) is already deleted. Any other failure goes back to
+`PENDING` and is retried when a free thread next polls (§5.5), incrementing
+`attempts` each time; when `attempts` reaches `max-attempts` the job goes to
+`FAILED` instead of `PENDING`.
 
-| Outcome                                              | Action                                                                                |
-|------------------------------------------------------|---------------------------------------------------------------------------------------|
-| All files deleted (or already gone)                  | `state='SUCCEEDED'`                                                                    |
-| Transient failure, `attempts < max-attempts`         | `attempts++`, set `last_error`, back to `PENDING`, `heartbeat_at=NULL`; re-claimed later |
-| Transient failure, `attempts` reaches `max-attempts` | `attempts++`, set `last_error` → `FAILED` (gave up retrying)                            |
-| Terminal failure (e.g. metadata gone/corrupt)        | set `last_error` → `FAILED` immediately; retrying cannot help                          |
-| Worker killed mid-job                                | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent  |
+| Outcome                                    | Action                                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| All files deleted (or already gone)        | `state='SUCCEEDED'`                                                                   |
+| Failure, `attempts < max-attempts`         | `attempts++`, set `last_error`, back to `PENDING`, `heartbeat_at=0`; re-claimed later |
+| Failure, `attempts` reaches `max-attempts` | `attempts++`, set `last_error` → `FAILED` (gave up retrying)                          |
+| Worker killed mid-job                      | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent |
 
 **After `SUCCEEDED`.** The files are gone, so the tombstone lifts at once:
 `createTable` / `register` at the identifier succeed again (§5.7). The
@@ -476,7 +533,7 @@ tombstone — no second table is needed. The REST server consults the store on
 the request thread (one indexed lookup via `idx_object`):
 
 | Operation                                   | Active job exists                 | No active job (`SUCCEEDED`/`FAILED`/none) |
-|---------------------------------------------|-----------------------------------|-------------------------------------------|
+| ------------------------------------------- | --------------------------------- | ----------------------------------------- |
 | `loadTable` / `HEAD`, `alterTable` / commit | `404 NoSuchTableException`        | `404`                                     |
 | `dropTable` (same identifier, repeated)     | `404 NoSuchTableException`        | `404`                                     |
 | `createTable` (same identifier)             | **`409 Conflict`** — being purged | succeeds                                  |
@@ -575,15 +632,15 @@ per-request **client** choice via the `X-Gravitino-Async-Purge` header
 (absent ⇒ synchronous; `true` opts into async deletion). The server-side keys
 only tune the worker pool and retries:
 
-| Key                                                           | Default  | Description                                                                  |
-|---------------------------------------------------------------|----------|------------------------------------------------------------------------------|
-| `gravitino.iceberg-rest.async-purge.worker-threads`           | `2`      | Worker pool size per server (concurrent jobs).                               |
-| `gravitino.iceberg-rest.async-purge.delete-threads`           | `4`      | Server-wide file-delete pool size, shared across all jobs.                   |
-| `gravitino.iceberg-rest.async-purge.delete-batch-size`        | `1000`   | Files per bulk-delete batch handed to `deleteExecutor` (§5.5).               |
-| `gravitino.iceberg-rest.async-purge.poll-interval-ms`         | `5000`   | Worker poll interval.                                                        |
-| `gravitino.iceberg-rest.async-purge.heartbeat-timeout-ms`     | `300000` | Age after which a job with no heartbeat is reclaimable.                      |
-| `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`      | Attempts before `FAILED`.                                                    |
-| `gravitino.iceberg-rest.async-purge.retention-hours`          | `720`    | How long terminal (`SUCCEEDED` / `FAILED`) rows are retained before pruning (30 days). |
+| Key                                                           | Default | Description                                                                            |
+| ------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| `gravitino.iceberg-rest.async-cleanup.worker-threads`         | `2`     | Worker pool size per server (concurrent jobs).                                         |
+| `gravitino.iceberg-rest.async-cleanup.delete-threads`         | `4`     | Server-wide file-delete pool size, shared across all jobs.                             |
+| `gravitino.iceberg-rest.async-cleanup.delete-batch-size`      | `1000`  | Files per bulk-delete batch handed to `deleteExecutor` (§5.5).                         |
+| `gravitino.iceberg-rest.async-cleanup.poll-interval-secs`     | `5`     | Worker poll interval in seconds; also the retry interval.                              |
+| `gravitino.iceberg-rest.async-cleanup.heartbeat-timeout-secs` | `300`   | Age in seconds after which a job with no heartbeat is reclaimable.                     |
+| `gravitino.iceberg-rest.async-cleanup.max-attempts`           | `5`     | Attempts before `FAILED`.                                                              |
+| `gravitino.iceberg-rest.async-cleanup.retention-hours`        | `720`   | How long terminal (`SUCCEEDED` / `FAILED`) rows are retained before pruning (30 days). |
 
 The thread defaults are deliberately modest. Each `delete-threads` thread now
 issues a *bulk* delete of up to `delete-batch-size` files per call (§5.5), so
@@ -635,8 +692,8 @@ opt-in path selected per request via the `X-Gravitino-Async-Purge` header.
 
 ### Phase 1 (1.3): Async purge core
 - [ ] Add the `iceberg_cleanup_job` schema and migrations (MySQL, H2, PostgreSQL)
-- [ ] Implement `IcebergPurgeJobStore` enqueue path (persist job, return)
-- [ ] Implement the worker pool: CAS claiming with heartbeat ownership (`FOR UPDATE SKIP LOCKED` where available), heartbeat renewal on a thread decoupled from deletion, streaming **bulk** file deletion (`CatalogUtil.deleteFiles(..., true)`) through a bounded `deleteExecutor` with `CallerRunsPolicy` back-pressure, retry state machine that records `last_error` (re-claim failed jobs on later polls, give up at `max-attempts`)
+- [ ] Implement `IcebergCleanupJobStore` enqueue path (persist job, return)
+- [ ] Implement the worker pool: portable CAS claiming with heartbeat ownership (one SQL provider for H2/MySQL/PostgreSQL, no `SKIP LOCKED`), heartbeat renewal on a thread decoupled from deletion, streaming **bulk** file deletion (`CatalogUtil.deleteFiles(..., true)`) through a bounded `deleteExecutor` with `CallerRunsPolicy` back-pressure, retry state machine that records `last_error` (re-claim failed jobs on later polls, give up at `max-attempts`)
 - [ ] Honor the `X-Gravitino-Async-Purge` request header and wire both paths into `IcebergTableOperationExecutor.dropTable`
 - [ ] Add observability (§5.9): metrics and the informative `ErrorResponse` message on the §5.7 `409`; operator read path in 1.3 is direct DB query
 - [ ] Enforce tombstone semantics (§5.7): on `createTable`/`registerTable`, reject with `409` when an active job exists (`idx_object` lookup on the request thread)
@@ -659,11 +716,11 @@ opt-in path selected per request via the `X-Gravitino-Async-Purge` header.
 ## 7. Testing
 
 - Unit (`./gradlew :iceberg:iceberg-rest-server:test -PskipITs`):
-  - `TestIcebergPurgeJobStore` — enqueue and row contents.
-  - `TestIcebergPurgeStateMachine` — PENDING → RUNNING → SUCCEEDED;
-    failure → retry (back to PENDING) → FAILED; `last_error` populated on
-    each failure.
-  - `TestIcebergPurgeWorker` — claiming, heartbeat renewal on a thread that
+  - `TestIcebergCleanupJobStore` — enqueue, row contents, and the state
+    machine: PENDING → RUNNING → SUCCEEDED; failure → retry (back to
+    PENDING) → FAILED; `last_error` populated on each failure. Runs against
+    the H2/MySQL/PostgreSQL backend matrix (`TestJDBCBackend`).
+  - `TestIcebergCleanupManager` — claiming, heartbeat renewal on a thread that
     stays fresh while delete batches block, contention (H2), bulk-delete
     batching, and `CallerRunsPolicy` back-pressure when the delete queue fills.
   - `TestIcebergTableOperationExecutorAsyncPurge` — `X-Gravitino-Async-Purge:
