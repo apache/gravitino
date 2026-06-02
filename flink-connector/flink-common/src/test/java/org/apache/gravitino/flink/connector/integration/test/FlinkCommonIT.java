@@ -95,6 +95,19 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     return false;
   }
 
+  protected boolean supportViewOperation() {
+    return false;
+  }
+
+  /**
+   * Returns the WITH clause to append to a base-table DDL inside view tests. Hive requires {@code
+   * WITH ('connector'='hive')}; Iceberg/Paimon use their catalog-native tables so return {@code
+   * ""}.
+   */
+  protected String baseTableConnectorClause() {
+    return "";
+  }
+
   protected String defaultDatabaseName() {
     return "default";
   }
@@ -811,5 +824,282 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
       Assertions.assertEquals(expected[i].autoIncrement(), actual[i].autoIncrement());
       Assertions.assertEquals(expected[i].nullable(), actual[i].nullable());
     }
+  }
+
+  @Test
+  @EnabledIf("supportViewOperation")
+  public void testCreateView() {
+    String schemaName = "test_create_view_db";
+    String viewName = "test_view_create";
+    String tableName = "test_view_base_table";
+    doWithSchema(
+        currentCatalog(),
+        schemaName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING)%s", tableName, baseTableConnectorClause()),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql(
+                  "CREATE VIEW %s COMMENT 'view comment' AS SELECT id, name FROM %s",
+                  viewName, tableName),
+              ResultKind.SUCCESS);
+
+          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
+          org.apache.gravitino.rel.View view =
+              viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+          Assertions.assertEquals(viewName, view.name());
+          Assertions.assertEquals("view comment", view.comment());
+          Assertions.assertEquals(1, view.representations().length);
+          Assertions.assertInstanceOf(
+              org.apache.gravitino.rel.SQLRepresentation.class, view.representations()[0]);
+
+          Optional<org.apache.flink.table.catalog.Catalog> flinkCatalog =
+              tableEnv.getCatalog(catalog.name());
+          Assertions.assertTrue(flinkCatalog.isPresent());
+          try {
+            CatalogBaseTable flinkTable =
+                flinkCatalog.get().getTable(new ObjectPath(schemaName, viewName));
+            Assertions.assertEquals(CatalogBaseTable.TableKind.VIEW, flinkTable.getTableKind());
+          } catch (org.apache.flink.table.catalog.exceptions.TableNotExistException e) {
+            Assertions.fail("view should exist in Flink catalog: " + e.getMessage());
+          }
+        },
+        true);
+  }
+
+  @Test
+  @EnabledIf("supportViewOperation")
+  public void testListViews() {
+    String schemaName = "test_list_views_db";
+    String tableName = "test_list_view_base";
+    String view1 = "test_list_view_1";
+    String view2 = "test_list_view_2";
+    doWithSchema(
+        currentCatalog(),
+        schemaName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT)%s", tableName, baseTableConnectorClause()),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW %s AS SELECT id FROM %s", view1, tableName), ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW %s AS SELECT id FROM %s", view2, tableName), ResultKind.SUCCESS);
+
+          List<String> views = Arrays.asList(tableEnv.listViews());
+          Assertions.assertTrue(views.contains(view1), "view1 not found in SHOW VIEWS");
+          Assertions.assertTrue(views.contains(view2), "view2 not found in SHOW VIEWS");
+          Assertions.assertFalse(views.contains(tableName), "table should not appear in listViews");
+
+          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
+          NameIdentifier[] gravitinoViews =
+              viewCatalog.listViews(org.apache.gravitino.Namespace.of(schemaName));
+          List<String> gravitinoViewNames =
+              Arrays.stream(gravitinoViews).map(NameIdentifier::name).collect(Collectors.toList());
+          Assertions.assertTrue(gravitinoViewNames.contains(view1));
+          Assertions.assertTrue(gravitinoViewNames.contains(view2));
+        },
+        true);
+  }
+
+  @Test
+  @EnabledIf("supportViewOperation")
+  public void testDropView() {
+    String schemaName = "test_drop_view_db";
+    String tableName = "test_drop_view_base";
+    String viewName = "test_view_drop";
+    doWithSchema(
+        currentCatalog(),
+        schemaName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT)%s", tableName, baseTableConnectorClause()),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW %s AS SELECT id FROM %s", viewName, tableName), ResultKind.SUCCESS);
+
+          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
+          Assertions.assertTrue(
+              viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)),
+              "view should exist before drop");
+
+          TestUtils.assertTableResult(sql("DROP VIEW %s", viewName), ResultKind.SUCCESS);
+
+          Assertions.assertFalse(
+              viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)),
+              "view should not exist after drop");
+        },
+        true);
+  }
+
+  @Test
+  @EnabledIf("supportViewOperation")
+  public void testAlterViewRename() {
+    String schemaName = "test_rename_view_db";
+    String tableName = "test_rename_view_base";
+    String viewName = "test_view_rename_src";
+    String newViewName = "test_view_rename_dst";
+    doWithSchema(
+        currentCatalog(),
+        schemaName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT)%s", tableName, baseTableConnectorClause()),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW %s AS SELECT id FROM %s", viewName, tableName), ResultKind.SUCCESS);
+
+          TestUtils.assertTableResult(
+              sql("ALTER VIEW %s RENAME TO %s", viewName, newViewName), ResultKind.SUCCESS);
+
+          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
+          Assertions.assertFalse(
+              viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)),
+              "old view name should not exist");
+          Assertions.assertTrue(
+              viewCatalog.viewExists(NameIdentifier.of(schemaName, newViewName)),
+              "new view name should exist");
+        },
+        true);
+  }
+
+  @Test
+  @EnabledIf("supportViewOperation")
+  public void testAlterViewReplaceBody() {
+    String schemaName = "test_replace_view_db";
+    String tableName = "test_replace_view_base";
+    String viewName = "test_view_replace";
+    doWithSchema(
+        currentCatalog(),
+        schemaName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING)%s", tableName, baseTableConnectorClause()),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW %s AS SELECT id FROM %s", viewName, tableName), ResultKind.SUCCESS);
+
+          TestUtils.assertTableResult(
+              sql("ALTER VIEW %s AS SELECT id, name FROM %s", viewName, tableName),
+              ResultKind.SUCCESS);
+
+          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
+          org.apache.gravitino.rel.View view =
+              viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+          Assertions.assertEquals(1, view.representations().length);
+          org.apache.gravitino.rel.SQLRepresentation rep =
+              (org.apache.gravitino.rel.SQLRepresentation) view.representations()[0];
+          Assertions.assertTrue(
+              rep.sql().contains("name") && rep.sql().contains("id"),
+              "updated view SQL should select both id and name columns");
+        },
+        true);
+  }
+
+  @Test
+  @EnabledIf("supportViewOperation")
+  public void testQueryView() {
+    String schemaName = "test_query_view_db";
+    String tableName = "test_query_view_base";
+    String viewName = "test_view_query";
+    doWithSchema(
+        currentCatalog(),
+        schemaName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT, name STRING)%s", tableName, baseTableConnectorClause()),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW %s AS SELECT id, name FROM %s WHERE id > 1", viewName, tableName),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("INSERT INTO %s VALUES (1, 'alice'), (2, 'bob'), (3, 'carol')", tableName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(-1L));
+
+          TestUtils.assertTableResult(
+              sql("SELECT * FROM %s ORDER BY id", viewName),
+              ResultKind.SUCCESS_WITH_CONTENT,
+              Row.of(2, "bob"),
+              Row.of(3, "carol"));
+        },
+        true);
+  }
+
+  @Test
+  @EnabledIf("supportViewOperation")
+  public void testCreateViewIfNotExists() {
+    String schemaName = "test_create_view_ifte_db";
+    String tableName = "test_create_view_ifte_base";
+    String viewName = "test_view_ifte";
+    doWithSchema(
+        currentCatalog(),
+        schemaName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT)%s", tableName, baseTableConnectorClause()),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW %s AS SELECT id FROM %s", viewName, tableName), ResultKind.SUCCESS);
+
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW IF NOT EXISTS %s AS SELECT id FROM %s", viewName, tableName),
+              ResultKind.SUCCESS);
+
+          org.apache.gravitino.rel.ViewCatalog viewCatalog = catalog.asViewCatalog();
+          Assertions.assertTrue(viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)));
+        },
+        true);
+  }
+
+  @Test
+  @EnabledIf("supportViewOperation")
+  public void testDropViewIfExists() {
+    String schemaName = "test_drop_view_ifte_db";
+    String tableName = "test_drop_view_ifte_base";
+    String viewName = "test_view_drop_ifte";
+    doWithSchema(
+        currentCatalog(),
+        schemaName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT)%s", tableName, baseTableConnectorClause()),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW %s AS SELECT id FROM %s", viewName, tableName), ResultKind.SUCCESS);
+
+          TestUtils.assertTableResult(sql("DROP VIEW %s", viewName), ResultKind.SUCCESS);
+
+          TestUtils.assertTableResult(sql("DROP VIEW IF EXISTS %s", viewName), ResultKind.SUCCESS);
+        },
+        true);
+  }
+
+  @Test
+  @EnabledIf("supportViewOperation")
+  public void testListTablesDoesNotIncludeViews() {
+    String schemaName = "test_list_tables_no_views_db";
+    String tableName = "test_list_no_view_base";
+    String viewName = "test_list_no_view_view";
+    doWithSchema(
+        currentCatalog(),
+        schemaName,
+        catalog -> {
+          TestUtils.assertTableResult(
+              sql("CREATE TABLE %s (id INT)%s", tableName, baseTableConnectorClause()),
+              ResultKind.SUCCESS);
+          TestUtils.assertTableResult(
+              sql("CREATE VIEW %s AS SELECT id FROM %s", viewName, tableName), ResultKind.SUCCESS);
+
+          List<String> tables = Arrays.asList(tableEnv.listTables());
+          Assertions.assertTrue(tables.contains(tableName), "table should appear in listTables");
+          Assertions.assertFalse(tables.contains(viewName), "view should not appear in listTables");
+
+          List<String> views = Arrays.asList(tableEnv.listViews());
+          Assertions.assertTrue(views.contains(viewName), "view should appear in listViews");
+          Assertions.assertFalse(views.contains(tableName), "table should not appear in listViews");
+        },
+        true);
   }
 }

@@ -94,4 +94,9 @@ public abstract class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
   protected String getWarehouse() {
     return warehouseDir.toString();
   }
+
+  @Override
+  protected boolean supportViewOperation() {
+    return true;
+  }
 }

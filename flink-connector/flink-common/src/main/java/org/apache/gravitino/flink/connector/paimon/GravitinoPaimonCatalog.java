@@ -76,11 +76,18 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @Override
   public void dropTable(ObjectPath tablePath, boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
-    boolean dropped =
-        catalog()
-            .asTableCatalog()
-            .purgeTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
-    if (!dropped && !ignoreIfNotExists) {
+    NameIdentifier identifier =
+        NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
+    boolean tableDropped = catalog().asTableCatalog().purgeTable(identifier);
+    boolean viewDropped = false;
+    if (!tableDropped) {
+      try {
+        viewDropped = catalog().asViewCatalog().dropView(identifier);
+      } catch (UnsupportedOperationException ignored) {
+        // catalog does not support views
+      }
+    }
+    if (!tableDropped && !viewDropped && !ignoreIfNotExists) {
       throw new TableNotExistException(catalogName(), tablePath);
     }
   }
