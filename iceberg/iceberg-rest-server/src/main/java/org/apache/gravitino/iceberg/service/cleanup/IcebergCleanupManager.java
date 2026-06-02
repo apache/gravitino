@@ -279,8 +279,9 @@ public class IcebergCleanupManager implements AutoCloseable {
 
   private void runJob(IcebergCleanupJob job) {
     long id = job.id();
-    try {
-      FileIO io = CatalogUtil.loadFileIO(job.fileIOImpl(), job.fileIOProperties(), null);
+    // try-with-resources so the per-job FileIO (which may hold an S3 client / connection pool) is
+    // closed on every path: success, transient failure, and the early return inside cleanupFiles.
+    try (FileIO io = CatalogUtil.loadFileIO(job.fileIOImpl(), job.fileIOProperties(), null)) {
       cleanupFiles(io, job.metadataLocation());
       finishJob(id, heartbeat -> store.markSucceeded(id, heartbeat));
     } catch (RuntimeException e) {
