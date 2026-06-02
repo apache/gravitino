@@ -34,6 +34,7 @@ dependencies {
     implementation(libs.thrift)
     implementation(libs.snappy.java)
     implementation(libs.commons.beanutils)
+    implementation(libs.woodstox.core)
   }
 
   implementation(libs.hadoop3.common) {

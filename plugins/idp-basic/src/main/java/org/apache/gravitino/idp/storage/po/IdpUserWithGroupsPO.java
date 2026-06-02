@@ -16,22 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.web.rest.feature;
+package org.apache.gravitino.idp.storage.po;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-import java.util.List;
-import org.junit.jupiter.api.Test;
-
-class TestIdpRESTFeature {
-
-  @Test
-  void testBasicAuthenticatorEnabled() {
-    assertFalse(IdpRESTFeature.basicAuthenticatorEnabled(null));
-    assertFalse(IdpRESTFeature.basicAuthenticatorEnabled(List.of("simple")));
-    assertTrue(
-        IdpRESTFeature.basicAuthenticatorEnabled(
-            List.of("simple", IdpRESTFeature.BASIC_AUTHENTICATOR)));
-  }
+/**
+ * Read-only PO for built-in IdP user rows joined with aggregated group names. This PO is not
+ * written to the database.
+ */
+@Getter
+@EqualsAndHashCode
+@ToString
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder(setterPrefix = "with")
+public class IdpUserWithGroupsPO {
+  private String name;
+  private String passwordHash;
+  private String groupNames;
 }

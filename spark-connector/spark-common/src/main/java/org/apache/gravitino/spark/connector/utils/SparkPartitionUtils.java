@@ -43,6 +43,9 @@ import org.apache.spark.unsafe.types.UTF8String;
 
 public class SparkPartitionUtils {
 
+  private static final String HIVE_DEFAULT_PARTITION_NAME = "__HIVE_DEFAULT_PARTITION__";
+  private static final String HIVE_DEFAULT_PARTITION_NAME_LEGACY = "HIVE_DEFAULT_PARTITION";
+
   private SparkPartitionUtils() {}
 
   public static Literal<?> toGravitinoLiteral(InternalRow ident, int ordinal, DataType sparkType) {
@@ -126,7 +129,7 @@ public class SparkPartitionUtils {
   }
 
   public static Object getSparkPartitionValue(String hivePartitionValue, DataType dataType) {
-    if (hivePartitionValue == null) {
+    if (hivePartitionValue == null || isHiveDefaultPartitionValue(hivePartitionValue)) {
       return null;
     }
     try {
@@ -165,5 +168,10 @@ public class SparkPartitionUtils {
               "Failed to convert partition value '%s' to type %s", hivePartitionValue, dataType),
           e);
     }
+  }
+
+  private static boolean isHiveDefaultPartitionValue(String hivePartitionValue) {
+    return HIVE_DEFAULT_PARTITION_NAME.equalsIgnoreCase(hivePartitionValue)
+        || HIVE_DEFAULT_PARTITION_NAME_LEGACY.equalsIgnoreCase(hivePartitionValue);
   }
 }

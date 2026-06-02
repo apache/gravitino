@@ -20,6 +20,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { copyToClipboard } from '@/lib/utils'
 import {
   Descriptions,
   Divider,
@@ -58,7 +59,6 @@ export default function ViewDetailsPage() {
   const [search, setSearch] = useState('')
   const [tabKey, setTabKey] = useState('Columns')
   const [activeSqlKey, setActiveSqlKey] = useState(null)
-  const [messageApi, contextHolder] = message.useMessage()
   const { ref, width } = useResizeObserver()
 
   const tableData = viewData?.columns
@@ -118,10 +118,11 @@ export default function ViewDetailsPage() {
 
   const onCopySql = async sql => {
     try {
-      await navigator.clipboard.writeText(sql)
-      messageApi.success('SQL copied')
-    } catch {
-      messageApi.error('Failed to copy SQL')
+      await copyToClipboard(sql)
+      message.success('SQL copied!')
+    } catch (err) {
+      console.error('Failed to copy SQL: ', err)
+      message.error('Failed to copy SQL')
     }
   }
 
@@ -222,7 +223,6 @@ export default function ViewDetailsPage() {
 
   return (
     <>
-      {contextHolder}
       <Spin spinning={store.activatedDetailsLoading}>
         <Flex className='mb-2' gap='small' align='flex-start' ref={ref}>
           <div className='size-8'>
@@ -337,7 +337,8 @@ export default function ViewDetailsPage() {
                     </button>
                   </Tooltip>
                   <pre
-                    className='m-0 whitespace-pre-wrap break-all font-mono text-sm leading-6'
+                    className='m-0 whitespace-pre-wrap break-all font-mono text-sm leading-6 overflow-auto'
+                    style={{ maxHeight: 'calc(100vh - 40rem)' }}
                     dangerouslySetInnerHTML={{ __html: highlightSql(activeSqlItem.formattedSql) }}
                   />
                 </div>

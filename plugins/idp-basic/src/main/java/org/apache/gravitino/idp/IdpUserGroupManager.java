@@ -21,13 +21,19 @@ package org.apache.gravitino.idp;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
-import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
@@ -48,23 +54,67 @@ public class IdpUserGroupManager implements Closeable {
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
 
+  private static volatile IdpUserGroupManager instance;
+
   private final IdpRelationalStorage relationalStorage;
+  private final IdpGarbageCollector garbageCollector;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
-  private final IdpGarbageCollector garbageCollector;
 
   /**
-   * Creates a built-in IdP user and group manager.
+   * Returns the shared built-in IdP user and group manager for the server process.
    *
    * @param config The server configuration.
    * @param idGenerator The id generator.
+   * @return The singleton manager instance.
    */
-  public IdpUserGroupManager(Config config, IdGenerator idGenerator) {
+  public static IdpUserGroupManager getInstance(Config config, IdGenerator idGenerator) {
+    if (instance == null) {
+      synchronized (IdpUserGroupManager.class) {
+        if (instance == null) {
+          instance = new IdpUserGroupManager(config, idGenerator);
+        }
+      }
+    }
+    return instance;
+  }
+
+  private IdpUserGroupManager(Config config, IdGenerator idGenerator) {
     this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
     this.passwordHasher = PasswordHasherFactory.create();
     this.garbageCollector = new IdpGarbageCollector(config);
-    garbageCollector.start();
+    this.garbageCollector.start();
+  }
+
+  public void initializeConfiguredServiceAdmins(Config config, String initialAdminPassword)
+      throws IOException {
+    List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
+    if (serviceAdmins == null || serviceAdmins.isEmpty()) {
+      return;
+    }
+
+    List<String> missingServiceAdmins = new ArrayList<>();
+    for (String serviceAdmin : serviceAdmins) {
+      IdpCredentialValidator.validateUsername(serviceAdmin);
+      if (!checkUserExistence(serviceAdmin)) {
+        missingServiceAdmins.add(serviceAdmin);
+      }
+    }
+    if (missingServiceAdmins.isEmpty()) {
+      return;
+    }
+
+    Preconditions.checkArgument(
+        !StringUtils.isBlank(initialAdminPassword),
+        "Missing initial password for configured service admin %s; declare"
+            + " GRAVITINO_INITIAL_ADMIN_PASSWORD",
+        missingServiceAdmins.get(0));
+    IdpCredentialValidator.validatePassword(initialAdminPassword);
+    String passwordHash = passwordHasher.hash(initialAdminPassword);
+    for (String serviceAdmin : missingServiceAdmins) {
+      USER_SERVICE.insertIdpUser(newUserPO(serviceAdmin, passwordHash));
+    }
   }
 
   /**
@@ -75,7 +125,8 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP user.
    */
   public IdpUser addUser(String username, String password) throws IOException {
-    USER_SERVICE.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
+    String passwordHash = passwordHasher.hash(password);
+    USER_SERVICE.insertIdpUser(newUserPO(username, passwordHash));
     return new IdpUser(username, Collections.emptyList());
   }
 
@@ -96,8 +147,21 @@ public class IdpUserGroupManager implements Closeable {
    * @return The built-in IdP user.
    */
   public IdpUser getUser(String username) {
-    IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
-    return new IdpUser(userPO.getUsername(), USER_SERVICE.listGroupNamesByUsername(username));
+    return USER_SERVICE.getIdpUser(username);
+  }
+
+  public IdpUser authenticate(String username, String password) {
+    try {
+      IdpUser user = USER_SERVICE.getIdpUser(username);
+      if (user.passwordHash() == null || !passwordHasher.verify(password, user.passwordHash())) {
+        throw new UnauthorizedException(
+            "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
+      }
+      return user;
+    } catch (NotFoundException e) {
+      throw new UnauthorizedException(
+          "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
+    }
   }
 
   /**
@@ -141,8 +205,7 @@ public class IdpUserGroupManager implements Closeable {
    * @return The built-in IdP group.
    */
   public IdpGroup getGroup(String groupName) {
-    IdpGroupPO groupPO = GROUP_SERVICE.getIdpGroupByName(groupName);
-    return new IdpGroup(groupPO.getGroupName(), GROUP_SERVICE.listUsernamesByGroupName(groupName));
+    return GROUP_SERVICE.getIdpGroup(groupName);
   }
 
   /**
@@ -180,6 +243,15 @@ public class IdpUserGroupManager implements Closeable {
         .withLastVersion(POConverters.INIT_VERSION)
         .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
         .build();
+  }
+
+  private boolean checkUserExistence(String username) {
+    try {
+      USER_SERVICE.getIdpUserByUsername(username);
+      return true;
+    } catch (NotFoundException e) {
+      return false;
+    }
   }
 
   private IdpGroupPO newGroupPO(String groupName) {

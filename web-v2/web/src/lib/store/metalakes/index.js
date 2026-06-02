@@ -1215,6 +1215,11 @@ export const getTableDetails = createAsyncThunk(
       }
     ]
 
+    resTable.columns = (resTable.columns || []).map(col => ({
+      ...col,
+      node: 'tableColumn'
+    }))
+
     dispatch(setTableProps(tableProps))
 
     dispatch(

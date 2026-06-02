@@ -47,6 +47,7 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -205,6 +206,8 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       return super.toFlinkTable(table, tablePath);
     } catch (NoSuchTableException e) {
       // Fall through to check views.
+    } catch (ForbiddenException e) {
+      throw new TableNotExistException(catalogName(), tablePath, e);
     } catch (Exception e) {
       LOG.warn("Failed to load table {} from catalog {}", tablePath, catalogName(), e);
       throw new CatalogException(e);
