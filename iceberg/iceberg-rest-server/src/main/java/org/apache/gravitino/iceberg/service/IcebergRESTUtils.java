@@ -43,6 +43,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.slf4j.Logger;
@@ -51,6 +52,14 @@ import org.slf4j.LoggerFactory;
 public class IcebergRESTUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
+
+  /**
+   * URL-encoded UTF-8 namespace separator ({@code 0x1F}) required by the Iceberg REST catalog spec.
+   *
+   * <p>Iceberg 1.11 allows a configurable separator in {@link RESTUtil#decodeNamespace}; use this
+   * value so decoding stays aligned with the wire format used in existing deployments and tests.
+   */
+  public static final String NAMESPACE_SEPARATOR_URLENCODED_UTF_8 = "%1F";
 
   public static final String SNAPSHOT_ALL = "all";
 

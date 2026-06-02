@@ -87,4 +87,16 @@ public class TestIcebergConfig {
     Assertions.assertFalse(
         icebergConfigWithNewKey.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ));
   }
+
+  @Test
+  public void testAsyncCleanupDefaults() {
+    IcebergConfig config = new IcebergConfig(ImmutableMap.of());
+    Assertions.assertEquals(2, config.get(IcebergConfig.ASYNC_CLEANUP_WORKER_THREADS));
+    Assertions.assertEquals(4, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_THREADS));
+    Assertions.assertEquals(1000, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_BATCH_SIZE));
+    Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_POLL_INTERVAL_SECS));
+    Assertions.assertEquals(300, config.get(IcebergConfig.ASYNC_CLEANUP_HEARTBEAT_TIMEOUT_SECS));
+    Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_MAX_ATTEMPTS));
+    Assertions.assertEquals(720, config.get(IcebergConfig.ASYNC_CLEANUP_RETENTION_HOURS));
+  }
 }

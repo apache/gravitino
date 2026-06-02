@@ -37,6 +37,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
@@ -46,6 +47,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -56,6 +58,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -1160,6 +1163,101 @@ class TestUserMetaService extends TestJDBCBackend {
     deletedCount =
         userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     Assertions.assertEquals(0, deletedCount); // no more to delete
+  }
+
+  @TestTemplate
+  void batchGetAuthSubjectsForUser() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    UserMetaService userMetaService = UserMetaService.getInstance();
+    GroupMetaService groupMetaService = GroupMetaService.getInstance();
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "batchUser",
+            auditInfo);
+    userMetaService.insertUser(user, false);
+
+    GroupEntity groupA =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "batchGroupA",
+            auditInfo,
+            Collections.emptyList(),
+            Collections.emptyList());
+    GroupEntity groupB =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "batchGroupB",
+            auditInfo,
+            Collections.emptyList(),
+            Collections.emptyList());
+    groupMetaService.insertGroup(groupA, false);
+    groupMetaService.insertGroup(groupB, false);
+
+    // Case 1: user + multiple groups, no role bindings → one row per subject.
+    List<AuthPrefetchRow> rows =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m ->
+                m.batchGetAuthSubjectsForUser(
+                    metalakeName, "batchUser", Lists.newArrayList("batchGroupA", "batchGroupB")));
+    assertEquals(3, rows.size());
+    AuthPrefetchRow userRow =
+        rows.stream()
+            .filter(r -> AuthPrefetchRow.Kind.USER == r.getSubjectType())
+            .findFirst()
+            .orElseThrow();
+    assertEquals(user.id(), userRow.getEntityId());
+    assertEquals("batchUser", userRow.getEntityName());
+    assertTrue(userRow.getUpdatedAt() >= 0);
+    List<AuthPrefetchRow> groupRows =
+        rows.stream()
+            .filter(r -> AuthPrefetchRow.Kind.GROUP == r.getSubjectType())
+            .sorted(Comparator.comparing(AuthPrefetchRow::getEntityName))
+            .collect(Collectors.toList());
+    assertEquals(2, groupRows.size());
+    assertEquals("batchGroupA", groupRows.get(0).getEntityName());
+    assertEquals(groupA.id(), groupRows.get(0).getEntityId());
+    assertEquals("batchGroupB", groupRows.get(1).getEntityName());
+    assertEquals(groupB.id(), groupRows.get(1).getEntityId());
+
+    // Case 2: empty group list → user-only branch (no GROUP / GROUP_ROLE UNION).
+    List<AuthPrefetchRow> userOnly =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m -> m.batchGetAuthSubjectsForUser(metalakeName, "batchUser", Collections.emptyList()));
+    assertEquals(1, userOnly.size());
+    assertEquals(AuthPrefetchRow.Kind.USER, userOnly.get(0).getSubjectType());
+    assertEquals(user.id(), userOnly.get(0).getEntityId());
+
+    // Case 3: missing user + missing group → only the present group row is returned.
+    List<AuthPrefetchRow> missing =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m ->
+                m.batchGetAuthSubjectsForUser(
+                    metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup", "batchGroupA")));
+    assertEquals(1, missing.size(), "Only the existing group should be returned");
+    assertEquals(AuthPrefetchRow.Kind.GROUP, missing.get(0).getSubjectType());
+    assertEquals("batchGroupA", missing.get(0).getEntityName());
+
+    // Case 4: both user and groups missing → empty result.
+    List<AuthPrefetchRow> none =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m ->
+                m.batchGetAuthSubjectsForUser(
+                    metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup")));
+    assertTrue(none.isEmpty());
   }
 
   private Integer countUsers(Long metalakeId) {

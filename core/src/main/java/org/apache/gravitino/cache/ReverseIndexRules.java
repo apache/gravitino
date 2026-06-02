@@ -111,6 +111,16 @@ public class ReverseIndexRules {
                     reverseIndexCache.put(securableObjectIdent, entityType, key);
                   });
         }
+
+        // When this role entity is stored as part of a relation cache entry (e.g.,
+        // METADATA_OBJECT_ROLE_REL keyed by a schema), also add a reverse mapping from the
+        // role's own identifier to that relation cache key. Without this, invalidating the
+        // role entity (e.g., after revokePrivilegesFromRole) would not propagate to the
+        // schema's METADATA_OBJECT_ROLE_REL cache entry, leaving stale data visible via
+        // listBindingRoleNames().
+        if (key.relationType() != null) {
+          reverseIndexCache.put(roleEntity.nameIdentifier(), EntityType.ROLE, key);
+        }
       };
 
   // Keep policies/tags to objects reverse index for metadata objects, so the key are objects and

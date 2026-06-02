@@ -106,6 +106,7 @@ dependencies {
 
   constraints {
     implementation(libs.snakeyaml)
+    implementation(libs.woodstox.core)
   }
 
   implementation(libs.hadoop3.common) {

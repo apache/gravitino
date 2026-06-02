@@ -82,6 +82,7 @@ dependencies {
   testImplementation(project(":bundles:iceberg-aws-bundle"))
   testImplementation(project(":bundles:iceberg-gcp-bundle"))
   testImplementation(project(":bundles:iceberg-azure-bundle"))
+  testImplementation(project(":core", "testArtifacts"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
 

@@ -929,7 +929,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         .map(Object::toString)
         .map(
             s -> {
-              String tmp = org.apache.commons.lang3.StringUtils.remove(s, "'");
+              String tmp = s.replace("'", "");
               if (org.apache.commons.lang3.StringUtils.isEmpty(tmp)) {
                 return tmp;
               } else if (tmp.startsWith("array")) {

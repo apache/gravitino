@@ -772,6 +772,14 @@ public class CatalogHive2IT extends BaseIT {
   }
 
   @Test
+  public void testListSchemasWithParentSchemaUnsupported() {
+    // Hive does not support hierarchical (nested) schemas, so listing schemas under a parent
+    // schema must be rejected instead of returning the catalog's flat schemas (see issue #11317).
+    SupportsSchemas schemas = catalog.asSchemas();
+    assertThrows(UnsupportedOperationException.class, () -> schemas.listSchemas(schemaName));
+  }
+
+  @Test
   public void testFunctions() throws InterruptedException {
     // test list functions in a schema which not created by Gravitino
     String schemaName1 = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
