@@ -428,7 +428,7 @@ You can run the Gravitino server through a Docker container:
 docker run -d -p 8090:8090 apache/gravitino:latest
 ```
 
-The Gravitino Docker image supports injecting configuration values via environment variables by translating them to corresponding entries in `gravitino.conf` at container startup.
+The Gravitino Docker image supports injecting configuration values via environment variables by translating them to corresponding entries in `gravitino.conf` at container startup.
 
 This is done using a startup script that parses environment variables prefixed with `GRAVITINO_` and rewrites the configuration file accordingly.
 
@@ -457,24 +457,10 @@ These variables override the corresponding entries in `gravitino.conf` at startu
 | `GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE`               | `gravitino.authorization.threadPoolSize`             | `100`                                                | 1.0.0         |
 | `GRAVITINO_AUTHORIZATION_SERVICE_ADMINS`                 | `gravitino.authorization.serviceAdmins`              | `anonymous`                                          | 1.0.0         |
 | `GRAVITINO_AUX_SERVICE_NAMES`                            | `gravitino.auxService.names`                         | `iceberg-rest`                                       | 1.0.0         |
-
-### Iceberg REST auxiliary service environment variables
-
-The Gravitino server Docker image starts Iceberg REST as an auxiliary service by default.
-The following `GRAVITINO_ICEBERG_REST_*` environment variables configure the
-`gravitino.iceberg-rest.*` entries in `gravitino.conf`. The standalone Iceberg REST Docker
-image uses the same variable names.
-
-In the **Gravitino server Docker image**, five `GRAVITINO_ICEBERG_REST_*` variables have been
-supported since `1.0.0`. The remaining variables in this table are supported starting from
-`1.3.0`.
-
-| Environment Variable                                     | Configuration Key                                    | Default Value                                        | Since Version |
-|----------------------------------------------------------|------------------------------------------------------|------------------------------------------------------|---------------|
+| `GRAVITINO_ICEBERG_REST_CLASSPATH`                       | `gravitino.iceberg-rest.classpath`                   | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.0.0         |
 | `GRAVITINO_ICEBERG_REST_HOST`                            | `gravitino.iceberg-rest.host`                        | `0.0.0.0`                                            | 1.0.0         |
 | `GRAVITINO_ICEBERG_REST_HTTP_PORT`                       | `gravitino.iceberg-rest.httpPort`                    | `9001`                                               | 1.0.0         |
 | `GRAVITINO_ICEBERG_REST_URI`                             | `gravitino.iceberg-rest.uri`                         | (none)                                               | 1.3.0         |
-| `GRAVITINO_ICEBERG_REST_CLASSPATH`                       | `gravitino.iceberg-rest.classpath`                   | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.0.0         |
 | `GRAVITINO_ICEBERG_REST_IO_IMPL`                         | `gravitino.iceberg-rest.io-impl`                     | (none)                                               | 1.3.0         |
 | `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                 | `gravitino.iceberg-rest.catalog-backend`             | `memory`                                             | 1.0.0         |
 | `GRAVITINO_ICEBERG_REST_JDBC_DRIVER`                     | `gravitino.iceberg-rest.jdbc-driver`                 | (none)                                               | 1.3.0         |
@@ -558,7 +544,7 @@ curl http://127.0.0.1:9001/iceberg/v1/config
 ```
 
 :::note
-If both `gravitino.conf` and environment variable exist, the container's startup script will overwrite the config file value with the environment variable.
+If both `gravitino.conf` and environment variable exist, the container’s startup script will overwrite the config file value with the environment variable.
 :::
 
 
