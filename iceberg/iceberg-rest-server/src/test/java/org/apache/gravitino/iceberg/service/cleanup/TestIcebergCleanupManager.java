@@ -26,8 +26,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -271,6 +273,33 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  @SuppressWarnings("unchecked")
+  void testRefreshHeartbeatsPublishesNewTokenBeforeStoreUpdate() throws Exception {
+    BlockingHeartbeatStore blockingStore = new BlockingHeartbeatStore();
+    IcebergCleanupManager svc =
+        new IcebergCleanupManager(blockingStore, new IcebergConfig(new HashMap<>()));
+    try {
+      Map<Long, Long> heartbeats =
+          (Map<Long, Long>) FieldUtils.readField(svc, "ownedHeartbeats", true);
+      heartbeats.put(1L, 100L);
+
+      Thread refresh = new Thread(svc::refreshHeartbeats);
+      refresh.start();
+      Assertions.assertTrue(blockingStore.heartbeatStarted.await(5, TimeUnit.SECONDS));
+
+      AtomicLong token = new AtomicLong();
+      svc.finishJob(1L, heartbeat -> token.compareAndSet(0L, heartbeat));
+      Assertions.assertTrue(token.get() > 100L);
+
+      blockingStore.releaseHeartbeat.countDown();
+      refresh.join(5_000L);
+      Assertions.assertFalse(refresh.isAlive());
+    } finally {
+      svc.close();
+    }
+  }
+
+  @TestTemplate
   void testIsNameOccupied() {
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
@@ -351,6 +380,27 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
     @Override
     public void deleteFile(String path) {
       throw new NotFoundException("Missing file: %s", path);
+    }
+  }
+
+  private static class BlockingHeartbeatStore extends IcebergCleanupJobStore {
+    private final CountDownLatch heartbeatStarted = new CountDownLatch(1);
+    private final CountDownLatch releaseHeartbeat = new CountDownLatch(1);
+
+    BlockingHeartbeatStore() {
+      super(new RandomIdGenerator());
+    }
+
+    @Override
+    public boolean heartbeat(long id, long lastHeartbeat, long now) {
+      heartbeatStarted.countDown();
+      try {
+        Assertions.assertTrue(releaseHeartbeat.await(5, TimeUnit.SECONDS));
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      }
+      return true;
     }
   }
 }

@@ -295,25 +295,26 @@ public class IcebergCleanupManager implements AutoCloseable {
   // reclaimed cannot overwrite the job the peer now owns. A null token means a refresh already
   // saw the takeover, so we skip. A failed CAS just leaves the row RUNNING to be reclaimed and
   // re-run (which finds the files gone and succeeds); we log it so the reclaim is observable.
-  private void finishJob(long id, LongPredicate terminalUpdate) {
+  void finishJob(long id, LongPredicate terminalUpdate) {
     Long heartbeat = ownedHeartbeats.get(id);
     if (heartbeat != null && !terminalUpdate.test(heartbeat)) {
       LOG.warn("Could not finish cleanup job {}; it will be reclaimed and re-run", id);
     }
   }
 
-  private void refreshHeartbeats() {
+  void refreshHeartbeats() {
     long now = System.currentTimeMillis();
     for (Map.Entry<Long, Long> entry : new ArrayList<>(ownedHeartbeats.entrySet())) {
       long id = entry.getKey();
       try {
-        if (store.heartbeat(id, entry.getValue(), now)) {
-          ownedHeartbeats.put(id, now);
-        } else {
+        long previousHeartbeat = entry.getValue();
+        ownedHeartbeats.put(id, now);
+        if (!store.heartbeat(id, previousHeartbeat, now)) {
           LOG.warn("Lost ownership of cleanup job {}", id);
-          ownedHeartbeats.remove(id);
+          ownedHeartbeats.remove(id, now);
         }
       } catch (Throwable t) {
+        ownedHeartbeats.replace(id, now, entry.getValue());
         // scheduleAtFixedRate stops a task forever if it throws, so never let one escape: a bad job
         // must not stop heartbeat renewal for the whole process.
         LOG.warn("Heartbeat update failed for job {}", id, t);
