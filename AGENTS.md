@@ -28,11 +28,12 @@
   - **Good**: `Table table = ...;` (with `import org.apache.gravitino.rel.Table;`)
   - Do not write inline types like `java.nio.file.Paths` or `org.apache.xxx.Table` unless there is a real class name conflict that cannot be resolved cleanly.
   - If two classes share the same simple name, prefer imports plus small refactors over keeping FQNs throughout the code.
-- **Safety**: Use `@Nullable` annotations. Handle resources with try-with-resources.
+- **Safety**: Use `@Nullable` only for values that can actually be null. Handle resources with try-with-resources.
 - **Logging**: Use SLF4J. No `System.out.println`.
 - **Testing**:
   - Write unit tests for ALL new logic. NO tests = NO merge.
   - Use `TestXxx` naming pattern (e.g., `TestCatalogService`).
+  - For a bug fix, add a regression test that directly exercises the original failure semantics, not only a nearby happy path. When a test is conditionally disabled, document why and what behavior remains uncovered.
   - Run tests: `./gradlew test -PskipITs`.
   - Docker tests: Tag with `@Tag("gravitino-docker-test")`; run them with `-PskipDockerTests=false`.
 - **Class Member Ordering**: Follow the order:
@@ -54,6 +55,7 @@
 - **Dependency injection, not singletons**: Avoid the singleton pattern (including lazy-holder/double-checked instances) — it is hard to test. Construct collaborators once in the owning class (for example, the plugin/bootstrap class) and inject them; do not `new` a manager/service inline in the middle of logic, and never create two instances of a component that is meant to be shared.
 - **Naming follows existing conventions**: Match the naming patterns already used by sibling classes and the surrounding package, and make the name reflect the class's actual role. Established suffixes include `XxxManager`, `XxxDispatcher`, `XxxService`, `XxxOperations`, `XxxListener`, `XxxPoller`, capability interfaces `SupportsXxx`, and tests `TestXxx`. Capitalize acronyms consistently with existing code (`RESTUtils`, not `RestUtils`). Name boolean fields without an `is` prefix (`basicAuthEnabled`, not `isBasicAuthEnabled`). Do not invent a new convention when a matching one already exists.
 - **Reuse existing types and patterns**: Before adding a new request DTO, PO, or helper, check whether an existing one (for example, an `XxxAssociateRequest` or `XxxPO`) already fits, and reuse it. Validate request DTOs at the request boundary (reject nulls, overlapping add/remove sets, etc.).
+- **Prefer immutable data objects**: Keep DTOs and POs immutable where practical. Prefer constructors or builders over setters unless a framework requires mutable JavaBeans-style objects.
 - **Exceptions**: Throw the standard, semantically correct exception type for the situation (for example, the project's unauthorized/forbidden exception for auth failures). Do not add a `catch (RuntimeException e) { throw e; }` that adds no behavior, and collapse identical sibling `catch` blocks. When refactoring, preserve identifying context (such as the table identifier) in error messages and logs.
 - **Prefer standard-library and Commons idioms**: Use `StringUtils.isBlank`/`isNotBlank` instead of manual null/empty string checks, a `Set` (not a `List`) for repeated membership lookups, and `Base64.getEncoder().encodeToString(...)` rather than manual byte/string round-trips. Do not introduce calls to APIs that are deprecated at the version the build pins; keep a `@SuppressWarnings("deprecation")` only when it is required for compatibility, with a comment explaining why.
 - **Component placement & lifecycle**: Put a class in the module that owns its concern. A sub-component of another component (for example, a side module of the entity store) should be created, started, and closed by its owner — mirroring sibling components such as `RelationalGarbageCollector` — rather than being exposed and wired as a global `GravitinoEnv` component.
@@ -63,8 +65,13 @@
 
 ## Configuration Changes
 - When adding a new `ConfigEntry`, document it in the matching table in `docs/gravitino-server-config.md` (config name, description, default value, required, and since version).
+- When changing a user-visible configuration key or default value, update the matching user documentation.
 - Any test that initializes the owning component with a **mocked `Config`** must stub the new key. A real `Config` returns the entry's registered default, but a Mockito-mocked `Config` returns `null` and will throw `NullPointerException` on unboxing (for example, to `long`). Follow how existing keys such as `STORE_DELETE_AFTER_TIME` are already stubbed.
 - Validate config values at the entry (for example, `checkValue(v -> v > 0, ...)`). Once validated, do not re-guard the value downstream (no `Math.max(1, ...)` on an already-positive value).
+
+## Persistence Changes
+- When adding a database table or column, update every supported schema script consistently and add comments that explain the stored data.
+- For persisted background work, design for process restarts and multi-server deployments. Define ownership, lease/retry behavior, and one consistent time source instead of mixing database and JVM clocks.
 
 ## Concurrency & Background Tasks
 - **Lifecycle flags**: A `running`/`started` flag that can be touched concurrently must be an `AtomicBoolean` guarded with `compareAndSet`. Make `start()` idempotent, and make it fail fast (not run with shut-down executors) if called after `close()`.
@@ -84,6 +91,7 @@
 - **User guides describe usage, not internals**: Keep `docs/` how-to guides focused on how to use a feature; leave implementation and design rationale to the design docs. Do not forward-reference components (for example, a "garbage collector") that the guide never explains.
 - **Consistent terminology**: Use one capitalization/spelling for a term throughout (for example, `IdP`, not a mix of `IdP`/`IDP`), matching the surrounding docs.
 - **Runnable examples**: Shell snippets must work as written — for example, use `base64 -w 0` (or pipe through `tr -d '\n'`) so an `Authorization` header has no embedded newline.
+- **Links and OpenAPI validation**: Check links in changed documentation. When adding an OpenAPI specification, keep existing lint coverage intact, wire the new specification into the docs build, and run `./gradlew :docs:build`.
 
 ## Create Issue and PR Guidelines
 [IMPORTANT] Before creating an issue or PR using the gh command or the GitHub MCP server, please show a preview of the PR/issue first. Submit it only after I confirm. The issue/PR format should follow the reference and keep the content concise and clear.
