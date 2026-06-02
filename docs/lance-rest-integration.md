@@ -57,7 +57,7 @@ The following table outlines the tested compatibility between Gravitino versions
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
 
-#### Reproducing the matrix locally
+### Reproducing the matrix locally
 
 Both connectors ship with a multi-version integration test driver so the
 matrix can be re-verified (and extended) without ad-hoc scripting:

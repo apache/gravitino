@@ -1,0 +1,34 @@
+name: Docs Checks
+
+on:
+  push:
+    branches: [ "main", "branch-*" ]
+    paths:
+      - 'docs/**'
+      - 'scripts/check_links.py'
+      - 'scripts/*audit*.py'
+      - 'docs/STYLE.md'
+      - '.github/workflows/docs-check.yml'
+  pull_request:
+    branches: [ "main", "branch-*" ]
+    paths:
+      - 'docs/**'
+      - 'scripts/check_links.py'
+      - 'scripts/*audit*.py'
+      - 'docs/STYLE.md'
+      - '.github/workflows/docs-check.yml'
+
+jobs:
+  docs-validation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run docs validation scripts
+        run: |
+          python3 scripts/check_links.py docs/
+          python3 scripts/title_h2_audit.py
+          python3 scripts/intro_audit.py
+          python3 scripts/heading_audit.py
+          python3 scripts/heading_spacing_audit.py
