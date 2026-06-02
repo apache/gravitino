@@ -23,11 +23,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -377,7 +379,15 @@ public final class JettyServerConfig {
     this.customFilters =
         internalConfig
             .get(CUSTOM_FILTERS)
-            .map(filters -> Collections.unmodifiableSet(Sets.newHashSet(filters.split(SPLITTER))))
+            .map(
+                filters ->
+                    Collections.unmodifiableSet(
+                        Arrays.stream(filters.split(SPLITTER))
+                            .map(StringUtils::trim)
+                            .filter(StringUtils::isNotBlank)
+                            .filter(filter -> !filter.equals("\"\""))
+                            .filter(filter -> !filter.equals("''"))
+                            .collect(Collectors.toSet())))
             .orElse(Collections.emptySet());
 
     this.keyStoreType = internalConfig.get(SSL_KEYSTORE_TYPE);

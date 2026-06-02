@@ -62,8 +62,21 @@ public class TestJettyServerConfig {
 
   @Test
   public void testCustomFilters() {
-    Config emptyconfig = new Config() {};
-    JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(emptyconfig, "");
+    Config emptyConfig = new Config() {};
+    JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(emptyConfig, "");
+    Assertions.assertNotNull(jettyServerConfig.getCustomFilters());
+    Assertions.assertTrue(jettyServerConfig.getCustomFilters().isEmpty());
+
+    Config quotedEmptyConfig = new Config() {};
+    quotedEmptyConfig.set(JettyServerConfig.CUSTOM_FILTERS, Optional.of("\"\""));
+    jettyServerConfig = JettyServerConfig.fromConfig(quotedEmptyConfig, "");
+    Assertions.assertNotNull(jettyServerConfig.getCustomFilters());
+    Assertions.assertTrue(jettyServerConfig.getCustomFilters().isEmpty());
+
+    Config singleQuotedEmptyConfig = new Config() {};
+    singleQuotedEmptyConfig.set(JettyServerConfig.CUSTOM_FILTERS, Optional.of("''"));
+    jettyServerConfig = JettyServerConfig.fromConfig(singleQuotedEmptyConfig, "");
+    Assertions.assertNotNull(jettyServerConfig.getCustomFilters());
     Assertions.assertTrue(jettyServerConfig.getCustomFilters().isEmpty());
 
     Config somethingConfig = new Config() {};
