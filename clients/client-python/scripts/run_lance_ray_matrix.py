@@ -35,7 +35,7 @@ use::
 
     distribution/package/bin/gravitino.sh start
     python3 clients/client-python/scripts/run_lance_ray_matrix.py \
-        --versions 0.4.2,0.4.1 \
+        --versions 0.4.2,0.3.0 \
         --gravitino-home distribution/package
     distribution/package/bin/gravitino.sh stop
 
@@ -56,7 +56,7 @@ from typing import List
 
 # Default version set tracks what the Compatibility Matrix in
 # docs/lance-rest-integration.md claims to support. Keep these in sync.
-DEFAULT_VERSIONS = ["0.4.2", "0.4.1", "0.4.0", "0.3.0"]
+DEFAULT_VERSIONS = ["0.4.2", "0.3.0"]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]

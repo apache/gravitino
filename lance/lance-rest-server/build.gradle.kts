@@ -31,7 +31,7 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 // Comma-separated list of lance-spark-bundle versions to test against.
 // The default is the latest supported version; the integration test matrix
 // (`:lance:lance-rest-server:lanceSparkMatrixTest`) covers every version in
-// this list. Override via `-PlanceSparkBundleVersions=0.2.0,0.3.0,0.4.0`.
+// this list. Override via `-PlanceSparkBundleVersions=0.2.0,0.4.0`.
 val lanceSparkBundleVersions: List<String> =
   ((project.properties["lanceSparkBundleVersions"] as? String) ?: "0.4.0")
     .split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
@@ -257,14 +257,15 @@ tasks {
     dependsOn(
       lanceSparkBundleVersions.map { named(lanceSparkTestTaskName(it)) }
     )
-    // Force serial execution: each version spins up an embedded MiniGravitino on a
-    // dynamically chosen port. findAvailablePort is a scan, not an atomic OS-level
-    // reservation (TOCTOU), so concurrent tasks can race to bind the same port and
-    // produce intermittent "address already in use" failures under --parallel.
-    lanceSparkBundleVersions.zipWithNext { a, b ->
-      named(lanceSparkTestTaskName(b)) {
-        mustRunAfter(named(lanceSparkTestTaskName(a)))
-      }
+  }
+
+  // Force serial execution: each version spins up an embedded MiniGravitino on a
+  // dynamically chosen port. findAvailablePort is a scan, not an atomic OS-level
+  // reservation (TOCTOU), so concurrent tasks can race to bind the same port and
+  // produce intermittent "address already in use" failures under --parallel.
+  lanceSparkBundleVersions.zipWithNext { a, b ->
+    named(lanceSparkTestTaskName(b)) {
+      mustRunAfter(named(lanceSparkTestTaskName(a)))
     }
   }
 }
