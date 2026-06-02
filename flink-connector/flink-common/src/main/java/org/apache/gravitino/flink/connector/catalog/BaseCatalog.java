@@ -68,6 +68,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -255,6 +256,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
       return toFlinkTable(table, tablePath);
     } catch (NoSuchTableException e) {
       // Fall through to check views.
+    } catch (ForbiddenException e) {
+      // Flink/Calcite speculatively probes tables during multi-part identifier resolution.
+      // Treat authorization failure as table-not-exist to allow Calcite to fall back to
+      // alternative resolution paths (e.g., treating the name as a schema).
+      throw new TableNotExistException(catalogName(), tablePath, e);
     } catch (Exception e) {
       LOG.warn("Failed to load table {} from catalog {}", ident, catalogName(), e);
       throw new CatalogException(e);
@@ -271,6 +277,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
       if (catalog().asTableCatalog().tableExists(ident)) {
         return true;
       }
+    } catch (ForbiddenException e) {
+      return false;
     } catch (Exception e) {
       throw new CatalogException(e);
     }
