@@ -31,7 +31,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
@@ -114,13 +113,13 @@ class HiveViewCatalogOperations implements ViewCatalog {
     if (!schemaExistsChecker.test(schemaIdent)) {
       throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
     }
+    Map<String, String> safeProperties = properties == null ? ImmutableMap.of() : properties;
     SQLRepresentation sqlRepresentation =
         validateSQLRepresentation(
-            representations, defaultCatalog, defaultSchema, properties, ident);
+            representations, defaultCatalog, defaultSchema, safeProperties, ident);
 
     try {
-      Map<String, String> params =
-          Maps.newHashMap(properties == null ? ImmutableMap.of() : properties);
+      Map<String, String> params = Maps.newHashMap(safeProperties);
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
       if (defaultCatalog != null) {
         params.put(HiveView.SPARK_DEFAULT_CATALOG_KEY, defaultCatalog);
@@ -221,7 +220,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
                   replace.getRepresentations(),
                   replace.getDefaultCatalog(),
                   replace.getDefaultSchema(),
-                  null,
+                  updatedProperties,
                   ident);
           updatedColumns = copyColumns(replace.getColumns());
           updatedComment = replace.getComment();
@@ -408,15 +407,14 @@ class HiveViewCatalogOperations implements ViewCatalog {
    * Validates that {@code representations} contains exactly one {@link SQLRepresentation} with a
    * supported dialect, and that dialect-specific constraints are satisfied.
    *
-   * @param properties caller-supplied view properties; when non-null, marker-property presence is
-   *     validated (required for create; null is passed by alter to skip this check because the
-   *     markers are already stored in HMS from the original create)
+   * @param properties view properties used to verify dialect marker keys are present (e.g. {@code
+   *     spark.sql.create.version} for Spark, a {@code flink.*} key for Flink)
    */
   private SQLRepresentation validateSQLRepresentation(
       Representation[] representations,
       String defaultCatalog,
       String defaultSchema,
-      @Nullable Map<String, String> properties,
+      Map<String, String> properties,
       NameIdentifier ident) {
     int representationCount = representations == null ? 0 : representations.length;
     Representation firstRepresentation =
@@ -441,7 +439,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
             defaultCatalog,
             defaultSchema,
             ident);
-        if (Dialects.FLINK.equalsIgnoreCase(selected.dialect()) && properties != null) {
+        if (Dialects.FLINK.equalsIgnoreCase(selected.dialect())) {
           Preconditions.checkArgument(
               properties.keySet().stream()
                   .anyMatch(k -> k.startsWith(HiveView.FLINK_PROPERTY_PREFIX)),
@@ -452,14 +450,12 @@ class HiveViewCatalogOperations implements ViewCatalog {
         }
         return selected;
       case Dialects.SPARK:
-        if (properties != null) {
-          Preconditions.checkArgument(
-              properties.containsKey(HiveView.SPARK_VERSION_KEY),
-              "Spark dialect view '%s' requires property '%s' to be set; "
-                  + "without it the view silently round-trips as Hive dialect on reload",
-              ident,
-              HiveView.SPARK_VERSION_KEY);
-        }
+        Preconditions.checkArgument(
+            properties.containsKey(HiveView.SPARK_VERSION_KEY),
+            "Spark dialect view '%s' requires property '%s' to be set; "
+                + "without it the view silently round-trips as Hive dialect on reload",
+            ident,
+            HiveView.SPARK_VERSION_KEY);
         return selected;
       default:
         // TODO(design-docs/gravitino-logical-view-management.md): support creating trino HMS views.
