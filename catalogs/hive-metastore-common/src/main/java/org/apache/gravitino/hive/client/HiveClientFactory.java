@@ -115,10 +115,13 @@ public final class HiveClientFactory {
   public HiveClient createHiveClientWithBackend() {
     HiveClient client = null;
     HiveClientClassLoader classloader = null;
+    // Use HiveClientFactory's own ClassLoader as baseLoader so that shared classes
+    // (e.g. HiveClient interface, UserGroupInformation) are resolved consistently
+    // regardless of which thread calls this method (TCCL is not stable across threads).
+    ClassLoader factoryCl = HiveClientFactory.class.getClassLoader();
     try {
       // Try using Hive3 first
-      classloader =
-          HiveClientClassLoader.createLoader(HIVE3, Thread.currentThread().getContextClassLoader());
+      classloader = HiveClientClassLoader.createLoader(HIVE3, factoryCl);
       client = createHiveClientInternal(classloader);
       client.getCatalogs();
       LOG.info("Connected to Hive Metastore using Hive version HIVE3");
@@ -137,10 +140,9 @@ public final class HiveClientFactory {
         // Fallback to Hive2 if we can list databases
         if (e.getMessage().contains("Invalid method name: 'get_catalogs'")
             || e.getMessage().contains("class not found") // caused by MiniHiveMetastoreService
+            || e.getMessage().contains("Cannot find Hive jar directory") // HIVE3 libs dir absent
         ) {
-          classloader =
-              HiveClientClassLoader.createLoader(
-                  HIVE2, Thread.currentThread().getContextClassLoader());
+          classloader = HiveClientClassLoader.createLoader(HIVE2, factoryCl);
           client = createHiveClientInternal(classloader);
           LOG.info("Connected to Hive Metastore using Hive version HIVE2");
           backendClassLoader = classloader;
@@ -162,10 +164,18 @@ public final class HiveClientFactory {
       HiveClientClassLoader.HiveVersion version, Properties properties, ClassLoader classloader)
       throws Exception {
     Class<?> hiveClientImplClass = classloader.loadClass(HiveClientImpl.class.getName());
+    // HiveClientImpl is a barrier class loaded via defineClass inside the isolated classloader.
+    // Its constructor expects the HiveVersion enum type from the *isolated* classloader scope.
+    // Passing the system classloader's HiveVersion.class causes NoSuchMethodException because
+    // the two Class objects are not identical even though they have the same name.
+    Class<?> hiveVersionInIsolated =
+        classloader.loadClass(HiveClientClassLoader.HiveVersion.class.getName());
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    Object isolatedVersion =
+        Enum.valueOf((Class<? extends Enum>) hiveVersionInIsolated, version.name());
     Constructor<?> hiveClientImplCtor =
-        hiveClientImplClass.getConstructor(
-            HiveClientClassLoader.HiveVersion.class, Properties.class);
-    return (HiveClient) hiveClientImplCtor.newInstance(version, properties);
+        hiveClientImplClass.getConstructor(hiveVersionInIsolated, Properties.class);
+    return (HiveClient) hiveClientImplCtor.newInstance(isolatedVersion, properties);
   }
 
   public static HiveClient createProxyHiveClientImpl(
@@ -202,6 +212,17 @@ public final class HiveClientFactory {
         return createProxyHiveClientImpl(
             classloader.getHiveVersion(), properties, ugi, classloader);
 
+      } else if (enableKerberos) {
+        // UGI is a shared class (org.apache.hadoop.* delegated to baseLoader), so the system CL
+        // and HiveClientClassLoader share the same UGI static state. The TGT is already stored in
+        // realLoginUgi.subject by kerberosClient.login(). The only thing needed is to bind that
+        // Subject to the current thread so GSSAPI can find the TGT during the HMS Thrift handshake.
+        // UGI.doAs() wraps Subject.doAs() internally — same pattern as ImpalaEngineAdapter.
+        UserGroupInformation realUgi = kerberosClient.getRealLoginUgi();
+        final HiveClientClassLoader.HiveVersion hiveVersion = classloader.getHiveVersion();
+        return realUgi.doAs(
+            (java.security.PrivilegedExceptionAction<HiveClient>)
+                () -> createHiveClientImpl(hiveVersion, properties, classloader));
       } else {
         return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
       }
