@@ -208,13 +208,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadCredentialsResponse getTableCredentials(
       TableIdentifier identifier, CredentialPrivilege privilege) {
     if (isRESTCatalog()) {
-      return restTableCredentials((RESTCatalog) getCatalog(), identifier);
+      return getRESTTableCredentials((RESTCatalog) getCatalog(), identifier);
     } else {
-      return localTableCredentials(identifier, privilege);
+      return getLocalTableCredentials(identifier, privilege);
     }
   }
 
-  private LoadCredentialsResponse localTableCredentials(
+  private LoadCredentialsResponse getLocalTableCredentials(
       TableIdentifier identifier, CredentialPrivilege privilege) {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
@@ -233,7 +233,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
   }
 
-  private static LoadCredentialsResponse restTableCredentials(
+  private static LoadCredentialsResponse getRESTTableCredentials(
       RESTCatalog restCatalog, TableIdentifier identifier) {
     try {
       Map<String, String> properties = Maps.newHashMap(restCatalog.properties());

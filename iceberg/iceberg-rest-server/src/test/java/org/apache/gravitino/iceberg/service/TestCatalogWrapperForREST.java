@@ -115,7 +115,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testRestTableCredentials() throws Exception {
+  void testRESTTableCredentials() throws Exception {
     TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
     String expectedPath = "/v1/upstream/namespaces/db/tables/tbl/credentials";
     String upstreamJson =
@@ -177,7 +177,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testRestTableCredentialsOnFailure() throws Exception {
+  void testRESTTableCredentialsOnFailure() throws Exception {
     HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
     server.createContext(
         "/",
@@ -220,7 +220,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testRestTableCredentialsNoSuchTable() throws Exception {
+  void testRESTTableCredentialsNoSuchTable() throws Exception {
     String errorJson =
         "{\"error\":{\"message\":\"Table not found\",\"type\":\"NoSuchTableException\","
             + "\"code\":404,\"stack\":[]}}";
@@ -315,7 +315,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testRestCatalogClientConfigMergesRemote() {
+  void testRESTCatalogClientConfigMergesRemote() {
     IcebergConfig config =
         new IcebergConfig(
             ImmutableMap.of(
@@ -371,7 +371,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testNonRestCatalogClientConfig() {
+  void testNonRESTCatalogClientConfig() {
     Catalog catalog = mock(Catalog.class);
     IcebergConfig config =
         new IcebergConfig(
