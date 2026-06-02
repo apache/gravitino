@@ -982,7 +982,7 @@ EOF
 expect "A: create role $ROLE_V with MANAGE_USERS" 200
 
 api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/roles/$ROLE_V"
-expect "B: GET role $ROLE_V shows MANAGE_USERS (initial)" 200 '"MANAGE_USERS"'
+expect "B: GET role $ROLE_V shows manage_users (initial)" 200 '"manage_users"'
 
 # Swap privilege set on A: remove MANAGE_USERS, add CREATE_TAG.
 api "$INSTANCE_A" "$USER_LISI" PUT \
@@ -996,8 +996,8 @@ api "$INSTANCE_A" "$USER_LISI" PUT \
 expect "A: grant CREATE_TAG to $ROLE_V" 200
 
 api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/roles/$ROLE_V"
-expect "B: GET role $ROLE_V now shows CREATE_TAG" 200 '"CREATE_TAG"'
-expect_absent "B: GET role $ROLE_V no longer shows MANAGE_USERS" 200 '"MANAGE_USERS"'
+expect "B: GET role $ROLE_V now shows create_tag" 200 '"create_tag"'
+expect_absent "B: GET role $ROLE_V no longer shows manage_users" 200 '"manage_users"'
 
 api "$INSTANCE_A" "$USER_LISI" DELETE "/api/metalakes/$METALAKE/roles/$ROLE_V"
 expect "A: delete role $ROLE_V" 200
