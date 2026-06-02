@@ -261,6 +261,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
       // Treat authorization failure as table-not-exist to allow Calcite to fall back to
       // alternative resolution paths (e.g., treating the name as a schema).
       throw new TableNotExistException(catalogName(), tablePath, e);
+    } catch (CatalogException e) {
+      throw e;
     } catch (Exception e) {
       LOG.warn("Failed to load table {} from catalog {}", ident, catalogName(), e);
       throw new CatalogException(e);
@@ -320,8 +322,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
       if (!tableDropped && !viewDropped && !ignoreIfNotExists) {
         throw new TableNotExistException(catalogName(), tablePath);
       }
-      // Invalidate native catalog cache after successful DDL
-      invalidateTable(tablePath);
+      if (tableDropped) {
+        invalidateTable(tablePath);
+      }
     } catch (TableNotExistException e) {
       throw e;
     } catch (Exception e) {
@@ -734,7 +737,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
    *
    * @param tablePath the table whose native cache entry should be dropped
    */
-  public void invalidateTable(ObjectPath tablePath) {
+  protected void invalidateTable(ObjectPath tablePath) {
     try {
       invalidateNativeTableCache(tablePath);
     } catch (Exception e) {

@@ -198,6 +198,9 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     if (!dropped && !ignoreIfNotExists) {
       throw new TableNotExistException(catalogName(), tablePath);
     }
+    if (dropped) {
+      invalidateNativeTableCache(tablePath);
+    }
   }
 
   @Override
@@ -253,10 +256,11 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
    */
   @Override
   protected void invalidateNativeTableCache(ObjectPath tablePath) {
-    if (paimonCatalog instanceof FlinkCatalog) {
+    AbstractCatalog nativeCatalog = realCatalog();
+    if (nativeCatalog instanceof FlinkCatalog) {
       Identifier identifier =
           Identifier.create(tablePath.getDatabaseName(), tablePath.getObjectName());
-      ((FlinkCatalog) paimonCatalog).catalog().invalidateTable(identifier);
+      ((FlinkCatalog) nativeCatalog).catalog().invalidateTable(identifier);
     }
   }
 }

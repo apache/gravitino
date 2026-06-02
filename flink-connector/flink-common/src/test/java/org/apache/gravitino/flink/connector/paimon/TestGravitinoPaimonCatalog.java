@@ -57,7 +57,6 @@ import org.junit.jupiter.api.Test;
 public class TestGravitinoPaimonCatalog {
 
   private AbstractCatalog mockPaimonCatalog;
-  private GravitinoPaimonCatalog catalog;
 
   // ---------------------------------------------------------------------------
   // Minimal test double for BaseCatalog — overrides only what's needed
@@ -68,6 +67,9 @@ public class TestGravitinoPaimonCatalog {
    * All abstract methods delegate to no-ops or mocks; the only interesting thing is the hook.
    */
   private static class TestableBaseCatalog extends BaseCatalog {
+
+    private CatalogBaseTable toFlinkTableResult;
+    private CatalogException toFlinkTableException;
 
     TestableBaseCatalog() {
       super(
@@ -83,6 +85,20 @@ public class TestGravitinoPaimonCatalog {
       return mock(AbstractCatalog.class);
     }
 
+    @Override
+    protected org.apache.gravitino.Catalog catalog() {
+      return mock(org.apache.gravitino.Catalog.class);
+    }
+
+    @Override
+    protected CatalogBaseTable toFlinkTable(
+        org.apache.gravitino.rel.Table table, ObjectPath tablePath) {
+      if (toFlinkTableException != null) {
+        throw toFlinkTableException;
+      }
+      return toFlinkTableResult;
+    }
+
     public CatalogBaseTable callEnrichCatalogTable(CatalogTable table, ObjectPath path) {
       return enrichCatalogTable(table, path);
     }
@@ -93,15 +109,21 @@ public class TestGravitinoPaimonCatalog {
   // ---------------------------------------------------------------------------
 
   /**
-   * Extends {@link GravitinoPaimonCatalog} so that the internal {@code paimonCatalog} field is
-   * replaced with a Mockito mock, enabling white-box verification without a real Paimon/Hive
-   * environment.
+   * Extends {@link GravitinoPaimonCatalog} so that tests can inject a mock native catalog via
+   * {@link #realCatalog()} and verify cache invalidation and enrichment behavior without a real
+   * Paimon environment.
    */
   private static class TestablePaimonCatalog extends GravitinoPaimonCatalog {
 
     private final AbstractCatalog injectedPaimon;
+    private final org.apache.gravitino.Catalog injectedCatalog;
 
     TestablePaimonCatalog(AbstractCatalog injectedPaimon) {
+      this(injectedPaimon, null);
+    }
+
+    TestablePaimonCatalog(
+        AbstractCatalog injectedPaimon, org.apache.gravitino.Catalog injectedCatalog) {
       // We cannot call super(context, ...) without a real FlinkCatalogFactory, so we use a
       // package-private constructor shim that skips the factory call.  Because we override
       // realCatalog() the parent constructor's catalog reference is never used.
@@ -111,18 +133,23 @@ public class TestGravitinoPaimonCatalog {
           PaimonPropertiesConverter.INSTANCE,
           DefaultPartitionConverter.INSTANCE);
       this.injectedPaimon = injectedPaimon;
+      this.injectedCatalog = injectedCatalog;
     }
 
     @Override
     protected AbstractCatalog realCatalog() {
       return injectedPaimon;
     }
+
+    @Override
+    protected org.apache.gravitino.Catalog catalog() {
+      return injectedCatalog != null ? injectedCatalog : super.catalog();
+    }
   }
 
   @BeforeEach
   void setUp() {
     mockPaimonCatalog = mock(AbstractCatalog.class);
-    catalog = new TestablePaimonCatalog(mockPaimonCatalog);
   }
 
   // ---------------------------------------------------------------------------
@@ -168,7 +195,8 @@ public class TestGravitinoPaimonCatalog {
     when(mockPaimonCatalog.getTable(path)).thenReturn(paimonNativeTable);
 
     CatalogTable gravitinoBuiltTable = mock(CatalogTable.class);
-    CatalogBaseTable result = catalog.enrichCatalogTable(gravitinoBuiltTable, path);
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog);
+    CatalogBaseTable result = cat.enrichCatalogTable(gravitinoBuiltTable, path);
 
     Assertions.assertSame(
         paimonNativeTable,
@@ -195,9 +223,10 @@ public class TestGravitinoPaimonCatalog {
 
     CatalogTable gravitinoBuiltTable = mock(CatalogTable.class);
 
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog);
     CatalogException ex =
         Assertions.assertThrows(
-            CatalogException.class, () -> catalog.enrichCatalogTable(gravitinoBuiltTable, path));
+            CatalogException.class, () -> cat.enrichCatalogTable(gravitinoBuiltTable, path));
 
     Assertions.assertTrue(
         ex.getMessage().contains("missing_in_paimon"),
@@ -267,8 +296,52 @@ public class TestGravitinoPaimonCatalog {
   @Test
   public void testInvalidateNativeTableCacheIsNoOpForNonFlinkCatalog() {
     // mockPaimonCatalog is AbstractCatalog, not FlinkCatalog — must not throw
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog);
     Assertions.assertDoesNotThrow(
-        () -> catalog.invalidateNativeTableCache(new ObjectPath("db", "tbl")));
+        () -> cat.invalidateNativeTableCache(new ObjectPath("db", "tbl")));
+  }
+
+  /**
+   * Verifies that {@link BaseCatalog#getTable(ObjectPath)} preserves hook-thrown CatalogException.
+   */
+  @Test
+  public void testGetTablePreservesCatalogException() {
+    TestableBaseCatalog baseCatalog = new TestableBaseCatalog();
+    CatalogException expected = new CatalogException("boom");
+    baseCatalog.toFlinkTableException = expected;
+
+    CatalogException actual =
+        Assertions.assertThrows(
+            CatalogException.class,
+            () ->
+                baseCatalog.toFlinkTable(
+                    mock(org.apache.gravitino.rel.Table.class), new ObjectPath("db", "tbl")));
+
+    Assertions.assertSame(expected, actual, "CatalogException should be rethrown as-is");
+  }
+
+  /** Verifies that successful Paimon dropTable invalidates the native cache. */
+  @Test
+  public void testDropTableInvalidatesNativeCacheAfterSuccessfulPurge() throws Exception {
+    org.apache.paimon.catalog.Catalog mockInnerCatalog =
+        mock(org.apache.paimon.catalog.Catalog.class);
+    org.apache.paimon.flink.FlinkCatalog mockFlinkCatalog =
+        mock(org.apache.paimon.flink.FlinkCatalog.class);
+    when(mockFlinkCatalog.catalog()).thenReturn(mockInnerCatalog);
+
+    org.apache.gravitino.Catalog mockCatalog = mock(org.apache.gravitino.Catalog.class);
+    org.apache.gravitino.rel.TableCatalog mockTableCatalog =
+        mock(org.apache.gravitino.rel.TableCatalog.class);
+    when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);
+    when(mockTableCatalog.purgeTable(any())).thenReturn(true);
+
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockFlinkCatalog, mockCatalog);
+    ObjectPath path = new ObjectPath("mydb", "mytable");
+    cat.dropTable(path, false);
+
+    org.apache.paimon.catalog.Identifier expected =
+        org.apache.paimon.catalog.Identifier.create("mydb", "mytable");
+    verify(mockInnerCatalog).invalidateTable(expected);
   }
 
   // ---------------------------------------------------------------------------
