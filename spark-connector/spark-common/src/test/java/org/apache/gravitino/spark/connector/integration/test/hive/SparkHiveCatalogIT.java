@@ -534,7 +534,11 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     dropTableIfExists(tableName);
     createSimpleTable(tableName);
     try {
-      // Spark V2 named catalogs do not support CREATE VIEW via SQL; this documents the limitation.
+      // CREATE VIEW via SQL is not supported for V2 named catalogs. Spark's
+      // ResolveSessionCatalog unconditionally throws for any non-session catalog
+      // (see the "case CreateView(ResolvedIdentifier(catalog, _), ...)" branch), regardless of
+      // whether the catalog implements ViewCatalog. Views must be created through the
+      // Gravitino API (ViewCatalog.createView) and are readable via SELECT.
       AnalysisException ex =
           Assertions.assertThrows(
               AnalysisException.class,
