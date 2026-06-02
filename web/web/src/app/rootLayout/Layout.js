@@ -79,12 +79,14 @@ const Layout = ({ children, scrollToTop }) => {
                 <Box sx={{ flex: 1 }}>
                   <Typography variant='body2' component='div'>
                     <Box component='span' sx={{ fontWeight: 600 }}>
-                      Try the new V2 Web UI.
+                      Try to use the V2 Web UI.
                     </Box>
                     <Box component='div' sx={{ fontFamily: 'monospace', mt: 1 }}>
                       # In &lt;path-to-gravitino&gt;/conf/gravitino-env.sh
                       <br />
-                      GRAVITINO_USE_WEB_V2=true
+                      Remove GRAVITINO_USE_WEB_V1, or set:
+                      <br />
+                      GRAVITINO_USE_WEB_V1=false
                     </Box>
                     <Box component='div' sx={{ fontFamily: 'monospace', mt: 1 }}>
                       &lt;path-to-gravitino&gt;/bin/gravitino.sh restart

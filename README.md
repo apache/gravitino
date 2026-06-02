@@ -82,16 +82,17 @@ Clone or download the [Gravitino Playground repository](https://github.com/apach
 
 Press `CTRL+C` to stop.
 
-5. (Optional) Use the new UI
+5. (Optional) Switch UI version
 
-  - To switch to the new UI at runtime: edit `conf/gravitino-env.sh` (or set the environment variable before starting) and set `GRAVITINO_USE_WEB_V2` to `true`:
+  - By default, Gravitino uses the new UI (Web V2) when `GRAVITINO_USE_WEB_V1` is unset or set to `false`.
+  - To switch to the legacy UI (Web V1) at runtime, edit `conf/gravitino-env.sh` (or set the environment variable before starting) and set `GRAVITINO_USE_WEB_V1=true`:
 
 ```bash
-export GRAVITINO_USE_WEB_V2=true
+export GRAVITINO_USE_WEB_V1=true
 ./bin/gravitino.sh start
 ```
 
-  - Alternatively, you can remove the `GRAVITINO_USE_WEB_V2=...` line from `conf/gravitino-env.sh` (the template defaults to `false`); removing that line will revert the service to the legacy UI behavior.
+  - To switch back to Web V2, remove `GRAVITINO_USE_WEB_V1=...` from `conf/gravitino-env.sh` or set `GRAVITINO_USE_WEB_V1=false`.
 
 
 ## 🧊 Iceberg REST Catalog

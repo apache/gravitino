@@ -31,6 +31,11 @@
 >
 > Before running commands, you must ensure that you are in the front-end directory `gravitino/web`. If not, run `cd web` first.
 
+> **ℹ️ UI Version Selection**
+>
+> Gravitino uses Web V2 by default when `GRAVITINO_USE_WEB_V1` is unset or set to `false`.
+> Set `GRAVITINO_USE_WEB_V1=true` in `conf/gravitino-env.sh` only when you want to force Web V1.
+
 ---
 
 ## Getting started

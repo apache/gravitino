@@ -14,11 +14,11 @@ This document outlines how users can manage metadata within Apache Gravitino usi
 
 ## UI Version 1.2.0 — Web V2 introduced
 
-Starting with version 1.2.0, Gravitino introduces Web V2. By default, the template does not set `GRAVITINO_USE_WEB_V2`, so the container or environment controls which UI is used. To force the v1 UI, explicitly set it to `false`; to enable the v2 UI, set it to `true` (for example: `export GRAVITINO_USE_WEB_V2=true`). If you want to enable Web V2 from the server env file, set the following environment variable in `conf/gravitino-env.sh` before starting the server:
+Starting with version 1.2.0, Gravitino introduces Web V2. By default, leave `GRAVITINO_USE_WEB_V1` unset (or set it to `false`) to use Web V2. Set `GRAVITINO_USE_WEB_V1=true` only when you want to force Web V1. If you want to force Web V1 from the server env file, set the following environment variable in `conf/gravitino-env.sh` before starting the server:
 
 ```bash
 # In <path-to-gravitino>/conf/gravitino-env.sh
-GRAVITINO_USE_WEB_V2=true
+GRAVITINO_USE_WEB_V1=true
 ```
 
 After changing this value, restart the Gravitino server for the change to take effect:
@@ -29,7 +29,7 @@ After changing this value, restart the Gravitino server for the change to take e
 
 ## Web V2
 
-The sections below describe the Web V2 (requires `GRAVITINO_USE_WEB_V2=true` to enable).
+The sections below describe Web V2 (default when `GRAVITINO_USE_WEB_V1` is unset or `false`).
 The Web V2 introduces additional modules (such as Jobs, Job Templates, Data Compliance, and Access) and expands table creation and editing to support more complex data types across providers.
 
 Data Compliance includes **Tags** and **Policies**. The **Access** module is visible only when `gravitino.authorization.enable=true` and includes **Users**, **User Groups**, and **Roles**.
