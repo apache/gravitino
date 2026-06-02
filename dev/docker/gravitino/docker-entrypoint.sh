@@ -50,11 +50,9 @@ if [ -d "${jdbc_driver_dir}" ]; then
   # Link JDBC drivers for the main Gravitino server.
   find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
   find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
-  find "${jdbc_driver_dir}" -name "sqlite-jdbc-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
   # Link the same JDBC drivers for the auxiliary Iceberg REST service.
   find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${iceberg_rest_lib_dir}/" \;
   find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${iceberg_rest_lib_dir}/" \;
-  find "${jdbc_driver_dir}" -name "sqlite-jdbc-*.jar" -exec ln -sfv {} "${iceberg_rest_lib_dir}/" \;
 fi
 
 # Create soft links for Iceberg bundle jars

@@ -508,7 +508,7 @@ column shows when each alias became available.
 | `GRAVITINO_OSS_EXTERNAL_ID` / `GRAVITINO_ICEBERG_REST_OSS_EXTERNAL_ID`                       | `gravitino.iceberg-rest.oss-external-id`            | (none)                                               | 1.3.0 / 1.3.0                |
 
 :::note
-The Gravitino server Docker image bundles SQLite, MySQL, and PostgreSQL JDBC drivers under
+The Gravitino server Docker image bundles MySQL and PostgreSQL JDBC drivers under
 `jdbc-drivers/`. The container startup script links them into `libs/` and
 `iceberg-rest-server/libs/` for the auxiliary Iceberg REST service.
 
@@ -538,16 +538,13 @@ docker run --rm -d \
   apache/gravitino:<tag>
 ```
 
-To configure the auxiliary Iceberg REST service with JDBC catalog and local storage:
+To configure the auxiliary Iceberg REST service with local storage:
 
 ```shell
 docker run --rm -d \
   -p 8090:8090 \
   -p 9001:9001 \
   -e GRAVITINO_WAREHOUSE=/tmp/warehouse/ \
-  -e GRAVITINO_CATALOG_BACKEND=jdbc \
-  -e GRAVITINO_URI=jdbc:sqlite::memory: \
-  -e GRAVITINO_JDBC_DRIVER=org.sqlite.JDBC \
   -e GRAVITINO_HTTP_PORT=9001 \
   apache/gravitino:<tag>
 ```

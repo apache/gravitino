@@ -71,9 +71,6 @@ wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/$mysql_dr
 pg_driver="postgresql-42.7.0.jar"
 wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${jdbc_driver_dir}/${pg_driver}"
 
-sqlite_driver="sqlite-jdbc-3.42.0.0.jar"
-wget "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/${sqlite_driver}" -O "${jdbc_driver_dir}/${sqlite_driver}"
-
 echo "Finish downloading"
 
 # Copy the Docker entrypoint and its helper script into the docker/ subdirectory so they
