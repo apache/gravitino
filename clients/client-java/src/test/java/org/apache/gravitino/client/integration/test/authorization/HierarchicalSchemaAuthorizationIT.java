@@ -41,6 +41,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -326,5 +327,21 @@ public class HierarchicalSchemaAuthorizationIT extends BaseRestApiAuthorizationI
     List<String> children = Arrays.asList(catalog.asSchemas().listSchemas("P:Q"));
     assertTrue(children.contains("P:Q:R"), "listSchemas(\"P:Q\") should include P:Q:R");
     assertTrue(children.contains("P:Q:S"), "listSchemas(\"P:Q\") should include P:Q:S");
+  }
+
+  @Test
+  @Order(10)
+  public void testDropParentHierarchicalSchemaWithChildFails() {
+    Catalog catalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    String parent = "DROP_PARENT";
+    String child = "DROP_PARENT:CHILD";
+
+    catalog.asSchemas().createSchema(parent, "parent schema", new HashMap<>());
+    catalog.asSchemas().createSchema(child, "child schema", new HashMap<>());
+
+    assertThrows(
+        NonEmptySchemaException.class, () -> catalog.asSchemas().dropSchema(parent, false));
+    assertEquals(parent, catalog.asSchemas().loadSchema(parent).name());
+    assertEquals(child, catalog.asSchemas().loadSchema(child).name());
   }
 }
