@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
@@ -912,6 +913,72 @@ public class TestJobManager {
 
     Assertions.assertThrows(
         RuntimeException.class, () -> JobManager.fetchFileFromUri(uri, stagingDir, 1000));
+  }
+
+  @Test
+  public void testFetchFileFromUriSsrfBlocked() {
+    File stagingDir = new File(testStagingDir);
+    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
+
+    // Loopback address
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> JobManager.fetchFileFromUri("http://127.0.0.1:8090/configs", stagingDir, 1000));
+
+    // AWS / GCP / Azure cloud-metadata endpoint (link-local 169.254.x.x)
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            JobManager.fetchFileFromUri(
+                "http://169.254.169.254/latest/meta-data/", stagingDir, 1000));
+
+    // RFC-1918 private range
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> JobManager.fetchFileFromUri("http://192.168.1.1/", stagingDir, 1000));
+
+    // Alibaba Cloud / Oracle Cloud metadata endpoint
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> JobManager.fetchFileFromUri("http://100.100.100.200/", stagingDir, 1000));
+  }
+
+  @Test
+  public void testValidateRemoteUri() throws Exception {
+    // Loopback
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.validateRemoteUri(new URI("http://127.0.0.1/")));
+
+    // Link-local (cloud metadata)
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.validateRemoteUri(new URI("http://169.254.169.254/")));
+
+    // RFC-1918 private 10.x.x.x
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.validateRemoteUri(new URI("http://10.0.0.1/")));
+
+    // RFC-1918 private 172.16.x.x
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.validateRemoteUri(new URI("http://172.16.0.1/")));
+
+    // RFC-1918 private 192.168.x.x
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.validateRemoteUri(new URI("http://192.168.0.1/")));
+
+    // Alibaba Cloud metadata
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.validateRemoteUri(new URI("http://100.100.100.200/")));
+
+    // localhost resolves to loopback
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobManager.validateRemoteUri(new URI("http://localhost/")));
   }
 
   @Test

@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
@@ -808,6 +809,7 @@ public class JobManager implements JobOperationDispatcher {
         case "http":
         case "https":
         case "ftp":
+          validateRemoteUri(fileUri);
           FileUtils.copyURLToFile(fileUri.toURL(), destFile, timeoutInMs, timeoutInMs);
           break;
 
@@ -828,6 +830,47 @@ public class JobManager implements JobOperationDispatcher {
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
     }
+  }
+
+  /**
+   * Resolves the host in the given URI and rejects addresses that should not be reachable from the
+   * server (loopback, link-local, RFC-1918 private ranges, cloud metadata endpoints). This is a
+   * defence-in-depth measure against Server-Side Request Forgery (SSRF).
+   */
+  @VisibleForTesting
+  static void validateRemoteUri(URI uri) throws IOException {
+    String host = uri.getHost();
+    if (host == null) {
+      throw new IllegalArgumentException("URI has no host: " + uri);
+    }
+    InetAddress[] addresses = InetAddress.getAllByName(host);
+    for (InetAddress address : addresses) {
+      if (isBlockedAddress(address)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "URI '%s' resolves to blocked address %s, access denied (SSRF prevention)",
+                uri, address.getHostAddress()));
+      }
+    }
+  }
+
+  private static boolean isBlockedAddress(InetAddress address) {
+    // Covers loopback (127.x.x.x / ::1), link-local (169.254.x.x / fe80::/10 — includes AWS/GCP/
+    // Azure metadata), RFC-1918 private (10.x / 172.16-31.x / 192.168.x), multicast, unspecified.
+    if (address.isLoopbackAddress()
+        || address.isLinkLocalAddress()
+        || address.isSiteLocalAddress()
+        || address.isMulticastAddress()
+        || address.isAnyLocalAddress()) {
+      return true;
+    }
+    // Alibaba Cloud / Oracle Cloud metadata endpoint: 100.100.100.200
+    byte[] b = address.getAddress();
+    return b.length == 4
+        && (b[0] & 0xFF) == 100
+        && (b[1] & 0xFF) == 100
+        && (b[2] & 0xFF) == 100
+        && (b[3] & 0xFF) == 200;
   }
 
   @VisibleForTesting
