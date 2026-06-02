@@ -17,25 +17,25 @@
 
 # gravitino-docs-refine skill
 
-A practical skill for refining Gravitino documentation so edits follow `docs/STYLE.md` and pass the docs audit scripts.
+A practical skill for refining Gravitino documentation so edits follow `STYLE.md` and pass the docs audit scripts.
 
 ## What it does
 
 The skill guides a concise docs refinement workflow:
 
 1. Apply focused style and heading-structure edits.
-2. Run required audits from `scripts/`.
+2. Run required audits from `.claude/skills/gravitino-docs-refine/scripts/`.
 3. Fix reported issues and re-run until clean.
 
 ### Required script checks
 
 | Script | Purpose | Command |
 |---|---|---|
-| `scripts/title_h2_audit.py` | Detect duplicate page-title H2 headings | `python3 scripts/title_h2_audit.py` |
-| `scripts/intro_audit.py` | Find content that appears before the first H2 | `python3 scripts/intro_audit.py` |
-| `scripts/heading_audit.py` | Detect heading-level order problems and level jumps | `python3 scripts/heading_audit.py` |
-| `scripts/heading_spacing_audit.py` | Enforce blank-line spacing around headings | `python3 scripts/heading_spacing_audit.py` |
-| `scripts/check_links.py` | Validate internal links and anchors in `docs/` | `python3 scripts/check_links.py docs/` |
+| `.claude/skills/gravitino-docs-refine/scripts/title_h2_audit.py` | Detect duplicate page-title H2 headings | `python3 .claude/skills/gravitino-docs-refine/scripts/title_h2_audit.py` |
+| `.claude/skills/gravitino-docs-refine/scripts/intro_audit.py` | Find content that appears before the first H2 | `python3 .claude/skills/gravitino-docs-refine/scripts/intro_audit.py` |
+| `.claude/skills/gravitino-docs-refine/scripts/heading_audit.py` | Detect heading-level order problems and level jumps | `python3 .claude/skills/gravitino-docs-refine/scripts/heading_audit.py` |
+| `.claude/skills/gravitino-docs-refine/scripts/heading_spacing_audit.py` | Enforce blank-line spacing around headings | `python3 .claude/skills/gravitino-docs-refine/scripts/heading_spacing_audit.py` |
+| `.claude/skills/gravitino-docs-refine/scripts/check_links.py` | Validate internal links and anchors in `docs/` | `python3 .claude/skills/gravitino-docs-refine/scripts/check_links.py docs/` |
 
 ## Installation
 
@@ -60,9 +60,9 @@ Ask Claude Code to apply the skill while editing docs pages:
 Recommended final gate:
 
 ```bash
-python3 scripts/title_h2_audit.py \
-  && python3 scripts/intro_audit.py \
-  && python3 scripts/heading_audit.py \
-  && python3 scripts/heading_spacing_audit.py \
-  && python3 scripts/check_links.py docs/
+python3 .claude/skills/gravitino-docs-refine/scripts/title_h2_audit.py \
+  && python3 .claude/skills/gravitino-docs-refine/scripts/intro_audit.py \
+  && python3 .claude/skills/gravitino-docs-refine/scripts/heading_audit.py \
+  && python3 .claude/skills/gravitino-docs-refine/scripts/heading_spacing_audit.py \
+  && python3 .claude/skills/gravitino-docs-refine/scripts/check_links.py docs/
 ```

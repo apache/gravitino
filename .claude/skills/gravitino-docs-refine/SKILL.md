@@ -17,7 +17,7 @@
 
 ---
 name: gravitino-docs-refine
-description: Use when refining Gravitino Markdown docs to match docs/STYLE.md and pass docs audit scripts
+description: Use when refining Gravitino Markdown docs to match STYLE.md and pass docs audit scripts
 allowed-tools: Bash
 ---
 
@@ -25,12 +25,12 @@ allowed-tools: Bash
 
 ## Overview
 
-Refine Markdown files under `docs/` with focused, reviewable edits that follow `docs/STYLE.md`.
-Always validate with the audit scripts under `scripts/` before finishing.
+Refine Markdown files under `docs/` with focused, reviewable edits that follow `STYLE.md`.
+Always validate with the audit scripts under `.claude/skills/gravitino-docs-refine/scripts/` before finishing.
 
 ## Refinement Workflow
 
-1. Read `docs/STYLE.md` and the target file end to end.
+1. Read `STYLE.md` and the target file end to end.
 2. Apply focused style and structure edits only.
 3. Run the audit scripts in the required order.
 4. Fix issues by file and line number.
@@ -42,34 +42,34 @@ Run from the repository root.
 
 | Script | What it checks | When to run |
 |---|---|---|
-| `scripts/title_h2_audit.py` | First body H2 should not duplicate frontmatter `title` | After title or opening-section edits |
-| `scripts/intro_audit.py` | Body content should not appear before the first H2 | After restructuring page openings |
-| `scripts/heading_audit.py` | Heading hierarchy: first heading is H2 and no level jumps (`H2 -> H4`) | After heading edits |
-| `scripts/heading_spacing_audit.py` | One blank line before and after each `H2`-`H6` heading | After formatting sweeps |
-| `scripts/check_links.py` | Internal Markdown links and anchors under `docs/` | Final quality gate before PR |
+| `.claude/skills/gravitino-docs-refine/scripts/title_h2_audit.py` | First body H2 should not duplicate frontmatter `title` | After title or opening-section edits |
+| `.claude/skills/gravitino-docs-refine/scripts/intro_audit.py` | Body content should not appear before the first H2 | After restructuring page openings |
+| `.claude/skills/gravitino-docs-refine/scripts/heading_audit.py` | Heading hierarchy: first heading is H2 and no level jumps (`H2 -> H4`) | After heading edits |
+| `.claude/skills/gravitino-docs-refine/scripts/heading_spacing_audit.py` | One blank line before and after each `H2`-`H6` heading | After formatting sweeps |
+| `.claude/skills/gravitino-docs-refine/scripts/check_links.py` | Internal Markdown links and anchors under `docs/` | Final quality gate before PR |
 
 ## Script Usage
 
 ```bash
-python3 scripts/title_h2_audit.py
-python3 scripts/intro_audit.py
-python3 scripts/heading_audit.py
-python3 scripts/heading_spacing_audit.py
-python3 scripts/check_links.py docs/
+python3 .claude/skills/gravitino-docs-refine/scripts/title_h2_audit.py
+python3 .claude/skills/gravitino-docs-refine/scripts/intro_audit.py
+python3 .claude/skills/gravitino-docs-refine/scripts/heading_audit.py
+python3 .claude/skills/gravitino-docs-refine/scripts/heading_spacing_audit.py
+python3 .claude/skills/gravitino-docs-refine/scripts/check_links.py docs/
 ```
 
 Run as a single gate when finishing:
 
 ```bash
-python3 scripts/title_h2_audit.py \
-  && python3 scripts/intro_audit.py \
-  && python3 scripts/heading_audit.py \
-  && python3 scripts/heading_spacing_audit.py \
-  && python3 scripts/check_links.py docs/
+python3 .claude/skills/gravitino-docs-refine/scripts/title_h2_audit.py \
+  && python3 .claude/skills/gravitino-docs-refine/scripts/intro_audit.py \
+  && python3 .claude/skills/gravitino-docs-refine/scripts/heading_audit.py \
+  && python3 .claude/skills/gravitino-docs-refine/scripts/heading_spacing_audit.py \
+  && python3 .claude/skills/gravitino-docs-refine/scripts/check_links.py docs/
 ```
 
 ## Completion Criteria
 
-- Target docs comply with `docs/STYLE.md`.
+- Target docs comply with `STYLE.md`.
 - All five scripts exit with code `0`.
 - No unrelated files are changed.
