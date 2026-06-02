@@ -72,6 +72,7 @@ public class TestIcebergViewHookDispatcher {
 
   private IcebergViewHookDispatcher hookDispatcher;
   private IcebergViewOperationDispatcher mockExecutor;
+  private IcebergNamespaceOperationDispatcher mockNamespaceDispatcher;
   private EntityStore mockEntityStore;
   private ViewDispatcher mockViewDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
@@ -86,6 +87,7 @@ public class TestIcebergViewHookDispatcher {
   @BeforeEach
   public void setUp() {
     mockExecutor = mock(IcebergViewOperationDispatcher.class);
+    mockNamespaceDispatcher = mock(IcebergNamespaceOperationDispatcher.class);
     mockEntityStore = mock(EntityStore.class);
     mockViewDispatcher = mock(ViewDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
@@ -113,7 +115,7 @@ public class TestIcebergViewHookDispatcher {
       throw new RuntimeException("Failed to setup test", e);
     }
 
-    hookDispatcher = new IcebergViewHookDispatcher(mockExecutor, METALAKE);
+    hookDispatcher = new IcebergViewHookDispatcher(mockExecutor, mockNamespaceDispatcher, METALAKE);
   }
 
   @AfterEach
@@ -283,6 +285,21 @@ public class TestIcebergViewHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdent, ":");
     verify(mockEntityStore, times(1)).delete(eq(expectedIdent), eq(Entity.EntityType.VIEW));
     verify(mockViewDispatcher, times(1)).loadView(eq(expectedIdent));
+  }
+
+  @Test
+  public void testDropViewCleansUpOrphanedSchemaEntities() throws Exception {
+    TableIdentifier viewIdent = TableIdentifier.of(Namespace.of("parent", "child"), VIEW_NAME);
+    NameIdentifier schemaIdent = NameIdentifier.of(METALAKE, CATALOG, "parent");
+    when(mockNamespaceDispatcher.namespaceExists(mockContext, Namespace.of("parent", "child")))
+        .thenReturn(false);
+    when(mockNamespaceDispatcher.namespaceExists(mockContext, Namespace.of("parent")))
+        .thenReturn(false);
+
+    hookDispatcher.dropView(mockContext, viewIdent);
+
+    verify(mockExecutor, times(1)).dropView(mockContext, viewIdent);
+    verify(mockEntityStore, times(1)).delete(schemaIdent, Entity.EntityType.SCHEMA, true);
   }
 
   @Test

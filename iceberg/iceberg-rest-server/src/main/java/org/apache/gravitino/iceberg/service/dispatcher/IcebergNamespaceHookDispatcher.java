@@ -18,24 +18,21 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+import org.apache.gravitino.utils.SchemaEntityCleaner;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -147,49 +144,24 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         () -> {
           dispatcher.dropNamespace(context, namespace);
 
-          // Only the leaf namespace is dropped from the Iceberg catalog above. getAncestorNames
-          // returns ancestors outermost-to-innermost, so we walk it in reverse (innermost outward),
-          // advancing outermostStale past every ancestor whose Iceberg namespace no longer exists
-          // and stopping at the first ancestor that still exists. outermostStale therefore ends up
-          // as the outermost missing ancestor; everything from there down to the leaf is now stale
-          // in Gravitino.
-          //
-          // An inner Iceberg namespace cannot exist unless all of its outer ancestors do, so an
-          // ancestor missing from the catalog implies none of its descendants exist there
-          // either. A single cascade delete of the outermost empty namespace therefore removes
-          // it and every descendant Gravitino entity (the leaf plus the intermediate ancestors)
-          // in one batched operation, rather than issuing one delete per target.
+          // Only the leaf namespace is dropped from the Iceberg catalog above. Dropping it may have
+          // also emptied its ancestors, so clean up every Gravitino schema entity whose Iceberg
+          // namespace no longer exists. An inner Iceberg namespace cannot exist unless all of its
+          // outer ancestors do, so the cleaner cascade-deletes the outermost stale namespace and
+          // every descendant entity in one batched operation.
           //
           // Ancestor entities are still only cleaned up when the underlying Iceberg catalog
           // removes the empty parents on leaf-drop, which is catalog-implementation-dependent.
           // For catalogs that keep empty parents, operators may need to drop them manually.
           String separator = HierarchicalSchemaUtil.schemaSeparator();
-          Namespace outermostStale = namespace;
-          String namespaceName = String.join(separator, namespace.levels());
-          List<String> ancestorNames =
-              HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator);
-          for (int i = ancestorNames.size() - 1; i >= 0; i--) {
-            Namespace ancestor = Namespace.of(ancestorNames.get(i).split(Pattern.quote(separator)));
-            if (dispatcher.namespaceExists(context, ancestor)) {
-              break;
-            }
-            outermostStale = ancestor;
-          }
-
-          EntityStore store = GravitinoEnv.getInstance().entityStore();
-          if (store != null) {
-            try {
-              store.delete(
-                  IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                      metalake, catalogName, outermostStale, separator),
-                  Entity.EntityType.SCHEMA,
-                  true);
-            } catch (NoSuchEntityException ignore) {
-              // Already gone.
-            } catch (IOException ioe) {
-              throw new RuntimeException("io exception when deleting schema entity", ioe);
-            }
-          }
+          SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+              GravitinoEnv.getInstance().entityStore(),
+              IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+                  metalake, catalogName, namespace, separator),
+              true,
+              schemaIdent ->
+                  dispatcher.namespaceExists(
+                      context, Namespace.of(schemaIdent.name().split(Pattern.quote(separator)))));
           return null;
         });
   }

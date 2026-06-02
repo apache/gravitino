@@ -74,6 +74,7 @@ public class TestIcebergTableHookDispatcher {
 
   private IcebergTableHookDispatcher hookDispatcher;
   private IcebergTableOperationDispatcher mockDispatcher;
+  private IcebergNamespaceOperationDispatcher mockNamespaceDispatcher;
   private EntityStore mockEntityStore;
   private TableDispatcher mockTableDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
@@ -88,6 +89,7 @@ public class TestIcebergTableHookDispatcher {
   public void setUp() throws IllegalAccessException {
     // Mock the underlying dispatcher
     mockDispatcher = mock(IcebergTableOperationDispatcher.class);
+    mockNamespaceDispatcher = mock(IcebergNamespaceOperationDispatcher.class);
 
     // Mock GravitinoEnv components
     mockEntityStore = mock(EntityStore.class);
@@ -115,7 +117,7 @@ public class TestIcebergTableHookDispatcher {
     IcebergRESTServerContext.create(mockConfigProvider, false, false, true, null);
 
     // Create hook dispatcher
-    hookDispatcher = new IcebergTableHookDispatcher(mockDispatcher);
+    hookDispatcher = new IcebergTableHookDispatcher(mockDispatcher, mockNamespaceDispatcher);
 
     // Mock request context
     mockContext = mock(IcebergRequestContext.class);
@@ -212,6 +214,21 @@ public class TestIcebergTableHookDispatcher {
             TEST_METALAKE, TEST_CATALOG, tableId, ":");
     verify(mockEntityStore).delete(expectedIdentifier, Entity.EntityType.TABLE);
     verify(mockTableDispatcher).loadTable(expectedIdentifier);
+  }
+
+  @Test
+  public void testDropTableCleansUpOrphanedSchemaEntities() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of(Namespace.of("parent", "child"), "test_table");
+    NameIdentifier schemaIdent = NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "parent");
+    when(mockNamespaceDispatcher.namespaceExists(mockContext, Namespace.of("parent", "child")))
+        .thenReturn(false);
+    when(mockNamespaceDispatcher.namespaceExists(mockContext, Namespace.of("parent")))
+        .thenReturn(false);
+
+    hookDispatcher.dropTable(mockContext, tableId, false);
+
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+    verify(mockEntityStore).delete(schemaIdent, Entity.EntityType.SCHEMA, true);
   }
 
   @Test

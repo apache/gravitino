@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
+import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -29,6 +30,7 @@ import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+import org.apache.gravitino.utils.SchemaEntityCleaner;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -53,10 +55,15 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private static final Logger LOG = LoggerFactory.getLogger(IcebergViewHookDispatcher.class);
 
   private final IcebergViewOperationDispatcher dispatcher;
+  private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
   private final String metalake;
 
-  public IcebergViewHookDispatcher(IcebergViewOperationDispatcher dispatcher, String metalake) {
+  public IcebergViewHookDispatcher(
+      IcebergViewOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher,
+      String metalake) {
     this.dispatcher = dispatcher;
+    this.namespaceDispatcher = namespaceDispatcher;
     this.metalake = metalake;
   }
 
@@ -101,6 +108,7 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // another node may recreate the same view between the drop above and the
     // EntityStore delete, leaving a stale Gravitino entity if we blindly delete.
     bestEffortReconcileViewEntity(context, viewIdentifier);
+    bestEffortCleanUpOrphanedSchemaEntities(context, viewIdentifier.namespace());
   }
 
   @Override
@@ -236,6 +244,28 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
               + "succeeded. catalog={}, view={}",
           context.catalogName(),
           viewIdentifier,
+          e);
+    }
+  }
+
+  private void bestEffortCleanUpOrphanedSchemaEntities(
+      IcebergRequestContext context, Namespace namespace) {
+    try {
+      String separator = HierarchicalSchemaUtil.schemaSeparator();
+      SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+          GravitinoEnv.getInstance().entityStore(),
+          IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+              metalake, context.catalogName(), namespace, separator),
+          true,
+          schemaIdent ->
+              namespaceDispatcher.namespaceExists(
+                  context, Namespace.of(schemaIdent.name().split(Pattern.quote(separator)))));
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to clean up orphaned Gravitino schema entities after the Iceberg backend operation "
+              + "succeeded. catalog={}, namespace={}",
+          context.catalogName(),
+          namespace,
           e);
     }
   }

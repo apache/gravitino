@@ -119,13 +119,19 @@ public class RESTService implements GravitinoAuxiliaryService {
             skipAuthorizationForRestBackend,
             icebergCatalogWrapperManager);
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    // The raw namespace operation executor is shared with the table and view hook dispatchers so
+    // their orphan-schema cleanup can probe namespace existence without firing namespace events.
+    IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
+        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
+
     // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
     IcebergTableOperationDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {
-      icebergTableEventDispatcher = new IcebergTableHookDispatcher(icebergTableEventDispatcher);
+      icebergTableEventDispatcher =
+          new IcebergTableHookDispatcher(icebergTableEventDispatcher, namespaceOperationDispatcher);
     }
     IcebergTableOperationDispatcher icebergTableDispatcher = icebergTableEventDispatcher;
 
@@ -136,13 +142,12 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {
       icebergViewEventDispatcher =
-          new IcebergViewHookDispatcher(icebergViewEventDispatcher, metalakeName);
+          new IcebergViewHookDispatcher(
+              icebergViewEventDispatcher, namespaceOperationDispatcher, metalakeName);
     }
     IcebergViewOperationDispatcher icebergViewDispatcher = icebergViewEventDispatcher;
 
     // Namespace: HookDispatcher -> EventDispatcher -> OperationExecutor
-    IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
-        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
     IcebergNamespaceOperationDispatcher icebergNamespaceEventDispatcher =
         new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {

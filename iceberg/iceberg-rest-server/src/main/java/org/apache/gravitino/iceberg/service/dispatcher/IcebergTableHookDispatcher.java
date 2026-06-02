@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -34,6 +35,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.SchemaEntityCleaner;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -53,10 +55,14 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableHookDispatcher.class);
 
   private final IcebergTableOperationDispatcher dispatcher;
+  private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
   private String metalake;
 
-  public IcebergTableHookDispatcher(IcebergTableOperationDispatcher dispatcher) {
+  public IcebergTableHookDispatcher(
+      IcebergTableOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher) {
     this.dispatcher = dispatcher;
+    this.namespaceDispatcher = namespaceDispatcher;
     this.metalake = IcebergRESTServerContext.getInstance().metalakeName();
   }
 
@@ -100,6 +106,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     // another node may recreate the same table between the drop above and the
     // EntityStore delete, leaving a stale Gravitino entity if we blindly delete.
     bestEffortReconcileTableEntity(context, tableIdentifier);
+    bestEffortCleanUpOrphanedSchemaEntities(context, tableIdentifier.namespace());
   }
 
   @Override
@@ -252,6 +259,28 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
               + "succeeded. catalog={}, table={}",
           context.catalogName(),
           tableIdentifier,
+          e);
+    }
+  }
+
+  private void bestEffortCleanUpOrphanedSchemaEntities(
+      IcebergRequestContext context, Namespace namespace) {
+    try {
+      String separator = HierarchicalSchemaUtil.schemaSeparator();
+      SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+          GravitinoEnv.getInstance().entityStore(),
+          IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+              metalake, context.catalogName(), namespace, separator),
+          true,
+          schemaIdent ->
+              namespaceDispatcher.namespaceExists(
+                  context, Namespace.of(schemaIdent.name().split(Pattern.quote(separator)))));
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to clean up orphaned Gravitino schema entities after the Iceberg backend operation "
+              + "succeeded. catalog={}, namespace={}",
+          context.catalogName(),
+          namespace,
           e);
     }
   }

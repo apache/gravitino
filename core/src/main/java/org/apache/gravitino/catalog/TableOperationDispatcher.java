@@ -65,6 +65,7 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.SchemaEntityCleaner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -356,7 +357,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // 2. Is found in the catalog but not in the store (not managed by Gravitino)
           // 3. Is found in the catalog and the store (managed by Gravitino)
           // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the schema from the store, but we don't take the
+          // In all situations, we try to delete the table from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
           try {
@@ -365,6 +366,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
           } catch (Exception e) {
             throw new RuntimeException(e);
+          }
+          if (droppedFromCatalog) {
+            SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+                store,
+                schemaIdentifier,
+                true,
+                schemaIdent ->
+                    doWithCatalog(
+                        catalogIdent,
+                        c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
+                        RuntimeException.class));
           }
           return droppedFromCatalog;
         });
@@ -409,7 +421,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // 2. Is found in the catalog but not in the store (not managed by Gravitino)
           // 3. Is found in the catalog and the store (managed by Gravitino)
           // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the schema from the store, but we don't take the
+          // In all situations, we try to delete the table from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
           try {
@@ -419,6 +431,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             return false;
           } catch (Exception e) {
             throw new RuntimeException(e);
+          }
+          if (droppedFromCatalog) {
+            SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+                store,
+                schemaIdentifier,
+                true,
+                schemaIdent ->
+                    doWithCatalog(
+                        catalogIdent,
+                        c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
+                        RuntimeException.class));
           }
           return droppedFromCatalog;
         });

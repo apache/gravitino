@@ -52,6 +52,7 @@ import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.SchemaEntityCleaner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -291,6 +292,17 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
           } catch (Exception e) {
             throw new RuntimeException(e);
+          }
+          if (droppedFromCatalog) {
+            SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+                store,
+                schemaIdentifier,
+                true,
+                schemaIdent ->
+                    doWithCatalog(
+                        catalogIdent,
+                        c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
+                        RuntimeException.class));
           }
           return droppedFromCatalog;
         });
