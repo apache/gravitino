@@ -33,6 +33,7 @@ import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   private static final List<String> JDBC_PROPERTIES =
@@ -77,7 +78,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 true /* required */,
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */,
+                true /* hidden */,
                 false /* reserved */),
             stringPropertyEntry(
                 JdbcConfig.PASSWORD.getKey(),
@@ -85,7 +86,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 true /* required */,
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */,
+                true /* hidden */,
                 false /* reserved */),
             integerPropertyEntry(
                 JdbcConfig.POOL_MIN_SIZE.getKey(),

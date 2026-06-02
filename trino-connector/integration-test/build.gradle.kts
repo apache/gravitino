@@ -28,6 +28,11 @@ repositories {
 }
 
 dependencies {
+  // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
+  constraints {
+    testImplementation(libs.thrift)
+  }
+
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))

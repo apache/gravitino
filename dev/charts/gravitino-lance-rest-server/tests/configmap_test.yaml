@@ -1,0 +1,137 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino lance rest server configmap
+templates:
+  - configmap.yaml
+tests:
+  - it: fails when Gravitino metalake is missing for the default backend
+    asserts:
+      - failedTemplate:
+          errorMessage: "lanceRest.gravitinoMetalake must be set when namespaceBackend is gravitino"
+
+  - it: renders default config files
+    release:
+      name: lance-rest
+      namespace: lance-system
+    set:
+      lanceRest:
+        gravitinoMetalake: lrs_test
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: lance-rest-gravitino-lance-rest-server-helm
+      - equal:
+          path: metadata.namespace
+          value: lance-system
+      - exists:
+          path: data["init.sh"]
+      - exists:
+          path: data["gravitino-lance-rest-server.conf"]
+      - exists:
+          path: data["gravitino-lance-rest-log4j2.properties"]
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: "start-lance-rest-server\\.sh"
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.httpPort = 9101"
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.namespace-backend = gravitino"
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.gravitino-uri = http://gravitino-server:8090"
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.gravitino-metalake = lrs_test"
+      - matchRegex:
+          path: data["gravitino-lance-rest-log4j2.properties"]
+          pattern: "rootLogger\\.level = info"
+      - matchRegex:
+          path: data["gravitino-lance-rest-log4j2.properties"]
+          pattern: "appender\\.console\\.type = Console"
+
+  - it: renders customized Lance REST and log4j configuration
+    release:
+      name: custom-lance-rest
+    set:
+      lanceRest:
+        shutdownTimeout: 6000
+        host: 127.0.0.1
+        httpPort: 19101
+        minThreads: 12
+        maxThreads: 120
+        stopTimeout: 45000
+        idleTimeout: 45000
+        threadPoolWorkQueueSize: 64
+        requestHeaderSize: 65536
+        responseHeaderSize: 65536
+        namespaceBackend: gravitino
+        gravitinoUri: http://gravitino.test:8090
+        gravitinoMetalake: lrs_custom
+      additionalConfigItems:
+        gravitino.lance-rest.custom.setting: "{{ .Release.Name }}"
+      log4j2Properties:
+        status: error
+        rootLoggerLevel: debug
+      additionalLog4j2Properties:
+        logger.custom.name: org.apache.gravitino.Custom
+    asserts:
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.shutdown\\.timeout = 6000"
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.host = 127\\.0\\.0\\.1"
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.httpPort = 19101"
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.gravitino-uri = http://gravitino\\.test:8090"
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.gravitino-metalake = lrs_custom"
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.custom\\.setting = custom-lance-rest"
+      - matchRegex:
+          path: data["gravitino-lance-rest-log4j2.properties"]
+          pattern: "status = error"
+      - matchRegex:
+          path: data["gravitino-lance-rest-log4j2.properties"]
+          pattern: "rootLogger\\.level = debug"
+      - matchRegex:
+          path: data["gravitino-lance-rest-log4j2.properties"]
+          pattern: "logger\\.custom\\.name = org\\.apache\\.gravitino\\.Custom"
+
+  - it: skips Gravitino metalake when the backend is not gravitino
+    set:
+      lanceRest:
+        namespaceBackend: memory
+    asserts:
+      - matchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.namespace-backend = memory"
+      - notMatchRegex:
+          path: data["gravitino-lance-rest-server.conf"]
+          pattern: "gravitino\\.lance-rest\\.gravitino-metalake ="

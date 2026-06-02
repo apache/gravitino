@@ -16,3 +16,8 @@
 # under the License.
 
 from gravitino.dto.authorization.owner_dto import OwnerDTO
+from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
+from gravitino.dto.authorization.role_dto import RoleDTO
+from gravitino.dto.authorization.securable_object_dto import SecurableObjectDTO
+
+__all__ = ["OwnerDTO", "PrivilegeDTO", "RoleDTO", "SecurableObjectDTO"]

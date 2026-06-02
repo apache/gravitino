@@ -200,6 +200,7 @@ public class TestFunctionEvent {
     FunctionInfo[] functionInfos = ((ListFunctionInfosEvent) event).functionInfos();
     Assertions.assertEquals(1, functionInfos.length);
     checkFunctionInfo(functionInfos[0], function);
+    Assertions.assertEquals(1, ((ListFunctionInfosEvent) event).resultCount());
     Assertions.assertEquals(OperationType.LIST_FUNCTION_INFOS, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
@@ -341,7 +342,7 @@ public class TestFunctionEvent {
         .thenReturn(function);
     when(dispatcher.getFunction(any(NameIdentifier.class))).thenReturn(function);
     when(dispatcher.dropFunction(any(NameIdentifier.class))).thenReturn(true);
-    when(dispatcher.listFunctions(any(Namespace.class))).thenReturn(null);
+    when(dispatcher.listFunctions(any(Namespace.class))).thenReturn(new NameIdentifier[0]);
     when(dispatcher.listFunctionInfos(any(Namespace.class))).thenReturn(new Function[] {function});
     when(dispatcher.alterFunction(any(NameIdentifier.class), any(FunctionChange.class)))
         .thenReturn(function);

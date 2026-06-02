@@ -19,16 +19,20 @@
 
 package org.apache.gravitino.iceberg.service.rest.authorization;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import ognl.OgnlException;
 import org.apache.gravitino.iceberg.service.rest.IcebergViewOperations;
 import org.apache.gravitino.iceberg.service.rest.IcebergViewRenameOperations;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -181,11 +185,68 @@ public class TestIcebergViewAuthorizationExpression {
                 "METALAKE::USE_SCHEMA",
                 "METALAKE::USE_CATALOG")));
 
-    // CREATE_VIEW grants load permission to allow catalog implementations that call viewExists()
-    // during creation to work
+    // CREATE_VIEW alone does NOT grant the primary load-view permission; existence checks for
+    // view creation are handled by the allowCheckExistence expression -- see
+    // {@link
+    // AuthorizationExpressionConstants#ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION}
+    // and {@link #testIcebergLoadViewAllowCheckExistenceAuthorizationExpression()} below.
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of("SCHEMA::CREATE_VIEW", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
+  }
+
+  @Test
+  public void testIcebergLoadViewAllowCheckExistenceAuthorizationExpression() throws OgnlException {
+    // Existence-check expression used by LoadViewAuthzHandler when the primary load-view expression
+    // denies: should allow schema-level principals with create-view or table-access privileges to
+    // resolve a view identifier (existence check) even without full load-view privileges.
+    String expression =
+        AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION;
+    MockAuthorizationExpressionEvaluator mockEvaluator =
+        new MockAuthorizationExpressionEvaluator(expression);
+
+    // No privileges -> denied.
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
+
+    // CREATE_VIEW + USE_SCHEMA + USE_CATALOG -> allowed: lets catalog implementations that call
+    // viewExists() during creation succeed.
     assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::CREATE_VIEW", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
+
+    // Table-side grants also pass the secondary check (used for resolving view backing tables).
+    assertTrue(
+        mockEvaluator.getResult(
+            ImmutableSet.of("SCHEMA::SELECT_TABLE", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
+    assertTrue(
+        mockEvaluator.getResult(
+            ImmutableSet.of("SCHEMA::CREATE_TABLE", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
+
+    // Missing USE_SCHEMA -> denied.
+    assertFalse(
+        mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_VIEW", "CATALOG::USE_CATALOG")));
+    // Missing USE_CATALOG -> denied.
+    assertFalse(
+        mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_VIEW", "SCHEMA::USE_SCHEMA")));
+  }
+
+  @Test
+  public void testLoadViewIcebergAuthorizationMetadata() throws NoSuchMethodException {
+    Method method =
+        IcebergViewOperations.class.getMethod("loadView", String.class, String.class, String.class);
+    AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
+    assertEquals(
+        AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION,
+        annotation.expression());
+    assertEquals(
+        AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION,
+        annotation.allowCheckExistence());
+
+    Parameter viewParameter = method.getParameters()[2];
+    IcebergAuthorizationMetadata icebergMetadata =
+        viewParameter.getAnnotation(IcebergAuthorizationMetadata.class);
+    assertNotNull(icebergMetadata);
+    assertEquals(IcebergAuthorizationMetadata.RequestType.LOAD_VIEW, icebergMetadata.type());
   }
 
   @Test

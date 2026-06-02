@@ -29,6 +29,7 @@ import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -51,8 +52,10 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -103,6 +106,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -290,8 +294,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final EntityStore store;
 
+  @Nullable private final CatalogChangeLogListener catalogChangeLogListener;
+
   private final IdGenerator idGenerator;
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
+  private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
+      new ConcurrentHashMap<>();
+
+  // Set to true when a CatalogChangeLogListener is active. markLocalMutation() is a no-op
+  // unless this flag is set, preventing unbounded growth of localMutationCounts in deployments
+  // that do not use a relational entity store (where the poller never runs).
+  private volatile boolean trackLocalMutations = false;
 
   /**
    * Constructs a CatalogManager instance.
@@ -328,6 +341,21 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             .setNameFormat("catalog-cleaner-%d")
                             .build())))
             .build();
+
+    // If the entity store maintains a change log, register a listener that invalidates this
+    // manager's local catalog cache from cross-node changes, and enable local-mutation tracking so
+    // changes made by this node are not redundantly re-invalidated. Registration is the last step
+    // of
+    // the constructor so the listener never sees a half-initialized manager (catalogCache and
+    // localMutationCounts are already set). CatalogChangeLogListener stays an implementation detail
+    // of this class rather than being wired externally.
+    if (store instanceof SupportsEntityChangeLog) {
+      this.trackLocalMutations = true;
+      this.catalogChangeLogListener = new CatalogChangeLogListener(this);
+      ((SupportsEntityChangeLog) store).registerEntityChangeLogListener(catalogChangeLogListener);
+    } else {
+      this.catalogChangeLogListener = null;
+    }
   }
 
   /**
@@ -336,6 +364,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   @Override
   public void close() {
+    if (catalogChangeLogListener != null) {
+      ((SupportsEntityChangeLog) store).unregisterEntityChangeLogListener(catalogChangeLogListener);
+      trackLocalMutations = false;
+      localMutationCounts.clear();
+    }
     catalogCache.invalidateAll();
   }
 
@@ -352,6 +385,48 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public void addCatalogCacheRemoveListener(Consumer<NameIdentifier> listener) {
     removalListeners.add(listener);
+  }
+
+  /**
+   * Records that this process has just mutated the given catalog locally. The entity change log
+   * poller will see the corresponding change log row and should skip cache invalidation for it
+   * because this process already updated the cache.
+   *
+   * @param ident the catalog identifier (pre-mutation name for renames)
+   */
+  void markLocalMutation(NameIdentifier ident) {
+    if (!trackLocalMutations) {
+      return;
+    }
+    localMutationCounts.computeIfAbsent(ident, k -> new AtomicInteger()).incrementAndGet();
+  }
+
+  /**
+   * Attempts to consume one local mutation marker for the given identifier.
+   *
+   * <p>Thread-safety note: {@link ConcurrentHashMap#computeIfPresent} executes the remapping
+   * function atomically under a per-bucket lock, so {@code consumed[0]} is set and the counter is
+   * decremented as a single atomic step. {@code consumed[0]} is a single-element array (the
+   * standard Java pattern for a mutable capture in a lambda) that is only read by this thread after
+   * {@code computeIfPresent} returns, so no additional synchronization is needed.
+   *
+   * @return true if a local mutation was pending and has been consumed (caller should skip
+   *     invalidation), false if the change originated from a remote node
+   */
+  boolean consumeLocalMutation(NameIdentifier ident) {
+    boolean[] consumed = {false};
+    localMutationCounts.computeIfPresent(
+        ident,
+        (k, count) -> {
+          consumed[0] = true;
+          return count.decrementAndGet() <= 0 ? null : count;
+        });
+    return consumed[0];
+  }
+
+  @VisibleForTesting
+  void setTrackLocalMutations(boolean trackLocalMutations) {
+    this.trackLocalMutations = trackLocalMutations;
   }
 
   /**
@@ -612,6 +687,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
+            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             return null;
           } catch (IOException e) {
@@ -652,6 +728,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
+            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             return null;
           } catch (IOException e) {
@@ -738,6 +815,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // the old catalog identifier from the store (after the invalidate) will get
             // NoSuchCatalogException instead of stale data. Invalidating before the update creates
             // a window where the background thread repopulates the cache with the old entity.
+            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
             // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
@@ -812,6 +890,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // Invalidate after store.delete() to prevent a background thread from repopulating
             // the cache with stale data between invalidate and delete.
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
+            if (deleted) {
+              markLocalMutation(ident);
+            }
             catalogCache.invalidate(ident);
             return deleted;
 
@@ -1331,6 +1412,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
             return newCatalogBuilder.build();
           });
+      markLocalMutation(nameIdentifier);
       catalogCache.invalidate(nameIdentifier);
 
     } catch (NoSuchCatalogException e) {

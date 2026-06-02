@@ -22,12 +22,15 @@ package org.apache.gravitino.audit.v2;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.AuditLog;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 
@@ -101,7 +104,17 @@ public class SimpleAuditLogV2 implements AuditLog {
   @Override
   public String toString() {
     Map<String, String> info = customInfo();
-    String customInfoStr = info != null && !info.isEmpty() ? info.toString() : "";
+    List<String> parts = new ArrayList<>();
+    if (info != null) {
+      info.forEach((k, v) -> parts.add(k + "=" + v));
+    }
+    if (event instanceof ListEvent) {
+      int count = ((ListEvent) event).resultCount();
+      if (count >= 0) {
+        parts.add("count=" + count);
+      }
+    }
+    String customInfoStr = parts.isEmpty() ? "" : "{" + String.join(", ", parts) + "}";
     return String.format(
         "[%s]\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
         TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(timestamp())),
