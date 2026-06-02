@@ -77,6 +77,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.inmemory.InMemoryFileIO;
 import org.apache.iceberg.io.CloseableIterable;
@@ -235,34 +236,29 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private static LoadCredentialsResponse getRESTTableCredentials(
       RESTCatalog restCatalog, TableIdentifier identifier) {
-    try {
-      Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
-      String credentialsPath =
-          ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials";
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
+    String credentialsPath =
+        ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials";
 
-      try (AuthManager authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
-          RESTClient client =
-              HTTPClient.builder(properties)
-                  .uri(properties.get(CatalogProperties.URI))
-                  .withHeaders(RESTUtil.configHeaders(properties))
-                  .build();
-          AuthSession authSession = authManager.catalogSession(client, properties)) {
-        return client
-            .withAuthSession(authSession)
-            .get(
-                credentialsPath,
-                LoadCredentialsResponse.class,
-                Collections.emptyMap(),
-                ErrorHandlers.tableErrorHandler());
-      }
-    } catch (NoSuchTableException e) {
-      throw e;
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to load table credentials from REST catalog backend for table: {}",
-          identifier,
-          e);
-      return ImmutableLoadCredentialsResponse.builder().build();
+    try (AuthManager authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
+        RESTClient client =
+            HTTPClient.builder(properties)
+                .uri(properties.get(CatalogProperties.URI))
+                .withHeaders(RESTUtil.configHeaders(properties))
+                .build();
+        AuthSession authSession = authManager.catalogSession(client, properties)) {
+      return client
+          .withAuthSession(authSession)
+          .get(
+              credentialsPath,
+              LoadCredentialsResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.tableErrorHandler());
+    } catch (IOException e) {
+      throw new RESTException(
+          e,
+          "Failed to close REST client resources when loading credentials for table: %s",
+          identifier);
     }
   }
 

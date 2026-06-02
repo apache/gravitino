@@ -61,7 +61,10 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.NotAuthorizedException;
+import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -209,11 +212,111 @@ public class TestCatalogWrapperForREST {
                   "/tmp/warehouse"));
       CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
 
-      LoadCredentialsResponse response =
-          wrapper.getTableCredentials(
-              TableIdentifier.of(Namespace.of("db"), "tbl"), CredentialPrivilege.READ);
+      Assertions.assertThrows(
+          ServiceFailureException.class,
+          () ->
+              wrapper.getTableCredentials(
+                  TableIdentifier.of(Namespace.of("db"), "tbl"), CredentialPrivilege.READ));
+    } finally {
+      server.stop(0);
+    }
+  }
 
-      Assertions.assertTrue(response.credentials().isEmpty());
+  @Test
+  void testRESTTableCredentialsOnForbidden() throws Exception {
+    String errorJson =
+        "{\"error\":{\"message\":\"Forbidden\",\"type\":\"ForbiddenException\","
+            + "\"code\":403,\"stack\":[]}}";
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          byte[] body = errorJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(403, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      Assertions.assertThrows(
+          ForbiddenException.class,
+          () ->
+              wrapper.getTableCredentials(
+                  TableIdentifier.of(Namespace.of("db"), "tbl"), CredentialPrivilege.READ));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void testRESTTableCredentialsOnUnauthorized() throws Exception {
+    String errorJson =
+        "{\"error\":{\"message\":\"Not authorized\",\"type\":\"NotAuthorizedException\","
+            + "\"code\":401,\"stack\":[]}}";
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          byte[] body = errorJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(401, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      Assertions.assertThrows(
+          NotAuthorizedException.class,
+          () ->
+              wrapper.getTableCredentials(
+                  TableIdentifier.of(Namespace.of("db"), "tbl"), CredentialPrivilege.READ));
     } finally {
       server.stop(0);
     }
