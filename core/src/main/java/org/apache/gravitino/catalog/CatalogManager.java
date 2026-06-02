@@ -294,6 +294,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final EntityStore store;
 
+  @Nullable private final CatalogChangeLogListener catalogChangeLogListener;
+
   private final IdGenerator idGenerator;
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
@@ -349,8 +351,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // of this class rather than being wired externally.
     if (store instanceof SupportsEntityChangeLog) {
       this.trackLocalMutations = true;
-      ((SupportsEntityChangeLog) store)
-          .registerEntityChangeLogListener(new CatalogChangeLogListener(this));
+      this.catalogChangeLogListener = new CatalogChangeLogListener(this);
+      ((SupportsEntityChangeLog) store).registerEntityChangeLogListener(catalogChangeLogListener);
+    } else {
+      this.catalogChangeLogListener = null;
     }
   }
 
@@ -360,6 +364,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   @Override
   public void close() {
+    if (catalogChangeLogListener != null) {
+      ((SupportsEntityChangeLog) store).unregisterEntityChangeLogListener(catalogChangeLogListener);
+      trackLocalMutations = false;
+      localMutationCounts.clear();
+    }
     catalogCache.invalidateAll();
   }
 
@@ -881,7 +890,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // Invalidate after store.delete() to prevent a background thread from repopulating
             // the cache with stale data between invalidate and delete.
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
-            markLocalMutation(ident);
+            if (deleted) {
+              markLocalMutation(ident);
+            }
             catalogCache.invalidate(ident);
             return deleted;
 
