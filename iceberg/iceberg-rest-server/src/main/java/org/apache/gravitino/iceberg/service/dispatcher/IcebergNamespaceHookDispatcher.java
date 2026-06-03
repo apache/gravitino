@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Pattern;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -114,7 +113,8 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // probing once we hit one that exists.
     List<Namespace> missing = new ArrayList<>();
     for (int i = ancestorNames.size() - 1; i >= 0; i--) {
-      Namespace ancestor = Namespace.of(ancestorNames.get(i).split(Pattern.quote(separator)));
+      Namespace ancestor =
+          Namespace.of(HierarchicalSchemaUtil.splitSchemaName(ancestorNames.get(i), separator));
       if (dispatcher.namespaceExists(context, ancestor)) {
         break;
       }
@@ -161,7 +161,9 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
               true,
               schemaIdent ->
                   dispatcher.namespaceExists(
-                      context, Namespace.of(schemaIdent.name().split(Pattern.quote(separator)))));
+                      context,
+                      Namespace.of(
+                          HierarchicalSchemaUtil.splitSchemaName(schemaIdent.name(), separator))));
           return null;
         });
   }
