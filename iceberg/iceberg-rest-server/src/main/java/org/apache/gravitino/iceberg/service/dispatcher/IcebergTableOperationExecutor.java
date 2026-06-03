@@ -134,6 +134,9 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       return;
     }
 
+    // Async purge needs the cleanup manager, which only exists in auxiliary mode. A request may
+    // still ask for async purge in standalone mode (empty manager); there is no async engine to
+    // enqueue into, so we fall back to synchronous purge rather than fail the request.
     cleanupManager.ifPresentOrElse(
         manager -> {
           // Read the metadata location before dropping the catalog entry, then enqueue the job. The

@@ -137,7 +137,7 @@ public class RESTService implements GravitinoAuxiliaryService {
       this.cleanupManager = Optional.empty();
       LOG.info(
           "Async Iceberg table cleanup is only available in auxiliary mode; "
-              + "purge requests fall back to synchronous purge.");
+              + "purge requests with async mode will fall back to synchronous purge.");
     }
     // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =

@@ -23,9 +23,12 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper;
+import org.apache.gravitino.iceberg.service.cleanup.mapper.provider.IcebergCleanupMapperPackageProvider;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.ibatis.session.Configuration;
 
 /**
  * Persistence for {@code iceberg_cleanup_job}, layered on the Gravitino entity store's shared
@@ -47,6 +50,31 @@ public class IcebergCleanupJobStore {
    */
   public IcebergCleanupJobStore(IdGenerator idGenerator) {
     this.idGenerator = idGenerator;
+    registerMappers();
+  }
+
+  /**
+   * Registers the cleanup mappers into the entity store's shared MyBatis configuration.
+   *
+   * <p>The {@link IcebergCleanupMapperPackageProvider} SPI is discovered by {@code ServiceLoader}
+   * when {@code SqlSessionFactoryHelper} builds the factory. In deploy mode, however, the factory
+   * is built by the Gravitino core during startup, while the iceberg-rest-server runs in an
+   * isolated auxiliary-service class loader whose {@code META-INF/services} entry is invisible to
+   * that loader. The mappers therefore never reach the registry and every cleanup query fails with
+   * {@code BindingException}. Re-registering here, from within the isolated class loader that can
+   * see the mapper classes, closes that gap. The {@code hasMapper} guard keeps it idempotent and
+   * harmless when the SPI already registered them (e.g. in single-class-loader unit tests).
+   */
+  private static void registerMappers() {
+    Configuration configuration =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().getConfiguration();
+    for (Class<?> mapper : new IcebergCleanupMapperPackageProvider().getMapperClasses()) {
+      synchronized (configuration) {
+        if (!configuration.hasMapper(mapper)) {
+          configuration.addMapper(mapper);
+        }
+      }
+    }
   }
 
   /**

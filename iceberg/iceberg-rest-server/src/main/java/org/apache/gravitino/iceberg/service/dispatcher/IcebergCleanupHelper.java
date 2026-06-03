@@ -61,7 +61,7 @@ final class IcebergCleanupHelper {
       String catalogName,
       Namespace namespace,
       String tableName) {
-    if (!cleanupManager.isPresent()) {
+    if (cleanupManager.isEmpty()) {
       return;
     }
     long catalogId;
