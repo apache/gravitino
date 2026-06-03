@@ -43,6 +43,8 @@ export const checkCatalogIcon = ({ type, provider }) => {
           return 'custom-icons-starrocks'
         case 'lakehouse-generic':
           return 'custom-icons-lakehouse'
+        case 'glue':
+          return 'logos:aws-glue'
         case 'jdbc-clickhouse':
           return 'custom-icons-clickhouse'
         default:
