@@ -24,26 +24,37 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.util.ArrayList;
+import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.connector.GenericColumn;
+import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -52,6 +63,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
 import org.lance.WriteParams;
@@ -164,28 +176,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       return table;
     }
 
-    List<TableChange> changes = new ArrayList<>();
-    if (!emptySchema) {
-      for (Column column : table.columns()) {
-        changes.add(TableChange.deleteColumn(new String[] {column.name()}, true));
-      }
-    } else {
-      // When the stored schema is empty there are no old columns to delete first. Add a
-      // protective deleteColumn(ifExists=true) for each incoming column so that a second
-      // concurrent loadTable that arrives after the first has already committed the repair
-      // will issue a no-op delete rather than failing with "column already exists".
-      for (Column column : columns) {
-        changes.add(TableChange.deleteColumn(new String[] {column.name()}, true));
-      }
-    }
-    addColumnChanges(changes, columns);
-    changes.add(
-        TableChange.setProperty(
-            LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion)));
-    changes.add(TableChange.removeProperty(LanceConstants.LANCE_TABLE_DECLARED));
-    // This is a metadata-only repair. Calling super avoids replaying these column changes against
-    // the Lance dataset that we just read from.
-    return super.alterTable(ident, changes.toArray(new TableChange[0]));
+    return repairTableMetadata(ident, columns, datasetVersion);
   }
 
   @Override
@@ -425,13 +416,21 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   private boolean isDeclaredOnly(Table table) {
-    return Optional.ofNullable(table.properties().get(LanceConstants.LANCE_TABLE_DECLARED))
+    return isDeclaredOnly(table.properties());
+  }
+
+  private boolean isDeclaredOnly(Map<String, String> properties) {
+    return Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_DECLARED))
         .map(Boolean::parseBoolean)
         .orElse(false);
   }
 
   private boolean isDatasetVersionChanged(Table table, long datasetVersion) {
-    String version = table.properties().get(LanceConstants.LANCE_TABLE_VERSION);
+    return isDatasetVersionChanged(table.properties(), datasetVersion);
+  }
+
+  private boolean isDatasetVersionChanged(Map<String, String> properties, long datasetVersion) {
+    String version = properties.get(LanceConstants.LANCE_TABLE_VERSION);
     if (StringUtils.isBlank(version)) {
       return true;
     }
@@ -440,20 +439,6 @@ public class LanceTableOperations extends ManagedTableOperations {
       return Long.parseLong(version) != datasetVersion;
     } catch (NumberFormatException e) {
       return true;
-    }
-  }
-
-  private void addColumnChanges(List<TableChange> changes, Column[] columns) {
-    for (Column column : columns) {
-      changes.add(
-          TableChange.addColumn(
-              new String[] {column.name()},
-              column.dataType(),
-              column.comment(),
-              null,
-              column.nullable(),
-              column.autoIncrement(),
-              column.defaultValue()));
     }
   }
 
@@ -469,6 +454,101 @@ public class LanceTableOperations extends ManagedTableOperations {
                     false,
                     DEFAULT_VALUE_NOT_SET))
         .toArray(Column[]::new);
+  }
+
+  private Table repairTableMetadata(NameIdentifier ident, Column[] columns, long datasetVersion) {
+    try {
+      TableEntity tableEntity =
+          store.update(
+              ident,
+              TableEntity.class,
+              Entity.EntityType.TABLE,
+              current -> {
+                if (!needsSchemaRefresh(current, datasetVersion)) {
+                  return current;
+                }
+                return replaceColumnsFromDataset(current, columns, datasetVersion);
+              });
+      return toGenericTable(tableEntity);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTableException(e, "Table %s does not exist", ident);
+    } catch (EntityAlreadyExistsException e) {
+      throw new IllegalArgumentException("Failed to repair table " + ident, e);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to repair table " + ident, e);
+    }
+  }
+
+  private boolean needsSchemaRefresh(TableEntity tableEntity, long datasetVersion) {
+    return isDeclaredOnly(tableEntity.properties())
+        || tableEntity.columns().isEmpty()
+        || isDatasetVersionChanged(tableEntity.properties(), datasetVersion);
+  }
+
+  private TableEntity replaceColumnsFromDataset(
+      TableEntity tableEntity, Column[] columns, long datasetVersion) {
+    Map<String, String> updatedProperties = new HashMap<>(tableEntity.properties());
+    updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
+    updatedProperties.remove(LanceConstants.LANCE_TABLE_DECLARED);
+
+    AuditInfo columnAuditInfo =
+        AuditInfo.builder()
+            .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+            .withCreateTime(Instant.now())
+            .build();
+    List<ColumnEntity> columnEntities =
+        IntStream.range(0, columns.length)
+            .mapToObj(
+                i ->
+                    ColumnEntity.toColumnEntity(
+                        columns[i], i, idGenerator.nextId(), columnAuditInfo))
+            .collect(Collectors.toList());
+
+    return TableEntity.builder()
+        .withId(tableEntity.id())
+        .withName(tableEntity.name())
+        .withNamespace(tableEntity.namespace())
+        .withComment(tableEntity.comment())
+        .withColumns(columnEntities)
+        .withProperties(updatedProperties)
+        .withPartitioning(tableEntity.partitioning())
+        .withDistribution(tableEntity.distribution())
+        .withSortOrders(tableEntity.sortOrders())
+        .withIndexes(tableEntity.indexes())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(tableEntity.auditInfo().creator())
+                .withCreateTime(tableEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .build();
+  }
+
+  private GenericTable toGenericTable(TableEntity tableEntity) {
+    return GenericTable.builder()
+        .withName(tableEntity.name())
+        .withComment(tableEntity.comment())
+        .withColumns(
+            tableEntity.columns().stream().map(this::toGenericColumn).toArray(Column[]::new))
+        .withProperties(tableEntity.properties())
+        .withAuditInfo(tableEntity.auditInfo())
+        .withSortOrders(tableEntity.sortOrders())
+        .withPartitioning(tableEntity.partitioning())
+        .withDistribution(tableEntity.distribution())
+        .withIndexes(tableEntity.indexes())
+        .build();
+  }
+
+  private GenericColumn toGenericColumn(ColumnEntity columnEntity) {
+    return GenericColumn.builder()
+        .withName(columnEntity.name())
+        .withComment(columnEntity.comment())
+        .withAutoIncrement(columnEntity.autoIncrement())
+        .withNullable(columnEntity.nullable())
+        .withType(columnEntity.dataType())
+        .withDefaultValue(columnEntity.defaultValue())
+        .build();
   }
 
   /**

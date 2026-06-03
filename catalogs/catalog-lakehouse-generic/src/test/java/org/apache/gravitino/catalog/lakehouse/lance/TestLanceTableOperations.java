@@ -277,6 +277,72 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testVersionCheckRefreshIsIdempotentWhenCurrentEntityWasAlreadyRepaired()
+      throws Exception {
+    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("concurrent-version-check-table").toString();
+    TableEntity staleTableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(10L)
+                    .withName("old_col")
+                    .withDataType(Types.StringType.get())
+                    .withPosition(0)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
+    TableEntity alreadyRepairedTableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(11L)
+                    .withName("id")
+                    .withDataType(Types.IntegerType.get())
+                    .withPosition(0)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build(),
+                ColumnEntity.builder()
+                    .withId(12L)
+                    .withName("name")
+                    .withDataType(Types.StringType.get())
+                    .withPosition(1)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "9"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(staleTableEntity);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              return updater.apply(alreadyRepairedTableEntity);
+            });
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(
+            new Schema(
+                List.of(
+                    Field.nullable("id", new ArrowType.Int(32, true)),
+                    Field.nullable("name", new ArrowType.Utf8()))));
+    when(dataset.version()).thenReturn(9L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loadedTable =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(2, loadedTable.columns().length);
+    Assertions.assertEquals("id", loadedTable.columns()[0].name());
+    Assertions.assertEquals("name", loadedTable.columns()[1].name());
+    Assertions.assertEquals("9", loadedTable.properties().get(LANCE_TABLE_VERSION));
+  }
+
+  @Test
   public void testAlterTablePersistsUpdatedLanceVersion() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("alter-table").toString();
