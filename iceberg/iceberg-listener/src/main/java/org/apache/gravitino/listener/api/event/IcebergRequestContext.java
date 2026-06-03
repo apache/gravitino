@@ -26,6 +26,9 @@ import java.util.Map;
 /** The general request context information for Iceberg REST operations. */
 public class IcebergRequestContext {
 
+  /** Header that opts a drop purge request into asynchronous file cleanup. */
+  public static final String ASYNC_PURGE_HEADER = "X-Gravitino-Async-Purge";
+
   private final String catalogName;
   private final String userName;
   private final String remoteHostName;
@@ -92,6 +95,24 @@ public class IcebergRequestContext {
    */
   public Map<String, String> httpHeaders() {
     return httpHeaders;
+  }
+
+  /**
+   * Checks whether this request opted into asynchronous table purge.
+   *
+   * <p>Async purge is opt-in. Standard Iceberg clients send no header and keep synchronous purge
+   * behavior; a client opts in with {@code X-Gravitino-Async-Purge: true}.
+   *
+   * @return true only when the async purge header explicitly says {@code true}
+   */
+  public boolean asyncPurge() {
+    for (Map.Entry<String, String> header : httpHeaders.entrySet()) {
+      // HTTP header names are case-insensitive; the value is matched exactly as "true".
+      if (ASYNC_PURGE_HEADER.equalsIgnoreCase(header.getKey())) {
+        return "true".equals(header.getValue().trim());
+      }
+    }
+    return false;
   }
 
   /**
