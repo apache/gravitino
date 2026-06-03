@@ -30,31 +30,12 @@ repositories {
 }
 
 val glueHiveJarsDir = "$buildDir/tmp/glue-hive-jars"
-val glueLibsBase =
-  "https://raw.githubusercontent.com/datastrato/spark-hive-glue-libs/main/spark3/glue-3.4.0"
-val mavenCentral = "https://repo1.maven.org/maven2"
-
 // Jars for Spark's IsolatedClientLoader: patched Hive 2.3.10 + Glue datacatalog client.
 // aws-java-sdk-glue 1.12.31 requires PropertyNamingStrategy$PascalCaseStrategy which was
-// removed in Jackson 2.12. Jackson 2.11.x is included here so the isolated classloader
-// uses a compatible version instead of the app-level Jackson bundled with Spark (2.14+).
-val glueHiveJarDownloads =
-  mapOf(
-    "aws-glue-datacatalog-spark-client-3.4.0.jar" to
-      "$glueLibsBase/aws-glue-datacatalog-spark-client-3.4.0.jar",
-    "aws-java-sdk-core-1.12.31.jar" to "$glueLibsBase/aws-java-sdk-core-1.12.31.jar",
-    "aws-java-sdk-glue-1.12.31.jar" to "$glueLibsBase/aws-java-sdk-glue-1.12.31.jar",
-    "hive-common-2.3.10.jar" to "$glueLibsBase/hive-common-2.3.10.jar",
-    "hive-exec-2.3.10.jar" to "$glueLibsBase/hive-exec-2.3.10.jar",
-    "hive-metastore-2.3.10.jar" to "$glueLibsBase/hive-metastore-2.3.10.jar",
-    "hive-serde-2.3.10.jar" to "$glueLibsBase/hive-serde-2.3.10.jar",
-    "hive-shims-2.3.10.jar" to "$glueLibsBase/hive-shims-2.3.10.jar",
-    "jmespath-java-1.12.31.jar" to "$glueLibsBase/jmespath-java-1.12.31.jar",
-    "jackson-core-2.12.3.jar" to "$glueLibsBase/jackson-core-2.12.3.jar",
-    "jackson-databind-2.12.3.jar" to "$glueLibsBase/jackson-databind-2.12.3.jar",
-    "jackson-annotations-2.12.3.jar" to "$glueLibsBase/jackson-annotations-2.12.3.jar",
-    "jackson-dataformat-cbor-2.12.3.jar" to "$glueLibsBase/jackson-dataformat-cbor-2.12.3.jar"
-  )
+// removed in Jackson 2.12. Jackson included here so the isolated classloader uses a compatible
+// version instead of the app-level Jackson bundled with Spark (2.14+).
+val glueLibsApiUrl =
+  "https://api.github.com/repos/datastrato/spark-hive-glue-libs/contents/spark3/glue-3.4.0"
 
 val downloadGlueHiveJars by
 tasks.registering {
@@ -62,15 +43,23 @@ tasks.registering {
   doLast {
     val outputDir = file(glueHiveJarsDir)
     outputDir.mkdirs()
-    glueHiveJarDownloads.forEach { (jarName, url) ->
-      val dest = outputDir.resolve(jarName)
-      if (!dest.exists()) {
-        logger.lifecycle("Downloading $jarName ...")
-        URI(url).toURL().openStream().use { input ->
-          dest.outputStream().use { output -> input.copyTo(output) }
+    val response = URI(glueLibsApiUrl).toURL().readText()
+
+    @Suppress("UNCHECKED_CAST")
+    val entries = groovy.json.JsonSlurper().parseText(response) as List<Map<String, Any>>
+    entries
+      .filter { (it["name"] as String).endsWith(".jar") }
+      .forEach { entry ->
+        val jarName = entry["name"] as String
+        val downloadUrl = entry["download_url"] as String
+        val dest = outputDir.resolve(jarName)
+        if (!dest.exists()) {
+          logger.lifecycle("Downloading $jarName ...")
+          URI(downloadUrl).toURL().openStream().use { input ->
+            dest.outputStream().use { output -> input.copyTo(output) }
+          }
         }
       }
-    }
   }
 }
 
