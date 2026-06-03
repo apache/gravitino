@@ -202,9 +202,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   /**
    * Get table credentials.
    *
-   * @param identifier The table identifier for which to load credentials
-   * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
-   *     the credentials.
+   * @param identifier table identifier
+   * @param privilege used for local credential vending; ignored for REST catalog backends
+   * @return table credentials response
    */
   public LoadCredentialsResponse getTableCredentials(
       TableIdentifier identifier, CredentialPrivilege privilege) {
