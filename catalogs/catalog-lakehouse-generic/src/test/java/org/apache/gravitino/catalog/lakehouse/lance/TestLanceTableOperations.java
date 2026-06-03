@@ -37,6 +37,7 @@ import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -273,6 +274,52 @@ public class TestLanceTableOperations {
     verify(dataset, never()).getSchema();
     verify(store, never())
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testAlterTablePersistsUpdatedLanceVersion() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("alter-table").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(10L)
+                    .withName("id")
+                    .withDataType(Types.IntegerType.get())
+                    .withPosition(0)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    AtomicReference<TableEntity> storedTable = new AtomicReference<>();
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              TableEntity updated = updater.apply(tableEntity);
+              storedTable.set(updated);
+              return updated;
+            });
+
+    Dataset dataset = mock(Dataset.class);
+    Version version = mock(Version.class);
+    when(dataset.getVersion()).thenReturn(version);
+    when(version.getId()).thenReturn(9L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table alteredTable =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.alterTable(
+                    ident, TableChange.deleteColumn(new String[] {"id"}, false)));
+
+    Assertions.assertEquals("9", alteredTable.properties().get(LANCE_TABLE_VERSION));
+    Assertions.assertEquals("9", storedTable.get().properties().get(LANCE_TABLE_VERSION));
   }
 
   @Test

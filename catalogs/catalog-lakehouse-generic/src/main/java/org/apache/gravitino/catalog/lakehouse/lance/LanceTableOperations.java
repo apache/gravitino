@@ -26,7 +26,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,7 +37,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
-import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -260,20 +258,10 @@ public class LanceTableOperations extends ManagedTableOperations {
     // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
-    GenericTable table = (GenericTable) super.alterTable(ident, changes);
-    Map<String, String> updatedProperties = new HashMap<>(table.properties());
-    updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
-    return GenericTable.builder()
-        .withName(table.name())
-        .withColumns(table.columns())
-        .withComment(table.comment())
-        .withProperties(updatedProperties)
-        .withAuditInfo(table.auditInfo())
-        .withPartitioning(table.partitioning())
-        .withSortOrders(table.sortOrder())
-        .withDistribution(table.distribution())
-        .withIndexes(table.index())
-        .build();
+    TableChange[] metadataChanges = Arrays.copyOf(changes, changes.length + 1);
+    metadataChanges[changes.length] =
+        TableChange.setProperty(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
+    return super.alterTable(ident, metadataChanges);
   }
 
   @Override
