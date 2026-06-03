@@ -38,7 +38,7 @@ class TestIcebergRequestContext {
   @Test
   void testTrueHeaderIsAsync() {
     Assertions.assertTrue(
-        new IcebergRequestContext(requestWithAsyncPurgeHeader(" True "), "cat").asyncPurge());
+        new IcebergRequestContext(requestWithAsyncPurgeHeader(" true "), "cat").asyncPurge());
   }
 
   @Test
@@ -54,16 +54,16 @@ class TestIcebergRequestContext {
   }
 
   @Test
-  void testLowercaseValueIsSync() {
-    // HTTP header values are case-sensitive; only the exact value "True" opts in.
+  void testUppercaseValueIsSync() {
+    // HTTP header values are case-sensitive; only the exact value "true" opts in.
     Assertions.assertFalse(
-        new IcebergRequestContext(requestWithAsyncPurgeHeader("true"), "cat").asyncPurge());
+        new IcebergRequestContext(requestWithAsyncPurgeHeader("True"), "cat").asyncPurge());
   }
 
   @Test
   void testHeaderNameIsCaseInsensitive() {
     Assertions.assertTrue(
-        new IcebergRequestContext(requestWithHeader("x-gravitino-async-purge", "True"), "cat")
+        new IcebergRequestContext(requestWithHeader("x-gravitino-async-purge", "true"), "cat")
             .asyncPurge());
   }
 

@@ -239,7 +239,7 @@ public class IcebergRESTAsyncPurgeIT extends BaseIT {
     props.put("rest.auth.basic.username", USER);
     props.put("rest.auth.basic.password", "mock");
     // Opt every request from this client into async purge.
-    props.put("header." + IcebergRequestContext.ASYNC_PURGE_HEADER, "True");
+    props.put("header." + IcebergRequestContext.ASYNC_PURGE_HEADER, "true");
     RESTCatalog catalog = new RESTCatalog();
     catalog.setConf(new Configuration());
     catalog.initialize("async_purge", ImmutableMap.copyOf(props));

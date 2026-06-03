@@ -120,15 +120,15 @@ public class IcebergRequestContext {
    * Checks whether this request opted into asynchronous table purge.
    *
    * <p>Async purge is opt-in. Standard Iceberg clients send no header and keep synchronous purge
-   * behavior; a client opts in with {@code X-Gravitino-Async-Purge: True}.
+   * behavior; a client opts in with {@code X-Gravitino-Async-Purge: true}.
    *
-   * @return true only when the async purge header explicitly says {@code True}
+   * @return true only when the async purge header explicitly says {@code true}
    */
   public boolean asyncPurge() {
     for (Map.Entry<String, String> header : httpHeaders.entrySet()) {
-      // HTTP header names are case-insensitive; the value is matched exactly as "True".
+      // HTTP header names are case-insensitive; the value is matched exactly as "true".
       if (ASYNC_PURGE_HEADER.equalsIgnoreCase(header.getKey())) {
-        return "True".equals(header.getValue().trim());
+        return "true".equals(header.getValue().trim());
       }
     }
     return false;

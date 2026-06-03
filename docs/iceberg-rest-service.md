@@ -95,9 +95,9 @@ You can also specify filter parameters by setting configuration entries in the s
 
 By default, dropping a table with `purgeRequested=true` is synchronous: the catalog entry and the table files are removed before the `DELETE` returns.
 
-When the Iceberg REST service runs inside Gravitino (as an auxiliary service), a client can instead request asynchronous purge by adding the header `X-Gravitino-Async-Purge: True` to `DELETE ...?purgeRequested=true`. The drop then returns `204 No Content` once the table is removed from the catalog, and the files are deleted in the background. The table is gone from `LIST` immediately, but recreating it (`createTable` / `registerTable` with the same name) returns `409 Conflict` until the file cleanup finishes.
+When the Iceberg REST service runs inside Gravitino (as an auxiliary service), a client can instead request asynchronous purge by adding the header `X-Gravitino-Async-Purge: true` to `DELETE ...?purgeRequested=true`. The drop then returns `204 No Content` once the table is removed from the catalog, and the files are deleted in the background. The table is gone from `LIST` immediately, but recreating it (`createTable` / `registerTable` with the same name) returns `409 Conflict` until the file cleanup finishes.
 
-The header name is case-insensitive (per the HTTP standard), but its value must be exactly `True`. Any other value, or no header, uses the synchronous default, so standard Iceberg clients are unaffected. Asynchronous purge is only available in auxiliary mode; in standalone mode the header is ignored.
+The header name is case-insensitive (per the HTTP standard), but its value must be exactly `true`. Any other value, or no header, uses the synchronous default, so standard Iceberg clients are unaffected. Asynchronous purge is only available in auxiliary mode; in standalone mode the header is ignored.
 
 The settings below tune the background workers and are optional.
 
