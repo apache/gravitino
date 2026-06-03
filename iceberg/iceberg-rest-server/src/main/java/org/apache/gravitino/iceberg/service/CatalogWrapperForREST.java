@@ -77,7 +77,6 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
-import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.inmemory.InMemoryFileIO;
 import org.apache.iceberg.io.CloseableIterable;
@@ -240,13 +239,17 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     String credentialsPath =
         ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials";
 
-    try (AuthManager authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
-        RESTClient client =
-            HTTPClient.builder(properties)
-                .uri(properties.get(CatalogProperties.URI))
-                .withHeaders(RESTUtil.configHeaders(properties))
-                .build();
-        AuthSession authSession = authManager.catalogSession(client, properties)) {
+    AuthManager authManager = null;
+    RESTClient client = null;
+    AuthSession authSession = null;
+    try {
+      authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
+      client =
+          HTTPClient.builder(properties)
+              .uri(properties.get(CatalogProperties.URI))
+              .withHeaders(RESTUtil.configHeaders(properties))
+              .build();
+      authSession = authManager.catalogSession(client, properties);
       return client
           .withAuthSession(authSession)
           .get(
@@ -254,11 +257,33 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
               LoadCredentialsResponse.class,
               Collections.emptyMap(),
               ErrorHandlers.tableErrorHandler());
-    } catch (IOException e) {
-      throw new RESTException(
-          e,
-          "Failed to close REST client resources when loading credentials for table: %s",
-          identifier);
+    } finally {
+      if (authSession != null) {
+        try {
+          authSession.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close auth session when loading credentials for table: {}", identifier, e);
+        }
+      }
+
+      if (client != null) {
+        try {
+          client.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close REST client when loading credentials for table: {}", identifier, e);
+        }
+      }
+
+      if (authManager != null) {
+        try {
+          authManager.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close auth manager when loading credentials for table: {}", identifier, e);
+        }
+      }
     }
   }
 
