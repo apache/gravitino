@@ -1008,6 +1008,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @throws NoSuchCatalogException If the specified catalog does not exist.
    */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
+    CatalogWrapper wrapper = catalogCache.get(ident, this::loadCatalogInternal);
+    if (wrapper.catalog() != null) {
+      return wrapper;
+    }
+
+    catalogCache.asMap().remove(ident, wrapper);
     return catalogCache.get(ident, this::loadCatalogInternal);
   }
 
