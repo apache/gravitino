@@ -1018,7 +1018,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         .toArray(Column[]::new);
   }
 
-  private static org.apache.flink.table.api.Schema.Builder buildSchemaFromColumns(
+  protected static org.apache.flink.table.api.Schema.Builder buildSchemaFromColumns(
       Column[] columns) {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
@@ -1033,7 +1033,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   private static Representation[] buildSqlRepresentation(String dialect, String sql) {
     return new Representation[] {
-      SQLRepresentation.builder().withDialect(dialect).withSql(sql).build()
+      SQLRepresentation.builder().withDialect(dialect).withSql(sql).build(),
+      SQLRepresentation.builder().withDialect(Dialects.QUERY_DIALECT).withSql(sql).build()
     };
   }
 

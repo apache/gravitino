@@ -39,5 +39,11 @@ public final class Dialects {
   /** The Apache Flink SQL dialect. */
   public static final String FLINK = "flink";
 
+  /**
+   * The generic query dialect used as a canonical SQL representation when no engine-specific
+   * dialect is available (e.g. Paimon view stored in Hive metastore).
+   */
+  public static final String QUERY_DIALECT = "query";
+
   private Dialects() {}
 }

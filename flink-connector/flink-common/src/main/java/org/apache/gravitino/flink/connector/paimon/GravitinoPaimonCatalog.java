@@ -22,12 +22,16 @@ package org.apache.gravitino.flink.connector.paimon;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.CatalogView;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.NameIdentifier;
@@ -35,6 +39,9 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+import org.apache.gravitino.rel.Dialects;
+import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -68,6 +75,32 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @Override
   protected AbstractCatalog realCatalog() {
     return paimonCatalog;
+  }
+
+  @Override
+  protected CatalogView toFlinkView(View view) {
+    Schema.Builder builder = buildSchemaFromColumns(view.columns());
+    String sql =
+        view.sqlFor(Dialects.FLINK)
+            .map(SQLRepresentation::sql)
+            .orElseGet(
+                () ->
+                    view.sqlFor(Dialects.QUERY_DIALECT)
+                        .map(SQLRepresentation::sql)
+                        .orElseThrow(
+                            () ->
+                                new CatalogException(
+                                    String.format(
+                                        "View '%s' in catalog '%s' has no SQL representation for dialect '%s' or '%s'",
+                                        view.name(),
+                                        catalogName(),
+                                        Dialects.FLINK,
+                                        Dialects.QUERY_DIALECT))));
+    Map<String, String> properties =
+        view.properties() != null
+            ? Collections.unmodifiableMap(view.properties())
+            : Collections.emptyMap();
+    return CatalogView.of(builder.build(), view.comment(), sql, sql, properties);
   }
 
   @Override

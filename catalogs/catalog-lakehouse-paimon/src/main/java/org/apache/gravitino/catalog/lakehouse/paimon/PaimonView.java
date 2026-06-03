@@ -116,19 +116,26 @@ final class PaimonView implements View {
       Preconditions.checkArgument(
           representation instanceof SQLRepresentation, "Paimon only supports SQL representations");
       SQLRepresentation sqlRepresentation = (SQLRepresentation) representation;
-      String normalizedDialect = sqlRepresentation.dialect().toLowerCase(Locale.ROOT);
-      Preconditions.checkArgument(
-          !dialectQueries.containsKey(normalizedDialect),
-          "Only one representation per dialect is allowed (case-insensitive). Found duplicate: %s",
-          sqlRepresentation.dialect());
-      dialectQueries.put(normalizedDialect, sqlRepresentation.sql());
-      if (query == null) {
+      if (PAIMON_VIEW_QUERY.equalsIgnoreCase(sqlRepresentation.dialect())) {
+        Preconditions.checkArgument(
+            query == null,
+            "Only one representation with dialect '%s' is allowed",
+            PAIMON_VIEW_QUERY);
         query = sqlRepresentation.sql();
+      } else {
+        String normalizedDialect = sqlRepresentation.dialect().toLowerCase(Locale.ROOT);
+        Preconditions.checkArgument(
+            !dialectQueries.containsKey(normalizedDialect),
+            "Only one representation per dialect is allowed (case-insensitive). Found duplicate: %s",
+            sqlRepresentation.dialect());
+        dialectQueries.put(normalizedDialect, sqlRepresentation.sql());
       }
     }
 
     Preconditions.checkArgument(
-        query != null && !query.isEmpty(), "representations must not be null or empty");
+        query != null && !query.isEmpty(),
+        "View representation with dialect '%s' must not be null or empty",
+        PAIMON_VIEW_QUERY);
 
     Map<String, String> options = properties == null ? new HashMap<>() : new HashMap<>(properties);
     if (defaultCatalog != null) {
