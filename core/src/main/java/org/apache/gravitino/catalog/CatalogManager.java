@@ -1001,7 +1001,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   /**
    * Loads the catalog with the specified identifier, wraps it in a CatalogWrapper, and caches the
-   * wrapper for reuse.
+   * wrapper for reuse. If the cached wrapper has already been closed (its underlying catalog is
+   * null), the stale entry is evicted and a fresh wrapper is loaded and cached.
    *
    * @param ident The identifier of the catalog to load.
    * @return The wrapped CatalogWrapper containing the loaded catalog.
@@ -1013,6 +1014,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       return wrapper;
     }
 
+    // The cached wrapper has already been closed (catalog() == null), e.g. by a prior
+    // dropCatalog or cache eviction. Evict the stale entry and reload a fresh one.
+    // Use a conditional remove so we do not clobber a wrapper that another thread may
+    // have concurrently reloaded into the cache between our initial get and this remove.
     catalogCache.asMap().remove(ident, wrapper);
     return catalogCache.get(ident, this::loadCatalogInternal);
   }
