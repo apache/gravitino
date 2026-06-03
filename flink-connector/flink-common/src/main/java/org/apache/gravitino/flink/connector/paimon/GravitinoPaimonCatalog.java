@@ -40,6 +40,7 @@ import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.gravitino.rel.Dialects;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -75,6 +76,14 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @Override
   protected AbstractCatalog realCatalog() {
     return paimonCatalog;
+  }
+
+  @Override
+  protected Representation[] buildViewRepresentations(String sql) {
+    return new Representation[] {
+      SQLRepresentation.builder().withDialect(Dialects.FLINK).withSql(sql).build(),
+      SQLRepresentation.builder().withDialect(Dialects.QUERY_DIALECT).withSql(sql).build()
+    };
   }
 
   @Override
