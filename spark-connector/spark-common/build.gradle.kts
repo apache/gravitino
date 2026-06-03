@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import java.net.URI
+
 plugins {
   `maven-publish`
   id("java")
@@ -157,6 +159,40 @@ dependencies {
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+// Jars for Spark's IsolatedClientLoader: patched Hive 2.3.10 + Glue datacatalog client.
+// aws-java-sdk-glue 1.12.31 requires PropertyNamingStrategy$PascalCaseStrategy which was
+// removed in Jackson 2.12. Jackson included here so the isolated classloader uses a compatible
+// version instead of the app-level Jackson bundled with Spark (2.14+).
+val glueHiveJarsDir = "$buildDir/tmp/glue-hive-jars"
+val glueLibsApiUrl =
+  "https://api.github.com/repos/datastrato/spark-hive-glue-libs/contents/spark3/glue-3.4.0"
+
+val downloadGlueHiveJars by
+tasks.registering {
+  outputs.dir(glueHiveJarsDir)
+  doLast {
+    val outputDir = file(glueHiveJarsDir)
+    outputDir.mkdirs()
+    val response = URI(glueLibsApiUrl).toURL().readText()
+
+    @Suppress("UNCHECKED_CAST")
+    val entries = groovy.json.JsonSlurper().parseText(response) as List<Map<String, Any>>
+    entries
+      .filter { (it["name"] as String).endsWith(".jar") }
+      .forEach { entry ->
+        val jarName = entry["name"] as String
+        val downloadUrl = entry["download_url"] as String
+        val dest = outputDir.resolve(jarName)
+        if (!dest.exists()) {
+          logger.lifecycle("Downloading $jarName ...")
+          URI(downloadUrl).toURL().openStream().use { input ->
+            dest.outputStream().use { output -> input.copyTo(output) }
+          }
+        }
+      }
+  }
 }
 
 tasks.test {

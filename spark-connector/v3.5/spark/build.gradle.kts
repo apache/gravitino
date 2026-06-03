@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import java.net.URI
-
 plugins {
   `maven-publish`
   id("java")
@@ -29,39 +27,8 @@ repositories {
   mavenCentral()
 }
 
-val glueHiveJarsDir = "$buildDir/tmp/glue-hive-jars"
-// Jars for Spark's IsolatedClientLoader: patched Hive 2.3.10 + Glue datacatalog client.
-// aws-java-sdk-glue 1.12.31 requires PropertyNamingStrategy$PascalCaseStrategy which was
-// removed in Jackson 2.12. Jackson included here so the isolated classloader uses a compatible
-// version instead of the app-level Jackson bundled with Spark (2.14+).
-val glueLibsApiUrl =
-  "https://api.github.com/repos/datastrato/spark-hive-glue-libs/contents/spark3/glue-3.4.0"
-
-val downloadGlueHiveJars by
-tasks.registering {
-  outputs.dir(glueHiveJarsDir)
-  doLast {
-    val outputDir = file(glueHiveJarsDir)
-    outputDir.mkdirs()
-    val response = URI(glueLibsApiUrl).toURL().readText()
-
-    @Suppress("UNCHECKED_CAST")
-    val entries = groovy.json.JsonSlurper().parseText(response) as List<Map<String, Any>>
-    entries
-      .filter { (it["name"] as String).endsWith(".jar") }
-      .forEach { entry ->
-        val jarName = entry["name"] as String
-        val downloadUrl = entry["download_url"] as String
-        val dest = outputDir.resolve(jarName)
-        if (!dest.exists()) {
-          logger.lifecycle("Downloading $jarName ...")
-          URI(downloadUrl).toURL().openStream().use { input ->
-            dest.outputStream().use { output -> input.copyTo(output) }
-          }
-        }
-      }
-  }
-}
+val glueHiveJarsDir =
+  project(":spark-connector:spark-common").buildDir.resolve("tmp/glue-hive-jars").absolutePath
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
@@ -221,7 +188,7 @@ tasks.test {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
-    dependsOn(downloadGlueHiveJars)
+    dependsOn(":spark-connector:spark-common:downloadGlueHiveJars")
     jvmArgs("-Dglue.hive-jars-dir=$glueHiveJarsDir")
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")

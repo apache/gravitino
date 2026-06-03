@@ -181,6 +181,9 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+val glueHiveJarsDir =
+  project(":spark-connector:spark-common").buildDir.resolve("tmp/glue-hive-jars").absolutePath
+
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
@@ -191,6 +194,8 @@ tasks.test {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
+    dependsOn(":spark-connector:spark-common:downloadGlueHiveJars")
+    jvmArgs("-Dglue.hive-jars-dir=$glueHiveJarsDir")
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")
