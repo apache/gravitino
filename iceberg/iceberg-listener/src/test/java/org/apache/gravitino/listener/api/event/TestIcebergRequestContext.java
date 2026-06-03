@@ -58,8 +58,7 @@ class TestIcebergRequestContext {
 
   @Test
   void testHeaderNameIsCaseInsensitive() {
-    Assertions.assertTrue(
-        context(Map.of("x-gravitino-async-purge", "true")).asyncPurge());
+    Assertions.assertTrue(context(Map.of("x-gravitino-async-purge", "true")).asyncPurge());
   }
 
   private static IcebergRequestContext context(Map<String, String> headers) {
