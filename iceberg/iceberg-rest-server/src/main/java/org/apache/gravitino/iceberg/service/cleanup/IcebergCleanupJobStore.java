@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper;
-import org.apache.gravitino.iceberg.service.cleanup.mapper.provider.IcebergCleanupMapperPackageProvider;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -54,25 +53,22 @@ public class IcebergCleanupJobStore {
   }
 
   /**
-   * Registers the cleanup mappers into the entity store's shared MyBatis configuration.
+   * Registers the cleanup mapper into the entity store's shared MyBatis configuration.
    *
-   * <p>The {@link IcebergCleanupMapperPackageProvider} SPI is discovered by {@code ServiceLoader}
-   * when {@code SqlSessionFactoryHelper} builds the factory. In deploy mode, however, the factory
-   * is built by the Gravitino core during startup, while the iceberg-rest-server runs in an
-   * isolated auxiliary-service class loader whose {@code META-INF/services} entry is invisible to
-   * that loader. The mappers therefore never reach the registry and every cleanup query fails with
-   * {@code BindingException}. Re-registering here, from within the isolated class loader that can
-   * see the mapper classes, closes that gap. The {@code hasMapper} guard keeps it idempotent and
-   * harmless when the SPI already registered them (e.g. in single-class-loader unit tests).
+   * <p>Gravitino core builds the shared {@code SqlSessionFactory} during startup, before any
+   * auxiliary service is loaded, and in deploy mode the iceberg-rest-server runs in an isolated
+   * auxiliary-service class loader that core cannot see into. Core therefore cannot discover this
+   * module's mapper, and without it every cleanup query fails with {@code BindingException}. We
+   * register the mapper here instead, lazily, from within the class loader that can see it the
+   * first time a store is created. The {@code hasMapper} guard keeps it idempotent across stores
+   * and threads.
    */
   private static void registerMappers() {
     Configuration configuration =
         SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().getConfiguration();
-    for (Class<?> mapper : new IcebergCleanupMapperPackageProvider().getMapperClasses()) {
-      synchronized (configuration) {
-        if (!configuration.hasMapper(mapper)) {
-          configuration.addMapper(mapper);
-        }
+    synchronized (configuration) {
+      if (!configuration.hasMapper(IcebergCleanupJobMapper.class)) {
+        configuration.addMapper(IcebergCleanupJobMapper.class);
       }
     }
   }
