@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
@@ -379,6 +380,25 @@ public class TestGravitinoPaimonCatalog {
     verify(mockPaimonCatalog, never()).getTable(any());
   }
 
+  /** Verifies that alterTable with tableChanges is a no-op when ignoreIfNotExists is true. */
+  @Test
+  public void testAlterTableWithTableChangesIgnoreIfNotExistsIsNoOp() throws Exception {
+    Catalog mockCatalog = mock(Catalog.class);
+    TableCatalog mockTableCatalog = mock(TableCatalog.class);
+    when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);
+    when(mockTableCatalog.tableExists(any())).thenReturn(false);
+
+    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog, mockCatalog);
+    CatalogTable newTable = mock(CatalogTable.class);
+
+    cat.alterTable(new ObjectPath("missing_db", "missing_table"), newTable, List.of(), true);
+
+    verify(mockTableCatalog, never()).loadTable(any());
+    verify(mockTableCatalog, never()).alterTable(any(), any());
+    verify(mockPaimonCatalog, never()).getTable(any());
+  }
+
+  /** Verifies that successful Paimon dropTable invalidates the native cache. */
   @Test
   public void testDropTableInvalidatesNativeCacheAfterSuccessfulPurge() throws Exception {
     org.apache.paimon.catalog.Catalog mockInnerCatalog =
