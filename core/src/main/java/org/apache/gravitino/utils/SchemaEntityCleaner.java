@@ -43,6 +43,10 @@ public final class SchemaEntityCleaner {
    * checked before that point is stale. A single cascade delete on the outermost stale schema
    * removes it and all descendant schema entities.
    *
+   * <p>This is best-effort: callers invoke it after the primary drop has already succeeded, so any
+   * failure (a store error or a catalog existence probe failure) is logged and swallowed rather
+   * than propagated. The orphan, if any, is retried on a subsequent drop.
+   *
    * @param store the Gravitino entity store; if {@code null}, this method is a no-op
    * @param schemaIdent the schema identifier to start checking from
    * @param includeSelf whether to check {@code schemaIdent} itself before checking ancestors
@@ -57,32 +61,33 @@ public final class SchemaEntityCleaner {
       return;
     }
 
-    String separator = HierarchicalSchemaUtil.schemaSeparator();
-    ArrayList<String> schemaNames =
-        new ArrayList<>(HierarchicalSchemaUtil.allScopes(schemaIdent.name(), separator));
-    if (!includeSelf && !schemaNames.isEmpty()) {
-      schemaNames.remove(0);
-    }
-
-    NameIdentifier outermostOrphan = null;
-    for (String schemaName : schemaNames) {
-      NameIdentifier candidate = NameIdentifier.of(schemaIdent.namespace(), schemaName);
-      if (schemaExists.test(candidate)) {
-        break;
-      }
-      outermostOrphan = candidate;
-    }
-
-    if (outermostOrphan == null) {
-      return;
-    }
-
     try {
+      String separator = HierarchicalSchemaUtil.schemaSeparator();
+      ArrayList<String> schemaNames =
+          new ArrayList<>(HierarchicalSchemaUtil.allScopes(schemaIdent.name(), separator));
+      if (!includeSelf && !schemaNames.isEmpty()) {
+        schemaNames.remove(0);
+      }
+
+      NameIdentifier outermostOrphan = null;
+      for (String schemaName : schemaNames) {
+        NameIdentifier candidate = NameIdentifier.of(schemaIdent.namespace(), schemaName);
+        if (schemaExists.test(candidate)) {
+          break;
+        }
+        outermostOrphan = candidate;
+      }
+
+      if (outermostOrphan == null) {
+        return;
+      }
+
       store.delete(outermostOrphan, SCHEMA, true);
     } catch (NoSuchEntityException e) {
-      LOG.warn("The orphaned schema does not exist in the store: {}", outermostOrphan, e);
+      LOG.debug("The orphaned schema entity was already removed from the store", e);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      // Best-effort: the primary drop already succeeded, so swallow and log rather than fail it.
+      LOG.warn("Failed to clean up orphaned schema entities starting from {}", schemaIdent, e);
     }
   }
 }
