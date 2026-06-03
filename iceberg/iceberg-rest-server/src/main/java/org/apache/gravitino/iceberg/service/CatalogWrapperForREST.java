@@ -20,14 +20,10 @@
 package org.apache.gravitino.iceberg.service;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URI;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,7 +32,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
@@ -45,7 +40,6 @@ import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
-import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
@@ -55,48 +49,22 @@ import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.iceberg.BaseMetadataTable;
-import org.apache.iceberg.BaseTable;
-import org.apache.iceberg.BaseTransaction;
-import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
-import org.apache.iceberg.MetadataUpdate;
-import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Scan;
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
-import org.apache.iceberg.Transaction;
-import org.apache.iceberg.UpdateRequirement;
-import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.AlreadyExistsException;
-import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
-import org.apache.iceberg.inmemory.InMemoryFileIO;
 import org.apache.iceberg.io.CloseableIterable;
-import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.rest.CatalogHandlers;
-import org.apache.iceberg.rest.ErrorHandlers;
-import org.apache.iceberg.rest.HTTPClient;
 import org.apache.iceberg.rest.PlanStatus;
-import org.apache.iceberg.rest.RESTCatalog;
-import org.apache.iceberg.rest.RESTClient;
-import org.apache.iceberg.rest.RESTUtil;
-import org.apache.iceberg.rest.ResourcePaths;
-import org.apache.iceberg.rest.auth.AuthManager;
-import org.apache.iceberg.rest.auth.AuthManagers;
-import org.apache.iceberg.rest.auth.AuthSession;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
-import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -105,8 +73,8 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
-  private static final String FORMAT_VERSION = "format-version";
-  private final CatalogCredentialManager catalogCredentialManager;
+  /** Vends Gravitino-managed credentials and exposes the catalog name for credential refresh. */
+  protected final CatalogCredentialManager catalogCredentialManager;
 
   private volatile Map<String, String> catalogConfigToClients;
   private final Object catalogConfigToClientsLock = new Object();
@@ -115,9 +83,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
-  private static final Schema EMPTY_SCHEMA = new Schema();
 
-  private static final Set<String> catalogPropertiesToClientKeys =
+  /**
+   * Client-facing catalog property keys retained when building the IRC {@code /v1/config} defaults
+   * and when extracting FileIO-derived config in {@link FederatedCatalogWrapper}.
+   */
+  protected static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
           IcebergConstants.IO_IMPL,
           IcebergConstants.AWS_S3_REGION,
@@ -203,22 +174,17 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   /**
-   * Get table credentials.
+   * Get table credentials from the local (Gravitino-managed) catalog backend.
+   *
+   * <p>{@link FederatedCatalogWrapper} overrides this to fetch credentials from the remote REST
+   * catalog instead, so the base implementation never needs an {@code instanceof RESTCatalog}
+   * check.
    *
    * @param identifier table identifier
-   * @param privilege used for local credential vending; ignored for REST catalog backends
+   * @param privilege used for local credential vending
    * @return table credentials response
    */
   public LoadCredentialsResponse getTableCredentials(
-      TableIdentifier identifier, CredentialPrivilege privilege) {
-    if (isRESTCatalog()) {
-      return getRESTTableCredentials((RESTCatalog) getCatalog(), identifier);
-    } else {
-      return getLocalTableCredentials(identifier, privilege);
-    }
-  }
-
-  private LoadCredentialsResponse getLocalTableCredentials(
       TableIdentifier identifier, CredentialPrivilege privilege) {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
@@ -234,60 +200,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     } catch (ServiceUnavailableException e) {
       LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);
       return ImmutableLoadCredentialsResponse.builder().build();
-    }
-  }
-
-  private static LoadCredentialsResponse getRESTTableCredentials(
-      RESTCatalog restCatalog, TableIdentifier identifier) {
-    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
-    String credentialsPath =
-        ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials";
-
-    AuthManager authManager = null;
-    RESTClient client = null;
-    AuthSession authSession = null;
-    try {
-      authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
-      client =
-          HTTPClient.builder(properties)
-              .uri(properties.get(CatalogProperties.URI))
-              .withHeaders(RESTUtil.configHeaders(properties))
-              .build();
-      authSession = authManager.catalogSession(client, properties);
-      return client
-          .withAuthSession(authSession)
-          .get(
-              credentialsPath,
-              LoadCredentialsResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
-    } finally {
-      if (authSession != null) {
-        try {
-          authSession.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth session when loading credentials for table: {}", identifier, e);
-        }
-      }
-
-      if (client != null) {
-        try {
-          client.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close REST client when loading credentials for table: {}", identifier, e);
-        }
-      }
-
-      if (authManager != null) {
-        try {
-          authManager.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth manager when loading credentials for table: {}", identifier, e);
-        }
-      }
     }
   }
 
@@ -734,334 +646,5 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       properties.remove(deprecatedProperty);
       properties.put(newProperty, deprecatedValue);
     }
-  }
-
-  /**
-   * Federation-aware {@code createTable}: creates the table on the underlying (remote) catalog and
-   * extracts client-facing FileIO/credential properties from {@code table.io()}.
-   *
-   * @param namespace the table namespace.
-   * @param request the create-table request.
-   * @return the load-table response including FileIO-derived client config.
-   */
-  protected LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
-    Catalog loadedCatalog = getCatalog();
-
-    request.validate();
-
-    if (request.stageCreate()) {
-      return stageTableCreateInternal(namespace, request);
-    }
-
-    TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    Table table =
-        loadedCatalog
-            .buildTable(ident, request.schema())
-            .withLocation(request.location())
-            .withPartitionSpec(request.spec())
-            .withSortOrder(request.writeOrder())
-            .withProperties(request.properties())
-            .create();
-
-    if (table instanceof BaseTable) {
-      Map<String, String> properties = retrieveFileIOProperties(table.io());
-      Map<String, String> filteredCredentialProperties =
-          CredentialPropertyUtils.filterCredentialProperties(properties);
-      return LoadTableResponse.builder()
-          .withTableMetadata(((BaseTable) table).operations().current())
-          .addAllConfig(
-              MapUtils.getFilteredMap(
-                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
-          // Keep only credential fields from FileIO properties before returning them to the
-          // client.
-          .addAllConfig(filteredCredentialProperties)
-          .addAllConfig(
-              IcebergRESTUtils.buildRefreshProps(
-                  catalogCredentialManager.catalogName(), ident, filteredCredentialProperties))
-          .addAllCredentials(
-              IcebergRESTUtils.buildStorageCreds(
-                  catalogCredentialManager.catalogName(), ident, table.io()))
-          .build();
-    }
-
-    throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
-  }
-
-  private LoadTableResponse stageTableCreateInternal(
-      Namespace namespace, CreateTableRequest request) {
-    Catalog loadedCatalog = getCatalog();
-    TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    if (loadedCatalog.tableExists(ident)) {
-      throw new AlreadyExistsException("Table already exists: %s", ident);
-    }
-
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("created-at", OffsetDateTime.now(ZoneOffset.UTC).toString());
-    properties.putAll(request.properties());
-
-    Map<String, String> config = Maps.newHashMap();
-    Catalog.TableBuilder tableBuilder =
-        loadedCatalog
-            .buildTable(ident, request.schema())
-            .withPartitionSpec(request.spec())
-            .withSortOrder(request.writeOrder())
-            .withProperties(properties);
-
-    Table table;
-    if (request.location() != null) {
-      table = tableBuilder.withLocation(request.location()).createTransaction().table();
-    } else {
-      table = tableBuilder.createTransaction().table();
-    }
-
-    Map<String, String> tableProperties = retrieveFileIOProperties(table.io());
-    Map<String, String> filteredCredentialProperties =
-        CredentialPropertyUtils.filterCredentialProperties(tableProperties);
-    config.putAll(
-        MapUtils.getFilteredMap(
-            tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
-    config.putAll(filteredCredentialProperties);
-    config.putAll(
-        IcebergRESTUtils.buildRefreshProps(
-            catalogCredentialManager.catalogName(), ident, filteredCredentialProperties));
-
-    List<org.apache.iceberg.rest.credentials.Credential> credentials =
-        IcebergRESTUtils.buildStorageCreds(
-            catalogCredentialManager.catalogName(), ident, table.io());
-
-    TableMetadata metadata =
-        TableMetadata.newTableMetadata(
-            request.schema(),
-            request.spec() != null ? request.spec() : PartitionSpec.unpartitioned(),
-            request.writeOrder() != null ? request.writeOrder() : SortOrder.unsorted(),
-            table.location(),
-            properties);
-
-    return LoadTableResponse.builder()
-        .withTableMetadata(metadata)
-        .addAllConfig(config)
-        .addAllCredentials(credentials)
-        .build();
-  }
-
-  /**
-   * Federation-aware {@code registerTable}: registers the existing table metadata on the underlying
-   * (remote) catalog and extracts client-facing FileIO/credential properties from {@code
-   * table.io()}, mirroring {@link #loadTableInternal(TableIdentifier)}.
-   *
-   * @param namespace the table namespace.
-   * @param request the register-table request.
-   * @return the load-table response including FileIO-derived client config.
-   */
-  protected LoadTableResponse registerTableInternal(
-      Namespace namespace, RegisterTableRequest request) {
-    TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    Table table = getCatalog().registerTable(ident, request.metadataLocation());
-
-    if (table instanceof BaseTable) {
-      Map<String, String> properties = retrieveFileIOProperties(table.io());
-      return LoadTableResponse.builder()
-          .withTableMetadata(((BaseTable) table).operations().current())
-          .addAllConfig(
-              MapUtils.getFilteredMap(
-                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
-          // Keep only credential fields from FileIO properties before returning them to the client.
-          .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
-          .build();
-    }
-
-    throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
-  }
-
-  /**
-   * Federation-aware {@code updateTable}: applies the update against the underlying (remote)
-   * catalog, including the staged-create path used by federated table creation.
-   *
-   * @param ident the table identifier.
-   * @param request the update-table request.
-   * @return the load-table response with the updated metadata.
-   */
-  protected LoadTableResponse tableUpdateInternal(
-      TableIdentifier ident, UpdateTableRequest request) {
-    if (isCreate(request)) {
-      // this is a hacky way to get TableOperations for an uncommitted table
-      Optional<Integer> formatVersion =
-          request.updates().stream()
-              .filter(update -> update instanceof MetadataUpdate.UpgradeFormatVersion)
-              .map(update -> ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion())
-              .findFirst();
-
-      Schema schema =
-          request.updates().stream()
-              .filter(update -> update instanceof MetadataUpdate.AddSchema)
-              .map(update -> ((MetadataUpdate.AddSchema) update).schema())
-              .findFirst()
-              .orElse(EMPTY_SCHEMA);
-
-      Catalog.TableBuilder tableBuilder = getCatalog().buildTable(ident, schema);
-
-      TableMetadata.Builder changedMetadata =
-          formatVersion.map(TableMetadata::buildFromEmpty).orElse(TableMetadata.buildFromEmpty());
-      request.updates().forEach(update -> update.applyTo(changedMetadata));
-
-      TableMetadata changedTableMeta = changedMetadata.build();
-      tableBuilder.withPartitionSpec(changedTableMeta.spec());
-      tableBuilder.withSortOrder(changedTableMeta.sortOrder());
-      tableBuilder.withLocation(changedTableMeta.location());
-      tableBuilder.withProperty(FORMAT_VERSION, String.valueOf(changedTableMeta.formatVersion()));
-      tableBuilder.withProperties(changedTableMeta.properties());
-
-      Transaction transaction = tableBuilder.createOrReplaceTransaction();
-      if (transaction instanceof BaseTransaction) {
-        BaseTransaction baseTransaction = (BaseTransaction) transaction;
-
-        return LoadTableResponse.builder()
-            .withTableMetadata(create(baseTransaction, request))
-            .build();
-      } else {
-        throw new IllegalStateException(
-            "Cannot wrap catalog that does not produce BaseTransaction");
-      }
-
-    } else {
-      return CatalogHandlers.updateTable(getCatalog(), ident, request);
-    }
-  }
-
-  /**
-   * Federation-aware {@code loadTable}: loads the table from the underlying (remote) catalog and
-   * extracts client-facing FileIO/credential properties from {@code table.io()}.
-   *
-   * @param ident the table identifier.
-   * @return the load-table response including FileIO-derived client config.
-   */
-  protected LoadTableResponse loadTableInternal(TableIdentifier ident) {
-    Table table = getCatalog().loadTable(ident);
-
-    if (table instanceof BaseTable) {
-      Map<String, String> properties = retrieveFileIOProperties(table.io());
-      Map<String, String> filteredCredentialProperties =
-          CredentialPropertyUtils.filterCredentialProperties(properties);
-      return LoadTableResponse.builder()
-          .withTableMetadata(((BaseTable) table).operations().current())
-          .addAllConfig(
-              MapUtils.getFilteredMap(
-                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
-          // Keep only credential fields from FileIO properties before returning them to the client.
-          .addAllConfig(filteredCredentialProperties)
-          .addAllConfig(
-              IcebergRESTUtils.buildRefreshProps(
-                  catalogCredentialManager.catalogName(), ident, filteredCredentialProperties))
-          .addAllCredentials(
-              IcebergRESTUtils.buildStorageCreds(
-                  catalogCredentialManager.catalogName(), ident, table.io()))
-          .build();
-    } else if (table instanceof BaseMetadataTable) {
-      // metadata tables are loaded on the client side, return NoSuchTableException for now
-      throw new NoSuchTableException("Table does not exist: %s", ident.toString());
-    }
-
-    throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
-  }
-
-  private static boolean isCreate(UpdateTableRequest request) {
-    boolean isCreate =
-        request.requirements().stream()
-            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
-
-    if (isCreate) {
-      List<UpdateRequirement> invalidRequirements =
-          request.requirements().stream()
-              .filter(req -> !(req instanceof UpdateRequirement.AssertTableDoesNotExist))
-              .collect(Collectors.toList());
-      Preconditions.checkArgument(
-          invalidRequirements.isEmpty(), "Invalid create requirements: %s", invalidRequirements);
-    }
-
-    return isCreate;
-  }
-
-  private static TableMetadata create(BaseTransaction baseTransaction, UpdateTableRequest request) {
-    // the only valid requirement is that the table will be created
-    TableOperations ops = baseTransaction.underlyingOps();
-    request.requirements().forEach(requirement -> requirement.validate(ops.current()));
-
-    TableMetadata.Builder builder = TableMetadata.buildFrom(baseTransaction.currentMetadata());
-    request
-        .updates()
-        .forEach(
-            update -> {
-              if (shouldApplyMetadataUpdateAfterBuilder(update)) {
-                update.applyTo(builder);
-              }
-            });
-
-    // create transactions do not retry. if the table exists, retrying is not a solution
-    ops.commit(null, builder.build());
-
-    return ops.current();
-  }
-
-  /**
-   * Returns {@code false} for updates already reflected through {@link Catalog.TableBuilder} during
-   * staged create; those must not be applied again on {@link TableMetadata.Builder}.
-   */
-  @VisibleForTesting
-  static boolean shouldApplyMetadataUpdateAfterBuilder(MetadataUpdate update) {
-    if (update instanceof MetadataUpdate.UpgradeFormatVersion) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.AddSchema) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.SetCurrentSchema) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.RemoveSchemas) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.SetLocation) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.SetProperties) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.RemoveProperties) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.AddSortOrder) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.SetDefaultSortOrder) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.AddPartitionSpec) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.SetDefaultPartitionSpec) {
-      return false;
-    }
-
-    if (update instanceof MetadataUpdate.RemovePartitionSpecs) {
-      return false;
-    }
-
-    return true;
-  }
-
-  private static Map<String, String> retrieveFileIOProperties(FileIO fileIO) {
-    return fileIO instanceof InMemoryFileIO
-        ? Maps.newHashMap()
-        : new HashMap<>(fileIO.properties());
   }
 }

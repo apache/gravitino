@@ -825,41 +825,41 @@ public class TestCatalogWrapperForREST {
   void testPostBuilderMetadataSkipsHandledKinds() {
     Schema schema = new Schema(Types.NestedField.required(1, "c", Types.LongType.get()));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.AddSchema(schema)));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.UpgradeFormatVersion(2)));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.SetCurrentSchema(-1)));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.SetLocation("file:///tmp/loc")));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.SetProperties(ImmutableMap.of("k", "v"))));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.RemoveProperties(Collections.singleton("k"))));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.AddPartitionSpec(PartitionSpec.unpartitioned())));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.SetDefaultPartitionSpec(PartitionSpec.unpartitioned().specId())));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.AddSortOrder(SortOrder.unsorted())));
     Assertions.assertFalse(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.SetDefaultSortOrder(SortOrder.unsorted().orderId())));
   }
 
   @Test
   void testPostBuilderMetadataAllowsAssignUuid() {
     Assertions.assertTrue(
-        CatalogWrapperForREST.shouldApplyMetadataUpdateAfterBuilder(
+        FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.AssignUUID(UUID.randomUUID().toString())));
   }
 
@@ -971,8 +971,8 @@ public class TestCatalogWrapperForREST {
   }
 
   /**
-   * Same derivation as {@link CatalogWrapperForREST#tableUpdateInternal} for staged create: replay
-   * metadata updates and read {@link TableMetadata#formatVersion()}.
+   * Same derivation as {@link FederatedCatalogWrapper#tableUpdateInternal} for staged create:
+   * replay metadata updates and read {@link TableMetadata#formatVersion()}.
    */
   private static String expectedFormatVersionStringAfterStagedUpdates(
       Schema schema, Optional<Integer> formatVersionForUpgrade) {
@@ -990,7 +990,7 @@ public class TestCatalogWrapperForREST {
 
   /**
    * Minimal valid Iceberg staged-create update sequence so {@link TableMetadata.Builder#build()}
-   * succeeds in {@link CatalogWrapperForREST#tableUpdateInternal}.
+   * succeeds in {@link FederatedCatalogWrapper#tableUpdateInternal}.
    */
   private static List<MetadataUpdate> stagedCreateMetadataUpdates(
       Schema schema, Optional<Integer> formatVersion) {
