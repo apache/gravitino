@@ -20,7 +20,6 @@ package org.apache.gravitino.server.web.filter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -82,8 +81,7 @@ public class ParameterUtil {
     if (fullName.isPresent() && metadataObjectType.isPresent()) {
       String metalake = entities.get(Entity.EntityType.METALAKE);
       if (metalake != null) {
-        MetadataObject.Type type =
-            MetadataObject.Type.valueOf(metadataObjectType.get().toUpperCase(Locale.ROOT));
+        MetadataObject.Type type = MetadataObjectUtil.parseType(metadataObjectType.get());
         NameIdentifier nameIdentifier =
             MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName.get(), type));
         nameIdentifierMap.putAll(

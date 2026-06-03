@@ -26,7 +26,6 @@ import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import javax.inject.Inject;
@@ -62,6 +61,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,8 +109,7 @@ public class MetadataObjectTagOperations {
           httpRequest,
           () -> {
             MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+                MetadataObjects.parse(fullName, MetadataObjectUtil.parseType(type));
             Optional<Tag> tag = getTagForObject(metalake, object, tagName);
             Optional<TagDTO> tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(false)));
 
@@ -177,8 +176,7 @@ public class MetadataObjectTagOperations {
           httpRequest,
           () -> {
             MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+                MetadataObjects.parse(fullName, MetadataObjectUtil.parseType(type));
 
             Set<TagDTO> tags = Sets.newHashSet();
             Tag[] nonInheritedTags = tagDispatcher.listTagsInfoForMetadataObject(metalake, object);
@@ -269,8 +267,7 @@ public class MetadataObjectTagOperations {
           () -> {
             request.validate();
             MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+                MetadataObjects.parse(fullName, MetadataObjectUtil.parseType(type));
             String[] tagNames =
                 tagDispatcher.associateTagsForMetadataObject(
                     metalake, object, request.getTagsToAdd(), request.getTagsToRemove());

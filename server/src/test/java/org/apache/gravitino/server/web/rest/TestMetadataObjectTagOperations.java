@@ -674,6 +674,42 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
+  @Test
+  public void testInvalidMetadataObjectType() {
+    // Test with completely invalid metadata object type
+    Response response =
+        target(basePath(metalake))
+            .path("INVALID_TYPE")
+            .path("catalog.schema.table")
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+
+    ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Invalid metadata object type"));
+    Assertions.assertTrue(errorResponse.getMessage().contains("INVALID_TYPE"));
+
+    // Test with another invalid type
+    Response response2 =
+        target(basePath(metalake))
+            .path("UNKNOWN")
+            .path("catalog.schema")
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response2.getStatus());
+
+    ErrorResponse errorResponse2 = response2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse2.getCode());
+    Assertions.assertTrue(errorResponse2.getMessage().contains("Invalid metadata object type"));
+  }
+
   private String basePath(String metalake) {
     return "/metalakes/" + metalake + "/objects";
   }
