@@ -276,6 +276,52 @@ public class TestBaseCatalog {
     return new ResolvedCatalogView(catalogView, resolvedSchema);
   }
 
+  @Test
+  public void testBaseCatalogViewDialectFallbackOrderIsFLINKThenHIVE() {
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
+    List<String> order = catalog.viewDialectFallbackOrder();
+    Assertions.assertEquals(2, order.size());
+    Assertions.assertEquals(Dialects.FLINK, order.get(0));
+    Assertions.assertEquals(Dialects.HIVE, order.get(1));
+  }
+
+  @Test
+  public void testBaseCatalogBuildViewRepresentationsProducesSingleFlinkEntry() {
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+    ResolvedCatalogView view = resolveView(schema, "SELECT id FROM t", "comment");
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
+    Representation[] reps = catalog.buildViewRepresentations(view);
+    Assertions.assertEquals(1, reps.length);
+    Assertions.assertInstanceOf(SQLRepresentation.class, reps[0]);
+    SQLRepresentation sqlRep = (SQLRepresentation) reps[0];
+    Assertions.assertEquals(Dialects.FLINK, sqlRep.dialect());
+    Assertions.assertEquals("SELECT id FROM t", sqlRep.sql());
+  }
+
+  @Test
+  public void testPaimonLikeViewDialectFallbackOrderIsFLINKThenQUERY() {
+    BaseCatalog catalog = new PaimonLikeBaseCatalog();
+    List<String> order = catalog.viewDialectFallbackOrder();
+    Assertions.assertEquals(2, order.size());
+    Assertions.assertEquals(Dialects.FLINK, order.get(0));
+    Assertions.assertEquals(Dialects.QUERY_DIALECT, order.get(1));
+  }
+
+  @Test
+  public void testPaimonLikeBuildViewRepresentationsProducesBothFlinkAndQueryDialects() {
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+    ResolvedCatalogView view = resolveView(schema, "SELECT id FROM t", "comment");
+    BaseCatalog catalog = new PaimonLikeBaseCatalog();
+    Representation[] reps = catalog.buildViewRepresentations(view);
+    Assertions.assertEquals(2, reps.length);
+    SQLRepresentation first = (SQLRepresentation) reps[0];
+    Assertions.assertEquals(Dialects.FLINK, first.dialect());
+    Assertions.assertEquals("SELECT id FROM t", first.sql());
+    SQLRepresentation second = (SQLRepresentation) reps[1];
+    Assertions.assertEquals(Dialects.QUERY_DIALECT, second.dialect());
+    Assertions.assertEquals("SELECT id FROM t", second.sql());
+  }
+
   /**
    * Returns a mock {@link Catalog} whose {@code asViewCatalog()} throws
    * UnsupportedOperationException.
@@ -285,6 +331,43 @@ public class TestBaseCatalog {
     Mockito.when(gravitinoCatalog.asViewCatalog())
         .thenThrow(new UnsupportedOperationException("views not supported"));
     return gravitinoCatalog;
+  }
+
+  /** Simulates a Paimon-like catalog that overrides dialect hooks. */
+  private static class PaimonLikeBaseCatalog extends BaseCatalog {
+
+    PaimonLikeBaseCatalog() {
+      super(
+          "paimon-test",
+          Collections.emptyMap(),
+          "default",
+          Mockito.mock(SchemaAndTablePropertiesConverter.class),
+          Mockito.mock(PartitionConverter.class));
+    }
+
+    @Override
+    protected AbstractCatalog realCatalog() {
+      return null;
+    }
+
+    @Override
+    protected Catalog catalog() {
+      return null;
+    }
+
+    @Override
+    protected List<String> viewDialectFallbackOrder() {
+      return Arrays.asList(Dialects.FLINK, Dialects.QUERY_DIALECT);
+    }
+
+    @Override
+    protected Representation[] buildViewRepresentations(ResolvedCatalogView view) {
+      String sql = view.getExpandedQuery();
+      return new Representation[] {
+        buildSqlRepresentation(Dialects.FLINK, sql)[0],
+        buildSqlRepresentation(Dialects.QUERY_DIALECT, sql)[0]
+      };
+    }
   }
 
   private static class TestableBaseCatalog extends BaseCatalog {

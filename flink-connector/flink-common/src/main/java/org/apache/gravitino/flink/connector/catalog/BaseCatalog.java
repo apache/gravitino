@@ -314,8 +314,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
       boolean viewDropped = false;
       try {
         viewDropped = catalog().asViewCatalog().dropView(ident);
-      } catch (UnsupportedOperationException ignored) {
-        // catalog does not support views
+      } catch (UnsupportedOperationException e) {
+        LOG.debug(
+            "Catalog {} does not support views; skipping dropView for {}", catalogName(), ident, e);
       }
       if (!tableDropped && !viewDropped && !ignoreIfNotExists) {
         throw new TableNotExistException(catalogName(), tablePath);
@@ -330,6 +331,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   /**
    * Drops the table entry. Subclasses may override to use a different drop strategy (e.g., purge).
    *
+   * @param ident the Gravitino name identifier of the table to drop
    * @return {@code true} if the table existed and was dropped.
    */
   protected boolean dropTableEntry(NameIdentifier ident) {
@@ -515,6 +517,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
           throw new TableNotExistException(catalogName(), tablePath, e);
         }
       } catch (Exception e) {
+        LOG.warn("Failed to alter view {} in catalog {}", identifier, catalogName(), e);
         throw new CatalogException(e);
       }
     } else {
@@ -566,6 +569,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
           throw new TableNotExistException(catalogName(), tablePath, e);
         }
       } catch (Exception e) {
+        LOG.warn("Failed to alter view {} in catalog {}", identifier, catalogName(), e);
         throw new CatalogException(e);
       }
     } else {
@@ -935,19 +939,20 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   /**
-   * Converts a Gravitino {@link View} to a Flink {@link CatalogView}.
-   *
-   * @param view The Gravitino view to convert.
-   * @return The corresponding Flink CatalogView.
-   */
-  /**
    * Returns the ordered list of SQL dialects to try when loading a view. The first dialect with an
-   * available representation wins. Subclasses may override to change the fallback order.
+   * available representation wins. Subclasses may override to change the fallback order. Must be
+   * consistent with the dialects stored by {@link #buildViewRepresentations}.
    */
   protected List<String> viewDialectFallbackOrder() {
     return Arrays.asList(Dialects.FLINK, Dialects.HIVE);
   }
 
+  /**
+   * Converts a Gravitino {@link View} to a Flink {@link CatalogView}.
+   *
+   * @param view The Gravitino view to convert.
+   * @return The corresponding Flink CatalogView.
+   */
   protected CatalogView toFlinkView(View view) {
     org.apache.flink.table.api.Schema.Builder builder = buildSchemaFromColumns(view.columns());
     List<String> dialects = viewDialectFallbackOrder();
@@ -1036,6 +1041,12 @@ public abstract class BaseCatalog extends AbstractCatalog {
         .toArray(Column[]::new);
   }
 
+  /**
+   * Builds a Flink {@link org.apache.flink.table.api.Schema.Builder} from Gravitino columns.
+   *
+   * @param columns the Gravitino column definitions
+   * @return a Flink schema builder populated with the given columns
+   */
   protected static org.apache.flink.table.api.Schema.Builder buildSchemaFromColumns(
       Column[] columns) {
     org.apache.flink.table.api.Schema.Builder builder =
@@ -1051,12 +1062,23 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   /**
    * Builds the SQL representations to store when creating or replacing a view. Subclasses may
-   * override to include additional dialect representations.
+   * override to include additional dialect representations. The returned array must contain at
+   * least one representation whose dialect appears in {@link #viewDialectFallbackOrder()}.
+   *
+   * @param view the resolved Flink view being created or replaced
+   * @return representations to pass to the Gravitino view catalog API
    */
   protected Representation[] buildViewRepresentations(ResolvedCatalogView view) {
     return buildSqlRepresentation(Dialects.FLINK, view.getExpandedQuery());
   }
 
+  /**
+   * Builds a single-element {@link Representation} array for the given dialect and SQL text.
+   *
+   * @param dialect the SQL dialect identifier (see {@link Dialects})
+   * @param sql the SQL text of the view
+   * @return a single-element array containing the built {@link SQLRepresentation}
+   */
   protected static Representation[] buildSqlRepresentation(String dialect, String sql) {
     return new Representation[] {
       SQLRepresentation.builder().withDialect(dialect).withSql(sql).build()
