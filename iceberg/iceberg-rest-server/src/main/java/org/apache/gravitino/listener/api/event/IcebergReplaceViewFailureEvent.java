@@ -45,6 +45,6 @@ public class IcebergReplaceViewFailureEvent extends IcebergViewFailureEvent {
 
   @Override
   public OperationType operationType() {
-    return OperationType.ALTER_VIEW;
+    return OperationType.REPLACE_VIEW;
   }
 }

@@ -154,6 +154,7 @@ public class TestCatalogEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListCatalogEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogEvent) event).namespace());
+    Assertions.assertEquals(2, ((ListCatalogEvent) event).resultCount());
     Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
@@ -173,6 +174,7 @@ public class TestCatalogEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListCatalogEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogEvent) event).namespace());
+    Assertions.assertEquals(3, ((ListCatalogEvent) event).resultCount());
     Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
@@ -319,6 +321,14 @@ public class TestCatalogEvent {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
+  void testListCatalogEventDeprecatedConstructorReturnsNegativeCount() {
+    Namespace namespace = Namespace.of("metalake");
+    ListCatalogEvent event = new ListCatalogEvent("user", namespace);
+    Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @Test
   void testListCatalogFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
@@ -376,7 +386,13 @@ public class TestCatalogEvent {
         .thenReturn(catalog);
     when(dispatcher.loadCatalog(any(NameIdentifier.class))).thenReturn(catalog);
     when(dispatcher.dropCatalog(any(NameIdentifier.class), anyBoolean())).thenReturn(true);
-    when(dispatcher.listCatalogs(any(Namespace.class))).thenReturn(null);
+    when(dispatcher.listCatalogs(any(Namespace.class)))
+        .thenReturn(
+            new NameIdentifier[] {
+              NameIdentifier.of("metalake", "catalog1"), NameIdentifier.of("metalake", "catalog2")
+            });
+    when(dispatcher.listCatalogsInfo(any(Namespace.class)))
+        .thenReturn(new Catalog[] {catalog, catalog, catalog});
     when(dispatcher.alterCatalog(any(NameIdentifier.class), any(CatalogChange.class)))
         .thenReturn(catalog);
     return dispatcher;

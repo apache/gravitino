@@ -49,7 +49,8 @@ public class ConfigServlet extends HttpServlet {
           OAuthConfig.SCOPE);
 
   private static final ImmutableSet<ConfigEntry<?>> basicConfigEntries =
-      ImmutableSet.of(Configs.AUTHENTICATORS, Configs.ENABLE_AUTHORIZATION);
+      ImmutableSet.of(
+          Configs.AUTHENTICATORS, Configs.ENABLE_AUTHORIZATION, Configs.SCHEMA_SEPARATOR);
 
   private final Map<String, Object> configs = Maps.newHashMap();
 

@@ -20,6 +20,8 @@ package org.apache.gravitino.idp.storage.mapper.provider;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
+import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
 
@@ -28,6 +30,7 @@ public class IdpBasicMapperPackageProvider implements MapperPackageProvider {
 
   @Override
   public List<Class<?>> getMapperClasses() {
-    return ImmutableList.of(IdpUserMetaMapper.class);
+    return ImmutableList.of(
+        IdpUserMetaMapper.class, IdpGroupMetaMapper.class, IdpUserGroupRelMapper.class);
   }
 }

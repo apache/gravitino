@@ -306,14 +306,14 @@ public class LanceTableOperations extends ManagedTableOperations {
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }
 
-    // Check whether it's a create empty table operation.
-    boolean createEmpty =
-        Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_CREATE_EMPTY))
+    // Check whether it's a metadata-only declare table operation.
+    boolean declaredOnly =
+        Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_DECLARED))
             .map(Boolean::parseBoolean)
             .orElse(false);
-    if (createEmpty) {
-      // For create empty table, we just create the table metadata in Gravitino without creating
-      // the underlying Lance dataset.
+    if (declaredOnly) {
+      // For declare table, we just create the table metadata in Gravitino without creating the
+      // underlying Lance dataset.
       return super.createTable(
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }

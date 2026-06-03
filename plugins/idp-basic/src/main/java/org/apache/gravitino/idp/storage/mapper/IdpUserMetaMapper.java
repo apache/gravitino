@@ -21,6 +21,7 @@ package org.apache.gravitino.idp.storage.mapper;
 
 import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.po.IdpUserWithGroupsPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -41,18 +42,21 @@ public interface IdpUserMetaMapper {
   @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUser")
   IdpUserPO selectIdpUser(@Param("username") String username);
 
-  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUsers")
-  List<IdpUserPO> selectIdpUsers(@Param("usernames") List<String> usernames);
+  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUserWithGroups")
+  IdpUserWithGroupsPO selectIdpUserWithGroups(@Param("username") String username);
+
+  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUsersByUsernames")
+  List<IdpUserPO> selectIdpUsersByUsernames(@Param("usernames") List<String> usernames);
 
   @InsertProvider(type = IdpUserMetaSQLProviderFactory.class, method = "insertIdpUser")
   void insertIdpUser(@Param("userMeta") IdpUserPO userPO);
 
   @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "updateIdpUserPassword")
   Integer updateIdpUserPassword(
-      @Param("userId") Long userId, @Param("passwordHash") String passwordHash);
+      @Param("username") String username, @Param("passwordHash") String passwordHash);
 
   @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "softDeleteIdpUser")
-  Integer softDeleteIdpUser(@Param("userId") Long userId);
+  Integer softDeleteIdpUser(@Param("username") String username);
 
   @DeleteProvider(
       type = IdpUserMetaSQLProviderFactory.class,

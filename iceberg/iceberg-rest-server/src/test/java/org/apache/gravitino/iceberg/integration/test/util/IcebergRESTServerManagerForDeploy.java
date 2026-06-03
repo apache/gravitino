@@ -94,6 +94,10 @@ public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager 
   @Override
   public void doStopIcebergRESTServer() {
     String cmd = String.format("%s/bin/%s stop", icebergRESTServerHome.toString(), SCRIPT_NAME);
-    CommandExecutor.executeCommandLocalHost(cmd, false, TypesOfData.ERROR);
+    CommandExecutor.executeCommandLocalHost(
+        cmd,
+        false,
+        TypesOfData.ERROR,
+        ImmutableMap.of("GRAVITINO_HOME", icebergRESTServerHome.toString()));
   }
 }

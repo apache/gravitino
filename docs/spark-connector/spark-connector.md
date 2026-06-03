@@ -104,3 +104,8 @@ Gravitino spark connector support the following datatype mapping between Spark a
 | `ArrayType`                       | `array`                       | 0.5.0         |
 | `MapType`                         | `map`                         | 0.5.0         |
 | `StructType`                      | `struct`                      | 0.5.0         |
+
+:::note
+For Gravitino `UUID` type, Spark connector represents it as `StringType` because Spark has no native UUID type.
+This behavior is consistent with Spark built-in PostgreSQL JDBC mapping (`uuid` -> `StringType`).
+:::

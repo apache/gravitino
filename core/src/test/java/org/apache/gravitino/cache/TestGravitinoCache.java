@@ -19,7 +19,13 @@
 package org.apache.gravitino.cache;
 
 import com.github.benmanes.caffeine.cache.Ticker;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.awaitility.Awaitility;
@@ -48,6 +54,148 @@ public class TestGravitinoCache {
       Assertions.assertFalse(missing.isPresent());
 
       Assertions.assertEquals(2, cache.size());
+    } finally {
+      cache.close();
+    }
+  }
+
+  @Test
+  void testCaffeineGetLoadsSameKeyAtomically() throws Exception {
+    CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(60_000L, 1000L);
+    ExecutorService executorService = Executors.newFixedThreadPool(8);
+    try {
+      AtomicLong loadCount = new AtomicLong();
+      CountDownLatch ready = new CountDownLatch(8);
+      CountDownLatch start = new CountDownLatch(1);
+      List<Future<Long>> futures = new ArrayList<>();
+
+      for (int i = 0; i < 8; i++) {
+        futures.add(
+            executorService.submit(
+                () -> {
+                  ready.countDown();
+                  start.await();
+                  return cache.get(
+                      "shared",
+                      key -> {
+                        loadCount.incrementAndGet();
+                        return 100L;
+                      });
+                }));
+      }
+
+      Assertions.assertTrue(ready.await(5, TimeUnit.SECONDS));
+      start.countDown();
+      for (Future<Long> future : futures) {
+        Assertions.assertEquals(100L, future.get(5, TimeUnit.SECONDS));
+      }
+
+      Assertions.assertEquals(1L, loadCount.get());
+      Assertions.assertEquals(1L, cache.size());
+    } finally {
+      executorService.shutdownNow();
+      cache.close();
+    }
+  }
+
+  @Test
+  void testCaffeineInvalidateWaitsForInFlightReader() throws Exception {
+    CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(60_000L, 1000L);
+    ExecutorService executorService = Executors.newFixedThreadPool(2);
+    try {
+      CountDownLatch readerHoldsLock = new CountDownLatch(1);
+      CountDownLatch readerMayProceed = new CountDownLatch(1);
+
+      Future<Long> reader =
+          executorService.submit(
+              () ->
+                  cache.get(
+                      "k",
+                      key -> {
+                        readerHoldsLock.countDown();
+                        try {
+                          Assertions.assertTrue(readerMayProceed.await(5, TimeUnit.SECONDS));
+                        } catch (InterruptedException e) {
+                          Thread.currentThread().interrupt();
+                          throw new RuntimeException(e);
+                        }
+                        return 42L;
+                      }));
+
+      Assertions.assertTrue(readerHoldsLock.await(5, TimeUnit.SECONDS));
+      Future<?> invalidator = executorService.submit(() -> cache.invalidate("k"));
+
+      // Invalidator should be parked on the write lock until the reader releases its read lock.
+      Thread.sleep(150);
+      Assertions.assertFalse(
+          invalidator.isDone(), "invalidate must not proceed while a reader holds the read lock");
+
+      readerMayProceed.countDown();
+      Assertions.assertEquals(42L, reader.get(5, TimeUnit.SECONDS));
+      invalidator.get(5, TimeUnit.SECONDS);
+
+      // Reader installed the value, invalidator then removed it.
+      Assertions.assertFalse(cache.getIfPresent("k").isPresent());
+    } finally {
+      executorService.shutdownNow();
+      cache.close();
+    }
+  }
+
+  @Test
+  void testCaffeineRunInvalidationBatchIsAtomicForReaders() throws Exception {
+    CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(60_000L, 1000L);
+    ExecutorService executorService = Executors.newFixedThreadPool(2);
+    try {
+      cache.put("k1", 1L);
+      cache.put("k2", 2L);
+      cache.put("k3", 3L);
+
+      CountDownLatch batchEntered = new CountDownLatch(1);
+      CountDownLatch batchMayProceed = new CountDownLatch(1);
+
+      Future<?> batcher =
+          executorService.submit(
+              () ->
+                  cache.runInvalidationBatch(
+                      () -> {
+                        batchEntered.countDown();
+                        try {
+                          Assertions.assertTrue(batchMayProceed.await(5, TimeUnit.SECONDS));
+                        } catch (InterruptedException e) {
+                          Thread.currentThread().interrupt();
+                          throw new RuntimeException(e);
+                        }
+                        cache.invalidate("k1");
+                        cache.invalidate("k2");
+                        cache.invalidate("k3");
+                      }));
+
+      Assertions.assertTrue(batchEntered.await(5, TimeUnit.SECONDS));
+
+      // Reader started while the batcher holds the write lock must block until the batch ends.
+      Future<Optional<Long>> reader = executorService.submit(() -> cache.getIfPresent("k2"));
+      Thread.sleep(150);
+      Assertions.assertFalse(reader.isDone(), "reader must wait for the batch to release the lock");
+
+      batchMayProceed.countDown();
+      batcher.get(5, TimeUnit.SECONDS);
+
+      // Reader observes the post-batch state, never a partially-invalidated cache.
+      Assertions.assertFalse(reader.get(5, TimeUnit.SECONDS).isPresent());
+      Assertions.assertEquals(0, cache.size());
+    } finally {
+      executorService.shutdownNow();
+      cache.close();
+    }
+  }
+
+  @Test
+  void testCaffeineGetRejectsNullLoadResult() {
+    CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(60_000L, 1000L);
+    try {
+      Assertions.assertThrows(NullPointerException.class, () -> cache.get("key", key -> null));
+      Assertions.assertFalse(cache.getIfPresent("key").isPresent());
     } finally {
       cache.close();
     }
@@ -90,7 +238,7 @@ public class TestGravitinoCache {
   void testCaffeineInvalidateByPrefix() {
     CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(60_000L, 1000L);
     try {
-      // Simulate hierarchical keys: metalake::catalog::schema::
+      // Simulate name-path keys: metalake::catalog::schema::
       cache.put("lake1::cat1::", 1L);
       cache.put("lake1::cat1::s1::", 2L);
       cache.put("lake1::cat1::s1::t1::TABLE", 3L);
@@ -167,6 +315,23 @@ public class TestGravitinoCache {
       cache.invalidate("key1");
       cache.invalidateAll();
       cache.invalidateByPrefix("any");
+    } finally {
+      cache.close();
+    }
+  }
+
+  @Test
+  void testNoOpsGetAlwaysLoadsAndDoesNotCache() {
+    NoOpsGravitinoCache<String, Long> cache = new NoOpsGravitinoCache<>();
+    try {
+      AtomicLong loadCount = new AtomicLong();
+
+      Assertions.assertEquals(1L, cache.get("key", key -> loadCount.incrementAndGet()));
+      Assertions.assertEquals(2L, cache.get("key", key -> loadCount.incrementAndGet()));
+
+      Assertions.assertEquals(2L, loadCount.get());
+      Assertions.assertFalse(cache.getIfPresent("key").isPresent());
+      Assertions.assertEquals(0, cache.size());
     } finally {
       cache.close();
     }

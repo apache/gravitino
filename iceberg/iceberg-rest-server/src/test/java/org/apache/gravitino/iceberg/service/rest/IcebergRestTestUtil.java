@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
@@ -36,7 +37,9 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationExecutor;
@@ -74,7 +77,11 @@ public class IcebergRestTestUtil {
       Namespace.of("gravitino-test-2", "nested");
 
   public static final String VIEW_PATH =
-      NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(TEST_NAMESPACE_NAME) + "/views";
+      NAMESPACE_PATH
+          + "/"
+          + RESTUtil.encodeNamespace(
+              TEST_NAMESPACE_NAME, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8)
+          + "/views";
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
 
   public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
@@ -141,7 +148,8 @@ public class IcebergRestTestUtil {
       EventBus eventBus = new EventBus(eventListenerPlugins);
 
       IcebergTableOperationExecutor icebergTableOperationExecutor =
-          new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
+          new IcebergTableOperationExecutor(
+              icebergCatalogWrapperManager, Optional.of(mock(IcebergCleanupManager.class)));
       IcebergTableEventDispatcher icebergTableEventDispatcher =
           new IcebergTableEventDispatcher(
               icebergTableOperationExecutor, eventBus, configProvider.getMetalakeName());
@@ -151,7 +159,8 @@ public class IcebergRestTestUtil {
           new IcebergViewEventDispatcher(
               icebergViewOperationExecutor, eventBus, configProvider.getMetalakeName());
       IcebergNamespaceOperationExecutor icebergNamespaceOperationExecutor =
-          new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
+          new IcebergNamespaceOperationExecutor(
+              icebergCatalogWrapperManager, Optional.of(mock(IcebergCleanupManager.class)));
       IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
           new IcebergNamespaceEventDispatcher(
               icebergNamespaceOperationExecutor, eventBus, configProvider.getMetalakeName());

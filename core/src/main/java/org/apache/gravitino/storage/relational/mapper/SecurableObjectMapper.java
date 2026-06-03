@@ -75,8 +75,8 @@ public interface SecurableObjectMapper {
 
   @UpdateProvider(
       type = SecurableObjectSQLProviderFactory.class,
-      method = "softDeleteObjectRelsBySchemaId")
-  void softDeleteObjectRelsBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteObjectRelsBySchemaIds")
+  void softDeleteObjectRelsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @SelectProvider(
       type = SecurableObjectSQLProviderFactory.class,

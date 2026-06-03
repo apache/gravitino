@@ -24,6 +24,12 @@ plugins {
 }
 
 dependencies {
+  // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
+  constraints {
+    compileOnly(libs.thrift)
+    testImplementation(libs.thrift)
+  }
+
   compileOnly(project(":api"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
@@ -120,7 +126,6 @@ dependencies {
     exclude("org.openjdk.jol")
     exclude("org.slf4j")
   }
-  testImplementation(libs.htrace.core4)
   testImplementation(libs.caffeine)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)

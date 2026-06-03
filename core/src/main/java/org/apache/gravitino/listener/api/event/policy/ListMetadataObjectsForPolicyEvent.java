@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event.policy;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
 
 /**
@@ -28,15 +29,40 @@ import org.apache.gravitino.listener.api.event.OperationType;
  * a policy.
  */
 @DeveloperApi
-public final class ListMetadataObjectsForPolicyEvent extends PolicyEvent {
+public final class ListMetadataObjectsForPolicyEvent extends PolicyEvent implements ListEvent {
+
+  private final int count;
+
   /**
    * Constructs an instance of {@code ListMetadataObjectsForPolicyEvent}.
    *
    * @param user The username of the individual who initiated the list metadata objects operation.
    * @param identifier The identifier of the policy.
+   * @param count The number of metadata objects returned by the list operation.
    */
-  public ListMetadataObjectsForPolicyEvent(String user, NameIdentifier identifier) {
+  public ListMetadataObjectsForPolicyEvent(String user, NameIdentifier identifier, int count) {
     super(user, identifier);
+    this.count = count;
+  }
+
+  /**
+   * Constructs an instance of {@code ListMetadataObjectsForPolicyEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the list metadata objects operation.
+   * @param identifier The identifier of the policy.
+   * @deprecated Use {@link #ListMetadataObjectsForPolicyEvent(String, NameIdentifier, int)}
+   *     instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListMetadataObjectsForPolicyEvent(String user, NameIdentifier identifier) {
+    this(user, identifier, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return count;
   }
 
   /**

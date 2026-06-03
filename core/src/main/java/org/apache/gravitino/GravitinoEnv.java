@@ -88,6 +88,7 @@ import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
+import org.apache.gravitino.listener.ViewEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metalake.MetalakeManager;
@@ -563,6 +564,8 @@ public class GravitinoEnv {
     // Create and initialize Catalog related modules, the operation chain is:
     // CatalogHookDispatcher -> CatalogEventDispatcher -> CatalogNormalizeDispatcher ->
     // CatalogManager
+    // CatalogManager registers its own change-log listener with the entity store (when the store
+    // supports it), so no poller wiring is needed here.
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);
@@ -633,13 +636,17 @@ public class GravitinoEnv {
         new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
     this.functionDispatcher = new FunctionHookDispatcher(functionEventDispatcher);
 
-    // TODO: Add ViewHookDispatcher and ViewEventDispatcher when needed for view-specific hooks
-    //  and event handling.
+    // View operation chain: ViewEventDispatcher -> ViewNormalizeDispatcher ->
+    // ViewOperationDispatcher.
+    // TODO(#11007): Add ViewHookDispatcher for view ownership and privilege hooks when view
+    // privilege support is finalized.
     ViewOperationDispatcher viewOperationDispatcher =
         new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
     ViewNormalizeDispatcher viewNormalizeDispatcher =
         new ViewNormalizeDispatcher(viewOperationDispatcher, catalogManager);
-    this.viewDispatcher = viewNormalizeDispatcher;
+    ViewEventDispatcher viewEventDispatcher =
+        new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
+    this.viewDispatcher = viewEventDispatcher;
 
     this.statisticDispatcher =
         new StatisticEventDispatcher(

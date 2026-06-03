@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
 
+import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserMetaBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
@@ -26,8 +28,19 @@ import org.apache.ibatis.annotations.Param;
 public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
 
   @Override
-  protected String currentTimeMillisExpression() {
-    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+  public String selectIdpUserWithGroups(@Param("username") String username) {
+    return "SELECT u.user_name as name, u.password_hash as passwordHash,"
+        + " COALESCE(JSON_AGG(g.group_name), '[]'::json) as groupNames"
+        + " FROM "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u LEFT JOIN "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r ON r.user_id = u.user_id AND r.deleted_at = 0"
+        + " LEFT JOIN "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
+        + " WHERE u.user_name = #{username} AND u.deleted_at = 0"
+        + " GROUP BY u.user_id, u.user_name, u.password_hash";
   }
 
   @Override
@@ -38,5 +51,10 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
         + " WHERE user_id IN (SELECT user_id FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
+
+  @Override
+  protected String currentTimeMillisExpression() {
+    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
   }
 }

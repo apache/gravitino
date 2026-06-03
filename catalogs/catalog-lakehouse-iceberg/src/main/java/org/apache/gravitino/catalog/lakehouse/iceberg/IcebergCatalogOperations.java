@@ -57,6 +57,7 @@ import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -72,6 +73,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -159,13 +161,31 @@ public class IcebergCatalogOperations
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     try {
-      List<org.apache.iceberg.catalog.Namespace> namespaces =
-          icebergCatalogWrapper
-              .listNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace())
-              .namespaces();
+      String separator = HierarchicalSchemaUtil.schemaSeparator();
+      org.apache.iceberg.catalog.Namespace icebergParent;
+      if (namespace.length() == 2) {
+        icebergParent = org.apache.iceberg.catalog.Namespace.empty();
+      } else {
+        String parentPath =
+            String.join(separator, Arrays.copyOfRange(namespace.levels(), 2, namespace.length()));
+        icebergParent =
+            IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(parentPath, separator);
+      }
 
+      List<org.apache.iceberg.catalog.Namespace> namespaces =
+          icebergCatalogWrapper.listNamespace(icebergParent).namespaces();
+
+      Namespace catalogNamespace = Namespace.of(namespace.level(0), namespace.level(1));
       return namespaces.stream()
-          .map(icebergNamespace -> NameIdentifier.of(namespace, icebergNamespace.toString()))
+          .map(
+              icebergNamespace -> {
+                // Convert the multi-level Iceberg namespace back to a logical schema name using the
+                // configured separator so upper layers receive consistent logical names.
+                String logicalName =
+                    IcebergIdentifierUtils.icebergNamespaceToSchemaName(
+                        icebergNamespace, separator);
+                return NameIdentifier.of(catalogNamespace, logicalName);
+              })
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {
       throw new NoSuchSchemaException(

@@ -416,7 +416,9 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 | `metalake_name`                 | The metalake name which the fileset belongs to.                                                                                                                                                                                                                                                                                                                        | (none)                                                               | Yes                               | 0.6.0-incubating |
 | `cache_size`                    | The cache capacity of the Gravitino Virtual File System.                                                                                                                                                                                                                                                                                                               | `20`                                                                 | No                                | 0.6.0-incubating |
 | `cache_expired_time`            | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`.                                                                                                                                                                                                                                              | `3600`                                                               | No                                | 0.6.0-incubating |
-| `auth_type`                     | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently supports `simple` and `oauth2` auth types.                                                                                                                                                                                                                   | `simple`                                                             | No                                | 0.6.0-incubating |
+| `auth_type`                     | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently supports `simple`, `basic`, and `oauth2` auth types.                                                                                                                                                                                                         | `simple`                                                             | No                                | 0.6.0-incubating |
+| `basic_username`                | The username for the Gravitino client when using `basic` auth type with the built-in IDP.                                                                                                                                                                                                                                                                                | (none)                                                               | Yes if you use `basic` auth type  | 1.3.0            |
+| `basic_password`                | The password for the Gravitino client when using `basic` auth type with the built-in IDP.                                                                                                                                                                                                                                                                                | (none)                                                               | Yes if you use `basic` auth type  | 1.3.0            |
 | `oauth2_server_uri`             | The auth server URI for the Gravitino client when using `oauth2` auth type.                                                                                                                                                                                                                                                                                            | (none)                                                               | Yes if you use `oauth2` auth type | 0.7.0-incubating |
 | `oauth2_credential`             | The auth credential for the Gravitino client when using `oauth2` auth type.                                                                                                                                                                                                                                                                                            | (none)                                                               | Yes if you use `oauth2` auth type | 0.7.0-incubating |
 | `oauth2_path`                   | The auth server path for the Gravitino client when using `oauth2` auth type. Please remove the first slash `/` from the path, for example `oauth/token`.                                                                                                                                                                                                               | (none)                                                               | Yes if you use `oauth2` auth type | 0.7.0-incubating |
@@ -695,7 +697,7 @@ print(documents)
 
 ### Authentication
 
-Currently, Gravitino Virtual File System in Python supports two kinds of authentication types to access Gravitino server: `simple` and `oauth2`.
+Currently, Gravitino Virtual File System in Python supports three kinds of authentication types to access Gravitino server: `simple`, `basic`, and `oauth2`.
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System in Python.
 
@@ -711,6 +713,26 @@ Then, you can configure the authentication like this:
 from gravitino import gvfs
 
 options = {"auth_type": "simple"}
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
+print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
+```
+
+##### Using `basic` authentication
+
+First, make sure that your Gravitino server is also configured to use the `basic` authentication mode.
+See [How to authenticate](security/how-to-authenticate.md#basic-mode) for server-side setup.
+
+Then, you can configure the authentication like this:
+
+```python
+from gravitino import gvfs
+from gravitino.filesystem.gvfs_config import GVFSConfig
+
+options = {
+    GVFSConfig.AUTH_TYPE: GVFSConfig.BASIC_AUTH_TYPE,
+    GVFSConfig.BASIC_USERNAME: "admin",
+    GVFSConfig.BASIC_PASSWORD: "YourSecureGravitinoPassword",
+}
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
 print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
 ```

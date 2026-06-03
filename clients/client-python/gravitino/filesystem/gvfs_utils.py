@@ -18,6 +18,7 @@ import re
 from typing import Dict
 
 from gravitino.client.gravitino_client import GravitinoClient
+from gravitino.auth.basic_auth_provider import BasicAuthProvider
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
 from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
@@ -69,6 +70,21 @@ def create_client(
             uri=server_uri,
             metalake_name=metalake_name,
             auth_data_provider=SimpleAuthProvider(),
+            request_headers=request_headers,
+            client_config=client_config,
+        )
+
+    if auth_type == GVFSConfig.BASIC_AUTH_TYPE:
+        basic_username = options.get(GVFSConfig.BASIC_USERNAME)
+        _check_auth_config(auth_type, GVFSConfig.BASIC_USERNAME, basic_username)
+
+        basic_password = options.get(GVFSConfig.BASIC_PASSWORD)
+        _check_auth_config(auth_type, GVFSConfig.BASIC_PASSWORD, basic_password)
+
+        return GravitinoClient(
+            uri=server_uri,
+            metalake_name=metalake_name,
+            auth_data_provider=BasicAuthProvider(basic_username, basic_password),
             request_headers=request_headers,
             client_config=client_config,
         )

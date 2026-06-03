@@ -43,6 +43,9 @@ public interface HiveClient extends AutoCloseable {
 
   List<String> getAllTables(String catalogName, String databaseName);
 
+  List<String> listTablesByType(
+      String catalogName, String databaseName, String tablePattern, String tableType);
+
   List<String> listTableNamesByFilter(
       String catalogName, String databaseName, String filter, short pageSize);
 

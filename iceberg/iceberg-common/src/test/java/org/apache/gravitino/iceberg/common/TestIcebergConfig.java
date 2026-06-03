@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.common;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -64,11 +65,38 @@ public class TestIcebergConfig {
   }
 
   @Test
+  public void testTableMetadataCacheDefaults() {
+    IcebergConfig icebergConfig = new IcebergConfig(ImmutableMap.of());
+    Assertions.assertEquals(
+        LocalTableMetadataCache.class.getName(),
+        icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_IMPL));
+    Assertions.assertEquals(1000, icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_CAPACITY));
+    Assertions.assertEquals(
+        IcebergConfig.TABLE_METADATA_CACHE_IMPL.getDefaultValue(),
+        icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_IMPL));
+    Assertions.assertEquals(
+        IcebergConfig.TABLE_METADATA_CACHE_CAPACITY.getDefaultValue(),
+        icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_CAPACITY));
+  }
+
+  @Test
   public void testDisableRestAuthzConfigKey() {
     Map<String, String> propertiesWithNewKey =
         ImmutableMap.of(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ.getKey(), "false");
     IcebergConfig icebergConfigWithNewKey = new IcebergConfig(propertiesWithNewKey);
     Assertions.assertFalse(
         icebergConfigWithNewKey.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ));
+  }
+
+  @Test
+  public void testAsyncCleanupDefaults() {
+    IcebergConfig config = new IcebergConfig(ImmutableMap.of());
+    Assertions.assertEquals(2, config.get(IcebergConfig.ASYNC_CLEANUP_WORKER_THREADS));
+    Assertions.assertEquals(4, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_THREADS));
+    Assertions.assertEquals(1000, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_BATCH_SIZE));
+    Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_POLL_INTERVAL_SECS));
+    Assertions.assertEquals(300, config.get(IcebergConfig.ASYNC_CLEANUP_HEARTBEAT_TIMEOUT_SECS));
+    Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_MAX_ATTEMPTS));
+    Assertions.assertEquals(720, config.get(IcebergConfig.ASYNC_CLEANUP_RETENTION_HOURS));
   }
 }

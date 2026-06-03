@@ -53,6 +53,7 @@ import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
@@ -186,6 +187,7 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(new HealthAliasServlet(), "/health.html");
 
     server.addCustomFilters(API_ANY_PATH);
+    server.addFilter(new RequestContextFilter(), API_ANY_PATH);
     server.addFilter(new VersioningFilter(), API_ANY_PATH);
     server.addSystemFilters(API_ANY_PATH);
     if (server.isWebUiEnabled()) {

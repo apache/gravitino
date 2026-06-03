@@ -104,6 +104,7 @@ public class TestCompatibilityUtils {
       {OperationType.LIST_TOPIC, Operation.LIST_TOPIC},
       {OperationType.CREATE_VIEW, Operation.CREATE_VIEW},
       {OperationType.ALTER_VIEW, Operation.ALTER_VIEW},
+      {OperationType.REPLACE_VIEW, Operation.REPLACE_VIEW},
       {OperationType.DROP_VIEW, Operation.DROP_VIEW},
       {OperationType.LOAD_VIEW, Operation.LOAD_VIEW},
       {OperationType.VIEW_EXISTS, Operation.VIEW_EXISTS},

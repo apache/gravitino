@@ -75,4 +75,14 @@ public abstract class BasePOStorageOps<PO, Mapper> {
     throw new UnsupportedOperationException(
         "listPOsByNSFullName is not supported by " + getClass().getSimpleName());
   }
+
+  /**
+   * Lists the PO identified by {@code (parentId, name)} together with every descendant whose name
+   * shares the same prefix (the notion of "descendant" is implementation-specific). For
+   * non-hierarchical entities, this typically returns the single matching row.
+   */
+  public List<PO> listPOsByNamePrefix(Mapper mapper, Long parentId, String name) {
+    throw new UnsupportedOperationException(
+        "listPOsByNamePrefix is not supported by " + getClass().getSimpleName());
+  }
 }
