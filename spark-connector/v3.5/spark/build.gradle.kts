@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+evaluationDependsOn(":spark-connector:spark-common")
+
 plugins {
   `maven-publish`
   id("java")
@@ -27,8 +29,8 @@ repositories {
   mavenCentral()
 }
 
-val glueHiveJarsDir =
-  project(":spark-connector:spark-common").buildDir.resolve("tmp/glue-hive-jars").absolutePath
+val glueHiveJarsDir: String? =
+  project(":spark-connector:spark-common").extra["glueHiveJarsDir"] as String?
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
@@ -188,8 +190,10 @@ tasks.test {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
-    dependsOn(":spark-connector:spark-common:downloadGlueHiveJars")
-    jvmArgs("-Dglue.hive-jars-dir=$glueHiveJarsDir")
+    if (glueHiveJarsDir != null) {
+      dependsOn(":spark-connector:spark-common:downloadGlueHiveJars")
+      jvmArgs("-Dglue.hive-jars-dir=$glueHiveJarsDir")
+    }
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")

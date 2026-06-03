@@ -165,15 +165,19 @@ dependencies {
 // aws-java-sdk-glue 1.12.31 requires PropertyNamingStrategy$PascalCaseStrategy which was
 // removed in Jackson 2.12. Jackson included here so the isolated classloader uses a compatible
 // version instead of the app-level Jackson bundled with Spark (2.14+).
-val glueHiveJarsDir = "$buildDir/tmp/glue-hive-jars"
+// Only set when AWS_ACCESS_KEY_ID is present so version-specific modules can skip the download
+// when Glue tests are not enabled.
+val glueHiveJarsDir: String? =
+  if (System.getenv("AWS_ACCESS_KEY_ID") != null) "$buildDir/tmp/glue-hive-jars" else null
+extra["glueHiveJarsDir"] = glueHiveJarsDir
 val glueLibsApiUrl =
   "https://api.github.com/repos/datastrato/spark-hive-glue-libs/contents/spark3/glue-3.4.0"
 
 val downloadGlueHiveJars by
 tasks.registering {
-  outputs.dir(glueHiveJarsDir)
+  glueHiveJarsDir?.let { outputs.dir(it) }
   doLast {
-    val outputDir = file(glueHiveJarsDir)
+    val outputDir = file(glueHiveJarsDir ?: return@doLast)
     outputDir.mkdirs()
     val response = URI(glueLibsApiUrl).toURL().readText()
 
