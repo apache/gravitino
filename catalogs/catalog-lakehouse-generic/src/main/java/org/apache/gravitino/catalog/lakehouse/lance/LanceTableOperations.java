@@ -225,8 +225,7 @@ public class LanceTableOperations extends ManagedTableOperations {
             LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
         ReadOptions readOptions =
             new ReadOptions.Builder().setStorageOptions(resolvedStorageOptions).build();
-        try (RootAllocator allocator = new RootAllocator();
-            Dataset ignored = Dataset.open(allocator, location, readOptions)) {
+        try (Dataset ignored = Dataset.open().uri(location).readOptions(readOptions).build()) {
         } catch (Exception e) {
           LOG.warn(
               "Failed to open Lance dataset at location {} with options {}, it may have already"
