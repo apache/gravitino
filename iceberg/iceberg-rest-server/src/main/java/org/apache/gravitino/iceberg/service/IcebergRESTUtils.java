@@ -41,13 +41,8 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.credential.ADLSTokenCredential;
-import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
-import org.apache.gravitino.credential.GCSTokenCredential;
-import org.apache.gravitino.credential.OSSTokenCredential;
-import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
@@ -97,9 +92,12 @@ public class IcebergRESTUtils {
    * scan-plan, or credentials API responses.
    *
    * <p>Refresh credential endpoints are added only for credential types whose Iceberg client
-   * modules support vended credential refresh: S3 ({@link S3TokenCredential}, {@link
-   * AwsIrsaCredential}), GCS ({@link GCSTokenCredential}), and ADLS ({@link ADLSTokenCredential}).
-   * OSS temporary credentials ({@link OSSTokenCredential}) are omitted because Iceberg's Aliyun OSS
+   * modules support vended credential refresh: S3 ({@link
+   * org.apache.gravitino.credential.S3TokenCredential}, {@link
+   * org.apache.gravitino.credential.AwsIrsaCredential}), GCS ({@link
+   * org.apache.gravitino.credential.GCSTokenCredential}), and ADLS ({@link
+   * org.apache.gravitino.credential.ADLSTokenCredential}). OSS temporary credentials ({@link
+   * org.apache.gravitino.credential.OSSTokenCredential}) are omitted because Iceberg's Aliyun OSS
    * FileIO does not consume {@code client.refresh-credentials-endpoint}; only the initial STS
    * properties are returned.
    *
