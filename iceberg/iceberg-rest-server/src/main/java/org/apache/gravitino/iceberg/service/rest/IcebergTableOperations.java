@@ -133,7 +133,7 @@ public class IcebergTableOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             ListTablesResponse listTablesResponse =
                 tableOperationDispatcher.listTable(context, icebergNS);
 
@@ -183,7 +183,8 @@ public class IcebergTableOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+                IcebergRESTUtils.getIcebergRequestContext(
+                    httpServletRequest(), catalogName, isCredentialVending);
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
             return buildResponseWithETag(loadTableResponse);
@@ -228,7 +229,7 @@ public class IcebergTableOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
@@ -273,7 +274,7 @@ public class IcebergTableOperations {
           () -> {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
             return IcebergRESTUtils.noContent();
           });
@@ -320,7 +321,8 @@ public class IcebergTableOperations {
           () -> {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+                IcebergRESTUtils.getIcebergRequestContext(
+                    httpServletRequest(), catalogName, isCredentialVending);
 
             // Fast path: if client sent If-None-Match, try to resolve ETag without full table load
             if (StringUtils.isNotBlank(ifNoneMatch)) {
@@ -379,7 +381,7 @@ public class IcebergTableOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
             if (exists) {
@@ -479,7 +481,7 @@ public class IcebergTableOperations {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             // First check if the table exists
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             // Get credentials using the table operation dispatcher
             LoadCredentialsResponse credentialsResponse =
                 tableOperationDispatcher.getTableCredentials(context, tableIdentifier);
@@ -534,7 +536,7 @@ public class IcebergTableOperations {
           () -> {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
 
             PlanTableScanResponse scanResponse =
                 tableOperationDispatcher.planTableScan(context, tableIdentifier, scanRequest);

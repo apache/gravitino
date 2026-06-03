@@ -41,6 +41,8 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
@@ -260,6 +262,29 @@ public class IcebergRESTUtils {
       }
     }
     return headers;
+  }
+
+  public static IcebergRequestContext getIcebergRequestContext(
+      HttpServletRequest httpServletRequest, String catalogName) {
+    return getIcebergRequestContext(httpServletRequest, catalogName, false);
+  }
+
+  public static IcebergRequestContext getIcebergRequestContext(
+      HttpServletRequest httpServletRequest, String catalogName, boolean requestCredentialVending) {
+    return new IcebergRequestContext(
+        catalogName,
+        PrincipalUtils.getCurrentUserName(),
+        resolveClientAddress(httpServletRequest),
+        getHttpHeaders(httpServletRequest),
+        requestCredentialVending);
+  }
+
+  private static String resolveClientAddress(HttpServletRequest request) {
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (StringUtils.isNotBlank(xForwardedFor)) {
+      return xForwardedFor.split(",")[0].trim();
+    }
+    return request.getRemoteHost();
   }
 
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to

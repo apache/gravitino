@@ -84,14 +84,19 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
             metalakeName, context.catalogName(), viewIdentifier);
     Optional<BaseEvent> transformedEvent =
         eventBus.dispatchEvent(
-            new IcebergCreateViewPreEvent(context, nameIdentifier, createViewRequest));
+            new IcebergCreateViewPreEvent(
+                context,
+                nameIdentifier,
+                IcebergEventPayloads.requestPayload(createViewRequest, CreateViewRequest.class)));
     IcebergCreateViewPreEvent transformedCreateEvent =
         (IcebergCreateViewPreEvent) transformedEvent.get();
+    CreateViewRequest transformedCreateRequest =
+        IcebergEventPayloads.requestFromPayload(
+            transformedCreateEvent.createViewRequest(), CreateViewRequest.class);
     LoadViewResponse loadViewResponse;
     try {
       loadViewResponse =
-          icebergViewOperationDispatcher.createView(
-              context, namespace, transformedCreateEvent.createViewRequest());
+          icebergViewOperationDispatcher.createView(context, namespace, transformedCreateRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergCreateViewFailureEvent(
@@ -100,7 +105,10 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
     }
     eventBus.dispatchEvent(
         new IcebergCreateViewEvent(
-            context, nameIdentifier, transformedCreateEvent.createViewRequest(), loadViewResponse));
+            context,
+            nameIdentifier,
+            transformedCreateEvent.createViewRequest(),
+            IcebergEventPayloads.responsePayload(loadViewResponse, LoadViewResponse.class)));
     return loadViewResponse;
   }
 
@@ -114,14 +122,20 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
             metalakeName, context.catalogName(), viewIdentifier);
     Optional<BaseEvent> transformedEvent =
         eventBus.dispatchEvent(
-            new IcebergReplaceViewPreEvent(context, gravitinoNameIdentifier, replaceViewRequest));
+            new IcebergReplaceViewPreEvent(
+                context,
+                gravitinoNameIdentifier,
+                IcebergEventPayloads.requestPayload(replaceViewRequest, UpdateTableRequest.class)));
     IcebergReplaceViewPreEvent transformedReplaceEvent =
         (IcebergReplaceViewPreEvent) transformedEvent.get();
+    UpdateTableRequest transformedReplaceRequest =
+        IcebergEventPayloads.requestFromPayload(
+            transformedReplaceEvent.replaceViewRequest(), UpdateTableRequest.class);
     LoadViewResponse loadViewResponse;
     try {
       loadViewResponse =
           icebergViewOperationDispatcher.replaceView(
-              context, viewIdentifier, transformedReplaceEvent.replaceViewRequest());
+              context, viewIdentifier, transformedReplaceRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergReplaceViewFailureEvent(
@@ -133,7 +147,7 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
             context,
             gravitinoNameIdentifier,
             transformedReplaceEvent.replaceViewRequest(),
-            loadViewResponse));
+            IcebergEventPayloads.responsePayload(loadViewResponse, LoadViewResponse.class)));
     return loadViewResponse;
   }
 
@@ -166,7 +180,10 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergLoadViewEvent(context, gravitinoNameIdentifier, loadViewResponse));
+        new IcebergLoadViewEvent(
+            context,
+            gravitinoNameIdentifier,
+            IcebergEventPayloads.responsePayload(loadViewResponse, LoadViewResponse.class)));
     return loadViewResponse;
   }
 
@@ -214,16 +231,25 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
         IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), sourceView);
     eventBus.dispatchEvent(
-        new IcebergRenameViewPreEvent(context, gravitinoNameIdentifier, renameViewRequest));
+        new IcebergRenameViewPreEvent(
+            context,
+            gravitinoNameIdentifier,
+            IcebergEventPayloads.requestPayload(renameViewRequest, RenameTableRequest.class)));
     try {
       icebergViewOperationDispatcher.renameView(context, renameViewRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergRenameViewFailureEvent(
-              context, gravitinoNameIdentifier, renameViewRequest, e));
+              context,
+              gravitinoNameIdentifier,
+              IcebergEventPayloads.requestPayload(renameViewRequest, RenameTableRequest.class),
+              e));
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergRenameViewEvent(context, gravitinoNameIdentifier, renameViewRequest));
+        new IcebergRenameViewEvent(
+            context,
+            gravitinoNameIdentifier,
+            IcebergEventPayloads.requestPayload(renameViewRequest, RenameTableRequest.class)));
   }
 }

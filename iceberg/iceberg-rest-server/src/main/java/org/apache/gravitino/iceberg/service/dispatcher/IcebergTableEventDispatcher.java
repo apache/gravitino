@@ -93,14 +93,19 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
             metalakeName, context.catalogName(), tableIdentifier);
     Optional<BaseEvent> transformedEvent =
         eventBus.dispatchEvent(
-            new IcebergCreateTablePreEvent(context, nameIdentifier, createTableRequest));
+            new IcebergCreateTablePreEvent(
+                context,
+                nameIdentifier,
+                IcebergEventPayloads.requestPayload(createTableRequest, CreateTableRequest.class)));
     IcebergCreateTablePreEvent transformedCreateEvent =
         (IcebergCreateTablePreEvent) transformedEvent.get();
+    CreateTableRequest transformedCreateRequest =
+        IcebergEventPayloads.requestFromPayload(
+            transformedCreateEvent.createTableRequest(), CreateTableRequest.class);
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =
-          icebergTableOperationDispatcher.createTable(
-              context, namespace, transformedCreateEvent.createTableRequest());
+          icebergTableOperationDispatcher.createTable(context, namespace, transformedCreateRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergCreateTableFailureEvent(
@@ -112,7 +117,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
             context,
             nameIdentifier,
             transformedCreateEvent.createTableRequest(),
-            loadTableResponse));
+            IcebergEventPayloads.responsePayload(loadTableResponse, LoadTableResponse.class)));
     return loadTableResponse;
   }
 
@@ -126,14 +131,20 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
             metalakeName, context.catalogName(), tableIdentifier);
     Optional<BaseEvent> transformedEvent =
         eventBus.dispatchEvent(
-            new IcebergUpdateTablePreEvent(context, gravitinoNameIdentifier, updateTableRequest));
+            new IcebergUpdateTablePreEvent(
+                context,
+                gravitinoNameIdentifier,
+                IcebergEventPayloads.requestPayload(updateTableRequest, UpdateTableRequest.class)));
     IcebergUpdateTablePreEvent transformedUpdateEvent =
         (IcebergUpdateTablePreEvent) transformedEvent.get();
+    UpdateTableRequest transformedUpdateRequest =
+        IcebergEventPayloads.requestFromPayload(
+            transformedUpdateEvent.updateTableRequest(), UpdateTableRequest.class);
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =
           icebergTableOperationDispatcher.updateTable(
-              context, tableIdentifier, transformedUpdateEvent.updateTableRequest());
+              context, tableIdentifier, transformedUpdateRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergUpdateTableFailureEvent(
@@ -145,7 +156,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
             context,
             gravitinoNameIdentifier,
             transformedUpdateEvent.updateTableRequest(),
-            loadTableResponse));
+            IcebergEventPayloads.responsePayload(loadTableResponse, LoadTableResponse.class)));
     return loadTableResponse;
   }
 
@@ -183,7 +194,10 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergLoadTableEvent(context, gravitinoNameIdentifier, loadTableResponse));
+        new IcebergLoadTableEvent(
+            context,
+            gravitinoNameIdentifier,
+            IcebergEventPayloads.responsePayload(loadTableResponse, LoadTableResponse.class)));
     return loadTableResponse;
   }
 
@@ -231,17 +245,26 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
         IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), sourceTable);
     eventBus.dispatchEvent(
-        new IcebergRenameTablePreEvent(context, gravitinoNameIdentifier, renameTableRequest));
+        new IcebergRenameTablePreEvent(
+            context,
+            gravitinoNameIdentifier,
+            IcebergEventPayloads.requestPayload(renameTableRequest, RenameTableRequest.class)));
     try {
       icebergTableOperationDispatcher.renameTable(context, renameTableRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergRenameTableFailureEvent(
-              context, gravitinoNameIdentifier, renameTableRequest, e));
+              context,
+              gravitinoNameIdentifier,
+              IcebergEventPayloads.requestPayload(renameTableRequest, RenameTableRequest.class),
+              e));
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergRenameTableEvent(context, gravitinoNameIdentifier, renameTableRequest));
+        new IcebergRenameTableEvent(
+            context,
+            gravitinoNameIdentifier,
+            IcebergEventPayloads.requestPayload(renameTableRequest, RenameTableRequest.class)));
   }
 
   /**

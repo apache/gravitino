@@ -65,6 +65,7 @@ if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) 
   println("Skipping filesystem-fuse module since enableFuse is set to false")
 }
 include("iceberg:iceberg-common")
+include("iceberg:iceberg-listener")
 include("iceberg:iceberg-rest-server")
 include("lance:lance-common")
 include("lance:lance-rest-server")

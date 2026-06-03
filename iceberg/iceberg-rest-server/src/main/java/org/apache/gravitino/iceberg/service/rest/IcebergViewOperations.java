@@ -107,7 +107,7 @@ public class IcebergViewOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             ListTablesResponse listTablesResponse =
                 viewOperationDispatcher.listView(context, icebergNS);
 
@@ -149,7 +149,7 @@ public class IcebergViewOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.createView(context, icebergNS, createViewRequest);
             return IcebergRESTUtils.ok(loadViewResponse);
@@ -194,7 +194,7 @@ public class IcebergViewOperations {
           () -> {
             TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.loadView(context, viewIdentifier);
             return IcebergRESTUtils.ok(loadViewResponse);
@@ -233,7 +233,7 @@ public class IcebergViewOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.replaceView(context, viewIdentifier, replaceViewRequest);
@@ -272,7 +272,7 @@ public class IcebergViewOperations {
           () -> {
             TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             viewOperationDispatcher.dropView(context, viewIdentifier);
             return IcebergRESTUtils.noContent();
           });
@@ -308,7 +308,7 @@ public class IcebergViewOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
             boolean exists = viewOperationDispatcher.viewExists(context, viewIdentifier);
             if (exists) {

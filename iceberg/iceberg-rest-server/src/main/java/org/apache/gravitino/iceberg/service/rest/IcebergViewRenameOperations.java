@@ -85,7 +85,7 @@ public class IcebergViewRenameOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             viewOperationDispatcher.renameView(context, renameViewRequest);
             return IcebergRESTUtils.noContent();
           });
