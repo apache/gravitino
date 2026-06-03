@@ -88,7 +88,10 @@ public class MockGravitinoAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+  public boolean isSelf(
+      Entity.EntityType type,
+      NameIdentifier nameIdentifier,
+      AuthorizationRequestContext requestContext) {
     return true;
   }
 

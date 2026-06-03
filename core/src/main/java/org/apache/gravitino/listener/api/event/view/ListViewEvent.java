@@ -22,6 +22,7 @@ package org.apache.gravitino.listener.api.event.view;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
 
 /**
@@ -29,16 +30,49 @@ import org.apache.gravitino.listener.api.event.OperationType;
  * listed identifiers are not stored on the event.
  */
 @DeveloperApi
-public final class ListViewEvent extends ViewEvent {
+public final class ListViewEvent extends ViewEvent implements ListEvent {
   private final Namespace namespace;
+  private final int viewCount;
 
-  public ListViewEvent(String user, Namespace namespace) {
+  /**
+   * Constructs an instance of {@code ListViewEvent}.
+   *
+   * @param user The username of the individual who initiated the view listing.
+   * @param namespace The namespace from which views were listed.
+   * @param viewCount The number of views returned by the list operation.
+   */
+  public ListViewEvent(String user, Namespace namespace, int viewCount) {
     super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
+    this.viewCount = viewCount;
   }
 
+  /**
+   * Constructs an instance of {@code ListViewEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the view listing.
+   * @param namespace The namespace from which views were listed.
+   * @deprecated Use {@link #ListViewEvent(String, Namespace, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListViewEvent(String user, Namespace namespace) {
+    this(user, namespace, -1);
+  }
+
+  /**
+   * Returns the namespace associated with this event.
+   *
+   * @return the namespace.
+   */
   public Namespace namespace() {
     return namespace;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return viewCount;
   }
 
   @Override

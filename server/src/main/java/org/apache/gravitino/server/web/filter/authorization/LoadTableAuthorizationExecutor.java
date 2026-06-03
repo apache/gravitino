@@ -20,13 +20,11 @@ import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.ParameterUtil;
 
@@ -52,30 +50,36 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
       Map<String, Object> pathParams,
       Optional<String> entityType,
       String secondaryExpression,
-      String secondaryExpressionCondition) {
+      ExpressionCondition secondaryExpressionCondition) {
     super(expression, metadataContext, pathParams, entityType);
 
-    // If secondaryExpression and condition are provided, evaluate the condition
-    if (StringUtils.isNotBlank(secondaryExpression)
-        && StringUtils.isNotBlank(secondaryExpressionCondition)) {
-      String privileges = (String) ParameterUtil.extractFromParameters(parameters, args);
-
-      // Evaluate the condition: does the request contain MODIFY_TABLE privilege?
-      if (privileges != null
-          && secondaryExpressionCondition.equals(
-              AuthorizationExpressionConstants.REQUEST_REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE)) {
-        Set<Privilege.Name> privilegeNames =
-            Arrays.stream(privileges.split(","))
-                .map(Privilege.Name::valueOf)
-                .collect(Collectors.toSet());
-
-        if (privilegeNames.contains(Privilege.Name.MODIFY_TABLE)) {
-          // Use the secondary expression for stricter authorization
-          this.expression = secondaryExpression;
-          this.authorizationExpressionEvaluator =
-              new AuthorizationExpressionEvaluator(secondaryExpression);
-        }
-      }
+    if (!shouldCheckModifyTablePrivilege(secondaryExpression, secondaryExpressionCondition)) {
+      return;
     }
+
+    String privileges = (String) ParameterUtil.extractFromParameters(parameters, args);
+    if (containsModifyTablePrivilege(privileges)) {
+      this.expression = secondaryExpression;
+      this.authorizationExpressionEvaluator =
+          new AuthorizationExpressionEvaluator(secondaryExpression);
+    }
+  }
+
+  private static boolean shouldCheckModifyTablePrivilege(
+      String secondaryExpression, ExpressionCondition secondaryExpressionCondition) {
+    return StringUtils.isNotBlank(secondaryExpression)
+        && secondaryExpressionCondition == ExpressionCondition.REQUIRED_MODIFY_PRIVILEGES;
+  }
+
+  private static boolean containsModifyTablePrivilege(String privileges) {
+    if (StringUtils.isBlank(privileges)) {
+      return false;
+    }
+
+    return Arrays.stream(privileges.split(","))
+        .map(String::trim)
+        .filter(StringUtils::isNotBlank)
+        .map(Privilege.Name::valueOf)
+        .anyMatch(Privilege.Name.MODIFY_TABLE::equals);
   }
 }

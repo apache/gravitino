@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -109,14 +110,40 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
     createAndInsertMakeLake(METALAKE_NAME);
 
     CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
-    long maxIdBeforeCatalogRename = maxEntityChangeId();
-    CatalogEntity renamedCatalog =
+    long maxIdBeforeCatalogAlter = maxEntityChangeId();
+    CatalogEntity alteredCatalog =
         backend.update(
             catalog.nameIdentifier(),
             Entity.EntityType.CATALOG,
             entity ->
+                CatalogEntity.builder()
+                    .withId(catalog.id())
+                    .withNamespace(catalog.namespace())
+                    .withName(CATALOG_NAME)
+                    .withType(Catalog.Type.RELATIONAL)
+                    .withProvider("test")
+                    .withComment("updated comment")
+                    .withProperties(null)
+                    .withAuditInfo(AUDIT_INFO)
+                    .build());
+    assertEntityChange(
+        maxIdBeforeCatalogAlter,
+        METALAKE_NAME,
+        Entity.EntityType.CATALOG,
+        NameIdentifierUtil.ofCatalog(METALAKE_NAME, CATALOG_NAME).toString(),
+        OperateType.ALTER);
+
+    long maxIdBeforeCatalogRename = maxEntityChangeId();
+    CatalogEntity renamedCatalog =
+        backend.update(
+            alteredCatalog.nameIdentifier(),
+            Entity.EntityType.CATALOG,
+            entity ->
                 createCatalog(
-                    catalog.id(), catalog.namespace(), CATALOG_NAME + "_renamed", AUDIT_INFO));
+                    alteredCatalog.id(),
+                    alteredCatalog.namespace(),
+                    CATALOG_NAME + "_renamed",
+                    AUDIT_INFO));
     assertEntityChange(
         maxIdBeforeCatalogRename,
         METALAKE_NAME,

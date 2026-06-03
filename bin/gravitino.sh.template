@@ -126,7 +126,7 @@ function start() {
 }
 
 function run() {
-  ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_SERVER_NAME}
+  exec ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_SERVER_NAME}
 }
 
 function stop() {
@@ -153,7 +153,7 @@ JAVA_OPTS+=" -Dgravitino.log.path=${GRAVITINO_LOG_DIR}"
 JAVA_OPTS+=" -Dgravitino.server.name=${GRAVITINO_SIMPLE_SERVER_NAME}"
 JAVA_OPTS+=" ${GRAVITINO_MEM}"
 
-if [ "$JVM_VERSION" -eq 17 ]; then
+if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" -XX:+IgnoreUnrecognizedVMOptions"
   JAVA_OPTS+=" --add-opens java.base/java.io=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.base/java.lang.invoke=ALL-UNNAMED"

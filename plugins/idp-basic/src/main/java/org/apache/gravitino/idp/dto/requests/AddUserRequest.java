@@ -20,13 +20,12 @@
 package org.apache.gravitino.idp.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to add a built-in IdP user. */
@@ -68,9 +67,7 @@ public class AddUserRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(user), "\"user\" field is required and cannot be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(password), "\"password\" field is required and cannot be empty");
+    IdpCredentialValidator.validateUsername(user);
+    IdpCredentialValidator.validatePassword(password);
   }
 }

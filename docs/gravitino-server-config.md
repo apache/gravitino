@@ -57,6 +57,9 @@ The following table lists the storage configuration items:
 | `gravitino.entity.store.maxTransactionSkewTimeMs` | The maximum skew time of transactions in milliseconds.                                                                                                                                                                                                  | `2000`                            | No                                              | 0.3.0            |
 | `gravitino.entity.store.deleteAfterTimeMs`        | The maximum time in milliseconds that deleted and old-version data is kept. Set to at least 10 minutes and no longer than 30 days.                                                                                                                      | `604800000`(7 days)               | No                                              | 0.5.0            |
 | `gravitino.entity.store.versionRetentionCount`    | The Count of versions allowed to be retained, including the current version, used to delete old versions data. Set to at least 1 and no greater than 10.                                                                                                | `1`                               | No                                              | 0.5.0            |
+| `gravitino.entityChangeLog.pollIntervalSecs`      | The interval in seconds for polling the entity change log. The poller invalidates stale local caches (e.g. the catalog cache) across HA nodes by consuming change log records. Must be positive.                                                        | `3`                               | No                                              | 1.3.0            |
+| `gravitino.entityChangeLog.retentionSecs`         | The retention time in seconds for entity change log rows. Expired rows are pruned periodically. Set to `0` to disable automatic cleanup. Must be non-negative.                                                                                          | `86400`(1 day)                    | No                                              | 1.3.0            |
+| `gravitino.entityChangeLog.cleanupIntervalSecs`   | The interval in seconds for pruning expired entity change log rows. Must be positive.                                                                                                                                                                   | `3600`(1 hour)                    | No                                              | 1.3.0            |
 | `gravitino.entity.store.relational`               | Detailed implementation of Relational storage. `H2`, `MySQL` and `PostgreSQL` is currently supported, and the implementation is `JDBCBackend`.                                                                                                          | `JDBCBackend`                     | No                                              | 0.5.0            |
 | `gravitino.entity.store.relational.jdbcUrl`       | The database url that the `JDBCBackend` needs to connect to. If you use `MySQL` or `PostgreSQL`, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/{DATABASE_TYPE}/` directory. | `jdbc:h2`                         | No                                              | 0.5.0            |
 | `gravitino.entity.store.relational.jdbcDriver`    | The jdbc driver name that the `JDBCBackend` needs to use. You should place the driver Jar package in the `${GRAVITINO_HOME}/libs/` directory.                                                                                                           | `org.h2.Driver`                   | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
@@ -143,8 +146,9 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 
 | Configuration item                           | Description                                                                                                                                                                                         | Default value | Required | Since version |
 |----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                     | `3600000`     | No       | 0.1.0         |
-| `gravitino.catalog.classloader.isolated`     | Whether to use an isolated classloader for catalog. If `true`, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | No       | 0.1.0         |
+| `gravitino.catalog.cache.evictionIntervalMs`           | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                                                                                                                                                                                                                          | `3600000` | No | 0.1.0 |
+| `gravitino.catalog.classloader.isolated`               | Whether to use an isolated classloader for catalog. If `true`, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`.                                                                                                                                                                                                       | `true`    | No | 0.1.0 |
+| `gravitino.catalog.credential.backfillToProperties`    | For backward compatibility only: if `true`, the server exposes hidden catalog credentials (such as jdbc-user and jdbc-password) in the catalog properties response so that connectors that do not support credential vending can still read them. **Enabling this is a security risk** — credentials are visible to anyone who can read catalog properties. Disable once all connectors are upgraded.       | `false`   | No | 1.3.0 |
 
 ### Schema configuration
 
@@ -247,11 +251,11 @@ The audit log framework defines how audit logs are formatted and written to vari
 
 Gravitino provides a default implementation to log basic audit information to a file. You can extend the audit system by implementing the corresponding interfaces.
 
-| Property name                         | Description                            | Default value                                  | Required | Since Version    |
-|---------------------------------------|----------------------------------------|------------------------------------------------|----------|------------------|
-| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                          | NO       | 0.7.0-incubating |
-| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter     | NO       | 0.7.0-incubating |
-| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.v2.SimpleFormatterV2 | NO      | 0.7.0-incubating |
+| Property name                         | Description                            | Default value                                   | Required | Since Version     |
+|---------------------------------------|----------------------------------------|-------------------------------------------------|----------|-------------------|
+| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                           | NO       | 0.7.0-incubating  |
+| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter      | NO       | 0.7.0-incubating  |
+| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.v2.SimpleFormatterV2 | NO       | 0.7.0-incubating  |
 
 #### Audit log formatter
 
@@ -268,10 +272,10 @@ The `AuditLogWriter` interface enables writing audit logs to different storage m
 The following `gravitino.audit.writer.file.*` properties were accepted in earlier versions but are now **deprecated** and have no effect. `FileAuditWriter` emits a `WARN` log at startup if any of them are present. Configure the equivalent behavior directly in `conf/log4j2.properties` instead.
 
 | Deprecated property                             | Migration: configure in `conf/log4j2.properties`                  |
-|-------------------------------------------------|--------------------------------------------------------------------|
-| `gravitino.audit.writer.file.fileName`          | `appender.audit_file.fileName`                                     |
-| `gravitino.audit.writer.file.append`            | `appender.audit_file.append`                                       |
-| `gravitino.audit.writer.file.flushIntervalSecs` | Use `immediateFlush` on the appender or an async appender wrapper  |
+|-------------------------------------------------|-------------------------------------------------------------------|
+| `gravitino.audit.writer.file.fileName`          | `appender.audit_file.fileName`                                    |
+| `gravitino.audit.writer.file.append`            | `appender.audit_file.append`                                      |
+| `gravitino.audit.writer.file.flushIntervalSecs` | Use `immediateFlush` on the appender or an async appender wrapper |
 
 Example — change the audit log path:
 
@@ -296,6 +300,63 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 | Property name                             | Description                                          | Default value | Required | Since Version |
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
+
+### Health check endpoints
+
+Gravitino exposes three health check endpoints following [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics. All endpoints are exempt from authentication so that Kubernetes probes, load balancers, and global traffic managers can reach them without credentials.
+
+| Endpoint                | Description                                                                                                                                                                           | HTTP status |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /api/health/live`  | Liveness probe. Returns 200 as long as the HTTP server thread can respond. Use this to determine whether to restart a pod.                                                            | 200         |
+| `GET /api/health/ready` | Readiness probe. Returns 200 when the entity store is reachable within the configured timeout; 503 when the entity store is unavailable or slow. Use this to control traffic routing. | 200 / 503   |
+| `GET /api/health`       | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                                                                                         | 200 / 503   |
+
+Root-level aliases are also available for global traffic managers that require probes at well-known root paths:
+
+| Alias               | Forwards to             |
+|---------------------|-------------------------|
+| `GET /health`       | `GET /api/health`       |
+| `GET /health/live`  | `GET /api/health/live`  |
+| `GET /health/ready` | `GET /api/health/ready` |
+| `GET /health.html`  | `GET /api/health`       |
+
+**Configuration:**
+
+| Property name                                        | Description                                                                               | Default value | Required | Since version |
+|------------------------------------------------------|-------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.server.health.entityStore.probeTimeoutMs` | Timeout in milliseconds for the entity-store readiness probe used by `/api/health/ready`. | `2000`        | No       | 1.3.0         |
+
+**Response format:**
+
+All endpoints return a JSON body with the same shape. The `code` field is always `0`. `status` is `UP` or `DOWN`. `checks` lists per-component results; liveness reports `httpServer` and readiness reports `entityStore`.
+
+Healthy response (HTTP 200):
+
+```json
+{
+  "code": 0,
+  "status": "UP",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "entityStore", "status": "UP", "details": {} }
+  ]
+}
+```
+
+Unhealthy response (HTTP 503):
+
+```json
+{
+  "code": 0,
+  "status": "DOWN",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "entityStore", "status": "DOWN", "details": { "reason": "timeout" } }
+  ]
+}
+```
+
+Possible `reason` values in the `entityStore` DOWN check: `timeout`, `interrupted`, `probe-rejected`, or the class name of an unexpected exception.
 
 ### Memory settings
 

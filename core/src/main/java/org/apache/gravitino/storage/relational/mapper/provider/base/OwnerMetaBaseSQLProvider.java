@@ -36,6 +36,11 @@ import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaBaseSQLProvider {
+  protected String currentTimestampMillisExpression() {
+    return "(UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+  }
+
   public String selectUserOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
@@ -141,11 +146,14 @@ public class OwnerMetaBaseSQLProvider {
 
   public String batchSoftDeleteOwnerRelByMetadataObjects(
       @Param("deletions") List<OwnerRelForDeletion> deletions) {
+    String now = currentTimestampMillisExpression();
     return "<script>"
         + "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE deleted_at = 0 AND ("
         + "<foreach collection='deletions' item='t' separator=' OR '>"
         + "(metadata_object_id = #{t.metadataObjectId} AND metadata_object_type = #{t.metadataObjectType})"
@@ -157,35 +165,47 @@ public class OwnerMetaBaseSQLProvider {
   public String softDeleteOwnerRelByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0";
   }
 
   public String softDeleteOwnerRelByOwnerIdAndType(
       @Param("ownerId") Long ownerId, @Param("ownerType") String ownerType) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0";
   }
 
   public String softDeleteOwnerRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " ot SET ot.deleted_at = "
+        + now
+        + ", ot.updated_at = "
+        + now
         + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -230,11 +250,14 @@ public class OwnerMetaBaseSQLProvider {
   }
 
   public String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    String now = currentTimestampMillisExpression();
     return "<script>"
         + "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " ot SET ot.deleted_at = "
+        + now
+        + ", ot.updated_at = "
+        + now
         + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
@@ -316,23 +339,33 @@ public class OwnerMetaBaseSQLProvider {
         + " ORDER BY updated_at DESC, id DESC LIMIT 1";
   }
 
-  public String selectChangedOwners(@Param("lastConsumedId") long lastConsumedId) {
-    // Owner changes are broadcast to every server instance because owner caches are local. Each
-    // instance tracks its own last consumed id; re-reading a row is harmless because cache
-    // invalidation is idempotent.
+  public String selectChangedOwners(
+      @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId) {
+    // Owner changes are broadcast to every server instance because owner caches are local. Both
+    // inserts and soft-deletes advance owner_meta.updated_at, so a single (updated_at, id) keyset
+    // cursor catches every change; id is the tiebreaker when multiple rows share an updated_at
+    // millisecond (batch soft-deletes do that).
     return "SELECT id,"
         + " metadata_object_id as metadataObjectId,"
         + " metadata_object_type as metadataObjectType,"
         + " updated_at as updatedAt"
         + " FROM "
         + OWNER_TABLE_NAME
-        + " WHERE deleted_at = 0 AND id > #{lastConsumedId}"
-        + " ORDER BY id LIMIT 1000";
+        + " WHERE updated_at > #{lastConsumedUpdatedAt}"
+        + " OR (updated_at = #{lastConsumedUpdatedAt} AND id > #{lastConsumedUpdatedAtId})"
+        + " ORDER BY updated_at, id LIMIT 1000";
   }
 
-  public String selectMaxChangeId() {
-    // A newly started server has an empty local owner cache. It can start from the current max id
-    // and consume only owner changes that happen after startup.
-    return "SELECT COALESCE(MAX(id), 0) FROM " + OWNER_TABLE_NAME + " WHERE deleted_at = 0";
+  public String selectMaxChangedOwner() {
+    // A newly started server has an empty local owner cache. It can start from the current tail
+    // tuple and consume only owner changes that happen after startup.
+    return "SELECT id,"
+        + " metadata_object_id as metadataObjectId,"
+        + " metadata_object_type as metadataObjectType,"
+        + " updated_at as updatedAt"
+        + " FROM "
+        + OWNER_TABLE_NAME
+        + " ORDER BY updated_at DESC, id DESC LIMIT 1";
   }
 }

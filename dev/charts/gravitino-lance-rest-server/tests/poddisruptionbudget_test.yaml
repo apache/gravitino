@@ -1,0 +1,111 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino lance rest server pod disruption budget
+templates:
+  - poddisruptionbudget.yaml
+tests:
+  - it: does not render a PodDisruptionBudget by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders minAvailable when enabled
+    set:
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.minAvailable
+          value: 1
+      - notExists:
+          path: spec.maxUnavailable
+
+  - it: renders maxUnavailable when minAvailable is empty
+    set:
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: ""
+        maxUnavailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+      - notExists:
+          path: spec.minAvailable
+
+  - it: renders a percentage minAvailable value
+    set:
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: "50%"
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.minAvailable
+          value: "50%"
+      - notExists:
+          path: spec.maxUnavailable
+
+  - it: renders a percentage maxUnavailable value
+    set:
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: ""
+        maxUnavailable: "25%"
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.maxUnavailable
+          value: "25%"
+      - notExists:
+          path: spec.minAvailable
+
+  - it: renders labels and annotations
+    set:
+      podDisruptionBudget:
+        enabled: true
+        labels:
+          exposure: protected
+        annotations:
+          policy.example.com/enabled: "true"
+    asserts:
+      - equal:
+          path: metadata.labels.exposure
+          value: protected
+      - equal:
+          path: metadata.annotations["policy.example.com/enabled"]
+          value: "true"
+
+  - it: fails when minAvailable and maxUnavailable are both specified
+    set:
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: 1
+        maxUnavailable: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "podDisruptionBudget.minAvailable and podDisruptionBudget.maxUnavailable cannot both be specified. Please specify only one."

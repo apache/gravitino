@@ -26,8 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
-import org.apache.gravitino.idp.exception.AlreadyExistsException;
-import org.apache.gravitino.idp.exception.NotFoundException;
+import java.util.Set;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,6 +46,34 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("missing"));
     assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testGetIdpGroup(String type) throws IOException {
+    init(type);
+    insertUsers(2);
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
+    runServiceCall(
+        () ->
+            groupMetaService.insertIdpGroup(
+                IdpGroupPO.builder()
+                    .withGroupId(1L)
+                    .withGroupName("engineering")
+                    .withCurrentVersion(1L)
+                    .withLastVersion(0L)
+                    .withDeletedAt(0L)
+                    .build()));
+    runServiceCall(
+        () ->
+            groupMetaService.changeGroupMembership(
+                "engineering", List.of("user1", "user2"), List.of()));
+
+    assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroup("missing"));
+    assertEquals("engineering", groupMetaService.getIdpGroup("engineering").name());
+    assertEquals(
+        Set.of("user1", "user2"),
+        Set.copyOf(groupMetaService.getIdpGroup("engineering").usernames()));
   }
 
   @ParameterizedTest

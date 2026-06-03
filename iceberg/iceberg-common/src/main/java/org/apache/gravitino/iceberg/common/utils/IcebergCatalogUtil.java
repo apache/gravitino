@@ -115,6 +115,12 @@ public class IcebergCatalogUtil {
     // Default to V1 schema to support view operations; can be overridden by explicit config.
     properties.putIfAbsent(IcebergConstants.ICEBERG_JDBC_SCHEMA_VERSION, "V1");
 
+    // Default to strict mode so that creating a table or view in a non-existent namespace fails
+    // with NoSuchNamespaceException (HTTP 404) instead of implicitly creating the namespace,
+    // matching the Iceberg REST spec and the memory backend behavior. Can be overridden by
+    // explicit config.
+    properties.putIfAbsent(IcebergConstants.ICEBERG_JDBC_STRICT_MODE, "true");
+
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     jdbcCatalog.setConf(hdfsConfiguration);

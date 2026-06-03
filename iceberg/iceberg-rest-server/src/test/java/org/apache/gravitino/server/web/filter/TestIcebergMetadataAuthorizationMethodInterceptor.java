@@ -40,6 +40,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -192,7 +193,9 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
             "testTableOperation", String.class, String.class, String.class);
     Parameter[] parameters = testMethod.getParameters();
 
-    String encodedNamespace = RESTUtil.encodeNamespace(Namespace.of("A", "B", "C"));
+    String encodedNamespace =
+        RESTUtil.encodeNamespace(
+            Namespace.of("A", "B", "C"), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
 
     Config mockConfig = Mockito.mock(Config.class);
@@ -222,7 +225,9 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
             "testTableOperation", String.class, String.class, String.class);
     Parameter[] parameters = testMethod.getParameters();
 
-    String encodedNamespace = RESTUtil.encodeNamespace(Namespace.of("my_schema"));
+    String encodedNamespace =
+        RESTUtil.encodeNamespace(
+            Namespace.of("my_schema"), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
 
     Config mockConfig = Mockito.mock(Config.class);
@@ -268,7 +273,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         new IcebergMetadataAuthorizationMethodInterceptor() {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
-              Parameter[] parameters, Object[] args) {
+              Method method, Parameter[] parameters, Object[] args) {
             return Optional.of(
                 new AuthorizationHandler() {
                   @Override
@@ -316,7 +321,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         new IcebergMetadataAuthorizationMethodInterceptor() {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
-              Parameter[] parameters, Object[] args) {
+              Method method, Parameter[] parameters, Object[] args) {
             return Optional.of(
                 new AuthorizationHandler() {
                   @Override
@@ -394,7 +399,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         new IcebergMetadataAuthorizationMethodInterceptor() {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
-              Parameter[] parameters, Object[] args) {
+              Method method, Parameter[] parameters, Object[] args) {
             throw new RuntimeException("test");
           }
         };

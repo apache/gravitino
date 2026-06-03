@@ -77,7 +77,11 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     eventBus.dispatchEvent(new ListFilesetPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listFilesets(namespace);
-      eventBus.dispatchEvent(new ListFilesetEvent(PrincipalUtils.getCurrentUserName(), namespace));
+      eventBus.dispatchEvent(
+          new ListFilesetEvent(
+              PrincipalUtils.getCurrentUserName(),
+              namespace,
+              nameIdentifiers != null ? nameIdentifiers.length : -1));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -94,7 +98,12 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     try {
       FileInfo[] fileInfos = dispatcher.listFiles(ident, locationName, subPath);
       eventBus.dispatchEvent(
-          new ListFilesEvent(PrincipalUtils.getCurrentUserName(), ident, locationName, subPath));
+          new ListFilesEvent(
+              PrincipalUtils.getCurrentUserName(),
+              ident,
+              locationName,
+              subPath,
+              fileInfos != null ? fileInfos.length : -1));
       return fileInfos;
     } catch (Exception e) {
       eventBus.dispatchEvent(

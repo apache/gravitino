@@ -76,7 +76,7 @@ public class TestScanPlanCache {
     PlanTableScanResponse response =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(Collections.singletonList("task1"))
+            .withFileScanTasks(Collections.emptyList())
             .build();
 
     Optional<PlanTableScanResponse> cached1 =
@@ -104,13 +104,13 @@ public class TestScanPlanCache {
     PlanTableScanResponse response1 =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(Collections.singletonList("task1"))
+            .withFileScanTasks(Collections.emptyList())
             .build();
 
     PlanTableScanResponse response2 =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(Collections.singletonList("task2"))
+            .withFileScanTasks(Collections.emptyList())
             .build();
 
     scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, mockTable, request1), response1);
@@ -145,7 +145,7 @@ public class TestScanPlanCache {
     PlanTableScanResponse response =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(Collections.singletonList("task1"))
+            .withFileScanTasks(Collections.emptyList())
             .build();
 
     scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, mockTable, request1), response);
@@ -167,13 +167,13 @@ public class TestScanPlanCache {
     PlanTableScanResponse response1 =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(Collections.singletonList("task1"))
+            .withFileScanTasks(Collections.emptyList())
             .build();
 
     PlanTableScanResponse response2 =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(Collections.singletonList("task2"))
+            .withFileScanTasks(Collections.emptyList())
             .build();
 
     scanPlanCache.put(ScanPlanCacheKey.create(table1, mockTable, scanRequest), response1);
@@ -199,7 +199,7 @@ public class TestScanPlanCache {
     PlanTableScanResponse response1 =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(Collections.singletonList("task1"))
+            .withFileScanTasks(Collections.emptyList())
             .build();
 
     // Cache with snapshot ID 1
@@ -237,13 +237,13 @@ public class TestScanPlanCache {
     PlanTableScanResponse response1 =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(Collections.singletonList("task1"))
+            .withFileScanTasks(Collections.emptyList())
             .build();
 
     PlanTableScanResponse response2 =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(Collections.singletonList("task2"))
+            .withFileScanTasks(Collections.emptyList())
             .build();
 
     scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, mockTable, request1), response1);

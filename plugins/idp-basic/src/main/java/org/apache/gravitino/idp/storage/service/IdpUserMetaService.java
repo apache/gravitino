@@ -24,11 +24,14 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.po.IdpUserWithGroupsPO;
 import org.apache.gravitino.idp.storage.relational.utils.IdpExceptionUtils;
+import org.apache.gravitino.idp.storage.relational.utils.IdpPOConverters;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -56,6 +59,17 @@ public class IdpUserMetaService {
       throw new NotFoundException("IdP user not found: %s", username);
     }
     return userPO;
+  }
+
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getIdpUser")
+  public IdpUser getIdpUser(String username) {
+    IdpUserWithGroupsPO userWithGroups =
+        SessionUtils.getWithoutCommit(
+            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUserWithGroups(username));
+    if (userWithGroups == null) {
+      throw new NotFoundException("IdP user not found: %s", username);
+    }
+    return IdpPOConverters.fromIdpUserWithGroupsPO(userWithGroups);
   }
 
   @Monitored(
@@ -101,22 +115,28 @@ public class IdpUserMetaService {
   }
 
   /**
-   * Updates the password hash for an active user, following the core relational meta update flow:
-   * load the current row, commit the update, and use the affected row count as the success signal.
+   * Updates the password hash for an active user. Succeeds when the user exists and the update is
+   * committed, even if the stored hash is already equal to {@code passwordHash}.
    *
    * @param username username of the user
    * @param passwordHash new password hash to store
-   * @return {@code true} if the user exists and the password hash was updated
+   * @return {@code true} if the password hash was updated
+   * @throws NotFoundException if the user does not exist or is soft-deleted
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateIdpUserPassword")
   public boolean updateIdpUserPassword(String username, String passwordHash) {
-    Integer updated =
-        SessionUtils.doWithCommitAndFetchResult(
-            IdpUserMetaMapper.class,
-            mapper -> mapper.updateIdpUserPassword(username, passwordHash));
-    return updated > 0;
+    return SessionUtils.doWithCommitAndFetchResult(
+        IdpUserMetaMapper.class,
+        mapper -> {
+          IdpUserPO userPO = mapper.selectIdpUser(username);
+          if (userPO == null) {
+            throw new NotFoundException("IdP user not found: %s", username);
+          }
+          mapper.updateIdpUserPassword(username, passwordHash);
+          return true;
+        });
   }
 
   @Monitored(
