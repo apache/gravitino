@@ -40,6 +40,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -203,6 +204,78 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     testProperties(props, loadedSchema3.properties());
     // Audit info is gotten from catalog, not from the entity store
     Assertions.assertEquals("test", loadedSchema3.auditInfo().creator());
+  }
+
+  @Test
+  public void testConcurrentImportSchemaReusesExistingEntity() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schemaConcurrent");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(schemaIdent, "comment", props);
+    SchemaEntity importedSchemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+
+    AuditInfo concurrentAudit =
+        AuditInfo.builder().withCreator("concurrent").withCreateTime(Instant.now()).build();
+    SchemaEntity concurrentSchemaEntity =
+        SchemaEntity.builder()
+            .withId(importedSchemaEntity.id())
+            .withName(schemaIdent.name())
+            .withNamespace(schemaIdent.namespace())
+            .withAuditInfo(concurrentAudit)
+            .build();
+
+    // Simulate HA race: first two gets return not-found (so both the pre-import check and the
+    // internalLoadSchema inside importSchema proceed to store.put), then put throws
+    // EntityAlreadyExistsException, and the dispatcher-level retry sees the entity on the third
+    // get.
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(concurrentSchemaEntity)
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.SCHEMA), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    Schema loadedSchema = Assertions.assertDoesNotThrow(() -> dispatcher.loadSchema(schemaIdent));
+    Assertions.assertEquals(schemaIdent.name(), loadedSchema.name());
+    Assertions.assertEquals("comment", loadedSchema.comment());
+  }
+
+  @Test
+  public void testConcurrentImportSchemaFailsOnMismatchedIdentifier() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schemaConcurrentMismatch");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(schemaIdent, "comment", props);
+    SchemaEntity importedSchemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+
+    AuditInfo concurrentAudit =
+        AuditInfo.builder().withCreator("concurrent").withCreateTime(Instant.now()).build();
+    SchemaEntity mismatchedSchemaEntity =
+        SchemaEntity.builder()
+            .withId(importedSchemaEntity.id() + 1)
+            .withName(schemaIdent.name())
+            .withNamespace(schemaIdent.namespace())
+            .withAuditInfo(concurrentAudit)
+            .build();
+
+    // Simulate genuine multi-catalog conflict: put fails, and the dispatcher-level retry finds
+    // an entity with a mismatched ID (operateOnEntity returns null → imported=false → error
+    // thrown).
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(mismatchedSchemaEntity)
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.SCHEMA), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
+    Assertions.assertTrue(exception.getMessage().contains("Schema managed by multiple catalogs"));
   }
 
   @Test

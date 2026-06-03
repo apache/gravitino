@@ -75,16 +75,18 @@ public class IcebergCleanupJobSQLProviderFactory {
       @Param("id") long id,
       @Param("state") String state,
       @Param("reason") String reason,
-      @Param("now") long now) {
-    return getProvider().markFinished(id, state, reason, now);
+      @Param("now") long now,
+      @Param("heartbeat") long heartbeat) {
+    return getProvider().markFinished(id, state, reason, now, heartbeat);
   }
 
   public static String recordFailure(
       @Param("id") long id,
       @Param("reason") String reason,
       @Param("maxAttempts") int maxAttempts,
-      @Param("now") long now) {
-    return getProvider().recordFailure(id, reason, maxAttempts, now);
+      @Param("now") long now,
+      @Param("heartbeat") long heartbeat) {
+    return getProvider().recordFailure(id, reason, maxAttempts, now, heartbeat);
   }
 
   public static String heartbeat(

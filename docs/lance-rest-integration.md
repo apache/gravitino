@@ -23,19 +23,62 @@ The following table outlines the tested compatibility between Gravitino versions
 | Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions                  |
 |--------------------------------|--------------------------------|-----------------------------------------------|
 | 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
-| 1.3.0                          | 0.1.0 - 0.4.0                  | 0.3.0 - 0.4.2, 0.2.0 supports with conditions |
+| 1.3.0                          | {0.2.0, 0.4.0}                 | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
 
 :::note
-- These version ranges show which versions are expected to work together.
+- These version entries show which versions are expected to work together.
 - For Gravitino 1.3.0, the explicitly verified release versions are
-  `lance-spark` {0.1.0, 0.1.1, 0.2.0, 0.4.0} and `lance-ray`
-  {0.3.0, 0.4.2}. By default, lance-ray 0.2.0 and earlier are *not* supported on 1.3.0
-  because pip resolves them with an older `lance-namespace` whose request
-  schema is incompatible with the upgraded server-side `lance-namespace-core`
-  (0.7.5+). But if you can still use lance-ray 0.2.0 with Gravitino 1.3.0 by pining pylance to 3.x or 4.x; 
+  `lance-spark` {0.2.0, 0.4.0} and `lance-ray` {0.3.0, 0.4.2}. `lance-ray`
+  0.2.0 is conditionally supported only with the conditions described below.
+
+- **`lance-spark` 0.1.0 and 0.1.1 are not supported on Gravitino 1.3.0.**
+  Those bundles create tables by calling the legacy
+  `POST /lance/v1/table/{id}/create-empty` endpoint, which 1.3.0 no longer
+  exposes — the table-declaration path was consolidated onto
+  `POST /lance/v1/table/{id}/declare` (`LanceTableOperations#declareTable`)
+  when the deprecated `createEmptyTable` API was removed during the
+  `lance-namespace-core` 0.7.5 upgrade. Running 0.1.x against 1.3.0 surfaces
+  as `404 Not Found` on every table-creation flow; the small set of
+  list/describe-only tests still works, but any write path will fail.
+- **`lance-ray` 0.1.0 is not supported on Gravitino 1.3.0.** It exposes
+  `write_lance(... namespace=<LanceNamespace>)`, whereas the 0.2.0+ test path
+  uses the new `write_lance(... namespace_impl="rest",
+  namespace_properties={...})` signature. Calling it on 0.1.0 raises
+  `TypeError: write_lance() got an unexpected keyword argument 'namespace_impl'`.
+- **`lance-ray` 0.2.0 is conditionally supported on Gravitino 1.3.0.** It
+  matches the new signature, but at runtime
+  `lance_ray.utils.create_storage_options_provider` does
+  `from lance import LanceNamespaceStorageOptionsProvider`, which no longer
+  exists in the `pylance` 6.0.0 wheel that `lance-namespace==0.7.5` pulls in,
+  raising `ImportError: cannot import name
+  'LanceNamespaceStorageOptionsProvider' from 'lance'`. You can use
+  `lance-ray` 0.2.0 with Gravitino 1.3.0 by pinning `pylance` to 3.x or 4.x.
 - Before using in production, please test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
+
+#### Reproducing the matrix locally
+
+Both connectors ship with a multi-version integration test driver so the
+matrix can be re-verified (and extended) without ad-hoc scripting:
+
+```bash
+# lance-spark — runs LanceSparkRESTServiceIT once per bundle version.
+# The default list intentionally omits 0.1.0 / 0.1.1: those bundles call the
+# removed /create-empty endpoint and will fail with 404 against 1.3.0+.
+./gradlew :lance:lance-rest-server:lanceSparkMatrixTest \
+    -PlanceSparkBundleVersions=0.2.0,0.4.0 \
+    -PskipDockerTests=true
+# Per-version JUnit reports land under
+# lance/lance-rest-server/build/reports/lance-spark-matrix/<version>/.
+
+# lance-ray — provisions a venv per version under
+# clients/client-python/build/lance-ray-matrix/.venv-<version>/ and runs
+# tests/integration/test_lance_ray.py against each. The Gradle wrapper
+# below starts / stops Gravitino automatically.
+./gradlew :clients:client-python:lanceRayMatrixTest \
+    -PlanceRayVersions=0.4.2,0.3.0
+```
 
 ### Why Maintain a Compatibility Matrix?
 
