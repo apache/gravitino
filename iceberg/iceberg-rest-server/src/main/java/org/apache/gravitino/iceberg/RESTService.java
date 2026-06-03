@@ -79,7 +79,7 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
-  private Optional<IcebergCleanupManager> cleanupManager = Optional.empty();
+  private Optional<IcebergCleanupManager> cleanupManager;
   private IcebergConfigProvider configProvider;
   private boolean auxMode;
 
