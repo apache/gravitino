@@ -44,6 +44,7 @@ import org.apache.gravitino.listener.api.event.IcebergReplaceViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergReplaceViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergReplaceViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.listener.api.event.IcebergRequestPayload;
 import org.apache.gravitino.listener.api.event.IcebergViewExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergViewExistsFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergViewExistsPreEvent;
@@ -230,26 +231,18 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
     NameIdentifier gravitinoNameIdentifier =
         IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), sourceView);
+    IcebergRequestPayload renamePayload =
+        IcebergEventPayloads.requestPayload(renameViewRequest, RenameTableRequest.class);
     eventBus.dispatchEvent(
-        new IcebergRenameViewPreEvent(
-            context,
-            gravitinoNameIdentifier,
-            IcebergEventPayloads.requestPayload(renameViewRequest, RenameTableRequest.class)));
+        new IcebergRenameViewPreEvent(context, gravitinoNameIdentifier, renamePayload));
     try {
       icebergViewOperationDispatcher.renameView(context, renameViewRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new IcebergRenameViewFailureEvent(
-              context,
-              gravitinoNameIdentifier,
-              IcebergEventPayloads.requestPayload(renameViewRequest, RenameTableRequest.class),
-              e));
+          new IcebergRenameViewFailureEvent(context, gravitinoNameIdentifier, renamePayload, e));
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergRenameViewEvent(
-            context,
-            gravitinoNameIdentifier,
-            IcebergEventPayloads.requestPayload(renameViewRequest, RenameTableRequest.class)));
+        new IcebergRenameViewEvent(context, gravitinoNameIdentifier, renamePayload));
   }
 }

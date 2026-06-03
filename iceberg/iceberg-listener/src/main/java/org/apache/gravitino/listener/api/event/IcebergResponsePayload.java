@@ -19,7 +19,11 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.base.Preconditions;
+import org.apache.gravitino.annotation.DeveloperApi;
+
 /** JSON payload for an Iceberg REST response used by listener events. */
+@DeveloperApi
 public class IcebergResponsePayload {
 
   private final String type;
@@ -32,8 +36,8 @@ public class IcebergResponsePayload {
    * @param json The serialized response JSON.
    */
   public IcebergResponsePayload(String type, String json) {
-    requireNonBlank(type, "type");
-    requireNonBlank(json, "json");
+    Preconditions.checkArgument(type != null && !type.isBlank(), "type cannot be blank");
+    Preconditions.checkArgument(json != null && !json.isBlank(), "json cannot be blank");
     this.type = type;
     this.json = json;
   }
@@ -54,11 +58,5 @@ public class IcebergResponsePayload {
    */
   public String json() {
     return json;
-  }
-
-  private static void requireNonBlank(String value, String name) {
-    if (value == null || value.isBlank()) {
-      throw new IllegalArgumentException(name + " cannot be blank");
-    }
   }
 }

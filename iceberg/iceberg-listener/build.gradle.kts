@@ -25,6 +25,7 @@ plugins {
 }
 
 dependencies {
+  implementation(libs.guava)
   implementation(project(":api"))
   implementation(project(":core")) {
     exclude("*")

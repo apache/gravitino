@@ -47,6 +47,7 @@ import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.listener.api.event.IcebergRequestPayload;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
@@ -244,27 +245,19 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     NameIdentifier gravitinoNameIdentifier =
         IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), sourceTable);
+    IcebergRequestPayload renamePayload =
+        IcebergEventPayloads.requestPayload(renameTableRequest, RenameTableRequest.class);
     eventBus.dispatchEvent(
-        new IcebergRenameTablePreEvent(
-            context,
-            gravitinoNameIdentifier,
-            IcebergEventPayloads.requestPayload(renameTableRequest, RenameTableRequest.class)));
+        new IcebergRenameTablePreEvent(context, gravitinoNameIdentifier, renamePayload));
     try {
       icebergTableOperationDispatcher.renameTable(context, renameTableRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new IcebergRenameTableFailureEvent(
-              context,
-              gravitinoNameIdentifier,
-              IcebergEventPayloads.requestPayload(renameTableRequest, RenameTableRequest.class),
-              e));
+          new IcebergRenameTableFailureEvent(context, gravitinoNameIdentifier, renamePayload, e));
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergRenameTableEvent(
-            context,
-            gravitinoNameIdentifier,
-            IcebergEventPayloads.requestPayload(renameTableRequest, RenameTableRequest.class)));
+        new IcebergRenameTableEvent(context, gravitinoNameIdentifier, renamePayload));
   }
 
   /**

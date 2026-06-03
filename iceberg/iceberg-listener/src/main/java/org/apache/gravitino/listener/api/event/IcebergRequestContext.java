@@ -19,11 +19,14 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /** The general request context information for Iceberg REST operations. */
+@DeveloperApi
 public class IcebergRequestContext {
 
   /** Header that opts a drop purge request into asynchronous file cleanup. */
@@ -50,10 +53,10 @@ public class IcebergRequestContext {
       String remoteHostName,
       Map<String, String> httpHeaders,
       boolean requestCredentialVending) {
-    requireNonNull(catalogName, "catalogName");
-    requireNonNull(userName, "userName");
-    requireNonNull(remoteHostName, "remoteHostName");
-    requireNonNull(httpHeaders, "httpHeaders");
+    Preconditions.checkArgument(catalogName != null, "catalogName cannot be null");
+    Preconditions.checkArgument(userName != null, "userName cannot be null");
+    Preconditions.checkArgument(remoteHostName != null, "remoteHostName cannot be null");
+    Preconditions.checkArgument(httpHeaders != null, "httpHeaders cannot be null");
     this.catalogName = catalogName;
     this.userName = userName;
     this.remoteHostName = remoteHostName;
@@ -122,11 +125,5 @@ public class IcebergRequestContext {
    */
   public boolean requestCredentialVending() {
     return requestCredentialVending;
-  }
-
-  private static void requireNonNull(Object value, String name) {
-    if (value == null) {
-      throw new IllegalArgumentException(name + " cannot be null");
-    }
   }
 }

@@ -39,7 +39,7 @@ public class IcebergUpdateTableEvent extends IcebergTableEvent {
     this.loadTableResponse = loadTableResponse;
   }
 
-  public IcebergRequestPayload createTableRequest() {
+  public IcebergRequestPayload updateTableRequest() {
     return updateTableRequest;
   }
 

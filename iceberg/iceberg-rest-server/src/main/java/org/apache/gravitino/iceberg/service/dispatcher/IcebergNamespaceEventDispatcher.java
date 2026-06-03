@@ -44,6 +44,7 @@ import org.apache.gravitino.listener.api.event.IcebergRegisterTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.listener.api.event.IcebergRequestPayload;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
@@ -250,11 +251,10 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
         IcebergRESTUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
 
+    IcebergRequestPayload registerPayload =
+        IcebergEventPayloads.requestPayload(registerTableRequest, RegisterTableRequest.class);
     eventBus.dispatchEvent(
-        new IcebergRegisterTablePreEvent(
-            context,
-            nameIdentifier,
-            IcebergEventPayloads.requestPayload(registerTableRequest, RegisterTableRequest.class)));
+        new IcebergRegisterTablePreEvent(context, nameIdentifier, registerPayload));
 
     LoadTableResponse loadTableResponse;
     try {
@@ -262,11 +262,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
           operationDispatcher.registerTable(context, namespace, registerTableRequest);
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new IcebergRegisterTableFailureEvent(
-              context,
-              nameIdentifier,
-              IcebergEventPayloads.requestPayload(registerTableRequest, RegisterTableRequest.class),
-              e));
+          new IcebergRegisterTableFailureEvent(context, nameIdentifier, registerPayload, e));
       throw e;
     }
 
@@ -274,7 +270,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
         new IcebergRegisterTableEvent(
             context,
             nameIdentifier,
-            IcebergEventPayloads.requestPayload(registerTableRequest, RegisterTableRequest.class),
+            registerPayload,
             IcebergEventPayloads.responsePayload(loadTableResponse, LoadTableResponse.class)));
     return loadTableResponse;
   }

@@ -264,11 +264,26 @@ public class IcebergRESTUtils {
     return headers;
   }
 
+  /**
+   * Builds an {@link IcebergRequestContext} from the current HTTP request.
+   *
+   * @param httpServletRequest The HTTP servlet request.
+   * @param catalogName The Iceberg catalog name.
+   * @return A new {@link IcebergRequestContext}.
+   */
   public static IcebergRequestContext getIcebergRequestContext(
       HttpServletRequest httpServletRequest, String catalogName) {
     return getIcebergRequestContext(httpServletRequest, catalogName, false);
   }
 
+  /**
+   * Builds an {@link IcebergRequestContext} from the current HTTP request.
+   *
+   * @param httpServletRequest The HTTP servlet request.
+   * @param catalogName The Iceberg catalog name.
+   * @param requestCredentialVending Whether the request is for credential vending.
+   * @return A new {@link IcebergRequestContext}.
+   */
   public static IcebergRequestContext getIcebergRequestContext(
       HttpServletRequest httpServletRequest, String catalogName, boolean requestCredentialVending) {
     return new IcebergRequestContext(
