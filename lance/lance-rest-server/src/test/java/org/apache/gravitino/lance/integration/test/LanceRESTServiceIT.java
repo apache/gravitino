@@ -1075,7 +1075,7 @@ public class LanceRESTServiceIT extends BaseIT {
     RegisterTableRequest registerTableRequest = new RegisterTableRequest();
     registerTableRequest.setId(registerIds);
     registerTableRequest.setLocation(missingLocation);
-    registerTableRequest.setMode(ModeEnum.CREATE);
+    registerTableRequest.setMode("create");
     RegisterTableResponse registerTableResponse =
         Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertEquals(missingLocation, registerTableResponse.getLocation());
@@ -1098,7 +1098,6 @@ public class LanceRESTServiceIT extends BaseIT {
     CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
     createEmptyTableRequest.setId(emptyIds);
     createEmptyTableRequest.setLocation(existingLocation);
-    createEmptyTableRequest.setProperties(ImmutableMap.of());
     Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
     FileUtils.deleteQuietly(new File(existingLocation));
     Assertions.assertFalse(new File(existingLocation).exists());
