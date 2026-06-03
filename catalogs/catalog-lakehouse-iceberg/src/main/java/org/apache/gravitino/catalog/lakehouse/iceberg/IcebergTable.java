@@ -23,6 +23,7 @@ import static org.apache.iceberg.TableProperties.DEFAULT_FILE_FORMAT;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
@@ -154,13 +155,22 @@ public class IcebergTable extends BaseTable {
     SortOrder[] sortOrder = FromIcebergSortOrder.fromSortOrder(table.sortOrder());
     IcebergColumn[] icebergColumns =
         schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(IcebergColumn[]::new);
+    AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
+    String owner = properties.get(IcebergConstants.OWNER);
+    if (owner != null) {
+      auditInfoBuilder.withCreator(owner);
+    }
+    if (table.lastUpdatedMillis() > 0) {
+      auditInfoBuilder.withCreateTime(Instant.ofEpochMilli(table.lastUpdatedMillis()));
+    }
+
     return IcebergTable.builder()
         .withComment(table.property(IcebergTablePropertiesMetadata.COMMENT, null))
         .withLocation(table.location())
         .withProperties(properties)
         .withColumns(icebergColumns)
         .withName(tableName)
-        .withAuditInfo(AuditInfo.EMPTY)
+        .withAuditInfo(auditInfoBuilder.build())
         .withPartitioning(partitionSpec)
         .withSortOrders(sortOrder)
         .withDistribution(getDistribution(properties))
