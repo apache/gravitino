@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -239,8 +242,25 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
   }
 
+  /**
+   * Spark built-in DataSource format names that can appear as the first part of a multipart
+   * identifier when a user writes {@code SELECT * FROM <format>.`<path>`}. When this catalog
+   * intercepts such a lookup, the server-side authorization filter would call {@code
+   * MetadataObjects.of(TABLE, names)} which requires {@code names.length == 3} and throws an {@code
+   * IllegalArgumentException} because the path is counted as a single name.
+   *
+   * <p>Short-circuiting those lookups with {@code NoSuchTableException} makes the Spark analyzer
+   * fall back to its DataSource shortcut resolver and build a {@code HadoopFsRelation} directly —
+   * the same path vanilla Spark takes when no CatalogPlugin is installed.
+   */
+  private static final ImmutableSet<String> BUILTIN_DATASOURCE_FORMATS =
+      ImmutableSet.of("parquet", "csv", "json", "orc", "text", "avro", "binaryfile");
+
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
+    if (isBuiltinDataSourceReference(ident)) {
+      throw new NoSuchTableException(ident);
+    }
     try {
       org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
@@ -256,6 +276,15 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
+  }
+
+  @VisibleForTesting
+  static boolean isBuiltinDataSourceReference(Identifier ident) {
+    String[] namespace = ident.namespace();
+    if (namespace.length != 1) {
+      return false;
+    }
+    return BUILTIN_DATASOURCE_FORMATS.contains(namespace[0].toLowerCase(Locale.ROOT));
   }
 
   @Override
@@ -303,6 +332,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public boolean tableExists(Identifier ident) {
+    // Spark's DataSource shortcut resolver asks the CatalogManager whether the identifier exists
+    // before falling back to format-based resolution. Answer "no" so the authorization filter for
+    // TABLE (which wants 3 name parts) never fires on a namespace that is actually a DataSource
+    // format name such as `parquet`, `csv`, or `json`.
+    if (isBuiltinDataSourceReference(ident)) {
+      return false;
+    }
     // Gravitino uses loadTable() to verify table existence, which requires LOAD_TABLE privilege.
     // For CREATE TABLE IF NOT EXISTS operations, users may only have CREATE_TABLE privilege.
     // When ForbiddenException is thrown (lacking LOAD_TABLE privilege), we return false to allow
