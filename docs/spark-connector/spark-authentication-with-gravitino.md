@@ -7,11 +7,11 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-Spark connector supports `simple` `oauth2` and `kerberos` authentication when accessing Gravitino server.
+Spark connector supports `simple`, `oauth2`, `bearer-token-file` and `kerberos` authentication when accessing Gravitino server.
 
 | Property                     | Type   | Default Value | Description                                                                                                         | Required | Since Version    |
 |------------------------------|--------|---------------|---------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| spark.sql.gravitino.authType | string | `simple`      | The authentication mechanisms when communicating with Gravitino server, supports `simple`, `oauth2` and `kerberos`. | No       | 0.7.0-incubating |
+| spark.sql.gravitino.authType | string | `simple`      | The authentication mechanisms when communicating with Gravitino server, supports `simple`, `oauth2`, `bearer-token-file` and `kerberos`. | No       | 0.7.0-incubating |
 
 ## Simple mode
 
@@ -30,6 +30,14 @@ In the OAuth2 mode, you could use the following configuration to fetch an OAuth2
 | spark.sql.gravitino.oauth2.tokenPath  | string | None          | The path of token interface in OAuth2 server. | Yes, for OAuth2 mode | 0.7.0-incubating |
 | spark.sql.gravitino.oauth2.credential | string | None          | The credential to request the OAuth2 token.   | Yes, for OAuth2 mode | 0.7.0-incubating |
 | spark.sql.gravitino.oauth2.scope      | string | None          | The scope to request the OAuth2 token.        | Yes, for OAuth2 mode | 0.7.0-incubating |
+
+## Bearer token file mode
+
+In bearer token file mode, Spark connector reads an existing Bearer token from a local file when accessing Gravitino server. This is useful when another trusted runtime component, such as a sidecar, refreshes the token file outside the Spark connector.
+
+| Property                                | Type   | Default Value | Description                                                                                  | Required                         | Since Version |
+|-----------------------------------------|--------|---------------|----------------------------------------------------------------------------------------------|----------------------------------|---------------|
+| spark.sql.gravitino.bearer.tokenFile    | string | None          | The local file path containing a Bearer token. The file may contain either the raw token or a `Bearer ` prefixed value. | Yes, for bearer-token-file mode | TBD           |
 
 ## Kerberos mode
 

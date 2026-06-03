@@ -43,4 +43,11 @@ public class TestGravitinoSparkConfig {
     Assertions.assertEquals(clientConfig.get("gravitino.client.socketTimeoutMs"), "1000");
     Assertions.assertEquals(clientConfig.get("gravitino.client.connectionTimeoutMs"), "2000");
   }
+
+  @Test
+  void testBearerTokenFileConfig() {
+    Assertions.assertEquals(
+        "spark.sql.gravitino.bearer.tokenFile",
+        GravitinoSparkConfig.GRAVITINO_BEARER_TOKEN_FILE);
+  }
 }
