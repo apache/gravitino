@@ -56,8 +56,9 @@ public interface Table extends Auditable {
    * <p>Current supported formats include:
    *
    * <ul>
-   *   <li>lance
+   *   <li>Lance
    *   <li>Delta
+   *   <li>Iceberg
    * </ul>
    */
   String PROPERTY_TABLE_FORMAT = "format";

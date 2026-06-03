@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Entity;
@@ -41,6 +42,7 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.GenericColumn;
 import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.TableCapability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -62,6 +64,7 @@ import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.TableCapabilityValidator;
 
 public abstract class ManagedTableOperations implements TableCatalog {
 
@@ -72,6 +75,8 @@ public abstract class ManagedTableOperations implements TableCatalog {
   protected abstract SupportsSchemas schemas();
 
   protected abstract IdGenerator idGenerator();
+
+  public abstract Set<TableCapability> capabilities();
 
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
@@ -117,6 +122,10 @@ public abstract class ManagedTableOperations implements TableCatalog {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    TableCapabilityValidator.validateIndexSupport(capabilities(), indexes);
+    TableCapabilityValidator.validateTableLayoutSupport(
+        capabilities(), partitions, distribution, sortOrders);
+
     // createTable in ManagedTableOperations only stores the table metadata in the entity store.
     // It doesn't handle any additional operations like creating physical location, preprocessing
     // the properties, etc. Those operations should be handled in the specific catalog
@@ -165,6 +174,8 @@ public abstract class ManagedTableOperations implements TableCatalog {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
+    TableCapabilityValidator.validateIndexSupport(capabilities(), changes);
+
     // The alterTable in ManagedTableOperations only updates the table metadata in the entity store.
     // It doesn't handle any additional operations like modifying physical data, etc. Those
     // operations should be handled in the specific catalog implementation.

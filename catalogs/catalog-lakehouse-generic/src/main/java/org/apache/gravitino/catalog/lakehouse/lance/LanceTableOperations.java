@@ -24,10 +24,12 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -38,6 +40,7 @@ import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.TableCapability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -111,6 +114,11 @@ public class LanceTableOperations extends ManagedTableOperations {
   public void setCatalogProperties(Map<String, String> catalogProperties) {
     this.catalogProperties =
         catalogProperties == null ? Map.of() : ImmutableMap.copyOf(catalogProperties);
+  }
+
+  @Override
+  public Set<TableCapability> capabilities() {
+    return EnumSet.allOf(TableCapability.class);
   }
 
   @Override

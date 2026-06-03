@@ -20,13 +20,16 @@ package org.apache.gravitino.catalog.lakehouse.delta;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.TableCapability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -107,6 +110,11 @@ public class DeltaTableOperations extends ManagedTableOperations {
     return idGenerator;
   }
 
+  @Override
+  public Set<TableCapability> capabilities() {
+    return EnumSet.of(TableCapability.SUPPORTS_PARTITIONING, TableCapability.REQUIRES_LOCATION);
+  }
+
   /**
    * Creates an external Delta table by registering its metadata in Gravitino.
    *
@@ -182,7 +190,6 @@ public class DeltaTableOperations extends ManagedTableOperations {
             + " Delta table location.",
         Table.PROPERTY_LOCATION);
 
-    // Validate partition transforms - only identity transforms are allowed
     Transform[] validatedPartitions = Transforms.EMPTY_TRANSFORM;
     if (partitions != null && partitions.length > 0) {
       for (Transform partition : partitions) {
