@@ -226,8 +226,9 @@ public class RESTService implements GravitinoAuxiliaryService {
         server.start();
         LOG.info("Iceberg REST service started");
       } catch (Exception e) {
-        // Stop the cleanup workers we just started so they don't outlive a failed startup.
+        // Stop the components we already started so they don't outlive a failed startup.
         cleanupManager.ifPresent(IcebergCleanupManager::close);
+        icebergMetricsManager.close();
         throw new RuntimeException(e);
       }
     }

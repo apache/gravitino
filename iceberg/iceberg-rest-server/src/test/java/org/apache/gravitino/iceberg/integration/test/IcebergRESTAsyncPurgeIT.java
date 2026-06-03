@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -140,6 +141,9 @@ public class IcebergRESTAsyncPurgeIT extends BaseIT {
       LOG.warn("Failed to drop metalake {}", METALAKE_NAME, e);
     }
     super.stopIntegrationTest();
+    if (warehouseDir != null) {
+      FileUtils.deleteQuietly(warehouseDir.toFile());
+    }
   }
 
   @Test

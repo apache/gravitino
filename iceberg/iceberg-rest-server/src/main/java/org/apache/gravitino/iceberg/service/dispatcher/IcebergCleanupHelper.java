@@ -68,7 +68,7 @@ final class IcebergCleanupHelper {
     try {
       catalogId = catalogId(catalogName);
     } catch (RuntimeException e) {
-      LOG.debug("No catalog id for {}; skipping purge check", catalogName, e);
+      LOG.warn("No catalog id for {}; skipping purge check", catalogName, e);
       return;
     }
     if (cleanupManager.get().isNameOccupied(catalogId, namespace.toString(), tableName)) {
