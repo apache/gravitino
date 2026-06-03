@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
@@ -43,7 +44,7 @@ final class PaimonView implements View {
   static final String DEFAULT_CATALOG_PROPERTY = "gravitino.view.default-catalog";
   static final String DEFAULT_SCHEMA_PROPERTY = "gravitino.view.default-schema";
 
-  private static final String PAIMON_VIEW_QUERY = "query";
+  private static final String PAIMON_VIEW_QUERY = Dialects.QUERY_DIALECT;
 
   private final String name;
   @Nullable private final String comment;

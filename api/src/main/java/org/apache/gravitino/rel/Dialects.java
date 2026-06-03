@@ -40,8 +40,9 @@ public final class Dialects {
   public static final String FLINK = "flink";
 
   /**
-   * The generic query dialect used as a canonical SQL representation when no engine-specific
-   * dialect is available (e.g. Paimon view stored in Hive metastore).
+   * A dialect key for the canonical SQL representation of a view, used as a fallback when no
+   * engine-specific dialect (e.g. {@link #FLINK}, {@link #HIVE}) is available or preserved by the
+   * underlying metastore.
    */
   public static final String QUERY_DIALECT = "query";
 
