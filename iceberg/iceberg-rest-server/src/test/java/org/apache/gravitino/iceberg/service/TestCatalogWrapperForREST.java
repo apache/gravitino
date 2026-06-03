@@ -46,6 +46,7 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.MetadataUpdate;
@@ -415,6 +416,52 @@ public class TestCatalogWrapperForREST {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> CatalogWrapperForREST.validateCredentialLocation("   "));
+  }
+
+  @Test
+  void testLoadTableInjectsRefreshEndpoint() {
+    TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "tbl");
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    BaseTable baseTable = mock(BaseTable.class);
+    TableOperations ops = mock(TableOperations.class);
+    FileIO fileIO = mock(FileIO.class);
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+            PartitionSpec.unpartitioned(),
+            SortOrder.unsorted(),
+            "s3://bucket/db/tbl",
+            Collections.emptyMap());
+
+    when(catalog.loadTable(ident)).thenReturn(baseTable);
+    when(baseTable.operations()).thenReturn(ops);
+    when(ops.current()).thenReturn(metadata);
+    when(baseTable.io()).thenReturn(fileIO);
+    when(fileIO.properties())
+        .thenReturn(
+            ImmutableMap.of(
+                "s3.session-token",
+                "token",
+                "s3.session-token-expires-at-ms",
+                "123",
+                "client.refresh-credentials-endpoint",
+                "v1/upstream/namespaces/db/tables/tbl/credentials"));
+
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
+
+    LoadTableResponse response = wrapper.loadTable(ident, false, CredentialPrivilege.READ);
+
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        response.config().get("client.refresh-credentials-endpoint"));
+    Assertions.assertEquals("token", response.config().get("s3.session-token"));
   }
 
   @Test

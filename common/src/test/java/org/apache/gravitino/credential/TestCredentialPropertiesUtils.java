@@ -95,4 +95,59 @@ public class TestCredentialPropertiesUtils {
             String.valueOf(expireTimeInMS));
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
+
+  @Test
+  void testBuildRefreshEndpointsForS3() {
+    Map<String, String> credentialProperties =
+        ImmutableMap.of(
+            CredentialPropertyUtils.ICEBERG_S3_TOKEN, "token",
+            CredentialPropertyUtils.ICEBERG_S3_TOKEN_EXPIRES_AT_MS, "123");
+
+    Map<String, String> refreshEndpointProperties =
+        CredentialPropertyUtils.buildRefreshCredentialEndpoints(
+            "irc1", "db", "tbl", credentialProperties);
+
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        refreshEndpointProperties.get(
+            CredentialPropertyUtils.ICEBERG_CLIENT_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testBuildRefreshEndpointsForGCS() {
+    Map<String, String> credentialProperties =
+        ImmutableMap.of(
+            CredentialPropertyUtils.ICEBERG_GCS_TOKEN, "token",
+            CredentialPropertyUtils.ICEBERG_GCS_TOKEN_EXPIRES_AT, "123");
+
+    Map<String, String> refreshEndpointProperties =
+        CredentialPropertyUtils.buildRefreshCredentialEndpoints(
+            "irc1", "db", "tbl", credentialProperties);
+
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        refreshEndpointProperties.get(
+            CredentialPropertyUtils.ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testBuildRefreshEndpointsForADLS() {
+    String adlsHost = "storage.dfs.core.windows.net";
+    String sasTokenKey = CredentialPropertyUtils.ICEBERG_ADLS_TOKEN + "." + adlsHost;
+    Map<String, String> credentialProperties =
+        ImmutableMap.of(
+            sasTokenKey,
+            "sas-token",
+            CredentialPropertyUtils.ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsHost,
+            "123");
+
+    Map<String, String> refreshEndpointProperties =
+        CredentialPropertyUtils.buildRefreshCredentialEndpoints(
+            "irc1", "db", "tbl", credentialProperties);
+
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        refreshEndpointProperties.get(
+            CredentialPropertyUtils.ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT));
+  }
 }

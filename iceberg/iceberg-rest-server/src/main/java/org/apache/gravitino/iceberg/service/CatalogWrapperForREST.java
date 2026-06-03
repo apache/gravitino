@@ -734,6 +734,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
                   properties, key -> catalogPropertiesToClientKeys.contains(key)))
           // Keep only credential fields from FileIO properties before returning them to the client.
           .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
+          .addAllConfig(
+              CredentialPropertyUtils.buildRefreshCredentialEndpoints(
+                  RESTUtil.encodeString(catalogCredentialManager.catalogName()),
+                  RESTUtil.encodeNamespace(
+                      ident.namespace(), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
+                  RESTUtil.encodeString(ident.name()),
+                  CredentialPropertyUtils.filterCredentialProperties(properties)))
           .build();
     }
 
@@ -772,6 +779,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         MapUtils.getFilteredMap(
             tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
     config.putAll(CredentialPropertyUtils.filterCredentialProperties(tableProperties));
+    config.putAll(
+        CredentialPropertyUtils.buildRefreshCredentialEndpoints(
+            RESTUtil.encodeString(catalogCredentialManager.catalogName()),
+            RESTUtil.encodeNamespace(
+                ident.namespace(), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
+            RESTUtil.encodeString(ident.name()),
+            CredentialPropertyUtils.filterCredentialProperties(tableProperties)));
 
     TableMetadata metadata =
         TableMetadata.newTableMetadata(
@@ -842,6 +856,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
                   properties, key -> catalogPropertiesToClientKeys.contains(key)))
           // Keep only credential fields from FileIO properties before returning them to the client.
           .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
+          .addAllConfig(
+              CredentialPropertyUtils.buildRefreshCredentialEndpoints(
+                  RESTUtil.encodeString(catalogCredentialManager.catalogName()),
+                  RESTUtil.encodeNamespace(
+                      ident.namespace(), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
+                  RESTUtil.encodeString(ident.name()),
+                  CredentialPropertyUtils.filterCredentialProperties(properties)))
           .build();
     } else if (table instanceof BaseMetadataTable) {
       // metadata tables are loaded on the client side, return NoSuchTableException for now

@@ -74,15 +74,6 @@ public class IcebergRESTUtils {
 
   public static final String SNAPSHOT_REFS = "refs";
 
-  private static final String CLIENT_REFRESH_CREDENTIALS_ENDPOINT =
-      "client.refresh-credentials-endpoint";
-
-  private static final String GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
-      "gcs.oauth2.refresh-credentials-endpoint";
-
-  private static final String ADLS_REFRESH_CREDENTIALS_ENDPOINT =
-      "adls.refresh-credentials-endpoint";
-
   /** Snapshot modes for the Iceberg loadTable endpoint. */
   public enum SnapshotMode {
     ALL(SNAPSHOT_ALL),
@@ -125,26 +116,13 @@ public class IcebergRESTUtils {
       TableMetadata tableMetadata) {
     Map<String, String> config =
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
-
-    String refreshEndpointProp = null;
-    if (credential instanceof GCSTokenCredential) {
-      refreshEndpointProp = GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT;
-    } else if (credential instanceof ADLSTokenCredential) {
-      refreshEndpointProp = ADLS_REFRESH_CREDENTIALS_ENDPOINT;
-    } else if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
-      refreshEndpointProp = CLIENT_REFRESH_CREDENTIALS_ENDPOINT;
-    }
-
-    if (refreshEndpointProp != null) {
-      config.put(
-          refreshEndpointProp,
-          String.format(
-              "v1/%s/namespaces/%s/tables/%s/credentials",
-              RESTUtil.encodeString(catalogName),
-              RESTUtil.encodeNamespace(
-                  tableIdentifier.namespace(), NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
-              RESTUtil.encodeString(tableIdentifier.name())));
-    }
+    config.putAll(
+        CredentialPropertyUtils.buildRefreshCredentialEndpoints(
+            RESTUtil.encodeString(catalogName),
+            RESTUtil.encodeNamespace(
+                tableIdentifier.namespace(), NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
+            RESTUtil.encodeString(tableIdentifier.name()),
+            config));
 
     String location = tableMetadata.location();
     String prefix = location.endsWith("/") ? location : location + "/";

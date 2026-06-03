@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,10 @@ public class CredentialPropertyUtils {
 
   @VisibleForTesting
   static final String ICEBERG_S3_TOKEN_EXPIRES_AT_MS = "s3.session-token-expires-at-ms";
+
+  @VisibleForTesting
+  static final String ICEBERG_CLIENT_REFRESH_CREDENTIALS_ENDPOINT =
+      "client.refresh-credentials-endpoint";
 
   @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
   @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
@@ -58,10 +63,18 @@ public class CredentialPropertyUtils {
   @VisibleForTesting
   static final String ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX = "adls.sas-token-expires-at-ms.";
 
+  @VisibleForTesting
+  static final String ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT =
+      "adls.refresh-credentials-endpoint";
+
   @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
 
   @VisibleForTesting
   static final String ICEBERG_GCS_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+
+  @VisibleForTesting
+  static final String ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
+      "gcs.oauth2.refresh-credentials-endpoint";
 
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
@@ -154,6 +167,45 @@ public class CredentialPropertyUtils {
                     && !entry.getKey().startsWith(ICEBERG_ADLS_TOKEN)
                     && !entry.getKey().startsWith(ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX));
     return filteredProperties;
+  }
+
+  /**
+   * Builds refresh credential endpoint properties for Iceberg credential properties.
+   *
+   * @param encodedCatalogName Iceberg REST encoded catalog name
+   * @param encodedNamespace Iceberg REST encoded namespace
+   * @param encodedTableName Iceberg REST encoded table name
+   * @param credentialProperties Iceberg credential properties used to determine refresh keys
+   * @return refresh endpoint properties keyed by Iceberg client config names
+   */
+  public static Map<String, String> buildRefreshCredentialEndpoints(
+      String encodedCatalogName,
+      String encodedNamespace,
+      String encodedTableName,
+      Map<String, String> credentialProperties) {
+    if (credentialProperties == null || credentialProperties.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    String credentialsRefreshPath =
+        String.format(
+            "v1/%s/namespaces/%s/tables/%s/credentials",
+            encodedCatalogName, encodedNamespace, encodedTableName);
+    Map<String, String> refreshEndpointProperties = Maps.newHashMap();
+    if (credentialProperties.containsKey(ICEBERG_S3_TOKEN)) {
+      refreshEndpointProperties.put(
+          ICEBERG_CLIENT_REFRESH_CREDENTIALS_ENDPOINT, credentialsRefreshPath);
+    }
+    if (credentialProperties.containsKey(ICEBERG_GCS_TOKEN)) {
+      refreshEndpointProperties.put(
+          ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT, credentialsRefreshPath);
+    }
+    if (credentialProperties.keySet().stream()
+        .anyMatch(key -> key.startsWith(ICEBERG_ADLS_TOKEN + "."))) {
+      refreshEndpointProperties.put(
+          ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT, credentialsRefreshPath);
+    }
+    return ImmutableMap.copyOf(refreshEndpointProperties);
   }
 
   /**
