@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.TableChange;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.factories.CatalogFactory;
@@ -181,6 +183,32 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
               "Paimon bucket number must be a valid integer, but was '%s'.", bucketNumStr),
           e);
     }
+  }
+
+  @Override
+  public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
+      throws TableNotExistException, CatalogException {
+    if (ignoreIfNotExists && !tableExists(tablePath)) {
+      return;
+    }
+
+    super.alterTable(tablePath, newTable, ignoreIfNotExists);
+    invalidateNativeTableCache(tablePath);
+  }
+
+  @Override
+  public void alterTable(
+      ObjectPath tablePath,
+      CatalogBaseTable newTable,
+      List<TableChange> tableChanges,
+      boolean ignoreIfNotExists)
+      throws TableNotExistException, CatalogException {
+    if (ignoreIfNotExists && !tableExists(tablePath)) {
+      return;
+    }
+
+    super.alterTable(tablePath, newTable, tableChanges, ignoreIfNotExists);
+    invalidateNativeTableCache(tablePath);
   }
 
   @Override
