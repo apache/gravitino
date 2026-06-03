@@ -20,12 +20,20 @@ package org.apache.gravitino.iceberg.service;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -34,6 +42,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapperManagerForREST {
@@ -90,6 +99,76 @@ public class TestIcebergCatalogWrapperManagerForREST {
     IcebergRESTServerContext.create(configProvider, false, false, true, manager);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
+  }
+
+  @Test
+  public void testDynamicProviderLoadsCredentialManagerWithGravitinoCatalogName() {
+    String metalakeName = "test_metalake";
+    String catalogName = "iceberg";
+    String backendCatalogName = "jdbc";
+
+    DynamicIcebergConfigProvider configProvider = Mockito.mock(DynamicIcebergConfigProvider.class);
+    Mockito.when(configProvider.getMetalakeName()).thenReturn(metalakeName);
+    Mockito.when(configProvider.getDefaultCatalogName()).thenReturn(catalogName);
+
+    CatalogCredentialManager credentialManager = Mockito.mock(CatalogCredentialManager.class);
+    BaseCatalog baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(baseCatalog.catalogCredentialManager()).thenReturn(credentialManager);
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    Mockito.reset(catalogManager);
+    Mockito.when(catalogManager.loadCatalogAndWrap(Mockito.any()))
+        .thenReturn(new CatalogWrapper(baseCatalog, null));
+
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, false, metalakeName);
+    IcebergRESTServerContext.create(configProvider, false, true, true, manager);
+
+    Map<String, String> config = Maps.newHashMap();
+    config.put(IcebergConstants.CATALOG_BACKEND, "memory");
+    config.put(IcebergConstants.CATALOG_BACKEND_NAME, backendCatalogName);
+    config.put(IcebergConstants.WAREHOUSE, "/tmp/warehouse");
+    manager.createCatalogWrapper(catalogName, new IcebergConfig(config));
+
+    ArgumentCaptor<NameIdentifier> identCaptor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(catalogManager).loadCatalogAndWrap(identCaptor.capture());
+    Assertions.assertEquals(NameIdentifier.of(metalakeName, catalogName), identCaptor.getValue());
+  }
+
+  @Test
+  public void testDynamicProviderResolvesDefaultCatalogToConfiguredDefaultCatalog() {
+    String metalakeName = "test_metalake";
+    String catalogName = "iceberg";
+
+    DynamicIcebergConfigProvider configProvider = Mockito.mock(DynamicIcebergConfigProvider.class);
+    Mockito.when(configProvider.getMetalakeName()).thenReturn(metalakeName);
+    Mockito.when(configProvider.getDefaultCatalogName()).thenReturn(catalogName);
+
+    CatalogCredentialManager credentialManager = Mockito.mock(CatalogCredentialManager.class);
+    BaseCatalog baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(baseCatalog.catalogCredentialManager()).thenReturn(credentialManager);
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    Mockito.reset(catalogManager);
+    Mockito.when(catalogManager.loadCatalogAndWrap(Mockito.any()))
+        .thenReturn(new CatalogWrapper(baseCatalog, null));
+
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(Maps.newHashMap(), configProvider, false, metalakeName);
+    IcebergRESTServerContext.create(configProvider, false, true, true, manager);
+
+    Map<String, String> config = Maps.newHashMap();
+    config.put(IcebergConstants.CATALOG_BACKEND, "memory");
+    config.put(IcebergConstants.WAREHOUSE, "/tmp/warehouse");
+    Mockito.when(configProvider.getIcebergCatalogConfig(catalogName))
+        .thenReturn(Optional.of(new IcebergConfig(config)));
+
+    manager.getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
+
+    ArgumentCaptor<NameIdentifier> identCaptor = ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(configProvider).getIcebergCatalogConfig(catalogName);
+    Mockito.verify(configProvider, Mockito.never())
+        .getIcebergCatalogConfig(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
+    Mockito.verify(catalogManager).loadCatalogAndWrap(identCaptor.capture());
+    Assertions.assertEquals(NameIdentifier.of(metalakeName, catalogName), identCaptor.getValue());
   }
 
   @Test

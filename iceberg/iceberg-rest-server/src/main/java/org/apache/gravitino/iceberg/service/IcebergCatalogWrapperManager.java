@@ -27,7 +27,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
@@ -98,12 +102,25 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   }
 
   public CatalogWrapperForREST getCatalogWrapper(String catalogName) {
+    String resolvedCatalogName = resolveCatalogName(catalogName);
     CatalogWrapperForREST catalogWrapperForREST =
-        catalogWrapperCache.get(catalogName, k -> createCatalogWrapper(catalogName));
+        catalogWrapperCache.get(
+            resolvedCatalogName, k -> createCatalogWrapper(resolvedCatalogName));
     // Reload conf to reset UserGroupInformation or icebergTableOps will always use
     // Simple auth.
     catalogWrapperForREST.reloadHadoopConf();
     return catalogWrapperForREST;
+  }
+
+  @VisibleForTesting
+  String resolveCatalogName(String catalogName) {
+    if (!(configProvider instanceof DynamicIcebergConfigProvider)
+        || !IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(catalogName)) {
+      return catalogName;
+    }
+
+    String defaultCatalogName = configProvider.getDefaultCatalogName();
+    return StringUtils.isBlank(defaultCatalogName) ? catalogName : defaultCatalogName;
   }
 
   private CatalogWrapperForREST createCatalogWrapper(String catalogName) {
@@ -127,7 +144,10 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   @VisibleForTesting
   protected CatalogWrapperForREST createCatalogWrapper(
       String catalogName, IcebergConfig icebergConfig) {
-    CatalogWrapperForREST rest = new CatalogWrapperForREST(catalogName, icebergConfig);
+    CatalogWrapperForREST rest =
+        loadCatalogCredentialManager(catalogName)
+            .map(manager -> new CatalogWrapperForREST(icebergConfig, manager))
+            .orElseGet(() -> new CatalogWrapperForREST(catalogName, icebergConfig));
     AuthenticationConfig authenticationConfig =
         new AuthenticationConfig(icebergConfig.getAllConfig());
     if (authenticationConfig.isKerberosAuth() && rest.getCatalog() instanceof SupportsKerberos) {
@@ -136,6 +156,20 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     }
 
     return rest;
+  }
+
+  private Optional<CatalogCredentialManager> loadCatalogCredentialManager(String catalogName) {
+    IcebergRESTServerContext serverContext = IcebergRESTServerContext.getInstance();
+    if (!serverContext.isAuxMode() || !(configProvider instanceof DynamicIcebergConfigProvider)) {
+      return Optional.empty();
+    }
+
+    return Optional.of(
+        GravitinoEnv.getInstance()
+            .catalogManager()
+            .loadCatalogAndWrap(NameIdentifier.of(configProvider.getMetalakeName(), catalogName))
+            .catalog()
+            .catalogCredentialManager());
   }
 
   private void closeIcebergCatalogWrapper(IcebergCatalogWrapper catalogWrapper) {

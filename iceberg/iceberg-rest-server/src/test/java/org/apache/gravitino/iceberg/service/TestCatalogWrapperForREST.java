@@ -38,7 +38,10 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.io.GravitinoCredentialFileIO;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
@@ -222,6 +225,39 @@ public class TestCatalogWrapperForREST {
       Assertions.assertDoesNotThrow(() -> new LazyCheckCatalogWrapperForREST("test", config));
     } finally {
       CONSTRUCTION_IN_PROGRESS.set(false);
+    }
+  }
+
+  @Test
+  void testCredentialProviderWrapsServerSideFileIO() throws Exception {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "gs://bucket/warehouse",
+                CredentialConstants.CREDENTIAL_PROVIDERS,
+                "gcs-token"));
+    CatalogCredentialManager credentialManager = mock(CatalogCredentialManager.class);
+
+    try (CatalogWrapperForREST wrapper = new CatalogWrapperForREST(config, credentialManager)) {
+      Map<String, String> properties = wrapper.getIcebergConfig().getIcebergCatalogProperties();
+
+      Assertions.assertEquals(
+          GravitinoCredentialFileIO.class.getName(), properties.get(IcebergConstants.IO_IMPL));
+      Assertions.assertEquals(
+          ResolvingFileIO.class.getName(),
+          properties.get(GravitinoCredentialFileIO.DELEGATE_IO_IMPL));
+      Assertions.assertTrue(
+          properties.containsKey(GravitinoCredentialFileIO.CREDENTIAL_SUPPLIER_ID));
+
+      Map<String, String> clientProperties = wrapper.getCatalogConfigToClient();
+      Assertions.assertFalse(clientProperties.containsKey(IcebergConstants.IO_IMPL));
+      Assertions.assertFalse(
+          clientProperties.containsKey(GravitinoCredentialFileIO.DELEGATE_IO_IMPL));
+      Assertions.assertFalse(
+          clientProperties.containsKey(GravitinoCredentialFileIO.CREDENTIAL_SUPPLIER_ID));
     }
   }
 

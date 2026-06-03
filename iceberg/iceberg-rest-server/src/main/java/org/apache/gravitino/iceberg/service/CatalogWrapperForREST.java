@@ -45,9 +45,13 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.io.GravitinoCredentialFileIO;
+import org.apache.gravitino.iceberg.common.io.GravitinoCredentialFileIORegistry;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
 import org.apache.gravitino.storage.GCSProperties;
@@ -80,6 +84,7 @@ import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.inmemory.InMemoryFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -97,6 +102,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private static final String FORMAT_VERSION = "format-version";
   private final CatalogCredentialManager catalogCredentialManager;
+  private final boolean closeCatalogCredentialManager;
+  private final String credentialSupplierId;
+  private final IcebergConfig clientConfig;
 
   private volatile Map<String, String> catalogConfigToClients;
   private final Object catalogConfigToClientsLock = new Object();
@@ -124,13 +132,116 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           "gcs-credential-file-path",
           GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
 
-  public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
-    super(config);
-    // To be compatible with old properties
+  private static WrapperContext createWrapperContext(String catalogName, IcebergConfig config) {
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
-    this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
-    this.scanPlanCache = loadScanPlanCache(config);
+    return createWrapperContext(
+        config, new CatalogCredentialManager(catalogName, catalogProperties), true);
+  }
+
+  private static WrapperContext createWrapperContext(
+      IcebergConfig config,
+      CatalogCredentialManager catalogCredentialManager,
+      boolean closeCatalogCredentialManager) {
+    Map<String, String> catalogProperties =
+        checkForCompatibility(config.getAllConfig(), deprecatedProperties);
+    Set<String> providers = CredentialUtils.getCredentialProvidersByOrder(() -> catalogProperties);
+    if (providers.isEmpty() || "rest".equalsIgnoreCase(config.get(IcebergConfig.CATALOG_BACKEND))) {
+      return new WrapperContext(
+          config, config, catalogCredentialManager, closeCatalogCredentialManager, null);
+    }
+
+    String credentialSupplierId =
+        GravitinoCredentialFileIORegistry.register(
+            path -> loadStorageCredentials(catalogCredentialManager, path));
+    Map<String, String> wrappedConfig = Maps.newHashMap(config.getAllConfig());
+    Map<String, String> fileIOProperties = Maps.newHashMap(config.getIcebergCatalogProperties());
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(fileIOProperties);
+    wrappedConfig.putAll(
+        GravitinoCredentialFileIO.wrapProperties(fileIOProperties, credentialSupplierId));
+    return new WrapperContext(
+        new IcebergConfig(wrappedConfig),
+        config,
+        catalogCredentialManager,
+        closeCatalogCredentialManager,
+        credentialSupplierId);
+  }
+
+  private static List<StorageCredential> loadStorageCredentials(
+      CatalogCredentialManager catalogCredentialManager, String path) {
+    if (StringUtils.isBlank(path) || isLocalOrHdfsLocation(path)) {
+      return Collections.emptyList();
+    }
+
+    PathBasedCredentialContext context =
+        new PathBasedCredentialContext(
+            PrincipalUtils.getCurrentUserName(),
+            Collections.singleton(path),
+            Collections.singleton(path));
+    try {
+      return catalogCredentialManager
+          .getCredentialByPath(path, context)
+          .map(
+              credential ->
+                  Collections.singletonList(
+                      StorageCredential.create(
+                          path, CredentialPropertyUtils.toIcebergProperties(credential))))
+          .orElse(Collections.emptyList());
+    } catch (IllegalArgumentException e) {
+      String message = e.getMessage();
+      if (message != null
+          && (message.startsWith("No credential provider found")
+              || message.startsWith("No supported path in credential context"))) {
+        LOG.debug("No credential provider matched the Iceberg FileIO path {}", path, e);
+        return Collections.emptyList();
+      }
+      throw e;
+    }
+  }
+
+  private static class WrapperContext {
+    private final IcebergConfig config;
+    private final IcebergConfig clientConfig;
+    private final CatalogCredentialManager catalogCredentialManager;
+    private final boolean closeCatalogCredentialManager;
+    private final String credentialSupplierId;
+
+    private WrapperContext(
+        IcebergConfig config,
+        IcebergConfig clientConfig,
+        CatalogCredentialManager catalogCredentialManager,
+        boolean closeCatalogCredentialManager,
+        String credentialSupplierId) {
+      this.config = config;
+      this.clientConfig = clientConfig;
+      this.catalogCredentialManager = catalogCredentialManager;
+      this.closeCatalogCredentialManager = closeCatalogCredentialManager;
+      this.credentialSupplierId = credentialSupplierId;
+    }
+  }
+
+  public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
+    this(createWrapperContext(catalogName, config));
+  }
+
+  /**
+   * Creates a REST catalog wrapper with an existing credential manager.
+   *
+   * @param config the Iceberg catalog config
+   * @param catalogCredentialManager the existing credential manager
+   */
+  public CatalogWrapperForREST(
+      IcebergConfig config, CatalogCredentialManager catalogCredentialManager) {
+    this(createWrapperContext(config, catalogCredentialManager, false));
+  }
+
+  private CatalogWrapperForREST(WrapperContext context) {
+    super(context.config);
+    this.clientConfig = context.clientConfig;
+    this.catalogCredentialManager = context.catalogCredentialManager;
+    this.closeCatalogCredentialManager = context.closeCatalogCredentialManager;
+    this.credentialSupplierId = context.credentialSupplierId;
+    this.scanPlanCache = loadScanPlanCache(context.config);
   }
 
   public LoadTableResponse createTable(
@@ -227,7 +338,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @Override
   public void close() throws Exception {
     try {
-      if (catalogCredentialManager != null) {
+      if (credentialSupplierId != null) {
+        GravitinoCredentialFileIORegistry.unregister(credentialSupplierId);
+      }
+      if (closeCatalogCredentialManager && catalogCredentialManager != null) {
         catalogCredentialManager.close();
       }
       if (scanPlanCache != null) {
@@ -250,7 +364,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     synchronized (catalogConfigToClientsLock) {
       if (catalogConfigToClients == null) {
-        catalogConfigToClients = buildCatalogConfigToClients(getIcebergConfig(), getCatalog());
+        catalogConfigToClients = buildCatalogConfigToClients(clientConfig, getCatalog());
       }
       return catalogConfigToClients;
     }
