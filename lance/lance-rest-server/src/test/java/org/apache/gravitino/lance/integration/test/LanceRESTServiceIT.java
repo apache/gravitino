@@ -1039,25 +1039,28 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertThrows(
         LanceNamespaceException.class, () -> ns.describeTable(describeRegistered));
 
-    // Create table via create-empty with existing location then remove location before drop
-    List<String> emptyIds = List.of(CATALOG_NAME, SCHEMA_NAME, "empty_missing_location");
-    String existingLocation = tempDir + "/" + "empty_missing_location/";
+    // Register table with an existing location, then delete the location before drop
+    List<String> existingIds = List.of(CATALOG_NAME, SCHEMA_NAME, "existing_then_deleted");
+    String existingLocation = tempDir + "/" + "existing_then_deleted/";
     new File(existingLocation).mkdirs();
     Assertions.assertTrue(new File(existingLocation).exists());
 
-    CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
-    createEmptyTableRequest.setId(emptyIds);
-    createEmptyTableRequest.setLocation(existingLocation);
-    Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
+    RegisterTableRequest existingRegisterRequest = new RegisterTableRequest();
+    existingRegisterRequest.setId(existingIds);
+    existingRegisterRequest.setLocation(existingLocation);
+    existingRegisterRequest.setMode("create");
+    Assertions.assertDoesNotThrow(() -> ns.registerTable(existingRegisterRequest));
+
     FileUtils.deleteQuietly(new File(existingLocation));
     Assertions.assertFalse(new File(existingLocation).exists());
 
-    DropTableRequest dropEmptyTable = new DropTableRequest();
-    dropEmptyTable.setId(emptyIds);
-    Assertions.assertDoesNotThrow(() -> ns.dropTable(dropEmptyTable));
-    DescribeTableRequest describeEmpty = new DescribeTableRequest();
-    describeEmpty.setId(emptyIds);
-    Assertions.assertThrows(LanceNamespaceException.class, () -> ns.describeTable(describeEmpty));
+    DropTableRequest dropExistingTable = new DropTableRequest();
+    dropExistingTable.setId(existingIds);
+    Assertions.assertDoesNotThrow(() -> ns.dropTable(dropExistingTable));
+    DescribeTableRequest describeExisting = new DescribeTableRequest();
+    describeExisting.setId(existingIds);
+    Assertions.assertThrows(
+        LanceNamespaceException.class, () -> ns.describeTable(describeExisting));
   }
 
   private GravitinoMetalake createMetalake(String metalakeName) {
