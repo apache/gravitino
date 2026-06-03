@@ -79,6 +79,12 @@ public class TestJettyServerConfig {
     Assertions.assertNotNull(jettyServerConfig.getCustomFilters());
     Assertions.assertTrue(jettyServerConfig.getCustomFilters().isEmpty());
 
+    Config mixedEmptyConfig = new Config() {};
+    mixedEmptyConfig.set(JettyServerConfig.CUSTOM_FILTERS, Optional.of(" 1, ,,\"\", '',, 2 "));
+    jettyServerConfig = JettyServerConfig.fromConfig(mixedEmptyConfig, "");
+    Assertions.assertIterableEquals(
+        Sets.newHashSet("1", "2"), jettyServerConfig.getCustomFilters());
+
     Config somethingConfig = new Config() {};
     somethingConfig.set(JettyServerConfig.CUSTOM_FILTERS, Optional.of("1,2"));
     somethingConfig.set(new ConfigBuilder("1.1").stringConf(), "test");
