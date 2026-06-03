@@ -193,7 +193,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     }
 
     super.alterTable(tablePath, newTable, ignoreIfNotExists);
-    invalidateNativeTableCache(tablePath);
   }
 
   @Override
@@ -208,7 +207,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     }
 
     super.alterTable(tablePath, newTable, tableChanges, ignoreIfNotExists);
-    invalidateNativeTableCache(tablePath);
   }
 
   @Override
