@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -56,7 +57,7 @@ public class TestIcebergTableOperationExecutor {
   public void setUp() {
     mockWrapperManager = mock(IcebergCatalogWrapperManager.class);
     mockCatalogWrapper = mock(CatalogWrapperForREST.class);
-    executor = new IcebergTableOperationExecutor(mockWrapperManager);
+    executor = new IcebergTableOperationExecutor(mockWrapperManager, Optional.empty());
 
     mockContext = mock(IcebergRequestContext.class);
     when(mockContext.catalogName()).thenReturn("test_catalog");
