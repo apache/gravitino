@@ -209,7 +209,7 @@ class TestGlueCatalogOperationsForIceberg {
   }
 
   @Test
-  void testLoadTable_icebergMetadataLoadFailureKeepsGlueOpsContext() {
+  void testLoadTableWithIcebergMetadataLoadFailure() {
     software.amazon.awssdk.services.glue.model.Table rawTable =
         software.amazon.awssdk.services.glue.model.Table.builder()
             .name(TABLE)
