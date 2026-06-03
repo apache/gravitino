@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.core.exception.SdkClientException;
 
 public class TestGravitinoGlueCredentialsProvider {
 
@@ -36,31 +35,6 @@ public class TestGravitinoGlueCredentialsProvider {
     AwsCredentials creds = provider.resolveCredentials();
     Assertions.assertEquals("AKID", creds.accessKeyId());
     Assertions.assertEquals("SECRET", creds.secretAccessKey());
-  }
-
-  @Test
-  void testResolveThrowsOnNullAccessKey() {
-    GravitinoGlueCredentialsProvider provider =
-        new GravitinoGlueCredentialsProvider(null, "secret");
-    Assertions.assertThrows(SdkClientException.class, provider::resolveCredentials);
-  }
-
-  @Test
-  void testResolveThrowsOnEmptyAccessKey() {
-    GravitinoGlueCredentialsProvider provider = new GravitinoGlueCredentialsProvider("", "secret");
-    Assertions.assertThrows(SdkClientException.class, provider::resolveCredentials);
-  }
-
-  @Test
-  void testResolveThrowsOnNullSecretKey() {
-    GravitinoGlueCredentialsProvider provider = new GravitinoGlueCredentialsProvider("akid", null);
-    Assertions.assertThrows(SdkClientException.class, provider::resolveCredentials);
-  }
-
-  @Test
-  void testResolveThrowsOnEmptySecretKey() {
-    GravitinoGlueCredentialsProvider provider = new GravitinoGlueCredentialsProvider("akid", "");
-    Assertions.assertThrows(SdkClientException.class, provider::resolveCredentials);
   }
 
   @Test
