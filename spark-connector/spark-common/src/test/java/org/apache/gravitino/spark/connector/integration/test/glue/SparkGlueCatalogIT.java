@@ -29,6 +29,7 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -122,6 +123,19 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   @Override
   protected boolean supportsFunction() {
     return false;
+  }
+
+  @BeforeAll
+  @Override
+  protected void startUp() throws Exception {
+    String accessKeyId = System.getenv("AWS_ACCESS_KEY_ID");
+    String secretAccessKey = System.getenv("AWS_SECRET_ACCESS_KEY");
+    setGlueEndpoint(null);
+    setAwsCredentials(accessKeyId, secretAccessKey);
+    setAwsRegion(System.getenv("AWS_DEFAULT_REGION"));
+    setS3Credentials(null, accessKeyId, secretAccessKey);
+    setS3BucketName(System.getenv("AWS_S3_TEST_BUCKET"));
+    super.startUp();
   }
 
   /**

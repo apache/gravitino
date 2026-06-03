@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.glue;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 /**
@@ -35,24 +34,4 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
  * </ul>
  */
 @EnabledIfEnvironmentVariable(named = "AWS_ACCESS_KEY_ID", matches = ".+")
-public class SparkAwsGlueCatalogIT34 extends SparkGlueCatalogIT {
-
-  @BeforeAll
-  @Override
-  protected void startUp() throws Exception {
-    String accessKeyId = System.getenv("AWS_ACCESS_KEY_ID");
-    String secretAccessKey = System.getenv("AWS_SECRET_ACCESS_KEY");
-    // For real AWS, use default Glue endpoint (no custom endpoint)
-    // AWS SDK will use the standard endpoint for the given region
-    setGlueEndpoint(null);
-    setAwsCredentials(accessKeyId, secretAccessKey);
-    setAwsRegion(System.getenv("AWS_DEFAULT_REGION"));
-    // For real AWS, S3 credentials are the same as Glue credentials
-    // Use default S3 endpoint (derived from region)
-    setS3Credentials(null, accessKeyId, secretAccessKey);
-    // Must be set BEFORE calling super.startUp() because the warehouse path is derived from it.
-    setS3BucketName(System.getenv("AWS_S3_TEST_BUCKET"));
-
-    super.startUp();
-  }
-}
+public class SparkAwsGlueCatalogIT34 extends SparkGlueCatalogIT {}
