@@ -288,9 +288,7 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleIcebergTableColumn());
+        SparkTableInfoChecker.create().withName(tableName).withColumns(getSimpleTableColumn());
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
   }
@@ -317,9 +315,7 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
 
     SparkTableInfo icebergTableInfo = getTableInfo(icebergTable);
     SparkTableInfoChecker icebergChecker =
-        SparkTableInfoChecker.create()
-            .withName(icebergTable)
-            .withColumns(getSimpleIcebergTableColumn());
+        SparkTableInfoChecker.create().withName(icebergTable).withColumns(getSimpleTableColumn());
     icebergChecker.check(icebergTableInfo);
     checkTableReadWrite(icebergTableInfo);
   }
@@ -361,9 +357,7 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
 
     SparkTableInfo tableInfo = getTableInfo(tableName);
     SparkTableInfoChecker checker =
-        SparkTableInfoChecker.create()
-            .withName(tableName)
-            .withColumns(getSimpleIcebergTableColumn());
+        SparkTableInfoChecker.create().withName(tableName).withColumns(getSimpleTableColumn());
     checker.check(tableInfo);
     checkTableReadWrite(tableInfo);
   }
@@ -575,18 +569,5 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
 
     // Glue may throw AnalysisException instead of NoSuchNamespaceException
     Assertions.assertThrows(Exception.class, () -> listTableNames("not_exists_db"));
-  }
-
-  /**
-   * Returns simple table columns for Iceberg table assertions. Iceberg normalizes empty-string
-   * column comments to null, so this variant uses null instead of "" for the name column.
-   */
-  protected List<SparkColumnInfo> getSimpleIcebergTableColumn() {
-    // "name" is created with COMMENT '' (empty string) in getCreateSimpleTableString; Iceberg
-    // preserves the empty string rather than normalizing it to null.
-    return Arrays.asList(
-        SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
-        SparkColumnInfo.of("name", DataTypes.StringType, ""),
-        SparkColumnInfo.of("age", DataTypes.IntegerType, null));
   }
 }

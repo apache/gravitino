@@ -103,7 +103,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     try {
       org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       if (isIcebergTable(gravitinoTable)) {
-        return loadIcebergSparkTable(ident, getOrCreateIcebergGlueCatalog());
+        return getOrCreateIcebergGlueCatalog().loadTable(ident);
       }
       return sparkCatalog.loadTable(ident);
     } catch (NoSuchTableException e) {
@@ -230,17 +230,5 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     SparkCatalog catalog = new SparkCatalog();
     catalog.initialize(catalogName + "_iceberg", new CaseInsensitiveStringMap(icebergProperties));
     return catalog;
-  }
-
-  /**
-   * Loads the raw Spark table from the Iceberg GlueCatalog.
-   *
-   * @param identifier the table identifier
-   * @param icebergCatalog the Iceberg SparkCatalog
-   * @return the Spark table
-   */
-  private Table loadIcebergSparkTable(Identifier identifier, SparkCatalog icebergCatalog)
-      throws NoSuchTableException {
-    return icebergCatalog.loadTable(identifier);
   }
 }

@@ -25,7 +25,6 @@ import org.apache.commons.lang3.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.core.exception.SdkClientException;
 
 /**
  * AWS credentials provider for Iceberg {@code GlueCatalog} that reads static credentials from a
@@ -70,16 +69,6 @@ public class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider 
 
   @Override
   public AwsCredentials resolveCredentials() {
-    if (accessKeyId == null || accessKeyId.isEmpty()) {
-      throw SdkClientException.create(
-          "Gravitino Glue credentials provider: access-key-id is not configured."
-              + " Set client.credentials-provider.access-key-id in catalog properties.");
-    }
-    if (secretAccessKey == null || secretAccessKey.isEmpty()) {
-      throw SdkClientException.create(
-          "Gravitino Glue credentials provider: secret-access-key is not configured."
-              + " Set client.credentials-provider.secret-access-key in catalog properties.");
-    }
     return AwsBasicCredentials.create(accessKeyId, secretAccessKey);
   }
 }
