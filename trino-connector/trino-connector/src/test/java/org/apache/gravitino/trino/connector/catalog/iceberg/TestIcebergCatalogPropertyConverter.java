@@ -75,8 +75,7 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(
         hiveBackendConfig.get("iceberg.jdbc-catalog.connection-url"),
         "jdbc:mysql://127.0.0.1:3306/metastore_db?createDatabaseIfNotExist=true");
-    Assertions.assertEquals(
-        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "jack");
+    Assertions.assertEquals(hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "jack");
     Assertions.assertEquals(
         hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "alice");
     Assertions.assertNull(hiveBackendConfig.get("other-key"));
