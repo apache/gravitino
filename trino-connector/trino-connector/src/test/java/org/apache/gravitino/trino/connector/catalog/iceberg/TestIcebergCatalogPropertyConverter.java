@@ -63,8 +63,8 @@ public class TestIcebergCatalogPropertyConverter {
         ImmutableMap.<String, String>builder()
             .put("uri", "jdbc:mysql://127.0.0.1:3306/metastore_db?createDatabaseIfNotExist=true")
             .put("catalog-backend", "jdbc")
-            .put("jdbc-user", "zhangsan")
-            .put("jdbc-password", "lisi")
+            .put("jdbc-user", "jack")
+            .put("jdbc-password", "alice")
             .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
             .put("other-key", "other")
             .build();
@@ -75,10 +75,9 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(
         hiveBackendConfig.get("iceberg.jdbc-catalog.connection-url"),
         "jdbc:mysql://127.0.0.1:3306/metastore_db?createDatabaseIfNotExist=true");
+    Assertions.assertEquals(hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "jack");
     Assertions.assertEquals(
-        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "zhangsan");
-    Assertions.assertEquals(
-        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "lisi");
+        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "alice");
     Assertions.assertNull(hiveBackendConfig.get("other-key"));
     Assertions.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "jdbc");
     Assertions.assertEquals(
