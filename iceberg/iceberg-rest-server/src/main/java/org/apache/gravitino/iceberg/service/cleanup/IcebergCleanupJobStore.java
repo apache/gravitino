@@ -23,9 +23,12 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper;
+import org.apache.gravitino.iceberg.service.cleanup.mapper.provider.IcebergCleanupMapperPackageProvider;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.ibatis.session.Configuration;
 
 /**
  * Persistence for {@code iceberg_cleanup_job}, layered on the Gravitino entity store's shared
@@ -47,6 +50,30 @@ public class IcebergCleanupJobStore {
    */
   public IcebergCleanupJobStore(IdGenerator idGenerator) {
     this.idGenerator = idGenerator;
+    registerMappers();
+  }
+
+  /**
+   * Registers the cleanup mappers into the entity store's shared MyBatis configuration.
+   *
+   * <p>Gravitino core builds the shared {@code SqlSessionFactory} during startup, before any
+   * auxiliary service is loaded, and in deploy mode the iceberg-rest-server runs in an isolated
+   * auxiliary-service class loader that core cannot see into. Core therefore cannot discover this
+   * module's mappers, and without them every cleanup query fails with {@code BindingException}. We
+   * register them here instead, lazily, from within the class loader that can see them the first
+   * time a store is created. The {@code hasMapper} guard keeps it idempotent across stores and
+   * threads.
+   */
+  private static void registerMappers() {
+    Configuration configuration =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().getConfiguration();
+    for (Class<?> mapper : new IcebergCleanupMapperPackageProvider().getMapperClasses()) {
+      synchronized (configuration) {
+        if (!configuration.hasMapper(mapper)) {
+          configuration.addMapper(mapper);
+        }
+      }
+    }
   }
 
   /**
