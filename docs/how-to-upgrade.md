@@ -157,11 +157,11 @@ changes listed in the sections below.
 
 #### 1.2.0 → 1.3.0
 
-| Field | 1.2.0 | 1.3.0 |
-| --- | --- | --- |
-| `image.tag` | `1.2.0` | `1.3.0` |
-| `env.GRAVITINO_HOME` | `/root/gravitino` | `/opt/gravitino` |
-| `extraVolumeMounts[gravitino-log].mountPath` | `/root/gravitino/logs` | `/opt/gravitino/logs` |
+| Field                                         | 1.2.0                  | 1.3.0                 |
+| --------------------------------------------- | ---------------------- | --------------------- |
+| `image.tag`                                   | `1.2.0`                | `1.3.0`               |
+| `env.GRAVITINO_HOME`                          | `/root/gravitino`      | `/opt/gravitino`      |
+| `extraVolumeMounts[gravitino-log].mountPath`  | `/root/gravitino/logs` | `/opt/gravitino/logs` |
 
 Key points:
 - The `GRAVITINO_HOME` path changed from `/root/gravitino` to `/opt/gravitino`. Make sure
