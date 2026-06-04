@@ -848,7 +848,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .withId(entity.id())
                                 .withName(entity.name())
                                 .withNamespace(entity.namespace())
+                                .withComment(entity.comment())
+                                .withProperties(entity.properties())
                                 .withColumns(columnsUpdateResult.getRight())
+                                .withPartitioning(entity.partitioning())
+                                .withDistribution(entity.distribution())
+                                .withSortOrders(entity.sortOrders())
+                                .withIndexes(entity.indexes())
                                 .withAuditInfo(
                                     AuditInfo.builder()
                                         .withCreator(entity.auditInfo().creator())
