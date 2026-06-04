@@ -370,7 +370,7 @@ public class HiveCatalogOperations
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
-    if (!schemaExists(schemaIdent)) {   
+    if (!schemaExists(schemaIdent)) {
       throw new NoSuchSchemaException("Schema (database) does not exist %s", namespace);
     }
 
@@ -675,16 +675,16 @@ public class HiveCatalogOperations
       String newComment = currentTable.comment();
       Map<String, String> updatedProperties = new HashMap<>(currentTable.properties());
       List<Column> updatedColumns = new ArrayList<>(Arrays.asList(currentTable.columns()));
-      String targetDatabaseName = schemaIdent.name();  // Define a separate variable to track the target database name.
-      
+      // Use the loaded table's database name as the default.
+      // If a new schema is explicitly requested during a rename, this will be overwritten below.
+      String targetDatabaseName = currentTable.databaseName();
 
       for (TableChange change : changes) {
         if (change instanceof TableChange.RenameTable) {
           TableChange.RenameTable rename = (TableChange.RenameTable) change;
-          if (rename.getNewSchemaName().isPresent()) {    // Check if a new schema is specified for the table rename
+          if (rename.getNewSchemaName().isPresent()) {
             String newSchemaName = rename.getNewSchemaName().get();
-            if (!schemaExists(   // Validate that the target schema exists before moving the table
-                NameIdentifier.of(tableIdent.namespace().levels()[0], newSchemaName))) {
+            if (!schemaExists(NameIdentifier.of(schemaIdent.namespace(), newSchemaName))) {
               throw new NoSuchSchemaException("Schema %s does not exist", newSchemaName);
             }
             // Move table to the new schema

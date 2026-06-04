@@ -577,6 +577,51 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   }
 
   @Test
+  public void testCrossSchemaRename() {
+    // Create a second schema to serve as the destination for the cross-schema rename
+    String newSchemaName = HIVE_SCHEMA_NAME + "_new";
+    NameIdentifier newSchemaIdent =
+        NameIdentifier.of(META_LAKE_NAME, HIVE_CATALOG_NAME, newSchemaName);
+    hiveCatalogOperations.createSchema(newSchemaIdent, HIVE_COMMENT, Maps.newHashMap());
+
+    // Create a table in the original schema
+    String originalTableName = genRandomName();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), originalTableName);
+    HiveColumn col1 =
+        HiveColumn.builder()
+            .withName("col_1")
+            .withType(Types.ByteType.get())
+            .withComment(HIVE_COMMENT)
+            .build();
+    hiveCatalogOperations.createTable(
+        tableIdentifier,
+        new Column[] {col1},
+        HIVE_COMMENT,
+        Maps.newHashMap(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    // Alter the table to rename it and explicitly move it to the new schema
+    String newTableName = originalTableName + "_new";
+    hiveCatalogOperations.alterTable(
+        tableIdentifier, TableChange.rename(newTableName, newSchemaName));
+
+    // Verify the table is successfully loadable from the new schema
+    NameIdentifier newTableIdentifier =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), newSchemaName, newTableName);
+
+    Assertions.assertTrue(hiveCatalogOperations.tableExists(newTableIdentifier));
+
+    // Verify the table is fully absent from the old schema
+    Assertions.assertFalse(hiveCatalogOperations.tableExists(tableIdentifier));
+    Assertions.assertFalse(
+        hiveCatalogOperations.tableExists(
+            NameIdentifier.of(tableIdentifier.namespace(), newTableName)));
+  }
+
+  @Test
   public void testPurgeHiveTable() {
     String hiveTableName = "test_hive_table";
     NameIdentifier tableIdentifier =
