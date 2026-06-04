@@ -1028,6 +1028,66 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testDropCatalogReloadsClosedCachedWrapper() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "closed_cache_drop_test");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    Catalog catalog =
+        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
+    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    FieldUtils.writeField(catalog, "entity", entity, true);
+
+    CatalogManager.CatalogWrapper closedWrapper = catalogManager.loadCatalogAndWrap(ident);
+    closedWrapper.close();
+    Assertions.assertSame(closedWrapper, catalogManager.getCatalogCache().getIfPresent(ident));
+
+    boolean dropped = catalogManager.dropCatalog(ident);
+
+    Assertions.assertTrue(dropped);
+    Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+  }
+
+  @Test
+  void testLoadCatalogAndWrapDoesNotInvalidateConcurrentlyReloadedWrapper() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "concurrent_cache_reload_test");
+
+    CatalogManager.CatalogWrapper closedWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    CatalogManager.CatalogWrapper freshWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    BaseCatalog<?> freshCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.doReturn(freshCatalog).when(freshWrapper).catalog();
+    Mockito.doAnswer(
+            invocation -> {
+              catalogManager.getCatalogCache().put(ident, freshWrapper);
+              return null;
+            })
+        .when(closedWrapper)
+        .catalog();
+
+    try {
+      catalogManager.getCatalogCache().put(ident, closedWrapper);
+
+      CatalogManager.CatalogWrapper loadedWrapper = catalogManager.loadCatalogAndWrap(ident);
+
+      Assertions.assertSame(freshWrapper, loadedWrapper);
+      Assertions.assertSame(freshWrapper, catalogManager.getCatalogCache().getIfPresent(ident));
+      Mockito.verify(freshWrapper, Mockito.never()).close();
+    } finally {
+      catalogManager.getCatalogCache().invalidate(ident);
+    }
+  }
+
+  @Test
   void testAlterMutableProperties() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test51");
     Map<String, String> props =
