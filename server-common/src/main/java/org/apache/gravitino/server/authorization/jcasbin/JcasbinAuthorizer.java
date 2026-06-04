@@ -890,7 +890,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (!Entity.EntityType.GROUP.name().equalsIgnoreCase(ownerInfo.getOwnerType())) {
       return false;
     }
-    for (String groupName : currentPrincipalGroupNames()) {
+    for (String groupName : principalGroupNames(principal)) {
       Optional<GroupUpdatedAt> groupInfo = loadGroupInfo(metalake, groupName, requestContext);
       if (groupInfo.isPresent() && groupInfo.get().getGroupId() == ownerInfo.getOwnerId()) {
         return true;
@@ -1034,7 +1034,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * or has no groups.
    */
   private List<String> currentPrincipalGroupNames() {
-    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    return principalGroupNames(PrincipalUtils.getCurrentPrincipal());
+  }
+
+  private List<String> principalGroupNames(Principal principal) {
     if (!(principal instanceof UserPrincipal)) {
       return new ArrayList<>();
     }

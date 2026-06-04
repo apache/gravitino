@@ -696,6 +696,28 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testGroupOwnerCheckUsesProvidedPrincipalGroups() throws Exception {
+    UserPrincipal ownerGroupPrincipal =
+        new UserPrincipal(USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), GROUP_NAME)));
+    UserPrincipal currentPrincipalWithoutOwnerGroup =
+        new UserPrincipal(
+            USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), "otherGroup")));
+    principalUtilsMockedStatic
+        .when(PrincipalUtils::getCurrentPrincipal)
+        .thenReturn(currentPrincipalWithoutOwnerGroup);
+
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
+        .thenReturn(new GroupUpdatedAt(GROUP_ID, groupVersionCounter.incrementAndGet()));
+
+    OwnerInfo groupOwnerInfo = new OwnerInfo(GROUP_ID, "GROUP");
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(groupOwnerInfo);
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    assertTrue(doAuthorizeOwner(ownerGroupPrincipal));
+  }
+
+  @Test
   public void testAuthorizeByGroupRole() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
