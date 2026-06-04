@@ -79,16 +79,11 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
   /**
    * Drops the specified catalog.
    *
-   * <p>If the catalog is not present in the local connector cache, this method falls back to a
-   * server-side drop against the Gravitino server. The local cache may legitimately be missing the
-   * entry (e.g. the connector failed to load at startup, or the cache was evicted), so consulting
-   * the server avoids leaving the catalog in a zombie state where it can be neither dropped nor
-   * re-created. Only when the server also reports that the catalog does not exist is {@code
-   * ignoreNotExist} consulted to decide between silent return and an error.
+   * <p>If the catalog is not present in the local connector cache, falls back to a server-side drop
+   * so that catalogs that failed to load can still be removed.
    *
    * @param catalogName the name of the catalog to drop
-   * @param ignoreNotExist whether to ignore if the catalog does not exist on both the local cache
-   *     and the Gravitino server
+   * @param ignoreNotExist whether to ignore if the catalog does not exist
    * @throws TrinoException if the catalog does not exist and ignoreNotExist is false
    */
   public void dropCatalog(String catalogName, boolean ignoreNotExist) {
@@ -96,13 +91,6 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
       CatalogConnectorContext catalogConnector =
           catalogConnectorManager.getCatalogConnector(
               catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
-
-      // The local in-memory cache may not have an entry even if the catalog exists on
-      // the Gravitino server (e.g. the connector failed to load at startup, or the cache was
-      // evicted). In that case the catalog would otherwise be stuck in a zombie state:
-      // it cannot be dropped here because the local check would say "not exists", and it
-      // cannot be re-created either because the server still holds the metadata.
-      // Fall back to the server-side drop so the server is the source of truth.
       if (catalogConnector == null) {
         boolean dropped =
             catalogConnectorManager.getMetalake(metalake).dropCatalog(catalogName, true);
