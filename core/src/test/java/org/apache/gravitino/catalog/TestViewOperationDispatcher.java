@@ -497,6 +497,43 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testDropMissingViewCleansUpSchemas() throws Exception {
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "dropViewGoneA:dropViewGoneB");
+    NameIdentifier ancestorIdent = NameIdentifier.of(metalake, catalog, "dropViewGoneA");
+    Namespace viewNs =
+        Namespace.of(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_already_gone");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    putSchemaEntity(ancestorIdent);
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    // Simulate an out-of-band drop: the backend already removed the view and auto-dropped the
+    // now-empty namespaces, so the catalog no longer knows the view (dropView returns false),
+    // while Gravitino still holds the orphaned schema entities.
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    Assertions.assertTrue(testCatalogOperations.dropView(viewIdent));
+    Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
+
+    // dropView returns false because the view is already gone from the catalog, but the
+    // orphaned schema entities must still be cleaned up.
+    Assertions.assertFalse(viewOperationDispatcher.dropView(viewIdent));
+    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
+  }
+
+  @Test
   public void testListViews() throws IOException {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema_list_view");
     schemaOperationDispatcher.createSchema(

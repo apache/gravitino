@@ -532,6 +532,48 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testDropMissingTableCleansUpSchemas() throws Exception {
+    reset(entityStore);
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "dropTableGoneA:dropTableGoneB");
+    NameIdentifier ancestorIdent = NameIdentifier.of(metalake, catalog, "dropTableGoneA");
+    Namespace tableNs =
+        Namespace.of(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_already_gone");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    putSchemaEntity(ancestorIdent);
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    // Simulate an out-of-band drop: the backend already removed the table and auto-dropped the
+    // now-empty namespaces, so the catalog no longer knows the table (dropTable returns false),
+    // while Gravitino still holds the orphaned schema entities.
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    Assertions.assertTrue(testCatalogOperations.dropTable(tableIdent));
+    Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
+
+    // dropTable returns false because the table is already gone from the catalog, but the
+    // orphaned schema entities must still be cleaned up.
+    Assertions.assertFalse(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
+  }
+
+  @Test
   public void testCreateTableNeedImportingSchema() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema181");
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "topic81");

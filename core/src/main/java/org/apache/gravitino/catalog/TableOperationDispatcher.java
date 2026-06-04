@@ -367,17 +367,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
-          if (droppedFromCatalog) {
-            SchemaEntityCleaner.deleteOrphanedSchemaEntities(
-                store,
-                schemaIdentifier,
-                true,
-                schemaIdent ->
-                    doWithCatalog(
-                        catalogIdent,
-                        c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
-                        RuntimeException.class));
-          }
+          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
+          // cleanup is best-effort and stops as soon as a schema still exists.
+          cleanUpOrphanedSchemaEntities(catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
   }
@@ -432,19 +424,31 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
-          if (droppedFromCatalog) {
-            SchemaEntityCleaner.deleteOrphanedSchemaEntities(
-                store,
-                schemaIdentifier,
-                true,
-                schemaIdent ->
-                    doWithCatalog(
-                        catalogIdent,
-                        c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
-                        RuntimeException.class));
-          }
+          // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
+          // cleanup is best-effort and stops as soon as a schema still exists.
+          cleanUpOrphanedSchemaEntities(catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
+  }
+
+  /**
+   * Removes Gravitino schema entities whose backing catalog schema no longer exists, starting from
+   * {@code schemaIdentifier} and walking toward its outermost ancestor.
+   *
+   * @param catalogIdent the identifier of the catalog owning the schema
+   * @param schemaIdentifier the schema identifier to start the orphan check from
+   */
+  private void cleanUpOrphanedSchemaEntities(
+      NameIdentifier catalogIdent, NameIdentifier schemaIdentifier) {
+    SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+        store,
+        schemaIdentifier,
+        true,
+        schemaIdent ->
+            doWithCatalog(
+                catalogIdent,
+                c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
+                RuntimeException.class));
   }
 
   private Namespace getNewNamespace(NameIdentifier tableIdent, TableChange... changes) {
