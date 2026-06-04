@@ -26,8 +26,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -366,6 +368,14 @@ public class HTTPClient implements RESTClient {
           new String(authDataProvider.getTokenData(), StandardCharsets.UTF_8));
     }
 
+    // adding URI variable with exception handling to provide more context during syntax errors
+    URI requestUri;
+    try {
+      requestUri = request.getUri();
+    } catch (URISyntaxException e) {
+      throw new RESTException(e, "Invalid URI while processing %s request", method);
+    }
+
     try (CloseableHttpResponse response = httpClient.execute(request)) {
       Map<String, String> respHeaders = Maps.newHashMap();
       for (Header header : response.getHeaders()) {
@@ -406,8 +416,34 @@ public class HTTPClient implements RESTClient {
             response.getCode(),
             responseType != null ? responseType.getSimpleName() : "unknown");
       }
+    } catch (UnknownHostException e) {
+      throw new RESTException(
+          e,
+          "Cannot resolve Gravitino server host while processing %s request: %s",
+          method,
+          requestUri);
+    } catch (ConnectException e) {
+      throw new RESTException(
+          e,
+          "Failed to connect to Gravitino server while processing %s request: %s",
+          method,
+          requestUri);
     } catch (IOException e) {
-      throw new RESTException(e, "Error occurred while processing %s request", method);
+      throw new RESTException(
+          e,
+          "Failed to execute request to Gravitino server while processing %s request: %s",
+          method,
+          requestUri);
+    } catch (NullPointerException e) {
+      if ("Endpoint".equals(e.getMessage())) {
+        throw new RESTException(
+            e,
+            "Failed to determine target endpoint while processing %s request: %s",
+            method,
+            requestUri);
+      }
+
+      throw e;
     }
   }
 

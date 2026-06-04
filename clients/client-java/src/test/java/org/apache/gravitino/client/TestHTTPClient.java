@@ -353,6 +353,37 @@ public class TestHTTPClient {
     }
   }
 
+  @Test
+  public void testConnectionRefusedThrowsMeaningfulException() {
+    GravitinoAdminClient client = GravitinoAdminClient.builder("http://localhost:1").build();
+
+    RESTException exception =
+        Assertions.assertThrows(RESTException.class, () -> client.listMetalakes());
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("Failed to connect to Gravitino server"),
+        exception.getMessage());
+
+    Assertions.assertTrue(exception.getMessage().contains("localhost"), exception.getMessage());
+  }
+
+  @Test
+  public void testUnresolvableHostThrowsMeaningfulException() {
+    GravitinoAdminClient client =
+        GravitinoAdminClient.builder("http://bad-host-that-does-not-exist.invalid:9090").build();
+
+    RESTException exception =
+        Assertions.assertThrows(RESTException.class, () -> client.listMetalakes());
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("Cannot resolve Gravitino server host"),
+        exception.getMessage());
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("bad-host-that-does-not-exist.invalid"),
+        exception.getMessage());
+  }
+
   public static void testHttpMethodOnSuccess(
       Method method, boolean hasRequestBody, boolean hasResponseBody)
       throws JsonProcessingException {
