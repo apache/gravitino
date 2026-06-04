@@ -96,8 +96,8 @@ class TestBasicAuthenticator {
     assertEquals("alice", principal.getName());
     assertEquals(authHeader, principal.getAccessToken().orElse(null));
     assertEquals(2, principal.getGroups().size());
-    assertEquals("group-a", principal.getGroups().get(0).getGroupname());
-    assertEquals("group-b", principal.getGroups().get(1).getGroupname());
+    assertEquals("group-a", principal.getGroups().get(0).getGroupName());
+    assertEquals("group-b", principal.getGroups().get(1).getGroupName());
   }
 
   @Test
