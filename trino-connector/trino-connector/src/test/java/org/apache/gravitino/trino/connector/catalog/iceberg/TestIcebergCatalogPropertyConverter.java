@@ -25,6 +25,7 @@ import io.trino.spi.TrinoException;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.property.PropertyConverter;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -62,8 +63,8 @@ public class TestIcebergCatalogPropertyConverter {
         ImmutableMap.<String, String>builder()
             .put("uri", "jdbc:mysql://127.0.0.1:3306/metastore_db?createDatabaseIfNotExist=true")
             .put("catalog-backend", "jdbc")
-            .put("jdbc-user", "zhangsan")
-            .put("jdbc-password", "lisi")
+            .put("jdbc-user", "jack")
+            .put("jdbc-password", "alice")
             .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
             .put("other-key", "other")
             .build();
@@ -74,10 +75,9 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(
         hiveBackendConfig.get("iceberg.jdbc-catalog.connection-url"),
         "jdbc:mysql://127.0.0.1:3306/metastore_db?createDatabaseIfNotExist=true");
+    Assertions.assertEquals(hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "jack");
     Assertions.assertEquals(
-        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "zhangsan");
-    Assertions.assertEquals(
-        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "lisi");
+        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "alice");
     Assertions.assertNull(hiveBackendConfig.get("other-key"));
     Assertions.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "jdbc");
     Assertions.assertEquals(
@@ -111,7 +111,8 @@ public class TestIcebergCatalogPropertyConverter {
     IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
 
     Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
 
     // test converted properties
     Assertions.assertEquals(config.get("hive.metastore.uri"), "thrift://localhost:9083");
@@ -150,7 +151,8 @@ public class TestIcebergCatalogPropertyConverter {
     IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
 
     Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
 
     // test converted properties
     Assertions.assertEquals(

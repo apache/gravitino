@@ -79,8 +79,8 @@ public interface ModelVersionAliasRelMapper {
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
-      method = "softDeleteModelVersionAliasRelsBySchemaId")
-  Integer softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteModelVersionAliasRelsBySchemaIds")
+  Integer softDeleteModelVersionAliasRelsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = ModelVersionAliasSQLProviderFactory.class,

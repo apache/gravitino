@@ -19,13 +19,18 @@
 
 package org.apache.gravitino.audit.v2;
 
-import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.AuditLog;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 
@@ -34,6 +39,9 @@ import org.apache.gravitino.listener.api.event.OperationType;
  * server, add eventSource and remoteAddress to audit log.
  */
 public class SimpleAuditLogV2 implements AuditLog {
+
+  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
 
   private final BaseEvent event;
 
@@ -95,14 +103,27 @@ public class SimpleAuditLogV2 implements AuditLog {
 
   @Override
   public String toString() {
+    Map<String, String> info = customInfo();
+    List<String> parts = new ArrayList<>();
+    if (info != null) {
+      info.forEach((k, v) -> parts.add(k + "=" + v));
+    }
+    if (event instanceof ListEvent) {
+      int count = ((ListEvent) event).resultCount();
+      if (count >= 0) {
+        parts.add("count=" + count);
+      }
+    }
+    String customInfoStr = parts.isEmpty() ? "" : "{" + String.join(", ", parts) + "}";
     return String.format(
-        "[%s]\t%s\t%s\t%s\t%s\t%s\t%s",
-        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(timestamp()),
+        "[%s]\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+        TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(timestamp())),
         user(),
         operationType(),
         identifier(),
         operationStatus(),
         eventSource(),
-        remoteAddress());
+        remoteAddress(),
+        customInfoStr);
   }
 }

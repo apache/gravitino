@@ -56,6 +56,7 @@ setup(
     install_requires=open("requirements.txt").read(),
     extras_require={
         "dev": open("requirements-dev.txt").read(),
+        "lance": open("requirements-lance.txt").read(),
     },
     include_package_data=True,
 )

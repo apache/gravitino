@@ -19,8 +19,9 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.base;
 
-import java.util.List;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -35,19 +36,19 @@ public class IdpGroupMetaBaseSQLProvider {
         + " WHERE group_name = #{groupName} AND deleted_at = 0";
   }
 
-  public String selectIdpGroups(@Param("groupNames") List<String> groupNames) {
-    return "<script>"
-        + "SELECT group_id as groupId, group_name as groupName,"
-        + " current_version as currentVersion,"
-        + " last_version as lastVersion, deleted_at as deletedAt"
+  public String selectIdpGroupWithUsers(@Param("groupName") String groupName) {
+    return "SELECT g.group_name as name,"
+        + " COALESCE(JSON_ARRAYAGG(u.user_name), JSON_ARRAY()) as usernames"
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
-        + " WHERE deleted_at = 0 "
-        + "<foreach collection='groupNames' item='groupName'"
-        + " open='AND group_name IN (' separator=',' close=')'>"
-        + "#{groupName}"
-        + "</foreach>"
-        + "</script>";
+        + " g LEFT JOIN "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r ON r.group_id = g.group_id AND r.deleted_at = 0"
+        + " LEFT JOIN "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u ON u.user_id = r.user_id AND u.deleted_at = 0"
+        + " WHERE g.group_name = #{groupName} AND g.deleted_at = 0"
+        + " GROUP BY g.group_id, g.group_name";
   }
 
   public String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
@@ -63,12 +64,12 @@ public class IdpGroupMetaBaseSQLProvider {
         + " )";
   }
 
-  public String softDeleteIdpGroup(@Param("groupId") Long groupId) {
+  public String softDeleteIdpGroup(@Param("groupName") String groupName) {
     return "UPDATE "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " SET deleted_at = "
         + currentTimeMillisExpression()
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        + " WHERE group_name = #{groupName} AND deleted_at = 0";
   }
 
   public String deleteIdpGroupMetasByLegacyTimeline(

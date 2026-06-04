@@ -245,7 +245,7 @@ class TestHiveCatalogOperations {
                     null,
                     null,
                     Maps.newHashMap()));
-    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+    Assertions.assertTrue(exception.getMessage().contains("supports only"));
   }
 
   @Test
@@ -373,7 +373,7 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testCreateViewRejectsSparkDialect() throws Exception {
+  void testCreateViewAcceptsSparkDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
 
@@ -381,6 +381,7 @@ class TestHiveCatalogOperations {
     HiveClient hiveClient = mock(HiveClient.class);
     HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
     when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+    doNothing().when(hiveClient).createTable(any());
     when(clientPool.run(any()))
         .thenAnswer(
             invocation -> {
@@ -389,21 +390,25 @@ class TestHiveCatalogOperations {
             });
     op.clientPool = clientPool;
 
-    UnsupportedOperationException exception =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                op.createView(
-                    NameIdentifier.of("db", "v_spark"),
-                    null,
-                    new Column[0],
-                    new SQLRepresentation[] {
-                      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
-                    },
-                    null,
-                    null,
-                    Maps.newHashMap()));
-    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+    // Callers must supply spark.sql.create.version so HMS detectDialect identifies the view as
+    // Spark
+    View view =
+        op.createView(
+            NameIdentifier.of("db", "v_spark"),
+            null,
+            new Column[0],
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+            },
+            null,
+            null,
+            Maps.newHashMap(ImmutableMap.of("spark.sql.create.version", "3.5.3")));
+
+    Assertions.assertNotNull(view);
+    Assertions.assertEquals(1, view.representations().length);
+    SQLRepresentation rep = (SQLRepresentation) view.representations()[0];
+    Assertions.assertEquals("spark", rep.dialect());
+    Assertions.assertEquals("SELECT 1", rep.sql());
   }
 
   @Test
@@ -510,7 +515,7 @@ class TestHiveCatalogOperations {
         Assertions.assertThrows(
             UnsupportedOperationException.class,
             () -> op.loadView(NameIdentifier.of("db", "v_trino")));
-    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+    Assertions.assertTrue(exception.getMessage().contains("supports only"));
   }
 
   @Test
@@ -628,7 +633,7 @@ class TestHiveCatalogOperations {
                         null,
                         null,
                         null)));
-    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+    Assertions.assertTrue(exception.getMessage().contains("supports only"));
   }
 
   @Test
@@ -867,6 +872,66 @@ class TestHiveCatalogOperations {
         .listTablesByType(eq("hive"), eq("db"), eq("*"), eq(TableType.VIRTUAL_VIEW.name()));
     verify(hiveClient, never())
         .listTableNamesByFilter(anyString(), anyString(), anyString(), anyShort());
+  }
+
+  @Test
+  void testListTablesRemovesOnlyHudiBaseAndDerivedTables() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(ImmutableMap.of(LIST_ALL_TABLES, "false"), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    when(hiveClient.getAllDatabases(anyString())).thenReturn(List.of("db"));
+    when(hiveClient.getAllTables(anyString(), anyString()))
+        .thenReturn(
+            new ArrayList<>(
+                List.of(
+                    "v1",
+                    "hive_tbl",
+                    "ice_tbl",
+                    "hudi_base",
+                    "hudi_base_ro",
+                    "hudi_base_rt",
+                    "hudi_base_root")));
+    when(hiveClient.listTablesByType(anyString(), anyString(), anyString(), anyString()))
+        .thenReturn(List.of("v1"));
+
+    String icebergAndPaimonFilter =
+        String.format(
+            "%stable_type like \"ICEBERG\" or %stable_type like \"PAIMON\"",
+            HiveConstants.HIVE_FILTER_FIELD_PARAMS, HiveConstants.HIVE_FILTER_FIELD_PARAMS);
+    String hudiBaseFilter =
+        String.format("%sprovider like \"hudi\"", HiveConstants.HIVE_FILTER_FIELD_PARAMS);
+    when(hiveClient.listTableNamesByFilter(anyString(), anyString(), anyString(), anyShort()))
+        .thenAnswer(
+            invocation -> {
+              String filter = invocation.getArgument(2);
+              if (icebergAndPaimonFilter.equals(filter)) {
+                return List.of("ice_tbl");
+              }
+
+              if (hudiBaseFilter.equals(filter)) {
+                return List.of("hudi_base");
+              }
+
+              return List.of();
+            });
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    NameIdentifier[] tables = op.listTables(Namespace.of("metalake", "hive", "db"));
+
+    Assertions.assertEquals(2, tables.length);
+    Assertions.assertEquals("hive_tbl", tables[0].name());
+    Assertions.assertEquals("hudi_base_root", tables[1].name());
+    verify(hiveClient)
+        .listTableNamesByFilter(eq("hive"), eq("db"), eq(icebergAndPaimonFilter), anyShort());
+    verify(hiveClient).listTableNamesByFilter(eq("hive"), eq("db"), eq(hudiBaseFilter), anyShort());
   }
 
   @Test

@@ -24,7 +24,6 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.OUTPUT_FORMAT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_LIB;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_NAME;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_PARAMETER_PREFIX;
-import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -176,9 +175,7 @@ public class GlueTable extends BaseTable {
     if (glueTable.hasParameters()) {
       properties.putAll(glueTable.parameters());
     }
-    if (StringUtils.isNotBlank(glueTable.tableType())) {
-      properties.put(TABLE_TYPE, glueTable.tableType());
-    }
+
     if (sd != null) {
       putIfNotBlank(properties, LOCATION, sd.location());
       putIfNotBlank(properties, INPUT_FORMAT_CLASS, sd.inputFormat());
@@ -278,5 +275,15 @@ public class GlueTable extends BaseTable {
    */
   void setProperties(Map<String, String> properties) {
     this.properties = properties;
+  }
+
+  /**
+   * Replaces the columns with types sourced from the Iceberg schema, which is authoritative for
+   * Iceberg tables. Glue stores some types (e.g. TIME) as "string", so this corrects the loss.
+   *
+   * @param columns the columns derived from the Iceberg table schema
+   */
+  void setColumns(Column[] columns) {
+    this.columns = columns;
   }
 }

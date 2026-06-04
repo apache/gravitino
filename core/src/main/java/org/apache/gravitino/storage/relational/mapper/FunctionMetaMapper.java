@@ -165,8 +165,8 @@ public interface FunctionMetaMapper {
 
   @UpdateProvider(
       type = FunctionMetaSQLProviderFactory.class,
-      method = "softDeleteFunctionMetasBySchemaId")
-  Integer softDeleteFunctionMetasBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteFunctionMetasBySchemaIds")
+  Integer softDeleteFunctionMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @DeleteProvider(
       type = FunctionMetaSQLProviderFactory.class,

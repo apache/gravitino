@@ -58,8 +58,8 @@ public interface TableColumnMapper {
 
   @UpdateProvider(
       type = TableColumnSQLProviderFactory.class,
-      method = "softDeleteColumnsBySchemaId")
-  Integer softDeleteColumnsBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteColumnsBySchemaIds")
+  Integer softDeleteColumnsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @DeleteProvider(
       type = TableColumnSQLProviderFactory.class,

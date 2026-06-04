@@ -99,8 +99,10 @@ public interface OwnerMetaMapper {
       method = "softDeleteOwnerRelByCatalogId")
   void softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId);
 
-  @UpdateProvider(type = OwnerMetaSQLProviderFactory.class, method = "softDeleteOwnerRelBySchemaId")
-  void softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId);
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelBySchemaIds")
+  void softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
@@ -116,8 +118,10 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectType") String metadataObjectType);
 
   @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectChangedOwners")
-  List<ChangedOwnerInfo> selectChangedOwners(@Param("lastConsumedId") long lastConsumedId);
+  List<ChangedOwnerInfo> selectChangedOwners(
+      @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId);
 
-  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectMaxChangeId")
-  Long selectMaxChangeId();
+  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectMaxChangedOwner")
+  ChangedOwnerInfo selectMaxChangedOwner();
 }

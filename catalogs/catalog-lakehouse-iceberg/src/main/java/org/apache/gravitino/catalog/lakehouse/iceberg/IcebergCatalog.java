@@ -31,6 +31,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Implementation of an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
@@ -71,7 +72,7 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
 
   @Override
   public Capability newCapability() {
-    return new IcebergCatalogCapability();
+    return new IcebergCatalogCapability(HierarchicalSchemaUtil.schemaSeparator());
   }
 
   @Override
@@ -93,6 +94,10 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   @Evolving
   public Map<String, String> propertiesWithCredentialProviders() {
     Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
+    // Iceberg is security-first: the vended s3:ListBucket statement keeps the bare location prefix
+    // disabled so a credential cannot enumerate sibling keys sharing the location prefix. This is
+    // determined by the catalog type and is not meant to be configured by users.
+    properties.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "false");
     return applyDefaultCredentialProviders(properties);
   }
 

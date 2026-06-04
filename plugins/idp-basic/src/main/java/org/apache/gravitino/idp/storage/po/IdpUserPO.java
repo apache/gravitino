@@ -34,7 +34,7 @@ import lombok.ToString;
 @Builder(setterPrefix = "with")
 public class IdpUserPO {
   private Long userId;
-  private String userName;
+  private String username;
   private String passwordHash;
   private Long currentVersion;
   private Long lastVersion;

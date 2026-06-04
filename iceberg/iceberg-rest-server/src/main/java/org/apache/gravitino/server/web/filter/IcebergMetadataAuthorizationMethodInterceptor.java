@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,10 +27,12 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
@@ -69,7 +72,9 @@ public class IcebergMetadataAuthorizationMethodInterceptor
                 Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
             break;
           case SCHEMA:
-            rawNamespace = RESTUtil.decodeNamespace(value);
+            rawNamespace =
+                RESTUtil.decodeNamespace(
+                    value, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
             schema = String.join(separator, rawNamespace.levels());
             nameIdentifierMap.put(
                 Entity.EntityType.SCHEMA,
@@ -108,7 +113,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Parameter[] parameters, Object[] args) {
+      Method method, Parameter[] parameters, Object[] args) {
+    AuthorizationExpression authExpr = method.getAnnotation(AuthorizationExpression.class);
     for (Parameter parameter : parameters) {
       IcebergAuthorizationMetadata icebergMetadata =
           parameter.getAnnotation(IcebergAuthorizationMetadata.class);
@@ -117,7 +123,9 @@ public class IcebergMetadataAuthorizationMethodInterceptor
         RequestType type = icebergMetadata.type();
         switch (type) {
           case LOAD_TABLE:
-            return Optional.of(new LoadTableAuthzHandler(parameters, args));
+            return Optional.of(new LoadTableAuthzHandler(authExpr, parameters, args));
+          case LOAD_VIEW:
+            return Optional.of(new LoadViewAuthzHandler(authExpr, parameters, args));
           case RENAME_TABLE:
             return Optional.of(new RenameTableAuthzHandler(parameters, args));
           case RENAME_VIEW:
@@ -159,7 +167,12 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       return false;
     }
 
-    IcebergCatalogWrapper catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
+    IcebergCatalogWrapper catalogWrapper;
+    try {
+      catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
+    } catch (NoSuchCatalogException e) {
+      return false;
+    }
     // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
     // authorization. IRC2 handles authorization.
     return catalogWrapper.isRESTCatalog();

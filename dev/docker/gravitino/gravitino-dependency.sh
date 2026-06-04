@@ -47,12 +47,18 @@ download_gcs_connector() {
   rm "${temp_file}"
 }
 
-# Build the Gravitino project
-${gravitino_home}/gradlew clean build -x test
-
 rm -rf ${gravitino_home}/distribution
 # Prepare compile Gravitino packages
-${gravitino_home}/gradlew compileDistribution -x test
+${gravitino_home}/gradlew compileDistribution \
+  :bundles:aliyun-bundle:shadowJar \
+  :bundles:aws-bundle:shadowJar \
+  :bundles:gcp-bundle:shadowJar \
+  :bundles:azure-bundle:shadowJar \
+  :bundles:iceberg-gcp-bundle:shadowJar \
+  :bundles:iceberg-aws-bundle:shadowJar \
+  :bundles:iceberg-azure-bundle:shadowJar \
+  :bundles:iceberg-aliyun-bundle:shadowJar \
+  -x test
 
 # Removed old packages, Avoid multiple re-executions using the wrong file
 rm -rf "${gravitino_dir}/packages"
@@ -73,8 +79,14 @@ wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${jdbc_driver_dir}/
 
 echo "Finish downloading"
 
+# Copy the Docker entrypoint and its helper script into the docker/ subdirectory so they
+# are clearly separated from user-facing scripts in bin/.
+mkdir -p "${gravitino_dir}/packages/gravitino/docker"
+cp "${gravitino_dir}/docker-entrypoint.sh" "${gravitino_dir}/packages/gravitino/docker/"
+cp "${gravitino_dir}/rewrite_gravitino_server_config.py" "${gravitino_dir}/packages/gravitino/docker/"
+
+# Copy the deprecated stub into bin/ for one-release backward compatibility.
 mkdir -p "${gravitino_dir}/packages/gravitino/bin"
-cp "${gravitino_dir}/rewrite_gravitino_server_config.py" "${gravitino_dir}/packages/gravitino/bin/"
 cp "${gravitino_dir}/start-gravitino.sh" "${gravitino_dir}/packages/gravitino/bin/"
 
 fileset_lib_dir="${gravitino_dir}/packages/gravitino/catalogs/fileset/libs"
@@ -96,10 +108,3 @@ find ${gravitino_home}/bundles/iceberg-aliyun-bundle/build/libs/ -name 'gravitin
 
 
 download_gcs_connector
-
-# Keeping the container running at all times
-cat <<EOF >> "${gravitino_dir}/packages/gravitino/bin/gravitino.sh"
-
-# Keeping a process running in the background
-tail -f /dev/null
-EOF
