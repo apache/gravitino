@@ -97,6 +97,7 @@ public abstract class FlinkPaimonJdbcBackendIT extends FlinkPaimonCatalogIT {
 
   @Override
   protected boolean supportViewOperation() {
-    return true;
+    // Paimon JDBC metastore backend does not support view operations.
+    return false;
   }
 }
