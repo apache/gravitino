@@ -49,8 +49,11 @@ import Icons from '@/components/Icons'
 import Policies from '@/components/PolicyTag'
 import TableActions from '@/components/TableActions'
 import PropertiesContent from '@/components/PropertiesContent'
+import buildSchemaColumns from './SharedSchemaColumns'
 import {
   getCatalogDetails,
+  fetchSchemas,
+  deleteSchema,
   deleteFileset,
   deleteModel,
   deleteTopic,
@@ -61,6 +64,7 @@ import {
 } from '@/lib/store/metalakes'
 import Link from 'next/link'
 import { cn } from '@/lib/utils/tailwind'
+import { to } from '@/lib/utils'
 import Loading from '@/components/Loading'
 import CreateSchemaDialog from '../CreateSchemaDialog'
 import CreateFilesetDialog from '../CreateFilesetDialog'
@@ -79,6 +83,8 @@ const { Search } = Input
 
 export default function SchemaDetailsPage() {
   const [openSchema, setOpenSchema] = useState(false)
+  const [editSchemaName, setEditSchemaName] = useState('')
+  const [editSchemaInit, setEditSchemaInit] = useState(true)
   const [openTable, setOpenTable] = useState(false)
   const [openFileset, setOpenFileset] = useState(false)
   const [openTopic, setOpenTopic] = useState(false)
@@ -105,10 +111,12 @@ export default function SchemaDetailsPage() {
   const [entityType, setEntityType] = useState('')
   const [tabKey, setTabKey] = useState('')
   const [nameCol, setNameCol] = useState('')
+  const [subSchemas, setSubSchemas] = useState([])
   const { ref, width } = useResizeObserver()
   const treeRef = useContext(TreeRefContext)
   const [catalogData, setCatalogData] = useState(null)
   const [ownerData, setOwnerData] = useState(null)
+  const [modal, contextHolder] = Modal.useModal()
 
   useEffect(() => {
     if (!currentMetalake || !catalog) return
@@ -135,9 +143,62 @@ export default function SchemaDetailsPage() {
   }, [anthEnable])
 
   useEffect(() => {
+    if (!currentMetalake || !catalog || !schema) {
+      setSubSchemas([])
+
+      return
+    }
+
+    const provider = catalogData?.provider
+    const catalogBackend = catalogData?.properties?.['catalog-backend']
+    const isIcebergJdbcCatalog = provider === 'lakehouse-iceberg' && catalogBackend === 'jdbc'
+
+    if (!isIcebergJdbcCatalog) {
+      // only iceberg jdbc catalogs support subschemas
+      setSubSchemas([])
+
+      return
+    }
+
+    const loadSubSchemas = async () => {
+      const [err, res] = await to(
+        dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
+      )
+      if (err || !res) {
+        setSubSchemas([])
+
+        return
+      }
+
+      const { schemas = [] } = res?.payload || {}
+
+      const nextSubSchemas = schemas.map(item => {
+        return {
+          ...item,
+          name: item.name,
+          key: item.name,
+          title: item.name
+        }
+      })
+
+      setSubSchemas(nextSubSchemas)
+    }
+
+    loadSubSchemas()
+  }, [currentMetalake, catalog, schema, catalogData?.provider, catalogData?.properties?.['catalog-backend']])
+
+  useEffect(() => {
+    const hasSubSchemas = subSchemas.length > 0
+    const withSubSchemas = tabs => (hasSubSchemas ? [{ label: 'Subschemas', key: 'Subschemas' }, ...tabs] : tabs)
+
+    let nextTabOptions = []
+    let nextCreateBtn = ''
+    let nextNameCol = ''
+    let nextEntityType = ''
+
     switch (catalogType) {
       case 'relational':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Tables', key: 'Tables' },
@@ -151,13 +212,12 @@ export default function SchemaDetailsPage() {
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Tables')
-        setCreateBtn('Create Table')
-        setNameCol('Table Name')
-        setEntityType('table')
+        nextCreateBtn = 'Create Table'
+        nextNameCol = 'Table Name'
+        nextEntityType = 'table'
         break
       case 'messaging':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Topics', key: 'Topics' },
@@ -169,13 +229,12 @@ export default function SchemaDetailsPage() {
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Topics')
-        setCreateBtn('Create Topic')
-        setNameCol('Topic Name')
-        setEntityType('topic')
+        nextCreateBtn = 'Create Topic'
+        nextNameCol = 'Topic Name'
+        nextEntityType = 'topic'
         break
       case 'fileset':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Filesets', key: 'Filesets' },
@@ -187,13 +246,12 @@ export default function SchemaDetailsPage() {
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Filesets')
-        setCreateBtn('Create Fileset')
-        setNameCol('Fileset Name')
-        setEntityType('fileset')
+        nextCreateBtn = 'Create Fileset'
+        nextNameCol = 'Fileset Name'
+        nextEntityType = 'fileset'
         break
       case 'model':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Models', key: 'Models' },
@@ -205,20 +263,71 @@ export default function SchemaDetailsPage() {
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Models')
-        setCreateBtn('Register Model')
-        setNameCol('Model Name')
-        setEntityType('model')
+        nextCreateBtn = 'Register Model'
+        nextNameCol = 'Model Name'
+        nextEntityType = 'model'
         break
       default:
-        setTabOptions([])
-        setCreateBtn('')
-        setEntityType('')
+        nextTabOptions = []
+        nextCreateBtn = ''
+        nextEntityType = ''
     }
-  }, [catalogType, anthEnable])
+
+    setTabOptions(nextTabOptions)
+    setCreateBtn(nextCreateBtn)
+    setNameCol(nextNameCol)
+    setEntityType(nextEntityType)
+  }, [catalogType, anthEnable, subSchemas])
+
+  useEffect(() => {
+    const hasSubSchemas = subSchemas.length > 0
+    if (hasSubSchemas) {
+      setTabKey('Subschemas')
+    } else {
+      switch (catalogType) {
+        case 'relational':
+          setTabKey('Tables')
+          break
+        case 'messaging':
+          setTabKey('Topics')
+          break
+        case 'fileset':
+          setTabKey('Filesets')
+          break
+        case 'model':
+          setTabKey('Models')
+          break
+        default:
+          setTabKey('')
+      }
+    }
+  }, [subSchemas, catalogType])
 
   const onChangeTab = key => {
     setTabKey(key)
+  }
+
+  const showDeleteSchemaConfirm = name => {
+    modal.confirm({
+      title: `Are you sure to delete the schema ${name}?`,
+      icon: <ExclamationCircleFilled />,
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        await dispatch(deleteSchema({ metalake: currentMetalake, catalog, catalogType, schema: name }))
+
+        const [err, res] = await to(
+          dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
+        )
+        if (!err && res) {
+          const { schemas = [] } = res.payload || {}
+          const nextSubSchemas = schemas.map(item => ({ ...item, name: item.name, key: item.name, title: item.name }))
+          setSubSchemas(nextSubSchemas)
+        }
+        treeRef.current.onLoadData({ key: catalog, nodeType: 'catalog', inUse: 'true' }, true)
+      }
+    })
   }
 
   const tableData = [...store.tableData]
@@ -244,6 +353,18 @@ export default function SchemaDetailsPage() {
     .map(entity => ({
       ...entity,
       key: entity.name,
+      children: undefined
+    }))
+
+  const subSchemaData = [...subSchemas]
+    .filter(item => {
+      if (search === '') return true
+
+      return item.name.includes(search)
+    })
+    .map(item => ({
+      ...item,
+      key: item.name,
       children: undefined
     }))
 
@@ -290,6 +411,8 @@ export default function SchemaDetailsPage() {
   }
 
   const handleEditSchema = () => {
+    setEditSchemaName(schema)
+    setEditSchemaInit(true)
     setOpenSchema(true)
   }
 
@@ -334,7 +457,20 @@ export default function SchemaDetailsPage() {
     setOpenOwner(true)
   }
 
-  const showDeleteConfirm = async (modal, entityObj, type) => {
+  const showDeleteConfirm = async (maybeModalOrEntityObj, maybeEntityObj, maybeType) => {
+    // support two call signatures:
+    // 1) showDeleteConfirm(modalInstance, entityObj, type)
+    // 2) showDeleteConfirm(entityObj, type)
+    let modalToUse = modal
+    let entityObj = maybeModalOrEntityObj
+    let type = maybeEntityObj
+
+    if (maybeModalOrEntityObj && typeof maybeModalOrEntityObj.confirm === 'function') {
+      modalToUse = maybeModalOrEntityObj
+      entityObj = maybeEntityObj
+      type = maybeType
+    }
+
     const { name: entity, storageLocation, type: managedOrExtenalType } = entityObj
     let isManaged = false
     let location = ''
@@ -360,7 +496,7 @@ export default function SchemaDetailsPage() {
       validateFn = fn
     }
 
-    modal.confirm({
+    modalToUse.confirm({
       title: `Are you sure to delete the ${type} ${entity}?`,
       icon: <ExclamationCircleFilled />,
       content: (
@@ -500,7 +636,7 @@ export default function SchemaDetailsPage() {
         render: (_, record) => (
           <a data-refer={`delete-view-${record.name}`}>
             <Tooltip title='Delete'>
-              <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(Modal, record, 'view')} />
+              <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(record, 'view')} />
             </Tooltip>
           </a>
         )
@@ -508,6 +644,23 @@ export default function SchemaDetailsPage() {
     ],
     [currentMetalake, catalogType, catalog, schema, catalogData?.provider]
   )
+
+  const subSchemaColumns = useMemo(() => {
+    return buildSchemaColumns({
+      currentMetalake,
+      catalog,
+      catalogType,
+      anthEnable,
+      provider: catalogData?.provider,
+      handleEditSchema: name => {
+        setEditSchemaName(name)
+        setEditSchemaInit(false)
+        setOpenSchema(true)
+      },
+      showDeleteConfirm: name => showDeleteSchemaConfirm(name),
+      handleSetOwner
+    })
+  }, [currentMetalake, catalog, catalogType, anthEnable, catalogData?.provider])
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
     return { columns, minWidth: 100 }
@@ -521,8 +674,17 @@ export default function SchemaDetailsPage() {
     return { columns: viewColumns, minWidth: 100 }
   }, [viewColumns])
 
+  const {
+    resizableColumns: subSchemaResizableColumns,
+    components: subSchemaComponents,
+    tableWidth: subSchemaTableWidth
+  } = useAntdColumnResize(() => {
+    return { columns: subSchemaColumns, minWidth: 100 }
+  }, [subSchemaColumns])
+
   return (
     <div ref={ref}>
+      {contextHolder}
       <Spin spinning={store.activatedDetailsLoading}>
         <Flex className='mb-2' gap='small' align='flex-start'>
           <div className='size-8'>
@@ -611,13 +773,31 @@ export default function SchemaDetailsPage() {
           )}
         </Space>
       </Spin>
-      <Tabs data-refer='details-tabs' defaultActiveKey={tabKey} onChange={onChangeTab} items={tabOptions} />
+      <Tabs data-refer='details-tabs' activeKey={tabKey} onChange={onChangeTab} items={tabOptions} />
       {tabKey === 'Associated Roles' ? (
         <AssociatedTable
           metalake={currentMetalake}
           metadataObjectType={'schema'}
           metadataObjectFullName={`${catalog}.${schema}`}
         />
+      ) : tabKey === 'Subschemas' ? (
+        <>
+          <Flex justify='flex-end' className='mb-4'>
+            <div className='flex w-1/3 gap-4'>
+              <Search name='searchSubSchemaInput' placeholder='Search...' value={search} onChange={onSearchTable} />
+            </div>
+          </Flex>
+          <Table
+            data-refer='subschema-list-grid'
+            size='small'
+            style={{ maxHeight: 'calc(100vh - 30rem)' }}
+            scroll={{ x: subSchemaTableWidth, y: 'calc(100vh - 37rem)' }}
+            dataSource={subSchemaData}
+            pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+            columns={subSchemaResizableColumns}
+            components={subSchemaComponents}
+          />
+        </>
       ) : tabKey === 'Functions' ? (
         <Functions metalake={currentMetalake} catalog={catalog} schema={schema} />
       ) : tabKey === 'Views' ? (
@@ -738,8 +918,8 @@ export default function SchemaDetailsPage() {
           catalogType={catalogType}
           provider={catalogData?.provider}
           locationProviders={catalogData?.properties?.['filesystem-providers']?.split(',') || []}
-          editSchema={schema}
-          init={true}
+          editSchema={editSchemaName || schema}
+          init={editSchemaInit}
         />
       )}
       {openOwner && (
