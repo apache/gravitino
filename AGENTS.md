@@ -94,7 +94,6 @@
 - **User guides describe usage, not internals**: Keep `docs/` how-to guides focused on how to use a feature; leave implementation and design rationale to the design docs. Do not forward-reference components (for example, a "garbage collector") that the guide never explains.
 - **Consistent terminology**: Use one capitalization/spelling for a term throughout (for example, `IdP`, not a mix of `IdP`/`IDP`), matching the surrounding docs.
 - **Runnable examples**: Shell snippets must work as written — for example, use `base64 -w 0` (or pipe through `tr -d '\n'`) so an `Authorization` header has no embedded newline.
-- **Links and OpenAPI validation**: Check links in changed documentation. When adding an OpenAPI specification, keep existing lint coverage intact, wire the new specification into the docs build, and run `./gradlew :docs:build`.
 
 ## Create Issue and PR Guidelines
 [IMPORTANT] Before creating an issue or PR using the gh command or the GitHub MCP server, please show a preview of the PR/issue first. Submit it only after I confirm. The issue/PR format should follow the reference and keep the content concise and clear.
