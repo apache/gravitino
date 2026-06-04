@@ -280,6 +280,25 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
+  void testBuildStorageCredsNormalizesPrefixWithoutTrailingSlash() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    FileIO fileIO =
+        mock(FileIO.class, withSettings().extraInterfaces(SupportsStorageCredentials.class));
+    SupportsStorageCredentials storageCredentialsFileIO = (SupportsStorageCredentials) fileIO;
+    StorageCredential upstreamCredential =
+        StorageCredential.create(
+            "s3://bucket/db/tbl",
+            ImmutableMap.of(
+                "s3.session-token", "upstream-token",
+                "s3.session-token-expires-at-ms", "123"));
+    when(storageCredentialsFileIO.credentials()).thenReturn(List.of(upstreamCredential));
+
+    Credential credential = IcebergRESTUtils.buildStorageCreds("irc1", table, fileIO).get(0);
+
+    Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+  }
+
+  @Test
   void testBuildStorageCredsEmpty() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
     FileIO fileIO = mock(FileIO.class);

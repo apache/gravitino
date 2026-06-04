@@ -122,9 +122,7 @@ public class IcebergRESTUtils {
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
     config.putAll(buildRefreshProps(catalogName, tableIdentifier, config));
 
-    String location = tableMetadata.location();
-    String prefix = location.endsWith("/") ? location : location + "/";
-    return toRESTCredential(prefix, config);
+    return toRESTCredential(storageLocationPrefix(tableMetadata.location()), config);
   }
 
   /**
@@ -184,7 +182,8 @@ public class IcebergRESTUtils {
           CredentialPropertyUtils.filterCredentialProperties(credential.config());
       filteredConfig.putAll(buildRefreshProps(catalogName, tableIdentifier, filteredConfig));
       restCredentials.add(
-          toRESTCredential(credential.prefix(), ImmutableMap.copyOf(filteredConfig)));
+          toRESTCredential(
+              storageLocationPrefix(credential.prefix()), ImmutableMap.copyOf(filteredConfig)));
     }
 
     return List.copyOf(restCredentials);
@@ -386,6 +385,19 @@ public class IcebergRESTUtils {
         RESTUtil.encodeNamespace(tableIdentifier.namespace(), NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
         RESTUtil.encodeString(tableIdentifier.name()),
         credentialProperties);
+  }
+
+  /**
+   * Ensures a storage location prefix ends with {@code /} for Iceberg REST credential matching.
+   *
+   * @param prefix storage location prefix
+   * @return prefix with a trailing slash when non-blank
+   */
+  private static String storageLocationPrefix(String prefix) {
+    if (StringUtils.isBlank(prefix)) {
+      return prefix;
+    }
+    return prefix.endsWith("/") ? prefix : prefix + "/";
   }
 
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
