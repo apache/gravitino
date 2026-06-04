@@ -867,7 +867,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             Assertions.fail("view should exist in Flink catalog: " + e.getMessage());
           }
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
@@ -901,7 +902,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           Assertions.assertTrue(gravitinoViewNames.contains(view1));
           Assertions.assertTrue(gravitinoViewNames.contains(view2));
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
@@ -931,7 +933,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)),
               "view should not exist after drop");
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
@@ -962,7 +965,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               viewCatalog.viewExists(NameIdentifier.of(schemaName, newViewName)),
               "new view name should exist");
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
@@ -993,7 +997,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               rep.sql().contains("name") && rep.sql().contains("id"),
               "updated view SQL should select both id and name columns");
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
@@ -1023,7 +1028,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               Row.of(2, "bob"),
               Row.of(3, "carol"));
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
@@ -1049,7 +1055,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           ViewCatalog viewCatalog = catalog.asViewCatalog();
           Assertions.assertTrue(viewCatalog.viewExists(NameIdentifier.of(schemaName, viewName)));
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
@@ -1072,7 +1079,8 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
           TestUtils.assertTableResult(sql("DROP VIEW IF EXISTS %s", viewName), ResultKind.SUCCESS);
         },
-        true);
+        true,
+        supportDropCascade());
   }
 
   @Test
@@ -1099,6 +1107,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           Assertions.assertTrue(views.contains(viewName), "view should appear in listViews");
           Assertions.assertFalse(views.contains(tableName), "table should not appear in listViews");
         },
-        true);
+        true,
+        supportDropCascade());
   }
 }
