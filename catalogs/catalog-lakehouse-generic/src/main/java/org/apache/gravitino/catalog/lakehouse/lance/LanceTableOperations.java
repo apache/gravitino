@@ -21,11 +21,13 @@ package org.apache.gravitino.catalog.lakehouse.lance;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -227,6 +229,10 @@ public class LanceTableOperations extends ManagedTableOperations {
             new ReadOptions.Builder().setStorageOptions(resolvedStorageOptions).build();
         try (Dataset ignored = Dataset.open().uri(location).readOptions(readOptions).build()) {
         } catch (Exception e) {
+          if (!isMissingDatasetException(e)) {
+            throw e;
+          }
+
           LOG.warn(
               "Failed to open Lance dataset at location {} with options {}, it may have already"
                   + " been deleted. Skipping dataset deletion.",
@@ -247,6 +253,26 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (Exception e) {
       throw new RuntimeException("Failed to purge Lance dataset for table " + ident, e);
     }
+  }
+
+  @VisibleForTesting
+  static boolean isMissingDatasetException(Exception exception) {
+    Throwable current = exception;
+    while (current != null) {
+      String message = current.getMessage();
+      if (message != null && current instanceof IllegalArgumentException) {
+        String normalizedMessage = message.toLowerCase(Locale.ROOT);
+        if (normalizedMessage.contains("dataset at path")
+            && normalizedMessage.contains("was not found")
+            && normalizedMessage.contains("_versions")) {
+          return true;
+        }
+      }
+
+      current = current.getCause();
+    }
+
+    return false;
   }
 
   @Override
