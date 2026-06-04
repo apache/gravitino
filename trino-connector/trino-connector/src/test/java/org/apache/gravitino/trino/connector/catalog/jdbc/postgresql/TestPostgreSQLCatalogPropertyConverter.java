@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.postgresql;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -47,7 +48,8 @@ public class TestPostgreSQLCatalogPropertyConverter {
     PostgreSQLConnectorAdapter adapter = new PostgreSQLConnectorAdapter();
 
     Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
 
     // test converted properties
     Assertions.assertEquals(config.get("connection-url"), "jdbc:postgresql://localhost:5432/test");

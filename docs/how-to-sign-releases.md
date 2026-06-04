@@ -159,7 +159,7 @@ Keep your private key secure and saved somewhere other than just on your compute
 
 1. **Import public keys:**
 
-    Download the KEYS file. Import the public keys used to sign all previous releases with this command. It doesn't matter if you have already imported the keys.
+    Download the KEYS file from https://downloads.apache.org/gravitino/KEYS. Import the public keys used to sign all previous releases with this command. It doesn't matter if you have already imported the keys.
 
     ```shell
     gpg --import KEYS

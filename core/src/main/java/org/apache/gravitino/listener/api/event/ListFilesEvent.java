@@ -26,22 +26,41 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * a filesets within a system.
  */
 @DeveloperApi
-public final class ListFilesEvent extends FilesetEvent {
+public final class ListFilesEvent extends FilesetEvent implements ListEvent {
   private final String subPath;
   private final String locationName;
+  private final int resultCount;
 
   /**
-   * Constructs a new {@code ListFilesEvent}.
+   * Constructs a new {@code ListFilesEvent} with the result count.
    *
    * @param user The user who initiated the listing of files/directories under the fileset.
    * @param ident The identifier of the fileset.
    * @param locationName The name of the location.
-   * @param subPath The subPath of the fileset
+   * @param subPath The subPath of the fileset.
+   * @param resultCount The number of files returned, or {@code -1} if not captured.
    */
-  public ListFilesEvent(String user, NameIdentifier ident, String locationName, String subPath) {
+  public ListFilesEvent(
+      String user, NameIdentifier ident, String locationName, String subPath, int resultCount) {
     super(user, ident);
     this.locationName = locationName;
     this.subPath = subPath;
+    this.resultCount = resultCount;
+  }
+
+  /**
+   * Constructs a new {@code ListFilesEvent} without a result count.
+   *
+   * @param user The user who initiated the listing of files/directories under the fileset.
+   * @param ident The identifier of the fileset.
+   * @param locationName The name of the location.
+   * @param subPath The subPath of the fileset.
+   * @deprecated Use {@link #ListFilesEvent(String, NameIdentifier, String, String, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListFilesEvent(String user, NameIdentifier ident, String locationName, String subPath) {
+    this(user, ident, locationName, subPath, -1);
   }
 
   public String locationName() {
@@ -50,6 +69,12 @@ public final class ListFilesEvent extends FilesetEvent {
 
   public String subPath() {
     return subPath;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return resultCount;
   }
 
   /**

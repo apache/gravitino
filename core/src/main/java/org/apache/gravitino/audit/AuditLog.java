@@ -333,6 +333,8 @@ public interface AuditLog {
 
     ALTER_VIEW,
 
+    REPLACE_VIEW,
+
     DROP_VIEW,
 
     LOAD_VIEW,

@@ -7,8 +7,10 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-The Apache Gravitino Flink connector implements the [Catalog Store](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/dev/table/catalogs/#catalog-store) to manage the catalogs under Gravitino.
+The Apache Gravitino Flink connector implements the [Catalog Store](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/catalogs/#catalog-store) to manage the catalogs under Gravitino.
 This capability allows users to perform federation queries, accessing data from various catalogs through a unified interface and consistent access control.
+
+The connector is published as a version-specific runtime JAR for each supported Flink minor version. Internally, Gravitino uses shared connector logic with version-specific catalog and factory entry points so that each runtime artifact matches the Flink APIs it runs against.
 
 ## Capabilities
 
@@ -20,13 +22,21 @@ This capability allows users to perform federation queries, accessing data from 
 
 ## Requirement
 
-* Flink 1.18
 * Scala 2.12
+* Flink 1.18, 1.19, or 1.20
 * JDK 8, 11 or 17
 
 ## How to use it
 
-1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
+1. [Build](../how-to-build.md) or download the Gravitino Flink connector runtime JAR that matches your Flink minor version, and place it in the classpath of Flink.
+
+| Flink version | Runtime artifact |
+|---------------|------------------|
+| 1.18          | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| 1.19          | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
+| 1.20          | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+
+Do not mix runtime JARs from different Flink minor versions in the same Flink deployment.
 
 2. Configure the Flink configuration to use the Gravitino flink connector.
 

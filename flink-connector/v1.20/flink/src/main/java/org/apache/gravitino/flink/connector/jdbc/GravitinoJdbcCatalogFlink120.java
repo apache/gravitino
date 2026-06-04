@@ -42,12 +42,12 @@ public class GravitinoJdbcCatalogFlink120 extends GravitinoJdbcCatalog {
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
-    super(
-        context,
-        defaultDatabase,
-        schemaAndTablePropertiesConverter,
-        partitionConverter,
-        (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context));
+    super(context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter);
+  }
+
+  @Override
+  protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
+    return (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context);
   }
 
   @Override

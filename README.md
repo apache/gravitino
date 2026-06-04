@@ -36,7 +36,7 @@ Apache Gravitino is a high-performance, geo-distributed, and federated metadata 
 
 ## 🚀 Key Features
 
-- **Unified Metadata Management**: Manage diverse metadata sources through a single model and API (e.g., Hive, MySQL, HDFS, S3).
+- **Unified Metadata Management**: Manage diverse metadata sources through a single model and API (e.g., Hive, MySQL, MariaDB, HDFS, S3).
 - **End-to-End Data Governance**: Features like access control, auditing, and discovery across all metadata assets.
 - **Direct Metadata Integration**: Changes in underlying systems are immediately reflected via Gravitino’s connectors.
 - **Geo-Distribution Support**: Share metadata across regions and clouds to support global architectures.

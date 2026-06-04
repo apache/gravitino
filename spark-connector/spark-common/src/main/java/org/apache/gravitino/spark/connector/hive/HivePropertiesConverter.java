@@ -47,16 +47,17 @@ public class HivePropertiesConverter implements PropertiesConverter {
 
   // Transform Spark Hive file format to Gravitino hive file format
   static final Map<String, String> fileFormatMap =
-      ImmutableMap.of(
-          "sequencefile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_SEQUENCEFILE,
-          "rcfile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_RCFILE,
-          "orc", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_ORC,
-          "parquet", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_PARQUET,
-          "textfile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE,
-          "hive", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE,
-          "json", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_JSON,
-          "csv", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_CSV,
-          "avro", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_AVRO);
+      ImmutableMap.<String, String>builder()
+          .put("sequencefile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_SEQUENCEFILE)
+          .put("rcfile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_RCFILE)
+          .put("orc", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_ORC)
+          .put("parquet", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_PARQUET)
+          .put("textfile", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE)
+          .put("hive", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_TEXTFILE)
+          .put("json", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_JSON)
+          .put("csv", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_CSV)
+          .put("avro", HivePropertiesConstants.GRAVITINO_HIVE_FORMAT_AVRO)
+          .build();
 
   static final Map<String, String> sparkToGravitinoPropertyMap =
       ImmutableMap.of(

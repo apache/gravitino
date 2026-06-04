@@ -82,6 +82,7 @@ dependencies {
   testImplementation(project(":bundles:iceberg-aws-bundle"))
   testImplementation(project(":bundles:iceberg-gcp-bundle"))
   testImplementation(project(":bundles:iceberg-azure-bundle"))
+  testImplementation(project(":core", "testArtifacts"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
 
@@ -108,6 +109,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.sqlite.jdbc)
