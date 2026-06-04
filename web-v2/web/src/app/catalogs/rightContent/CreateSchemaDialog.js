@@ -41,6 +41,7 @@ const { TextArea } = Input
 const defaultValues = {
   name: '',
   comment: '',
+  glueLocation: '',
   properties: []
 }
 
@@ -68,6 +69,7 @@ export default function CreateSchemaDialog({ ...props }) {
   const [topShadow, setTopShadow] = useState(false)
   const currentSelectBefore = locationProviders?.map(p => filesetLocationProviders[p])
   const selectBefore = [...new Set(['file:/', 'hdfs://', ...currentSelectBefore])]
+  const isGlueProvider = provider === 'glue'
   const dispatch = useAppDispatch()
 
   const paimonCatalogBackend = provider === 'lakehouse-paimon' && ['hive', 'jdbc'].includes(catalogBackend)
@@ -110,12 +112,17 @@ export default function CreateSchemaDialog({ ...props }) {
           setCacheData(schema)
           form.setFieldValue('name', schema.name)
           form.setFieldValue('comment', schema.comment)
-          let index = 0
-          Object.entries(schema.properties || {}).forEach(([key, value]) => {
-            form.setFieldValue(['properties', index, 'key'], key)
-            form.setFieldValue(['properties', index, 'value'], value)
-            index++
-          })
+          if (isGlueProvider) {
+            form.setFieldValue('glueLocation', schema.properties?.location || '')
+            form.setFieldValue('properties', [])
+          } else {
+            let index = 0
+            Object.entries(schema.properties || {}).forEach(([key, value]) => {
+              form.setFieldValue(['properties', index, 'key'], key)
+              form.setFieldValue(['properties', index, 'value'], value)
+              index++
+            })
+          }
           handScroll()
           setIsLoading(false)
         } catch (e) {
@@ -132,11 +139,21 @@ export default function CreateSchemaDialog({ ...props }) {
   }, [open, editSchema, metalake, catalog])
 
   useEffect(() => {
-    if (open && !editSchema && locationProviders?.length) {
-      form.setFieldValue(['properties', 0, 'key'], 'location')
-      form.setFieldValue(['properties', 0, 'description'], 'Hadoop catalog storage location')
-      form.setFieldValue(['properties', 0, 'selectBefore'], selectBefore)
-      form.setFieldValue(['properties', 0, 'prefix'], selectBefore?.[0])
+    if (!open || editSchema) {
+      return
+    }
+
+    if (locationProviders?.length || isGlueProvider) {
+      if (isGlueProvider) {
+        form.setFieldValue('glueLocation', '')
+        form.setFieldValue('properties', [])
+      } else {
+        const locationPrefix = selectBefore
+        form.setFieldValue(['properties', 0, 'key'], 'location')
+        form.setFieldValue(['properties', 0, 'description'], 'Schema storage location')
+        form.setFieldValue(['properties', 0, 'selectBefore'], locationPrefix)
+        form.setFieldValue(['properties', 0, 'prefix'], locationPrefix?.[0])
+      }
     }
   }, [open, editSchema, provider, locationProviders])
 
@@ -150,19 +167,24 @@ export default function CreateSchemaDialog({ ...props }) {
         const submitData = {
           name: values.name.trim(),
           comment: values.comment,
-          properties:
-            values.properties &&
-            values.properties.reduce((acc, item) => {
-              if (item.key === 'location' || item.key.startsWith('location-')) {
-                if (item.value) {
-                  acc[item.key] = item.prefix ? item.prefix + item.value : item.value
-                }
-              } else {
-                acc[item.key] = values[item.key] || item.value
-              }
+          properties: isGlueProvider
+            ? (() => {
+                const location = values.glueLocation?.trim()
 
-              return acc
-            }, {})
+                return location ? { location } : {}
+              })()
+            : values.properties &&
+              values.properties.reduce((acc, item) => {
+                if (item.key === 'location' || item.key.startsWith('location-')) {
+                  if (item.value) {
+                    acc[item.key] = item.prefix ? item.prefix + item.value : item.value
+                  }
+                } else {
+                  acc[item.key] = values[item.key] || item.value
+                }
+
+                return acc
+              }, {})
         }
         if (editSchema) {
           // update schema
@@ -237,22 +259,33 @@ export default function CreateSchemaDialog({ ...props }) {
                     <TextArea disabled={editSchema} />
                   </Form.Item>
                 )}
-                {(!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql'].includes(provider) ||
-                  paimonCatalogBackend) && (
-                  <Form.Item label='Properties'>
-                    <Form.List name='properties'>
-                      {(fields, subOpt) => (
-                        <RenderPropertiesFormItem
-                          fields={fields}
-                          subOpt={subOpt}
-                          form={form}
-                          isEdit={!!editSchema}
-                          isDisable={['jdbc-doris'].includes(provider) && !!editSchema}
-                          selectBefore={selectBefore}
-                        />
-                      )}
-                    </Form.List>
+                {isGlueProvider ? (
+                  <Form.Item
+                    name='glueLocation'
+                    label='Location'
+                    data-refer='schema-location-field'
+                    extra='Only location is supported for Glue schema properties.'
+                  >
+                    <Input placeholder='s3://my-bucket/path' />
                   </Form.Item>
+                ) : (
+                  (!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql'].includes(provider) ||
+                    paimonCatalogBackend) && (
+                    <Form.Item label='Properties'>
+                      <Form.List name='properties'>
+                        {(fields, subOpt) => (
+                          <RenderPropertiesFormItem
+                            fields={fields}
+                            subOpt={subOpt}
+                            form={form}
+                            isEdit={!!editSchema}
+                            isDisable={['jdbc-doris'].includes(provider) && !!editSchema}
+                            selectBefore={selectBefore}
+                          />
+                        )}
+                      </Form.List>
+                    </Form.Item>
+                  )
                 )}
               </Form>
             </Spin>
