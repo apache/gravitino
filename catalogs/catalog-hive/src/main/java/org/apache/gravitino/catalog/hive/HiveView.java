@@ -41,8 +41,8 @@ import org.apache.gravitino.rel.View;
 /**
  * Represents a view stored in Hive Metastore (VIRTUAL_VIEW table type). The SQL dialect is detected
  * from table properties: Trino views start with "/* Presto View:", Spark views carry {@code
- * spark.sql.create.version} in their parameters, and all other views are treated as native Hive SQL
- * views.
+ * spark.sql.create.version}, Flink views carry properties prefixed with {@code flink.}, and all
+ * other views are treated as native Hive SQL views.
  */
 @Unstable
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -52,7 +52,8 @@ import org.apache.gravitino.rel.View;
 @ToString
 public class HiveView implements View {
 
-  private static final String SPARK_VERSION_KEY = "spark.sql.create.version";
+  static final String SPARK_VERSION_KEY = "spark.sql.create.version";
+  static final String FLINK_PROPERTY_PREFIX = "flink.";
   private static final String TRINO_VIEW_MARKER_KEY = "presto_view";
   private static final String TRINO_VIEW_PREFIX = "/* Presto View:";
 
@@ -112,7 +113,7 @@ public class HiveView implements View {
    *
    * @param viewOriginalText The original view text from HMS.
    * @param parameters The HMS table parameters map.
-   * @return The detected dialect string: "trino", "spark", or "hive".
+   * @return The detected dialect string: "trino", "spark", "flink", or "hive".
    */
   static String detectDialect(String viewOriginalText, Map<String, String> parameters) {
     if (parameters != null && "true".equalsIgnoreCase(parameters.get(TRINO_VIEW_MARKER_KEY))) {
@@ -123,6 +124,10 @@ public class HiveView implements View {
     }
     if (parameters != null && parameters.containsKey(SPARK_VERSION_KEY)) {
       return Dialects.SPARK;
+    }
+    if (parameters != null
+        && parameters.keySet().stream().anyMatch(k -> k.startsWith(FLINK_PROPERTY_PREFIX))) {
+      return Dialects.FLINK;
     }
     return Dialects.HIVE;
   }

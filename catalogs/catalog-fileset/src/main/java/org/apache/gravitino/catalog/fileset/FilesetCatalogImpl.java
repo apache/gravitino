@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.CredentialConstants;
 
 /**
  * Hadoop catalog is a fileset catalog that can manage filesets on the Hadoop Compatible File
@@ -67,5 +69,19 @@ public class FilesetCatalogImpl extends BaseCatalog<FilesetCatalogImpl> {
   @Override
   public PropertiesMetadata filesetPropertiesMetadata() throws UnsupportedOperationException {
     return FILESET_PROPERTIES_META;
+  }
+
+  /**
+   * Fileset access goes through the Hadoop FileSystem API (e.g. GVFS over S3A), whose {@code
+   * getFileStatus} issues a HEAD on the directory-root key. That HEAD returns 404 (instead of 403)
+   * only when the vended {@code s3:ListBucket} statement allows the bare location prefix, so this
+   * catalog enables that internal flag. It is determined by the catalog type and is not meant to be
+   * configured by users.
+   */
+  @Override
+  public Map<String, String> propertiesWithCredentialProviders() {
+    Map<String, String> properties = new HashMap<>(super.propertiesWithCredentialProviders());
+    properties.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "true");
+    return properties;
   }
 }

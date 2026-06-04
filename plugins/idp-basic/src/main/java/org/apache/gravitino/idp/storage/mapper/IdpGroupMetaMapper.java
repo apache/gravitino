@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
-import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
+import org.apache.gravitino.idp.storage.po.IdpGroupWithUsersPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -41,18 +41,14 @@ public interface IdpGroupMetaMapper {
   @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroup")
   IdpGroupPO selectIdpGroup(@Param("groupName") String groupName);
 
-  /**
-   * Selects active groups by name. An empty list returns all active groups; pass null for an
-   * explicit error.
-   */
-  @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroups")
-  List<IdpGroupPO> selectIdpGroups(@Param("groupNames") List<String> groupNames);
+  @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroupWithUsers")
+  IdpGroupWithUsersPO selectIdpGroupWithUsers(@Param("groupName") String groupName);
 
   @InsertProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "insertIdpGroup")
   void insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO);
 
   @UpdateProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "softDeleteIdpGroup")
-  Integer softDeleteIdpGroup(@Param("groupId") Long groupId);
+  Integer softDeleteIdpGroup(@Param("groupName") String groupName);
 
   @DeleteProvider(
       type = IdpGroupMetaSQLProviderFactory.class,

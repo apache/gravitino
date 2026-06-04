@@ -89,13 +89,14 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
    * <p>Override this method to provide custom handlers based on request characteristics (e.g.,
    * annotations, request types, parameters).
    *
+   * @param method REST method being invoked
    * @param parameters Method parameters
    * @param args Method arguments
    * @return Optional handler for custom authorization processing, or empty if standard
    *     authorization is sufficient
    */
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Parameter[] parameters, Object[] args) {
+      Method method, Parameter[] parameters, Object[] args) {
     return Optional.empty();
   }
 
@@ -160,7 +161,8 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         }
 
         // Process custom authorization if handler exists
-        Optional<AuthorizationHandler> handler = createAuthorizationHandler(parameters, args);
+        Optional<AuthorizationHandler> handler =
+            createAuthorizationHandler(method, parameters, args);
 
         if (!skipStandardCheck && handler.isPresent()) {
           AuthorizationHandler authzHandler = handler.get();

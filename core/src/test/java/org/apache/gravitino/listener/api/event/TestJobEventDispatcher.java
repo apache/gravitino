@@ -115,6 +115,14 @@ public class TestJobEventDispatcher {
     Assertions.assertInstanceOf(ListJobTemplatesEvent.class, postEvent);
     Assertions.assertEquals(OperationType.LIST_JOB_TEMPLATES, postEvent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+    Assertions.assertEquals(1, ((ListJobTemplatesEvent) postEvent).resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListJobTemplatesEventDeprecatedConstructorReturnsNegativeCount() {
+    ListJobTemplatesEvent event = new ListJobTemplatesEvent("user", "metalake");
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test
@@ -320,6 +328,14 @@ public class TestJobEventDispatcher {
     Assertions.assertInstanceOf(ListJobsEvent.class, postEvent);
     Assertions.assertEquals(OperationType.LIST_JOBS, postEvent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+    Assertions.assertEquals(1, ((ListJobsEvent) postEvent).resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListJobsEventDeprecatedConstructorReturnsNegativeCount() {
+    ListJobsEvent event = new ListJobsEvent("user", "metalake", Optional.empty());
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test

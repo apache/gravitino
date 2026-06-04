@@ -245,6 +245,10 @@ class IllegalMetadataObjectException(IllegalArgumentException):
     """An exception thrown when a metadata object is invalid."""
 
 
+class IllegalRoleException(IllegalArgumentException):
+    """An exception thrown when a role is invalid."""
+
+
 class NoSuchRoleException(NotFoundException):
     """Exception thrown when a role with specified name is not existed."""
 
@@ -263,3 +267,11 @@ class NoSuchUserException(NotFoundException):
 
 class UserAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a user already exists."""
+
+
+class NoSuchGroupException(NotFoundException):
+    """An exception thrown when a group is not found."""
+
+
+class GroupAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a group already exists."""

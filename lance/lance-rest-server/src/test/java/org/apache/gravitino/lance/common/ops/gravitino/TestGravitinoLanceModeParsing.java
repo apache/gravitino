@@ -20,12 +20,16 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -35,6 +39,8 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DescribeTableResponse;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -160,6 +166,61 @@ class TestGravitinoLanceModeParsing {
                     Map.of(LANCE_LOCATION, "/tmp/table")));
     Assertions.assertTrue(
         exception.getMessage().contains("Unknown register table mode: #register$"));
+  }
+
+  @Test
+  void testCreateTableReturnsPropertiesAndStorageOptions() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Table table = Mockito.mock(Table.class);
+    when(table.properties())
+        .thenReturn(
+            Map.of(
+                "custom-key",
+                "custom-value",
+                LANCE_LOCATION,
+                "/tmp/table",
+                LANCE_TABLE_VERSION,
+                "5",
+                LANCE_STORAGE_OPTIONS_PREFIX + "region",
+                "us-west-2"));
+    when(tableCatalog.createTable(
+            any(NameIdentifier.class), any(Column[].class), isNull(), anyMap()))
+        .thenReturn(table);
+    GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
+
+    CreateTableResponse response =
+        operations.createTable("catalog.schema.table", "create", ".", null, Map.of(), null);
+
+    Assertions.assertEquals("/tmp/table", response.getLocation());
+    Assertions.assertEquals(5L, response.getVersion());
+    Assertions.assertEquals("custom-value", response.getProperties().get("custom-key"));
+    Assertions.assertEquals("us-west-2", response.getStorageOptions().get("region"));
+  }
+
+  @Test
+  void testDescribeTableReturnsDeclaredStateWhenRequested() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Table table = Mockito.mock(Table.class);
+    when(table.properties())
+        .thenReturn(
+            Map.of(
+                LANCE_LOCATION,
+                "/tmp/table",
+                LANCE_TABLE_DECLARED,
+                "true",
+                LANCE_STORAGE_OPTIONS_PREFIX + "region",
+                "us-west-2"));
+    when(table.columns()).thenReturn(new Column[0]);
+    when(tableCatalog.loadTable(any(NameIdentifier.class))).thenReturn(table);
+    GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
+
+    DescribeTableResponse response =
+        operations.describeTable("catalog.schema.table", ".", Optional.empty(), true);
+
+    Assertions.assertEquals(Boolean.TRUE, response.getIsOnlyDeclared());
+    Assertions.assertEquals(Boolean.FALSE, response.getManagedVersioning());
+    Assertions.assertEquals("true", response.getProperties().get(LANCE_TABLE_DECLARED));
+    Assertions.assertEquals("us-west-2", response.getStorageOptions().get("region"));
   }
 
   private static GravitinoLanceTableOperations newTableOperations(TableCatalog tableCatalog) {

@@ -21,9 +21,11 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -42,11 +44,14 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
   private static final Logger LOG =
       LoggerFactory.getLogger(IcebergNamespaceOperationExecutor.class);
 
-  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+  private final IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+  private final Optional<IcebergCleanupManager> cleanupManager;
 
   public IcebergNamespaceOperationExecutor(
-      IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager,
+      Optional<IcebergCleanupManager> cleanupManager) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
+    this.cleanupManager = cleanupManager;
   }
 
   @Override
@@ -121,6 +126,9 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
       IcebergRequestContext context,
       Namespace namespace,
       RegisterTableRequest registerTableRequest) {
+    IcebergCleanupHelper.rejectIfBeingPurged(
+        cleanupManager, context.catalogName(), namespace, registerTableRequest.name());
+
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .registerTable(namespace, registerTableRequest, context.requestCredentialVending());

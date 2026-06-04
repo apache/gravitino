@@ -33,6 +33,8 @@ dependencies {
   constraints {
     implementation(libs.thrift)
     implementation(libs.snappy.java)
+    implementation(libs.commons.beanutils)
+    implementation(libs.woodstox.core)
   }
 
   implementation(libs.hadoop3.common) {
@@ -67,6 +69,7 @@ dependencies {
     exclude(group = "javax.transaction", module = "transaction-api")
     exclude(group = "junit")
     exclude(group = "org.apache.ant")
+    exclude(group = "org.apache.arrow")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.derby")
     exclude(group = "org.apache.hadoop", module = "hadoop-yarn-server-resourcemanager")

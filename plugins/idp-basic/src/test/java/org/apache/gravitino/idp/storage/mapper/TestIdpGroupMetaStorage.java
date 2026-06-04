@@ -20,15 +20,14 @@
 package org.apache.gravitino.idp.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
-import org.apache.ibatis.exceptions.PersistenceException;
+import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -62,34 +61,61 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testSelectIdpGroups(String type) throws IOException {
+  void testSelectIdpGroupWithUsers(String type) throws IOException {
     init(type);
-    IdpGroupPO firstGroup =
+    idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
             .withGroupId(1L)
             .withGroupName("dev")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
-            .build();
-    IdpGroupPO secondGroup =
-        IdpGroupPO.builder()
-            .withGroupId(2L)
-            .withGroupName("ops")
+            .build());
+    IdpUserMetaMapper idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
+    IdpUserGroupRelMapper idpUserGroupRelMapper =
+        sharedSession.getMapper(IdpUserGroupRelMapper.class);
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUsername("alice")
+            .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
-            .build();
-    idpGroupMetaMapper.insertIdpGroup(firstGroup);
-    idpGroupMetaMapper.insertIdpGroup(secondGroup);
+            .build());
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(2L)
+            .withUsername("bob")
+            .withPasswordHash("hash-b")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build());
+    idpUserGroupRelMapper.batchInsertRelations(
+        List.of(
+            IdpUserGroupRelPO.builder()
+                .withId(100L)
+                .withUserId(1L)
+                .withGroupId(1L)
+                .withCurrentVersion(1L)
+                .withLastVersion(0L)
+                .withDeletedAt(0L)
+                .build(),
+            IdpUserGroupRelPO.builder()
+                .withId(101L)
+                .withUserId(2L)
+                .withGroupId(1L)
+                .withCurrentVersion(1L)
+                .withLastVersion(0L)
+                .withDeletedAt(0L)
+                .build()));
 
-    List<IdpGroupPO> groups = idpGroupMetaMapper.selectIdpGroups(List.of("ops", "dev"));
-    groups.sort(Comparator.comparing(IdpGroupPO::getGroupId));
-    assertIterableEquals(List.of(firstGroup, secondGroup), groups);
-    List<IdpGroupPO> groupsWithEmptyFilter = idpGroupMetaMapper.selectIdpGroups(List.of());
-    groupsWithEmptyFilter.sort(Comparator.comparing(IdpGroupPO::getGroupId));
-    assertIterableEquals(List.of(firstGroup, secondGroup), groupsWithEmptyFilter);
-    assertThrows(PersistenceException.class, () -> idpGroupMetaMapper.selectIdpGroups(null));
+    var groupWithUsers = idpGroupMetaMapper.selectIdpGroupWithUsers("dev");
+    assertEquals("dev", groupWithUsers.getName());
+    assertTrue(groupWithUsers.getUsernames().contains("alice"));
+    assertTrue(groupWithUsers.getUsernames().contains("bob"));
+    assertNull(idpGroupMetaMapper.selectIdpGroupWithUsers("unknown"));
   }
 
   @ParameterizedTest
@@ -114,8 +140,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
             .withDeletedAt(10L)
             .build());
 
-    assertIterableEquals(
-        List.of(activeGroup), idpGroupMetaMapper.selectIdpGroups(List.of("dev", "ops")));
+    assertEquals(activeGroup, idpGroupMetaMapper.selectIdpGroup("dev"));
     assertNull(idpGroupMetaMapper.selectIdpGroup("ops"));
   }
 
@@ -132,9 +157,9 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
             .withDeletedAt(0L)
             .build());
 
-    assertEquals(1, idpGroupMetaMapper.softDeleteIdpGroup(1L));
+    assertEquals(1, idpGroupMetaMapper.softDeleteIdpGroup("dev"));
     assertNull(idpGroupMetaMapper.selectIdpGroup("dev"));
-    assertEquals(0, idpGroupMetaMapper.softDeleteIdpGroup(1L));
+    assertEquals(0, idpGroupMetaMapper.softDeleteIdpGroup("dev"));
     assertEquals(1, idpGroupMetaMapper.deleteIdpGroupMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }
 

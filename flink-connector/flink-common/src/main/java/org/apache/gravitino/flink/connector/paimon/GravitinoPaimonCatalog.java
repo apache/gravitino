@@ -44,7 +44,6 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.paimon.flink.FlinkCatalogFactory;
-import org.apache.paimon.flink.FlinkTableFactory;
 
 /**
  * The GravitinoPaimonCatalog class is an implementation of the BaseCatalog class that is used to
@@ -88,7 +87,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
 
   @Override
   public Optional<Factory> getFactory() {
-    return Optional.of(new FlinkTableFactory());
+    return paimonCatalog.getFactory();
   }
 
   @Override

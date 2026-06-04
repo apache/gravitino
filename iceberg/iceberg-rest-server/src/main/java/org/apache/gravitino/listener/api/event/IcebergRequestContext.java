@@ -21,11 +21,15 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** The general request context information for Iceberg REST operations. */
 public class IcebergRequestContext {
+
+  /** Header that opts a drop purge request into asynchronous file cleanup. */
+  public static final String ASYNC_PURGE_HEADER = "X-Gravitino-Async-Purge";
 
   /**
    * @deprecated Kept only for backward-compatibility and will be removed in the next major release.
@@ -58,11 +62,22 @@ public class IcebergRequestContext {
   public IcebergRequestContext(
       HttpServletRequest httpRequest, String catalogName, boolean requestCredentialVending) {
     this.httpServletRequest = httpRequest;
-    this.remoteHostName = httpRequest.getRemoteHost();
+    this.remoteHostName = resolveClientAddress(httpRequest);
     this.httpHeaders = IcebergRESTUtils.getHttpHeaders(httpRequest);
     this.catalogName = catalogName;
     this.userName = PrincipalUtils.getCurrentUserName();
     this.requestCredentialVending = requestCredentialVending;
+  }
+
+  private static String resolveClientAddress(HttpServletRequest request) {
+    // X-Forwarded-For is trusted unconditionally; callers in environments where the server is
+    // reachable directly (not only via a trusted proxy) should be aware that this header can be
+    // spoofed by clients.
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (StringUtils.isNotBlank(xForwardedFor)) {
+      return xForwardedFor.split(",")[0].trim();
+    }
+    return request.getRemoteHost();
   }
 
   /**
@@ -99,6 +114,24 @@ public class IcebergRequestContext {
    */
   public Map<String, String> httpHeaders() {
     return httpHeaders;
+  }
+
+  /**
+   * Checks whether this request opted into asynchronous table purge.
+   *
+   * <p>Async purge is opt-in. Standard Iceberg clients send no header and keep synchronous purge
+   * behavior; a client opts in with {@code X-Gravitino-Async-Purge: true}.
+   *
+   * @return true only when the async purge header explicitly says {@code true}
+   */
+  public boolean asyncPurge() {
+    for (Map.Entry<String, String> header : httpHeaders.entrySet()) {
+      // HTTP header names are case-insensitive; the value is matched exactly as "true".
+      if (ASYNC_PURGE_HEADER.equalsIgnoreCase(header.getKey())) {
+        return "true".equals(header.getValue().trim());
+      }
+    }
+    return false;
   }
 
   /**

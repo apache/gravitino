@@ -115,8 +115,8 @@ public class TopicMetaSQLProviderFactory {
     return getProvider().softDeleteTopicMetasByMetalakeId(metalakeId);
   }
 
-  public static String softDeleteTopicMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteTopicMetasBySchemaId(schemaId);
+  public static String softDeleteTopicMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteTopicMetasBySchemaIds(schemaIds);
   }
 
   public static String deleteTopicMetasByLegacyTimeline(

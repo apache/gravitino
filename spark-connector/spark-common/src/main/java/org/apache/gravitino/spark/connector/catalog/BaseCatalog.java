@@ -34,12 +34,14 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.JavaImpl;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
@@ -241,21 +243,22 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
+    org.apache.gravitino.rel.Table gravitinoTable;
     try {
-      org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
-      org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
-      // Will create a catalog specific table
-      return createSparkTable(
-          ident,
-          gravitinoTable,
-          sparkTable,
-          sparkCatalog,
-          propertiesConverter,
-          sparkTransformConverter,
-          sparkTypeConverter);
-    } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
-      throw new NoSuchTableException(ident);
+      gravitinoTable = loadGravitinoTable(ident);
+    } catch (NoSuchTableException e) {
+      // Not a table in Gravitino; try as a view.
+      return loadViewAsTable(ident);
     }
+    Table sparkTable = loadSparkTable(ident);
+    return createSparkTable(
+        ident,
+        gravitinoTable,
+        sparkTable,
+        sparkCatalog,
+        propertiesConverter,
+        sparkTransformConverter,
+        sparkTypeConverter);
   }
 
   @Override
@@ -312,9 +315,20 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       loadGravitinoTable(ident);
       return true;
     } catch (NoSuchTableException e) {
-      return false;
+      // fall through to view check
     } catch (ForbiddenException e) {
       // User lacks LOAD_TABLE privilege, return false to allow CREATE TABLE IF NOT EXISTS
+      return false;
+    }
+    try {
+      return gravitinoCatalogClient
+          .asViewCatalog()
+          .viewExists(NameIdentifier.of(getDatabase(ident), ident.name()));
+    } catch (UnsupportedOperationException e) {
+      return false;
+    } catch (ForbiddenException e) {
+      // Same rationale as the table check above: lacking LOAD_VIEW privilege is treated as
+      // non-existence so that CREATE TABLE IF NOT EXISTS can proceed.
       return false;
     }
   }
@@ -419,6 +433,45 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     } catch (NonEmptySchemaException e) {
       throw new NonEmptyNamespaceException(namespace);
     }
+  }
+
+  /**
+   * Loads a Gravitino view as a Spark Table when {@link #loadTable(Identifier)} fails because the
+   * object is a view. Subclasses can override {@link #createSparkView} to enable view support.
+   *
+   * @param ident the identifier to load
+   * @return Spark Table wrapping the view
+   * @throws NoSuchTableException if no view exists or views are not supported by this catalog
+   */
+  protected Table loadViewAsTable(Identifier ident) throws NoSuchTableException {
+    View gravitinoView;
+    try {
+      gravitinoView =
+          gravitinoCatalogClient
+              .asViewCatalog()
+              .loadView(NameIdentifier.of(getDatabase(ident), ident.name()));
+    } catch (NoSuchViewException | UnsupportedOperationException | ForbiddenException e) {
+      throw new NoSuchTableException(ident);
+    }
+    // Call sparkCatalog.loadTable directly to surface NoSuchTableException as checked,
+    // avoiding the RuntimeException wrapping in loadSparkTable.
+    Table sparkTable = sparkCatalog.loadTable(ident);
+    return createSparkView(ident, gravitinoView, sparkTable);
+  }
+
+  /**
+   * Creates a catalog-specific Spark Table wrapping a Gravitino view. Subclasses that support views
+   * must override this method.
+   *
+   * @param ident the identifier
+   * @param gravitinoView the Gravitino view metadata
+   * @param sparkTable the underlying Spark table for IO (view expansion)
+   * @return a Spark Table representing the view
+   * @throws UnsupportedOperationException if views are not supported by this catalog
+   */
+  protected Table createSparkView(Identifier ident, View gravitinoView, Table sparkTable) {
+    throw new UnsupportedOperationException(
+        "View not supported by catalog: " + getDatabase(ident) + "." + ident.name());
   }
 
   protected org.apache.gravitino.rel.Table loadGravitinoTable(Identifier ident)
