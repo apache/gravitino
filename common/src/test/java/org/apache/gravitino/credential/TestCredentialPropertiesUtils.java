@@ -104,8 +104,7 @@ public class TestCredentialPropertiesUtils {
             CredentialPropertyUtils.ICEBERG_S3_TOKEN_EXPIRES_AT_MS, "123");
 
     Map<String, String> refreshEndpointProperties =
-        CredentialPropertyUtils.buildRefreshCredentialEndpoints(
-            "irc1", "db", "tbl", credentialProperties);
+        CredentialPropertyUtils.buildRefreshProps("irc1", "db", "tbl", credentialProperties);
 
     Assertions.assertEquals(
         "v1/irc1/namespaces/db/tables/tbl/credentials",
@@ -121,8 +120,7 @@ public class TestCredentialPropertiesUtils {
             CredentialPropertyUtils.ICEBERG_GCS_TOKEN_EXPIRES_AT, "123");
 
     Map<String, String> refreshEndpointProperties =
-        CredentialPropertyUtils.buildRefreshCredentialEndpoints(
-            "irc1", "db", "tbl", credentialProperties);
+        CredentialPropertyUtils.buildRefreshProps("irc1", "db", "tbl", credentialProperties);
 
     Assertions.assertEquals(
         "v1/irc1/namespaces/db/tables/tbl/credentials",
@@ -142,8 +140,7 @@ public class TestCredentialPropertiesUtils {
             "123");
 
     Map<String, String> refreshEndpointProperties =
-        CredentialPropertyUtils.buildRefreshCredentialEndpoints(
-            "irc1", "db", "tbl", credentialProperties);
+        CredentialPropertyUtils.buildRefreshProps("irc1", "db", "tbl", credentialProperties);
 
     Assertions.assertEquals(
         "v1/irc1/namespaces/db/tables/tbl/credentials",

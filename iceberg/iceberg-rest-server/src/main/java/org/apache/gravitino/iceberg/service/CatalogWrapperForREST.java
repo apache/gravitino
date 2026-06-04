@@ -759,15 +759,15 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           .addAllConfig(
               MapUtils.getFilteredMap(
                   properties, key -> catalogPropertiesToClientKeys.contains(key)))
-          // Keep only credential fields from FileIO properties before returning them to the client.
+          // Keep only credential fields from FileIO properties before returning them to the
+          // client.
           .addAllConfig(filteredCredentialProperties)
           .addAllConfig(
-              CredentialPropertyUtils.buildRefreshCredentialEndpoints(
-                  RESTUtil.encodeString(catalogCredentialManager.catalogName()),
-                  RESTUtil.encodeNamespace(
-                      ident.namespace(), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
-                  RESTUtil.encodeString(ident.name()),
-                  filteredCredentialProperties))
+              IcebergRESTUtils.buildRefreshProps(
+                  catalogCredentialManager.catalogName(), ident, filteredCredentialProperties))
+          .addAllCredentials(
+              IcebergRESTUtils.buildStorageCreds(
+                  catalogCredentialManager.catalogName(), ident, table.io()))
           .build();
     }
 
@@ -809,12 +809,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
     config.putAll(filteredCredentialProperties);
     config.putAll(
-        CredentialPropertyUtils.buildRefreshCredentialEndpoints(
-            RESTUtil.encodeString(catalogCredentialManager.catalogName()),
-            RESTUtil.encodeNamespace(
-                ident.namespace(), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
-            RESTUtil.encodeString(ident.name()),
-            filteredCredentialProperties));
+        IcebergRESTUtils.buildRefreshProps(
+            catalogCredentialManager.catalogName(), ident, filteredCredentialProperties));
+
+    List<org.apache.iceberg.rest.credentials.Credential> credentials =
+        IcebergRESTUtils.buildStorageCreds(
+            catalogCredentialManager.catalogName(), ident, table.io());
 
     TableMetadata metadata =
         TableMetadata.newTableMetadata(
@@ -824,7 +824,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             table.location(),
             properties);
 
-    return LoadTableResponse.builder().withTableMetadata(metadata).addAllConfig(config).build();
+    return LoadTableResponse.builder()
+        .withTableMetadata(metadata)
+        .addAllConfig(config)
+        .addAllCredentials(credentials)
+        .build();
   }
 
   private LoadTableResponse tableUpdateInternal(TableIdentifier ident, UpdateTableRequest request) {
@@ -888,12 +892,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           // Keep only credential fields from FileIO properties before returning them to the client.
           .addAllConfig(filteredCredentialProperties)
           .addAllConfig(
-              CredentialPropertyUtils.buildRefreshCredentialEndpoints(
-                  RESTUtil.encodeString(catalogCredentialManager.catalogName()),
-                  RESTUtil.encodeNamespace(
-                      ident.namespace(), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
-                  RESTUtil.encodeString(ident.name()),
-                  filteredCredentialProperties))
+              IcebergRESTUtils.buildRefreshProps(
+                  catalogCredentialManager.catalogName(), ident, filteredCredentialProperties))
+          .addAllCredentials(
+              IcebergRESTUtils.buildStorageCreds(
+                  catalogCredentialManager.catalogName(), ident, table.io()))
           .build();
     } else if (table instanceof BaseMetadataTable) {
       // metadata tables are loaded on the client side, return NoSuchTableException for now

@@ -178,7 +178,7 @@ public class CredentialPropertyUtils {
    * @param credentialProperties Iceberg credential properties used to determine refresh keys
    * @return refresh endpoint properties keyed by Iceberg client config names
    */
-  public static Map<String, String> buildRefreshCredentialEndpoints(
+  public static Map<String, String> buildRefreshProps(
       String encodedCatalogName,
       String encodedNamespace,
       String encodedTableName,

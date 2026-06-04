@@ -21,7 +21,10 @@ package org.apache.gravitino.iceberg.service;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -37,6 +40,10 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.StorageCredential;
+import org.apache.iceberg.io.SupportsStorageCredentials;
+import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.types.Types.IntegerType;
 import org.apache.iceberg.types.Types.NestedField;
@@ -235,6 +242,49 @@ public class TestIcebergRESTUtils {
         config.get("adls.refresh-credentials-endpoint"));
     Assertions.assertEquals(
         "3456", config.get("adls.sas-token-expires-at-ms.storageacct.dfs.core.windows.net"));
+  }
+
+  @Test
+  void testBuildStorageCreds() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    FileIO fileIO =
+        mock(FileIO.class, withSettings().extraInterfaces(SupportsStorageCredentials.class));
+    SupportsStorageCredentials storageCredentialsFileIO = (SupportsStorageCredentials) fileIO;
+    StorageCredential upstreamCredential =
+        StorageCredential.create(
+            "s3://bucket/db/tbl/",
+            ImmutableMap.of(
+                "s3.access-key-id",
+                "upstream-key",
+                "s3.secret-access-key",
+                "upstream-secret",
+                "s3.session-token",
+                "upstream-token",
+                "s3.session-token-expires-at-ms",
+                "123",
+                "client.refresh-credentials-endpoint",
+                "v1/upstream/namespaces/db/tables/tbl/credentials"));
+    when(storageCredentialsFileIO.credentials()).thenReturn(List.of(upstreamCredential));
+
+    List<Credential> credentials = IcebergRESTUtils.buildStorageCreds("irc1", table, fileIO);
+
+    Assertions.assertEquals(1, credentials.size());
+    Credential credential = credentials.get(0);
+    Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+    Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        credential.config().get("client.refresh-credentials-endpoint"));
+    Assertions.assertFalse(
+        credential.config().containsValue("v1/upstream/namespaces/db/tables/tbl/credentials"));
+  }
+
+  @Test
+  void testBuildStorageCredsEmpty() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    FileIO fileIO = mock(FileIO.class);
+
+    Assertions.assertTrue(IcebergRESTUtils.buildStorageCreds("irc1", table, fileIO).isEmpty());
   }
 
   @Test

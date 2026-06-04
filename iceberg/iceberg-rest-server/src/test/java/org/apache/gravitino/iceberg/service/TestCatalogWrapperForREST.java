@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableMap;
 import com.sun.net.httpserver.HttpServer;
@@ -68,6 +69,8 @@ import org.apache.iceberg.exceptions.NotAuthorizedException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
+import org.apache.iceberg.io.StorageCredential;
+import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.auth.AuthProperties;
 import org.apache.iceberg.rest.credentials.Credential;
@@ -419,7 +422,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testLoadTableInjectsRefreshEndpoint() {
+  void testLoadTableRefreshEndpoint() {
     TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "tbl");
     RESTCatalog catalog = mock(RESTCatalog.class);
     BaseTable baseTable = mock(BaseTable.class);
@@ -462,6 +465,66 @@ public class TestCatalogWrapperForREST {
         "v1/irc1/namespaces/db/tables/tbl/credentials",
         response.config().get("client.refresh-credentials-endpoint"));
     Assertions.assertEquals("token", response.config().get("s3.session-token"));
+  }
+
+  @Test
+  void testLoadTableStorageCreds() {
+    TableIdentifier ident = TableIdentifier.of(Namespace.of("db"), "tbl");
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    BaseTable baseTable = mock(BaseTable.class);
+    TableOperations ops = mock(TableOperations.class);
+    FileIO fileIO =
+        mock(FileIO.class, withSettings().extraInterfaces(SupportsStorageCredentials.class));
+    SupportsStorageCredentials storageCredentialsFileIO = (SupportsStorageCredentials) fileIO;
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
+            PartitionSpec.unpartitioned(),
+            SortOrder.unsorted(),
+            "s3://bucket/db/tbl",
+            Collections.emptyMap());
+
+    StorageCredential upstreamCredential =
+        StorageCredential.create(
+            "s3://bucket/db/tbl/",
+            ImmutableMap.of(
+                "s3.access-key-id",
+                "upstream-key",
+                "s3.secret-access-key",
+                "upstream-secret",
+                "s3.session-token",
+                "upstream-token",
+                "s3.session-token-expires-at-ms",
+                "123",
+                "client.refresh-credentials-endpoint",
+                "v1/upstream/namespaces/db/tables/tbl/credentials"));
+
+    when(catalog.loadTable(ident)).thenReturn(baseTable);
+    when(baseTable.operations()).thenReturn(ops);
+    when(ops.current()).thenReturn(metadata);
+    when(baseTable.io()).thenReturn(fileIO);
+    when(fileIO.properties()).thenReturn(Collections.emptyMap());
+    when(storageCredentialsFileIO.credentials()).thenReturn(List.of(upstreamCredential));
+
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
+
+    LoadTableResponse response = wrapper.loadTable(ident, false, CredentialPrivilege.READ);
+
+    Assertions.assertEquals(1, response.credentials().size());
+    Credential credential = response.credentials().get(0);
+    Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+    Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        credential.config().get("client.refresh-credentials-endpoint"));
+    Assertions.assertFalse(response.config().containsKey("client.refresh-credentials-endpoint"));
   }
 
   @Test
