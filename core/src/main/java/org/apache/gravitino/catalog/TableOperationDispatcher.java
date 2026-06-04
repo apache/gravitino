@@ -65,7 +65,6 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.gravitino.utils.SchemaEntityCleaner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -369,7 +368,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           }
           // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
-          cleanUpOrphanedSchemaEntities(catalogIdent, schemaIdentifier);
+          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
   }
@@ -426,29 +425,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           }
           // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
-          cleanUpOrphanedSchemaEntities(catalogIdent, schemaIdentifier);
+          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
-  }
-
-  /**
-   * Removes Gravitino schema entities whose backing catalog schema no longer exists, starting from
-   * {@code schemaIdentifier} and walking toward its outermost ancestor.
-   *
-   * @param catalogIdent the identifier of the catalog owning the schema
-   * @param schemaIdentifier the schema identifier to start the orphan check from
-   */
-  private void cleanUpOrphanedSchemaEntities(
-      NameIdentifier catalogIdent, NameIdentifier schemaIdentifier) {
-    SchemaEntityCleaner.deleteOrphanedSchemaEntities(
-        store,
-        schemaIdentifier,
-        true,
-        schemaIdent ->
-            doWithCatalog(
-                catalogIdent,
-                c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
-                RuntimeException.class));
   }
 
   private Namespace getNewNamespace(NameIdentifier tableIdent, TableChange... changes) {

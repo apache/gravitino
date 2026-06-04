@@ -31,7 +31,6 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
-import org.apache.gravitino.utils.SchemaEntityCleaner;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -153,17 +152,10 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
           // Ancestor entities are still only cleaned up when the underlying Iceberg catalog
           // removes the empty parents on leaf-drop, which is catalog-implementation-dependent.
           // For catalogs that keep empty parents, operators may need to drop them manually.
-          String separator = HierarchicalSchemaUtil.schemaSeparator();
-          SchemaEntityCleaner.deleteOrphanedSchemaEntities(
-              GravitinoEnv.getInstance().entityStore(),
-              IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                  metalake, catalogName, namespace, separator),
-              true,
-              schemaIdent ->
-                  dispatcher.namespaceExists(
-                      context,
-                      Namespace.of(
-                          HierarchicalSchemaUtil.splitSchemaName(schemaIdent.name(), separator))));
+          //
+          // Routed through the same guarded helper as the table and view drop paths so the cleanup
+          // never surfaces an error after the namespace drop has already succeeded.
+          IcebergOrphanSchemaCleanup.bestEffortCleanUp(metalake, dispatcher, context, namespace);
           return null;
         });
   }
