@@ -368,7 +368,6 @@ public class HTTPClient implements RESTClient {
           new String(authDataProvider.getTokenData(), StandardCharsets.UTF_8));
     }
 
-    // adding URI variable with exception handling to provide more context during syntax errors
     URI requestUri;
     try {
       requestUri = request.getUri();
