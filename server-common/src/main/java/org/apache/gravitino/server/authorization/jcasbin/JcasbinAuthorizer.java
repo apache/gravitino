@@ -1045,7 +1045,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (groups.isEmpty()) {
       return new ArrayList<>();
     }
-    return groups.stream().map(UserGroup::getGroupname).collect(Collectors.toList());
+    return groups.stream().map(UserGroup::getGroupName).collect(Collectors.toList());
   }
 
   private void versionCheckAndLoadRoles(
