@@ -61,6 +61,8 @@ export const checkCatalogIcon = ({ type, provider }) => {
   }
 }
 
+export const sensitiveCatalogPropertyKeys = ['jdbc-password', 'aws-secret-access-key']
+
 export const tableDefaultProps = {
   hive: [
     {

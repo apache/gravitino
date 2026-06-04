@@ -136,7 +136,7 @@ export default function CreateSchemaDialog({ ...props }) {
     if (!open) {
       loadedRef.current = false
     }
-  }, [open, editSchema, metalake, catalog])
+  }, [open, editSchema, metalake, catalog, provider])
 
   useEffect(() => {
     if (!open || editSchema) {

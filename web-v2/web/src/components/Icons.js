@@ -158,8 +158,8 @@ const Icons = {
       <path d='M0 0h256v256H0z' fill='none' />
       <defs>
         <linearGradient id='SVGusebDeuy' x1='0%' x2='100%' y1='100%' y2='0%'>
-          <stop offset='0%' stop-color='#4d27a8' />
-          <stop offset='100%' stop-color='#a166ff' />
+          <stop offset='0%' stopColor='#4d27a8' />
+          <stop offset='100%' stopColor='#a166ff' />
         </linearGradient>
       </defs>
       <path fill='url(#SVGusebDeuy)' d='M0 0h256v256H0z' />
