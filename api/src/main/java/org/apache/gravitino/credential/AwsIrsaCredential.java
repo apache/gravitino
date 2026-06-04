@@ -127,6 +127,6 @@ public class AwsIrsaCredential implements Credential {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sessionToken), "Session token should not be empty");
     Preconditions.checkArgument(
-        expireTimeInMs > 0, "The expire time of AwsIrsaCredential should great than 0");
+        expireTimeInMs > 0, "The expiration time of AwsIrsaCredential should be greater than 0");
   }
 }

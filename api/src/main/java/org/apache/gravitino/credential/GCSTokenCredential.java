@@ -88,6 +88,6 @@ public class GCSTokenCredential implements Credential {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(token), "GCS session token should not be empty");
     Preconditions.checkArgument(
-        expireTimeInMs > 0, "The expire time of GcsTokenCredential should great than 0");
+        expireTimeInMs > 0, "The expiration time of GcsTokenCredential should be greater than 0");
   }
 }

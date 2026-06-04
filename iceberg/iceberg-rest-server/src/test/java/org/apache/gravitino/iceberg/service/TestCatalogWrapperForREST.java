@@ -404,7 +404,7 @@ public class TestCatalogWrapperForREST {
     LoadCredentialsResponse response = wrapper.getTableCredentials(table, CredentialPrivilege.READ);
 
     Assertions.assertEquals(1, response.credentials().size());
-    Assertions.assertEquals("s3://bucket/wh/db/tbl/", response.credentials().get(0).prefix());
+    Assertions.assertEquals("s3://bucket/wh/db/tbl", response.credentials().get(0).prefix());
   }
 
   @Test
