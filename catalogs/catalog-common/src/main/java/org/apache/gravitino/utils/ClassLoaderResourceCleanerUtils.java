@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.lang.reflect.Field;
 import java.util.IdentityHashMap;
 import java.util.Timer;
@@ -349,7 +350,8 @@ public class ClassLoaderResourceCleanerUtils {
    * parent). Use this before touching static fields that must belong to the catalog's own
    * classloader to avoid accidentally mutating JVM-global shared state.
    */
-  private static boolean isOwnedByClassLoader(Class<?> clazz, ClassLoader classLoader) {
+  @VisibleForTesting
+  static boolean isOwnedByClassLoader(Class<?> clazz, ClassLoader classLoader) {
     return clazz.getClassLoader() == classLoader;
   }
 
