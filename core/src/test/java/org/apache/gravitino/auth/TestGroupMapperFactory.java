@@ -29,14 +29,17 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.UserGroup;
 import org.junit.jupiter.api.Test;
 
 public class TestGroupMapperFactory {
 
+  private final Config config = new Config(false) {};
+
   @Test
   public void testCreateRegexMapper() {
-    GroupMapper mapper = GroupMapperFactory.create("regex", "group-(.*)");
+    GroupMapper mapper = GroupMapperFactory.create("regex", "group-(.*)", config);
 
     assertNotNull(mapper);
     assertTrue(mapper instanceof RegexGroupMapper);
@@ -53,7 +56,7 @@ public class TestGroupMapperFactory {
 
   @Test
   public void testCreateRegexMapperWithDefaultPattern() {
-    GroupMapper mapper = GroupMapperFactory.create("regex", "^(.*)$");
+    GroupMapper mapper = GroupMapperFactory.create("regex", "^(.*)$", config);
 
     assertNotNull(mapper);
     assertTrue(mapper instanceof RegexGroupMapper);
@@ -70,7 +73,7 @@ public class TestGroupMapperFactory {
 
   @Test
   public void testCreateRegexMapperWithSlash() {
-    GroupMapper mapper = GroupMapperFactory.create("regex", "/(.*)");
+    GroupMapper mapper = GroupMapperFactory.create("regex", "/(.*)", config);
 
     assertNotNull(mapper);
     assertTrue(mapper instanceof RegexGroupMapper);
@@ -91,12 +94,21 @@ public class TestGroupMapperFactory {
         assertThrows(
             IllegalArgumentException.class,
             () -> {
-              GroupMapperFactory.create("unknown.InvalidClass", null);
+              GroupMapperFactory.create("unknown.InvalidClass", null, config);
             });
     assertTrue(exception.getMessage().contains("Failed to load GroupMapper class"));
   }
 
   public static class TestCustomGroupMapper implements GroupMapper {
+    private boolean initialized = false;
+    private Config receivedConfig;
+
+    @Override
+    public void initialize(Config config) {
+      this.initialized = true;
+      this.receivedConfig = config;
+    }
+
     @Override
     public List<UserGroup> map(List<Object> groups) {
       if (groups == null) {
@@ -106,12 +118,16 @@ public class TestGroupMapperFactory {
           .map(g -> new UserGroup(Optional.empty(), "custom:" + g.toString()))
           .collect(Collectors.toList());
     }
+
+    public boolean isInitialized() {
+      return initialized;
+    }
   }
 
   @Test
   public void testCreateCustomMapperWithInlineClass() {
     String className = TestCustomGroupMapper.class.getName();
-    GroupMapper mapper = GroupMapperFactory.create(className, null);
+    GroupMapper mapper = GroupMapperFactory.create(className, null, config);
 
     assertNotNull(mapper);
     assertTrue(mapper instanceof TestCustomGroupMapper);
@@ -121,5 +137,14 @@ public class TestGroupMapperFactory {
 
     assertEquals(1, mappedGroups.size());
     assertEquals("custom:foo", mappedGroups.get(0).getGroupname());
+  }
+
+  @Test
+  public void testCustomMapperInitializeCalledWithConfig() {
+    String className = TestCustomGroupMapper.class.getName();
+    GroupMapper mapper = GroupMapperFactory.create(className, null, config);
+    TestCustomGroupMapper custom = (TestCustomGroupMapper) mapper;
+    assertTrue(custom.isInitialized());
+    assertEquals(config, custom.receivedConfig);
   }
 }

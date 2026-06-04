@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import java.net.URI
+
 plugins {
   `maven-publish`
   id("java")
@@ -51,6 +53,7 @@ dependencies {
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  compileOnly(libs.aws.glue)
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
@@ -87,6 +90,12 @@ dependencies {
   testImplementation(project(":server-common")) {
     exclude("org.apache.logging.log4j")
   }
+  testImplementation(project(":catalogs:catalog-glue")) {
+    exclude("org.apache.logging.log4j")
+  }
+  // Iceberg's GlueCatalog (in iceberg-spark-runtime) references AWS Glue SDK classes at runtime.
+  // catalog-glue uses `implementation` (not `api`) so the SDK is not transitively exposed here.
+  testImplementation(libs.aws.glue)
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation(libs.hive2.common) {
@@ -124,6 +133,8 @@ dependencies {
   testImplementation(libs.nimbus.jose.jwt)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.testcontainers)
 
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
@@ -148,6 +159,44 @@ dependencies {
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+// Jars for Spark's IsolatedClientLoader: patched Hive 2.3.10 + Glue datacatalog client.
+// aws-java-sdk-glue 1.12.31 requires PropertyNamingStrategy$PascalCaseStrategy which was
+// removed in Jackson 2.12. Jackson included here so the isolated classloader uses a compatible
+// version instead of the app-level Jackson bundled with Spark (2.14+).
+// Only set when AWS_ACCESS_KEY_ID is present so version-specific modules can skip the download
+// when Glue tests are not enabled.
+val glueHiveJarsDir: String? =
+  if (System.getenv("AWS_ACCESS_KEY_ID") != null) "$buildDir/tmp/glue-hive-jars" else null
+extra["glueHiveJarsDir"] = glueHiveJarsDir
+val glueLibsApiUrl =
+  "https://api.github.com/repos/datastrato/spark-hive-glue-libs/contents/spark3/glue-3.4.0"
+
+val downloadGlueHiveJars by
+tasks.registering {
+  glueHiveJarsDir?.let { outputs.dir(it) }
+  doLast {
+    val outputDir = file(glueHiveJarsDir ?: return@doLast)
+    outputDir.mkdirs()
+    val response = URI(glueLibsApiUrl).toURL().readText()
+
+    @Suppress("UNCHECKED_CAST")
+    val entries = groovy.json.JsonSlurper().parseText(response) as List<Map<String, Any>>
+    entries
+      .filter { (it["name"] as String).endsWith(".jar") }
+      .forEach { entry ->
+        val jarName = entry["name"] as String
+        val downloadUrl = entry["download_url"] as String
+        val dest = outputDir.resolve(jarName)
+        if (!dest.exists()) {
+          logger.lifecycle("Downloading $jarName ...")
+          URI(downloadUrl).toURL().openStream().use { input ->
+            dest.outputStream().use { output -> input.copyTo(output) }
+          }
+        }
+      }
+  }
 }
 
 tasks.test {
