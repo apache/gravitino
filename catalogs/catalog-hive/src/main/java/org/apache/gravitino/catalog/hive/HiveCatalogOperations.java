@@ -370,7 +370,7 @@ public class HiveCatalogOperations
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
-    if (!schemaExists(schemaIdent)) {   
+    if (!schemaExists(schemaIdent)) {
       throw new NoSuchSchemaException("Schema (database) does not exist %s", namespace);
     }
 
