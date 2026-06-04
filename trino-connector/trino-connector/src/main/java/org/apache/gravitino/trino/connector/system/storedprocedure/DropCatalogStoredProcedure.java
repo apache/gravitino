@@ -90,13 +90,16 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
           catalogConnectorManager.getCatalogConnector(
               catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
       if (catalogConnector == null) {
-        if (ignoreNotExist) {
-          return;
+        // Local cache miss — the catalog may still exist on the Gravitino server (e.g., connector
+        // failed to load after creation). Fall back to a direct server-side drop so zombie catalogs
+        // can be cleaned up.
+        if (!catalogConnectorManager.getMetalake(metalake).dropCatalog(catalogName, true)
+            && !ignoreNotExist) {
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
+              "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
         }
-
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
-            "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
+        return;
       }
       // Always ignore "ignoreNotExist" inside Metalake.dropCatalog()
       // because we already handled the null check above.
