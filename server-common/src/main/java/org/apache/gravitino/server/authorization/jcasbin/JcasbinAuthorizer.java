@@ -890,8 +890,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (!Entity.EntityType.GROUP.name().equalsIgnoreCase(ownerInfo.getOwnerType())) {
       return false;
     }
-    for (String groupname : currentPrincipalGroupNames()) {
-      Optional<GroupUpdatedAt> groupInfo = loadGroupInfo(metalake, groupname, requestContext);
+    for (String groupName : currentPrincipalGroupNames()) {
+      Optional<GroupUpdatedAt> groupInfo = loadGroupInfo(metalake, groupName, requestContext);
       if (groupInfo.isPresent() && groupInfo.get().getGroupId() == ownerInfo.getOwnerId()) {
         return true;
       }
