@@ -96,7 +96,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   }
 
   @BeforeAll
-  void startUp() throws Exception {
+  protected void startUp() throws Exception {
     initHiveEnv();
     // initialize the hiveMetastoreUri and warehouse at first to inject properties to
     // IcebergRestService
@@ -120,7 +120,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   }
 
   @AfterAll
-  void stop() throws IOException, InterruptedException {
+  protected void stop() throws IOException, InterruptedException {
     if (hdfs != null) {
       try {
         hdfs.close();
