@@ -377,12 +377,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         try {
           GlueIcebergTableHelper.loadTable(icebergGlueCatalog, dbName, ident.name(), table);
         } catch (Exception e) {
-          LOG.warn(
-              "Failed to load Iceberg metadata for table {}.{}. "
-                  + "Partitioning and sort order information may be incomplete.",
-              dbName,
-              ident.name(),
-              e);
+          LOG.warn("Failed to load Iceberg metadata for table {}.{}", dbName, ident.name(), e);
         }
       }
 

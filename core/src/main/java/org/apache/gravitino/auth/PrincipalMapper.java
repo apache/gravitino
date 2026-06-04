@@ -20,6 +20,7 @@
 package org.apache.gravitino.auth;
 
 import java.security.Principal;
+import org.apache.gravitino.Config;
 
 /**
  * Interface for mapping authenticated principals to user identities.
@@ -28,6 +29,16 @@ import java.security.Principal;
  * requests.
  */
 public interface PrincipalMapper {
+
+  /**
+   * Initializes the mapper with server configuration. Called by the factory after instantiation.
+   *
+   * <p>Custom implementations can override this to read additional configuration properties. The
+   * default implementation is a no-op for backward compatibility.
+   *
+   * @param config the server configuration
+   */
+  default void initialize(Config config) {}
 
   /**
    * Maps a principal string to a Principal object.
