@@ -958,7 +958,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
     List<String> dialects = viewDialectFallbackOrder();
     String sql =
         dialects.stream()
-            .flatMap(d -> view.sqlFor(d).map(SQLRepresentation::sql).stream())
+            .map(d -> view.sqlFor(d).map(SQLRepresentation::sql))
+            .filter(Optional::isPresent)
+            .map(Optional::get)
             .findFirst()
             .orElseThrow(
                 () ->
