@@ -564,6 +564,8 @@ public class GravitinoEnv {
     // Create and initialize Catalog related modules, the operation chain is:
     // CatalogHookDispatcher -> CatalogEventDispatcher -> CatalogNormalizeDispatcher ->
     // CatalogManager
+    // CatalogManager registers its own change-log listener with the entity store (when the store
+    // supports it), so no poller wiring is needed here.
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);

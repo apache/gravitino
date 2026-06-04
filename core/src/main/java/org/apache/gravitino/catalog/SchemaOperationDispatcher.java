@@ -192,13 +192,27 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
 
     if (!schema.imported()) {
-      TreeLockUtils.doWithTreeLock(
-          NameIdentifier.of(ident.namespace().levels()),
-          LockType.WRITE,
-          () -> {
-            importSchema(ident);
-            return null;
-          });
+      try {
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(ident.namespace().levels()),
+            LockType.WRITE,
+            () -> {
+              importSchema(ident);
+              return null;
+            });
+      } catch (EntityAlreadyExistsException e) {
+        // HA race: another Gravitino node concurrently imported this schema. Reload from the
+        // entity store to verify the entity stored by the winning node is consistent.
+        LOG.info(
+            "Schema {} was concurrently imported by another node; reloading from store.", ident);
+        EntityCombinedSchema reloaded =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
+        if (!reloaded.imported()) {
+          throw new UnsupportedOperationException(
+              "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+                  + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
+        }
+      }
     }
 
     return schema;
@@ -438,10 +452,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     try {
       store.put(schemaEntity, true);
     } catch (EntityAlreadyExistsException e) {
-      LOG.error("Failed to import schema {} with id {} to the store.", identifier, uid, e);
-      throw new UnsupportedOperationException(
-          "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-              + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import schema entity to the store.", e);

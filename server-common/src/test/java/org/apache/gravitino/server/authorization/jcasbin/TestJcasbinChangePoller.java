@@ -18,31 +18,20 @@
  */
 package org.apache.gravitino.server.authorization.jcasbin;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.cache.GravitinoCache;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
-import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
-import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 
-/** Tests for {@link JcasbinChangePoller} static helpers. */
+/** Tests for {@link JcasbinChangeListener} static helpers. */
 public class TestJcasbinChangePoller {
 
   @Test
@@ -52,30 +41,30 @@ public class TestJcasbinChangePoller {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> new JcasbinChangePoller(metadataIdCache, ownerRelCache, 0));
+        () -> new JcasbinChangeListener(metadataIdCache, ownerRelCache, 0));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> new JcasbinChangePoller(metadataIdCache, ownerRelCache, -1));
+        () -> new JcasbinChangeListener(metadataIdCache, ownerRelCache, -1));
   }
 
   @Test
   void testChangeLogFullNameStripsLeadingMetalakeForChildTypes() {
     MetadataObject catalog =
-        JcasbinChangePoller.metadataObjectFromChangeLog(
+        JcasbinChangeListener.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1", MetadataObject.Type.CATALOG);
     Assertions.assertEquals(
         key("ml1", "CATALOG", "cat1", ""),
         JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", catalog));
 
     MetadataObject schema =
-        JcasbinChangePoller.metadataObjectFromChangeLog(
+        JcasbinChangeListener.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1.sch1", MetadataObject.Type.SCHEMA);
     Assertions.assertEquals(
         key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", ""),
         JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", schema));
 
     MetadataObject table =
-        JcasbinChangePoller.metadataObjectFromChangeLog(
+        JcasbinChangeListener.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1.sch1.tbl1", MetadataObject.Type.TABLE);
     Assertions.assertEquals(
         key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", ""),
@@ -85,7 +74,8 @@ public class TestJcasbinChangePoller {
   @Test
   void testChangeLogFullNameForMetalakeKeepsItself() {
     MetadataObject metalake =
-        JcasbinChangePoller.metadataObjectFromChangeLog("ml1", "ml1", MetadataObject.Type.METALAKE);
+        JcasbinChangeListener.metadataObjectFromChangeLog(
+            "ml1", "ml1", MetadataObject.Type.METALAKE);
     Assertions.assertEquals(
         key("ml1", "METALAKE", ""),
         JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
@@ -95,37 +85,14 @@ public class TestJcasbinChangePoller {
   void testPollEntityChangesCoalescesContainerPrefixes() {
     RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
     RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
-    EntityChangeLogMapper entityChangeLogMapper = mock(EntityChangeLogMapper.class);
-    OwnerMetaMapper ownerMetaMapper = mock(OwnerMetaMapper.class);
 
-    when(ownerMetaMapper.selectChangedOwners(0L, 0L)).thenReturn(Collections.emptyList());
-    when(entityChangeLogMapper.selectEntityChanges(0L, 500))
-        .thenReturn(
-            List.of(
-                change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"),
-                change(2L, MetadataObject.Type.SCHEMA, "ml1.cat1.sch1"),
-                change(3L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"),
-                change(4L, MetadataObject.Type.TABLE, "ml1.cat2.sch1.tbl1")));
-
-    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
-      sessionUtils
-          .when(() -> SessionUtils.getWithoutCommit(any(), any()))
-          .thenAnswer(
-              invocation -> {
-                Class<?> mapperClass = invocation.getArgument(0);
-                Function<Object, Object> func = invocation.getArgument(1);
-                if (mapperClass == OwnerMetaMapper.class) {
-                  return func.apply(ownerMetaMapper);
-                }
-                if (mapperClass == EntityChangeLogMapper.class) {
-                  return func.apply(entityChangeLogMapper);
-                }
-                return null;
-              });
-
-      JcasbinChangePoller poller = new JcasbinChangePoller(metadataIdCache, ownerRelCache, 1);
-      poller.pollChanges();
-    }
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"),
+            change(2L, MetadataObject.Type.SCHEMA, "ml1.cat1.sch1"),
+            change(3L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"),
+            change(4L, MetadataObject.Type.TABLE, "ml1.cat2.sch1.tbl1")));
 
     Assertions.assertEquals(
         List.of(
@@ -137,11 +104,12 @@ public class TestJcasbinChangePoller {
 
   @Test
   void testPollCursorAdvancementIsSynchronized() throws NoSuchMethodException {
-    Method pollOwnerChanges = JcasbinChangePoller.class.getDeclaredMethod("pollOwnerChanges");
-    Method pollEntityChanges = JcasbinChangePoller.class.getDeclaredMethod("pollEntityChanges");
+    Method pollOwnerChanges = JcasbinChangeListener.class.getDeclaredMethod("pollOwnerChanges");
+    Method onEntityChange =
+        JcasbinChangeListener.class.getDeclaredMethod("onEntityChange", List.class);
 
     Assertions.assertTrue(Modifier.isSynchronized(pollOwnerChanges.getModifiers()));
-    Assertions.assertTrue(Modifier.isSynchronized(pollEntityChanges.getModifiers()));
+    Assertions.assertTrue(Modifier.isSynchronized(onEntityChange.getModifiers()));
   }
 
   private static String key(String... parts) {
