@@ -204,9 +204,11 @@ public class KerberosClient implements java.io.Closeable {
    * login via keytab. Used by callers that need to bind the JAAS Subject to the current thread
    * (e.g., via {@code ugi.doAs(...)}) before performing a Kerberos-protected RPC call.
    *
-   * @return the real login UGI, or {@code null} if {@link #login()} has not been called yet.
+   * @return the real login UGI.
+   * @throws IllegalStateException if {@link #login()} has not been called yet.
    */
   public UserGroupInformation getRealLoginUgi() {
+    Preconditions.checkState(realLoginUgi != null, "KerberosClient.login() has not been called");
     return realLoginUgi;
   }
 }

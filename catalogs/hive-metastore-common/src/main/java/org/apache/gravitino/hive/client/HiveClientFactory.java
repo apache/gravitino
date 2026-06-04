@@ -27,6 +27,7 @@ import static org.apache.gravitino.hive.client.Util.updateConfigurationFromPrope
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -164,18 +165,13 @@ public final class HiveClientFactory {
       HiveClientClassLoader.HiveVersion version, Properties properties, ClassLoader classloader)
       throws Exception {
     Class<?> hiveClientImplClass = classloader.loadClass(HiveClientImpl.class.getName());
-    // HiveClientImpl is a barrier class loaded via defineClass inside the isolated classloader.
-    // Its constructor expects the HiveVersion enum type from the *isolated* classloader scope.
-    // Passing the system classloader's HiveVersion.class causes NoSuchMethodException because
-    // the two Class objects are not identical even though they have the same name.
-    Class<?> hiveVersionInIsolated =
-        classloader.loadClass(HiveClientClassLoader.HiveVersion.class.getName());
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    Object isolatedVersion =
-        Enum.valueOf((Class<? extends Enum>) hiveVersionInIsolated, version.name());
+    // HiveVersion is a shared class (isSharedClass covers all org.apache.gravitino.* classes),
+    // so the isolated classloader delegates to the base classloader and both sides hold the
+    // same Class object. We can pass HiveVersion.class directly to getConstructor().
     Constructor<?> hiveClientImplCtor =
-        hiveClientImplClass.getConstructor(hiveVersionInIsolated, Properties.class);
-    return (HiveClient) hiveClientImplCtor.newInstance(isolatedVersion, properties);
+        hiveClientImplClass.getConstructor(
+            HiveClientClassLoader.HiveVersion.class, Properties.class);
+    return (HiveClient) hiveClientImplCtor.newInstance(version, properties);
   }
 
   public static HiveClient createProxyHiveClientImpl(
@@ -221,7 +217,7 @@ public final class HiveClientFactory {
         UserGroupInformation realUgi = kerberosClient.getRealLoginUgi();
         final HiveClientClassLoader.HiveVersion hiveVersion = classloader.getHiveVersion();
         return realUgi.doAs(
-            (java.security.PrivilegedExceptionAction<HiveClient>)
+            (PrivilegedExceptionAction<HiveClient>)
                 () -> createHiveClientImpl(hiveVersion, properties, classloader));
       } else {
         return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
