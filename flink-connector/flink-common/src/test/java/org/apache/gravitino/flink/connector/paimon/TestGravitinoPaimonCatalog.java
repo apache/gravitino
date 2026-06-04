@@ -25,10 +25,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
@@ -41,6 +42,8 @@ import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -138,7 +141,7 @@ public class TestGravitinoPaimonCatalog {
       // package-private constructor shim that skips the factory call.  Because we override
       // realCatalog() the parent constructor's catalog reference is never used.
       super(
-          new MockCatalogContext("test-paimon", Collections.emptyMap()),
+          new MockCatalogContext("test-paimon", defaultPaimonOptions()),
           "default",
           PaimonPropertiesConverter.INSTANCE,
           DefaultPartitionConverter.INSTANCE);
@@ -154,6 +157,12 @@ public class TestGravitinoPaimonCatalog {
     @Override
     protected Catalog catalog() {
       return injectedCatalog != null ? injectedCatalog : super.catalog();
+    }
+
+    private static Map<String, String> defaultPaimonOptions() {
+      Map<String, String> options = new HashMap<>();
+      options.put("warehouse", "file:/tmp/test-paimon-warehouse");
+      return options;
     }
   }
 
@@ -348,54 +357,34 @@ public class TestGravitinoPaimonCatalog {
     Catalog mockCatalog = mock(Catalog.class);
     TableCatalog mockTableCatalog = mock(TableCatalog.class);
     when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);
-    when(mockTableCatalog.loadTable(any())).thenReturn(mock(Table.class));
+
+    Table existingTable = mock(Table.class);
+    org.apache.gravitino.rel.Column existingColumn =
+        org.apache.gravitino.rel.Column.of(
+            "id", org.apache.gravitino.rel.types.Types.IntegerType.get());
+    when(existingTable.columns())
+        .thenReturn(new org.apache.gravitino.rel.Column[] {existingColumn});
+    when(existingTable.index()).thenReturn(new Index[0]);
+    when(existingTable.properties()).thenReturn(Collections.emptyMap());
+    when(existingTable.distribution()).thenReturn(null);
+    when(existingTable.partitioning()).thenReturn(Transforms.EMPTY_TRANSFORM);
+    when(existingTable.comment()).thenReturn("existing comment");
+    when(mockTableCatalog.loadTable(any())).thenReturn(existingTable);
 
     TestablePaimonCatalog cat = new TestablePaimonCatalog(mockFlinkCatalog, mockCatalog);
     ObjectPath path = new ObjectPath("mydb", "mytable");
-    CatalogTable newTable = mock(CatalogTable.class);
-    when(newTable.getTableKind()).thenReturn(CatalogBaseTable.TableKind.TABLE);
+    CatalogTable newTable =
+        CatalogTable.of(
+            org.apache.flink.table.api.Schema.newBuilder().column("id", DataTypes.INT()).build(),
+            "new comment",
+            Collections.emptyList(),
+            Collections.emptyMap());
     when(mockFlinkCatalog.getTable(path)).thenReturn(newTable);
 
     cat.alterTable(path, newTable, false);
 
     verify(mockTableCatalog).alterTable(any(), any());
     verify(mockInnerCatalog).invalidateTable(Identifier.create("mydb", "mytable"));
-  }
-
-  /** Verifies that alterTable is a no-op when ignoreIfNotExists is true. */
-  @Test
-  public void testAlterTableIgnoreIfNotExistsIsNoOp() throws Exception {
-    Catalog mockCatalog = mock(Catalog.class);
-    TableCatalog mockTableCatalog = mock(TableCatalog.class);
-    when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);
-    when(mockTableCatalog.tableExists(any())).thenReturn(false);
-
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog, mockCatalog);
-    CatalogTable newTable = mock(CatalogTable.class);
-
-    cat.alterTable(new ObjectPath("missing_db", "missing_table"), newTable, true);
-
-    verify(mockTableCatalog, never()).loadTable(any());
-    verify(mockTableCatalog, never()).alterTable(any(), any());
-    verify(mockPaimonCatalog, never()).getTable(any());
-  }
-
-  /** Verifies that alterTable with tableChanges is a no-op when ignoreIfNotExists is true. */
-  @Test
-  public void testAlterTableWithTableChangesIgnoreIfNotExistsIsNoOp() throws Exception {
-    Catalog mockCatalog = mock(Catalog.class);
-    TableCatalog mockTableCatalog = mock(TableCatalog.class);
-    when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);
-    when(mockTableCatalog.tableExists(any())).thenReturn(false);
-
-    TestablePaimonCatalog cat = new TestablePaimonCatalog(mockPaimonCatalog, mockCatalog);
-    CatalogTable newTable = mock(CatalogTable.class);
-
-    cat.alterTable(new ObjectPath("missing_db", "missing_table"), newTable, List.of(), true);
-
-    verify(mockTableCatalog, never()).loadTable(any());
-    verify(mockTableCatalog, never()).alterTable(any(), any());
-    verify(mockPaimonCatalog, never()).getTable(any());
   }
 
   /** Verifies that successful Paimon dropTable invalidates the native cache. */

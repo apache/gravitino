@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -32,7 +31,6 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
-import org.apache.flink.table.catalog.TableChange;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.factories.CatalogFactory;
@@ -186,30 +184,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   }
 
   @Override
-  public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
-      throws TableNotExistException, CatalogException {
-    if (ignoreIfNotExists && !tableExists(tablePath)) {
-      return;
-    }
-
-    super.alterTable(tablePath, newTable, ignoreIfNotExists);
-  }
-
-  @Override
-  public void alterTable(
-      ObjectPath tablePath,
-      CatalogBaseTable newTable,
-      List<TableChange> tableChanges,
-      boolean ignoreIfNotExists)
-      throws TableNotExistException, CatalogException {
-    if (ignoreIfNotExists && !tableExists(tablePath)) {
-      return;
-    }
-
-    super.alterTable(tablePath, newTable, tableChanges, ignoreIfNotExists);
-  }
-
-  @Override
   public Optional<Factory> getFactory() {
     return paimonCatalog.getFactory();
   }
@@ -256,7 +230,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   protected CatalogBaseTable enrichCatalogTable(CatalogTable ignoredBaseTable, ObjectPath tablePath)
       throws CatalogException {
     try {
-      return paimonCatalog.getTable(tablePath);
+      return realCatalog().getTable(tablePath);
     } catch (TableNotExistException e) {
       throw new CatalogException(
           String.format(
