@@ -19,7 +19,9 @@
 package org.apache.gravitino.server.web;
 
 import com.google.common.collect.Sets;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Config;
@@ -68,25 +70,27 @@ public class TestJettyServerConfig {
     Assertions.assertTrue(jettyServerConfig.getCustomFilters().isEmpty());
 
     Config quotedEmptyConfig = new Config() {};
-    quotedEmptyConfig.set(JettyServerConfig.CUSTOM_FILTERS, Optional.of("\"\""));
+    quotedEmptyConfig.set(JettyServerConfig.CUSTOM_FILTERS, List.of("\"\""));
     jettyServerConfig = JettyServerConfig.fromConfig(quotedEmptyConfig, "");
     Assertions.assertNotNull(jettyServerConfig.getCustomFilters());
     Assertions.assertTrue(jettyServerConfig.getCustomFilters().isEmpty());
 
     Config singleQuotedEmptyConfig = new Config() {};
-    singleQuotedEmptyConfig.set(JettyServerConfig.CUSTOM_FILTERS, Optional.of("''"));
+    singleQuotedEmptyConfig.set(JettyServerConfig.CUSTOM_FILTERS, List.of("''"));
     jettyServerConfig = JettyServerConfig.fromConfig(singleQuotedEmptyConfig, "");
     Assertions.assertNotNull(jettyServerConfig.getCustomFilters());
     Assertions.assertTrue(jettyServerConfig.getCustomFilters().isEmpty());
 
     Config mixedEmptyConfig = new Config() {};
-    mixedEmptyConfig.set(JettyServerConfig.CUSTOM_FILTERS, Optional.of(" 1, ,,\"\", '',, 2 "));
+    mixedEmptyConfig.set(
+        JettyServerConfig.CUSTOM_FILTERS,
+        Arrays.asList(" 1", " ", "", " \"\" ", " '' ", "", " 2 "));
     jettyServerConfig = JettyServerConfig.fromConfig(mixedEmptyConfig, "");
     Assertions.assertIterableEquals(
         Sets.newHashSet("1", "2"), jettyServerConfig.getCustomFilters());
 
     Config somethingConfig = new Config() {};
-    somethingConfig.set(JettyServerConfig.CUSTOM_FILTERS, Optional.of("1,2"));
+    somethingConfig.set(JettyServerConfig.CUSTOM_FILTERS, List.of("1,2"));
     somethingConfig.set(new ConfigBuilder("1.1").stringConf(), "test");
     somethingConfig.set(new ConfigBuilder("1.2").stringConf(), "test");
     jettyServerConfig = JettyServerConfig.fromConfig(somethingConfig, "");

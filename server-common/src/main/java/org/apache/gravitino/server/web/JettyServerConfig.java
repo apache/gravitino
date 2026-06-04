@@ -23,9 +23,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -209,12 +210,13 @@ public final class JettyServerConfig {
           .stringConf()
           .createWithDefault("JKS");
 
-  public static final ConfigEntry<Optional<String>> CUSTOM_FILTERS =
+  public static final ConfigEntry<List<String>> CUSTOM_FILTERS =
       new ConfigBuilder("customFilters")
           .doc("Comma separated list of filter class names to apply to the APIs")
           .version(ConfigConstants.VERSION_0_4_0)
           .stringConf()
-          .createWithOptional();
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
   public static final ConfigEntry<Boolean> ENABLE_CORS_FILTER =
       new ConfigBuilder("enableCorsFilter")
           .doc("Enable cross origin resource share filter")
@@ -377,18 +379,11 @@ public final class JettyServerConfig {
     this.enableClientAuth = internalConfig.get(ENABLE_CLIENT_AUTH);
 
     this.customFilters =
-        internalConfig
-            .get(CUSTOM_FILTERS)
-            .map(
-                filters ->
-                    Collections.unmodifiableSet(
-                        Arrays.stream(filters.split(SPLITTER))
-                            .map(StringUtils::trim)
-                            .filter(StringUtils::isNotBlank)
-                            .filter(filter -> !filter.equals("\"\""))
-                            .filter(filter -> !filter.equals("''"))
-                            .collect(Collectors.toSet())))
-            .orElse(Collections.emptySet());
+        Collections.unmodifiableSet(
+            internalConfig.get(CUSTOM_FILTERS).stream()
+                .filter(filter -> !filter.equals("\"\""))
+                .filter(filter -> !filter.equals("''"))
+                .collect(Collectors.toCollection(() -> new LinkedHashSet<>())));
 
     this.keyStoreType = internalConfig.get(SSL_KEYSTORE_TYPE);
     this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);
