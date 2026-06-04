@@ -19,24 +19,29 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
-import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.spark.connector.SparkTypeConverter;
-import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class SparkJdbcTypeConverter extends SparkTypeConverter {
+/** Unit tests for {@link SparkJdbcTypeConverter}. */
+public class TestSparkJdbcTypeConverter {
 
-  @Override
-  public DataType toSparkType(Type gravitinoType) {
-    // if spark version lower than 3.4.4, using VarCharType will throw an exception: Unsupported
-    // type varchar.
-    if (gravitinoType instanceof Types.VarCharType) {
-      return DataTypes.StringType;
-    } else if (gravitinoType instanceof Types.TimestampType) {
-      return DataTypes.TimestampType;
-    } else {
-      return super.toSparkType(gravitinoType);
-    }
+  private final SparkJdbcTypeConverter sparkJdbcTypeConverter = new SparkJdbcTypeConverter();
+
+  @Test
+  void testConvertTimestampTypesToSparkTimestamp() {
+    Assertions.assertEquals(
+        DataTypes.TimestampType,
+        sparkJdbcTypeConverter.toSparkType(Types.TimestampType.withTimeZone()));
+    Assertions.assertEquals(
+        DataTypes.TimestampType,
+        sparkJdbcTypeConverter.toSparkType(Types.TimestampType.withoutTimeZone()));
+  }
+
+  @Test
+  void testConvertVarCharTypeToSparkString() {
+    Assertions.assertEquals(
+        DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.VarCharType.of(10)));
   }
 }
