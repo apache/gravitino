@@ -61,6 +61,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -530,6 +531,127 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+  }
+
+  @Test
+  public void testDropTableCleansUpAutoDroppedParentSchemas() throws Exception {
+    reset(entityStore);
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "dropTableParentA:dropTableParentB");
+    NameIdentifier ancestorIdent = NameIdentifier.of(metalake, catalog, "dropTableParentA");
+    Namespace tableNs =
+        Namespace.of(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_auto_drop_parent");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    putSchemaEntity(ancestorIdent);
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
+
+    Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
+  }
+
+  @Test
+  public void testDropMissingTableCleansUpSchemas() throws Exception {
+    reset(entityStore);
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "dropTableGoneA:dropTableGoneB");
+    NameIdentifier ancestorIdent = NameIdentifier.of(metalake, catalog, "dropTableGoneA");
+    Namespace tableNs =
+        Namespace.of(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_already_gone");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    putSchemaEntity(ancestorIdent);
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    // Simulate an out-of-band drop: the backend already removed the table and auto-dropped the
+    // now-empty namespaces, so the catalog no longer knows the table (dropTable returns false),
+    // while Gravitino still holds the orphaned schema entities.
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    Assertions.assertTrue(testCatalogOperations.dropTable(tableIdent));
+    Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
+
+    // dropTable returns false because the table is already gone from the catalog, but the
+    // orphaned schema entities must still be cleaned up.
+    Assertions.assertFalse(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
+  }
+
+  @Test
+  public void testPurgeMissingTableCleansUpSchemas() throws Exception {
+    reset(entityStore);
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "purgeTableGoneA:purgeTableGoneB");
+    NameIdentifier ancestorIdent = NameIdentifier.of(metalake, catalog, "purgeTableGoneA");
+    Namespace tableNs =
+        Namespace.of(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_already_gone");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    putSchemaEntity(ancestorIdent);
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    // Simulate an out-of-band drop: the backend already removed the table and auto-dropped the
+    // now-empty namespaces, so the catalog no longer knows the table (purgeTable returns false),
+    // while Gravitino still holds the orphaned schema entities.
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    Assertions.assertTrue(testCatalogOperations.purgeTable(tableIdent));
+    Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
+
+    // purgeTable returns false because the table is already gone from the catalog, but the
+    // orphaned schema entities must still be cleaned up. A regression that re-guards the cleanup
+    // behind the catalog drop result would leave the stale schema entities behind.
+    Assertions.assertFalse(tableOperationDispatcher.purgeTable(tableIdent));
+    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
   }
 
   @Test
@@ -1038,6 +1160,18 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
           Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
         });
+  }
+
+  private void putSchemaEntity(NameIdentifier ident) throws IOException {
+    SchemaEntity entity =
+        SchemaEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(entity, true);
   }
 
   public static TableOperationDispatcher getTableOperationDispatcher() {
