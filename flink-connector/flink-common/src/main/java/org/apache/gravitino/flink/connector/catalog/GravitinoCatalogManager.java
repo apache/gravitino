@@ -72,9 +72,8 @@ public class GravitinoCatalogManager {
       if (authType != null) {
         throw new IllegalArgumentException(
             String.format(
-                "Unsupported auth type '%s'. Supported explicit values are basic and oauth2; leave"
-                    + " %s unset to use Flink Kerberos settings (or simple auth if security is"
-                    + " disabled).",
+                "Unsupported auth type '%s'. Only OAUTH and BASIC are supported; leave %s unset to"
+                    + " use Flink Kerberos settings (or simple auth if security is disabled).",
                 authType, GravitinoCatalogStoreFactoryOptions.AUTH_TYPE));
       }
 
