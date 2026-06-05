@@ -98,11 +98,11 @@ public class LanceTableOperations extends ManagedTableOperations {
    *       the register-table path before schema was captured).
    * </ul>
    *
-   * <p><b>Edge case — genuinely zero-column Lance dataset:</b> if the Lance dataset at the table
-   * location truly has no columns, Gravitino will open the dataset on each {@code loadTable} call
-   * and return without modifying metadata (there is nothing to repair). This is a rare corner case;
-   * users who encounter it should either add columns to the Lance dataset so the repair can
-   * complete, or switch to {@link #VERSION_CHECK} mode to prevent repeated dataset opens.
+   * <p><b>Zero-column Lance dataset:</b> when the dataset has no columns, Gravitino records the
+   * checked dataset version ({@code lance.version}) without modifying stored columns. Subsequent
+   * {@code loadTable} calls skip the dataset open because the stored version acts as a "confirmed
+   * empty" marker. The dataset is re-examined only after the stored version changes (for example
+   * via an explicit {@code alterTable}) or when the mode is switched to {@link #VERSION_CHECK}.
    */
   public enum SchemaRefreshMode {
     /**
@@ -170,6 +170,16 @@ public class LanceTableOperations extends ManagedTableOperations {
     if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
       return table;
     }
+    // Empty-schema table that was already confirmed against a stored version: skip the dataset
+    // open. The stored lance.version acts as a "checked at this version" marker written on the
+    // first confirmation. VERSION_CHECK mode does not take this shortcut — it opens the dataset
+    // every time to compare the current version.
+    if (!declaredOnly
+        && emptySchema
+        && StringUtils.isNotBlank(table.properties().get(LanceConstants.LANCE_TABLE_VERSION))
+        && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
+      return table;
+    }
 
     String location = table.properties().get(Table.PROPERTY_LOCATION);
     if (StringUtils.isBlank(location)) {
@@ -198,12 +208,13 @@ public class LanceTableOperations extends ManagedTableOperations {
       return table;
     }
 
-    // The Lance dataset has no columns — nothing to repair. In DECLARED_AND_EMPTY mode this
-    // condition will re-trigger on every loadTable because stored columns remain empty.
-    // This is a known edge case for genuinely zero-column Lance datasets; users who hit it should
-    // either write at least one column to the dataset so the repair can complete, or switch to
-    // VERSION_CHECK mode so that repeated opens are gated on a dataset-version change.
     if (columns.length == 0) {
+      // Dataset is genuinely empty: record the checked version so future DECLARED_AND_EMPTY loads
+      // can skip the dataset open (see the early-return above). Declared tables are excluded
+      // because their lance.declared flag is the authoritative "not yet written" signal.
+      if (!declaredOnly) {
+        return recordCheckedEmptyVersion(ident, datasetVersion);
+      }
       return table;
     }
 
@@ -507,6 +518,50 @@ public class LanceTableOperations extends ManagedTableOperations {
       throw new IllegalArgumentException("Failed to repair table " + ident, e);
     } catch (IOException e) {
       throw new RuntimeException("Failed to repair table " + ident, e);
+    }
+  }
+
+  private Table recordCheckedEmptyVersion(NameIdentifier ident, long datasetVersion) {
+    try {
+      TableEntity tableEntity =
+          store.update(
+              ident,
+              TableEntity.class,
+              Entity.EntityType.TABLE,
+              current -> {
+                if (!isDatasetVersionChanged(current.properties(), datasetVersion)) {
+                  return current;
+                }
+                Map<String, String> updatedProperties = new HashMap<>(current.properties());
+                updatedProperties.put(
+                    LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
+                return TableEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withColumns(current.columns())
+                    .withProperties(updatedProperties)
+                    .withPartitioning(current.partitioning())
+                    .withDistribution(current.distribution())
+                    .withSortOrders(current.sortOrders())
+                    .withIndexes(current.indexes())
+                    .withAuditInfo(
+                        AuditInfo.builder()
+                            .withCreator(current.auditInfo().creator())
+                            .withCreateTime(current.auditInfo().createTime())
+                            .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                            .withLastModifiedTime(Instant.now())
+                            .build())
+                    .build();
+              });
+      return toGenericTable(tableEntity);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTableException(e, "Table %s does not exist", ident);
+    } catch (EntityAlreadyExistsException e) {
+      throw new IllegalArgumentException("Failed to record empty version for table " + ident, e);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to record empty version for table " + ident, e);
     }
   }
 

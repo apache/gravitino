@@ -132,12 +132,11 @@ Lakehouse catalog supports catalog-level schema refresh modes:
 Use `VERSION_CHECK` only when tables may be modified directly through the Lance path outside
 Gravitino. It adds a dataset version check to every `loadTable` call.
 
-:::note Zero-column edge case
-If a Lance dataset genuinely has no columns, `DECLARED_AND_EMPTY` mode will open the dataset on
-every `loadTable` and return without modifying metadata, because there is no schema to repair.
-This is uncommon in practice. If you encounter it, either write at least one column to the Lance
-dataset so the repair can complete, or switch to `VERSION_CHECK` mode so repeated opens are gated
-on a dataset-version change.
+:::note Zero-column Lance dataset
+If a Lance dataset genuinely has no columns, `DECLARED_AND_EMPTY` mode records the checked dataset
+version (`lance.version`) on the first `loadTable` call. Subsequent loads skip opening the dataset
+as long as the stored version is unchanged. Once columns are written to the dataset, the next
+`VERSION_CHECK` load or an explicit `alterTable` will detect the change and repair the schema.
 :::
 
 ### Table Operations

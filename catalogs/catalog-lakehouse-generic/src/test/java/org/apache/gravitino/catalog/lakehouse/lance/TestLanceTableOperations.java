@@ -457,6 +457,54 @@ public class TestLanceTableOperations {
     Mockito.verify(dataset).getVersion();
   }
 
+  @Test
+  public void testEmptyDatasetRecordsVersionOnFirstLoad() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("empty-dataset-first").toString();
+    TableEntity tableEntity =
+        tableEntity(ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              return updater.apply(tableEntity);
+            });
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema()).thenReturn(new Schema(List.of()));
+    when(dataset.version()).thenReturn(3L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loaded =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(0, loaded.columns().length);
+    Assertions.assertEquals("3", loaded.properties().get(LANCE_TABLE_VERSION));
+    verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testEmptyDatasetSkipsOpenWhenVersionAlreadyRecorded() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("empty-dataset-second").toString();
+    // Simulate the table after first-load recorded lance.version=3 but columns still empty
+    TableEntity tableEntity =
+        tableEntity(
+            ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "3"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+
+    Table loaded = lanceTableOps.loadTable(ident);
+
+    Assertions.assertEquals(0, loaded.columns().length);
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
   private static TableEntity tableEntity(
       NameIdentifier ident, List<ColumnEntity> columns, Map<String, String> properties) {
     return TableEntity.builder()
