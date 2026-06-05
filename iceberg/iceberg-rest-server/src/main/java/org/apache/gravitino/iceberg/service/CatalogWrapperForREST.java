@@ -34,7 +34,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
@@ -112,29 +111,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
     this.scanPlanCache = loadScanPlanCache(config);
-  }
-
-  /**
-   * Creates a wrapper for the given Iceberg catalog configuration.
-   *
-   * <p>When the underlying catalog backend is a federated Iceberg REST catalog (backend {@code
-   * rest}), a {@link FederatedCatalogWrapper} is returned so federation-aware behavior (FileIO
-   * property extraction, remote credential vending, remote {@code /v1/config} defaults) is applied
-   * through polymorphic dispatch rather than scattered {@code instanceof} checks. All other
-   * backends use the base {@link CatalogWrapperForREST}.
-   *
-   * @param catalogName the catalog name.
-   * @param config the Iceberg catalog configuration.
-   * @return a {@link CatalogWrapperForREST} (or {@link FederatedCatalogWrapper}) for the catalog.
-   */
-  public static CatalogWrapperForREST create(String catalogName, IcebergConfig config) {
-    IcebergCatalogBackend backend =
-        IcebergCatalogBackend.valueOf(
-            config.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
-    if (backend == IcebergCatalogBackend.REST) {
-      return new FederatedCatalogWrapper(catalogName, config);
-    }
-    return new CatalogWrapperForREST(catalogName, config);
   }
 
   public LoadTableResponse createTable(

@@ -613,37 +613,6 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testCreateReturnsFederatedWrapperForRestBackend() {
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "rest",
-                IcebergConstants.URI,
-                "http://localhost:8181"));
-
-    CatalogWrapperForREST wrapper = CatalogWrapperForREST.create("test", config);
-
-    Assertions.assertInstanceOf(FederatedCatalogWrapper.class, wrapper);
-  }
-
-  @Test
-  void testCreateReturnsBaseWrapperForNonRestBackend() {
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "memory",
-                IcebergConstants.WAREHOUSE,
-                "/tmp/warehouse"));
-
-    CatalogWrapperForREST wrapper = CatalogWrapperForREST.create("test", config);
-
-    Assertions.assertFalse(wrapper instanceof FederatedCatalogWrapper);
-    Assertions.assertEquals(CatalogWrapperForREST.class, wrapper.getClass());
-  }
-
-  @Test
   void testFederatedRegisterTableIncludesFileIo() {
     RESTCatalog catalog = mock(RESTCatalog.class);
     BaseTable table = mock(BaseTable.class);
