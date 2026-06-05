@@ -1,9 +1,9 @@
 ---
-title: Connect Ray via Iceberg REST
-sidebar_label: Ray
+title: "Connect Ray to Iceberg REST"
+sidebar_label: "Ray"
 ---
 
-# Connecting Ray via Iceberg REST
+## Introduction
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible client can connect to directly. This page describes how to use Ray Data with
@@ -27,7 +27,7 @@ or PyIceberg to manage table metadata.
 Ray Data connects to the Gravitino IRC endpoint via `catalog_kwargs` passed directly to the
 read/write functions. No separate catalog registration is required.
 
-### Without authentication
+### No Authentication
 
 ```python
 catalog_kwargs = {
@@ -37,7 +37,7 @@ catalog_kwargs = {
 }
 ```
 
-### With credential vending and Basic authentication
+### Credential Vending with Basic Authentication
 
 ```python
 catalog_kwargs = {
@@ -55,9 +55,9 @@ catalog_kwargs = {
 See [How to authenticate](../security/how-to-authenticate.md) for Gravitino authentication
 configuration options.
 
-## Usage examples
+## Examples
 
-### Write to an Iceberg table
+### Write to an Iceberg Table
 
 ```python
 import ray
@@ -71,7 +71,7 @@ ds.write_iceberg(
 )
 ```
 
-### Read from an Iceberg table
+### Read from an Iceberg Table
 
 ```python
 import ray
@@ -83,7 +83,7 @@ ds = ray.data.read_iceberg(
 ds.show(limit=1)
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

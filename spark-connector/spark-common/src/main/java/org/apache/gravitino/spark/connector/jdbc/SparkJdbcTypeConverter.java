@@ -33,6 +33,8 @@ public class SparkJdbcTypeConverter extends SparkTypeConverter {
     // type varchar.
     if (gravitinoType instanceof Types.VarCharType) {
       return DataTypes.StringType;
+    } else if (gravitinoType instanceof Types.TimestampType) {
+      return DataTypes.TimestampType;
     } else {
       return super.toSparkType(gravitinoType);
     }

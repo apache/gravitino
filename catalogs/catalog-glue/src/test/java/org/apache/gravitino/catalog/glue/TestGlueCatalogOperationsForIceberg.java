@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.glue;
 
 import static org.apache.gravitino.catalog.glue.GlueConstants.ICEBERG_TABLE_TYPE_VALUE;
 import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE_PARAM;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.when;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -42,8 +44,11 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
+import software.amazon.awssdk.services.glue.model.GetPartitionsResponse;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
@@ -201,6 +206,33 @@ class TestGlueCatalogOperationsForIceberg {
                 Distributions.NONE,
                 null,
                 Indexes.EMPTY_INDEXES));
+  }
+
+  @Test
+  void testLoadTableWithIcebergMetadataLoadFailure() {
+    software.amazon.awssdk.services.glue.model.Table rawTable =
+        software.amazon.awssdk.services.glue.model.Table.builder()
+            .name(TABLE)
+            .parameters(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE))
+            .storageDescriptor(StorageDescriptor.builder().build())
+            .build();
+
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(rawTable).build());
+    when(mockIcebergCatalog.loadTable(any(TableIdentifier.class)))
+        .thenThrow(new RuntimeException("metadata file is missing"));
+    when(mockClient.getPartitions(any(GetPartitionsRequest.class)))
+        .thenReturn(GetPartitionsResponse.builder().build());
+
+    GlueTable result = ops.loadTable(NameIdentifier.of("cat", "ns", DB, TABLE));
+    SupportsPartitions partitions = result.supportPartitions();
+
+    assertEquals(0, partitions.listPartitionNames().length);
+    ArgumentCaptor<GetPartitionsRequest> captor =
+        ArgumentCaptor.forClass(GetPartitionsRequest.class);
+    verify(mockClient).getPartitions(captor.capture());
+    assertEquals(DB, captor.getValue().databaseName());
+    assertEquals(TABLE, captor.getValue().tableName());
   }
 
   @Test

@@ -184,6 +184,34 @@ public class Configs {
           .longConf()
           .createWithDefault(60 * 60 * 1000L);
 
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS = 3L;
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 24 * 60 * 60L;
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 60 * 60L;
+
+  public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS =
+      new ConfigBuilder("gravitino.entityChangeLog.pollIntervalSecs")
+          .doc("The interval in seconds for polling entity change logs")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS);
+
+  public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_RETENTION_SECS =
+      new ConfigBuilder("gravitino.entityChangeLog.retentionSecs")
+          .doc("The retention time in seconds for entity change logs. Set 0 to disable cleanup")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS);
+
+  public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS =
+      new ConfigBuilder("gravitino.entityChangeLog.cleanupIntervalSecs")
+          .doc("The interval in seconds for pruning expired entity change logs")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS);
+
   public static final ConfigEntry<Boolean> CATALOG_LOAD_ISOLATED =
       new ConfigBuilder("gravitino.catalog.classloader.isolated")
           .doc("Whether to load the catalog in an isolated classloader")

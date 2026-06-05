@@ -1,9 +1,9 @@
 ---
-title: "Table partitioning, distribution and sort ordering and indexes"
-slug: /table-partitioning-distribution-sort-order-indexes
+title: "Table Structure"
+slug: "/table-partitioning-distribution-sort-order-indexes"
 date: 2023-12-25
-keyword: Table Partition Bucket Distribute Sort By
-license: This software is licensed under the Apache License version 2.
+keyword: "Table Partition Bucket Distribute Sort By"
+license: "This software is licensed under the Apache License version 2."
 last_update:
   date: 2024-02-02
   author: Clearvive
@@ -12,11 +12,15 @@ last_update:
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-## Table partitioning
+## Introduction
 
-To create a partitioned table, you should provide the following two components to construct a valid partitioned table.
+Tables in Gravitino have four configurable structural properties that affect how data is laid out and accessed: partitioning, distribution, sort ordering, and indexing. The sections below cover the syntax for each and how compute engines use them at query time.
 
-- Partitioning strategy. It defines how Gravitino distributes table data across partitions. Currently, Gravitino supports the following partitioning strategies.
+## Table Partitioning
+
+To create a partitioned table, you should provide the following two components to construct a valid partitioned table:
+
+- Partitioning strategy. It defines how Gravitino distributes table data across partitions. Gravitino supports the following partitioning strategies.
 
 :::note
 The `score`, `createTime`, and `city` appearing in the table below refer to the field names in a table.
@@ -45,9 +49,9 @@ For function partitioning, you should provide the function name and the function
 
 Once a partitioned table is created, you can [manage its partitions using Gravitino](./manage-table-partition-using-gravitino.md).
 
-## Table distribution
+## Table Distribution
 
-To create a distribution(bucketed) table, you should use the following three components to construct a valid bucketed table.
+To create a distribution(bucketed) table, you should use the following three components to construct a valid bucketed table:
 
 - Strategy. It defines how Gravitino distributes table data across partitions.
 
@@ -55,13 +59,13 @@ To create a distribution(bucketed) table, you should use the following three com
 |-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|------------------|
 | hash                  | Distribution table using hash. Gravitino distributes table data into buckets based on the hash value of the key.                                                               | `hash`  | `Strategy.HASH`  |
 | range                 | Distribution table using range. Gravitino distributes table data into buckets based on a specified range or interval of values.                                                | `range` | `Strategy.RANGE` |
-| even                  | Distribution table using even. Gravitino distributes table data, ensuring an equal distribution of data. Currently we use `even` to implementation Doris `random` distribution | `even`  | `Strategy.EVEN`  |
+| even                  | Distributes table data evenly across partitions. `even` implements Doris's `random` distribution. | `even`  | `Strategy.EVEN`  |
 
 - number. It defines how many buckets you use to distribution the table.
 - funcArgs. It defines the arguments of the strategy, the argument must be an [expression](./expression.md).
 
 <Tabs groupId='language' queryString>
-<TabItem value="Json" label="Json">
+<TabItem value="Json" label="JSON">
 
 ```json
 {
@@ -90,9 +94,9 @@ Distributions.auto(Strategy.HASH, NamedReference.field("score"));
 
 </Tabs>
 
-## Sort ordering
+## Sort Ordering
 
-To define a sorted order table, you should use the following three components to construct a valid sorted order table.
+To define a sorted order table, you should use the following three components to construct a valid sorted order table:
 
 - Direction. It defines in which direction Gravitino sorts the table. The default value is `ascending`.
 
@@ -113,7 +117,7 @@ Note: If the direction value is `ascending`, the default ordering value is `null
 - sortTerm. It shows which field or function Gravitino uses to sort the table, must be an [expression](./expression.md).
 
 <Tabs groupId='language' queryString>
-<TabItem value="Json" label="Json">
+<TabItem value="Json" label="JSON">
 
 ```json
  {
@@ -138,7 +142,7 @@ SortOrders.of(NamedReference.field("score"), SortDirection.ASCENDING, NullOrderi
 
 
 :::tip
-**Not all catalogs may support those features**. Please refer to the related document for more details.
+**Not all catalogs may support those features**. Refer to the related document for more details.
 :::
 
 The following is an example of creating a partitioned, bucketed table, and sorted order table:
@@ -241,7 +245,7 @@ tableCatalog.createTable(
 
 ## Indexes
 
-To define an indexed table, you should utilize the following three components to construct a valid indexed table.
+To define an indexed table, you should utilize the following three components to construct a valid indexed table:
 
 - IndexType. Represents the type of index, such as primary key or unique key.
 
@@ -255,7 +259,7 @@ To define an indexed table, you should utilize the following three components to
 - FieldNames. It defines which table fields Gravitino uses to index the table.
 
 <Tabs groupId='language' queryString>
-<TabItem value="Json" label="Json">
+<TabItem value="Json" label="JSON">
 
 ```json
  {

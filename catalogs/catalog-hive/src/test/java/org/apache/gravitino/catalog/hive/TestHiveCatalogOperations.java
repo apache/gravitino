@@ -375,7 +375,7 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testCreateViewRejectsSparkDialect() throws Exception {
+  void testCreateViewAcceptsSparkDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
 
@@ -383,6 +383,7 @@ class TestHiveCatalogOperations {
     HiveClient hiveClient = mock(HiveClient.class);
     HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
     when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+    doNothing().when(hiveClient).createTable(any());
     when(clientPool.run(any()))
         .thenAnswer(
             invocation -> {
@@ -391,21 +392,25 @@ class TestHiveCatalogOperations {
             });
     op.clientPool = clientPool;
 
-    UnsupportedOperationException exception =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                op.createView(
-                    NameIdentifier.of("db", "v_spark"),
-                    null,
-                    new Column[0],
-                    new SQLRepresentation[] {
-                      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
-                    },
-                    null,
-                    null,
-                    Maps.newHashMap()));
-    Assertions.assertTrue(exception.getMessage().contains("supports only"));
+    // Callers must supply spark.sql.create.version so HMS detectDialect identifies the view as
+    // Spark
+    View view =
+        op.createView(
+            NameIdentifier.of("db", "v_spark"),
+            null,
+            new Column[0],
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+            },
+            null,
+            null,
+            Maps.newHashMap(ImmutableMap.of("spark.sql.create.version", "3.5.3")));
+
+    Assertions.assertNotNull(view);
+    Assertions.assertEquals(1, view.representations().length);
+    SQLRepresentation rep = (SQLRepresentation) view.representations()[0];
+    Assertions.assertEquals("spark", rep.dialect());
+    Assertions.assertEquals("SELECT 1", rep.sql());
   }
 
   @Test

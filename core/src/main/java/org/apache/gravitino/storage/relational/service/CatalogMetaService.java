@@ -225,8 +225,6 @@ public class CatalogMetaService {
     String metalakeName = identifier.namespace().level(0);
     String oldFullName =
         NameIdentifierUtil.ofCatalog(metalakeName, oldCatalogEntity.name()).toString();
-    String newFullName = NameIdentifierUtil.ofCatalog(metalakeName, newEntity.name()).toString();
-    boolean isRenamed = !Objects.equals(oldFullName, newFullName);
 
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
@@ -241,7 +239,7 @@ public class CatalogMetaService {
                                   oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
                               oldCatalogPO))),
           () -> {
-            if (isRenamed && updateResult.get() > 0) {
+            if (updateResult.get() > 0) {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->

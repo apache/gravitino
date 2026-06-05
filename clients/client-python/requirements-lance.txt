@@ -16,9 +16,9 @@
 # under the License.
 
 # Lance integration deps. `lance-ray` owns the compatible `lance-namespace`
-# dependency, so do not pin `lance-namespace` here separately. Installed via
-# the `lance` extra (e.g. `pip install -e .[lance]`) so the heavy ray/pylance
-# native wheels don't slow down the default `dev` install used by lint and
-# unit-test tasks.
+# dependency, so do not pin `lance-namespace` here separately.
+# Installed via the `lance` extra (`pip install -e .[lance]`).
+# The same pins are also included in requirements-dev.txt so that the default
+# integration-test run works out of the box with `pip install -r requirements-dev.txt`.
 ray==2.55.1
 lance-ray==0.4.2

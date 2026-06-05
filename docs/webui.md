@@ -1,20 +1,22 @@
 ---
-title: 'Apache Gravitino web UI'
-slug: /webui
-keyword: webui
+title: "Web UI"
+slug: "/webui"
+keyword: "webui"
 last_update:
   date: 2024-10-30
   author: LauraXia123
-license: 'This software is licensed under the Apache License version 2.'
+license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 This document primarily outlines how users can manage metadata within Apache Gravitino using the web UI, the graphical interface is accessible through a web browser as an alternative to writing code or using the REST interface.
 
-Currently, you can integrate [OAuth settings](security/security.md) to view, add, modify, and delete metalakes, create catalogs, and view catalogs, schemas, and tables, among other functions.
+Integrate [OAuth settings](security/security.md) to view, add, modify, and delete metalakes, create catalogs, and view catalogs, schemas, and tables, among other functions.
 
 [Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`, by default is [http://localhost:8090](http://localhost:8090).
 
-## Initial page
+## Initial Page
 
 The web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode, see the details in [Security](security/security.md).
 
@@ -26,7 +28,7 @@ After changing the configuration, make sure to restart the Gravitino server.
 `<path-to-gravitino>/bin/gravitino.sh restart`
 :::
 
-### Simple mode
+### Simple Mode
 
 ```text
 gravitino.authenticators = simple
@@ -40,7 +42,7 @@ At the top-right, the UI displays the current Gravitino version.
 
 The main content displays the existing metalake list.
 
-### Oauth mode
+### OAuth Mode
 
 ```text
 gravitino.authenticators = oauth
@@ -57,7 +59,7 @@ Such as Safari need to enable the developer menu, and select `Disable Cross-Orig
 
 ![webui-login-with-oauth](./assets/webui/login-with-oauth.png)
 
-1. Enter the values corresponding to your specific configuration. For detailed instructions, please refer to [Security](security/security.md).
+1. Enter the values corresponding to your specific configuration. For detailed instructions, refer to [Security](security/security.md).
 
 2. Click on the `LOGIN` button takes you to the homepage.
 
@@ -65,13 +67,15 @@ Such as Safari need to enable the developer menu, and select `Disable Cross-Orig
 
 At the top-right, there is an icon button that takes you to the login page when clicked.
 
-## Manage metadata
+## Manage Metadata
 
 > All the manage actions are performed by using the [REST API](api/rest/gravitino-rest-api)
 
 ### Metalake
 
-#### [Create metalake](./getting-started/index.md#interact-with-apache-gravitino-api)
+#### Create Metalake
+
+See the [API reference](./getting-started/index.md#interact-with-apache-gravitino-api) for the underlying REST call.
 
 On the homepage, clicking on the `CREATE METALAKE` button displays a dialog to create a metalake.
 
@@ -89,15 +93,15 @@ There are 3 actions you can perform on a metalake.
 
 ![metalake-actions](./assets/webui/metalake-actions.png)
 
-#### Show metalake details
+#### Show Metalake Details
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this metalake in the drawer component on the right.
+See the detailed information of this metalake in the drawer component on the right.
 
 ![metalake-details](./assets/webui/metalake-details.png)
 
-#### Edit metalake
+#### Edit Metalake
 
 Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
 
@@ -105,7 +109,7 @@ Displays the dialog for modifying fields of the selected metalake.
 
 ![create-metalake-dialog](./assets/webui/create-metalake-dialog.png)
 
-#### Disable metalake
+#### Disable Metalake
 
 Metalake defaults to in-use after successful creation.
 
@@ -117,7 +121,7 @@ Click on the switch will disable the metalake, mouse over the switch next to the
 
 ![metalake-not-in-use](./assets/webui/metalake-not-in-use.png)
 
-#### Drop metalake
+#### Drop Metalake
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
@@ -151,7 +155,7 @@ Hover your mouse over the corresponding icon to the data changes to a reload ico
 
 ![tree-view-reload-catalog](./assets/webui/tree-view-reload-catalog.png)
 
-#### Create catalog
+#### Create Catalog
 
 Click on the `CREATE CATALOG` button displays the dialog to create a catalog.
 
@@ -226,7 +230,7 @@ Creating a catalog requires these fields:
 
     |Key                               |Description                                                                                                  |
     |----------------------------------|-------------------------------------------------------------------------------------------------------------|
-    |authentication.type               |The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple.|
+    |authentication.type               |The type of authentication for Paimon catalog backend, Gravitino only supports Kerberos and simple.|
     |authentication.kerberos.principal |The principal of the Kerberos authentication.                                                                |
     |authentication.kerberos.keytab-uri|The URI of The keytab for the Kerberos authentication.                                                       |
 
@@ -320,7 +324,7 @@ Creating a catalog requires these fields:
 
     |Key                               |Description                                                                                                  |
     |----------------------------------|-------------------------------------------------------------------------------------------------------------|
-    |authentication.type               |The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple.|
+    |authentication.type               |The type of authentication for Paimon catalog backend, Gravitino only supports Kerberos and simple.|
     |authentication.kerberos.principal |The principal of the Kerberos authentication.                                                                |
     |authentication.kerberos.keytab-uri|The URI of The keytab for the Kerberos authentication.                                                       |
 
@@ -393,15 +397,15 @@ After verifying the values of these fields, clicking on the `CREATE` button crea
 
 ![created-catalog](./assets/webui/created-catalog.png)
 
-#### Show catalog details
+#### Show Catalog Details
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this catalog in the drawer component on the right.
+See the detailed information of this catalog in the drawer component on the right.
 
 ![show-catalog-details](./assets/webui/show-catalog-details.png)
 
-#### Edit catalog
+#### Edit Catalog
 
 Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
 
@@ -413,7 +417,7 @@ Only the `name`, `comment`, and custom fields in `properties` can be modified, o
 
 The fields that are not allowed to be modified cannot be selected and modified in the web UI.
 
-#### Disable catalog
+#### Disable Catalog
 
 Catalog defaults to in-use after successful creation.
 
@@ -425,7 +429,7 @@ Click on the switch will disable the catalog, mouse over the switch next to the 
 
 ![catalog-not-in-use](./assets/webui/catalog-not-in-use.png)
 
-#### Delete catalog
+#### Delete Catalog
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
@@ -441,7 +445,7 @@ Displays the list schemas of the catalog.
 
 ![list-schemas](./assets/webui/list-schemas.png)
 
-#### Create schema
+#### Create Schema
 
 Click on the `CREATE SCHEMA` button displays the dialog to create a schema.
 
@@ -453,15 +457,15 @@ Creating a schema needs these fields:
 2. **Comment**(_optional_): the comment of the schema.
 3. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
-#### Show schema details
+#### Show Schema Details
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this schema in the drawer component on the right.
+See the detailed information of this schema in the drawer component on the right.
 
 ![schema-details](./assets/webui/schema-details.png)
 
-#### Edit schema
+#### Edit Schema
 
 Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
 
@@ -469,7 +473,7 @@ Displays the dialog for modifying fields of the selected schema.
 
 ![update-schema-dialog](./assets/webui/update-schema-dialog.png)
 
-#### Drop schema
+#### Drop Schema
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
@@ -485,7 +489,7 @@ Displays the list tables of the schema.
 
 ![list-tables](./assets/webui/list-tabels.png)
 
-#### Create table
+#### Create Table
 
 Click on the `CREATE TABLE` button displays the dialog to create a table.
 
@@ -500,22 +504,22 @@ Creating a table needs these fields:
 3. **Comment**(_optional_): the comment of the table.
 4. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
-#### Show table details
+#### Show Table Details
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this table in the drawer component on the right.
+See the detailed information of this table in the drawer component on the right.
 
 ![table-details](./assets/webui/table-details.png)
 
 Click the table tree node on the left sidebar or the table name link in the table cell.
 
-You can see the columns and detailed information on the right page.
+See the columns and detailed information on the right page.
 
 ![list-columns](./assets/webui/list-columns.png)
 ![table-selected-details](./assets/webui/table-selected-details.png)
 
-#### Edit table
+#### Edit Table
 
 Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
 
@@ -523,7 +527,7 @@ Displays the dialog for modifying fields of the selected table.
 
 ![update-table-dialog](./assets/webui/update-table-dialog.png)
 
-#### Drop table
+#### Drop Table
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
@@ -539,7 +543,7 @@ Displays the list filesets of the schema.
 
 ![list-filesets](./assets/webui/list-filesets.png)
 
-#### Create fileset
+#### Create Fileset
 
 Click on the `CREATE FILESET` button displays the dialog to create a fileset.
 
@@ -555,21 +559,21 @@ Creating a fileset needs these fields:
 4. **Comment**(_optional_): the comment of the fileset.
 5. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
-#### Show fileset details
+#### Show Fileset Details
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this fileset in the drawer component on the right.
+See the detailed information of this fileset in the drawer component on the right.
 
 ![fileset-details](./assets/webui/fileset-details.png)
 
 Click the fileset tree node on the left sidebar or the fileset name link in the table cell.
 
-You can see the detailed information on the right page.
+See the detailed information on the right page.
 
 ![fileset-selected-details](./assets/webui/fileset-selected-details.png)
 
-#### Edit fileset
+#### Edit Fileset
 
 Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
 
@@ -577,7 +581,7 @@ Displays the dialog for modifying fields of the selected fileset.
 
 ![update-fileset-dialog](./assets/webui/update-fileset-dialog.png)
 
-#### Drop fileset
+#### Drop Fileset
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
@@ -593,7 +597,7 @@ Displays the list topics of the schema.
 
 ![list-topics](./assets/webui/list-topics.png)
 
-#### Create topic
+#### Create Topic
 
 Click on the `CREATE TOPIC` button displays the dialog to create a topic.
 
@@ -605,21 +609,21 @@ Creating a topic needs these fields:
 2. **Comment**(_optional_): the comment of the topic.
 3. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
-#### Show topic details
+#### Show Topic Details
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this topic in the drawer component on the right.
+See the detailed information of this topic in the drawer component on the right.
 
 ![topic-details](./assets/webui/topic-drawer-details.png)
 
 Click the topic tree node on the left sidebar or the topic name link in the table cell.
 
-You can see the detailed information on the right page.
+See the detailed information on the right page.
 
 ![topic-details](./assets/webui/topic-details.png)
 
-#### Edit topic
+#### Edit Topic
 
 Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> in the table cell.
 
@@ -627,7 +631,7 @@ Displays the dialog for modifying fields of the selected topic.
 
 ![update-topic-dialog](./assets/webui/update-topic-dialog.png)
 
-#### Drop topic
+#### Drop Topic
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
@@ -643,7 +647,7 @@ Displays the list model of the schema.
 
 ![list-models](./assets/webui/list-models.png)
 
-#### Register model
+#### Register Model
 
 Click on the `REGISTER MODEL` button displays the dialog to register a model.
 
@@ -655,15 +659,15 @@ Register a model needs these fields:
 2. **Comment**(_optional_): the comment of the model.
 3. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
-#### Show model details
+#### Show Model Details
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this model in the drawer component on the right.
+See the detailed information of this model in the drawer component on the right.
 
 ![model-details](./assets/webui/model-details.png)
 
-#### Drop model
+#### Drop Model
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
@@ -679,7 +683,7 @@ Displays the list versions of the model.
 
 ![list-model-versions](./assets/webui/list-model-versions.png)
 
-#### Link version
+#### Link Version
 
 Click on the `LINK VERSION` button displays the dialog to link a version.
 
@@ -692,15 +696,15 @@ Link a version needs these fields:
 3. **Comment**(_optional_): the comment of the model.
 4. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
-#### Show version details
+#### Show Version Details
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this version in the drawer component on the right.
+See the detailed information of this version in the drawer component on the right.
 
 ![version-details](./assets/webui/version-details.png)
 
-#### Drop version
+#### Drop Version
 
 Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='red' /> in the table cell.
 
@@ -708,7 +712,7 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this version
 
 ![delete-version](./assets/webui/delete-version.png)
 
-## Feature capabilities
+## Feature Capabilities
 
 | Page     | Capabilities                                                                      |
 | -------- | --------------------------------------------------------------------------------- |
@@ -721,7 +725,7 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this version
 | Model    | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10008; / _`Delete`_ &#10004; |
 | Version  | _`View`_ &#10004; / _`Create`_ &#10004; / _`Edit`_ &#10008; / _`Delete`_ &#10004; |
 
-## E2E test
+## E2E Test
 
 End-to-end testing for web frontends is conducted using the [Selenium](https://www.selenium.dev/documentation/) testing framework, which is Java-based.
 

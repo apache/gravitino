@@ -1,13 +1,13 @@
 ---
-title: "Authorization Push-down"
-slug: /security/authorization-push-down
-keyword: security
+title: "Authorization Pushdown"
+slug: "/security/authorization-pushdown"
+keyword: "security"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Authorization Push-down
+## Introduction
 
-![authorization push down](../assets/security/authorization-pushdown.png)
+![authorization pushdown](../assets/security/authorization-pushdown.png)
 
 Gravitino offers a set of authorization frameworks that integrate with various underlying data source permission systems, such as MySQL's native permission management and Apache Ranger for big data. These frameworks align with Gravitino's own authorization model and methodology.
 Gravitino manages different data sources through Catalogs, and when a user performs an authorization operation on data within a Catalog, Gravitino invokes the Authorization Plugin module for that Catalog.
@@ -15,13 +15,13 @@ This module translates Gravitino's authorization model into the permission rules
 
 ### Ranger Hadoop SQL Plugin
 
-In order to use the Ranger Hadoop SQL Plugin, you need to configure the following properties:
+To use the Ranger Hadoop SQL Plugin, you need to configure the following properties:
 
 | Property Name                                         | Description                                                                                                                                          | Default Value                     | Required | Since Version    |
 |-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|----------|------------------|
 | `authorization-provider`                              | Providers to use to implement authorization plugin such as `ranger`.                                                                                 | (none)                            | No       | 0.6.0-incubating |
 | `authorization.ranger.admin.url`                      | The Apache Ranger web URIs.                                                                                                                          | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.service.type`                   | The Apache Ranger service type, Currently only supports `HadoopSQL` or `HDFS`                                                                        | (none)                            | No       | 0.8.0-incubating |
+| `authorization.ranger.service.type`                   | The Apache Ranger service type. Supports `HadoopSQL` or `HDFS`.                                                                        | (none)                            | No       | 0.8.0-incubating |
 | `authorization.ranger.auth.type`                      | The Apache Ranger authentication type `simple` or `kerberos`.                                                                                        | `simple`                          | No       | 0.6.0-incubating |
 | `authorization.ranger.username`                       | The Apache Ranger admin web login username (auth type=simple), or kerberos principal(auth type=kerberos), Need have Ranger administrator permission. | (none)                            | No       | 0.6.0-incubating |
 | `authorization.ranger.password`                       | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)                            | No       | 0.6.0-incubating |
@@ -45,7 +45,7 @@ Gravitino will initially create three roles in Apache Ranger:
 - GRAVITINO_CATALOG_OWNER_ROLE: Includes users and user groups designated as catalog owners, corresponding to the owner's privileges in Ranger policies.
 - GRAVITINO_OWNER_ROLE: Used to label Ranger policy items related to schema and table owner privileges. It does not include any users or user groups.
 
-#### Example of using the Ranger Hadoop SQL Plugin
+#### Configure the Ranger Hadoop SQL Plugin
 
 Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions.
 The Ranger service is accessible at `172.0.0.100:6080`, with the username `Jack` and the password `PWD123`.
@@ -67,13 +67,13 @@ Spark can use Kyuubi authorization plugin to access Gravitino's catalog. But the
 More data source authorization is under development.
 :::
 
-### chain authorization plugin
+### Chain Authorization Plugin
 
 Gravitino supports chaining multiple authorization plugins to secure one catalog.
 The authorization plugin chain is defined in the `authorization.chain.plugins` property, with the plugin names separated by commas.
 When a user performs an authorization operation on data within a catalog, the chained plugin will apply the authorization rules for every plugin defined in the chain.
 
-In order to use the chained authorization plugin, you need to configure the following properties:
+To use the chained authorization plugin, you need to configure the following properties:
 
 | Property Name                                             | Description                                                                            | Default Value | Required                    | Since Version    |
 |-----------------------------------------------------------|----------------------------------------------------------------------------------------|---------------|-----------------------------|------------------|
@@ -90,7 +90,7 @@ The Gravitino chain authorization plugin only supports the Apache Ranger HadoopS
 The properties of every chained authorization plugin should use `authorization.chain.${plugin-name}` as the prefix.
 :::
 
-#### Example of using the chain authorization Plugin
+#### Configure the Chain Authorization Plugin
 
 Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions.
 The Apache Hive service will use HDFS to store its data. You have created a `hdfsRepo` in Apache Ranger to manage HDFS's permissions.

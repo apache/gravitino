@@ -100,34 +100,54 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     Assertions.assertTrue(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
     Assertions.assertFalse(store.takePendingJob(now, 300_000L, 10).isPresent());
 
-    Assertions.assertTrue(store.markSucceeded(id));
+    Assertions.assertTrue(store.markSucceeded(id, now));
     Assertions.assertEquals(IcebergCleanupJob.State.SUCCEEDED, store.stateOf(id));
     // A second transition no longer owns the (now terminal) row, so it reports no update.
-    Assertions.assertFalse(store.markSucceeded(id));
+    Assertions.assertFalse(store.markSucceeded(id, now));
     Assertions.assertFalse(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
     Assertions.assertEquals(
         1, store.deleteFinishedJobsByLegacyTimeline(System.currentTimeMillis() + 1));
   }
 
   @TestTemplate
-  void testMarkFailed() {
+  void testTransientFailureRetriesThenFailsAtCeiling() {
     long id = store.addJob(sampleJob());
-    store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
-    Assertions.assertTrue(store.markFailed(id, "corrupt metadata"));
+    for (int i = 0; i < 2; i++) {
+      long heartbeat = System.currentTimeMillis();
+      store.takePendingJob(heartbeat, 300_000L, 10);
+      Assertions.assertTrue(store.recordFailure(id, "boom " + i, 3, heartbeat));
+      Assertions.assertEquals(IcebergCleanupJob.State.PENDING, store.stateOf(id));
+    }
+    long heartbeat = System.currentTimeMillis();
+    store.takePendingJob(heartbeat, 300_000L, 10);
+    Assertions.assertTrue(store.recordFailure(id, "boom final", 3, heartbeat));
     Assertions.assertEquals(IcebergCleanupJob.State.FAILED, store.stateOf(id));
   }
 
   @TestTemplate
-  void testTransientFailureRetriesThenFailsAtCeiling() {
+  void testRecordFailureAtMaxAttemptsMarksFailed() {
     long id = store.addJob(sampleJob());
-    for (int i = 0; i < 2; i++) {
-      store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
-      Assertions.assertTrue(store.recordFailure(id, "boom " + i, 3));
-      Assertions.assertEquals(IcebergCleanupJob.State.PENDING, store.stateOf(id));
-    }
-    store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
-    Assertions.assertTrue(store.recordFailure(id, "boom final", 3));
+    long heartbeat = System.currentTimeMillis();
+    store.takePendingJob(heartbeat, 300_000L, 10);
+
+    Assertions.assertTrue(store.recordFailure(id, "boom", 1, heartbeat));
     Assertions.assertEquals(IcebergCleanupJob.State.FAILED, store.stateOf(id));
+  }
+
+  @TestTemplate
+  void testTerminalUpdateNeedsOwnership() {
+    long id = store.addJob(sampleJob());
+    long now = System.currentTimeMillis();
+    store.takePendingJob(now, 300_000L, 10); // writes heartbeat_at = now
+
+    // A stale heartbeat token (a reclaimed worker) cannot finish or fail the job.
+    Assertions.assertFalse(store.markSucceeded(id, now - 1));
+    Assertions.assertFalse(store.recordFailure(id, "stale", 3, now - 1));
+    Assertions.assertEquals(IcebergCleanupJob.State.RUNNING, store.stateOf(id));
+
+    // The owner with the current token wins.
+    Assertions.assertTrue(store.markSucceeded(id, now));
+    Assertions.assertEquals(IcebergCleanupJob.State.SUCCEEDED, store.stateOf(id));
   }
 
   @TestTemplate
