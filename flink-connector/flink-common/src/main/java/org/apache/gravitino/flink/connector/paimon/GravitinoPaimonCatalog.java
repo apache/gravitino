@@ -127,21 +127,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     return catalog().asTableCatalog().purgeTable(ident);
   }
 
-  @Override
-  public Optional<Factory> getFactory() {
-    return paimonCatalog.getFactory();
-  }
-
-  @Override
-  protected Distribution toGravitinoDistribution(Map<String, String> properties) {
-    return getDistribution(properties);
-  }
-
-  @Override
-  protected Map<String, String> fromGravitinoDistribution(Distribution distribution) {
-    return distributionToProperties(distribution);
-  }
-
   @VisibleForTesting
   static Map<String, String> distributionToProperties(Distribution distribution) {
     if (distribution == null || distribution.strategy() == Strategy.NONE) {
