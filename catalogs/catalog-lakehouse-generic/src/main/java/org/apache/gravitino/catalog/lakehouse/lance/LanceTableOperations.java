@@ -23,6 +23,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -203,17 +204,26 @@ public class LanceTableOperations extends ManagedTableOperations {
   public boolean purgeTable(NameIdentifier ident) {
     try {
       Table table = loadTable(ident);
-      String location = table.properties().get(Table.PROPERTY_LOCATION);
+      boolean external =
+          Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
+              .map(Boolean::parseBoolean)
+              .orElse(false);
 
+      // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
+      // If the process crashes between them, the entity-store record will be gone but the
+      // Lance dataset will still exist on storage (orphaned data), or vice-versa. There is
+      // currently no recovery mechanism for this window.
       boolean purged = super.purgeTable(ident);
+      // If the table is a managed table, super.purgeTable will call dropTable to remove the
+      // underlying Lance dataset, so we don't need to do anything here.
+      if (!external) {
+        return purged;
+      }
+
       // If the table metadata is purged successfully, we can delete the Lance dataset.
       // Otherwise, we should not delete the dataset.
       if (purged) {
-        // Delete the Lance dataset at the location
-        Dataset.drop(
-            location,
-            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties()));
-        LOG.info("Deleted Lance dataset at location {}", location);
+        dropLanceDataset(table);
       }
 
       return purged;
@@ -234,22 +244,19 @@ public class LanceTableOperations extends ManagedTableOperations {
               .map(Boolean::parseBoolean)
               .orElse(false);
 
+      // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
+      // If the process crashes between them, the entity-store record will be gone but the
+      // Lance dataset will still exist on storage (orphaned data), or vice-versa. There is
+      // currently no recovery mechanism for this window.
       boolean dropped = super.dropTable(ident);
       if (external) {
         return dropped;
       }
 
-      // If the table metadata is dropped successfully, and the table is not external, we can delete
-      // the
-      // Lance dataset. Otherwise, we should not delete the dataset.
+      // If the table metadata is dropped successfully, and the table is not external, we can
+      // delete the Lance dataset. Otherwise, we should not delete the dataset.
       if (dropped) {
-        String location = table.properties().get(Table.PROPERTY_LOCATION);
-
-        // Delete the Lance dataset at the location
-        Dataset.drop(
-            location,
-            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties()));
-        LOG.info("Deleted Lance dataset at location {}", location);
+        dropLanceDataset(table);
       }
 
       return dropped;
@@ -258,6 +265,25 @@ public class LanceTableOperations extends ManagedTableOperations {
       return false;
     } catch (Exception e) {
       throw new RuntimeException("Failed to drop Lance dataset for table " + ident, e);
+    }
+  }
+
+  private void dropLanceDataset(Table table) {
+    String location = table.properties().get(Table.PROPERTY_LOCATION);
+    Map<String, String> resolvedStorageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    try {
+      Dataset.drop(location, resolvedStorageOptions);
+      LOG.info("Deleted Lance dataset at location {}", location);
+    } catch (Exception e) {
+      // Dataset.drop (native) throws IOException with "Not found:" when path doesn't exist.
+      if (e instanceof IOException
+          && e.getMessage() != null
+          && e.getMessage().contains("Not found:")) {
+        LOG.warn("Lance dataset at {} was already deleted, skipping.", location);
+      } else {
+        throw new RuntimeException("Failed to delete Lance dataset at " + location, e);
+      }
     }
   }
 
