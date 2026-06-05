@@ -251,10 +251,10 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
     InternalCatalogFetcher(String metalake) {
       this.metalake = metalake;
-      CatalogDispatcher dispatcher = GravitinoEnv.getInstance().catalogDispatcher();
+      CatalogDispatcher dispatcher = GravitinoEnv.getInstance().internalCatalogDispatcher();
       Preconditions.checkState(
           dispatcher != null,
-          "CatalogDispatcher is not available. "
+          "Internal CatalogDispatcher is not available. "
               + "Internal catalog fetcher requires running within Gravitino server.");
       this.catalogDispatcher = dispatcher;
     }

@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -256,6 +257,43 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("test", tableImportedEntity.auditInfo().creator());
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTable4.auditInfo().creator());
+  }
+
+  @Test
+  public void testTableOperationDispatcherRejectsNullSchemaDispatcherSupplier() {
+    Assertions.assertThrows(
+        NullPointerException.class,
+        () -> new TableOperationDispatcher(catalogManager, entityStore, idGenerator, null));
+  }
+
+  @Test
+  public void testCreateTableFailsFastWhenSchemaDispatcherSupplierReturnsNull() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema-null-dispatcher");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    Supplier<SchemaDispatcher> nullSchemaDispatcherSupplier = () -> null;
+    TableOperationDispatcher dispatcher =
+        new TableOperationDispatcher(
+            catalogManager, entityStore, idGenerator, nullSchemaDispatcherSupplier);
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_dispatcher");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> dispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]));
+    Assertions.assertEquals(
+        "schemaDispatcherSupplier returned null. "
+            + "SchemaDispatcher must be available for table operations.",
+        exception.getMessage());
   }
 
   @Test
