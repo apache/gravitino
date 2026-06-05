@@ -146,10 +146,9 @@ class TestGlueIcebergTableHelper {
             .build();
     Schema schema = GlueIcebergTableHelper.toIcebergSchema(new Column[] {col});
 
-    org.apache.iceberg.types.Types.NestedField field = schema.findField("col_list");
-    assertInstanceOf(org.apache.iceberg.types.Types.ListType.class, field.type());
-    org.apache.iceberg.types.Types.ListType listType =
-        (org.apache.iceberg.types.Types.ListType) field.type();
+    NestedField field = schema.findField("col_list");
+    assertInstanceOf(ListType.class, field.type());
+    ListType listType = (ListType) field.type();
     assertEquals(StringType.get(), listType.elementType());
     assertTrue(listType.isElementOptional());
   }
@@ -163,10 +162,9 @@ class TestGlueIcebergTableHelper {
             .build();
     Schema schema = GlueIcebergTableHelper.toIcebergSchema(new Column[] {col});
 
-    org.apache.iceberg.types.Types.NestedField field = schema.findField("col_map");
-    assertInstanceOf(org.apache.iceberg.types.Types.MapType.class, field.type());
-    org.apache.iceberg.types.Types.MapType mapType =
-        (org.apache.iceberg.types.Types.MapType) field.type();
+    NestedField field = schema.findField("col_map");
+    assertInstanceOf(MapType.class, field.type());
+    MapType mapType = (MapType) field.type();
     assertEquals(StringType.get(), mapType.keyType());
     assertEquals(LongType.get(), mapType.valueType());
     assertFalse(mapType.isValueOptional());
@@ -181,10 +179,9 @@ class TestGlueIcebergTableHelper {
     Column col = GlueColumn.builder().withName("col_struct").withType(gravitinoStruct).build();
     Schema schema = GlueIcebergTableHelper.toIcebergSchema(new Column[] {col});
 
-    org.apache.iceberg.types.Types.NestedField field = schema.findField("col_struct");
-    assertInstanceOf(org.apache.iceberg.types.Types.StructType.class, field.type());
-    org.apache.iceberg.types.Types.StructType structType =
-        (org.apache.iceberg.types.Types.StructType) field.type();
+    NestedField field = schema.findField("col_struct");
+    assertInstanceOf(StructType.class, field.type());
+    StructType structType = (StructType) field.type();
     assertEquals(2, structType.fields().size());
     assertEquals("name", structType.fields().get(0).name());
     assertEquals(StringType.get(), structType.fields().get(0).type());
