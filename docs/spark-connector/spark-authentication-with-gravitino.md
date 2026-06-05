@@ -9,9 +9,9 @@ license: "This software is licensed under the Apache License version 2."
 
 Spark connector supports `simple`, `basic`, `oauth2`, and `kerberos` authentication when accessing Gravitino server.
 
-| Property                     | Type   | Default Value | Description                                                                                                                   | Required | Since Version    |
-|------------------------------|--------|---------------|-------------------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| spark.sql.gravitino.authType | string | `simple`      | The authentication mechanism for communicating with the Gravitino server. Supported values: `simple`, `basic`, `oauth2`, `kerberos`. | No       | 0.7.0-incubating |
+| Property                       | Type     | Default Value   | Description                                                                                                                          | Required   | Since Version      |
+|--------------------------------|----------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------|------------|--------------------|
+| spark.sql.gravitino.authType   | string   | `simple`        | The authentication mechanism for communicating with the Gravitino server. Supported values: `simple`, `basic`, `oauth2`, `kerberos`. | No         | 0.7.0-incubating   |
 
 ## Simple Mode
 
@@ -26,11 +26,11 @@ In Basic mode, the Spark connector authenticates to the Gravitino server using H
 against the built-in IDP. The Gravitino server must have Basic authentication enabled. See
 [How to authenticate](../security/how-to-authenticate.md#basic-mode) for server-side setup.
 
-| Property                              | Type   | Default Value | Description                                   | Required             | Since Version    |
-|---------------------------------------|--------|---------------|-----------------------------------------------|----------------------|------------------|
-| spark.sql.gravitino.authType          | string | `simple`      | Set to `basic` to enable Basic authentication.| Yes, for Basic mode  | 1.3.0            |
-| spark.sql.gravitino.basic.username    | string | (none)        | The built-in IDP username.                    | Yes, for Basic mode  | 1.3.0            |
-| spark.sql.gravitino.basic.password    | string | (none)        | The built-in IDP password.                    | Yes, for Basic mode  | 1.3.0            |
+| Property                                | Type     | Default Value   | Description                                     | Required               | Since Version      |
+|-----------------------------------------|----------|-----------------|-------------------------------------------------|------------------------|--------------------|
+| spark.sql.gravitino.authType            | string   | `simple`        | Set to `basic` to enable Basic authentication.  | Yes, for Basic mode    | 1.3.0              |
+| spark.sql.gravitino.basic.username      | string   | (none)          | The built-in IDP username.                      | Yes, for Basic mode    | 1.3.0              |
+| spark.sql.gravitino.basic.password      | string   | (none)          | The built-in IDP password.                      | Yes, for Basic mode    | 1.3.0              |
 
 ### Basic Configuration Example
 
@@ -47,12 +47,12 @@ spark.sql.gravitino.basic.password=YourSecureGravitinoPassword
 
 In the OAuth2 mode, you could use the following configuration to fetch an OAuth2 token to access Gravitino server.
 
-| Property                              | Type   | Default Value | Description                                   | Required             | Since Version    |
-|---------------------------------------|--------|---------------|-----------------------------------------------|----------------------|------------------|
-| spark.sql.gravitino.oauth2.serverUri  | string | None          | The OAuth2 server uri address.                | Yes, for OAuth2 mode | 0.7.0-incubating |
-| spark.sql.gravitino.oauth2.tokenPath  | string | None          | The path of token interface in OAuth2 server. | Yes, for OAuth2 mode | 0.7.0-incubating |
-| spark.sql.gravitino.oauth2.credential | string | None          | The credential to request the OAuth2 token.   | Yes, for OAuth2 mode | 0.7.0-incubating |
-| spark.sql.gravitino.oauth2.scope      | string | None          | The scope to request the OAuth2 token.        | Yes, for OAuth2 mode | 0.7.0-incubating |
+| Property                                | Type     | Default Value   | Description                                     | Required               | Since Version      |
+|-----------------------------------------|----------|-----------------|-------------------------------------------------|------------------------|--------------------|
+| spark.sql.gravitino.oauth2.serverUri    | string   | None            | The OAuth2 server uri address.                  | Yes, for OAuth2 mode   | 0.7.0-incubating   |
+| spark.sql.gravitino.oauth2.tokenPath    | string   | None            | The path of token interface in OAuth2 server.   | Yes, for OAuth2 mode   | 0.7.0-incubating   |
+| spark.sql.gravitino.oauth2.credential   | string   | None            | The credential to request the OAuth2 token.     | Yes, for OAuth2 mode   | 0.7.0-incubating   |
+| spark.sql.gravitino.oauth2.scope        | string   | None            | The scope to request the OAuth2 token.          | Yes, for OAuth2 mode   | 0.7.0-incubating   |
 
 ## Kerberos Mode
 

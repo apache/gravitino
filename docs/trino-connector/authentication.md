@@ -29,10 +29,10 @@ gravitino.user=admin
 
 **Configuration properties:**
 
-| Property                    | Description                                                       | Default value | Required                               | Since version |
-|-----------------------------|-------------------------------------------------------------------|---------------|----------------------------------------|---------------|
-| `gravitino.client.authType` | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | No                                     | 1.3.0         |
-| `gravitino.user`            | Username for simple authentication                                | (none)        | No (uses system user if not specified) | 1.3.0         |
+| Property                      | Description                                                         | Default value   | Required                                 | Since version   |
+|-------------------------------|---------------------------------------------------------------------|-----------------|------------------------------------------|-----------------|
+| `gravitino.client.authType`   | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos`     | (none)          | No                                       | 1.3.0           |
+| `gravitino.user`              | Username for simple authentication                                  | (none)          | No (uses system user if not specified)   | 1.3.0           |
 
 ### Basic Authentication
 
@@ -55,11 +55,11 @@ gravitino.client.basic.password=YourSecureGravitinoPassword
 
 **Configuration properties:**
 
-| Property                          | Description                                                       | Default value | Required                   | Since version |
-|-----------------------------------|-------------------------------------------------------------------|---------------|----------------------------|---------------|
-| `gravitino.client.authType`       | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable Basic)      | 1.3.0         |
-| `gravitino.client.basic.username` | Built-in IDP username                                             | (none)        | Yes if authType is `basic` | 1.3.0         |
-| `gravitino.client.basic.password` | Built-in IDP password                                             | (none)        | Yes if authType is `basic` | 1.3.0         |
+| Property                            | Description                                                         | Default value   | Required                     | Since version   |
+|-------------------------------------|---------------------------------------------------------------------|-----------------|------------------------------|-----------------|
+| `gravitino.client.authType`         | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos`     | (none)          | Yes (to enable Basic)        | 1.3.0           |
+| `gravitino.client.basic.username`   | Built-in IDP username                                               | (none)          | Yes if authType is `basic`   | 1.3.0           |
+| `gravitino.client.basic.password`   | Built-in IDP password                                               | (none)          | Yes if authType is `basic`   | 1.3.0           |
 
 ### OAuth2 Authentication
 
@@ -82,13 +82,13 @@ gravitino.client.oauth2.scope=gravitino
 
 **Configuration properties:**
 
-| Property                             | Description                                                       | Default value | Required                   | Since version |
-|--------------------------------------|-------------------------------------------------------------------|---------------|----------------------------|---------------|
-| `gravitino.client.authType`          | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable OAuth2)     | 1.3.0         |
-| `gravitino.client.oauth2.serverUri`  | OAuth2 server URI                                                 | (none)        | Yes if authType is `oauth2`  | 1.3.0         |
-| `gravitino.client.oauth2.credential` | OAuth2 credentials in format `client_id:client_secret`            | (none)        | Yes if authType is `oauth2`  | 1.3.0         |
-| `gravitino.client.oauth2.path`       | OAuth2 token endpoint path                                        | (none)        | Yes if authType is `oauth2`  | 1.3.0         |
-| `gravitino.client.oauth2.scope`      | OAuth2 scope                                                      | (none)        | Yes if authType is `oauth2`  | 1.3.0         |
+| Property                               | Description                                                         | Default value   | Required                     | Since version   |
+|----------------------------------------|---------------------------------------------------------------------|-----------------|------------------------------|-----------------|
+| `gravitino.client.authType`            | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos`     | (none)          | Yes (to enable OAuth2)       | 1.3.0           |
+| `gravitino.client.oauth2.serverUri`    | OAuth2 server URI                                                   | (none)          | Yes if authType is `oauth2`  | 1.3.0           |
+| `gravitino.client.oauth2.credential`   | OAuth2 credentials in format `client_id:client_secret`              | (none)          | Yes if authType is `oauth2`  | 1.3.0           |
+| `gravitino.client.oauth2.path`         | OAuth2 token endpoint path                                          | (none)          | Yes if authType is `oauth2`  | 1.3.0           |
+| `gravitino.client.oauth2.scope`        | OAuth2 scope                                                        | (none)          | Yes if authType is `oauth2`  | 1.3.0           |
 
 ### Kerberos Authentication
 
@@ -109,11 +109,11 @@ gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
 
 **Configuration properties:**
 
-| Property                                   | Description                                                       | Default value | Required                                | Since version |
-|--------------------------------------------|-------------------------------------------------------------------|---------------|-----------------------------------------|---------------|
-| `gravitino.client.authType`                | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable Kerberos)                | 1.3.0         |
-| `gravitino.client.kerberos.principal`      | Kerberos principal                                                | (none)        | Yes if authType is `kerberos`          | 1.3.0         |
-| `gravitino.client.kerberos.keytabFilePath` | Path to keytab file                                               | (none)        | No (uses ticket cache if not specified) | 1.3.0         |
+| Property                                     | Description                                                         | Default value   | Required                                  | Since version   |
+|----------------------------------------------|---------------------------------------------------------------------|-----------------|-------------------------------------------|-----------------|
+| `gravitino.client.authType`                  | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos`     | (none)          | Yes (to enable Kerberos)                  | 1.3.0           |
+| `gravitino.client.kerberos.principal`        | Kerberos principal                                                  | (none)          | Yes if authType is `kerberos`             | 1.3.0           |
+| `gravitino.client.kerberos.keytabFilePath`   | Path to keytab file                                                 | (none)          | No (uses ticket cache if not specified)   | 1.3.0           |
 
 
 ### Example: Connecting to OAuth-Protected Gravitino Server
@@ -168,11 +168,11 @@ gravitino.client.session.forwardUser=true
 
 **Configuration properties:**
 
-| Property                                                   | Description                                                                                | Default value | Required | Since version |
-|------------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.client.session.forwardUser`                     | When `true` with `authType=simple`, forwards the Trino session user to Gravitino per-query | `false`       | No       | 1.3.0         |
-| `gravitino.client.session.cache.maxSize`                   | Maximum number of per-user sessions to keep in the cache                                   | `500`         | No       | 1.3.0         |
-| `gravitino.client.session.cache.expireAfterAccessSeconds`  | Seconds before an idle per-user session is evicted from the cache                          | `3600`        | No       | 1.3.0         |
+| Property                                                     | Description                                                                                  | Default value   | Required   | Since version   |
+|--------------------------------------------------------------|----------------------------------------------------------------------------------------------|-----------------|------------|-----------------|
+| `gravitino.client.session.forwardUser`                       | When `true` with `authType=simple`, forwards the Trino session user to Gravitino per-query   | `false`         | No         | 1.3.0           |
+| `gravitino.client.session.cache.maxSize`                     | Maximum number of per-user sessions to keep in the cache                                     | `500`           | No         | 1.3.0           |
+| `gravitino.client.session.cache.expireAfterAccessSeconds`    | Seconds before an idle per-user session is evicted from the cache                            | `3600`          | No         | 1.3.0           |
 
 ### Notes
 

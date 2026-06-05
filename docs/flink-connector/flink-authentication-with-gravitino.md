@@ -9,9 +9,9 @@ license: "This software is licensed under the Apache License version 2."
 
 Flink connector supports `simple`, `basic`, `oauth2`, and `kerberos` authentication when accessing the Gravitino server.
 
-| Property                                                 | Type   | Default Value | Description                                                                                                                              | Required | Since Version |
-|----------------------------------------------------------|--------|---------------|------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
-| table.catalog-store.gravitino.gravitino.client.auth.type | string | (none)        | When explicitly set, only `oauth2` and `basic` are supported.                                                                          | No       | 1.2.0         |
+| Property                                                   | Type     | Default Value   | Description                                                                                                                                | Required   | Since Version   |
+|------------------------------------------------------------|----------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------|------------|-----------------|
+| table.catalog-store.gravitino.gravitino.client.auth.type   | string   | (none)          | When explicitly set, only `oauth2` and `basic` are supported.                                                                              | No         | 1.2.0           |
 
 ## Simple Mode
 
@@ -25,11 +25,11 @@ In Basic mode, the Flink connector authenticates to the Gravitino server using H
 against the built-in IDP. The Gravitino server must have Basic authentication enabled. See
 [How to authenticate](../security/how-to-authenticate.md#basic-mode) for server-side setup.
 
-| Property                                                              | Type   | Default Value | Description                                      | Required                       | Since Version |
-|-----------------------------------------------------------------------|--------|---------------|--------------------------------------------------|--------------------------------|---------------|
-| table.catalog-store.gravitino.gravitino.client.auth.type              | string | (none)        | Set to `basic` to enable Basic authentication.   | Yes, for Basic mode            | 1.3.0         |
-| table.catalog-store.gravitino.gravitino.client.basic.username         | string | (none)        | The built-in IDP username.                       | Yes, for Basic mode            | 1.3.0         |
-| table.catalog-store.gravitino.gravitino.client.basic.password         | string | (none)        | The built-in IDP password.                       | Yes, for Basic mode            | 1.3.0         |
+| Property                                                                | Type     | Default Value   | Description                                        | Required                         | Since Version   |
+|-------------------------------------------------------------------------|----------|-----------------|----------------------------------------------------|----------------------------------|-----------------|
+| table.catalog-store.gravitino.gravitino.client.auth.type                | string   | (none)          | Set to `basic` to enable Basic authentication.     | Yes, for Basic mode              | 1.3.0           |
+| table.catalog-store.gravitino.gravitino.client.basic.username           | string   | (none)          | The built-in IDP username.                         | Yes, for Basic mode              | 1.3.0           |
+| table.catalog-store.gravitino.gravitino.client.basic.password           | string   | (none)          | The built-in IDP password.                         | Yes, for Basic mode              | 1.3.0           |
 
 ### Basic Configuration Example
 
@@ -46,12 +46,12 @@ table.catalog-store.gravitino.gravitino.client.basic.password: YourSecureGraviti
 
 In OAuth2 mode, configure the following settings to fetch an OAuth2 token to access the Gravitino server:
 
-| Property                                                              | Type   | Default Value | Description                                      | Required                       | Since Version |
-|-----------------------------------------------------------------------|--------|---------------|--------------------------------------------------|--------------------------------|---------------|
-| table.catalog-store.gravitino.gravitino.client.oauth2.serverUri       | string | (none)        | The OAuth2 server URI.                           | Yes, for OAuth2 mode           | 1.2.0         |
-| table.catalog-store.gravitino.gravitino.client.oauth2.tokenPath       | string | (none)        | The token endpoint path on the OAuth2 server.    | Yes, for OAuth2 mode           | 1.2.0         |
-| table.catalog-store.gravitino.gravitino.client.oauth2.credential      | string | (none)        | The credential used to request the OAuth2 token. | Yes, for OAuth2 mode           | 1.2.0         |
-| table.catalog-store.gravitino.gravitino.client.oauth2.scope           | string | (none)        | The scope used to request the OAuth2 token.      | Yes, for OAuth2 mode           | 1.2.0         |
+| Property                                                                | Type     | Default Value   | Description                                        | Required                         | Since Version   |
+|-------------------------------------------------------------------------|----------|-----------------|----------------------------------------------------|----------------------------------|-----------------|
+| table.catalog-store.gravitino.gravitino.client.oauth2.serverUri         | string   | (none)          | The OAuth2 server URI.                             | Yes, for OAuth2 mode             | 1.2.0           |
+| table.catalog-store.gravitino.gravitino.client.oauth2.tokenPath         | string   | (none)          | The token endpoint path on the OAuth2 server.      | Yes, for OAuth2 mode             | 1.2.0           |
+| table.catalog-store.gravitino.gravitino.client.oauth2.credential        | string   | (none)          | The credential used to request the OAuth2 token.   | Yes, for OAuth2 mode             | 1.2.0           |
+| table.catalog-store.gravitino.gravitino.client.oauth2.scope             | string   | (none)          | The scope used to request the OAuth2 token.        | Yes, for OAuth2 mode             | 1.2.0           |
 
 ### OAuth2 Configuration Example
 
