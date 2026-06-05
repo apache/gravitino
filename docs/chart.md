@@ -1,11 +1,11 @@
 ---
-title: "Helm Chart"
-slug: /chart
-keyword: chart
+title: "Install Gravitino on Kubernetes"
+slug: "/chart"
+keyword: "chart"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Install Gravitino on Kubernetes
+## Introduction
 
 This Helm chart deploys Apache Gravitino on Kubernetes with customizable configurations.
 
@@ -30,7 +30,7 @@ Or install directly:
 helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> -n <NAMESPACE> --create-namespace
 ```
 
-### Install from Local Repository (For Development or Unreleased Versions)
+### Install from Local Repository (for Development or Unreleased Versions)
 
 Clone the repository and navigate to the chart directory:
 
@@ -53,7 +53,7 @@ helm upgrade --install gravitino ./gravitino -n <NAMESPACE> --create-namespace
 
 ## View Chart Values
 
-You can customize values.yaml parameters to override chart default settings. Additionally, Gravitino configurations in gravitino.conf can be modified through Helm values.yaml.
+Customize values.yaml parameters to override chart default settings. Additionally, Gravitino configurations in gravitino.conf can be modified through Helm values.yaml.
 
 To display the default values of the Gravitino chart, run:
 
@@ -93,7 +93,7 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
   -f /path/to/values.yaml
 ```
 
-### Deploying Gravitino with MySQL as the Storage Backend
+### Deploy Gravitino with MySQL as the Storage Backend
 
 To deploy both Gravitino and MySQL, where MySQL is used as the storage backend, enable the built-in MySQL instance:
 
@@ -114,9 +114,9 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
   --set global.defaultStorageClass="-"
 ```
 
-You must then manually create a PersistentVolume (PV).
+Then manually create a PersistentVolume (PV).
 
-### Deploy Gravitino using an existed MySQL Database
+### Deploy Gravitino Using an Existed MySQL Database
 
 Ensure you have the following MySQL credentials ready: Username, Password, Database Name. When creating your database, we recommend calling it `gravitino`.
 

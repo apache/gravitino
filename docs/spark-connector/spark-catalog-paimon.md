@@ -1,9 +1,11 @@
 ---
-title: "Spark connector Paimon catalog"
-slug: /spark-connector/spark-catalog-paimon
-keyword: spark connector paimon catalog
+title: "Spark Connector: Paimon Catalog"
+slug: "/spark-connector/spark-catalog-paimon"
+keyword: "spark connector paimon catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 The Apache Gravitino Spark connector offers the capability to read and write Paimon tables, with the metadata managed by the Gravitino server.
 
@@ -14,13 +16,13 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 
 ## Capabilities
 
-### Support DDL and DML operations:
+### DDL and DML Operations
 
 - `CREATE NAMESPACE`
 - `DROP NAMESPACE`
 - `LIST NAMESPACE`
 - `LOAD NAMESPACE`
-  - It can not return any user-specified configs now, as we only support FilesystemCatalog in spark-connector now.
+  - Returning user-specified configs is not supported; the spark-connector currently only supports FilesystemCatalog.
 - `CREATE TABLE`
   - Doesn't support distribution and sort orders.
 - `DROP TABLE`
@@ -36,7 +38,7 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 Only supports Paimon FilesystemCatalog on HDFS now.
 :::
 
-#### Not supported operations:
+#### Unsupported Operations
 
 - `ALTER NAMESPACE`
   - Paimon does not support alter namespace.
@@ -48,7 +50,7 @@ Only supports Paimon FilesystemCatalog on HDFS now.
 - Time Travel
 - Hive and Jdbc backend, and Object Storage for FilesystemCatalog
 
-## SQL example
+## SQL Example
 
 ```sql
 -- Suppose paimon_catalog is the Paimon catalog name managed by Gravitino
@@ -79,7 +81,7 @@ SHOW PARTITIONS employee;
 ALTER TABLE employee DROP PARTITION (`name`='Alice');
 ```
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Paimon connector configuration.
 
