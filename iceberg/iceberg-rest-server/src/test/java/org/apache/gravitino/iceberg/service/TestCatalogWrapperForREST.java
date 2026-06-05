@@ -131,7 +131,9 @@ public class TestCatalogWrapperForREST {
         "{\"storage-credentials\":[{\"prefix\":\"s3://upstream/db/tbl/\",\"config\":{"
             + "\"s3.access-key-id\":\"upstream-key\","
             + "\"s3.secret-access-key\":\"upstream-secret\","
-            + "\"s3.session-token\":\"upstream-token\"}}]}";
+            + "\"s3.session-token\":\"upstream-token\","
+            + "\"client.refresh-credentials-endpoint\":"
+            + "\"v1/upstream/namespaces/db/tables/tbl/credentials\"}}]}";
 
     AtomicReference<String> requestPath = new AtomicReference<>();
     HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
@@ -180,6 +182,11 @@ public class TestCatalogWrapperForREST {
       Assertions.assertEquals("upstream-key", credential.config().get("s3.access-key-id"));
       Assertions.assertEquals("upstream-secret", credential.config().get("s3.secret-access-key"));
       Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+      // The upstream refresh endpoint is rewritten to this IRC catalog's prefix ("local"), not the
+      // remote catalog's ("upstream"), matching the loadTable/createTable federation paths.
+      Assertions.assertEquals(
+          "v1/local/namespaces/db/tables/tbl/credentials",
+          credential.config().get("client.refresh-credentials-endpoint"));
     } finally {
       server.stop(0);
     }

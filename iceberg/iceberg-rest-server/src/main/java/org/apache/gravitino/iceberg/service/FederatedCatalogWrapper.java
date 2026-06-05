@@ -132,14 +132,21 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    * Fetches table credentials from the remote REST catalog instead of vending Gravitino-managed
    * credentials. The {@code privilege} is ignored because the remote catalog decides what to vend.
    *
+   * <p>The upstream credentials are rewritten via {@link IcebergRESTUtils#rewriteTableCredentials}
+   * so their {@code refresh-credentials-endpoint} points at this IRC catalog rather than the remote
+   * catalog, consistent with the {@link #loadTable}/{@code createTable} federation paths.
+   *
    * @param identifier the table identifier.
    * @param privilege ignored; the remote REST catalog vends its own credentials.
-   * @return the credentials returned by the remote catalog.
+   * @return the remote credentials with IRC-local refresh endpoints.
    */
   @Override
   public LoadCredentialsResponse getTableCredentials(
       TableIdentifier identifier, CredentialPrivilege privilege) {
-    return getRESTTableCredentials((RESTCatalog) getCatalog(), identifier);
+    LoadCredentialsResponse upstream =
+        getRESTTableCredentials((RESTCatalog) getCatalog(), identifier);
+    return IcebergRESTUtils.rewriteTableCredentials(
+        catalogCredentialManager.catalogName(), identifier, upstream);
   }
 
   private static LoadCredentialsResponse getRESTTableCredentials(
