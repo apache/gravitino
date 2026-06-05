@@ -25,6 +25,7 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.util.Optional;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.utils.RemoteUriValidator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -35,6 +36,16 @@ public class FetchFileUtils {
 
   public static void fetchFileFromUri(
       String fileUri, File destFile, int timeout, Configuration conf) throws IOException {
+    fetchFileFromUri(fileUri, destFile, timeout, conf, false /* allowLocalAddressForRemoteUri */);
+  }
+
+  public static void fetchFileFromUri(
+      String fileUri,
+      File destFile,
+      int timeout,
+      Configuration conf,
+      boolean allowLocalAddressForRemoteUri)
+      throws IOException {
     try {
       URI uri = new URI(fileUri);
       String scheme = Optional.ofNullable(uri.getScheme()).orElse("file");
@@ -43,6 +54,14 @@ public class FetchFileUtils {
         case "http":
         case "https":
         case "ftp":
+          RemoteUriValidator.validate(
+              uri,
+              allowLocalAddressForRemoteUri,
+              String.format(
+                  "'%s' to true, or set 'gravitino.iceberg-rest.%s' to true for the Iceberg REST "
+                      + "service",
+                  KerberosConfig.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY,
+                  KerberosConfig.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY));
           FileUtils.copyURLToFile(uri.toURL(), destFile, timeout * 1000, timeout * 1000);
           break;
 

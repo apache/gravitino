@@ -18,7 +18,11 @@
  */
 package org.apache.gravitino.hive.kerberos;
 
+import com.sun.net.httpserver.HttpServer;
 import java.io.File;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -115,5 +119,57 @@ public class TestFetchFileUtils {
 
     FetchFileUtils.fetchFileFromUri(srcFileB.toURI().toString(), destFile, 10, conf);
     Assertions.assertEquals(srcFileB.toPath(), Files.readSymbolicLink(destFile.toPath()));
+  }
+
+  @Test
+  public void testRemoteFetchShouldBlockLocalhostByDefault() {
+    File destFile = new File(tempDir, "blocked");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                FetchFileUtils.fetchFileFromUri(
+                    "http://127.0.0.1:8090/keytab", destFile, 10, new Configuration()));
+
+    Assertions.assertTrue(exception.getMessage().contains("Gravitino server side"));
+    Assertions.assertTrue(
+        exception.getMessage().contains(KerberosConfig.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY));
+  }
+
+  @Test
+  public void testRemoteFetchShouldAllowLocalhostWhenConfigured() throws Exception {
+    File destFile = new File(tempDir, "allowed");
+    HttpServer server = createLoopbackHttpServer("keytab");
+
+    try {
+      server.start();
+      int port = server.getAddress().getPort();
+
+      FetchFileUtils.fetchFileFromUri(
+          String.format("http://127.0.0.1:%d/keytab", port),
+          destFile,
+          10,
+          new Configuration(),
+          true);
+
+      Assertions.assertEquals("keytab", Files.readString(destFile.toPath()));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  private HttpServer createLoopbackHttpServer(String response) throws Exception {
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/keytab",
+        exchange -> {
+          byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream outputStream = exchange.getResponseBody()) {
+            outputStream.write(bytes);
+          }
+        });
+    return server;
   }
 }

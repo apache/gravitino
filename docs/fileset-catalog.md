@@ -53,14 +53,15 @@ Please refer to [Credential vending](./security/credential-vending.md) for more 
 Apart from the above properties, to access fileset like HDFS fileset, you need to configure the following extra
 properties.
 
-| Property Name                                      | Description                                                                                     | Default Value | Required                                                    | Since Version |
-|----------------------------------------------------|-------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
-| `authentication.impersonation-enable`              | Whether to enable impersonation for the Fileset catalog.                                        | `false`       | No                                                          | 0.5.1         |
-| `authentication.type`                              | The type of authentication for Fileset catalog, currently we only support `kerberos`, `simple`. | `simple`      | No                                                          | 0.5.1         |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                    | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                          | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Fileset catalog.                                  | 60            | No                                                          | 0.5.1         |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.      | 60            | No                                                          | 0.5.1         |
+| Property Name                                              | Description                                                                                     | Default Value | Required                                                    | Since Version |
+|------------------------------------------------------------|-------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|---------------|
+| `authentication.impersonation-enable`                      | Whether to enable impersonation for the Fileset catalog.                                        | `false`       | No                                                          | 0.5.1         |
+| `authentication.type`                                      | The type of authentication for Fileset catalog, currently we only support `kerberos`, `simple`. | `simple`      | No                                                          | 0.5.1         |
+| `authentication.kerberos.principal`                        | The principal of the Kerberos authentication                                                    | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
+| `authentication.kerberos.keytab-uri`                       | The URI of The keytab for the Kerberos authentication.                                          | (none)        | required if the value of `authentication.type` is Kerberos. | 0.5.1         |
+| `authentication.kerberos.check-interval-sec`               | The check interval of Kerberos credential for Fileset catalog.                                  | 60            | No                                                          | 0.5.1         |
+| `authentication.kerberos.keytab-fetch-timeout-sec`         | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.      | 60            | No                                                          | 0.5.1         |
+| `authentication.kerberos.keytab-fetch-allow-local-address` | Whether to allow the Kerberos keytab URI to resolve to local, private, link-local, or cloud metadata addresses from the Gravitino server side. Enable this only for trusted URIs that must be fetched from local or private addresses. | false | No | 1.3.0 |
 
 The `config.resources` property allows users to specify custom configuration files.
 

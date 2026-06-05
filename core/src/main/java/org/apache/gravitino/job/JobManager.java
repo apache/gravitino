@@ -25,7 +25,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
@@ -65,6 +64,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RemoteUriValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,6 +98,8 @@ public class JobManager implements JobOperationDispatcher {
   private final IdGenerator idGenerator;
 
   private final long jobStagingDirKeepTimeInMs;
+
+  private final boolean allowLocalAddressForRemoteUri;
 
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
@@ -134,6 +136,7 @@ public class JobManager implements JobOperationDispatcher {
     }
 
     this.jobStagingDirKeepTimeInMs = config.get(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS);
+    this.allowLocalAddressForRemoteUri = config.get(Configs.JOB_REMOTE_URI_ALLOW_LOCAL_ADDRESS);
     if (jobStagingDirKeepTimeInMs < JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS) {
       LOG.warn(
           "The job staging directory keep time is set to {} ms, the number is too small, "
@@ -436,7 +439,9 @@ public class JobManager implements JobOperationDispatcher {
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values, and
     // also downloading any necessary files from the URIs specified in the job template.
-    JobTemplate jobTemplate = createRuntimeJobTemplate(jobTemplateEntity, jobConf, jobStagingDir);
+    JobTemplate jobTemplate =
+        createRuntimeJobTemplate(
+            jobTemplateEntity, jobConf, jobStagingDir, allowLocalAddressForRemoteUri);
 
     // Submit the job template to the job executor
     String jobExecutionId;
@@ -670,13 +675,26 @@ public class JobManager implements JobOperationDispatcher {
   @VisibleForTesting
   public static JobTemplate createRuntimeJobTemplate(
       JobTemplateEntity jobTemplateEntity, Map<String, String> jobConf, File stagingDir) {
+    return createRuntimeJobTemplate(
+        jobTemplateEntity, jobConf, stagingDir, false /* allowLocalAddressForRemoteUri */);
+  }
+
+  @VisibleForTesting
+  static JobTemplate createRuntimeJobTemplate(
+      JobTemplateEntity jobTemplateEntity,
+      Map<String, String> jobConf,
+      File stagingDir,
+      boolean allowLocalAddressForRemoteUri) {
     String name = jobTemplateEntity.name();
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
     String executable =
         fetchFileFromUri(
-            replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
+            replacePlaceholder(content.executable(), jobConf),
+            stagingDir,
+            TIMEOUT_IN_MS,
+            allowLocalAddressForRemoteUri);
 
     List<String> args =
         content.arguments().stream()
@@ -702,7 +720,10 @@ public class JobManager implements JobOperationDispatcher {
               .map(
                   script ->
                       fetchFileFromUri(
-                          replacePlaceholder(script, jobConf), stagingDir, TIMEOUT_IN_MS))
+                          replacePlaceholder(script, jobConf),
+                          stagingDir,
+                          TIMEOUT_IN_MS,
+                          allowLocalAddressForRemoteUri))
               .collect(Collectors.toList());
 
       return ShellJobTemplate.builder()
@@ -723,7 +744,11 @@ public class JobManager implements JobOperationDispatcher {
           content.jars().stream()
               .map(
                   jar ->
-                      fetchFileFromUri(replacePlaceholder(jar, jobConf), stagingDir, TIMEOUT_IN_MS))
+                      fetchFileFromUri(
+                          replacePlaceholder(jar, jobConf),
+                          stagingDir,
+                          TIMEOUT_IN_MS,
+                          allowLocalAddressForRemoteUri))
               .collect(Collectors.toList());
 
       List<String> files =
@@ -731,7 +756,10 @@ public class JobManager implements JobOperationDispatcher {
               .map(
                   file ->
                       fetchFileFromUri(
-                          replacePlaceholder(file, jobConf), stagingDir, TIMEOUT_IN_MS))
+                          replacePlaceholder(file, jobConf),
+                          stagingDir,
+                          TIMEOUT_IN_MS,
+                          allowLocalAddressForRemoteUri))
               .collect(Collectors.toList());
 
       List<String> archives =
@@ -739,7 +767,10 @@ public class JobManager implements JobOperationDispatcher {
               .map(
                   archive ->
                       fetchFileFromUri(
-                          replacePlaceholder(archive, jobConf), stagingDir, TIMEOUT_IN_MS))
+                          replacePlaceholder(archive, jobConf),
+                          stagingDir,
+                          TIMEOUT_IN_MS,
+                          allowLocalAddressForRemoteUri))
               .collect(Collectors.toList());
 
       Map<String, String> configs =
@@ -793,13 +824,27 @@ public class JobManager implements JobOperationDispatcher {
 
   @VisibleForTesting
   static List<String> fetchFilesFromUri(List<String> uris, File stagingDir, int timeoutInMs) {
+    return fetchFilesFromUri(
+        uris, stagingDir, timeoutInMs, false /* allowLocalAddressForRemoteUri */);
+  }
+
+  @VisibleForTesting
+  static List<String> fetchFilesFromUri(
+      List<String> uris, File stagingDir, int timeoutInMs, boolean allowLocalAddressForRemoteUri) {
     return uris.stream()
-        .map(uri -> fetchFileFromUri(uri, stagingDir, timeoutInMs))
+        .map(uri -> fetchFileFromUri(uri, stagingDir, timeoutInMs, allowLocalAddressForRemoteUri))
         .collect(Collectors.toList());
   }
 
   @VisibleForTesting
   static String fetchFileFromUri(String uri, File stagingDir, int timeoutInMs) {
+    return fetchFileFromUri(
+        uri, stagingDir, timeoutInMs, false /* allowLocalAddressForRemoteUri */);
+  }
+
+  @VisibleForTesting
+  static String fetchFileFromUri(
+      String uri, File stagingDir, int timeoutInMs, boolean allowLocalAddressForRemoteUri) {
     try {
       URI fileUri = new URI(uri);
       String scheme = Optional.ofNullable(fileUri.getScheme()).orElse("file");
@@ -809,7 +854,10 @@ public class JobManager implements JobOperationDispatcher {
         case "http":
         case "https":
         case "ftp":
-          validateRemoteUri(fileUri);
+          RemoteUriValidator.validate(
+              fileUri,
+              allowLocalAddressForRemoteUri,
+              String.format("'%s' to true", Configs.JOB_REMOTE_URI_ALLOW_LOCAL_ADDRESS_KEY));
           FileUtils.copyURLToFile(fileUri.toURL(), destFile, timeoutInMs, timeoutInMs);
           break;
 
@@ -830,57 +878,6 @@ public class JobManager implements JobOperationDispatcher {
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
     }
-  }
-
-  /**
-   * Resolves the host in the given URI and rejects addresses that should not be reachable from the
-   * server (loopback, link-local, RFC-1918 private ranges, IPv6 ULA, cloud metadata endpoints).
-   * This is a defence-in-depth measure against Server-Side Request Forgery (SSRF).
-   *
-   * <p><b>Note on DNS TOCTOU:</b> This method resolves the hostname once at validation time. {@code
-   * FileUtils.copyURLToFile()} will re-resolve it when opening the connection, so a precisely-timed
-   * DNS-rebinding attack could theoretically bypass this check. Complete protection against DNS
-   * rebinding requires network-level egress controls (e.g. firewall rules) in addition to this
-   * application-layer validation.
-   */
-  @VisibleForTesting
-  static void validateRemoteUri(URI uri) throws IOException {
-    String host = uri.getHost();
-    if (host == null) {
-      throw new IllegalArgumentException("URI has no host: " + uri);
-    }
-    InetAddress[] addresses = InetAddress.getAllByName(host);
-    for (InetAddress address : addresses) {
-      if (isBlockedAddress(address)) {
-        throw new IllegalArgumentException(
-            String.format(
-                "URI '%s' resolves to blocked address %s, access denied (SSRF prevention)",
-                uri, address.getHostAddress()));
-      }
-    }
-  }
-
-  private static boolean isBlockedAddress(InetAddress address) {
-    // Covers loopback (127.x.x.x / ::1), link-local (169.254.x.x / fe80::/10 — includes AWS/GCP/
-    // Azure metadata), RFC-1918 private (10.x / 172.16-31.x / 192.168.x), multicast, unspecified.
-    if (address.isLoopbackAddress()
-        || address.isLinkLocalAddress()
-        || address.isSiteLocalAddress()
-        || address.isMulticastAddress()
-        || address.isAnyLocalAddress()) {
-      return true;
-    }
-    byte[] b = address.getAddress();
-    // Alibaba Cloud / Oracle Cloud metadata endpoint: 100.100.100.200
-    if (b.length == 4
-        && (b[0] & 0xFF) == 100
-        && (b[1] & 0xFF) == 100
-        && (b[2] & 0xFF) == 100
-        && (b[3] & 0xFF) == 200) {
-      return true;
-    }
-    // IPv6 Unique Local Addresses (RFC 4193): fc00::/7 — not covered by isSiteLocalAddress()
-    return b.length == 16 && ((b[0] & 0xFE) == 0xFC);
   }
 
   @VisibleForTesting

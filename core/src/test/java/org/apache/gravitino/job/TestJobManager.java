@@ -31,9 +31,13 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.sun.net.httpserver.HttpServer;
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
@@ -902,6 +906,20 @@ public class TestJobManager {
         .build();
   }
 
+  private HttpServer createLoopbackHttpServer(String response) throws IOException {
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/artifact.jar",
+        exchange -> {
+          byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream outputStream = exchange.getResponseBody()) {
+            outputStream.write(bytes);
+          }
+        });
+    return server;
+  }
+
   @Test
   public void testFetchFileFromUriWithMissingLocalFileShouldFail() throws IOException {
     File stagingDir = new File(testStagingDir);
@@ -925,7 +943,7 @@ public class TestJobManager {
         Assertions.assertThrows(
             RuntimeException.class,
             () -> JobManager.fetchFileFromUri("http://127.0.0.1:8090/configs", stagingDir, 1000));
-    Assertions.assertTrue(e1.getCause().getMessage().contains("SSRF prevention"));
+    assertRemoteUriBlockedMessage(e1);
 
     // AWS / GCP / Azure cloud-metadata endpoint (link-local 169.254.x.x)
     RuntimeException e2 =
@@ -934,64 +952,47 @@ public class TestJobManager {
             () ->
                 JobManager.fetchFileFromUri(
                     "http://169.254.169.254/latest/meta-data/", stagingDir, 1000));
-    Assertions.assertTrue(e2.getCause().getMessage().contains("SSRF prevention"));
+    assertRemoteUriBlockedMessage(e2);
 
     // RFC-1918 private range
     RuntimeException e3 =
         Assertions.assertThrows(
             RuntimeException.class,
             () -> JobManager.fetchFileFromUri("http://192.168.1.1/", stagingDir, 1000));
-    Assertions.assertTrue(e3.getCause().getMessage().contains("SSRF prevention"));
+    assertRemoteUriBlockedMessage(e3);
 
     // Alibaba Cloud / Oracle Cloud metadata endpoint
     RuntimeException e4 =
         Assertions.assertThrows(
             RuntimeException.class,
             () -> JobManager.fetchFileFromUri("http://100.100.100.200/", stagingDir, 1000));
-    Assertions.assertTrue(e4.getCause().getMessage().contains("SSRF prevention"));
+    assertRemoteUriBlockedMessage(e4);
   }
 
   @Test
-  public void testValidateRemoteUri() throws Exception {
-    // Loopback
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.validateRemoteUri(new URI("http://127.0.0.1/")));
+  public void testFetchFileFromUriShouldAllowLocalhostWhenConfigured() throws Exception {
+    File stagingDir = new File(testStagingDir);
+    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
+    HttpServer server = createLoopbackHttpServer("job artifact");
 
-    // Link-local (cloud metadata)
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.validateRemoteUri(new URI("http://169.254.169.254/")));
+    try {
+      server.start();
+      int port = server.getAddress().getPort();
 
-    // RFC-1918 private 10.x.x.x
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.validateRemoteUri(new URI("http://10.0.0.1/")));
+      String fetchedFile =
+          JobManager.fetchFileFromUri(
+              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000, true);
 
-    // RFC-1918 private 172.16.x.x
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.validateRemoteUri(new URI("http://172.16.0.1/")));
+      Assertions.assertEquals("job artifact", Files.readString(Path.of(fetchedFile)));
+    } finally {
+      server.stop(0);
+    }
+  }
 
-    // RFC-1918 private 192.168.x.x
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.validateRemoteUri(new URI("http://192.168.0.1/")));
-
-    // Alibaba Cloud metadata
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.validateRemoteUri(new URI("http://100.100.100.200/")));
-
-    // localhost resolves to loopback
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.validateRemoteUri(new URI("http://localhost/")));
-
-    // IPv6 Unique Local Address (RFC 4193): fc00::/7
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> JobManager.validateRemoteUri(new URI("http://[fd00::1]/")));
+  private static void assertRemoteUriBlockedMessage(RuntimeException exception) {
+    Assertions.assertTrue(exception.getCause().getMessage().contains("Gravitino server side"));
+    Assertions.assertTrue(
+        exception.getCause().getMessage().contains(Configs.JOB_REMOTE_URI_ALLOW_LOCAL_ADDRESS_KEY));
   }
 
   @Test

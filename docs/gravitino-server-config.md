@@ -104,6 +104,18 @@ gravitino.cache.lockSegments=16
 - `gravitino.cache.expireTimeInMs`: Controls the cache TTL in milliseconds.
 - If `gravitino.cache.enableStats` is enabled, Gravitino will log cache statistics (hit count, miss count, load failures, etc.) every 5 minutes at the Info level.
 
+### Job configuration
+
+The following table lists the job configuration items:
+
+| Configuration item                          | Description                                                                                                                                                                                                                                  | Default value                  | Required | Since version |
+|---------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|----------|---------------|
+| `gravitino.job.stagingDir`                  | Directory for managing staging files when running jobs.                                                                                                                                                                                      | `/tmp/gravitino/jobs/staging`  | No       | 1.0.0         |
+| `gravitino.job.executor`                    | The executor to run jobs. By default it is `local`; users can implement their own executor and set it here.                                                                                                                                   | `local`                        | No       | 1.0.0         |
+| `gravitino.job.stagingDirKeepTimeInMs`      | The time in milliseconds to keep the staging files of the finished job in the job staging directory. The minimum recommended value is 10 minutes if you are not testing.                                                                      | `604800000` (7 days)           | No       | 1.0.0         |
+| `gravitino.job.statusPullIntervalInMs`      | The interval in milliseconds to pull the job status from the job executor. The minimum recommended value is 1 minute if you are not testing.                                                                                                  | `300000` (5 minutes)           | No       | 1.0.0         |
+| `gravitino.job.remoteUri.allowLocalAddress` | Whether to allow job file remote URIs to resolve to local, private, link-local, or cloud metadata addresses from the Gravitino server side. This is disabled by default to prevent server-side request forgery (SSRF). Enable it only for trusted URIs when existing jobs must fetch from local or private addresses. | `false`                        | No       | 1.3.0         |
+
 #### Eviction strategies
 
 Gravitino supports multiple eviction strategies including capacity-based, weight-based, and time-based (TTL) eviction. The following describes how they work with Caffeine:

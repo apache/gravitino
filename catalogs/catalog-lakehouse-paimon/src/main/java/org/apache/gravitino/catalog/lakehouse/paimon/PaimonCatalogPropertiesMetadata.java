@@ -85,17 +85,16 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           .build();
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
   public static final Map<String, String> KERBEROS_CONFIGURATION =
-      ImmutableMap.of(
-          KerberosConfig.PRINCIPAL_KEY,
-          KerberosConfig.PRINCIPAL_KEY,
-          KerberosConfig.KEY_TAB_URI_KEY,
-          KerberosConfig.KEY_TAB_URI_KEY,
-          KerberosConfig.CHECK_INTERVAL_SEC_KEY,
-          KerberosConfig.CHECK_INTERVAL_SEC_KEY,
-          KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
-          KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
-          AuthenticationConfig.AUTH_TYPE_KEY,
-          AuthenticationConfig.AUTH_TYPE_KEY);
+      ImmutableMap.<String, String>builder()
+          .put(KerberosConfig.PRINCIPAL_KEY, KerberosConfig.PRINCIPAL_KEY)
+          .put(KerberosConfig.KEY_TAB_URI_KEY, KerberosConfig.KEY_TAB_URI_KEY)
+          .put(KerberosConfig.CHECK_INTERVAL_SEC_KEY, KerberosConfig.CHECK_INTERVAL_SEC_KEY)
+          .put(KerberosConfig.FETCH_TIMEOUT_SEC_KEY, KerberosConfig.FETCH_TIMEOUT_SEC_KEY)
+          .put(
+              KerberosConfig.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY,
+              KerberosConfig.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY)
+          .put(AuthenticationConfig.AUTH_TYPE_KEY, AuthenticationConfig.AUTH_TYPE_KEY)
+          .build();
 
   public static final Map<String, String> S3_CONFIGURATION =
       ImmutableMap.of(

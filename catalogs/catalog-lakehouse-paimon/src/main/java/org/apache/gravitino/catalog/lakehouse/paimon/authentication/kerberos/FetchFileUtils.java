@@ -25,12 +25,19 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.util.Optional;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.utils.RemoteUriValidator;
 
 public class FetchFileUtils {
 
   private FetchFileUtils() {}
 
   public static void fetchFileFromUri(String fileUri, File destFile, int timeout)
+      throws IOException {
+    fetchFileFromUri(fileUri, destFile, timeout, false /* allowLocalAddressForRemoteUri */);
+  }
+
+  public static void fetchFileFromUri(
+      String fileUri, File destFile, int timeout, boolean allowLocalAddressForRemoteUri)
       throws IOException {
     try {
       URI uri = new URI(fileUri);
@@ -40,6 +47,10 @@ public class FetchFileUtils {
         case "http":
         case "https":
         case "ftp":
+          RemoteUriValidator.validate(
+              uri,
+              allowLocalAddressForRemoteUri,
+              String.format("'%s' to true", KerberosConfig.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY));
           FileUtils.copyURLToFile(uri.toURL(), destFile, timeout * 1000, timeout * 1000);
           break;
 

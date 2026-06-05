@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConf
 import static org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig.KERBEROS_DEFAULT_IMPERSONATION_ENABLE;
 import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.CHECK_INTERVAL_SEC_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.FETCH_TIMEOUT_SEC_KEY;
+import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
 import static org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig.PRINCIPAL_KEY;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
@@ -120,6 +121,17 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                   false /* immutable */,
                   60 /* defaultValue */,
                   false /* hidden */))
+          .put(
+              KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY,
+              PropertyEntry.booleanPropertyEntry(
+                  KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY,
+                  "Whether to allow Kerberos keytab fetch from local or private addresses from "
+                      + "the Gravitino server side. This is disabled by default to prevent SSRF.",
+                  false /* required */,
+                  false /* immutable */,
+                  false /* defaultValue */,
+                  false /* hidden */,
+                  false /* reserved */))
           .build();
 
   public static final Map<String, PropertyEntry<?>> AUTHENTICATION_PROPERTY_ENTRIES =
