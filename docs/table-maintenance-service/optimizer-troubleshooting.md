@@ -1,8 +1,8 @@
 ---
 title: "Optimizer Troubleshooting"
-slug: /table-maintenance-service/troubleshooting
-keyword: table maintenance, optimizer, troubleshooting, spark, strategy
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/troubleshooting"
+keyword: "table maintenance, optimizer, troubleshooting, spark, strategy"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## `Invalid --type`
@@ -25,7 +25,7 @@ Use a JSON array format, for example:
 [{"dt":"2026-01-01"}]
 ```
 
-## Job status appears stale (`queued` or `started` for a long time)
+## Job Status Appears Stale (`queued` or `started` for a Long Time)
 
 Check `gravitino.job.statusPullIntervalInMs` and local staging logs under:
 
@@ -38,13 +38,13 @@ restart Gravitino so REST status can refresh faster.
 
 `--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the policy type (`system_iceberg_compaction`) and not the strategy type (`iceberg-data-compaction`).
 
-## Dry-run returns no `DRY-RUN` or `SUBMIT` lines
+## Dry-Run Returns No `DRY-RUN` or `SUBMIT` Lines
 
 This usually means trigger conditions are not met. For compaction, verify
 `custom-data-file-mse` and `custom-delete-file-number` in table statistics/metrics are large
 enough to satisfy policy rules.
 
-## `monitor-metrics` returns `evaluation=false` unexpectedly
+## `monitor-metrics` Returns `evaluation=false` Unexpectedly
 
 Check both rule names and metric samples:
 
@@ -63,7 +63,7 @@ gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apac
 
 If you already use the packaged default optimizer config, this mapping may already exist.
 
-## Spark job fails with `hdfs://localhost:9000` or filesystem errors
+## Spark Job Fails with `hdfs://localhost:9000` or Filesystem Errors
 
 Set local filesystem explicitly in Spark config:
 
@@ -71,7 +71,7 @@ Set local filesystem explicitly in Spark config:
 spark.hadoop.fs.defaultFS=file:///
 ```
 
-## Rewrite fails on multi-level partition (`identity + day(...)`)
+## Rewrite Fails on Multi-level Partition (`identity + day(...)`)
 
 In release `1.2.0`, rewrite may fail for partition filters combining identity and day transform
 (for example `PARTITIONED BY (p, days(ts))`) with error:
@@ -98,7 +98,7 @@ Observed compatibility matrix in release `1.2.0` (rewrite path):
 - FAIL: `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)`,
   `p, truncate(1, c2)`, `p, bucket(8, id)`
 
-## `submit-update-stats-job` fails with JDBC metrics errors
+## `submit-update-stats-job` Fails with JDBC Metrics Errors
 
 When `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, ensure the JDBC driver is
 available to Spark runtime classpath. Typical failures include `ClassNotFoundException` for driver
@@ -116,7 +116,7 @@ Example in `--spark-conf`:
 
 Check your `--conf-path` and file permissions.
 
-## Related docs
+## Related
 
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)

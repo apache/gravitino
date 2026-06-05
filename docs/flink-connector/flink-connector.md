@@ -1,7 +1,7 @@
 ---
-title: "Apache Gravitino Flink connector"
-slug: /flink-connector/flink-connector
-keyword: flink connector federation query 
+title: "Flink Connector"
+slug: "/flink-connector/flink-connector"
+keyword: "flink connector federation query"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -20,13 +20,13 @@ The connector is published as a version-specific runtime JAR for each supported 
 4. Supports [Jdbc catalog](flink-catalog-jdbc.md)
 5. Supports most DDL and DML SQLs.
 
-## Requirement
+## Prerequisites
 
 * Scala 2.12
 * Flink 1.18, 1.19, or 1.20
 * JDK 8, 11 or 17
 
-## How to use it
+## Usage
 
 1. [Build](../how-to-build.md) or download the Gravitino Flink connector runtime JAR that matches your Flink minor version, and place it in the classpath of Flink.
 
@@ -63,7 +63,7 @@ To configure the Gravitino client, use properties prefixed with `table.catalog-s
 
 **Example:** Setting `table.catalog-store.gravitino.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 
-**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
+**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
 
 Set the flink configuration in flink-conf.yaml.
 ```yaml
@@ -107,7 +107,7 @@ INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
 SELECT * FROM hive_students;
 ```
 
-## Catalog naming restrictions
+## Catalog Naming Restrictions
 
 :::caution
 When creating catalogs that will be used with the Flink connector, the catalog name **cannot start with a number**. This is a Flink limitation. For example:
@@ -117,7 +117,7 @@ When creating catalogs that will be used with the Flink connector, the catalog n
 If you create a catalog with a name starting with a number, it will not be accessible from Flink.
 :::
 
-## Datatype mapping
+## Datatype Mapping
 
 Gravitino flink connector support the following datatype mapping between Flink and Gravitino.
 

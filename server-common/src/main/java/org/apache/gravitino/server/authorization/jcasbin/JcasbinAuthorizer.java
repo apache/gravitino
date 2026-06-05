@@ -55,7 +55,6 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
-import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
@@ -871,6 +870,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * Returns true when the cached owner type and ID match the given principal or one of the
    * principal's groups. The user id is resolved via the version-validated {@link #loadUserInfo}
    * cache so back-to-back ownership checks in the same request do not re-query {@code user_meta}.
+   * Group ids are resolved via {@link #loadGroupInfo}, which deduplicates within the request via
+   * {@code requestContext.groupInfoCache} and avoids loading full group entity objects.
    */
   private boolean ownerMatchesUserOrGroups(
       Optional<OwnerInfo> owner,
@@ -889,9 +890,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (!Entity.EntityType.GROUP.name().equalsIgnoreCase(ownerInfo.getOwnerType())) {
       return false;
     }
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    for (GroupEntity groupEntity : resolveCurrentUserGroups(metalake, entityStore)) {
-      if (Objects.equals(groupEntity.id(), ownerInfo.getOwnerId())) {
+    for (String groupName : principalGroupNames(principal)) {
+      Optional<GroupUpdatedAt> groupInfo = loadGroupInfo(metalake, groupName, requestContext);
+      if (groupInfo.isPresent() && groupInfo.get().getGroupId() == ownerInfo.getOwnerId()) {
         return true;
       }
     }
@@ -1033,24 +1034,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * or has no groups.
    */
   private List<String> currentPrincipalGroupNames() {
-    Principal principal = PrincipalUtils.getCurrentPrincipal();
-    if (!(principal instanceof UserPrincipal)) {
-      return new ArrayList<>();
-    }
-    List<UserGroup> groups = ((UserPrincipal) principal).getGroups();
-    if (groups.isEmpty()) {
-      return new ArrayList<>();
-    }
-    return groups.stream().map(UserGroup::getGroupname).collect(Collectors.toList());
+    return principalGroupNames(PrincipalUtils.getCurrentPrincipal());
   }
 
-  /**
-   * Resolves GroupEntity objects for the current principal's groups, skipping any that are stale or
-   * not found in the store. Used by owner checks that need full group entities instead of only
-   * group names.
-   */
-  private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
-    Principal principal = PrincipalUtils.getCurrentPrincipal();
+  private List<String> principalGroupNames(Principal principal) {
     if (!(principal instanceof UserPrincipal)) {
       return new ArrayList<>();
     }
@@ -1058,11 +1045,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (groups.isEmpty()) {
       return new ArrayList<>();
     }
-    List<NameIdentifier> groupIdents =
-        groups.stream()
-            .map(g -> NameIdentifierUtil.ofGroup(metalake, g.getGroupname()))
-            .collect(Collectors.toList());
-    return entityStore.batchGet(groupIdents, Entity.EntityType.GROUP, GroupEntity.class);
+    return groups.stream().map(UserGroup::getGroupName).collect(Collectors.toList());
   }
 
   private void versionCheckAndLoadRoles(

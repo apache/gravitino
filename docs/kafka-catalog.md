@@ -1,8 +1,8 @@
 ---
-title: "Kafka catalog"
-slug: /kafka-catalog
+title: "Kafka Catalog"
+slug: "/kafka-catalog"
 date: 2024-4-22
-keyword: kafka catalog
+keyword: "kafka catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -13,16 +13,16 @@ One Kafka catalog corresponds to one Kafka cluster.
 
 ## Catalog
 
-### Catalog properties
+### Catalog Properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Kafka catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Kafka catalog has the following properties:
 
 | Property Name       | Description                                                                                                                                                                                                   | Default Value | Required | Since Version |
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `bootstrap.servers` | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      | 0.5.0         |
 | `gravitino.bypass.` | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for more details) | (none)        | No       | 0.5.0         |
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Catalog operations](./manage-messaging-metadata-using-gravitino.md#catalog-operations) for more details.
 
@@ -30,33 +30,33 @@ Refer to [Catalog operations](./manage-messaging-metadata-using-gravitino.md#cat
 
 A "default" schema, which includes all the topics in the Kafka cluster, will be automatically created when catalog is created.
 
-### Schema capabilities
+### Schema Capabilities
 
 - Since the "default" schema is read-only, it only supports loading and listing schema.
 
-### Schema properties
+### Schema Properties
 
 None.
 
-### Schema operations
+### Schema Operations
 
 Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Topic
 
-### Topic capabilities
+### Topic Capabilities
 
 - The Kafka catalog supports creating, updating, deleting, and listing topics.
 
-### Topic properties
+### Topic Properties
 
 | Property name        | Description                              | Default value                                                                       | Required | Since Version |
 |----------------------|------------------------------------------|-------------------------------------------------------------------------------------|----------|---------------|
 | `partition-count`    | The number of partitions for the topic.  | if not specified, will use the `num.partition` property in the broker.              | No       | 0.5.0         |
 | `replication-factor` | The number of replications for the topic | if not specified, will use the `default.replication.factor` property in the broker. | No       | 0.5.0         |
 
-You can pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
+Pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
 
-### Topic operations
+### Topic Operations
 
 Refer to [Topic operation](./manage-messaging-metadata-using-gravitino.md#topic-operations) for more details.
