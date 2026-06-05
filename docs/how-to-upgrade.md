@@ -44,8 +44,10 @@ by creating a copy of the directory containing your database.
 For PostgreSQL, you can use the following command to backup your database:
 
 ```shell
-pg_dump -U username -h hostname -d database_name -n schema_name -a -F c -f data_backup.sql
+pg_dump -U username -h hostname -d database_name -n schema_name -Fc -f data_backup.dump
 ```
+The `-Fc` option produces a compressed binary dump in PostgreSQL's
+custom format, which can be restored with `pg_restore`.
 
 ### Step 3: Dump your Gravitino database
 Dump your Gravitino database schema to a file
@@ -70,7 +72,7 @@ Note that you may need to specify your h2 file path, username and password
 For PostgreSQL, you can use the following command to dump the database schema to a file:
 
 ```shell
-pg_dump -U username -h hostname -d database_name -n schema_name -s -F c -f schema-x.y.z-postgresql.sql
+pg_dump -U username -h hostname -d database_name -n schema_name -s -f schema-x.y.z-postgresql.sql
 ```
 
 ### Step 4: Determine differences between your schema and the official schema
@@ -81,8 +83,12 @@ Gravitino. The files in this directory with names like
 corresponding to each of the released versions of Gravitino. You can
 determine differences between your schema and the official schema
 by comparing the contents of the official dump with the schema dump
-you created in the previous step. Some differences are acceptable and will not interfere
-with the upgrade process, but others need to be resolved manually
+you created in the previous step.
+
+Some differences are acceptable and will not interfere
+with the upgrade process, such as differences in object ordering or
+comments. However, differences in table structures, column types, or
+missing tables/indexes need to be resolved manually
 or the upgrade scripts will fail to complete.
 
 ### Step 5: Apply the upgrade scripts
@@ -131,5 +137,44 @@ version of Gravitino. This is accomplished by repeating steps (3) and
 upgraded schema, e.g. if you upgraded the schema to Gravitino 0.8.0 then
 you will want to compare your schema dump against the contents of
 `schema-0.8.0-<type>.sql`
+
+## Rollback if Upgrade Fails
+
+If you encounter errors during the upgrade process, you can
+restore your database from the backup created in Step 2.
+
+### MySQL
+
+Use the backup file to restore your database. The `mysqldump`
+backup contains `DROP TABLE` statements by default (via `--opt`),
+so it will replace the upgraded tables automatically:
+
+```shell
+mysql -u username -h hostname <db_name> < backup.sql
+```
+
+### H2
+
+Replace the current database directory with the copy you made
+during the backup step:
+
+```shell
+rm -rf <db_directory>
+cp -r <db_directory_backup> <db_directory>
+```
+
+### PostgreSQL
+
+Use `pg_restore` with `--clean` to drop existing objects before
+restoring them in one transaction. This is safer than manually
+dropping the schema first:
+
+```shell
+pg_restore -U username -h hostname -d database_name --clean --if-exists --single-transaction data_backup.dump
+```
+
+After restoring, verify that your Gravitino instance starts
+successfully with the restored database before attempting the
+upgrade again.
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToUpgrade" alt="" />
