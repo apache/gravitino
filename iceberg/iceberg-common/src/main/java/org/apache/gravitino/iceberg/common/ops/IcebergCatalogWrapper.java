@@ -37,6 +37,7 @@ import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
@@ -44,6 +45,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -238,6 +240,36 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public void purgeTable(TableIdentifier tableIdentifier) {
     getMetadataCache().invalidate(tableIdentifier);
     CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
+  }
+
+  /**
+   * Loads current {@link TableMetadata}, bypassing the response cache. Used by the async cleanup
+   * path to snapshot the metadata location before dropping the catalog entry.
+   *
+   * @param tableIdentifier the table
+   * @return its metadata
+   */
+  public TableMetadata loadTableMetadata(TableIdentifier tableIdentifier) {
+    return ((BaseTable) getCatalog().loadTable(tableIdentifier)).operations().current();
+  }
+
+  /**
+   * Returns the FileIO implementation configured for this catalog.
+   *
+   * @return the {@code io-impl} class, or the Iceberg default when unset
+   */
+  public String fileIOImpl() {
+    String impl = icebergConfig.get(IcebergConfig.IO_IMPL);
+    return StringUtils.isNotBlank(impl) ? impl : ResolvingFileIO.class.getName();
+  }
+
+  /**
+   * Returns catalog properties used to reconstruct FileIO in a cleanup worker.
+   *
+   * @return catalog properties snapshotted at enqueue time
+   */
+  public Map<String, String> fileIOProperties() {
+    return getIcebergConfig().getIcebergCatalogProperties();
   }
 
   public LoadTableResponse loadTable(TableIdentifier tableIdentifier) {

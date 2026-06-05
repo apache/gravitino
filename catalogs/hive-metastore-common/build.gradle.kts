@@ -34,7 +34,10 @@ dependencies {
   compileOnly(project(":common"))
   compileOnly(project(":core"))
 
-  compileOnly(libs.hive2.metastore)
+  compileOnly(libs.hive2.metastore) {
+    exclude(group = "log4j")
+    exclude(group = "org.apache.logging.log4j")
+  }
   compileOnly(libs.immutables.value)
   compileOnly(libs.lombok)
   compileOnly(libs.caffeine)
@@ -126,10 +129,10 @@ dependencies {
     exclude("org.openjdk.jol")
     exclude("org.slf4j")
   }
-  testImplementation(libs.htrace.core4)
   testImplementation(libs.caffeine)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.testcontainers)
   testImplementation(libs.woodstox.core)
 

@@ -93,18 +93,22 @@ public class IcebergCleanupJobBaseSQLProvider {
    * @param state terminal state to set (SUCCEEDED or FAILED)
    * @param reason failure reason, or {@code null} for success
    * @param now state-change timestamp
+   * @param heartbeat the caller's owned heartbeat value (compare-and-swap ownership key)
    * @return the terminal-transition UPDATE statement
    */
   public String markFinished(
       @Param("id") long id,
       @Param("state") String state,
       @Param("reason") String reason,
-      @Param("now") long now) {
-    // Shared transition to a final state: SUCCEEDED (reason null) or FAILED (reason set).
+      @Param("now") long now,
+      @Param("heartbeat") long heartbeat) {
+    // Shared transition to a final state: SUCCEEDED (reason null) or FAILED (reason set). The
+    // heartbeat_at predicate checks ownership: a reclaimed worker no longer matches it.
     return "UPDATE "
         + TABLE_NAME
         + " SET state = #{state}, last_error = #{reason}, heartbeat_at = 0,"
-        + " updated_at = #{now} WHERE id = #{id} AND state = 'RUNNING'";
+        + " updated_at = #{now}"
+        + " WHERE id = #{id} AND state = 'RUNNING' AND heartbeat_at = #{heartbeat}";
   }
 
   /**
@@ -112,24 +116,28 @@ public class IcebergCleanupJobBaseSQLProvider {
    * @param reason failure reason
    * @param maxAttempts attempt ceiling past which the job is FAILED
    * @param now state-change timestamp
+   * @param heartbeat the caller's owned heartbeat value (compare-and-swap ownership key)
    * @return the transient-failure UPDATE statement
    */
   public String recordFailure(
       @Param("id") long id,
       @Param("reason") String reason,
       @Param("maxAttempts") int maxAttempts,
-      @Param("now") long now) {
+      @Param("now") long now,
+      @Param("heartbeat") long heartbeat) {
     // The state CASE must observe the pre-increment attempts value, so it MUST precede
     // "attempts = attempts + 1" in the SET list. MySQL evaluates SET assignments left to
     // right and later clauses see already-updated columns; if the increment came first the
     // CASE would compare attempts + 2 and fail one attempt early. H2 and PostgreSQL evaluate
     // every right-hand side against the original row, so state-first is correct there too,
-    // keeping this statement portable across all backends.
+    // keeping this statement portable across all backends. The heartbeat_at predicate checks
+    // ownership (see markFinished).
     return "UPDATE "
         + TABLE_NAME
         + " SET state = CASE WHEN attempts + 1 >= #{maxAttempts} THEN 'FAILED' ELSE 'PENDING' END,"
         + " attempts = attempts + 1, last_error = #{reason},"
-        + " heartbeat_at = 0, updated_at = #{now} WHERE id = #{id} AND state = 'RUNNING'";
+        + " heartbeat_at = 0, updated_at = #{now}"
+        + " WHERE id = #{id} AND state = 'RUNNING' AND heartbeat_at = #{heartbeat}";
   }
 
   /**

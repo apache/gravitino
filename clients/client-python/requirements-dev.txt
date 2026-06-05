@@ -33,3 +33,11 @@ jwcrypto==1.5.6
 sphinx==7.1.2
 furo==2024.8.6
 banks==2.4.1
+
+# Lance integration deps. Pinned so the default integration test runs against
+# a single, known-good (server-side `lance-namespace-core` 0.7.5+) combination.
+# The multi-version matrix (`:clients:client-python:lanceRayMatrixTest`) keeps
+# its own per-version venvs and does not consume these pins.
+ray==2.55.1
+lance-ray==0.4.2
+lance-namespace==0.7.5

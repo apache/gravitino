@@ -1,7 +1,7 @@
 ---
-title: "Flink authentication with Gravitino server"
-slug: /flink-connector/flink-authentication
-keyword: flink connector authentication basic oauth2 kerberos
+title: "Flink Authentication"
+slug: "/flink-connector/flink-authentication"
+keyword: "flink connector authentication basic oauth2 kerberos"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -13,13 +13,13 @@ Flink connector supports `simple`, `basic`, `oauth2`, and `kerberos` authenticat
 |----------------------------------------------------------|--------|---------------|------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
 | table.catalog-store.gravitino.gravitino.client.auth.type | string | (none)        | When set, supports `basic` and `oauth2`; if unset, Flink uses Kerberos or simple per its security settings.                              | No       | 1.2.0         |
 
-## Simple mode
+## Simple Mode
 
 In simple mode, the username originates from Flink. The resolution order is:
 1. `HADOOP_USER_NAME` environment variable
 2. The logged-in OS user
 
-## Basic mode
+## Basic Mode
 
 In Basic mode, the Flink connector authenticates to the Gravitino server using HTTP Basic credentials
 against the built-in IDP. The Gravitino server must have Basic authentication enabled. See
@@ -42,7 +42,7 @@ table.catalog-store.gravitino.gravitino.client.basic.username: admin
 table.catalog-store.gravitino.gravitino.client.basic.password: YourSecureGravitinoPassword
 ```
 
-## OAuth2 mode
+## OAuth2 Mode
 
 In OAuth2 mode, configure the following settings to fetch an OAuth2 token to access the Gravitino server:
 
@@ -66,7 +66,7 @@ table.catalog-store.gravitino.gravitino.client.oauth2.credential: client-id:clie
 table.catalog-store.gravitino.gravitino.client.oauth2.scope: your-scope
 ```
 
-## Kerberos mode
+## Kerberos Mode
 
 In Kerberos mode, use Flink security configurations to obtain a Kerberos ticket for accessing the Gravitino server. Configure `security.kerberos.login.principal` and `security.kerberos.login.keytab` for the Kerberos principal and keytab.
 

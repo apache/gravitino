@@ -1,0 +1,96 @@
+name: Lance Compatibility Matrix Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      lance_spark_versions:
+        description: "Comma-separated lance-spark-bundle versions"
+        required: false
+        default: "0.2.0,0.4.0"
+      lance_ray_versions:
+        description: "Comma-separated lance-ray versions"
+        required: false
+        default: "0.4.2,0.3.0"
+  schedule:
+    # Run weekly on main so compatibility drift is caught outside PR validation.
+    - cron: "0 18 * * 0"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lance-spark-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      LANCE_SPARK_VERSIONS: ${{ github.event.inputs.lance_spark_versions || '0.2.0,0.4.0' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Free up disk space
+        run: dev/ci/util_free_space.sh
+
+      - name: Run Lance Spark compatibility matrix
+        id: lanceSparkMatrixTest
+        run: |
+          ./gradlew :lance:lance-rest-server:lanceSparkMatrixTest \
+            -PlanceSparkBundleVersions="${LANCE_SPARK_VERSIONS}" \
+            -PskipDockerTests=true \
+            -PskipWeb=true
+
+      - name: Upload Lance Spark matrix reports
+        uses: actions/upload-artifact@v7
+        if: ${{ failure() && steps.lanceSparkMatrixTest.outcome == 'failure' }}
+        with:
+          name: lance-spark-matrix-reports
+          path: |
+            lance/lance-rest-server/build/reports/lance-spark-matrix
+            lance/lance-rest-server/build/test-results/lance-spark-matrix
+            build/reports
+
+  lance-ray-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      LANCE_RAY_VERSIONS: ${{ github.event.inputs.lance_ray_versions || '0.4.2,0.3.0' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Free up disk space
+        run: dev/ci/util_free_space.sh
+
+      - name: Package Gravitino
+        run: ./gradlew compileDistribution -PskipWeb=true -x test
+
+      - name: Run Lance Ray compatibility matrix
+        id: lanceRayMatrixTest
+        run: |
+          ./gradlew :clients:client-python:lanceRayMatrixTest \
+            -PlanceRayVersions="${LANCE_RAY_VERSIONS}" \
+            -PskipDockerTests=true \
+            -PskipWeb=true
+
+      - name: Upload Lance Ray matrix reports
+        uses: actions/upload-artifact@v7
+        if: ${{ failure() && steps.lanceRayMatrixTest.outcome == 'failure' }}
+        with:
+          name: lance-ray-matrix-reports
+          path: |
+            clients/client-python/build/lance-ray-matrix
+            build/reports
+            integration-test/build/integration-test.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log

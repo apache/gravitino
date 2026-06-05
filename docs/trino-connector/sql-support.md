@@ -1,20 +1,22 @@
 ---
-title: "Apache Gravitino Trino connector SQL support"
-slug: /trino-connector/sql-support
-keyword: gravitino connector trino
+title: "Trino Connector SQL Support"
+slug: "/trino-connector/sql-support"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 The connector provides read access and write access to data and metadata stored in Apache Gravitino.
 
-### Globally available statements
+### Globally Available Statements
 
 - [EXPLAIN](https://trino.io/docs/current/sql/explain.html)
 - [EXPLAIN ANALYZE](https://trino.io/docs/current/sql/explain-analyze.html)
 - [PREPARE](https://trino.io/docs/current/sql/prepare.html)
 - [USE](https://trino.io/docs/current/sql/use.html)
 
-### Read operations
+### Read Operations
 
 - [SELECT](https://trino.io/docs/current/sql/select.html)
 - [DESCRIBE](https://trino.io/docs/current/sql/describe.html)
@@ -25,7 +27,7 @@ The connector provides read access and write access to data and metadata stored 
 - [SHOW SCHEMAS](https://trino.io/docs/current/sql/show-schemas.html)
 - [SHOW TABLES](https://trino.io/docs/current/sql/show-tables.html)
 
-### Write operations
+### Write Operations
 
 - [INSERT](https://trino.io/docs/current/sql/insert.html)
 - [INSERT INTO SELECT](https://trino.io/docs/current/sql/insert.html)
@@ -33,7 +35,7 @@ The connector provides read access and write access to data and metadata stored 
 - [DELETE](https://trino.io/docs/current/sql/delete.html)
 - [MERGE](https://trino.io/docs/current/sql/merge.html)
 
-### Schema and table management
+### Schema and Table Management
 
 - [CREATE TABLE](https://trino.io/docs/current/sql/create-table.html)
 - [CREATE TABLE AS SELECT](https://trino.io/docs/current/sql/create-table-as.html) (`CREATE OR REPLACE TABLE AS SELECT` is not supported)
@@ -49,4 +51,4 @@ The connector provides read access and write access to data and metadata stored 
 - [COMMIT](https://trino.io/docs/current/sql/commit.html)
 - [ROLLBACK](https://trino.io/docs/current/sql/rollback.html)
 
-For more information, please refer to Trino [SQL statements support](https://trino.io/docs/current/language/sql-support.html#sql-globally-available)
+For more information, refer to Trino [SQL statements support](https://trino.io/docs/current/language/sql-support.html#sql-globally-available)
