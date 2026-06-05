@@ -204,7 +204,6 @@ public class LanceTableOperations extends ManagedTableOperations {
   public boolean purgeTable(NameIdentifier ident) {
     try {
       Table table = loadTable(ident);
-      String location = table.properties().get(Table.PROPERTY_LOCATION);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
@@ -224,21 +223,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       // If the table metadata is purged successfully, we can delete the Lance dataset.
       // Otherwise, we should not delete the dataset.
       if (purged) {
-        Map<String, String> resolvedStorageOptions =
-            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
-        try {
-          Dataset.drop(location, resolvedStorageOptions);
-          LOG.info("Deleted Lance dataset at location {}", location);
-        } catch (Exception e) {
-          // Dataset.drop (native) throws IOException with "Not found:" when path doesn't exist.
-          if (e instanceof IOException
-              && e.getMessage() != null
-              && e.getMessage().contains("Not found:")) {
-            LOG.warn("Lance dataset at {} was already deleted, skipping.", location);
-          } else {
-            throw new RuntimeException("Failed to delete Lance dataset at " + location, e);
-          }
-        }
+        dropLanceDataset(table);
       }
 
       return purged;
@@ -271,22 +256,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       // If the table metadata is dropped successfully, and the table is not external, we can
       // delete the Lance dataset. Otherwise, we should not delete the dataset.
       if (dropped) {
-        String location = table.properties().get(Table.PROPERTY_LOCATION);
-        Map<String, String> resolvedStorageOptions =
-            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
-        try {
-          Dataset.drop(location, resolvedStorageOptions);
-          LOG.info("Deleted Lance dataset at location {}", location);
-        } catch (Exception e) {
-          // Dataset.drop (native) throws IOException with "Not found:" when path doesn't exist.
-          if (e instanceof IOException
-              && e.getMessage() != null
-              && e.getMessage().contains("Not found:")) {
-            LOG.warn("Lance dataset at {} was already deleted, skipping.", location);
-          } else {
-            throw new RuntimeException("Failed to delete Lance dataset at " + location, e);
-          }
-        }
+        dropLanceDataset(table);
       }
 
       return dropped;
@@ -295,6 +265,25 @@ public class LanceTableOperations extends ManagedTableOperations {
       return false;
     } catch (Exception e) {
       throw new RuntimeException("Failed to drop Lance dataset for table " + ident, e);
+    }
+  }
+
+  private void dropLanceDataset(Table table) {
+    String location = table.properties().get(Table.PROPERTY_LOCATION);
+    Map<String, String> resolvedStorageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    try {
+      Dataset.drop(location, resolvedStorageOptions);
+      LOG.info("Deleted Lance dataset at location {}", location);
+    } catch (Exception e) {
+      // Dataset.drop (native) throws IOException with "Not found:" when path doesn't exist.
+      if (e instanceof IOException
+          && e.getMessage() != null
+          && e.getMessage().contains("Not found:")) {
+        LOG.warn("Lance dataset at {} was already deleted, skipping.", location);
+      } else {
+        throw new RuntimeException("Failed to delete Lance dataset at " + location, e);
+      }
     }
   }
 
