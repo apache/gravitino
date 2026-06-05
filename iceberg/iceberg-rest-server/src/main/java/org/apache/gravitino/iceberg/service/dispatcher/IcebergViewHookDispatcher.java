@@ -53,10 +53,15 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private static final Logger LOG = LoggerFactory.getLogger(IcebergViewHookDispatcher.class);
 
   private final IcebergViewOperationDispatcher dispatcher;
+  private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
   private final String metalake;
 
-  public IcebergViewHookDispatcher(IcebergViewOperationDispatcher dispatcher, String metalake) {
+  public IcebergViewHookDispatcher(
+      IcebergViewOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher,
+      String metalake) {
     this.dispatcher = dispatcher;
+    this.namespaceDispatcher = namespaceDispatcher;
     this.metalake = metalake;
   }
 
@@ -101,6 +106,8 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // another node may recreate the same view between the drop above and the
     // EntityStore delete, leaving a stale Gravitino entity if we blindly delete.
     bestEffortReconcileViewEntity(context, viewIdentifier);
+    IcebergOrphanSchemaCleanup.bestEffortCleanUp(
+        metalake, namespaceDispatcher, context, viewIdentifier.namespace());
   }
 
   @Override

@@ -1,10 +1,12 @@
 ---
-title: "Fileset catalog with ADLS"
-slug: /fileset-catalog-with-adls
+title: "Fileset Catalog with ADLS"
+slug: "/fileset-catalog-with-adls"
 date: 2025-01-03
-keyword: Fileset catalog ADLS
+keyword: "Fileset catalog ADLS"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 This document describes how to configure a Fileset catalog with ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)).
 
@@ -20,11 +22,11 @@ To set up a Fileset catalog with ADLS, follow these steps:
 $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Fileset catalog with ADLS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
+Once the server is up and running, you can proceed to configure the Fileset catalog with ADLS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
 
-## Configurations for creating a Fileset catalog with ADLS
+## ADLS Catalog Configuration
 
-### Configuration for a ADLS Fileset catalog
+### ADLS Fileset Catalog Configuration
 
 Apart from configurations mentioned in [fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with ADLS:
 
@@ -34,25 +36,25 @@ Apart from configurations mentioned in [fileset-catalog-catalog-configuration](.
 | `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                            | `builtin-local` | No       | 0.8.0-incubating |
 | `azure-storage-account-name ` | The account name of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | (none)          | Yes      | 0.8.0-incubating |
 | `azure-storage-account-key`   | The account key of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | (none)          | Yes      | 0.8.0-incubating |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, please see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       | 0.8.0-incubating |
+| `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       | 0.8.0-incubating |
 
 :::note
 `default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-azure-bundle`).
 :::
 
-### Configurations for a schema
+### Schema Configuration
 
 Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.
 
-### Configurations for a fileset
+### Fileset Configuration
 
 Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
-## Example of creating Fileset catalog with ADLS
+## Create the Catalog, Schema, and Fileset
 
 This section demonstrates how to create the Fileset catalog with ADLS in Gravitino, with a complete example.
 
-### Step1: Create a Fileset catalog with ADLS
+### Step 1: Create a Fileset Catalog with ADLS
 
 First, you need to create a Fileset catalog with ADLS. The following example shows how to create a Fileset catalog with ADLS:
 
@@ -117,7 +119,7 @@ adls_properties = gravitino_client.create_catalog(name="example_catalog",
 </TabItem>
 </Tabs>
 
-### Step2: Create a schema
+### Step 2: Create a Schema
 
 Once the catalog is created, you can create a schema. The following example shows how to create a schema:
 
@@ -167,7 +169,7 @@ catalog.as_schemas().create_schema(name="test_schema",
 </TabItem>
 </Tabs>
 
-### Step3: Create a fileset
+### Step 3: Create a Fileset
 
 After creating the schema, you can create a fileset. The following example shows how to create a fileset:
 
@@ -229,9 +231,9 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 </TabItem>
 </Tabs>
 
-## Accessing a fileset with ADLS
+## Access a Fileset with ADLS
 
-### Using the GVFS Java client to access the fileset
+### Access the Fileset with the GVFS Java Client
 
 To access fileset with Azure Blob Storage(ADLS) using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -302,7 +304,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
   </dependency>
 ```
 
-### Using Spark to access the fileset
+### Access the Fileset with Spark
 
 The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
@@ -383,9 +385,9 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is necessary for the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Accessing a fileset using the Hadoop fs command
+### Access a Fileset Using the Hadoop Fs Command
 
-The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
+The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3:
 
 1. Adding the following contents to the `${HADOOP_HOME}/etc/hadoop/core-site.xml` file:
 
@@ -431,9 +433,9 @@ For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-vers
 ./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/adls_catalog/adls_schema/adls_fileset
 ```
 
-### Using the GVFS Python client to access a fileset
+### Access the Fileset with the GVFS Python Client
 
-In order to access fileset with Azure Blob storage (ADLS) using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+To access fileset with Azure Blob storage (ADLS) using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
 | Configuration item           | Description                            | Default value | Required | Since version    |
 |------------------------------|----------------------------------------|---------------|----------|------------------|
@@ -464,7 +466,7 @@ fs.ls("gvfs://fileset/{adls_catalog}/{adls_schema}/{adls_fileset}/")
 ```
 
 
-### Using fileset with pandas
+### Access the Fileset with Pandas
 
 The following are examples of how to use the pandas library to access the ADLS fileset
 
@@ -484,15 +486,15 @@ ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}
 ds.head()
 ```
 
-For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
+For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with credential vending
+## Fileset with Credential Vending
 
 Since 0.8.0-incubating, Gravitino supports credential vending for ADLS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access ADLS fileset without providing authentication information like `azure-storage-account-name` and `azure-storage-account-key` in the properties.
 
-### How to create an ADLS Fileset catalog with credential vending
+### Create an ADLS Fileset Catalog with Credential Vending
 
-Apart from configuration method in [create-adls-fileset-catalog](#configuration-for-a-adls-fileset-catalog),
+Apart from configuration method in [create-adls-fileset-catalog](#adls-fileset-catalog-configuration),
 properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should
 also be set to enable credential vending for ADLS fileset. Take `adls-token` credential provider for example:
 
@@ -514,7 +516,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### How to access ADLS fileset with credential vending
+### Access an ADLS Fileset with Credential Vending
 
 When the catalog is configured with credentials and client-side credential vending is enabled, 
 you can access ADLS filesets directly using the GVFS Java/Python client or Spark without providing authentication details.

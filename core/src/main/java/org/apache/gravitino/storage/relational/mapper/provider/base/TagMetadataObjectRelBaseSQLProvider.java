@@ -83,9 +83,9 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " te JOIN "
         + TagMetaMapper.TAG_TABLE_NAME
-        + " tm JOIN "
+        + " tm ON te.tag_id = tm.tag_id JOIN "
         + MetalakeMetaMapper.TABLE_NAME
-        + " mm ON te.tag_id = tm.tag_id AND tm.metalake_id = mm.metalake_id"
+        + " mm ON tm.metalake_id = mm.metalake_id"
         + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
         + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0";
   }

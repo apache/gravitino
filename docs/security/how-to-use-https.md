@@ -1,19 +1,19 @@
 ---
-title: "How to use HTTPS"
-slug: /security/how-to-use-https
-keyword: security HTTPS protocol
+title: "HTTPS"
+slug: "/security/how-to-use-https"
+keyword: "security HTTPS protocol"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## HTTPS
+## Introduction
 
 For users choosing OAuth 2.0 as the authentication method, it is recommended to use HTTPS instead of HTTP. HTTPS encrypts the request headers, offering better protection against smuggling attacks.
 
 Note that Gravitino cannot simultaneously support both HTTP and HTTPS within a single server instance. If HTTPS is enabled, Gravitino will no longer provide HTTP service.
 
-Currently, both the Gravitino server and Iceberg REST service can configure and support HTTPS.
+Both the Gravitino server and Iceberg REST service can configure and support HTTPS.
 
-### Apache Gravitino server's configuration
+### Apache Gravitino Server Configuration
 
 | Configuration item                                  | Description                                                        | Default value       | Required                                          | Since version |
 |-----------------------------------------------------|--------------------------------------------------------------------|---------------------|---------------------------------------------------|---------------|
@@ -30,7 +30,7 @@ Currently, both the Gravitino server and Iceberg REST service can configure and 
 | `gravitino.server.webserver.trustStorePassword`     | Password to the trust store.                                       | (none)              | Yes if use HTTPS and the authentication of client | 0.3.0         |
 | `gravitino.server.webserver.trustStoreType`         | The type to the trust store.                                       | `JKS`               | No                                                | 0.3.0         |
 
-### Apache Iceberg REST service's configuration
+### Apache Iceberg REST Service Configuration
 
 | Configuration item                              | Description                                                        | Default value     | Required                                          | Since version |
 |-------------------------------------------------|--------------------------------------------------------------------|-------------------|---------------------------------------------------|---------------|
@@ -53,7 +53,7 @@ Refer to the "Additional JSSE Standard Names" section of the [Java security guid
 
 ### Example
 
-You can follow the steps to set up an HTTPS server.
+Follow these steps to set up an HTTPS server:
 
 1. Prerequisite
    - You need to install the JDK8, wget, and set the environment JAVA_HOME.
@@ -82,7 +82,7 @@ bin/keytool -export -alias localhost -keystore localhost.jks -file  localhost.cr
 bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file localhost.crt -storepass changeit -noprompt
 ```
 
-5. You can refer to the [Configurations](../gravitino-server-config.md) and append the configuration to the conf/gravitino.conf.
+5. Refer to the [Configurations](../gravitino-server-config.md) and append the configuration to the conf/gravitino.conf.
    Configuration doesn't support resolving environment variables, so you should replace `${JAVA_HOME}` with the actual value.
    Then, You can start the Gravitino server.
 

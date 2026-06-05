@@ -1,6 +1,6 @@
 ---
-title: "Manage jobs in Gravitino"
-slug: /manage-jobs-in-gravitino
+title: "Manage Jobs"
+slug: "/manage-jobs-in-gravitino"
 date: 2025-08-13
 keywords:
   - job
@@ -34,15 +34,15 @@ Gravitino's job system provides an extensible way to connect to different job ex
    support running a single job at a time, and it doesn't support job scheduling for now.
    :::
 
-## Job operations
+## Job Operations
 
-### Register a new job template
+### Register a New Job Template
 
-Before running a job, the first step is to register a job template. Currently, Gravitino
+Before running a job, the first step is to register a job template. Gravitino
 supports two types of job templates: `shell` and `spark` (we will add more job templates in the
 future).
 
-#### Shell job template
+#### Shell Job Template
 
 The `shell` job template is used to run scripts, it can be a shell script, or any executable
 script. The template is defined as follows:
@@ -80,8 +80,7 @@ Here is a brief description of the fields in the job template:
 
 Please note that:
 
-1. The `executable` and `scripts` must be accessible by the Gravitino server. Currently,
-   Gravitino supports accessing files from the local file system, HTTP(S) URLs, and FTP(S) URLs
+1. The `executable` and `scripts` must be accessible by the Gravitino server. Gravitino supports accessing files from the local file system, HTTP(S) URLs, and FTP(S) URLs
    (more distributed file system support will be added in the future). So the `executable` and
    `scripts` can be a local file path, or a URL like `http://example.com/my_script.sh`.
 2. The `executable`, `arguments`, `environments`, `customFields` and `scripts` can use placeholders
@@ -91,7 +90,7 @@ Please note that:
    when running the job, so you can use the relative path in the `executable` and `scripts` to
    refer to other scripts in the job working directory.
 
-#### Spark job template
+#### Spark Job Template
 
 The `spark` job template is used to run Spark jobs, it is a Spark application JAR file for now.
 
@@ -146,7 +145,7 @@ Here is a brief description of the fields in the Spark job template:
 Note that:
 
 1. The `executable`, `jars`, `files`, and `archives` must be accessible by the Gravitino server.
-   Currently, Gravitino support accessing files from the local file system, HTTP(S) URLs, and
+   Gravitino supports accessing files from the local file system, HTTP(S) URLs, and
    FTP(S) URLs (more distributed file system supports will be added in the future). So the
    `executable`, `jars`, `files`, and `archives` can be a local file path, or a URL like
    `http://example.com/my_spark_app.jar`.
@@ -231,9 +230,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### List registered job templates
+### List Registered Job Templates
 
-You can list all the registered job templates under a metalake by using the REST API or the Java
+List all the registered job templates under a metalake by using the REST API or the Java
 and Python SDKs.
 
 <Tabs groupId='language' queryString>
@@ -268,9 +267,9 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Get a registered job template by name
+### Get a Registered Job Template by Name
 
-You can get a registered job template by its name using the REST API or the Java and Python SDKs.
+Get a registered job template by its name using the REST API or the Java and Python SDKs.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -299,9 +298,9 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Delete a registered job template by name
+### Delete a Registered Job Template by Name
 
-You can delete a registered job template by its name using the REST API or the Java and Python SDKs.
+Delete a registered job template by its name using the REST API or the Java and Python SDKs.
 
 Note that deleting a job template will also delete all the jobs that are using this job template.
 If there are queued, started, or to be cancelled jobs that are using this job template, the deletion
@@ -334,9 +333,9 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Alter a registered job template
+### Alter a Registered Job Template
 
-You can alter a registered job template by its name using the REST API or the Java and Python
+Alter a registered job template by its name using the REST API or the Java and Python
 SDKs. Gravitino supports altering the `name`, `comment` and `template` fields of the job template.
 
 <Tabs groupId='language' queryString>
@@ -423,7 +422,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Run a job based on a job template
+### Run a Job Based on a Job Template
 
 To run a job based on the registered job template, you can use the REST API or the Java and Python SDKs.
 When running a job, you need to provide the job template name and the parameters to replace the
@@ -433,7 +432,7 @@ Gravitino leverages the job executor to run the job, so you need to specify the 
 through configuration `gravitino.job.executor`. By default, it is set to "local", which means
 the job will be launched as a process within the same machine that runs the Gravitino server. Note
 that the local job executor is only for testing. If you want to run the job in a distributed environment,
-you need to implement your own `JobExecutor` and set the configuration, please see
+you need to implement your own `JobExecutor` and set the configuration; see
 [Implement a custom job executor](#implement-a-custom-job-executor) section below.
 
 When running a Spark job template with the local executor, configure one of:
@@ -491,15 +490,15 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-The returned `JobHandle` contains the job ID and other information about the job. You can use the job ID to
+The returned `JobHandle` contains the job ID and other information about the job. Use the job ID to
 check the job status and cancel the job.
 
 The runJob API will return immediately after the job is submitted to the job executor, and the job will be
-executed asynchronously. You can check the job status using the job ID returned by the runJob API.
+executed asynchronously. Check the job status using the job ID returned by the runJob API.
 
-### List all jobs
+### List All Jobs
 
-You can list all the jobs under a metalake by using the REST API or the Java and Python SDKs.
+List all the jobs under a metalake by using the REST API or the Java and Python SDKs.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -540,9 +539,9 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Get a job by job ID
+### Get a Job by Job ID
 
-You can get a job by its job ID using the REST API or the Java and Python SDKs.
+Get a job by its job ID using the REST API or the Java and Python SDKs.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -571,9 +570,9 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Cancel a job by job ID
+### Cancel a Job by Job ID
 
-You can cancel a job by its job ID using the REST API or the Java and Python SDKs.
+Cancel a job by its job ID using the REST API or the Java and Python SDKs.
 
 The job will be cancelled asynchronously, and the job status will be updated to `CANCELLING` first,
 then to `CANCELLED` when the cancellation is completed. If the job is already in `SUCCEEDED`,
@@ -610,9 +609,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Configurations of the job system
+### Job System Configuration
 
-You can configure the job system through the `gravitino.conf` file. The following are the
+Configure the job system through the `gravitino.conf` file. The following are the
 default configurations:
 
 | Property name                          | Description                                                                       | Default value                 | Required | Since Version |
@@ -623,7 +622,7 @@ default configurations:
 | `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       | 1.0.0         |
 
 
-#### Configurations for local job executor
+#### Configurations for Local Job Executor
 
 The local job executor is used for testing and development purposes, it runs the job in the local process.
 The following are the default configurations for the local job executor:
@@ -635,10 +634,10 @@ The following are the default configurations for the local job executor:
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       | 1.0.0         |
 | `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       | 1.0.1         |
 
-### Implement a custom job executor
+### Implement a Custom Job Executor
 
-Gravitino's job system is designed to be extensible, allowing you to implement your own job executor
-to run jobs in a distributed environment. You can refer to the interface `JobExecutor` in the
+Gravitino's job system is extensible: you can implement your own job executor
+to run jobs in a distributed environment. Refer to the interface `JobExecutor` in the
 code [here](https://github.com/apache/gravitino/blob/main/core/src/main/java/org/apache/gravitino/connector/job/JobExecutor.java).
 
 After you implement your own job executor, you need to register it in the Gravitino server by
@@ -650,7 +649,7 @@ gravitino.job.executor = airflow
 gravitino.jobExecutor.airflow.class = com.example.MyAirflowJobExecutor
 ```
 
-You can also configure the job executor with additional properties, like:
+Configure the job executor with additional properties, like:
 
 ```
 gravitino.jobExecutor.airflow.host = http://localhost:8080
@@ -660,7 +659,7 @@ gravitino.jobExecutor.airflow.password = mypassword
 
 These properties will be passed to the airflow job executor when it is instantiated.
 
-## Future work
+## Future Work
 
 The job system is a new feature introduced in Gravitino 1.0.0, and it still needs more work:
 

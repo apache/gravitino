@@ -146,7 +146,9 @@ def ensure_venv(python: str, venv_dir: Path) -> Path:
     return venv_python
 
 
-def _deps_sentinel(venv_dir: Path, version: str, ray_spec: str, lance_namespace_spec: str) -> Path:
+def _deps_sentinel(
+    venv_dir: Path, version: str, ray_spec: str, lance_namespace_spec: str
+) -> Path:
     """Return the path to the sentinel file that marks a fully-installed venv.
 
     The sentinel encodes all dep specs so any change in pinned versions forces
@@ -171,7 +173,9 @@ def install_deps(
     """
     sentinel = _deps_sentinel(venv_dir, version, ray_spec, lance_namespace_spec)
     if sentinel.exists():
-        print(f"[matrix] venv for lance-ray=={version} already populated, skipping pip install")
+        print(
+            f"[matrix] venv for lance-ray=={version} already populated, skipping pip install"
+        )
         return
 
     rc = run(
