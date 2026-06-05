@@ -57,6 +57,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.MetadataUpdate;
@@ -81,8 +82,16 @@ import org.apache.iceberg.inmemory.InMemoryFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.ErrorHandlers;
+import org.apache.iceberg.rest.HTTPClient;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.rest.RESTClient;
+import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.ResourcePaths;
+import org.apache.iceberg.rest.auth.AuthManager;
+import org.apache.iceberg.rest.auth.AuthManagers;
+import org.apache.iceberg.rest.auth.AuthSession;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
@@ -192,35 +201,89 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   /**
    * Get table credentials.
    *
-   * @param identifier The table identifier for which to load credentials
-   * @return A {@link org.apache.iceberg.rest.responses.LoadCredentialsResponse} object containing
-   *     the credentials.
+   * @param identifier table identifier
+   * @param privilege used for local credential vending; ignored for REST catalog backends
+   * @return table credentials response
    */
   public LoadCredentialsResponse getTableCredentials(
       TableIdentifier identifier, CredentialPrivilege privilege) {
+    if (isRESTCatalog()) {
+      return getRESTTableCredentials((RESTCatalog) getCatalog(), identifier);
+    } else {
+      return getLocalTableCredentials(identifier, privilege);
+    }
+  }
+
+  private LoadCredentialsResponse getLocalTableCredentials(
+      TableIdentifier identifier, CredentialPrivilege privilege) {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
-      Credential credential = getCredential(loadTableResponse, privilege);
-      org.apache.iceberg.rest.credentials.Credential icebergCredential =
-          new org.apache.iceberg.rest.credentials.Credential() {
-            @Override
-            public String prefix() {
-              return "";
-            }
-
-            @Override
-            public Map<String, String> config() {
-              // Convert Gravitino credentials to the Iceberg REST credential payload format.
-              return CredentialPropertyUtils.toIcebergProperties(credential);
-            }
-
-            @Override
-            public void validate() {}
-          };
-      return ImmutableLoadCredentialsResponse.builder().addCredentials(icebergCredential).build();
+      Credential credential = getCredential(loadTableResponse.tableMetadata(), privilege);
+      return ImmutableLoadCredentialsResponse.builder()
+          .addCredentials(
+              IcebergRESTUtils.toRESTCredential(
+                  catalogCredentialManager.catalogName(),
+                  identifier,
+                  credential,
+                  loadTableResponse.tableMetadata()))
+          .build();
     } catch (ServiceUnavailableException e) {
       LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);
       return ImmutableLoadCredentialsResponse.builder().build();
+    }
+  }
+
+  private static LoadCredentialsResponse getRESTTableCredentials(
+      RESTCatalog restCatalog, TableIdentifier identifier) {
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
+    String credentialsPath =
+        ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials";
+
+    AuthManager authManager = null;
+    RESTClient client = null;
+    AuthSession authSession = null;
+    try {
+      authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
+      client =
+          HTTPClient.builder(properties)
+              .uri(properties.get(CatalogProperties.URI))
+              .withHeaders(RESTUtil.configHeaders(properties))
+              .build();
+      authSession = authManager.catalogSession(client, properties);
+      return client
+          .withAuthSession(authSession)
+          .get(
+              credentialsPath,
+              LoadCredentialsResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.tableErrorHandler());
+    } finally {
+      if (authSession != null) {
+        try {
+          authSession.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close auth session when loading credentials for table: {}", identifier, e);
+        }
+      }
+
+      if (client != null) {
+        try {
+          client.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close REST client when loading credentials for table: {}", identifier, e);
+        }
+      }
+
+      if (authManager != null) {
+        try {
+          authManager.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close auth manager when loading credentials for table: {}", identifier, e);
+        }
+      }
     }
   }
 
@@ -318,7 +381,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       TableIdentifier tableIdentifier,
       LoadTableResponse loadTableResponse,
       CredentialPrivilege privilege) {
-    final Credential credential = getCredential(loadTableResponse, privilege);
+    final Credential credential = getCredential(loadTableResponse.tableMetadata(), privilege);
 
     LOG.info(
         "Generate credential: {} for Iceberg table: {}",
@@ -327,7 +390,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     // Merge temporary credential fields as Iceberg client config entries in the load-table
     // response.
-    Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
+    Map<String, String> credentialConfig =
+        IcebergRESTUtils.toRESTCredential(
+                catalogCredentialManager.catalogName(),
+                tableIdentifier,
+                credential,
+                loadTableResponse.tableMetadata())
+            .config();
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
         .addAllConfig(loadTableResponse.config())
@@ -336,9 +405,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         .build();
   }
 
-  private Credential getCredential(
-      LoadTableResponse loadTableResponse, CredentialPrivilege privilege) {
-    TableMetadata tableMetadata = loadTableResponse.tableMetadata();
+  private Credential getCredential(TableMetadata tableMetadata, CredentialPrivilege privilege) {
     String[] path =
         Stream.of(
                 tableMetadata.location(),
@@ -685,13 +752,22 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     if (table instanceof BaseTable) {
       Map<String, String> properties = retrieveFileIOProperties(table.io());
+      Map<String, String> filteredCredentialProperties =
+          CredentialPropertyUtils.filterCredentialProperties(properties);
       return LoadTableResponse.builder()
           .withTableMetadata(((BaseTable) table).operations().current())
           .addAllConfig(
               MapUtils.getFilteredMap(
                   properties, key -> catalogPropertiesToClientKeys.contains(key)))
-          // Keep only credential fields from FileIO properties before returning them to the client.
-          .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
+          // Keep only credential fields from FileIO properties before returning them to the
+          // client.
+          .addAllConfig(filteredCredentialProperties)
+          .addAllConfig(
+              IcebergRESTUtils.buildRefreshProps(
+                  catalogCredentialManager.catalogName(), ident, filteredCredentialProperties))
+          .addAllCredentials(
+              IcebergRESTUtils.buildStorageCreds(
+                  catalogCredentialManager.catalogName(), ident, table.io()))
           .build();
     }
 
@@ -726,10 +802,19 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
 
     Map<String, String> tableProperties = retrieveFileIOProperties(table.io());
+    Map<String, String> filteredCredentialProperties =
+        CredentialPropertyUtils.filterCredentialProperties(tableProperties);
     config.putAll(
         MapUtils.getFilteredMap(
             tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
-    config.putAll(CredentialPropertyUtils.filterCredentialProperties(tableProperties));
+    config.putAll(filteredCredentialProperties);
+    config.putAll(
+        IcebergRESTUtils.buildRefreshProps(
+            catalogCredentialManager.catalogName(), ident, filteredCredentialProperties));
+
+    List<org.apache.iceberg.rest.credentials.Credential> credentials =
+        IcebergRESTUtils.buildStorageCreds(
+            catalogCredentialManager.catalogName(), ident, table.io());
 
     TableMetadata metadata =
         TableMetadata.newTableMetadata(
@@ -739,7 +824,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             table.location(),
             properties);
 
-    return LoadTableResponse.builder().withTableMetadata(metadata).addAllConfig(config).build();
+    return LoadTableResponse.builder()
+        .withTableMetadata(metadata)
+        .addAllConfig(config)
+        .addAllCredentials(credentials)
+        .build();
   }
 
   private LoadTableResponse tableUpdateInternal(TableIdentifier ident, UpdateTableRequest request) {
@@ -793,13 +882,21 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     if (table instanceof BaseTable) {
       Map<String, String> properties = retrieveFileIOProperties(table.io());
+      Map<String, String> filteredCredentialProperties =
+          CredentialPropertyUtils.filterCredentialProperties(properties);
       return LoadTableResponse.builder()
           .withTableMetadata(((BaseTable) table).operations().current())
           .addAllConfig(
               MapUtils.getFilteredMap(
                   properties, key -> catalogPropertiesToClientKeys.contains(key)))
           // Keep only credential fields from FileIO properties before returning them to the client.
-          .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
+          .addAllConfig(filteredCredentialProperties)
+          .addAllConfig(
+              IcebergRESTUtils.buildRefreshProps(
+                  catalogCredentialManager.catalogName(), ident, filteredCredentialProperties))
+          .addAllCredentials(
+              IcebergRESTUtils.buildStorageCreds(
+                  catalogCredentialManager.catalogName(), ident, table.io()))
           .build();
     } else if (table instanceof BaseMetadataTable) {
       // metadata tables are loaded on the client side, return NoSuchTableException for now
