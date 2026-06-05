@@ -85,8 +85,36 @@ public class LanceTableOperations extends ManagedTableOperations {
     OVERWRITE
   }
 
+  /**
+   * Controls when Gravitino refreshes a Lance table's stored columns from the underlying dataset.
+   *
+   * <p>{@link #DECLARED_AND_EMPTY} is the default. It covers two complementary repair cases:
+   *
+   * <ul>
+   *   <li><b>Declared tables</b> ({@code lance.declared=true}): metadata-only tables whose schema
+   *       has not yet been written to Gravitino (e.g. Spark staged-create flow).
+   *   <li><b>Empty stored columns</b>: tables where Gravitino has no column metadata but the Lance
+   *       dataset at the table's location already carries a real schema (e.g. tables registered via
+   *       the register-table path before schema was captured).
+   * </ul>
+   *
+   * <p><b>Edge case — genuinely zero-column Lance dataset:</b> if the Lance dataset at the table
+   * location truly has no columns, Gravitino will open the dataset on each {@code loadTable} call
+   * and return without modifying metadata (there is nothing to repair). This is a rare corner case;
+   * users who encounter it should either add columns to the Lance dataset so the repair can
+   * complete, or switch to {@link #VERSION_CHECK} mode to prevent repeated dataset opens.
+   */
   public enum SchemaRefreshMode {
-    DECLARED_ONLY,
+    /**
+     * Default mode. Refreshes stored columns from the Lance dataset for declared tables ({@code
+     * lance.declared=true}) and for tables whose Gravitino column list is empty. Also repairs
+     * empty-column tables that were registered before their schema was captured.
+     */
+    DECLARED_AND_EMPTY,
+    /**
+     * Opens the Lance dataset on every {@code loadTable}, compares the dataset version with the
+     * stored {@code lance.version}, and refreshes columns when the version has changed.
+     */
     VERSION_CHECK
   }
 
@@ -139,7 +167,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     boolean declaredOnly = isDeclaredOnly(table);
     boolean emptySchema = table.columns().length == 0;
     SchemaRefreshMode refreshMode = schemaRefreshMode();
-    if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_ONLY) {
+    if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
       return table;
     }
 
@@ -170,8 +198,11 @@ public class LanceTableOperations extends ManagedTableOperations {
       return table;
     }
 
-    // A genuinely-empty Lance dataset has no schema to repair; skip to avoid a metadata write
-    // that would immediately repeat on the next load because emptySchema remains true.
+    // The Lance dataset has no columns — nothing to repair. In DECLARED_AND_EMPTY mode this
+    // condition will re-trigger on every loadTable because stored columns remain empty.
+    // This is a known edge case for genuinely zero-column Lance datasets; users who hit it should
+    // either write at least one column to the dataset so the repair can complete, or switch to
+    // VERSION_CHECK mode so that repeated opens are gated on a dataset-version change.
     if (columns.length == 0) {
       return table;
     }
@@ -412,7 +443,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     return Optional.ofNullable(catalogProperties.get(LanceConstants.LANCE_SCHEMA_REFRESH_MODE))
         .map(mode -> mode.trim().replace('-', '_').toUpperCase())
         .map(SchemaRefreshMode::valueOf)
-        .orElse(SchemaRefreshMode.DECLARED_ONLY);
+        .orElse(SchemaRefreshMode.DECLARED_AND_EMPTY);
   }
 
   private boolean isDeclaredOnly(Table table) {

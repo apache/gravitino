@@ -44,11 +44,11 @@ For detailed information on available operations, see [Manage Relational Metadat
 
 ### Catalog Properties
 
-| Property                    | Description                                                                                                                                                                  | Example                 | Required | Since Version |
-|-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
-| `provider`                  | Catalog provider type                                                                                                                                                        | `lakehouse-generic`     | Yes      | 1.1.0         |
-| `location`                  | Root storage path for all schemas and tables                                                                                                                                 | `s3://bucket/lakehouse` | No       | 1.1.0         |
-| `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_ONLY` refreshes metadata-only declared or empty-schema tables. `VERSION_CHECK` additionally refreshes when Lance version changes. | `DECLARED_ONLY`         | No       | 1.3.0         |
+| Property                    | Description                                                                                                                                                                                                    | Example                 | Required | Since Version |
+|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
+| `provider`                  | Catalog provider type                                                                                                                                                                                          | `lakehouse-generic`     | Yes      | 1.1.0         |
+| `location`                  | Root storage path for all schemas and tables                                                                                                                                                                   | `s3://bucket/lakehouse` | No       | 1.1.0         |
+| `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes. | `DECLARED_AND_EMPTY`    | No       | 1.3.0         |
 
 #### Key Property: `location`
 

@@ -124,13 +124,21 @@ For Lance tables, Gravitino stores table columns in its metadata store. Some Lan
 update the dataset directly at the Lance location. To keep Gravitino metadata in sync, the Generic
 Lakehouse catalog supports catalog-level schema refresh modes:
 
-| Mode            | Behavior                                                                                                                                     |
-|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| `DECLARED_ONLY` | Default. Refreshes schema from the Lance dataset only for metadata-only declared tables or tables whose Gravitino column list is empty.        |
-| `VERSION_CHECK` | Opens the Lance dataset during `loadTable`, compares the dataset version with `lance.version`, and refreshes columns when the version changed. |
+| Mode                  | Behavior                                                                                                                                                                                                                                                                         |
+|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `DECLARED_AND_EMPTY`  | Default. Refreshes schema from the Lance dataset for two cases: (1) declared tables (`lance.declared=true`) whose schema has not yet been written to Gravitino; (2) tables whose Gravitino column list is empty, for example tables registered before their schema was captured. |
+| `VERSION_CHECK`       | Opens the Lance dataset on every `loadTable`, compares the dataset version with `lance.version`, and refreshes columns when the version has changed.                                                                                                                             |
 
 Use `VERSION_CHECK` only when tables may be modified directly through the Lance path outside
-Gravitino. It adds a lightweight dataset version check to `loadTable`.
+Gravitino. It adds a dataset version check to every `loadTable` call.
+
+:::note Zero-column edge case
+If a Lance dataset genuinely has no columns, `DECLARED_AND_EMPTY` mode will open the dataset on
+every `loadTable` and return without modifying metadata, because there is no schema to repair.
+This is uncommon in practice. If you encounter it, either write at least one column to the Lance
+dataset so the repair can complete, or switch to `VERSION_CHECK` mode so repeated opens are gated
+on a dataset-version change.
+:::
 
 ### Table Operations
 

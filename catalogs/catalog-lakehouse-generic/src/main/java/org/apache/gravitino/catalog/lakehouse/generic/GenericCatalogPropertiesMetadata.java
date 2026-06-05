@@ -60,7 +60,7 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* required */,
                 false /* immutable */,
                 LanceTableOperations.SchemaRefreshMode.class,
-                LanceTableOperations.SchemaRefreshMode.DECLARED_ONLY,
+                LanceTableOperations.SchemaRefreshMode.DECLARED_AND_EMPTY,
                 false /* hidden */,
                 false /* reserved */));
 
