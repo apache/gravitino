@@ -11,7 +11,7 @@ Flink connector supports `simple`, `basic`, `oauth2`, and `kerberos` authenticat
 
 | Property                                                 | Type   | Default Value | Description                                                                                                                              | Required | Since Version |
 |----------------------------------------------------------|--------|---------------|------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
-| table.catalog-store.gravitino.gravitino.client.auth.type | string | (none)        | When set, supports `basic` and `oauth2`; if unset, Flink uses Kerberos or simple per its security settings.                              | No       | 1.2.0         |
+| table.catalog-store.gravitino.gravitino.client.auth.type | string | (none)        | When explicitly set, only `oauth2` and `basic` are supported.                                                                          | No       | 1.2.0         |
 
 ## Simple Mode
 

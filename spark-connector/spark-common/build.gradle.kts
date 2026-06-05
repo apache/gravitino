@@ -103,6 +103,7 @@ dependencies {
     exclude(module = "core")
     exclude(module = "server-common")
   }
+
   testImplementation(libs.hive2.common) {
     exclude("org.apache.curator")
     // use hadoop from Spark
