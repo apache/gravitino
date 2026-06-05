@@ -1029,6 +1029,12 @@ gcli.sh model set --name catalog_model.schema.model --property k --value v
 gcli.sh model remove --name catalog_model.schema.model --property k
 ```
 
+#### List a model's properties
+
+```bash
+gcli.sh model properties --name catalog_model.schema.model
+```
+
 #### Link a model version
 
 ```bash
@@ -1063,6 +1069,18 @@ gcli.sh model set --name catalog_model.schema.model --version 0 --property k --v
 
 ```bash
 gcli.sh model remove --name catalog_model.schema.model --version 0 --property k
+```
+
+#### List a model version's properties
+
+```bash
+gcli.sh model properties --name catalog_model.schema.model --version 1
+```
+
+Or by alias:
+
+```bash
+gcli.sh model properties --name catalog_model.schema.model --alias alias1
 ```
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=CLI" alt="" />

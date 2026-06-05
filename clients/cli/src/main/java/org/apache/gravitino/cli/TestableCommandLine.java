@@ -21,6 +21,7 @@
 package org.apache.gravitino.cli;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.cli.commands.AddColumn;
 import org.apache.gravitino.cli.commands.AddRoleToGroup;
 import org.apache.gravitino.cli.commands.AddRoleToUser;
@@ -67,6 +68,8 @@ import org.apache.gravitino.cli.commands.ListIndexes;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
 import org.apache.gravitino.cli.commands.ListModel;
+import org.apache.gravitino.cli.commands.ListModelProperties;
+import org.apache.gravitino.cli.commands.ListModelVersionProperties;
 import org.apache.gravitino.cli.commands.ListRoles;
 import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
@@ -1899,6 +1902,45 @@ public class TestableCommandLine {
   protected ListModel newListModel(
       CommandContext context, String metalake, String catalog, String schema) {
     return new ListModel(context, metalake, catalog, schema);
+  }
+
+  /**
+   * Get a new instance of the command to list the properties of a model.
+   *
+   * @param context The command context.
+   * @param metalake The name of the metalake instance.
+   * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
+   * @param model The name of the model.
+   * @return The instance of the command.
+   */
+  protected ListModelProperties newListModelProperties(
+      CommandContext context, String metalake, String catalog, String schema, String model) {
+    return new ListModelProperties(context, metalake, catalog, schema, model);
+  }
+
+  /**
+   * Get a new instance of the command to list the properties of a model version.
+   *
+   * @param context The command context.
+   * @param metalake The name of the metalake instance.
+   * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
+   * @param model The name of the model.
+   * @param version The version number of the model version.
+   * @param alias The alias of the model version.
+   * @return The instance of the command.
+   */
+  protected ListModelVersionProperties newListModelVersionProperties(
+      CommandContext context,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      @Nullable Integer version,
+      @Nullable String alias) {
+    return new ListModelVersionProperties(
+        context, metalake, catalog, schema, model, version, alias);
   }
 
   /**
