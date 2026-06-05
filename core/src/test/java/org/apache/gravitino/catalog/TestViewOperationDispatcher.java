@@ -40,6 +40,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -196,6 +197,41 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
       View loadedView = viewOperationDispatcher.loadView(viewIdent);
       Assertions.assertEquals("view" + i, loadedView.name());
     }
+  }
+
+  @Test
+  public void testViewOperationDispatcherRejectsNullSchemaDispatcherSupplier() {
+    Assertions.assertThrows(
+        NullPointerException.class,
+        () -> new ViewOperationDispatcher(catalogManager, entityStore, idGenerator, null));
+  }
+
+  @Test
+  public void testCreateViewFailsFastWhenSchemaDispatcherSupplierReturnsNull() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema-null-view-dispatcher");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
+
+    Supplier<SchemaDispatcher> nullSchemaDispatcherSupplier = () -> null;
+    ViewOperationDispatcher dispatcher =
+        new ViewOperationDispatcher(
+            catalogManager, entityStore, idGenerator, nullSchemaDispatcherSupplier);
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_null_dispatcher");
+    Representation[] representations =
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("spark-sql").withSql("SELECT 1").build()
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                dispatcher.createView(
+                    viewIdent, "comment", new Column[0], representations, null, null, props));
+    Assertions.assertEquals(
+        "schemaDispatcherSupplier returned null. "
+            + "SchemaDispatcher must be available for view operations.",
+        exception.getMessage());
   }
 
   @Test
