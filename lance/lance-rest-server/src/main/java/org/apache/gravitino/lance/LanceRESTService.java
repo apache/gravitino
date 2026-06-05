@@ -21,6 +21,7 @@ package org.apache.gravitino.lance;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 
 import java.lang.reflect.Constructor;
+import java.util.HashMap;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
@@ -60,7 +61,10 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
-    LanceConfig lanceConfig = new LanceConfig(properties);
+    Map<String, String> lanceProperties = new HashMap<>(properties);
+    lanceProperties.put(LanceConfig.INTERNAL_AUX_MODE.getKey(), String.valueOf(auxMode));
+
+    LanceConfig lanceConfig = new LanceConfig(lanceProperties);
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
 
     server = new JettyServer();

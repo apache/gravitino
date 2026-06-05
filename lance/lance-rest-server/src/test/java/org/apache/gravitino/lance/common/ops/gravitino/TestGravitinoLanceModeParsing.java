@@ -228,7 +228,7 @@ class TestGravitinoLanceModeParsing {
         Mockito.mock(GravitinoLanceNamespaceWrapper.class);
     Catalog catalog = Mockito.mock(Catalog.class);
     when(namespaceWrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
-    when(catalog.asTableCatalog()).thenReturn(tableCatalog);
+    when(namespaceWrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
     return new GravitinoLanceTableOperations(namespaceWrapper);
   }
 

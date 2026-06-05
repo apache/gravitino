@@ -19,13 +19,37 @@
 package org.apache.gravitino.lance.common.ops.gravitino;
 
 import com.google.common.collect.ImmutableMap;
+import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.lance.common.config.LanceConfig;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoLanceNamespaceWrapper {
+
+  @AfterEach
+  public void tearDown() throws IllegalAccessException {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", null, true);
+  }
 
   @Test
   public void testClientPropertiesExtraction() {
@@ -228,5 +252,223 @@ public class TestGravitinoLanceNamespaceWrapper {
     Assertions.assertEquals("400", allConfig.get("gravitino.client.maxConnectionsPerRoute"));
     Assertions.assertEquals("10000", allConfig.get("gravitino.client.connectionTimeoutMs"));
     Assertions.assertEquals("60000", allConfig.get("gravitino.client.socketTimeoutMs"));
+  }
+
+  @Test
+  public void testCreateCatalogOperatorUsesHttpClientInStandaloneMode() {
+    LanceConfig lanceConfig =
+        new LanceConfig(
+            ImmutableMap.of(
+                LanceConfig.METALAKE_NAME.getKey(), "test_metalake",
+                LanceConfig.NAMESPACE_BACKEND_URI.getKey(), "http://localhost:8090",
+                LanceConfig.INTERNAL_AUX_MODE.getKey(), "false"));
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig);
+
+    GravitinoLanceNamespaceWrapper.CatalogOperator operator =
+        wrapper.createCatalogOperator("test_metalake");
+
+    Assertions.assertEquals("HttpCatalogOperator", operator.getClass().getSimpleName());
+    Assertions.assertDoesNotThrow(operator::close);
+  }
+
+  @Test
+  public void testLoadAndValidateLakehouseCatalogUsesCatalogOperator() {
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper();
+    Catalog expectedCatalog = createCatalogProxy(Catalog.Type.RELATIONAL, "lakehouse-generic");
+    wrapper.setCatalogOperator(
+        new GravitinoLanceNamespaceWrapper.CatalogOperator() {
+          @Override
+          public Catalog[] listCatalogsInfo() {
+            return new Catalog[0];
+          }
+
+          @Override
+          public Catalog loadCatalog(String catalogName) {
+            return expectedCatalog;
+          }
+
+          @Override
+          public Catalog createCatalog(
+              String catalogName,
+              Catalog.Type type,
+              String provider,
+              String comment,
+              Map<String, String> properties) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public Catalog alterCatalog(String catalogName, CatalogChange... changes) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public boolean dropCatalog(String catalogName, boolean force) {
+            throw new UnsupportedOperationException();
+          }
+        });
+
+    Assertions.assertSame(expectedCatalog, wrapper.loadAndValidateLakehouseCatalog("test_catalog"));
+  }
+
+  @Test
+  public void testLoadSchemaUsesSchemaDispatcherInAuxMode() throws Exception {
+    Schema expectedSchema = createSchemaProxy();
+    AtomicReference<NameIdentifier> loadedSchemaIdent = new AtomicReference<>();
+    SchemaDispatcher schemaDispatcher =
+        (SchemaDispatcher)
+            Proxy.newProxyInstance(
+                SchemaDispatcher.class.getClassLoader(),
+                new Class<?>[] {SchemaDispatcher.class},
+                (proxy, method, args) -> {
+                  if ("loadSchema".equals(method.getName())) {
+                    loadedSchemaIdent.set((NameIdentifier) args[0]);
+                    return expectedSchema;
+                  }
+
+                  Class<?> returnType = method.getReturnType();
+                  if (returnType.equals(boolean.class)) {
+                    return false;
+                  }
+                  if (returnType.equals(int.class)) {
+                    return 0;
+                  }
+                  return null;
+                });
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "catalogDispatcher",
+        Proxy.newProxyInstance(
+            CatalogDispatcher.class.getClassLoader(),
+            new Class<?>[] {CatalogDispatcher.class},
+            (proxy, method, args) -> null),
+        true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
+
+    LanceConfig lanceConfig =
+        new LanceConfig(
+            ImmutableMap.of(
+                LanceConfig.METALAKE_NAME.getKey(), "test_metalake",
+                LanceConfig.INTERNAL_AUX_MODE.getKey(), "true"));
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig);
+    wrapper.asNamespaceOps();
+
+    Schema actualSchema =
+        wrapper.loadSchema(
+            createCatalogProxy(Catalog.Type.RELATIONAL, "lakehouse-generic"), "test_schema");
+
+    Assertions.assertSame(expectedSchema, actualSchema);
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofSchema("test_metalake", "test_catalog", "test_schema"),
+        loadedSchemaIdent.get());
+  }
+
+  @Test
+  public void testAsTableCatalogUsesTableDispatcherInAuxMode() throws Exception {
+    Table expectedTable = createTableProxy();
+    AtomicReference<NameIdentifier> loadedTableIdent = new AtomicReference<>();
+    AtomicReference<Namespace> listedNamespace = new AtomicReference<>();
+    TableDispatcher tableDispatcher =
+        (TableDispatcher)
+            Proxy.newProxyInstance(
+                TableDispatcher.class.getClassLoader(),
+                new Class<?>[] {TableDispatcher.class},
+                (proxy, method, args) -> {
+                  if ("loadTable".equals(method.getName())) {
+                    loadedTableIdent.set((NameIdentifier) args[0]);
+                    return expectedTable;
+                  }
+                  if ("listTables".equals(method.getName())) {
+                    listedNamespace.set((Namespace) args[0]);
+                    return new NameIdentifier[] {NameIdentifier.of("test_schema", "test_table")};
+                  }
+
+                  Class<?> returnType = method.getReturnType();
+                  if (returnType.equals(boolean.class)) {
+                    return false;
+                  }
+                  if (returnType.equals(int.class)) {
+                    return 0;
+                  }
+                  return null;
+                });
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "catalogDispatcher",
+        Proxy.newProxyInstance(
+            CatalogDispatcher.class.getClassLoader(),
+            new Class<?>[] {CatalogDispatcher.class},
+            (proxy, method, args) -> null),
+        true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+
+    LanceConfig lanceConfig =
+        new LanceConfig(
+            ImmutableMap.of(
+                LanceConfig.METALAKE_NAME.getKey(), "test_metalake",
+                LanceConfig.INTERNAL_AUX_MODE.getKey(), "true"));
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig);
+    wrapper.asTableOps();
+
+    TableCatalog tableCatalog =
+        wrapper.asTableCatalog(createCatalogProxy(Catalog.Type.RELATIONAL, "lakehouse-generic"));
+
+    Assertions.assertSame(
+        expectedTable, tableCatalog.loadTable(NameIdentifier.of("test_schema", "test_table")));
+    Assertions.assertArrayEquals(
+        new NameIdentifier[] {NameIdentifier.of("test_schema", "test_table")},
+        tableCatalog.listTables(Namespace.of("test_schema")));
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofTable("test_metalake", "test_catalog", "test_schema", "test_table"),
+        loadedTableIdent.get());
+    Assertions.assertEquals(
+        Namespace.of("test_metalake", "test_catalog", "test_schema"), listedNamespace.get());
+  }
+
+  private Schema createSchemaProxy() {
+    return (Schema)
+        Proxy.newProxyInstance(
+            Schema.class.getClassLoader(),
+            new Class<?>[] {Schema.class},
+            (proxy, method, args) -> null);
+  }
+
+  private Table createTableProxy() {
+    return (Table)
+        Proxy.newProxyInstance(
+            Table.class.getClassLoader(),
+            new Class<?>[] {Table.class},
+            (proxy, method, args) -> null);
+  }
+
+  private Catalog createCatalogProxy(Catalog.Type type, String provider) {
+    return (Catalog)
+        Proxy.newProxyInstance(
+            Catalog.class.getClassLoader(),
+            new Class<?>[] {Catalog.class},
+            (proxy, method, args) -> {
+              switch (method.getName()) {
+                case "type":
+                  return type;
+                case "provider":
+                  return provider;
+                case "name":
+                  return "test_catalog";
+                case "properties":
+                  return null;
+                default:
+                  Class<?> returnType = method.getReturnType();
+                  if (returnType.equals(boolean.class)) {
+                    return false;
+                  }
+                  if (returnType.equals(int.class)) {
+                    return 0;
+                  }
+                  if (returnType.equals(long.class)) {
+                    return 0L;
+                  }
+                  return null;
+              }
+            });
   }
 }
