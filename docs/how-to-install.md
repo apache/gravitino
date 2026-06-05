@@ -150,6 +150,17 @@ curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: 
 
 to make sure Gravitino is running.
 
+### Using GCS as Object Store with Docker
+
+If your catalog uses Google Cloud Storage (GCS) as the object store, set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable and mount the service account key file into the container:
+
+```shell
+docker run -d -i -p 8090:8090 \
+  -v /path/to/your-service-account-key.json:/etc/gcs/key.json:ro \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/etc/gcs/key.json \
+  apache/gravitino:<version>
+```
+
 ## Install Using Docker Compose
 
 The published Gravitino Docker image only contains the Gravitino server with a basic configuration. If you want to experience the whole Gravitino system with other components, use the Docker `compose` file.

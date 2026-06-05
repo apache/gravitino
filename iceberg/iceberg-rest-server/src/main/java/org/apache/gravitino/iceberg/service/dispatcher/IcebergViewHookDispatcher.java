@@ -76,7 +76,7 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
         namespace,
         createViewRequest.name(),
         context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+        GravitinoEnv.getInstance().internalOwnerDispatcher());
 
     return response;
   }
@@ -181,7 +181,7 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
    * @param viewName The name of the view.
    */
   private void importView(String catalogName, Namespace namespace, String viewName) {
-    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().viewDispatcher();
+    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
     if (viewDispatcher != null) {
       try {
         viewDispatcher.loadView(

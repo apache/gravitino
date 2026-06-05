@@ -110,7 +110,7 @@ class TestAwsGlueCatalogOperations {
   }
 
   @Test
-  void testRenameTableIsUnsupported() {
+  void testRenameIsUnsupported() {
     String tableName = "rename_test_" + System.currentTimeMillis();
     NameIdentifier ident = NameIdentifier.of(NS.level(0), NS.level(1), TEST_SCHEMA, tableName);
 
@@ -119,7 +119,7 @@ class TestAwsGlueCatalogOperations {
         ident,
         new Column[] {col},
         "test table",
-        Map.of(GlueConstants.FORMAT, "parquet"),
+        Map.of(),
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         SortOrders.NONE,
