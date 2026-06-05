@@ -140,8 +140,10 @@ public interface ViewMetaMapper {
       method = "softDeleteViewMetasByCatalogId")
   Integer softDeleteViewMetasByCatalogId(@Param("catalogId") Long catalogId);
 
-  @UpdateProvider(type = ViewMetaSQLProviderFactory.class, method = "softDeleteViewMetasBySchemaId")
-  Integer softDeleteViewMetasBySchemaId(@Param("schemaId") Long schemaId);
+  @UpdateProvider(
+      type = ViewMetaSQLProviderFactory.class,
+      method = "softDeleteViewMetasBySchemaIds")
+  Integer softDeleteViewMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @DeleteProvider(
       type = ViewMetaSQLProviderFactory.class,

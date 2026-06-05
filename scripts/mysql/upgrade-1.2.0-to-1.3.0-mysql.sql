@@ -106,15 +106,34 @@ CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     UNIQUE KEY `uk_ign_del` (`group_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP group metadata';
 
-CREATE TABLE IF NOT EXISTS `idp_group_user_rel` (
+CREATE TABLE IF NOT EXISTS `idp_user_group_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_igiu_del` (`group_id`, `user_id`, `deleted_at`),
-    KEY `idx_iug_gid` (`group_id`),
-    KEY `idx_iug_uid` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP group user relation';
+    UNIQUE KEY `uk_iuig_del` (`user_id`, `group_id`, `deleted_at`),
+    KEY `idx_iuig_uid` (`user_id`),
+    KEY `idx_iuig_gid` (`group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP user group relation';
+
+CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
+  `id`                BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique cleanup job id',
+  `catalog_id`        BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique id of the owning catalog, stable across catalog rename',
+  `namespace`         VARCHAR(512)  NOT NULL COMMENT 'namespace of the table to be cleaned up',
+  `table_name`        VARCHAR(256)  NOT NULL COMMENT 'name of the table to be cleaned up',
+  `metadata_location` MEDIUMTEXT   NOT NULL COMMENT 'location of the table metadata file to purge',
+  `file_io_impl`      VARCHAR(256)  NOT NULL COMMENT 'FileIO implementation class used to access the table files',
+  `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON-encoded FileIO properties',
+  `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|FAILED',
+  `attempts`          INT(10)       NOT NULL DEFAULT 0 COMMENT 'number of processing attempts made so far',
+  `last_error`        VARCHAR(2048) NULL COMMENT 'truncated reason for the most recent failure, NULL until a job fails',
+  `heartbeat_at`      BIGINT(20)    NOT NULL DEFAULT 0 COMMENT 'last heartbeat from the worker, 0 when not running',
+  `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
+  `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
+  PRIMARY KEY (`id`),
+  KEY `idx_state_updated` (`state`, `updated_at`),
+  KEY `idx_object` (`catalog_id`, `namespace`(255), `table_name`(128), `state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table cleanup jobs';

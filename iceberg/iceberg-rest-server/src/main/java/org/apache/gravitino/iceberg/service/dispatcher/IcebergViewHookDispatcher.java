@@ -28,6 +28,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -52,10 +53,15 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private static final Logger LOG = LoggerFactory.getLogger(IcebergViewHookDispatcher.class);
 
   private final IcebergViewOperationDispatcher dispatcher;
+  private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
   private final String metalake;
 
-  public IcebergViewHookDispatcher(IcebergViewOperationDispatcher dispatcher, String metalake) {
+  public IcebergViewHookDispatcher(
+      IcebergViewOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher,
+      String metalake) {
     this.dispatcher = dispatcher;
+    this.namespaceDispatcher = namespaceDispatcher;
     this.metalake = metalake;
   }
 
@@ -75,7 +81,7 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
         namespace,
         createViewRequest.name(),
         context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+        GravitinoEnv.getInstance().internalOwnerDispatcher());
 
     return response;
   }
@@ -96,40 +102,12 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   @Override
   public void dropView(IcebergRequestContext context, TableIdentifier viewIdentifier) {
     dispatcher.dropView(context, viewIdentifier);
-
-    // Remove view from Gravitino entity store
-    EntityStore store = GravitinoEnv.getInstance().entityStore();
-    try {
-      if (store != null) {
-        store.delete(
-            IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), viewIdentifier),
-            Entity.EntityType.VIEW);
-        LOG.info(
-            "Successfully removed view from Gravitino entity store: {}.{}.{}.{}",
-            metalake,
-            context.catalogName(),
-            viewIdentifier.namespace(),
-            viewIdentifier.name());
-      }
-    } catch (NoSuchEntityException ignore) {
-      // Ignore if the view entity does not exist in the store
-      LOG.debug(
-          "View entity does not exist in store: {}.{}.{}.{}",
-          metalake,
-          context.catalogName(),
-          viewIdentifier.namespace(),
-          viewIdentifier.name());
-    } catch (IOException ioe) {
-      LOG.error(
-          "Failed to delete view entity from store: {}.{}.{}.{}",
-          metalake,
-          context.catalogName(),
-          viewIdentifier.namespace(),
-          viewIdentifier.name(),
-          ioe);
-      throw new RuntimeException("Failed to delete view entity from store", ioe);
-    }
+    // Reconcile against Iceberg backend state — without a distributed TreeLock,
+    // another node may recreate the same view between the drop above and the
+    // EntityStore delete, leaving a stale Gravitino entity if we blindly delete.
+    bestEffortReconcileViewEntity(context, viewIdentifier);
+    IcebergOrphanSchemaCleanup.bestEffortCleanUp(
+        metalake, namespaceDispatcher, context, viewIdentifier.namespace());
   }
 
   @Override
@@ -147,12 +125,13 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     dispatcher.renameView(context, renameViewRequest);
 
     // Update view in Gravitino entity store with new name
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
     NameIdentifier sourceIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameViewRequest.source());
+            metalake, context.catalogName(), renameViewRequest.source(), separator);
     NameIdentifier destIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameViewRequest.destination());
+            metalake, context.catalogName(), renameViewRequest.destination(), separator);
 
     EntityStore store = GravitinoEnv.getInstance().entityStore();
     try {
@@ -186,6 +165,12 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       LOG.error("Failed to rename view entity in store from {} to {}", sourceIdent, destIdent, ioe);
       throw new RuntimeException("Failed to rename view entity in store", ioe);
     }
+
+    // IRC rename can race with another node's drop/create on either name.
+    // Reconcile both ends against the Iceberg backend so we don't leave a
+    // stale entity on the source or miss importing a re-created destination.
+    bestEffortReconcileViewEntity(context, renameViewRequest.source());
+    bestEffortReconcileViewEntity(context, renameViewRequest.destination());
   }
 
   /**
@@ -203,12 +188,15 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
    * @param viewName The name of the view.
    */
   private void importView(String catalogName, Namespace namespace, String viewName) {
-    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().viewDispatcher();
+    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
     if (viewDispatcher != null) {
       try {
         viewDispatcher.loadView(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, catalogName, TableIdentifier.of(namespace, viewName)));
+                metalake,
+                catalogName,
+                TableIdentifier.of(namespace, viewName),
+                HierarchicalSchemaUtil.schemaSeparator()));
         LOG.info(
             "Successfully imported view into Gravitino: {}.{}.{}.{}",
             metalake,
@@ -225,6 +213,72 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
             viewName,
             e.getMessage());
       }
+    }
+  }
+
+  private void reconcileViewEntity(IcebergRequestContext context, TableIdentifier viewIdentifier) {
+    // IRC requests can be served by different Gravitino nodes. Without a distributed TreeLock,
+    // another node may drop or recreate the same Iceberg view between the backend operation and
+    // this hook's EntityStore mutation. Reconcile the local Gravitino entity with the Iceberg
+    // backend state to avoid leaving stale/orphan view metadata in multi-node deployments.
+    if (dispatcher.viewExists(context, viewIdentifier)) {
+      importView(context.catalogName(), viewIdentifier.namespace(), viewIdentifier.name());
+      return;
+    }
+
+    deleteViewEntity(context.catalogName(), viewIdentifier);
+
+    if (dispatcher.viewExists(context, viewIdentifier)) {
+      importView(context.catalogName(), viewIdentifier.namespace(), viewIdentifier.name());
+    }
+  }
+
+  private void bestEffortReconcileViewEntity(
+      IcebergRequestContext context, TableIdentifier viewIdentifier) {
+    try {
+      reconcileViewEntity(context, viewIdentifier);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to reconcile Gravitino view entity after the Iceberg backend operation "
+              + "succeeded. catalog={}, view={}",
+          context.catalogName(),
+          viewIdentifier,
+          e);
+    }
+  }
+
+  private void deleteViewEntity(String catalogName, TableIdentifier viewIdentifier) {
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    try {
+      if (store != null) {
+        store.delete(
+            IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                metalake, catalogName, viewIdentifier, HierarchicalSchemaUtil.schemaSeparator()),
+            Entity.EntityType.VIEW);
+        LOG.info(
+            "Successfully removed view from Gravitino entity store: {}.{}.{}.{}",
+            metalake,
+            catalogName,
+            viewIdentifier.namespace(),
+            viewIdentifier.name());
+      }
+    } catch (NoSuchEntityException ignore) {
+      // Ignore if the view entity does not exist in the store
+      LOG.debug(
+          "View entity does not exist in store: {}.{}.{}.{}",
+          metalake,
+          catalogName,
+          viewIdentifier.namespace(),
+          viewIdentifier.name());
+    } catch (IOException ioe) {
+      LOG.error(
+          "Failed to delete view entity from store: {}.{}.{}.{}",
+          metalake,
+          catalogName,
+          viewIdentifier.namespace(),
+          viewIdentifier.name(),
+          ioe);
+      throw new RuntimeException("Failed to delete view entity from store", ioe);
     }
   }
 }

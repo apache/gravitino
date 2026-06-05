@@ -1,11 +1,13 @@
 ---
-title: "Apache Gravitino Trino connector requirements"
-slug: /trino-connector/requirements
-keyword: gravitino connector trino
+title: "Trino Connector Requirements"
+slug: "/trino-connector/requirements"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-To install and deploy the Apache Gravitino Trino connector, The following environmental setup is necessary:
+## Introduction
+
+To install and deploy the Apache Gravitino Trino connector, the following environmental setup is necessary:
 
 - Trino server version should be between Trino-server-435 and Trino-server-478.
   The examples in this document use Trino `469` by default.

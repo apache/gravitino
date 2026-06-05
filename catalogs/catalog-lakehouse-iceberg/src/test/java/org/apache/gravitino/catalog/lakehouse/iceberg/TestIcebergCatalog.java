@@ -367,6 +367,34 @@ public class TestIcebergCatalog {
   }
 
   @Test
+  void testS3ListLocationPrefixForcedDisabled() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Iceberg is security-first: a user attempt to enable the location prefix is overridden.
+    Map<String, String> props = Maps.newHashMap();
+    props.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "true");
+
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(5L)
+            .withName("secure-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withAuditInfo(auditInfo)
+            .withProperties(props)
+            .build();
+
+    IcebergCatalog catalog = new IcebergCatalog().withCatalogConf(props).withCatalogEntity(entity);
+    Assertions.assertEquals(
+        "false",
+        catalog
+            .propertiesWithCredentialProviders()
+            .get(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX));
+  }
+
+  @Test
   void testJdbcBackendWithOSSCredentialProviders() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

@@ -266,12 +266,18 @@ public class FunctionMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
-  public String softDeleteFunctionMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteFunctionMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   public String deleteFunctionMetasByLegacyTimeline(

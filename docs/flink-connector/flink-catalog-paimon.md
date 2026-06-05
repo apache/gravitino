@@ -1,26 +1,28 @@
 ---
-title: "Flink connector paimon catalog"
-slug: /flink-connector/flink-catalog-paimon
-keyword: flink connector paimon catalog
+title: "Flink Connector: Paimon Catalog"
+slug: "/flink-connector/flink-catalog-paimon"
+keyword: "flink connector paimon catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 This document provides a comprehensive guide on configuring and using Apache Gravitino Flink connector to access the Paimon catalog managed by the Gravitino server.
 
 ## Capabilities
 
-### Supported Paimon Table Types
+### Paimon Table Types
 
 * AppendOnly Table
 * Primary Key Table (with bucket distribution)
 
-### Supported Distribution
+### Distribution
 
 * HASH distribution via `bucket-key` and `bucket` table properties.
 * Only HASH strategy is supported. Range or other strategies are not applicable.
 * When `bucket-key` is specified without `bucket`, the bucket number defaults to auto.
 
-### Supported Operation Types
+### Operation Types
 
 Supports most DDL and DML operations in Flink SQL, except such operations:
 
@@ -36,11 +38,11 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 - `DELETE` clause
 - `CALL` clause
 
-## Requirement
+## Prerequisites
 
-* Paimon 0.8
+* Paimon 1.2.0 is fully tested.
 
-Higher version like 0.9 or above may also support but have not been tested fully.
+Other Paimon versions may also work but have not been tested fully.
 
 ## Getting Started
 
@@ -48,8 +50,14 @@ Higher version like 0.9 or above may also support but have not been tested fully
 
 Place the following JAR files in the lib directory of your Flink installation:
 
-- `paimon-flink-1.18-${paimon-version}.jar`
-- `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar`
+- The Paimon Flink connector JAR that matches your Flink minor version
+- The Gravitino Flink connector runtime JAR that matches your Flink minor version
+
+| Flink version | Paimon connector artifact | Gravitino runtime artifact |
+|---------------|---------------------------|----------------------------|
+| 1.18          | `paimon-flink-1.18-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| 1.19          | `paimon-flink-1.19-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
+| 1.20          | `paimon-flink-1.20-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
 
 ### SQL Example
 
@@ -118,7 +126,7 @@ CREATE TABLE paimon_bucketed_table (
 );
 ```
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink Paimon connector configuration.
 

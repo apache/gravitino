@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import static org.apache.gravitino.storage.relational.mapper.GroupMetaMapper.GROUP_ROLE_RELATION_TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.GroupMetaMapper.GROUP_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.Param;
@@ -207,5 +210,119 @@ public class UserMetaBaseSQLProvider {
         + " mm ON um.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
         + " WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
         + " AND um.deleted_at = 0";
+  }
+
+  /**
+   * Builds the single-round-trip auth prefetch query for {@code (metalake, userName, groupNames)}.
+   *
+   * <p>The SQL is up to four {@code UNION ALL} branches that map 1:1 to the four {@code
+   * org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow.Kind} values:
+   *
+   * <ul>
+   *   <li>{@code 'USER'} branch — the request user's {@code user_meta} row.
+   *   <li>{@code 'USER_ROLE'} branch — roles bound directly to the request user via {@code
+   *       user_role_rel}; {@code parentId} carries the owning {@code user_id}.
+   *   <li>{@code 'GROUP'} branch — the request user's groups (one row per name in {@code
+   *       groupNames}).
+   *   <li>{@code 'GROUP_ROLE'} branch — roles inherited via group membership through {@code
+   *       group_role_rel}; {@code parentId} carries the owning {@code group_id}.
+   * </ul>
+   *
+   * <p>The {@code GROUP} / {@code GROUP_ROLE} branches are appended only when {@code groupNames} is
+   * non-empty, leaving a 2-branch query in the no-group case.
+   *
+   * <p>All branches must SELECT the same column list and aliases ({@code subjectType}, {@code
+   * entityId}, {@code entityName}, {@code updatedAt}, {@code bindingOwnerId}) because {@code UNION
+   * ALL} requires a uniform row shape. The aliases match {@code AuthPrefetchRow}'s field names so
+   * MyBatis can reflectively map each row.
+   *
+   * @param metalakeName the metalake the user belongs to
+   * @param userName the request user's name
+   * @param groupNames the user's group memberships; may be empty
+   * @return the SQL string
+   */
+  public String batchGetAuthSubjectsForUser(
+      @Param("metalakeName") String metalakeName,
+      @Param("userName") String userName,
+      @Param("groupNames") List<String> groupNames) {
+    // 'USER' branch → AuthPrefetchRow.Kind.USER.
+    String userBranch =
+        "SELECT 'USER' AS subjectType, um.user_id AS entityId, um.user_name AS entityName,"
+            + " um.updated_at AS updatedAt, NULL AS bindingOwnerId"
+            + " FROM "
+            + USER_TABLE_NAME
+            + " um"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm ON um.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
+            + " WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
+            + " AND um.deleted_at = 0";
+
+    // 'USER_ROLE' branch → AuthPrefetchRow.Kind.USER_ROLE.
+    // bindingOwnerId carries the owning user_id so consumers can bucket roles back to that user.
+    String userRoleBranch =
+        " UNION ALL "
+            + "SELECT 'USER_ROLE' AS subjectType, rm.role_id AS entityId, rm.role_name AS entityName,"
+            + " rm.updated_at AS updatedAt, ur.user_id AS bindingOwnerId"
+            + " FROM "
+            + USER_TABLE_NAME
+            + " um"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm3 ON um.metalake_id = mm3.metalake_id AND mm3.deleted_at = 0"
+            + " JOIN "
+            + USER_ROLE_RELATION_TABLE_NAME
+            + " ur ON ur.user_id = um.user_id AND ur.deleted_at = 0"
+            + " JOIN "
+            + ROLE_TABLE_NAME
+            + " rm ON rm.role_id = ur.role_id AND rm.deleted_at = 0"
+            + " WHERE mm3.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
+            + " AND um.deleted_at = 0";
+
+    if (groupNames == null || groupNames.isEmpty()) {
+      // No group memberships → 2-branch query (USER + USER_ROLE only).
+      return "<script>" + userBranch + userRoleBranch + "</script>";
+    }
+
+    // 'GROUP' branch → AuthPrefetchRow.Kind.GROUP.
+    String groupBranch =
+        " UNION ALL "
+            + "SELECT 'GROUP' AS subjectType, gm.group_id AS entityId, gm.group_name AS entityName,"
+            + " gm.updated_at AS updatedAt, NULL AS bindingOwnerId"
+            + " FROM "
+            + GROUP_TABLE_NAME
+            + " gm"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm2 ON gm.metalake_id = mm2.metalake_id AND mm2.deleted_at = 0"
+            + " WHERE mm2.metalake_name = #{metalakeName}"
+            + " AND gm.group_name IN"
+            + " <foreach item='g' collection='groupNames' open='(' separator=',' close=')'>#{g}</foreach>"
+            + " AND gm.deleted_at = 0";
+
+    // 'GROUP_ROLE' branch → AuthPrefetchRow.Kind.GROUP_ROLE.
+    // bindingOwnerId carries the owning group_id so consumers can bucket roles by group.
+    String groupRoleBranch =
+        " UNION ALL "
+            + "SELECT 'GROUP_ROLE' AS subjectType, rm.role_id AS entityId, rm.role_name AS entityName,"
+            + " rm.updated_at AS updatedAt, gr.group_id AS bindingOwnerId"
+            + " FROM "
+            + GROUP_TABLE_NAME
+            + " gm"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm4 ON gm.metalake_id = mm4.metalake_id AND mm4.deleted_at = 0"
+            + " JOIN "
+            + GROUP_ROLE_RELATION_TABLE_NAME
+            + " gr ON gr.group_id = gm.group_id AND gr.deleted_at = 0"
+            + " JOIN "
+            + ROLE_TABLE_NAME
+            + " rm ON rm.role_id = gr.role_id AND rm.deleted_at = 0"
+            + " WHERE mm4.metalake_name = #{metalakeName}"
+            + " AND gm.group_name IN"
+            + " <foreach item='g2' collection='groupNames' open='(' separator=',' close=')'>#{g2}</foreach>"
+            + " AND gm.deleted_at = 0";
+
+    return "<script>" + userBranch + userRoleBranch + groupBranch + groupRoleBranch + "</script>";
   }
 }

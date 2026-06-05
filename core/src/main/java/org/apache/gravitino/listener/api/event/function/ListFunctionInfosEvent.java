@@ -22,6 +22,7 @@ package org.apache.gravitino.listener.api.event.function;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.listener.api.info.FunctionInfo;
 
@@ -30,7 +31,7 @@ import org.apache.gravitino.listener.api.info.FunctionInfo;
  * namespace.
  */
 @DeveloperApi
-public final class ListFunctionInfosEvent extends FunctionEvent {
+public final class ListFunctionInfosEvent extends FunctionEvent implements ListEvent {
   private final Namespace namespace;
   private final FunctionInfo[] functionInfos;
 
@@ -59,10 +60,17 @@ public final class ListFunctionInfosEvent extends FunctionEvent {
   /**
    * Provides the function infos associated with this event.
    *
-   * @return An array of {@link FunctionInfo} instances that were listed.
+   * @return An array of {@link FunctionInfo} instances that were listed, or {@code null} if the
+   *     result was not captured.
    */
   public FunctionInfo[] functionInfos() {
     return functionInfos;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return functionInfos != null ? functionInfos.length : -1;
   }
 
   @Override

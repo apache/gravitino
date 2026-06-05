@@ -72,6 +72,21 @@ public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testListSchemasUnderParentSchemaUnsupported() {
+    // The test catalog does not support hierarchical schemas, so listing schemas under a parent
+    // schema (a namespace deeper than [metalake, catalog]) must be rejected instead of returning
+    // the catalog's flat schemas (see issue #11317).
+    Namespace nestedNamespace = Namespace.of(metalake, catalog, "parent");
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> schemaNormalizeDispatcher.listSchemas(nestedNamespace));
+    Assertions.assertTrue(
+        exception.getMessage().contains("does not support hierarchical schemas"),
+        exception.getMessage());
+  }
+
+  @Test
   public void testNameSpec() {
     NameIdentifier schemaIdent1 =
         NameIdentifier.of(metalake, catalog, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);

@@ -19,6 +19,7 @@ package org.apache.gravitino.authorization;
 
 import java.io.Closeable;
 import java.security.Principal;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -87,9 +88,14 @@ public interface GravitinoAuthorizer extends Closeable {
    *
    * @param type user or group
    * @param nameIdentifier name of user or group
+   * @param requestContext authorization request context; enables per-request dedup with other
+   *     authorization calls in the same request
    * @return authorization result
    */
-  boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier);
+  boolean isSelf(
+      Entity.EntityType type,
+      NameIdentifier nameIdentifier,
+      AuthorizationRequestContext requestContext);
 
   /**
    * Determine whether the user is the metalake user.
@@ -156,14 +162,50 @@ public interface GravitinoAuthorizer extends Closeable {
   }
 
   /**
+   * Called when the role assignments of a user change.
+   *
+   * @param metalake the metalake name
+   * @param userName the user name
+   */
+  default void handleUserRoleRelChange(String metalake, String userName) {
+    // default no-op for backward compatibility
+  }
+
+  /**
+   * Called when the role assignments of a group change.
+   *
+   * @param metalake the metalake name
+   * @param groupName the group name
+   */
+  default void handleGroupRoleRelChange(String metalake, String groupName) {
+    // default no-op for backward compatibility
+  }
+
+  /**
    * This method is called to clear the owner relationship in jcasbin when the owner of the metadata
    * changes.
    *
    * @param metalake metalake;
-   * @param oldOwnerId The old owner id;
+   * @param oldOwnerId The old owner id; null when setting the first owner.
    * @param nameIdentifier The metadata name identifier;
    * @param type entity type
    */
   void handleMetadataOwnerChange(
-      String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type);
+      String metalake,
+      @Nullable Long oldOwnerId,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType type);
+
+  /**
+   * Called when an entity name-to-id mapping may have changed because of a rename or drop.
+   * Implementations evict the cache key for the given entity and all of its descendants.
+   *
+   * @param metalake the metalake name
+   * @param nameIdentifier the entity name identifier
+   * @param type the entity type
+   */
+  default void handleEntityNameIdMappingChange(
+      String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
+    // default no-op for backward compatibility
+  }
 }

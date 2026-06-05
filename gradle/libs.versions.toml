@@ -24,12 +24,14 @@ reactor-netty-http = "1.2.1"
 reactor-netty-core = "1.2.1"
 junit = "5.8.1"
 jackson = "2.15.2"
+snakeyaml = "2.0"
+gson = "2.11.0"
 guava = "32.1.3-jre"
 lombok = "1.18.20"
 slf4j = "2.0.16"
 log4j = "2.25.4"
-lance = "2.0.1"
-lance-namespace = "0.4.5"
+lance = "6.0.0"
+lance-namespace = "0.7.5"
 delta-kernel = "3.3.0"
 jetty = "9.4.58.v20250814"
 jersey = "2.41"
@@ -45,13 +47,12 @@ hadoop3-aliyun = "3.3.6"
 hadoop3-thirdparty = "1.1.1"
 hadoop-minikdc = "3.3.6"
 re2j = "1.7"
-htrace-core4 = "4.1.0-incubating"
 httpclient = "4.4.1"
 httpclient5 = "5.4.4"
 httpcore5 = "5.3.4"
 micrometer-core = "1.12.2"
 mockserver = "5.15.0"
-commons-configuration2 = "2.8.0"
+commons-configuration2 = "2.10.1"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
@@ -59,11 +60,15 @@ commons-logging = "1.3.5"
 commons-io = "2.18.0"
 commons-collections4 = "4.4"
 commons-collections3 = "3.2.2"
+commons-beanutils = "1.11.0"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
-iceberg = '1.10.1' # used for Gravitino Iceberg catalog and Iceberg REST service
-iceberg4connector = "1.6.1" # used for compile connectors like Spark, Flink, etc
+iceberg = '1.11.0'
+# Last Iceberg release compatible with Spark 3.3; Spark 3.3 deploy ITs cover basic CRUD only.
+iceberg4spark33 = "1.8.1"
+iceberg4spark34 = "1.11.0"
+iceberg4spark35 = "1.11.0"
 paimon = '1.2.0'
 spark33 = "3.3.4"
 spark34 = "3.4.3"
@@ -84,13 +89,14 @@ metrics = "4.2.25"
 prometheus = "0.16.0"
 clickhouse = "0.7.1"
 lz4 = "1.8.0"
+snappy-java = "1.1.10.8"
 mysql = "8.0.33"
-postgresql = "42.6.0"
+postgresql = "42.7.11"
 immutables-value = "2.11.7"
 selenium = "4.33.0"
 rauschig = "1.2.0"
 mybatis = "3.5.6"
-h2db = "1.4.200"
+h2db = "2.2.224"
 kafka = "3.4.0"
 curator = "2.12.0"
 awaitility = "4.2.1"
@@ -99,10 +105,18 @@ bouncycastle = "1.84"
 jodd = "3.5.2"
 flink = "1.18.0"
 flink18 = "1.18.0"
+flink119 = "1.19.0"
+flink120 = "1.20.0"
 flinkjdbc = "3.2.0-1.18"
 flinkjdbc18 = "3.2.0-1.18"
+flinkjdbc119 = "3.3.0-1.19"
+flinkjdbc120 = "3.3.0-1.20"
 iceberg4flink18 = "1.9.2"
+iceberg4flink119 = "1.10.2"
+iceberg4flink120 = "1.11.0"
 paimon4flink18 = "1.2.0"
+paimon4flink119 = "1.2.0"
+paimon4flink120 = "1.2.0"
 # cglib upgraded from 2. to 3.3.0 for Java 17 compatibility.
 # Explicit ASM dependency (9.8) is required due to cglib's internal use and Java 17 module system.
 cglib = "3.3.0"
@@ -121,10 +135,10 @@ commons-cli = "1.2"
 commons-cli-new = "1.9.0"
 sun-activation-version = "1.2.0"
 error-prone = "3.1.0"
-woodstox-core = "5.3.0"
+woodstox-core = "6.5.1"
 mail = "1.4.1"
 rome = "1.0"
-jettison = "1.1"
+jettison = "1.5.4"
 thrift = "0.12.0"
 derby = "10.14.2.0"
 datanucleus-core = "4.1.17"
@@ -148,6 +162,7 @@ ql-expression = "4.0.3"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
+aws-dynamodb = { group = "software.amazon.awssdk", name = "dynamodb", version.ref = "awssdk" }
 aws-glue = { group = "software.amazon.awssdk", name = "glue", version.ref = "awssdk" }
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
 aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", version.ref = "awssdk" }
@@ -163,8 +178,10 @@ jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-an
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
 jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "jackson" }
 jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson" }
+snakeyaml = { group = "org.yaml", name = "snakeyaml", version.ref = "snakeyaml" }
 jackson-jaxrs-json-provider = { group = "com.fasterxml.jackson.jaxrs", name = "jackson-jaxrs-json-provider", version.ref = "jackson" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 kerby-core = { group = "org.apache.kerby", name = "kerb-core", version.ref = "kerby"}
 kerby-simplekdc = { group = "org.apache.kerby", name = "kerb-simplekdc", version.ref = "kerby"}
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
@@ -221,7 +238,6 @@ hadoop3-abs = { group = "org.apache.hadoop", name = "hadoop-azure", version.ref 
 hadoop3-shaded-guava = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-guava", version.ref = "hadoop3-thirdparty" }
 hadoop3-shaded-protobuf = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-protobuf_3_7", version.ref = "hadoop3-thirdparty" }
 re2j = { group = "com.google.re2j", name = "re2j", version.ref = "re2j" }
-htrace-core4 = { group = "org.apache.htrace", name = "htrace-core4", version.ref = "htrace-core4" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }
@@ -239,6 +255,7 @@ commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
+commons-beanutils = { group = "commons-beanutils", name = "commons-beanutils", version.ref = "commons-beanutils" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
 commons-configuration2 = { group = "org.apache.commons", name = "commons-configuration2", version.ref = "commons-configuration2" }
 iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
@@ -290,6 +307,7 @@ prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwiza
 prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
 clickhouse-driver = { group = "com.clickhouse", name = "clickhouse-jdbc", version.ref = "clickhouse" }
 lz4-java = { group = "org.lz4", name = "lz4-java", version.ref = "lz4" }
+snappy-java = { group = "org.xerial.snappy", name = "snappy-java", version.ref = "snappy-java" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop-minikdc"}
@@ -330,6 +348,8 @@ aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.
 aliyun-sdk-oss = { module = "com.aliyun.oss:aliyun-sdk-oss", version.ref = "aliyun-sdk-oss" }
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
 flinkjdbc18 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc18'}
+flinkjdbc119 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc119'}
+flinkjdbc120 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc120'}
 concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }

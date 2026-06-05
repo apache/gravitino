@@ -49,7 +49,16 @@ public class CatalogCredentialManager implements Closeable {
     credentialCache.initialize(catalogProperties);
   }
 
-  public Credential getCredential(String credentialType, CredentialContext context) {
+  /**
+   * Returns the catalog name this manager was created for.
+   *
+   * @return catalog name
+   */
+  public String catalogName() {
+    return catalogName;
+  }
+
+  public Optional<Credential> getCredential(String credentialType, CredentialContext context) {
     CredentialCacheKey credentialCacheKey = new CredentialCacheKey(credentialType, context);
     return credentialCache.getCredential(credentialCacheKey, cacheKey -> doGetCredential(cacheKey));
   }
@@ -58,7 +67,7 @@ public class CatalogCredentialManager implements Closeable {
     return Optional.ofNullable(credentialProviders.get(credentialType));
   }
 
-  public Credential getCredentialByPath(String path, CredentialContext context) {
+  public Optional<Credential> getCredentialByPath(String path, CredentialContext context) {
     String scheme = extractScheme(path);
     String matchedCredentialType = null;
     CredentialProvider matchedCredentialProvider = null;
@@ -133,13 +142,13 @@ public class CatalogCredentialManager implements Closeable {
     }
   }
 
-  private Credential doGetCredential(CredentialCacheKey credentialCacheKey) {
+  private Optional<Credential> doGetCredential(CredentialCacheKey credentialCacheKey) {
     String credentialType = credentialCacheKey.getCredentialType();
     CredentialContext context = credentialCacheKey.getCredentialContext();
     LOG.debug("Try get credential, credential type: {}, context: {}.", credentialType, context);
     Preconditions.checkState(
         credentialProviders.containsKey(credentialType),
         String.format("Credential %s not found", credentialType));
-    return credentialProviders.get(credentialType).getCredential(context);
+    return credentialProviders.get(credentialType).getCredentialOptional(context);
   }
 }

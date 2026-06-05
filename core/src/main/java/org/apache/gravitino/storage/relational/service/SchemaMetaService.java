@@ -33,7 +33,6 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -80,29 +79,18 @@ import org.apache.gravitino.utils.NamespaceUtil;
 /** The service class for schema metadata. It provides the basic database operations for schema. */
 public class SchemaMetaService {
   private static final SchemaMetaService INSTANCE = new SchemaMetaService();
+  private BasePOStorageOps<SchemaPO, SchemaMetaMapper> ops;
 
   public static SchemaMetaService getInstance() {
     return INSTANCE;
   }
 
-  private SchemaMetaService() {}
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getSchemaPOByCatalogIdAndName")
-  public SchemaPO getSchemaPOByCatalogIdAndName(Long catalogId, String schemaName) {
-    SchemaPO schemaPO =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaMetaByCatalogIdAndName(catalogId, schemaName));
-
-    if (schemaPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          schemaName);
-    }
-    return schemaPO;
+  private SchemaMetaService() {
+    this.ops =
+        new HierarchicalConversionPOStorageOps<>(
+            new SchemaPOStorageOps(),
+            SchemaMetaService::physicalToLogicalSchemaPO,
+            SchemaMetaService::logicalToPhysicalSchemaPO);
   }
 
   @Monitored(
@@ -110,39 +98,21 @@ public class SchemaMetaService {
       baseMetricName = "getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
-    SchemaIds schemaIds =
+    NameIdentifier identifier = NameIdentifier.of(metalakeName, catalogName, schemaName);
+    SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
             mapper ->
-                mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-                    metalakeName, catalogName, schemaName));
+                POStorageReadRouting.getPO(mapper, identifier, ops, Entity.EntityType.SCHEMA));
 
-    if (schemaIds == null) {
+    if (schemaPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.SCHEMA.name().toLowerCase(),
           schemaName);
     }
 
-    return schemaIds;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getSchemaIdByCatalogIdAndName")
-  public Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
-    Long schemaId =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
-
-    if (schemaId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          schemaName);
-    }
-    return schemaId;
+    return new SchemaIds(schemaPO.getMetalakeId(), schemaPO.getCatalogId(), schemaPO.getSchemaId());
   }
 
   @Monitored(
@@ -169,23 +139,24 @@ public class SchemaMetaService {
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
-      // Callers above this service (e.g. JDBCBackend + naming bridge) pass storage-form schema
-      // names: nested paths use the internal physical separator, not the external logical one.
-      String physicalSep = HierarchicalSchemaUtil.physicalSeparator();
+      // SchemaEntity arrives in API/logical form (separator = HierarchicalSchemaUtil
+      // .schemaSeparator()). We split here on the logical separator and build ancestor rows in
+      // logical form. HierarchicalConversionPOStorageOps.batchInsertPOs applies its write
+      // rewriter to translate each PO's name to storage form before SQL execution.
+      String logicalSep = HierarchicalSchemaUtil.schemaSeparator();
       String schemaName = schemaEntity.name();
       List<SchemaEntity> rowsToInsert = new ArrayList<>();
-      if (schemaName == null || !schemaName.contains(physicalSep)) {
+      if (schemaName == null || !schemaName.contains(logicalSep)) {
         rowsToInsert.add(schemaEntity);
       } else {
-        // Segments of the storage-form name; e.g. [A, B, C] -> ancestor rows "A", "A"+sep+"B", then
-        // leaf.
-        String[] parts = schemaName.split(Pattern.quote(physicalSep), -1);
+        // Segments of the logical name; e.g. "A:B:C" -> ancestor rows "A", "A:B", then leaf.
+        String[] parts = schemaName.split(Pattern.quote(logicalSep), -1);
         for (int nSeg = 1; nSeg < parts.length; nSeg++) {
-          String ancestorPhysical = String.join(physicalSep, Arrays.copyOf(parts, nSeg));
+          String ancestorLogical = String.join(logicalSep, Arrays.copyOf(parts, nSeg));
           SchemaEntity ancestor =
               SchemaEntity.builder()
                   .withId(nextIdForNestedAncestor())
-                  .withName(ancestorPhysical)
+                  .withName(ancestorLogical)
                   .withNamespace(schemaEntity.namespace())
                   .withComment(null)
                   .withProperties(Collections.emptyMap())
@@ -204,19 +175,16 @@ public class SchemaMetaService {
             if (n > 1) {
               SchemaEntity firstAncestor = rowsToInsert.get(0);
               Namespace ancestorNs = firstAncestor.namespace();
-              List<String> ancestorPhysicalNames =
+              List<String> ancestorNames =
                   rowsToInsert.subList(0, n - 1).stream()
                       .map(SchemaEntity::name)
                       .collect(Collectors.toList());
-              Set<String> existingAncestorNames =
-                  mapper
-                      .batchSelectSchemaByIdentifier(
-                          ancestorNs.level(0), ancestorNs.level(1), ancestorPhysicalNames)
-                      .stream()
+              Set<String> existingLogicalNames =
+                  ops.listPOs(mapper, ancestorNs, ancestorNames).stream()
                       .map(SchemaPO::getSchemaName)
                       .collect(Collectors.toSet());
               for (SchemaEntity row : rowsToInsert.subList(0, n - 1)) {
-                if (existingAncestorNames.contains(row.name())) {
+                if (existingLogicalNames.contains(row.name())) {
                   continue;
                 }
                 SchemaPO.Builder builder = SchemaPO.builder();
@@ -230,11 +198,7 @@ public class SchemaMetaService {
             SchemaPO leafPO = POConverters.initializeSchemaPOWithVersion(leafRow, leafBuilder);
             List<SchemaPO> schemaPosToInsert = new ArrayList<>(missingAncestorPOs);
             schemaPosToInsert.add(leafPO);
-            if (overwrite) {
-              mapper.batchInsertSchemaMetaOnDuplicateKeyUpdate(schemaPosToInsert);
-            } else {
-              mapper.batchInsertSchemaMeta(schemaPosToInsert);
-            }
+            ops.batchInsertPOs(mapper, schemaPosToInsert, overwrite);
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -271,7 +235,8 @@ public class SchemaMetaService {
                   SessionUtils.getWithoutCommit(
                       SchemaMetaMapper.class,
                       mapper ->
-                          mapper.updateSchemaMeta(
+                          ops.updatePO(
+                              mapper,
                               POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity),
                               oldSchemaPO))),
           () -> {
@@ -314,69 +279,81 @@ public class SchemaMetaService {
         NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName).toString();
 
     if (cascade) {
+      // For HierarchicalSchema, deleting `A:B` must also cascade into all descendant schemas
+      // such as `A:B:C`, `A:B:C:D`, etc. Collect the descendant schema ids up-front and run a
+      // single batch UPDATE per child table so the total SQL cost stays bounded regardless of
+      // how many descendants exist.
+      List<Long> schemaIds = listSchemaIdsForCascade(schemaPO);
+      if (schemaIds.isEmpty()) {
+        return false;
+      }
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
                   SchemaMetaMapper.class,
-                  mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteSchemaMetasBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
-                  TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
+                  TableMetaMapper.class,
+                  mapper -> mapper.softDeleteTableMetasBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
-                  TableColumnMapper.class, mapper -> mapper.softDeleteColumnsBySchemaId(schemaId)),
+                  TableColumnMapper.class,
+                  mapper -> mapper.softDeleteColumnsBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   FilesetMetaMapper.class,
-                  mapper -> mapper.softDeleteFilesetMetasBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteFilesetMetasBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   FilesetVersionMapper.class,
-                  mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteFilesetVersionsBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
-                  TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)),
+                  TopicMetaMapper.class,
+                  mapper -> mapper.softDeleteTopicMetasBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   FunctionMetaMapper.class,
-                  mapper -> mapper.softDeleteFunctionMetasBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteFunctionMetasBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   FunctionVersionMetaMapper.class,
-                  mapper -> mapper.softDeleteFunctionVersionMetasBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteFunctionVersionMetasBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
-                  OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelBySchemaId(schemaId)),
+                  OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   SecurableObjectMapper.class,
-                  mapper -> mapper.softDeleteObjectRelsBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteObjectRelsBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   TagMetadataObjectRelMapper.class,
-                  mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   PolicyMetadataObjectRelMapper.class,
-                  mapper -> mapper.softDeletePolicyMetadataObjectRelsBySchemaId(schemaId)),
+                  mapper -> mapper.softDeletePolicyMetadataObjectRelsBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   ModelVersionAliasRelMapper.class,
-                  mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   ModelVersionMetaMapper.class,
-                  mapper -> mapper.softDeleteModelVersionMetasBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteModelVersionMetasBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
-                  ModelMetaMapper.class, mapper -> mapper.softDeleteModelMetasBySchemaId(schemaId)),
+                  ModelMetaMapper.class,
+                  mapper -> mapper.softDeleteModelMetasBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
                   StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteStatisticsBySchemaIds(schemaIds)),
           () ->
               SessionUtils.doWithoutCommit(
-                  ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasBySchemaId(schemaId)),
+                  ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasBySchemaIds(schemaIds)),
           () -> {
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
@@ -434,11 +411,12 @@ public class SchemaMetaService {
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
 
+      List<Long> singleSchemaId = Collections.singletonList(schemaId);
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
                   SchemaMetaMapper.class,
-                  mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
+                  mapper -> mapper.softDeleteSchemaMetasBySchemaIds(singleSchemaId)),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -494,96 +472,42 @@ public class SchemaMetaService {
 
   private SchemaPO getSchemaPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkSchema(identifier);
-    return schemaPOFetcher().apply(identifier);
-  }
-
-  private SchemaPO getSchemaByFullQualifiedName(
-      String metalakeName, String catalogName, String schemaName) {
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
             mapper ->
-                mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName));
+                POStorageReadRouting.getPO(mapper, identifier, ops, Entity.EntityType.SCHEMA));
     if (schemaPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.CATALOG.name().toLowerCase(),
-          schemaName);
-    }
-
-    return schemaPO;
-  }
-
-  private List<SchemaPO> listSchemaPOs(Namespace namespace) {
-    return schemaListFetcher().apply(namespace);
-  }
-
-  private List<SchemaPO> listSchemaPOsByCatalogId(Namespace namespace) {
-    Long catalogId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
-
-    return SessionUtils.getWithoutCommit(
-        SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
-  }
-
-  private List<SchemaPO> listSchemaPOsByFullQualifiedName(Namespace namespace) {
-    String[] namespaceLevels = namespace.levels();
-    List<SchemaPO> schemaPOs =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper ->
-                mapper.listSchemaPOsByFullQualifiedName(namespaceLevels[0], namespaceLevels[1]));
-    if (schemaPOs.isEmpty() || schemaPOs.get(0).getCatalogId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          namespaceLevels[1]);
-    }
-    return schemaPOs.stream().filter(po -> po.getSchemaId() != null).collect(Collectors.toList());
-  }
-
-  private SchemaPO getSchemaPOByCatalogId(NameIdentifier identifier) {
-    Long catalogId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
-    return getSchemaPOByCatalogIdAndName(catalogId, identifier.name());
-  }
-
-  private SchemaPO getSchemaPOByFullQualifiedName(NameIdentifier identifier) {
-    String[] namespaceLevels = identifier.namespace().levels();
-    SchemaPO schemaPO =
-        getSchemaByFullQualifiedName(namespaceLevels[0], namespaceLevels[1], identifier.name());
-
-    if (schemaPO.getCatalogId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          namespaceLevels[1]);
-    }
-
-    if (schemaPO.getSchemaId() == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.SCHEMA.name().toLowerCase(),
           identifier.name());
     }
-
     return schemaPO;
   }
 
-  private Function<Namespace, List<SchemaPO>> schemaListFetcher() {
-    // If cache is enabled, we can use catalog id to fetch schemas faster or else use full qualified
-    // name to join several tables to get the schema list.
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::listSchemaPOsByCatalogId
-        : this::listSchemaPOsByFullQualifiedName;
+  private List<SchemaPO> listSchemaPOs(Namespace namespace) {
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class,
+        mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.SCHEMA));
   }
 
-  private Function<NameIdentifier, SchemaPO> schemaPOFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::getSchemaPOByCatalogId
-        : this::getSchemaPOByFullQualifiedName;
+  /**
+   * Collects the schema ids that participate in a cascade delete: the target schema itself plus
+   * every HierarchicalSchema descendant. The {@link SchemaPO} arrives in logical form (e.g. {@code
+   * A:B}); {@link HierarchicalConversionPOStorageOps} translates to storage form before running the
+   * SQL prefix match, so this method only deals in logical names.
+   */
+  private List<Long> listSchemaIdsForCascade(SchemaPO schemaPO) {
+    List<SchemaPO> matched =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                ops.listPOsByNamePrefix(mapper, schemaPO.getCatalogId(), schemaPO.getSchemaName()));
+    if (matched == null || matched.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return matched.stream().map(SchemaPO::getSchemaId).collect(Collectors.toList());
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
@@ -605,14 +529,20 @@ public class SchemaMetaService {
     List<String> schemaNames =
         identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
 
-    return SessionUtils.doWithCommitAndFetchResult(
+    return SessionUtils.getWithoutCommit(
         SchemaMetaMapper.class,
         mapper -> {
           List<SchemaPO> schemaPOs =
-              mapper.batchSelectSchemaByIdentifier(
-                  catalogIdent.namespace().level(0), catalogIdent.name(), schemaNames);
+              ops.listPOs(
+                  mapper,
+                  Namespace.of(catalogIdent.namespace().levels()[0], catalogIdent.name()),
+                  schemaNames);
           return POConverters.fromSchemaPOs(schemaPOs, firstIdent.namespace());
         });
+  }
+
+  public BasePOStorageOps<SchemaPO, SchemaMetaMapper> ops() {
+    return ops;
   }
 
   private static long nextIdForNestedAncestor() {
@@ -622,5 +552,40 @@ public class SchemaMetaService {
           "IdGenerator is not initialized in GravitinoEnv; ensure it is set up before inserting nested schemas");
     }
     return generator.nextId();
+  }
+
+  private static SchemaPO physicalToLogicalSchemaPO(SchemaPO po) {
+    String name = po.getSchemaName();
+    if (name == null || !name.contains(HierarchicalSchemaUtil.physicalSeparator())) {
+      return po;
+    }
+    return copySchemaPOWithName(
+        po,
+        HierarchicalSchemaUtil.physicalToLogical(name, HierarchicalSchemaUtil.schemaSeparator()));
+  }
+
+  private static SchemaPO logicalToPhysicalSchemaPO(SchemaPO po) {
+    String name = po.getSchemaName();
+    if (name == null || !name.contains(HierarchicalSchemaUtil.schemaSeparator())) {
+      return po;
+    }
+    return copySchemaPOWithName(
+        po,
+        HierarchicalSchemaUtil.logicalToPhysical(name, HierarchicalSchemaUtil.schemaSeparator()));
+  }
+
+  private static SchemaPO copySchemaPOWithName(SchemaPO po, String name) {
+    return SchemaPO.builder()
+        .withSchemaId(po.getSchemaId())
+        .withSchemaName(name)
+        .withMetalakeId(po.getMetalakeId())
+        .withCatalogId(po.getCatalogId())
+        .withSchemaComment(po.getSchemaComment())
+        .withProperties(po.getProperties())
+        .withAuditInfo(po.getAuditInfo())
+        .withCurrentVersion(po.getCurrentVersion())
+        .withLastVersion(po.getLastVersion())
+        .withDeletedAt(po.getDeletedAt())
+        .build();
   }
 }

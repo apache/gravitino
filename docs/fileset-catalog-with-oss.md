@@ -1,10 +1,12 @@
 ---
-title: "Fileset catalog with OSS"
-slug: /fileset-catalog-with-oss
+title: "Fileset Catalog with OSS"
+slug: "/fileset-catalog-with-oss"
 date: 2025-01-03
-keyword: Fileset catalog OSS
+keyword: "Fileset catalog OSS"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 This document explains how to configure a Fileset catalog with Aliyun OSS (Object Storage Service) in Gravitino.
 
@@ -20,11 +22,11 @@ To set up a Fileset catalog with OSS, follow these steps:
 $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Fileset catalog with OSS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
+Once the server is up and running, you can proceed to configure the Fileset catalog with OSS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
 
-## Configurations for creating a Fileset catalog with OSS
+## OSS Catalog Configuration
 
-### Configuration for an OSS Fileset catalog
+### OSS Fileset Catalog Configuration
 
 In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with OSS:
 
@@ -35,25 +37,25 @@ In addition to the basic configurations mentioned in [Fileset-catalog-catalog-co
 | `oss-endpoint`                | The endpoint of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | (none)          | Yes      | 0.7.0-incubating |
 | `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
 | `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, please see [oss-credential-vending](security/credential-vending.md#oss-credentials) | (none)          | No       | 0.8.0-incubating |
+| `credential-providers`        | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, see [oss-credential-vending](security/credential-vending.md#oss-credentials) | (none)          | No       | 0.8.0-incubating |
 
 :::note
 `default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aliyun-bundle`).
 :::
 
-### Configurations for a schema
+### Schema Configuration
 
 To create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
 
-### Configurations for a fileset
+### Fileset Configuration
 
 For instructions on how to create a fileset, refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
-## Example of creating Fileset catalog/schema/fileset with OSS
+## Create the Catalog, Schema, and Fileset
 
 This section will show you how to use the Fileset catalog with OSS in Gravitino, including detailed examples.
 
-### Step1: Create a Fileset catalog with OSS
+### Step 1: Create a Fileset Catalog with OSS
 
 First, you need to create a Fileset catalog for OSS. The following examples demonstrate how to create a Fileset catalog with OSS:
 
@@ -172,7 +174,7 @@ catalog.as_schemas().create_schema(name="test_schema",
 </Tabs>
 
 
-### Step3: Create a fileset
+### Step 3: Create a Fileset
 
 Now that the schema is created, you can create a fileset inside it. Here’s how:
 
@@ -234,9 +236,9 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 </TabItem>
 </Tabs>
 
-## Accessing a fileset with OSS
+## Access a Fileset with OSS
 
-### Using the GVFS Java client to access the fileset
+### Access the Fileset with the GVFS Java Client
 
 To access fileset with OSS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -308,7 +310,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
   </dependency>
 ```
 
-### Using Spark to access the fileset
+### Access the Fileset with Spark
 
 The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
@@ -383,9 +385,9 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Accessing a fileset using the Hadoop fs command
+### Access a Fileset Using the Hadoop Fs Command
 
-The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
+The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3:
 
 1. Adding the following contents to the `${HADOOP_HOME}/etc/hadoop/core-site.xml` file:
 
@@ -437,9 +439,9 @@ For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 ./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/oss_catalog/schema/oss_fileset
 ```
 
-### Using the GVFS Python client to access a fileset
+### Access the Fileset with the GVFS Python Client
 
-In order to access fileset with OSS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+To access fileset with OSS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
 | Configuration item      | Description                       | Default value | Required | Since version    |
 |-------------------------|-----------------------------------|---------------|----------|------------------|
@@ -473,7 +475,7 @@ fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
 
 
-### Using fileset with pandas
+### Access the Fileset with Pandas
 
 The following are examples of how to use the pandas library to access the OSS fileset
 
@@ -493,15 +495,15 @@ ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}
                  storage_options=storage_options)
 ds.head()
 ```
-For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
+For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with credential vending
+## Fileset with Credential Vending
 
 Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
 
-### How to create an OSS Fileset catalog with credential vending
+### Create an OSS Fileset Catalog with Credential Vending
 
-Apart from configuration method in [create-oss-fileset-catalog](#configuration-for-an-oss-fileset-catalog),
+Apart from configuration method in [create-oss-fileset-catalog](#oss-fileset-catalog-configuration),
 properties needed by [oss-credential](./security/credential-vending.md#oss-credentials)
 should also be set to enable credential vending for OSS fileset. Take `oss-token` credential provider for example:
 
@@ -523,7 +525,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### How to access OSS fileset with credential vending
+### Access an OSS Fileset with Credential Vending
 
 When the catalog is configured with credentials and client-side credential vending is enabled,
 you can access OSS filesets directly using the GVFS Java/Python client or Spark without providing authentication details.

@@ -24,6 +24,8 @@ import com.google.common.collect.Sets;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
 
 /**
@@ -73,5 +75,28 @@ public class JDBCCatalogPropertyConverter extends CatalogPropertyConverter {
     }
 
     return trinoProperties;
+  }
+
+  /**
+   * Injects JDBC user and password from vended credentials into the Gravitino-format properties
+   * map. If no {@link JdbcCredential} is present in the array, the map is left unchanged so that
+   * existing properties serve as fallback.
+   *
+   * @param credentials the credentials returned by the server; may be empty
+   * @param gravitinoProps the mutable Gravitino-format properties map to update
+   */
+  public static void applyJdbcCredential(
+      Credential[] credentials, Map<String, String> gravitinoProps) {
+    for (Credential credential : credentials) {
+      if (credential instanceof JdbcCredential) {
+        JdbcCredential jdbcCredential = (JdbcCredential) credential;
+        gravitinoProps.put(
+            TRINO_KEY_TO_GRAVITINO_KEY.get(JDBC_CONNECTION_USER_KEY), jdbcCredential.jdbcUser());
+        gravitinoProps.put(
+            TRINO_KEY_TO_GRAVITINO_KEY.get(JDBC_CONNECTION_PASSWORD_KEY),
+            jdbcCredential.jdbcPassword());
+        return;
+      }
+    }
   }
 }

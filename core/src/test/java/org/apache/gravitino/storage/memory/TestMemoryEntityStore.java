@@ -58,6 +58,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.Executable;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -156,6 +157,19 @@ public class TestMemoryEntityStore {
     public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
         throws IOException {
       Entity prev = entityMap.remove(ident);
+      if (cascade && entityType == EntityType.SCHEMA) {
+        // Mirror the relational store: a cascade delete of a hierarchical schema also removes its
+        // descendant schemas, i.e. the schemas in the same (metalake, catalog) namespace whose
+        // name carries the "<name><separator>" prefix. Tables and other child entities live under a
+        // deeper namespace, so the namespace check leaves them untouched here.
+        String descendantPrefix = ident.name() + HierarchicalSchemaUtil.schemaSeparator();
+        entityMap
+            .keySet()
+            .removeIf(
+                key ->
+                    key.namespace().equals(ident.namespace())
+                        && key.name().startsWith(descendantPrefix));
+      }
       return prev != null;
     }
 

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -72,6 +73,7 @@ class TestGlueCatalogTableOperations {
     mockClient = mock(GlueClient.class);
     ops = new GlueCatalogOperations();
     ops.glueClient = mockClient;
+    ops.warehouseLocation = "s3://test-bucket/warehouse";
   }
 
   // -------------------------------------------------------------------------
@@ -189,7 +191,7 @@ class TestGlueCatalogTableOperations {
             ident,
             columns,
             "my comment",
-            Map.of(GlueConstants.LOCATION, "s3://bucket/path"),
+            Map.of(GlueConstants.LOCATION, "s3://bucket/path", GlueConstants.FORMAT, "parquet"),
             Transforms.EMPTY_TRANSFORM,
             Distributions.NONE,
             SortOrders.NONE,
@@ -214,7 +216,7 @@ class TestGlueCatalogTableOperations {
                 ident,
                 new Column[0],
                 null,
-                Collections.emptyMap(),
+                Map.of(GlueConstants.FORMAT, "parquet"),
                 Transforms.EMPTY_TRANSFORM,
                 Distributions.NONE,
                 SortOrders.NONE,
@@ -244,11 +246,14 @@ class TestGlueCatalogTableOperations {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
     Map<String, String> props =
         Map.of(
-            GlueConstants.LOCATION, "s3://my-bucket/path",
-            GlueConstants.INPUT_FORMAT, "org.apache.hadoop.mapred.TextInputFormat",
+            GlueConstants.LOCATION,
+            "s3://my-bucket/path",
+            GlueConstants.INPUT_FORMAT_CLASS,
+            HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
             GlueConstants.OUTPUT_FORMAT,
-                "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-            GlueConstants.TABLE_TYPE, "EXTERNAL_TABLE");
+            HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+            GlueConstants.SERDE_LIB,
+            HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS);
 
     ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
 
@@ -267,7 +272,6 @@ class TestGlueCatalogTableOperations {
     assertEquals("EXTERNAL_TABLE", req.tableInput().tableType());
     assertEquals("s3://my-bucket/path", req.tableInput().storageDescriptor().location());
     assertFalse(req.tableInput().parameters().containsKey(GlueConstants.LOCATION));
-    assertFalse(req.tableInput().parameters().containsKey(GlueConstants.TABLE_TYPE));
   }
 
   // -------------------------------------------------------------------------
@@ -281,6 +285,7 @@ class TestGlueCatalogTableOperations {
         Table.builder()
             .name("old")
             .description("old comment")
+            .parameters(Map.of(GlueConstants.FORMAT, "parquet"))
             .storageDescriptor(StorageDescriptor.builder().build())
             .createTime(Instant.now())
             .build();
@@ -289,13 +294,8 @@ class TestGlueCatalogTableOperations {
     when(mockClient.updateTable(any(UpdateTableRequest.class)))
         .thenReturn(UpdateTableResponse.builder().build());
 
-    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    GlueTable result = ops.alterTable(ident, TableChange.updateComment("new comment"));
 
-    GlueTable result =
-        ops.alterTable(ident, TableChange.rename("new"), TableChange.updateComment("new comment"));
-
-    verify(mockClient).updateTable(captor.capture());
-    assertEquals("new", captor.getValue().tableInput().name());
     assertEquals("new comment", result.comment());
   }
 
@@ -305,7 +305,7 @@ class TestGlueCatalogTableOperations {
     Table glueTable =
         Table.builder()
             .name("t")
-            .parameters(Map.of("existing", "v1"))
+            .parameters(Map.of("existing", "v1", GlueConstants.FORMAT, "parquet"))
             .storageDescriptor(StorageDescriptor.builder().build())
             .createTime(Instant.now())
             .build();
@@ -326,6 +326,7 @@ class TestGlueCatalogTableOperations {
     Table glueTable =
         Table.builder()
             .name("t")
+            .parameters(Map.of(GlueConstants.FORMAT, "parquet"))
             .storageDescriptor(
                 StorageDescriptor.builder()
                     .columns(

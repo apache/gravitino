@@ -1190,7 +1190,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
         tableName);
   }
 
-  private SparkMetadataColumnInfo[] getIcebergMetadataColumns() {
+  protected SparkMetadataColumnInfo[] getIcebergMetadataColumns() {
     return new SparkMetadataColumnInfo[] {
       new SparkMetadataColumnInfo("_spec_id", DataTypes.IntegerType, false),
       new SparkMetadataColumnInfo(
@@ -1200,7 +1200,9 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
           true),
       new SparkMetadataColumnInfo("_file", DataTypes.StringType, false),
       new SparkMetadataColumnInfo("_pos", DataTypes.LongType, false),
-      new SparkMetadataColumnInfo("_deleted", DataTypes.BooleanType, false)
+      new SparkMetadataColumnInfo("_deleted", DataTypes.BooleanType, false),
+      new SparkMetadataColumnInfo("_row_id", DataTypes.LongType, true),
+      new SparkMetadataColumnInfo("_last_updated_sequence_number", DataTypes.LongType, true)
     };
   }
 

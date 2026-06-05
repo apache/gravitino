@@ -1,6 +1,6 @@
 ---
-title: "Lance REST service"
-slug: /lance-rest-service
+title: "Lance REST Service"
+slug: "/lance-rest-service"
 keywords:
   - Lance REST
   - Lance datasets
@@ -17,7 +17,7 @@ The Lance REST service provides a RESTful interface for managing Lance datasets 
 
 The service implements the [Lance REST API specification](https://docs.lancedb.com/api-reference/introduction). For detailed specification documentation, see the [official Lance REST documentation](https://lance.org/format/namespace/rest/catalog-spec/).
 
-### What is Lance?
+### About Lance
 
 [Lance](https://lance.org/format/) is a modern columnar data format designed for AI/ML workloads. It provides:
 
@@ -81,10 +81,9 @@ The Lance REST service provides comprehensive support for namespace management, 
 | TableExists       | Check whether a table exists                                                                                                                                                       | POST        | `/lance/v1/table/{id}/exists`         | 1.1.0         |
 | RegisterTable     | Register an existing Lance table to a namespace                                                                                                                                    | POST        | `/lance/v1/table/{id}/register`       | 1.1.0         |
 | DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)                                                                                                                  | POST        | `/lance/v1/table/{id}/deregister`     | 1.1.0         |
-| CreateEmptyTable  | **Deprecated**: Use `DeclareTable` instead. Declare a table and store the metadata without touching lance table data, for more, please refer to [doc](https://docs.lancedb.com/api-reference/rest/table/create-an-empty-table) | POST        | `/lance/v1/table/{id}/create-empty`   | 1.1.0         |
-| DeclareTable      | Declare a table and store the metadata without touching lance table data. This is the preferred replacement for `CreateEmptyTable`.                                                | POST        | `/lance/v1/table/{id}/declare`        | 1.3.0         |
+| DeclareTable      | Declare a table and store the metadata without touching lance table data.                                                                                                           | POST        | `/lance/v1/table/{id}/declare`        | 1.3.0         |
 
-More details, please refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
+More details, refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
 
 ### Operation Details
 
@@ -121,7 +120,7 @@ The `version` field of `CreateTable` response is always null, which stands for t
 
 ## Deployment
 
-### Running with Gravitino Server
+### Run with Gravitino Server
 
 To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file `${GRAVITINO_HOME}/conf/gravitino.conf`:
 
@@ -131,7 +130,7 @@ To enable the Lance REST service within Gravitino server, configure the followin
 | `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      | 1.1.0         |
 | `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       | 1.1.0         |
 | `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       | 1.1.0         |
-| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      | 1.1.0         |
+| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (only `gravitino` is supported)         | gravitino               | Yes      | 1.1.0         |
 | `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI (required when namespace-backend is `gravitino`)        | http://localhost:8090   | Yes      | 1.1.0         |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      | 1.1.0         |
 
@@ -146,7 +145,7 @@ gravitino.lance-rest.gravitino-uri = http://localhost:8090
 gravitino.lance-rest.gravitino-metalake = my_metalake
 ```
 
-### Running Standalone
+### Run Standalone
 
 To run Lance REST service independently without Gravitino server (You need to start Gravitino server first):
 
@@ -169,7 +168,7 @@ In most cases, you only need to configure `gravitino.lance-rest.gravitino-metala
 :::
 
 
-### Running with Docker
+### Run with Docker
 
 Launch Lance REST service using Docker(You need to start Gravitino server first):
 
@@ -194,7 +193,7 @@ Access the service at `http://localhost:9101`.
 
 :::tip Configuration Tips
 - **Required:** Set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name
-- **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost` in the docker instance.
+- **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost` in the Docker instance.
 - **Optional:** Other variables can use default values unless you have specific requirements
 :::
 
@@ -203,13 +202,15 @@ Access the service at `http://localhost:9101`.
 When using Lance REST service with Gravitino backend, keep the following considerations in mind:
 
 ### Prerequisites
-- A running Gravitino server with a created metalake
+
+- A running Gravitino server with a metalake
 
 ### Namespace Hierarchy
+
 Gravitino follows a three-level hierarchy: **catalog → schema → table**. When creating namespaces or tables:
 
 1. **Parent must exist:** Before creating `lance_catalog/schema`, ensure `lance_catalog` catalog exists in Gravitino metalake.
-2. **Two-level limit:** You can create namespace `lance_catalog/schema`, but **not** `lance_catalog/schema/sub_schema`.
+2. **Two-level limit:** Create namespace `lance_catalog/schema`, but **not** `lance_catalog/schema/sub_schema`.
 3. **Table placement:** Tables can only be created under `lance_catalog/schema`, not at catalog level.
 
 **Example Hierarchy:**
@@ -235,7 +236,7 @@ URL encoded:        lance_catalog%24schema%24table01
 ```
 
 :::caution Important Limitations
-- Currently supports only **two levels of namespaces** before tables
+- Supports only **two levels of namespaces** before tables
 - Tables **cannot** be nested deeper than schema level  
 - Parent catalog must be created in Gravitino before using Lance REST API
 - Namespace deletion is recursive and irreversible
@@ -280,17 +281,7 @@ curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table
     "mode": "create"
   }'
 
-# Create a new empty table
-# x-lance-table-properties is optional; if omitted, it defaults to an empty map.
-curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table02/create-empty \
-  -H 'Content-Type: application/json' \
-  -H "x-lance-table-properties: {\"description\":\"This is table02\"}" \
-  -d '{
-    "id": ["lance_catalog", "schema", "table02"],
-    "location": "/tmp/lance_catalog/schema/table02"
-  }'  
-
-# Declare a table (preferred replacement for create-empty)
+# Declare a table
 curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table04/declare \
   -H 'Content-Type: application/json' \
   -d '{
@@ -350,11 +341,11 @@ registerTableRequest.setId(Arrays.asList("lance_catalog", "schema", "table01"));
 registerTableRequest.setMode("create");
 ns.registerTable(registerTableRequest);
 
-// Create an empty table
-CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
-createEmptyTableRequest.setLocation("/tmp/lance_catalog/schema/table02");
-createEmptyTableRequest.setId(Arrays.asList("lance_catalog", "schema", "table02"));
-ns.createEmptyTable(createEmptyTableRequest);
+// Declare a table
+DeclareTableRequest declareTableRequest = new DeclareTableRequest();
+declareTableRequest.setLocation("/tmp/lance_catalog/schema/table02");
+declareTableRequest.setId(Arrays.asList("lance_catalog", "schema", "table02"));
+ns.declareTable(declareTableRequest);
 
 // Create a table with schema inferred from Arrow IPC file.
 // For REST create API, location/properties are passed via headers.
@@ -400,12 +391,12 @@ register_table_request = ln.RegisterTableRequest(
 )
 ns.register_table(register_table_request)
 
-# Create an empty table
-create_empty_table_request = ln.CreateEmptyTableRequest(
+# Declare a table
+declare_table_request = ln.DeclareTableRequest(
     id=['lance_catalog', 'schema', 'table02'],
     location='/tmp/lance_catalog/schema/table02'
 )
-ns.create_empty_table(create_empty_table_request)
+ns.declare_table(declare_table_request)
 
 # Create a table with schema inferred from Arrow IPC file.
 # For REST create API, location/properties are passed via headers.
@@ -431,4 +422,4 @@ response.raise_for_status()
 
 ## Integration with Lance REST
 
-To use the Lance REST service with Apache Spark, Ray and other engines, please refer to [lance-rest-integration](./lance-rest-integration.md) for more details.
+To use the Lance REST service with Apache Spark, Ray and other engines, refer to [lance-rest-integration](./lance-rest-integration.md) for more details.

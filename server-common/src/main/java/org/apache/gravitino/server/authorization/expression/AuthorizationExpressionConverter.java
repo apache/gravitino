@@ -112,7 +112,8 @@ public class AuthorizationExpressionConverter {
             } else if (AuthConstants.SELF.equals(privilegeOrExpression)) {
               replacement =
                   String.format(
-                      "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,%s_NAME_IDENT)",
+                      "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,"
+                          + "%s_NAME_IDENT,authorizationContext)",
                       type, type);
             } else {
               replacement =
@@ -243,8 +244,8 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_CREATE_SCHEMA",
-            "((ANY(CREATE_SCHEMA, METALAKE, CATALOG)) "
-                + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG)))");
+            "((ANY(CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
             "ANY_SELECT_TABLE",

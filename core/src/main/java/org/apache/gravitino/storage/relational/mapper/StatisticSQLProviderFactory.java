@@ -83,8 +83,8 @@ public class StatisticSQLProviderFactory {
     return getProvider().softDeleteStatisticsByCatalogId(catalogId);
   }
 
-  public static String softDeleteStatisticsBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteStatisticsBySchemaId(schemaId);
+  public static String softDeleteStatisticsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteStatisticsBySchemaIds(schemaIds);
   }
 
   public static String deleteStatisticsByLegacyTimeline(
