@@ -1,6 +1,6 @@
 ---
 title: "Generic Lakehouse Catalog"
-slug: /lakehouse-generic-catalog
+slug: "/lakehouse-generic-catalog"
 keywords:
   - lakehouse
   - lance
@@ -17,9 +17,9 @@ import TabItem from '@theme/TabItem';
 
 The Generic Lakehouse Catalog is a Gravitino catalog implementation designed to seamlessly integrate with lakehouse storage systems built on file system-based architectures. This catalog enables unified metadata management for lakehouse tables stored on various storage backends, providing a consistent interface for data discovery, governance, and access control. 
 
-Currently, Gravitino fully supports the **Lance** lakehouse format, with plans to extend support to additional formats in the future.
+Gravitino fully supports the **Lance** lakehouse format, with plans to extend support to additional formats in the future.
 
-### Why Use Generic Lakehouse Catalog?
+### Benefits
 
 1. **Unified Metadata Management**: Single source of truth for table metadata across multiple storage backends
 2. **Multi-Format Support**: Extensible architecture to support various lakehouse table formats such as Lance, Iceberg, Hudi, etc.
@@ -80,7 +80,7 @@ Catalog location: hdfs://namenode:9000/lakehouse
     
 ```
 
-### Creating a Catalog
+### Create a Catalog
 
 Use `provider: "lakehouse-generic"` when creating a generic lakehouse catalog.
 
@@ -151,7 +151,7 @@ Schemas inherit catalog properties and can override specific settings:
 |------------|----------------------------------------------------------|------------------------------|----------|---------------|
 | `location` | Custom storage root path for all tables under the schema | 's3://bucket/path_to_schema' | No       | 1.1.0         |
 
-About location resolution hierarchy, please see [Key Property: `location`](#key-property-location) in the Catalog Management section for more details.
+For location resolution hierarchy, see [Key Property: `location`](#key-property-location) in the Catalog Management section for more details.
 
 ### Schema Operations
 
@@ -193,10 +193,10 @@ catalog.asSchemas().createSchema(
 
 For additional operations, refer to [Schema Operations documentation](./manage-relational-metadata-using-gravitino.md#schema-operations).
 
-## Table management
+## Table Management
 
 ### Supported Operations
 
-Since different lakehouse table formats have varying capabilities, table operation support may differ. The following are table operations for different lakehouse formats.
+Since different lakehouse table formats have varying capabilities, table operation support may differ. The following are table operations for different lakehouse formats:
 
 - [Lance Format Support](./lakehouse-generic-lance-table.md)

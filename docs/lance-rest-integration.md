@@ -1,6 +1,6 @@
 ---
 title: "Lance REST Integration"
-slug: /lance-rest-integration
+slug: "/lance-rest-integration"
 keywords:
   - lance
   - lance-rest
@@ -53,11 +53,11 @@ The following table outlines the tested compatibility between Gravitino versions
   raising `ImportError: cannot import name
   'LanceNamespaceStorageOptionsProvider' from 'lance'`. You can use
   `lance-ray` 0.2.0 with Gravitino 1.3.0 by pinning `pylance` to 3.x or 4.x.
-- Before using in production, please test the exact connector versions in your own environment.
+- Before using in production, test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
 
-#### Reproducing the matrix locally
+### Reproducing the matrix locally
 
 Both connectors ship with a multi-version integration test driver so the
 matrix can be re-verified (and extended) without ad-hoc scripting:
@@ -80,7 +80,7 @@ matrix can be re-verified (and extended) without ad-hoc scripting:
     -PlanceRayVersions=0.4.2,0.3.0
 ```
 
-### Why Maintain a Compatibility Matrix?
+### Rationale
 
 The Lance ecosystem is under active development, with frequent updates to APIs and features. Gravitino's Lance REST service depends on specific connector behaviors to ensure reliable operation. Using incompatible versions may result in:
 
@@ -98,7 +98,7 @@ Before proceeding, ensure the following requirements are met:
 
 2. **Lance Catalog**: A Lance catalog created in Gravitino using either:
     - Lance REST namespace API (`CreateNamespace` operation - see [Lance REST Service documentation](./lance-rest-service.md)
-    - Gravitino REST API, for more, please refer to [lakehouse-generic-catalog](./lakehouse-generic-catalog.md)
+    - Gravitino REST API, for more, refer to [lakehouse-generic-catalog](./lakehouse-generic-catalog.md)
     - Example catalog name: `lance_catalog`
 
 3. **Lance Spark Bundle** (for Spark integration):
@@ -228,7 +228,7 @@ pip install lance-ray
 - Ensure Ray version compatibility in your environment before deployment
 :::
 
-### Usage Example
+### Example
 
 The following example demonstrates reading and writing Lance datasets through the Lance REST namespace using Ray:
 
@@ -268,7 +268,7 @@ result = ray_dataset.filter(lambda row: row["value"] < 100).count()
 print(f"Filtered row count: {result}")
 ```
 
-## Additional Engine Support
+## Additional Engines
 
 The Lance REST service is compatible with other data processing engines that support the Lance format, including:
 
@@ -291,7 +291,7 @@ Most Lance-compatible engines follow this general pattern:
 
 Refer to each engine's specific documentation for detailed configuration parameters and code examples.
 
-## Additional Resources
+## Related
 
 - [Lance REST Service Documentation](./lance-rest-service)
 - [Lance Format Specification](https://lance.org/)
