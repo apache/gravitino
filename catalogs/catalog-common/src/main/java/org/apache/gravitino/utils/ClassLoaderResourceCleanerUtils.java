@@ -352,7 +352,7 @@ public class ClassLoaderResourceCleanerUtils {
    */
   @VisibleForTesting
   static boolean isOwnedByClassLoader(Class<?> clazz, ClassLoader classLoader) {
-    return clazz.getClassLoader() == classLoader;
+    return classLoader != null && clazz.getClassLoader() == classLoader;
   }
 
   @FunctionalInterface
