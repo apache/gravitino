@@ -314,6 +314,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
+          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
+          // cleanup is best-effort and stops as soon as a schema still exists.
+          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
   }
