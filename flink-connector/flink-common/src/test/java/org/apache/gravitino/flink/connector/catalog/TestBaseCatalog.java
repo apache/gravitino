@@ -300,12 +300,13 @@ public class TestBaseCatalog {
   }
 
   @Test
-  public void testPaimonLikeViewDialectFallbackOrderIsFLINKThenQUERY() {
+  public void testPaimonLikeViewDialectFallbackOrderIsFLINKThenHIVEThenQUERY() {
     BaseCatalog catalog = new PaimonLikeBaseCatalog();
     List<String> order = catalog.viewDialectFallbackOrder();
-    Assertions.assertEquals(2, order.size());
+    Assertions.assertEquals(3, order.size());
     Assertions.assertEquals(Dialects.FLINK, order.get(0));
-    Assertions.assertEquals(PaimonConstants.VIEW_QUERY_DIALECT, order.get(1));
+    Assertions.assertEquals(Dialects.HIVE, order.get(1));
+    Assertions.assertEquals(PaimonConstants.VIEW_QUERY_DIALECT, order.get(2));
   }
 
   @Test
@@ -358,7 +359,7 @@ public class TestBaseCatalog {
 
     @Override
     protected List<String> viewDialectFallbackOrder() {
-      return Arrays.asList(Dialects.FLINK, PaimonConstants.VIEW_QUERY_DIALECT);
+      return Arrays.asList(Dialects.FLINK, Dialects.HIVE, PaimonConstants.VIEW_QUERY_DIALECT);
     }
 
     @Override

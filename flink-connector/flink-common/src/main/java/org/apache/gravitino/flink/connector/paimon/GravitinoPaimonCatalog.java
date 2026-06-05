@@ -110,7 +110,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
 
   @Override
   protected List<String> viewDialectFallbackOrder() {
-    return Arrays.asList(Dialects.FLINK, PaimonConstants.VIEW_QUERY_DIALECT);
+    return Arrays.asList(Dialects.FLINK, Dialects.HIVE, PaimonConstants.VIEW_QUERY_DIALECT);
   }
 
   @Override
