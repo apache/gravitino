@@ -1,13 +1,15 @@
 ---
-title: "Manage view metadata using Apache Gravitino"
-slug: /manage-view-metadata-using-gravitino
+title: "Manage View Metadata"
+slug: "/manage-view-metadata-using-gravitino"
 date: 2026-5-17
-keyword: Gravitino view metadata manage
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino view metadata manage"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+
+## Introduction
 
 This page introduces how to manage view metadata by Apache Gravitino. A view stores a logical
 query definition rather than physical data. Through Gravitino, you can create, load, alter,
@@ -24,25 +26,25 @@ support, see:
 
 Unlike tables, views define query output and one or more representations, but do not manage
 partitions, sort orders, indexes, or physical storage locations. The representation model is
-extensible, but currently only SQL representations are supported.
+extensible, but only SQL representations are supported.
 
-To use view management, please make sure that:
+To use view management, make sure that:
 
  - Gravitino server has started, and the host and port are [http://localhost:8090](http://localhost:8090).
  - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
  - A relational catalog has been created within the metalake.
  - A schema has been created within the catalog.
 
-## View operations
+## View Operations
 
 :::tip
 Users should create a metalake, a catalog, and a schema, and ensure that the metalake and
 catalog are enabled before operating views.
 :::
 
-### Create a view
+### Create a View
 
-You can create a view by sending a `POST` request to the
+Create a view by sending a `POST` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views` endpoint or just use the
 Gravitino Java client. The following is an example of creating a view:
 
@@ -122,13 +124,13 @@ representations for the same logical view. Supported dialects, representation co
 default-resolution fields depend on the catalog provider.
 :::
 
-#### Create request fields
+#### Create Request Fields
 
 Use the following fields when creating a view:
 
 - `columns`: Defines the output schema of the view.
 - `representations`: Provides one or more SQL definitions. The API uses the extensible
-  `Representation` model, but currently only the `sql` type is supported, which maps to
+  `Representation` model, but only the `sql` type is supported, which maps to
   `SQLRepresentation` in Java.
 - `defaultCatalog` and `defaultSchema`: Optionally define how unqualified identifiers in the SQL
   text are resolved for dialects that use them. For the `hive` dialect in Hive catalogs, both
@@ -136,11 +138,11 @@ Use the following fields when creating a view:
 - `properties`: Carries provider-specific metadata.
 
 Column types use the same Gravitino type system as table columns. For the full type list and the
-behavior of special types such as external and unparsed types, refer to [Apache Gravitino table column type](./manage-relational-metadata-using-gravitino.md#apache-gravitino-table-column-type).
+behavior of special types such as external and unparsed types, refer to [Apache Gravitino table column type](./manage-relational-metadata-using-gravitino.md#table-column-type).
 
-### Load a view
+### Load a View
 
-You can load a view by sending a `GET` request to the
+Load a view by sending a `GET` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}` endpoint or just use
 the Gravitino Java client. The following is an example of loading a view:
 
@@ -174,9 +176,9 @@ stored representations, default catalog, default schema, comment, and properties
 directly without a separate import step.
 :::
 
-### Alter a view
+### Alter a View
 
-You can modify a view by sending a `PUT` request to the
+Modify a view by sending a `PUT` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}` endpoint or just use
 the Gravitino Java client. The following is an example of modifying a view:
 
@@ -213,7 +215,7 @@ View view = viewCatalog.alterView(
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a view:
+Gravitino supports the following changes to a view:
 
 | Supported modification                                 | REST / JSON                                                                                                    | Java                                                                                                  |
 |--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
@@ -226,9 +228,9 @@ Currently, Gravitino supports the following changes to a view:
 change one part of the body, load the current view first and pass the unchanged fields back in the
 replacement request.
 
-### Drop a view
+### Drop a View
 
-You can remove a view by sending a `DELETE` request to the
+Remove a view by sending a `DELETE` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}` endpoint or just use
 the Gravitino Java client. The following is an example of dropping a view:
 
@@ -258,9 +260,9 @@ viewCatalog.dropView(NameIdentifier.of("schema", "example_view"));
 Dropping a view removes the view metadata definition only. It does not remove underlying table
 data because a view does not own storage.
 
-### List all views under a schema
+### List All Views Under a Schema
 
-You can list all views in a schema by sending a `GET` request to the
+List all views in a schema by sending a `GET` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views` endpoint or just use the
 Gravitino Java client. The following is an example of listing all the views in a schema:
 
