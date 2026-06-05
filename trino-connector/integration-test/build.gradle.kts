@@ -38,10 +38,14 @@ dependencies {
   testImplementation(project(":common"))
   testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":plugins:idp-basic")) {
+    isTransitive = false
+  }
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.bcprov.jdk18on)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.log4j)

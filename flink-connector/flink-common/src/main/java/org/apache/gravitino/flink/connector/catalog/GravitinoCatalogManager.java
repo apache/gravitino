@@ -66,11 +66,15 @@ public class GravitinoCatalogManager {
     // simple auth otherwise).
     if (GravitinoCatalogStoreFactoryOptions.OAUTH2.equalsIgnoreCase(authType)) {
       this.gravitinoClient = buildOAuthClient(gravitinoUri, gravitinoClientConfig);
+    } else if (GravitinoCatalogStoreFactoryOptions.BASIC.equalsIgnoreCase(authType)) {
+      this.gravitinoClient = buildBasicClient(gravitinoUri, gravitinoClientConfig);
     } else {
       if (authType != null) {
         throw new IllegalArgumentException(
             String.format(
-                "Unsupported auth type '%s'. Only OAUTH is supported; leave %s unset to use Flink Kerberos settings (or simple auth if security is disabled).",
+                "Unsupported auth type '%s'. Supported explicit values are basic and oauth2; leave"
+                    + " %s unset to use Flink Kerberos settings (or simple auth if security is"
+                    + " disabled).",
                 authType, GravitinoCatalogStoreFactoryOptions.AUTH_TYPE));
       }
 
@@ -242,6 +246,37 @@ public class GravitinoCatalogManager {
     return gravitinoCatalogManager.gravitinoUri.equals(gravitinoUri)
         && gravitinoCatalogManager.metalakeName.equals(metalakeName)
         && gravitinoCatalogManager.gravitinoClientConfig.equals(gravitinoClientConfig);
+  }
+
+  private static GravitinoAdminClient buildBasicClient(
+      String gravitinoUri, Map<String, String> config) {
+    String username = config.get(GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME);
+    String password = config.get(GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD);
+    if (Strings.isNullOrEmpty(username)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Basic username is required. Please set %s",
+              GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME));
+    }
+    if (Strings.isNullOrEmpty(password)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Basic password is required. Please set %s",
+              GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD));
+    }
+
+    Set<String> basicConfigKeys =
+        Sets.newHashSet(
+            GravitinoCatalogStoreFactoryOptions.AUTH_TYPE,
+            GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME,
+            GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD);
+    for (String key : basicConfigKeys) {
+      config.remove(key);
+    }
+    return GravitinoAdminClient.builder(gravitinoUri)
+        .withBasicAuth(username, password)
+        .withClientConfig(config)
+        .build();
   }
 
   private static GravitinoAdminClient buildOAuthClient(

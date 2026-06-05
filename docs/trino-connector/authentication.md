@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Authentication
 
-The Gravitino Trino connector supports authenticating to the Gravitino server using the same authentication mechanisms as the Gravitino Java client: Simple, OAuth2, and Kerberos. Authentication is configured through the Trino connector properties file using the `gravitino.client.*` prefix.
+The Gravitino Trino connector supports authenticating to the Gravitino server using the same authentication mechanisms as the Gravitino Java client: Simple, Basic, OAuth2, and Kerberos. Authentication is configured through the Trino connector properties file using the `gravitino.client.*` prefix.
 
 If `gravitino.client.authType` is not set, the connector operates in no-authentication mode and connects to the Gravitino server without any credentials.
 
@@ -29,10 +29,37 @@ gravitino.user=admin
 
 **Configuration properties:**
 
-| Property                          | Description                                                          | Default value    | Required                               | Since version |
-|-----------------------------------|----------------------------------------------------------------------|------------------|----------------------------------------|---------------|
-| `gravitino.client.authType`       | Authentication type: `simple`, `oauth2`, or `kerberos`                 | (none)        | No                                     | 1.3.0         |
-| `gravitino.user`                  | Username for simple authentication                                   | (none)           | No (uses system user if not specified) | 1.3.0         |
+| Property                    | Description                                                       | Default value | Required                               | Since version |
+|-----------------------------|-------------------------------------------------------------------|---------------|----------------------------------------|---------------|
+| `gravitino.client.authType` | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | No                                     | 1.3.0         |
+| `gravitino.user`            | Username for simple authentication                                | (none)        | No (uses system user if not specified) | 1.3.0         |
+
+### Basic Authentication
+
+Basic authentication uses HTTP Basic credentials against the Gravitino built-in IDP. The Gravitino
+server must have Basic authentication enabled. See
+[How to authenticate](../security/how-to-authenticate.md#basic-mode) for server-side setup.
+
+**Configuration in `etc/catalog/gravitino.properties`:**
+
+```properties
+connector.name=gravitino
+gravitino.metalake=metalake
+gravitino.uri=http://localhost:8090
+
+# Basic authentication with built-in IDP
+gravitino.client.authType=basic
+gravitino.client.basic.username=admin
+gravitino.client.basic.password=YourSecureGravitinoPassword
+```
+
+**Configuration properties:**
+
+| Property                          | Description                                                       | Default value | Required                   | Since version |
+|-----------------------------------|-------------------------------------------------------------------|---------------|----------------------------|---------------|
+| `gravitino.client.authType`       | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable Basic)      | 1.3.0         |
+| `gravitino.client.basic.username` | Built-in IDP username                                             | (none)        | Yes if authType is `basic` | 1.3.0         |
+| `gravitino.client.basic.password` | Built-in IDP password                                             | (none)        | Yes if authType is `basic` | 1.3.0         |
 
 ### OAuth2 Authentication
 
@@ -55,13 +82,13 @@ gravitino.client.oauth2.scope=gravitino
 
 **Configuration properties:**
 
-| Property                             | Description                                            | Default value | Required                    | Since version |
-|--------------------------------------|--------------------------------------------------------|---------------|-----------------------------|---------------|
-| `gravitino.client.authType`          | Authentication type: `simple`, `oauth2`, or `kerberos` | (none)        | Yes (to enable OAuth2)           | 1.3.0         |
-| `gravitino.client.oauth2.serverUri`  | OAuth2 server URI                                      | (none)        | Yes if authType is `oauth2` | 1.3.0         |
-| `gravitino.client.oauth2.credential` | OAuth2 credentials in format `client_id:client_secret` | (none)        | Yes if authType is `oauth2` | 1.3.0         |
-| `gravitino.client.oauth2.path`       | OAuth2 token endpoint path                             | (none)        | Yes if authType is `oauth2` | 1.3.0         |
-| `gravitino.client.oauth2.scope`      | OAuth2 scope                                           | (none)        | Yes if authType is `oauth2` | 1.3.0         |
+| Property                             | Description                                                       | Default value | Required                   | Since version |
+|--------------------------------------|-------------------------------------------------------------------|---------------|----------------------------|---------------|
+| `gravitino.client.authType`          | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable OAuth2)     | 1.3.0         |
+| `gravitino.client.oauth2.serverUri`  | OAuth2 server URI                                                 | (none)        | Yes if authType is `oauth2`  | 1.3.0         |
+| `gravitino.client.oauth2.credential` | OAuth2 credentials in format `client_id:client_secret`            | (none)        | Yes if authType is `oauth2`  | 1.3.0         |
+| `gravitino.client.oauth2.path`       | OAuth2 token endpoint path                                        | (none)        | Yes if authType is `oauth2`  | 1.3.0         |
+| `gravitino.client.oauth2.scope`      | OAuth2 scope                                                      | (none)        | Yes if authType is `oauth2`  | 1.3.0         |
 
 ### Kerberos Authentication
 
@@ -82,11 +109,11 @@ gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
 
 **Configuration properties:**
 
-| Property                                   | Description         | Default value | Required                                                   | Since version |
-|--------------------------------------------|---------------------|---------------|------------------------------------------------------------|---------------|
-| `gravitino.client.authType`                | Authentication type: `simple`, `oauth2`, or `kerberos` | (none)        | Yes (to enable Kerberos)                                   | 1.3.0         |
-| `gravitino.client.kerberos.principal`      | Kerberos principal  | (none)        | Yes if authType is `kerberos`           | 1.3.0         |
-| `gravitino.client.kerberos.keytabFilePath` | Path to keytab file | (none)        | No (uses ticket cache if not specified) | 1.3.0         |
+| Property                                   | Description                                                       | Default value | Required                                | Since version |
+|--------------------------------------------|-------------------------------------------------------------------|---------------|-----------------------------------------|---------------|
+| `gravitino.client.authType`                | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable Kerberos)                | 1.3.0         |
+| `gravitino.client.kerberos.principal`      | Kerberos principal                                                | (none)        | Yes if authType is `kerberos`          | 1.3.0         |
+| `gravitino.client.kerberos.keytabFilePath` | Path to keytab file                                               | (none)        | No (uses ticket cache if not specified) | 1.3.0         |
 
 
 ### Example: Connecting to OAuth-protected Gravitino Server
@@ -157,4 +184,5 @@ gravitino.client.session.forwardUser=true
 ### See Also
 
 - [Gravitino Server Authentication Configuration](../security/how-to-authenticate.md)
+- [How to use the built-in IDP](../security/how-to-use-built-in-idp.md)
 - [Trino Connector Configuration](./configuration.md)

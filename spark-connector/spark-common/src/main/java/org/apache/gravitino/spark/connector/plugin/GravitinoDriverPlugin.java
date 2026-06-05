@@ -206,6 +206,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           !UserGroupInformation.isSecurityEnabled(),
           "Spark simple auth mode doesn't support setting kerberos configurations");
       builder.withSimpleAuth(sparkUser);
+    } else if (AuthProperties.isBasic(authType)) {
+      String username = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_BASIC_USERNAME);
+      String password = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_BASIC_PASSWORD);
+      builder.withBasicAuth(username, password);
     } else if (AuthProperties.isOAuth2(authType)) {
       String oAuthUri = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_OAUTH2_URI);
       String credential =

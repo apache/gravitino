@@ -70,6 +70,18 @@ public class TestGravitinoAuthProvider {
   }
 
   @Test
+  public void testBuildBasicAuth() {
+    GravitinoAdminClient client =
+        GravitinoAuthProvider.build(
+            buildConfig(
+                ImmutableMap.of(
+                    GravitinoAuthProvider.AUTH_TYPE_KEY, "basic",
+                    GravitinoAuthProvider.BASIC_USERNAME_KEY, "alice",
+                    GravitinoAuthProvider.BASIC_PASSWORD_KEY, "secret")));
+    assertNotNull(client);
+  }
+
+  @Test
   public void testBuildClientInvalidAuthType() {
     assertThrows(
         IllegalArgumentException.class,
