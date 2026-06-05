@@ -286,20 +286,21 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         credential.credentialType(),
         tableIdentifier);
 
-    // Merge temporary credential fields as Iceberg client config entries in the load-table
-    // response.
-    Map<String, String> credentialConfig =
+    // Vend the temporary credential both as a first-class REST credential (storage-prefix scoped,
+    // for Iceberg 1.7+ clients) and, for backward compatibility, flattened into the load-table
+    // response config. This mirrors FederatedCatalogWrapper, which also populates both fields.
+    org.apache.iceberg.rest.credentials.Credential restCredential =
         IcebergRESTUtils.toRESTCredential(
-                catalogCredentialManager.catalogName(),
-                tableIdentifier,
-                credential,
-                loadTableResponse.tableMetadata())
-            .config();
+            catalogCredentialManager.catalogName(),
+            tableIdentifier,
+            credential,
+            loadTableResponse.tableMetadata());
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
         .addAllConfig(loadTableResponse.config())
         .addAllConfig(getCatalogConfigToClient())
-        .addAllConfig(credentialConfig)
+        .addAllConfig(restCredential.config())
+        .addCredential(restCredential)
         .build();
   }
 
