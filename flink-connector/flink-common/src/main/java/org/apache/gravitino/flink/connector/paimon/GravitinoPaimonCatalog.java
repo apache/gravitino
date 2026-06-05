@@ -124,7 +124,11 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
 
   @Override
   protected boolean dropTableEntry(NameIdentifier ident) {
-    return catalog().asTableCatalog().purgeTable(ident);
+    boolean dropped = catalog().asTableCatalog().purgeTable(ident);
+    if (dropped) {
+      invalidateNativeTableCache(new ObjectPath(ident.namespace().level(0), ident.name()));
+    }
+    return dropped;
   }
 
   @VisibleForTesting
@@ -210,21 +214,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @Override
   public Optional<Factory> getFactory() {
     return paimonCatalog.getFactory();
-  }
-
-  @Override
-  public void dropTable(ObjectPath tablePath, boolean ignoreIfNotExists)
-      throws TableNotExistException, CatalogException {
-    boolean dropped =
-        catalog()
-            .asTableCatalog()
-            .purgeTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
-    if (!dropped && !ignoreIfNotExists) {
-      throw new TableNotExistException(catalogName(), tablePath);
-    }
-    if (dropped) {
-      invalidateNativeTableCache(tablePath);
-    }
   }
 
   @Override
