@@ -1,7 +1,7 @@
 ---
 title: "Security"
-slug: /security/security
-keyword: security
+slug: "/security/security"
+keyword: "security"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -13,7 +13,7 @@ Gravitino provides features that ensure the highest levels of security for you.
 
 Gravitino has supported the following security features:
 
-### [Authorization push down](./authorization-pushdown.md)
+### [Authorization Pushdown](./authorization-pushdown.md)
 
 ### [Authentication](how-to-authenticate.md)
 

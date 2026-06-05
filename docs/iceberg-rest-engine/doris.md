@@ -1,9 +1,9 @@
 ---
-title: Connect Doris via Iceberg REST
-sidebar_label: Doris
+title: "Connect Doris to Iceberg REST"
+sidebar_label: "Doris"
 ---
 
-# Connecting Apache Doris via Iceberg REST
+## Introduction
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly. This page describes how to configure Apache Doris
@@ -31,7 +31,7 @@ CREATE CATALOG iceberg PROPERTIES (
 );
 ```
 
-## Usage examples
+## Examples
 
 ```sql
 SWITCH iceberg;
@@ -42,7 +42,7 @@ INSERT INTO t VALUES (1);
 SELECT * FROM t;
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

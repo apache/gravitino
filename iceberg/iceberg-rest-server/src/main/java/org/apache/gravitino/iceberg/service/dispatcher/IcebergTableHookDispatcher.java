@@ -53,10 +53,14 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableHookDispatcher.class);
 
   private final IcebergTableOperationDispatcher dispatcher;
+  private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
   private String metalake;
 
-  public IcebergTableHookDispatcher(IcebergTableOperationDispatcher dispatcher) {
+  public IcebergTableHookDispatcher(
+      IcebergTableOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher) {
     this.dispatcher = dispatcher;
+    this.namespaceDispatcher = namespaceDispatcher;
     this.metalake = IcebergRESTServerContext.getInstance().metalakeName();
   }
 
@@ -100,6 +104,8 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     // another node may recreate the same table between the drop above and the
     // EntityStore delete, leaving a stale Gravitino entity if we blindly delete.
     bestEffortReconcileTableEntity(context, tableIdentifier);
+    IcebergOrphanSchemaCleanup.bestEffortCleanUp(
+        metalake, namespaceDispatcher, context, tableIdentifier.namespace());
   }
 
   @Override
@@ -209,11 +215,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         namespace,
         tableName,
         context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+        GravitinoEnv.getInstance().internalOwnerDispatcher());
   }
 
   private void importTableEntity(String catalogName, Namespace namespace, String tableName) {
-    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
+    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().internalTableDispatcher();
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(

@@ -1,6 +1,6 @@
 ---
-title: "MySQL catalog"
-slug: /jdbc-mysql-catalog
+title: "MySQL Catalog"
+slug: "/jdbc-mysql-catalog"
 keywords:
 - jdbc
 - MySQL
@@ -16,12 +16,12 @@ import TabItem from '@theme/TabItem';
 Apache Gravitino provides the ability to manage MySQL metadata.
 
 :::caution
-Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 :::
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the MySQL instance.
 - Supports metadata management of MySQL (5.7, 8.0).
@@ -30,16 +30,16 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 - Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
 
-### Catalog properties
+### Catalog Properties
 
-You can pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+Pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-When you use the Gravitino with Trino. You can pass the Trino MySQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino MySQL catalog in Trino runtime.
+When using Gravitino with Trino, pass the Trino MySQL connector configuration using the `trino.bypass.` prefix. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino MySQL catalog in Trino runtime.
 
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the MySQL catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the MySQL catalog has the following properties:
 
 | Configuration item      | Description                                                                                            | Default value | Required | Since Version |
 |-------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -52,7 +52,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.      | `30000`       | No       | 1.1.0         |
 
 :::caution
-You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
+Download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
 :::
 
 ### Driver Version Compatibility
@@ -82,30 +82,30 @@ Returning null for TIMESTAMP type precision. Driver version: mysql-connector-jav
 **Recommended driver versions:**
 - `mysql-connector-java-8.0.16` or higher
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the MySQL database.
 - Supports creating schema, but does not support setting comment.
 - Supports dropping schema.
 - Supports cascade dropping schema.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support any schema property settings.
 
-### Schema operations
+### Schema Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
@@ -113,7 +113,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
 - Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type       | MySQL Type          |
 |----------------------|---------------------|
@@ -143,14 +143,14 @@ MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `Int
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-### Table column auto-increment
+### Table Column Auto-Increment
 
 :::note
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
 :::
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -196,7 +196,7 @@ Index[] indexes = new Index[] {
 </TabItem>
 </Tabs>
 
-### Table properties
+### Table Properties
 
 Although MySQL itself does not support table properties, Gravitino offers table property management for MySQL tables through the `jdbc-mysql` catalog, enabling control over table features. The supported properties are listed as follows:
 
@@ -221,7 +221,7 @@ Some MySQL storage engines, such as FEDERATED, are not enabled by default and re
 refer to the [MySQL documentation](https://dev.mysql.com/doc/refman/8.0/en/federated-storage-engine.html).
 :::
 
-### Table indexes
+### Table Indexes
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
@@ -231,7 +231,7 @@ The index name of the PRIMARY_KEY must be PRIMARY
 :::
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -263,11 +263,11 @@ Index[] indexes = new Index[] {
 </TabItem>
 </Tabs>
 
-### Table operations
+### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations:
 
