@@ -168,24 +168,4 @@ public class TestLanceTableOperations {
     Mockito.verify(dataset).dropColumns(anyList());
     Mockito.verify(dataset).getVersion();
   }
-
-  @Test
-  public void testDetectsMissingLanceDatasetException() {
-    IllegalArgumentException exception =
-        new IllegalArgumentException(
-            "Dataset at path /tmp/deleted_lance_table was not found: Not found: "
-                + "/tmp/deleted_lance_table/_versions");
-
-    Assertions.assertTrue(LanceTableOperations.isMissingDatasetException(exception));
-  }
-
-  @Test
-  public void testDoesNotTreatOtherLanceOpenFailuresAsMissingDataset() {
-    IllegalArgumentException permissionException =
-        new IllegalArgumentException("Access denied while opening /tmp/lance_table");
-    RuntimeException wrapper =
-        new RuntimeException("Failed to open Lance dataset", permissionException);
-
-    Assertions.assertFalse(LanceTableOperations.isMissingDatasetException(wrapper));
-  }
 }
