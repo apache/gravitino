@@ -60,8 +60,3 @@ In kerberos mode, you could use the Spark kerberos configuration to fetch a kerb
 
 The Gravitino server principal has the form `HTTP/$host@$realm`. Keep `$host` consistent with the host in the Gravitino server URI.
 Please make sure `krb5.conf` is accessible by Spark, like by specifying the configuration `spark.driver.extraJavaOptions="-Djava.security.krb5.conf=/xx/krb5.conf"`.
-
-### See Also
-
-- [Gravitino Server Authentication Configuration](../security/how-to-authenticate.md)
-- [How to use the built-in IDP](../security/how-to-use-built-in-idp.md)
