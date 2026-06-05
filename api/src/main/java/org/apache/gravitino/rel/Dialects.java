@@ -39,12 +39,5 @@ public final class Dialects {
   /** The Apache Flink SQL dialect. */
   public static final String FLINK = "flink";
 
-  /**
-   * A dialect key for the canonical SQL representation of a view, used as a fallback when no
-   * engine-specific dialect (e.g. {@link #FLINK}, {@link #HIVE}) is available or preserved by the
-   * underlying metastore.
-   */
-  public static final String QUERY_DIALECT = "query";
-
   private Dialects() {}
 }

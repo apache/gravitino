@@ -40,6 +40,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
@@ -304,7 +305,7 @@ public class TestBaseCatalog {
     List<String> order = catalog.viewDialectFallbackOrder();
     Assertions.assertEquals(2, order.size());
     Assertions.assertEquals(Dialects.FLINK, order.get(0));
-    Assertions.assertEquals(Dialects.QUERY_DIALECT, order.get(1));
+    Assertions.assertEquals(PaimonConstants.VIEW_QUERY_DIALECT, order.get(1));
   }
 
   @Test
@@ -318,7 +319,7 @@ public class TestBaseCatalog {
     Assertions.assertEquals(Dialects.FLINK, first.dialect());
     Assertions.assertEquals("SELECT id FROM t", first.sql());
     SQLRepresentation second = (SQLRepresentation) reps[1];
-    Assertions.assertEquals(Dialects.QUERY_DIALECT, second.dialect());
+    Assertions.assertEquals(PaimonConstants.VIEW_QUERY_DIALECT, second.dialect());
     Assertions.assertEquals("SELECT id FROM t", second.sql());
   }
 
@@ -357,7 +358,7 @@ public class TestBaseCatalog {
 
     @Override
     protected List<String> viewDialectFallbackOrder() {
-      return Arrays.asList(Dialects.FLINK, Dialects.QUERY_DIALECT);
+      return Arrays.asList(Dialects.FLINK, PaimonConstants.VIEW_QUERY_DIALECT);
     }
 
     @Override
@@ -365,7 +366,7 @@ public class TestBaseCatalog {
       String sql = view.getExpandedQuery();
       return new Representation[] {
         buildSqlRepresentation(Dialects.FLINK, sql)[0],
-        buildSqlRepresentation(Dialects.QUERY_DIALECT, sql)[0]
+        buildSqlRepresentation(PaimonConstants.VIEW_QUERY_DIALECT, sql)[0]
       };
     }
   }

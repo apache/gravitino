@@ -110,7 +110,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
 
   @Override
   protected List<String> viewDialectFallbackOrder() {
-    return Arrays.asList(Dialects.FLINK, Dialects.QUERY_DIALECT);
+    return Arrays.asList(Dialects.FLINK, PaimonConstants.VIEW_QUERY_DIALECT);
   }
 
   @Override
@@ -118,7 +118,10 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     String sql = view.getExpandedQuery();
     return new Representation[] {
       SQLRepresentation.builder().withDialect(Dialects.FLINK).withSql(sql).build(),
-      SQLRepresentation.builder().withDialect(Dialects.QUERY_DIALECT).withSql(sql).build()
+      SQLRepresentation.builder()
+          .withDialect(PaimonConstants.VIEW_QUERY_DIALECT)
+          .withSql(sql)
+          .build()
     };
   }
 

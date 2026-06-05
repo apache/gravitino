@@ -68,6 +68,10 @@ public class PaimonConstants {
   public static final String OWNER = "owner";
   public static final String BUCKET_KEY = "bucket-key";
   public static final String BUCKET_NUM = "bucket";
+
+  /** The dialect key used to store the canonical SQL query in a Paimon view. */
+  public static final String VIEW_QUERY_DIALECT = "query";
+
   public static final String MERGE_ENGINE = "merge-engine";
   public static final String SEQUENCE_FIELD = "sequence.field";
   public static final String ROWKIND_FIELD = "rowkind.field";
