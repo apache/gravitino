@@ -82,6 +82,9 @@ public final class GlueConstants {
    */
   public static final String TABLE_FORMAT = "table-format";
 
+  /** Table-format value indicating an Iceberg table stored in Glue {@code Table.parameters()}. */
+  public static final String TABLE_FORMAT_ICEBERG = "ICEBERG";
+
   /**
    * Table file format (lowercase, e.g. "parquet", "orc", "textfile") used when creating Hive-format
    * tables via Trino. Maps to input-format/output-format/serde-lib.
