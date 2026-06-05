@@ -71,8 +71,3 @@ table.catalog-store.gravitino.gravitino.client.oauth2.scope: your-scope
 In Kerberos mode, use Flink security configurations to obtain a Kerberos ticket for accessing the Gravitino server. Configure `security.kerberos.login.principal` and `security.kerberos.login.keytab` for the Kerberos principal and keytab.
 
 The Gravitino server principal follows the pattern `HTTP/$host@$realm`; ensure `$host` matches the host specified in the Gravitino server URI. Ensure `krb5.conf` is available to Flink, for example via `-Djava.security.krb5.conf=/path/to/krb5.conf` in Flink JVM options.
-
-### See Also
-
-- [Gravitino Server Authentication Configuration](../security/how-to-authenticate.md)
-- [How to use the built-in IDP](../security/how-to-use-built-in-idp.md)
