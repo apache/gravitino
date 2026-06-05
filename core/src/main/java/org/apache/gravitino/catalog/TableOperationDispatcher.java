@@ -379,7 +379,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // 2. Is found in the catalog but not in the store (not managed by Gravitino)
           // 3. Is found in the catalog and the store (managed by Gravitino)
           // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the schema from the store, but we don't take the
+          // In all situations, we try to delete the table from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
           try {
@@ -389,6 +389,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
+          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
+          // cleanup is best-effort and stops as soon as a schema still exists.
+          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
   }
@@ -432,7 +435,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // 2. Is found in the catalog but not in the store (not managed by Gravitino)
           // 3. Is found in the catalog and the store (managed by Gravitino)
           // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the schema from the store, but we don't take the
+          // In all situations, we try to delete the table from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
           try {
@@ -443,6 +446,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
+          // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
+          // cleanup is best-effort and stops as soon as a schema still exists.
+          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
   }
