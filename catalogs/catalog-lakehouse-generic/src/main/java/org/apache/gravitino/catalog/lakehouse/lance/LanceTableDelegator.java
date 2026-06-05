@@ -71,7 +71,7 @@ public class LanceTableDelegator implements LakehouseTableDelegator {
             LANCE_TABLE_DECLARED,
             "Whether this is a Lance metadata-only declare table operation.",
             false,
-            true /* immutable */,
+            false /* immutable */,
             false /* defaultValue */,
             false /* hidden */,
             false));
