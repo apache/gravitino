@@ -458,6 +458,31 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testVersionCheckSkipsSchemaReadForEmptySchemaWhenVersionUnchanged() throws Exception {
+    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("empty-version-check").toString();
+    // Table has empty columns but a known stored version (confirmed-empty state)
+    TableEntity tableEntity =
+        tableEntity(
+            ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "5"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.version()).thenReturn(5L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loaded = lanceTableOps.loadTable(ident);
+
+    Assertions.assertEquals(0, loaded.columns().length);
+    // version unchanged — schema read must be skipped even though columns are empty
+    verify(dataset, never()).getSchema();
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
   public void testEmptyDatasetRecordsVersionOnFirstLoad() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("empty-dataset-first").toString();

@@ -113,7 +113,9 @@ public class LanceTableOperations extends ManagedTableOperations {
     DECLARED_AND_EMPTY,
     /**
      * Opens the Lance dataset on every {@code loadTable}, compares the dataset version with the
-     * stored {@code lance.version}, and refreshes columns when the version has changed.
+     * stored {@code lance.version}, and refreshes columns when the version has changed. The version
+     * is the sole gating factor: if the version is unchanged the schema read is skipped even when
+     * stored columns are empty.
      */
     VERSION_CHECK
   }
@@ -194,7 +196,6 @@ public class LanceTableOperations extends ManagedTableOperations {
       datasetVersion = dataset.version();
       if (refreshMode == SchemaRefreshMode.VERSION_CHECK
           && !declaredOnly
-          && !emptySchema
           && !isDatasetVersionChanged(table, datasetVersion)) {
         return table;
       }
