@@ -46,7 +46,7 @@ tests:
           value: default
       - equal:
           path: spec.template.spec.containers[0].image
-          value: apache/gravitino-lance-rest:1.3.0-SNAPSHOT
+          value: apache/gravitino-lance-rest:1.4.0-SNAPSHOT
       - contains:
           path: spec.template.spec.containers[0].env
           content:

@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+evaluationDependsOn(":spark-connector:spark-common")
+
 plugins {
   `maven-publish`
   id("java")
@@ -143,6 +145,16 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.hadoop3.aws)
+  // hadoop-aws declares hadoop-client-api as provided; add it explicitly so S3AFileSystem can load
+  // org.apache.hadoop.fs.impl.prefetch.PrefetchingStatistics (added in 3.3.5) at runtime.
+  testImplementation(libs.hadoop3.client.api)
+  // Iceberg's GlueCatalog references several AWS SDK modules at runtime; must be on test classpath
+  testImplementation(libs.aws.dynamodb)
+  testImplementation(libs.aws.glue)
+  testImplementation(libs.aws.sts)
+  testImplementation(libs.aws.s3)
+  testImplementation(libs.aws.kms)
 
   // org.apache.iceberg.rest.RESTSerializers#registerAll(ObjectMapper) has different method signature for iceberg-core and iceberg-spark-runtime package, we must make sure iceberg-core is in front to start up MiniGravitino server.
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
@@ -172,6 +184,9 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+val glueHiveJarsDir: String? =
+  project(":spark-connector:spark-common").extra["glueHiveJarsDir"] as String?
+
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
@@ -182,6 +197,10 @@ tasks.test {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
+    if (glueHiveJarsDir != null) {
+      dependsOn(":spark-connector:spark-common:downloadGlueHiveJars")
+      jvmArgs("-Dglue.hive-jars-dir=$glueHiveJarsDir")
+    }
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")
