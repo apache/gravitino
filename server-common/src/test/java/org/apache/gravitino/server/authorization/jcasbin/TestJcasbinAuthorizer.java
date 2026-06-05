@@ -373,6 +373,12 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testIsMetalakeUserUsesUserInfoCache() {
+    assertTrue(jcasbinAuthorizer.isMetalakeUser(METALAKE, new AuthorizationRequestContext()));
+    verify(userMetaMapper).getUserUpdatedAt(METALAKE, USERNAME);
+  }
+
+  @Test
   public void testAuthorize() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();

@@ -209,11 +209,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         namespace,
         tableName,
         context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+        GravitinoEnv.getInstance().internalOwnerDispatcher());
   }
 
   private void importTableEntity(String catalogName, Namespace namespace, String tableName) {
-    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
+    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().internalTableDispatcher();
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
