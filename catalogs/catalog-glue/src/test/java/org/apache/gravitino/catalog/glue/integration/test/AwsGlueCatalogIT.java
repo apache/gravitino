@@ -129,15 +129,18 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
       Table loaded = ops.loadTable(NameIdentifier.of("ml", "cat", schema, "ice_complex"));
       assertEquals(3, loaded.columns().length);
 
+      assertEquals("list col", loaded.columns()[0].comment());
       Types.ListType listType = (Types.ListType) loaded.columns()[0].dataType();
       assertEquals(Types.StringType.get(), listType.elementType());
       assertTrue(listType.elementNullable());
 
+      assertEquals("map col", loaded.columns()[1].comment());
       Types.MapType mapType = (Types.MapType) loaded.columns()[1].dataType();
       assertEquals(Types.StringType.get(), mapType.keyType());
       assertEquals(Types.DoubleType.get(), mapType.valueType());
       assertFalse(mapType.valueNullable());
 
+      assertEquals("struct col", loaded.columns()[2].comment());
       Types.StructType structType = (Types.StructType) loaded.columns()[2].dataType();
       assertEquals(2, structType.fields().length);
       assertEquals("name", structType.fields()[0].name());
