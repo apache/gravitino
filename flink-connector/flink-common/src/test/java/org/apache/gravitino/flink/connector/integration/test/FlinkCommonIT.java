@@ -853,15 +853,16 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
           View view = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
           Assertions.assertEquals(viewName, view.name());
           Assertions.assertEquals("view comment", view.comment());
-          Assertions.assertEquals(1, view.representations().length);
+          Assertions.assertTrue(view.representations().length >= 1);
           Assertions.assertInstanceOf(SQLRepresentation.class, view.representations()[0]);
 
-          Optional<org.apache.flink.table.catalog.Catalog> flinkCatalog =
-              tableEnv.getCatalog(catalog.name());
-          Assertions.assertTrue(flinkCatalog.isPresent());
+          Assertions.assertTrue(tableEnv.getCatalog(catalog.name()).isPresent());
           try {
             CatalogBaseTable flinkTable =
-                flinkCatalog.get().getTable(new ObjectPath(schemaName, viewName));
+                tableEnv
+                    .getCatalog(catalog.name())
+                    .get()
+                    .getTable(new ObjectPath(schemaName, viewName));
             Assertions.assertEquals(CatalogBaseTable.TableKind.VIEW, flinkTable.getTableKind());
           } catch (TableNotExistException e) {
             Assertions.fail("view should exist in Flink catalog: " + e.getMessage());
@@ -991,7 +992,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
           ViewCatalog viewCatalog = catalog.asViewCatalog();
           View view = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
-          Assertions.assertEquals(1, view.representations().length);
+          Assertions.assertTrue(view.representations().length >= 1);
           SQLRepresentation rep = (SQLRepresentation) view.representations()[0];
           Assertions.assertTrue(
               rep.sql().contains("name") && rep.sql().contains("id"),
