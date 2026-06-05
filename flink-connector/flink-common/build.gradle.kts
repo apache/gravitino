@@ -90,12 +90,14 @@ dependencies {
   testImplementation(project(":common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":plugins:idp-basic")) {
-    isTransitive = false
+    exclude(module = "api")
+    exclude(module = "common")
+    exclude(module = "core")
+    exclude(module = "server-common")
   }
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(libs.awaitility)
-  testImplementation(libs.bcprov.jdk18on)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)

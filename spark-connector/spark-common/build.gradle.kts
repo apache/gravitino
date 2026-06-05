@@ -98,10 +98,11 @@ dependencies {
   testImplementation(libs.aws.glue)
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":plugins:idp-basic")) {
-    isTransitive = false
+    exclude(module = "api")
+    exclude(module = "common")
+    exclude(module = "core")
+    exclude(module = "server-common")
   }
-
-  testImplementation(libs.bcprov.jdk18on)
   testImplementation(libs.hive2.common) {
     exclude("org.apache.curator")
     // use hadoop from Spark
