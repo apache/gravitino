@@ -50,4 +50,38 @@ public class TestSimpleTokenProvider {
       }
     }
   }
+
+  @Test
+  public void testAuthenticationWithPassword() throws IOException {
+    try (AuthDataProvider provider = new SimpleTokenProvider("alice", "secret")) {
+      Assertions.assertTrue(provider.hasTokenData());
+      String token = new String(provider.getTokenData(), StandardCharsets.UTF_8);
+      Assertions.assertTrue(token.startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER));
+      String decoded =
+          new String(
+              Base64.getDecoder()
+                  .decode(
+                      token
+                          .substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length())
+                          .getBytes(StandardCharsets.UTF_8)),
+              StandardCharsets.UTF_8);
+      Assertions.assertEquals("alice:secret", decoded);
+    }
+  }
+
+  @Test
+  public void testSingleArgConstructorUsesDummyPassword() throws IOException {
+    try (AuthDataProvider provider = new SimpleTokenProvider("bob")) {
+      String token = new String(provider.getTokenData(), StandardCharsets.UTF_8);
+      String decoded =
+          new String(
+              Base64.getDecoder()
+                  .decode(
+                      token
+                          .substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length())
+                          .getBytes(StandardCharsets.UTF_8)),
+              StandardCharsets.UTF_8);
+      Assertions.assertEquals("bob:dummy", decoded);
+    }
+  }
 }
