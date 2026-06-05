@@ -124,11 +124,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
 
   @Override
   protected boolean dropTableEntry(NameIdentifier ident) {
-    boolean dropped = catalog().asTableCatalog().purgeTable(ident);
-    if (dropped) {
-      invalidateNativeTableCache(new ObjectPath(ident.namespace().level(0), ident.name()));
-    }
-    return dropped;
+    return catalog().asTableCatalog().purgeTable(ident);
   }
 
   @VisibleForTesting
