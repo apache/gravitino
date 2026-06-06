@@ -29,6 +29,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChangedOwnerInfo {
+  private long id;
   private long metadataObjectId;
   private String metadataObjectType;
   private long updatedAt;

@@ -27,7 +27,7 @@ except FileNotFoundError:
 setup(
     name="apache-gravitino",
     description="Python lib/client for Apache Gravitino",
-    version="1.3.0.dev0",
+    version="1.4.0.dev0",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Apache Software Foundation",
@@ -56,6 +56,7 @@ setup(
     install_requires=open("requirements.txt").read(),
     extras_require={
         "dev": open("requirements-dev.txt").read(),
+        "lance": open("requirements-lance.txt").read(),
     },
     include_package_data=True,
 )

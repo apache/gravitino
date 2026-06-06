@@ -29,6 +29,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 public class Configs {
 
@@ -183,6 +184,34 @@ public class Configs {
           .longConf()
           .createWithDefault(60 * 60 * 1000L);
 
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS = 3L;
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 24 * 60 * 60L;
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 60 * 60L;
+
+  public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS =
+      new ConfigBuilder("gravitino.entityChangeLog.pollIntervalSecs")
+          .doc("The interval in seconds for polling entity change logs")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS);
+
+  public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_RETENTION_SECS =
+      new ConfigBuilder("gravitino.entityChangeLog.retentionSecs")
+          .doc("The retention time in seconds for entity change logs. Set 0 to disable cleanup")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS);
+
+  public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS =
+      new ConfigBuilder("gravitino.entityChangeLog.cleanupIntervalSecs")
+          .doc("The interval in seconds for pruning expired entity change logs")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS);
+
   public static final ConfigEntry<Boolean> CATALOG_LOAD_ISOLATED =
       new ConfigBuilder("gravitino.catalog.classloader.isolated")
           .doc("Whether to load the catalog in an isolated classloader")
@@ -315,7 +344,10 @@ public class Configs {
 
   public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE =
       new ConfigBuilder("gravitino.authorization.jcasbin.roleCacheSize")
-          .doc("The maximum size of the role cache for authorization")
+          .doc(
+              "The maximum size of the role-related caches used by the JcasbinAuthorizer. "
+                  + "Shared by the user-role, group-role, and loaded-role caches, so the "
+                  + "effective memory footprint is up to roughly 3x this value.")
           .version(ConfigConstants.VERSION_1_1_1)
           .longConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE);
@@ -328,6 +360,25 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_1_1)
           .longConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_OWNER_CACHE_SIZE);
+
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_METADATA_ID_CACHE_SIZE = 100000L;
+
+  public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_METADATA_ID_CACHE_SIZE =
+      new ConfigBuilder("gravitino.authorization.jcasbin.metadataIdCacheSize")
+          .doc("The maximum size of the metadata-id cache for authorization")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_METADATA_ID_CACHE_SIZE);
+
+  public static final long DEFAULT_GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS = 3L;
+
+  public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS =
+      new ConfigBuilder("gravitino.authorization.jcasbin.changePollIntervalSecs")
+          .doc("The interval in seconds for polling entity and owner changes")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS);
 
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
@@ -499,6 +550,38 @@ public class Configs {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
+
+  public static final ConfigEntry<String> SCHEMA_SEPARATOR =
+      new ConfigBuilder("gravitino.schema.separator")
+          .doc(
+              "The separator used to represent HierarchicalSchema hierarchy in schema names at the "
+                  + "API boundary (e.g. ':' for 'A:B:C'). Schema names are stored internally in "
+                  + "EntityStore using ASCII-1 (\\u0001) as the physical separator. The "
+                  + "configured separator is only used at external API and catalog capability "
+                  + "validation layer. The internal physical separator and '.' must not be used "
+                  + "as the external separator.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  StringUtils.isNotBlank(value)
+                      && !value.contains(".")
+                      && !value.contains(HierarchicalSchemaUtil.physicalSeparator()),
+              ConfigConstants.NOT_BLANK_ERROR_MSG
+                  + " and must not contain '.' or the internal physical separator (\\u0001)")
+          .createWithDefault(":");
+
+  public static final ConfigEntry<Boolean> CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES =
+      new ConfigBuilder("gravitino.catalog.credential.backfillToProperties")
+          .doc(
+              "If true, the server exposes hidden catalog credentials (such as jdbc-user and "
+                  + "jdbc-password) in the catalog properties response. Enable only during a "
+                  + "rolling upgrade while old connectors that do not support credential vending "
+                  + "are still in use. Enabling this is a security risk because credentials "
+                  + "become visible to anyone who can read catalog properties.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .booleanConf()
+          .createWithDefault(false);
 
   public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
       new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")

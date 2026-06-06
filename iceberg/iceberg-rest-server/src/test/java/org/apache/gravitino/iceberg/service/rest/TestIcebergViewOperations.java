@@ -29,6 +29,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewFailureEvent;
@@ -48,8 +49,11 @@ import org.apache.gravitino.listener.api.event.IcebergRenameViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergReplaceViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergReplaceViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergReplaceViewPreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergViewExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergViewExistsPreEvent;
+import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.listener.api.event.PreEvent;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.Namespace;
@@ -68,6 +72,7 @@ import org.apache.iceberg.view.ViewMetadata;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
@@ -124,7 +129,9 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     dummyEventListener.clearEvent();
     verifyLisViewSucc(namespace, ImmutableSet.of("list_foo1", "list_foo2"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListViewPreEvent);
-    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergListViewEvent);
+    Event listViewPostEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(listViewPostEvent instanceof IcebergListViewEvent);
+    Assertions.assertEquals(2, ((IcebergListViewEvent) listViewPostEvent).resultCount());
   }
 
   @ParameterizedTest
@@ -172,16 +179,25 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
 
     dummyEventListener.clearEvent();
     verifyReplaceSucc(namespace, "replace_foo1", metadata);
-    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergReplaceViewPreEvent);
-    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergReplaceViewEvent);
+    PreEvent replacePreEvent = dummyEventListener.popPreEvent();
+    Event replacePostEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(replacePreEvent instanceof IcebergReplaceViewPreEvent);
+    Assertions.assertTrue(replacePostEvent instanceof IcebergReplaceViewEvent);
+    IcebergReplaceViewEvent replaceViewEvent = (IcebergReplaceViewEvent) replacePostEvent;
+    Assertions.assertNotNull(replaceViewEvent.replaceViewRequest());
+    Assertions.assertEquals(OperationType.REPLACE_VIEW, replacePreEvent.operationType());
+    Assertions.assertEquals(OperationType.REPLACE_VIEW, replacePostEvent.operationType());
 
     verifyDropViewSucc(namespace, "replace_foo1");
 
     dummyEventListener.clearEvent();
     verifyUpdateViewFail(namespace, "replace_foo1", 404, metadata);
-    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergReplaceViewPreEvent);
-    Assertions.assertTrue(
-        dummyEventListener.popPostEvent() instanceof IcebergReplaceViewFailureEvent);
+    PreEvent replaceFailurePreEvent = dummyEventListener.popPreEvent();
+    Event replaceFailurePostEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(replaceFailurePreEvent instanceof IcebergReplaceViewPreEvent);
+    Assertions.assertTrue(replaceFailurePostEvent instanceof IcebergReplaceViewFailureEvent);
+    Assertions.assertEquals(OperationType.REPLACE_VIEW, replaceFailurePreEvent.operationType());
+    Assertions.assertEquals(OperationType.REPLACE_VIEW, replaceFailurePostEvent.operationType());
 
     verifyDropNamespaceSucc(namespace);
     verifyUpdateViewFail(namespace, "replace_foo1", 404, metadata);
@@ -440,5 +456,15 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
   private void verifyRenameViewSucc(Namespace ns, String source, String dest) {
     Response response = doRenameView(ns, source, dest);
     Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testIcebergListViewEventDeprecatedConstructorReturnsNegativeCount() {
+    IcebergListViewEvent event =
+        new IcebergListViewEvent(
+            Mockito.mock(IcebergRequestContext.class),
+            NameIdentifier.of("metalake", "catalog", "schema"));
+    Assertions.assertEquals(-1, event.resultCount());
   }
 }

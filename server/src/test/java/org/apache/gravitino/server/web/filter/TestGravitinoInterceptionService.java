@@ -170,7 +170,7 @@ public class TestGravitinoInterceptionService {
           .when(
               () ->
                   AuthorizationUtils.checkCurrentUser(
-                      ArgumentMatchers.any(), ArgumentMatchers.any()))
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
           .thenThrow(new NoSuchMetalakeException("Metalake nonExistentMetalake does not exist"));
 
       GravitinoInterceptionService gravitinoInterceptionService =
@@ -313,12 +313,15 @@ public class TestGravitinoInterceptionService {
     }
 
     @Override
-    public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+    public boolean isSelf(
+        Entity.EntityType type,
+        NameIdentifier nameIdentifier,
+        AuthorizationRequestContext requestContext) {
       return true;
     }
 
     @Override
-    public boolean isMetalakeUser(String metalake) {
+    public boolean isMetalakeUser(String metalake, AuthorizationRequestContext requestContext) {
       return true;
     }
 

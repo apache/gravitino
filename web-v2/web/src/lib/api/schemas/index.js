@@ -34,9 +34,10 @@ const Apis = {
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}`
 }
 
-export const getSchemasApi = params => {
+export const getSchemasApi = ({ metalake, catalog, parentSchema }) => {
   return defHttp.get({
-    url: `${Apis.GET(params)}`
+    url: `${Apis.GET({ metalake, catalog })}`,
+    params: parentSchema ? { parentSchema } : undefined
   })
 }
 

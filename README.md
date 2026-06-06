@@ -36,7 +36,7 @@ Apache Gravitino is a high-performance, geo-distributed, and federated metadata 
 
 ## 🚀 Key Features
 
-- **Unified Metadata Management**: Manage diverse metadata sources through a single model and API (e.g., Hive, MySQL, HDFS, S3).
+- **Unified Metadata Management**: Manage diverse metadata sources through a single model and API (e.g., Hive, MySQL, MariaDB, HDFS, S3).
 - **End-to-End Data Governance**: Features like access control, auditing, and discovery across all metadata assets.
 - **Direct Metadata Integration**: Changes in underlying systems are immediately reflected via Gravitino’s connectors.
 - **Geo-Distribution Support**: Share metadata across regions and clouds to support global architectures.
@@ -82,16 +82,18 @@ Clone or download the [Gravitino Playground repository](https://github.com/apach
 
 Press `CTRL+C` to stop.
 
-5. (Optional) Use the new UI
+5. (Optional) Choose UI version
 
-  - To switch to the new UI at runtime: edit `conf/gravitino-env.sh` (or set the environment variable before starting) and set `GRAVITINO_USE_WEB_V2` to `true`:
+  - By default, Gravitino uses the Web V2 UI.
+
+  - To switch back to the legacy v1 UI at runtime, edit `conf/gravitino-env.sh` (or set the environment variable before starting) and set `GRAVITINO_USE_WEB_V2` to `false`:
 
 ```bash
-export GRAVITINO_USE_WEB_V2=true
-./bin/gravitino.sh start
+export GRAVITINO_USE_WEB_V2=false
+./bin/gravitino.sh restart
 ```
 
-  - Alternatively, you can remove the `GRAVITINO_USE_WEB_V2=...` line from `conf/gravitino-env.sh` (the template defaults to `false`); removing that line will revert the service to the legacy UI behavior.
+  - To use Web V2 explicitly, set `GRAVITINO_USE_WEB_V2=true`.
 
 
 ## 🧊 Iceberg REST Catalog

@@ -54,7 +54,9 @@ function check_process_status() {
 
 function found_gravitino_server_pid() {
   process_name='GravitinoServer';
-  RUNNING_PIDS=$(ps x | grep ${process_name} | grep -v grep | awk '{print $1}');
+  RUNNING_PIDS=$(
+    ps xww | grep -F "${process_name}" | grep -F "${GRAVITINO_HOME}" | grep -v grep | awk '{print $1}'
+  );
 
   if [[ -z "${RUNNING_PIDS}" ]]; then
     return
@@ -124,7 +126,7 @@ function start() {
 }
 
 function run() {
-  ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_SERVER_NAME}
+  exec ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_SERVER_NAME}
 }
 
 function stop() {
@@ -151,7 +153,7 @@ JAVA_OPTS+=" -Dgravitino.log.path=${GRAVITINO_LOG_DIR}"
 JAVA_OPTS+=" -Dgravitino.server.name=${GRAVITINO_SIMPLE_SERVER_NAME}"
 JAVA_OPTS+=" ${GRAVITINO_MEM}"
 
-if [ "$JVM_VERSION" -eq 17 ]; then
+if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" -XX:+IgnoreUnrecognizedVMOptions"
   JAVA_OPTS+=" --add-opens java.base/java.io=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.base/java.lang.invoke=ALL-UNNAMED"
@@ -181,23 +183,23 @@ fi
 
 addJarInDir "${GRAVITINO_HOME}/libs"
 
-# By default, prefer starting the legacy (old) UI war if present.
+# By default, prefer starting the new (v2) UI war when GRAVITINO_USE_WEB_V2 is unset.
 # Users may override by setting GRAVITINO_WAR to an explicit path, or
-# set GRAVITINO_USE_WEB_V2=true to prefer the new war when both exist.
+# set GRAVITINO_USE_WEB_V2=false to force the legacy war when both exist.
 if [[ -z "${GRAVITINO_WAR+x}" || -z "${GRAVITINO_WAR}" ]]; then
   # Compose expected war paths based on packaged layout and version
   WAR_V1_PATH="${GRAVITINO_HOME}/web/gravitino-web-${GRAVITINO_VERSION}.war"
   WAR_V2_PATH="${GRAVITINO_HOME}/web-v2/gravitino-web-${GRAVITINO_VERSION}.war"
 
-  if [[ -n "${GRAVITINO_USE_WEB_V2}" && "${GRAVITINO_USE_WEB_V2}" == "true" ]]; then
-    # User explicitly requests new UI if available
+  if [[ "${GRAVITINO_USE_WEB_V2:-true}" == "true" ]]; then
+    # Prefer new UI when enabled or unset
     if [[ -f "${WAR_V2_PATH}" ]]; then
       export GRAVITINO_WAR="${WAR_V2_PATH}"
     elif [[ -f "${WAR_V1_PATH}" ]]; then
       export GRAVITINO_WAR="${WAR_V1_PATH}"
     fi
   else
-    # Default behavior: prefer old UI war
+    # Explicitly disabled v2: prefer old UI war
     if [[ -f "${WAR_V1_PATH}" ]]; then
       export GRAVITINO_WAR="${WAR_V1_PATH}"
     elif [[ -f "${WAR_V2_PATH}" ]]; then

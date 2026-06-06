@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
@@ -66,6 +67,15 @@ public interface OwnerMetaMapper {
   @InsertProvider(type = OwnerMetaSQLProviderFactory.class, method = "insertOwnerRel")
   void insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO);
 
+  @InsertProvider(type = OwnerMetaSQLProviderFactory.class, method = "batchInsertOwnerRels")
+  void batchInsertOwnerRels(@Param("ownerRelPOs") List<OwnerRelPO> ownerRelPOs);
+
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "batchSoftDeleteOwnerRelByMetadataObjects")
+  void batchSoftDeleteOwnerRelByMetadataObjects(
+      @Param("deletions") List<OwnerRelForDeletion> deletions);
+
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
       method = "softDeleteOwnerRelByMetadataObjectIdAndType")
@@ -89,8 +99,10 @@ public interface OwnerMetaMapper {
       method = "softDeleteOwnerRelByCatalogId")
   void softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId);
 
-  @UpdateProvider(type = OwnerMetaSQLProviderFactory.class, method = "softDeleteOwnerRelBySchemaId")
-  void softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId);
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelBySchemaIds")
+  void softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
@@ -106,5 +118,10 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectType") String metadataObjectType);
 
   @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectChangedOwners")
-  List<ChangedOwnerInfo> selectChangedOwners(@Param("updatedAtFrom") long updatedAtFrom);
+  List<ChangedOwnerInfo> selectChangedOwners(
+      @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId);
+
+  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectMaxChangedOwner")
+  ChangedOwnerInfo selectMaxChangedOwner();
 }

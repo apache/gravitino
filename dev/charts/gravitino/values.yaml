@@ -31,7 +31,7 @@ global:
 image:
   registry: docker.io
   repository: apache/gravitino
-  tag: 1.3.0-SNAPSHOT
+  tag: 1.4.0-SNAPSHOT
   pullPolicy: IfNotPresent
 
 ## MySQL chart configuration
@@ -289,7 +289,11 @@ icebergRest:
   #   tenantId: ""
   #   clientId: ""
   #   clientSecret: ""
-  ## No need to configure extra Google Cloud Storage configuration
+  ## Google Cloud Storage (GCS) configuration
+  ## If your catalog uses GCS as the object store, you must set the
+  ## GOOGLE_APPLICATION_CREDENTIALS environment variable in the container (see the "env" section below).
+  ## Mount the service account key file into the pod via extraVolumes/extraVolumeMounts.
+  ## No additional Iceberg REST properties are required beyond the credential file.
   ##
   ## Catalog configuration provider class name
   ##
@@ -356,12 +360,24 @@ additionalConfigItems: {}
 extraVolumes:
   - name: gravitino-log
     emptyDir: {}
+  ## Uncomment the following to mount a GCS service account key for catalogs using GCS as object store.
+  ## Create the secret first: kubectl create secret generic gcs-key --from-file=key.json=<path-to-key-file> -n gravitino
+  ##
+  # - name: gcs-key
+  #   secret:
+  #     secretName: gcs-key
 
 ## Additional volume mounts
 ##
 extraVolumeMounts:
   - name: gravitino-log
     mountPath: /opt/gravitino/logs
+  ## Uncomment the following to mount the GCS key into the container.
+  ## Ensure GOOGLE_APPLICATION_CREDENTIALS env is set to /etc/gcs/key.json (see env section).
+  ##
+  # - name: gcs-key
+  #   mountPath: /etc/gcs
+  #   readOnly: true
 
 ## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
 ## If you set enabled as "True", you need :
@@ -532,6 +548,11 @@ containerSecurityContext:
 env:
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
+  ## Uncomment the following if your catalog uses Google Cloud Storage (GCS) as the object store.
+  ## You must also mount the service account key file via extraVolumes and extraVolumeMounts.
+  ##
+  # - name: GOOGLE_APPLICATION_CREDENTIALS
+  #   value: /etc/gcs/key.json
 
 ## The envWithTpl array below has the same usage as "env", but is using the tpl function to support templatable string.
 ## This can be useful when you want to pass dynamic values to the Chart using the helm argument "--set <variable>=<value>"

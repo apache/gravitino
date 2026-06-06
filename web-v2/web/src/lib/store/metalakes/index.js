@@ -78,6 +78,7 @@ import {
   deleteVersionApi
 } from '@/lib/api/models'
 import { getFunctionsApi, getFunctionDetailsApi } from '@/lib/api/functions'
+import { getViewsApi, getViewDetailsApi, deleteViewApi } from '@/lib/api/views'
 
 const remapExpandedAndLoadedNodes = ({ getState, mapNode }) => {
   const expandedNodes = getState().metalakes.expandedNodes.map(mapNode)
@@ -91,9 +92,20 @@ const remapExpandedAndLoadedNodes = ({ getState, mapNode }) => {
 
 const mergeWithFunctionNodes = ({ tree, key, entities }) => {
   const existingNode = findInTree(tree, 'key', key)
+  const subSchemas = existingNode?.children?.filter(child => child?.node === 'schema') || []
+  const functions = existingNode?.children?.filter(child => child?.node === 'function') || []
+  const views = existingNode?.children?.filter(child => child?.node === 'view') || []
+
+  return _.uniqBy([...subSchemas, ...entities, ...functions, ...views], 'key')
+}
+
+const mergeWithViewNodes = ({ tree, key, entities }) => {
+  const existingNode = findInTree(tree, 'key', key)
+  const subSchemas = existingNode?.children?.filter(child => child?.node === 'schema') || []
+  const tables = existingNode?.children?.filter(child => child?.node === 'table') || []
   const functions = existingNode?.children?.filter(child => child?.node === 'function') || []
 
-  return _.uniqBy([...entities, ...functions], 'key')
+  return _.uniqBy([...subSchemas, ...tables, ...functions, ...entities], 'key')
 }
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
@@ -266,6 +278,19 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         dispatch(setLoadedNodes(loaded))
       }
     } else if (pathArr.length === 4) {
+      // Only fetch subschemas for iceberg catalog with jdbc backend
+      const catalogNode = findInTree(
+        getState().metalakes.metalakeTree,
+        'key',
+        `{{${metalake}}}{{${catalog}}}{{${type}}}`
+      )
+      const provider = catalogNode?.provider || catalogNode?.catalogType || null
+      const catalogBackend = catalogNode?.properties?.['catalog-backend']
+      const isIcebergJdbcCatalog = provider === 'lakehouse-iceberg' && catalogBackend === 'jdbc'
+
+      const childSchemasPromise = isIcebergJdbcCatalog
+        ? getSchemasApi({ metalake, catalog, parentSchema: schema })
+        : Promise.resolve(null)
       let entityPromise = Promise.resolve(null)
       switch (type) {
         case 'relational':
@@ -284,10 +309,36 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           break
       }
 
-      const [funcResult, entityResult] = await Promise.allSettled([
+      const viewsPromise =
+        type === 'relational'
+          ? getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' })
+          : Promise.resolve(null)
+
+      const [funcResult, entityResult, viewResult, childSchemasResult] = await Promise.allSettled([
         getFunctionsApi({ metalake, catalog, schema, details: false }),
-        entityPromise
+        entityPromise,
+        viewsPromise,
+        childSchemasPromise
       ])
+
+      const childSchemas =
+        childSchemasResult.status === 'fulfilled' && childSchemasResult.value
+          ? (childSchemasResult.value?.identifiers || []).map(schemaItem => {
+              const schemaName = schemaItem.name
+
+              return {
+                ...schemaItem,
+                node: 'schema',
+                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaName}}}`,
+                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaName}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema: schemaName }).toString()}`,
+                name: schemaName,
+                title: schemaName,
+                tables: [],
+                children: []
+              }
+            })
+          : []
 
       const functions =
         funcResult.status === 'fulfilled'
@@ -302,6 +353,23 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
                 path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, function: functionName }).toString()}`,
                 name: functionName,
                 title: functionName,
+                isLeaf: true,
+                children: []
+              }
+            })
+          : []
+
+      const views =
+        viewResult.status === 'fulfilled' && viewResult.value
+          ? (viewResult.value?.identifiers || []).map(viewItem => {
+              return {
+                ...viewItem,
+                node: 'view',
+                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${viewItem.name}}}`,
+                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${viewItem.name}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema, view: viewItem.name }).toString()}`,
+                name: viewItem.name,
+                title: viewItem.name,
                 isLeaf: true,
                 children: []
               }
@@ -382,7 +450,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         }
       }
 
-      result.data = [...entities, ...functions]
+      result.data = [...childSchemas, ...entities, ...functions, ...views]
     }
 
     return result
@@ -797,12 +865,12 @@ export const switchInUseCatalog = createAsyncThunk(
 
 export const fetchSchemas = createAsyncThunk(
   'appMetalakes/fetchSchemas',
-  async ({ init, page, metalake, catalog, catalogType }, { getState, dispatch }) => {
+  async ({ init, page, metalake, catalog, catalogType, parentSchema }, { getState, dispatch }) => {
     if (init) {
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
     }
-    const [err, res] = await to(getSchemasApi({ metalake, catalog }))
+    const [err, res] = await to(getSchemasApi({ metalake, catalog, parentSchema }))
     await dispatch(setTableLoading(false))
 
     if (err || !res) {
@@ -814,11 +882,17 @@ export const fetchSchemas = createAsyncThunk(
 
       if (isCanceledRequest) {
         const catalogKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
-        const catalogNode = findInTree(getState().metalakes.metalakeTree, 'key', catalogKey)
-        const cachedSchemas = (catalogNode?.children || []).filter(item => item?.node === 'schema')
+
+        const parentKey = parentSchema
+          ? `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${parentSchema}}}`
+          : catalogKey
+        const parentNode = findInTree(getState().metalakes.metalakeTree, 'key', parentKey)
+        const cachedSchemas = (parentNode?.children || []).filter(item => item?.node === 'schema')
 
         if (cachedSchemas.length > 0) {
-          dispatch(setExpandedNodes([`{{${metalake}}}`, catalogKey]))
+          const expanded =
+            parentKey === catalogKey ? [`{{${metalake}}}`, catalogKey] : [`{{${metalake}}}`, catalogKey, parentKey]
+          dispatch(setExpandedNodes(expanded))
 
           return { schemas: cachedSchemas, page, init }
         }
@@ -830,39 +904,43 @@ export const fetchSchemas = createAsyncThunk(
     const { identifiers = [] } = res || {}
 
     const schemas = identifiers.map(schema => {
+      const schemaName = schema.name
+
       const schemaItem = findInTree(
         getState().metalakes.metalakeTree,
         'key',
-        `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema.name}}}`
+        `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schemaName}}}`
       )
 
       return {
         ...schema,
+        name: schemaName,
         node: 'schema',
-        id: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema.name}}}`,
-        key: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema.name}}}`,
-        path: `?${new URLSearchParams({ metalake, catalog, catalogType, schema: schema.name }).toString()}`,
-        name: schema.name,
-        title: schema.name,
+        id: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schemaName}}}`,
+        key: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schemaName}}}`,
+        path: `?${new URLSearchParams({ metalake, catalog, catalogType, schema: schemaName }).toString()}`,
+        title: schemaName,
         tables: schemaItem ? schemaItem.children : [],
         children: schemaItem ? schemaItem.children : []
       }
     })
 
     if (init) {
-      const catalogKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
+      const parentKey = parentSchema
+        ? `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${parentSchema}}}`
+        : `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
 
       // Always update tree nodes when init is true
       dispatch(
         setIntoTreeNodes({
-          key: catalogKey,
+          key: parentKey,
           data: schemas
         })
       )
 
-      // Add catalog to loadedNodes if not already present
-      if (!getState().metalakes.loadedNodes.includes(catalogKey)) {
-        dispatch(setLoadedNodes([...getState().metalakes.loadedNodes, catalogKey]))
+      // Add parent node to loadedNodes if not already present
+      if (!getState().metalakes.loadedNodes.includes(parentKey)) {
+        dispatch(setLoadedNodes([...getState().metalakes.loadedNodes, parentKey]))
       }
     }
 
@@ -1184,6 +1262,11 @@ export const getTableDetails = createAsyncThunk(
         })
       }
     ]
+
+    resTable.columns = (resTable.columns || []).map(col => ({
+      ...col,
+      node: 'tableColumn'
+    }))
 
     dispatch(setTableProps(tableProps))
 
@@ -2147,6 +2230,94 @@ export const getFunctionDetails = createAsyncThunk(
   }
 )
 
+export const fetchViews = createAsyncThunk(
+  'appMetalakes/fetchViews',
+  async ({ init, metalake, catalog, schema }, { getState, dispatch }) => {
+    const [err, res] = await to(getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
+
+    if (err || !res) {
+      // Catalog doesn't support views (HTTP 405) — return empty views silently
+      if (err?.response?.status === 405) {
+        return { views: [], init }
+      }
+      if (init) {
+        throw new Error(err)
+      }
+    }
+
+    const { identifiers = [] } = res || {}
+
+    const views = identifiers.map(viewItem => {
+      return {
+        ...viewItem,
+        node: 'view',
+        id: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}{{${viewItem.name}}}`,
+        key: `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}{{${viewItem.name}}}`,
+        path: `?${new URLSearchParams({
+          metalake,
+          catalog,
+          catalogType: 'relational',
+          schema,
+          view: viewItem.name
+        }).toString()}`,
+        name: viewItem.name,
+        title: viewItem.name,
+        isLeaf: true,
+        children: []
+      }
+    })
+
+    if (
+      init &&
+      getState().metalakes.loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`)
+    ) {
+      const schemaKey = `{{${metalake}}}{{${catalog}}}{{${'relational'}}}{{${schema}}}`
+      dispatch(
+        setIntoTreeNodes({
+          key: schemaKey,
+          data: mergeWithViewNodes({ tree: getState().metalakes.metalakeTree, key: schemaKey, entities: views })
+        })
+      )
+    }
+
+    return { views, init }
+  }
+)
+
+export const getViewDetails = createAsyncThunk(
+  'appMetalakes/getViewDetails',
+  async ({ init, metalake, catalog, schema, view }) => {
+    const [err, res] = await to(getViewDetailsApi({ metalake, catalog, schema, view }, { errorMessageMode: 'none' }))
+
+    if (err || !res) {
+      // Catalog doesn't support views (HTTP 405) — return empty result silently
+      if (err?.response?.status === 405) {
+        return { view: null, init }
+      }
+      throw new Error(err)
+    }
+
+    return { view: res.view || res, init }
+  }
+)
+
+export const deleteView = createAsyncThunk(
+  'appMetalakes/deleteView',
+  async ({ metalake, catalog, schema, view }, { dispatch }) => {
+    await dispatch(setTableLoading(true))
+    const [err, res] = await to(deleteViewApi({ metalake, catalog, schema, view }))
+    await dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    await dispatch(fetchViews({ metalake, catalog, schema, init: true }))
+
+    return res
+  }
+)
+
 export const appMetalakesSlice = createSlice({
   name: 'appMetalakes',
   initialState: {
@@ -2158,6 +2329,7 @@ export const appMetalakesSlice = createSlice({
     schemas: [],
     tables: [],
     functions: [],
+    views: [],
     columns: [],
     filesets: [],
     topics: [],
@@ -2222,6 +2394,7 @@ export const appMetalakesSlice = createSlice({
       state.schemas = []
       state.tables = []
       state.functions = []
+      state.views = []
       state.columns = []
       state.filesets = []
       state.topics = []
@@ -2504,6 +2677,7 @@ export const appMetalakesSlice = createSlice({
       state.catalogs = []
       state.schemas = []
       state.tables = []
+      state.views = []
       state.columns = []
       state.filesets = []
       state.topics = []
@@ -2857,6 +3031,29 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(getFunctionDetails.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(fetchViews.fulfilled, (state, action) => {
+      state.views = action.payload.views
+    })
+    builder.addCase(fetchViews.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(getViewDetails.fulfilled, (state, action) => {
+      if (action.payload.init) {
+        state.activatedDetails = action.payload.view
+      }
+    })
+    builder.addCase(getViewDetails.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(deleteView.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }

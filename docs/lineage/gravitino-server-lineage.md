@@ -1,7 +1,7 @@
 ---
-title: "Gravitino server Lineage support"
-slug: /lineage/gravitino-server-lineage
-keyword: Gravitino OpenLineage
+title: "Server Lineage"
+slug: "/lineage/gravitino-server-lineage"
+keyword: "Gravitino OpenLineage"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -20,7 +20,7 @@ Gravitino server provides a pluggable lineage framework to receive, process, and
 | `gravitino.lineage.${sinkName}.sinkClass`     | The name of the lineage sink class which should implement `org.apache.gravitino.lineage.sink.LineageSink` interface.                                                                                                                                       | (none)                                                 | No       | 0.9.0-incubating |
 | `gravitino.lineage.queueCapacity`             | The total capacity of lineage event queues. When there are multiple lineage sinks, each sink utilizes an isolated event queue. The capacity of each queue is calculated by dividing the value of `gravitino.lineage.queueCapacity` by the number of sinks. | 10000                                                  | No       | 0.9.0-incubating |
 
-## Lineage http source 
+## Lineage HTTP Source
 
 Http source provides an endpoint which follows [OpenLineage API spec](https://openlineage.io/apidocs/openapi/) to receive OpenLineage run event. The following use example:
 
@@ -51,11 +51,11 @@ curl -X POST \
   http://localhost:8090/api/lineage
 ```
 
-## Lineage log sink
+## Lineage Log Sink
 
 Log sink prints the log in a separate log file `gravitino_lineage.log`, you could change the default behavior in `conf/log4j2.properties`.
 
-## Lineage HTTP sink
+## Lineage HTTP Sink
 
 The HTTP sink supports sending the lineage event to an HTTP server that follows the OpenLineage REST specification, like marquez
 | Property Name                     | Description                                                                                                                            | Default Value                                      | Required | Since Version |
@@ -66,6 +66,6 @@ The HTTP sink supports sending the lineage event to an HTTP server that follows 
 | gravitino.lineage.http.authType   | Authentication type for http sink (options: `apiKey` or `none`)                                                                        | none                                               | Yes      | 1.0.0         |
 | gravitino.lineage.http.apiKey     | API key for authenticating with http sink (required if authType=`apiKey`)                                                              | none                                               | No       | 1.0.0         |
 
-## High watermark status
+## High Watermark Status
 
 When the lineage sink operates slowly, lineage events accumulate in the async queue. Once the queue size exceeds 90% of its capacity (high watermark threshold), the lineage system enters a high watermark status. In this state, the lineage source must implement retry and logging mechanisms for rejected events to prevent system overload. For the HTTP source, it returns the `429 Too Many Requests` status code to the client.

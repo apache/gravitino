@@ -101,6 +101,14 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
+  public void testToIcebergSchemaWithNullColumns() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ConvertUtil.toIcebergSchema((Column[]) null));
+    Assertions.assertEquals("columns must not be null", exception.getMessage());
+  }
+
+  @Test
   public void testToPrimitiveType() {
     ByteType byteType = ByteType.get();
     IllegalArgumentException exception =
@@ -452,8 +460,8 @@ public class TestConvertUtil extends TestBaseConvert {
 
   @Test
   public void testFromNestedField() {
-    String colName = RandomStringUtils.randomAlphabetic(10);
-    String doc = RandomStringUtils.randomAlphabetic(20);
+    String colName = RandomStringUtils.secure().nextAlphabetic(10);
+    String doc = RandomStringUtils.secure().nextAlphabetic(20);
     Types.NestedField colField =
         Types.NestedField.optional(1, colName, Types.IntegerType.get(), doc);
     IcebergColumn icebergColumn = ConvertUtil.fromNestedField(colField);
@@ -463,8 +471,8 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         icebergColumn.dataType() instanceof org.apache.gravitino.rel.types.Types.IntegerType);
 
-    colName = RandomStringUtils.randomAlphabetic(10);
-    doc = RandomStringUtils.randomAlphabetic(20);
+    colName = RandomStringUtils.secure().nextAlphabetic(10);
+    doc = RandomStringUtils.secure().nextAlphabetic(20);
     colField = Types.NestedField.required(1, colName, Types.StringType.get(), doc);
     icebergColumn = ConvertUtil.fromNestedField(colField);
     Assertions.assertEquals(icebergColumn.name(), colName);
@@ -473,8 +481,8 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         icebergColumn.dataType() instanceof org.apache.gravitino.rel.types.Types.StringType);
 
-    colName = RandomStringUtils.randomAlphabetic(10);
-    doc = RandomStringUtils.randomAlphabetic(20);
+    colName = RandomStringUtils.secure().nextAlphabetic(10);
+    doc = RandomStringUtils.secure().nextAlphabetic(20);
     colField = Types.NestedField.required(1, colName, Types.DateType.get(), doc);
     icebergColumn = ConvertUtil.fromNestedField(colField);
     Assertions.assertEquals(icebergColumn.name(), colName);
@@ -483,8 +491,8 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         icebergColumn.dataType() instanceof org.apache.gravitino.rel.types.Types.DateType);
 
-    colName = RandomStringUtils.randomAlphabetic(10);
-    doc = RandomStringUtils.randomAlphabetic(20);
+    colName = RandomStringUtils.secure().nextAlphabetic(10);
+    doc = RandomStringUtils.secure().nextAlphabetic(20);
     colField =
         Types.NestedField.required(
             1,

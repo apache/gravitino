@@ -22,7 +22,7 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMPTY;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -53,7 +53,6 @@ import org.apache.gravitino.rel.TableChange;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
-import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
 import org.lance.namespace.model.DeclareTableResponse;
 import org.lance.namespace.model.DeregisterTableResponse;
@@ -100,7 +99,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   @Override
   public DescribeTableResponse describeTable(
-      String tableId, String delimiter, Optional<Long> version) {
+      String tableId, String delimiter, Optional<Long> version, boolean checkDeclared) {
     if (!version.isEmpty()) {
       throw new UnsupportedOperationException(
           "Describing specific table version is not supported. It should be null to indicate the"
@@ -125,13 +124,20 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     }
     DescribeTableResponse response = new DescribeTableResponse();
     response.setMetadata(table.properties());
+    response.setProperties(table.properties());
     response.setLocation(table.properties().get(LANCE_LOCATION));
     response.setSchema(toJsonArrowSchema(table.columns()));
     response.setVersion(
         Optional.ofNullable(table.properties().get(LANCE_TABLE_VERSION))
             .map(Long::valueOf)
             .orElse(null));
-    response.setStorageOptions(LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+    response.setStorageOptions(
+        LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), table.properties()));
+    response.setManagedVersioning(false);
+    if (checkDeclared) {
+      response.setIsOnlyDeclared(
+          Boolean.parseBoolean(table.properties().getOrDefault(LANCE_TABLE_DECLARED, "false")));
+    }
     return response;
   }
 
@@ -179,14 +185,15 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
             .createTable(
                 tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
     Map<String, String> properties = t.properties();
+    Map<String, String> effectiveStorageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), properties);
 
     CreateTableResponse response = new CreateTableResponse();
-    // Extract storage options from table properties. All storage options stores in table
-    // properties.
-    response.setStorageOptions(LancePropertiesUtils.getLanceStorageOptions(properties));
+    response.setStorageOptions(effectiveStorageOptions);
     response.setVersion(
         Optional.ofNullable(properties.get(LANCE_TABLE_VERSION)).map(Long::valueOf).orElse(null));
     response.setLocation(properties.get(LANCE_LOCATION));
+    response.setProperties(properties);
     return response;
   }
 
@@ -196,7 +203,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     ImmutableMap<String, String> props =
         ImmutableMap.<String, String>builder()
             .putAll(tableProperties)
-            .put(LANCE_TABLE_CREATE_EMPTY, "true")
+            .put(LANCE_TABLE_DECLARED, "true")
             .put(Table.PROPERTY_EXTERNAL, "true")
             .build();
 
@@ -205,27 +212,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     DeclareTableResponse declareTableResponse = new DeclareTableResponse();
     declareTableResponse.setLocation(response.getLocation());
     declareTableResponse.setStorageOptions(response.getStorageOptions());
+    declareTableResponse.setProperties(response.getProperties());
+    declareTableResponse.setManagedVersioning(false);
     return declareTableResponse;
-  }
-
-  @Override
-  @SuppressWarnings("deprecation")
-  public CreateEmptyTableResponse createEmptyTable(
-      String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties) {
-    // Empty table creation only supports CREATE mode (not EXIST_OK or OVERWRITE).
-    ImmutableMap<String, String> props =
-        ImmutableMap.<String, String>builder()
-            .putAll(tableProperties)
-            .put(LANCE_TABLE_CREATE_EMPTY, "true")
-            .put(Table.PROPERTY_EXTERNAL, "true")
-            .build();
-
-    CreateTableResponse response =
-        createTable(tableId, "create", delimiter, tableLocation, props, null);
-    CreateEmptyTableResponse emptyTableResponse = new CreateEmptyTableResponse();
-    emptyTableResponse.setLocation(response.getLocation());
-    emptyTableResponse.setStorageOptions(response.getStorageOptions());
-    return emptyTableResponse;
   }
 
   @Override

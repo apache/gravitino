@@ -396,7 +396,7 @@ export default function TableDetailsPage({ ...props }) {
         dataIndex: 'tags',
         key: 'tags',
         render: (_, record) =>
-          !record?.node ? (
+          record?.node === 'tableColumn' ? (
             <Tags
               metadataObjectType={'column'}
               metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
@@ -408,7 +408,7 @@ export default function TableDetailsPage({ ...props }) {
         dataIndex: 'policies',
         key: 'policies',
         render: (_, record) =>
-          !record?.node ? (
+          record?.node === 'tableColumn' ? (
             <Policies
               metadataObjectType={'column'}
               metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}

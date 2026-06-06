@@ -47,8 +47,10 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
   static final String INT = "int";
   static final String INTEGER = "integer";
   static final String BIGINT = "bigint";
+  static final String LONG = "long";
   static final String FLOAT = "float";
   static final String DOUBLE = "double";
+  static final String DOUBLE_PRECISION = "double precision";
   static final String STRING = "string";
   static final String DATE = "date";
   static final String TIMESTAMP = "timestamp";
@@ -256,9 +258,9 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     int start = 0;
     for (int i = 0; i < s.length(); i++) {
       char c = s.charAt(i);
-      if (c == '<') {
+      if (c == '<' || c == '(') {
         depth++;
-      } else if (c == '>') {
+      } else if (c == '>' || c == ')') {
         depth--;
       } else if (c == ',' && depth == 0) {
         parts.add(s.substring(start, i).trim());

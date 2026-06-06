@@ -53,10 +53,10 @@ public class HivePropertyMeta implements HasPropertyMeta {
   static final String HIVE_TABLE_OUTPUT_FORMAT = "output_format";
   static final String HIVE_TABLE_SERDE_LIB = "serde_lib";
   static final String HIVE_TABLE_SERDE_NAME = "serde_name";
-  static final String HIVE_PARTITION_KEY = "partitioned_by";
-  static final String HIVE_BUCKET_KEY = "bucketed_by";
-  static final String HIVE_BUCKET_COUNT_KEY = "bucket_count";
-  static final String HIVE_SORT_ORDER_KEY = "sorted_by";
+  public static final String HIVE_PARTITION_KEY = "partitioned_by";
+  public static final String HIVE_BUCKET_KEY = "bucketed_by";
+  public static final String HIVE_BUCKET_COUNT_KEY = "bucket_count";
+  public static final String HIVE_SORT_ORDER_KEY = "sorted_by";
 
   private static final List<PropertyMetadata<?>> TABLE_PROPERTY_META =
       ImmutableList.of(
@@ -101,8 +101,7 @@ public class HivePropertyMeta implements HasPropertyMeta {
                           .map(name -> ((String) name).toLowerCase(ENGLISH))
                           .collect(toImmutableList()),
               value -> value),
-          integerProperty(
-              HIVE_BUCKET_COUNT_KEY, "The number of buckets for the table", null, false),
+          integerProperty(HIVE_BUCKET_COUNT_KEY, "The number of buckets for the table", 0, false),
           new PropertyMetadata<>(
               HIVE_SORT_ORDER_KEY,
               "Bucket sorting columns",

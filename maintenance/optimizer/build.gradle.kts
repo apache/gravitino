@@ -28,7 +28,7 @@ val scalaVersion: String =
   project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4connector.get()
+val icebergVersion: String = libs.versions.iceberg4spark33.get()
 
 dependencies {
   implementation(project(":api"))

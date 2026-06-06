@@ -86,6 +86,26 @@ public class SchemaMetaBaseSQLProvider {
         + "</script>";
   }
 
+  public String listSchemaPOsByCatalogIdAndNamePrefix(
+      @Param("catalogId") Long catalogId,
+      @Param("schemaName") String schemaName,
+      @Param("descendantPrefix") String descendantPrefix) {
+    return "SELECT schema_id as schemaId, schema_name as schemaName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}"
+        // The descendantPrefix has its LIKE metacharacters escaped with '!' by the caller
+        // (SchemaPOStorageOps#escapeLikeMetacharacters), so '!' is declared as the ESCAPE
+        // character to keep the prefix match literal across MySQL, H2, and PostgreSQL.
+        + " AND (schema_name = #{schemaName}"
+        + " OR schema_name LIKE CONCAT(#{descendantPrefix}, '%') ESCAPE '!')"
+        + " AND deleted_at = 0";
+  }
+
   public String selectSchemaIdByCatalogIdAndName(
       @Param("catalogId") Long catalogId, @Param("schemaName") String name) {
     return "SELECT schema_id as schemaId FROM "
@@ -200,6 +220,45 @@ public class SchemaMetaBaseSQLProvider {
         + " deleted_at = #{schemaMeta.deletedAt}";
   }
 
+  public String batchInsertSchemaMeta(@Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return "<script>"
+        + "INSERT INTO "
+        + TABLE_NAME
+        + " (schema_id, schema_name, metalake_id, catalog_id, schema_comment,"
+        + " properties, audit_info, current_version, last_version, deleted_at) VALUES "
+        + "<foreach collection='schemaMetas' item='po' separator=','>"
+        + "(#{po.schemaId}, #{po.schemaName}, #{po.metalakeId}, #{po.catalogId},"
+        + " #{po.schemaComment}, #{po.properties}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt})"
+        + "</foreach>"
+        + "</script>";
+  }
+
+  public String batchInsertSchemaMetaOnDuplicateKeyUpdate(
+      @Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return "<script>"
+        + "INSERT INTO "
+        + TABLE_NAME
+        + " (schema_id, schema_name, metalake_id, catalog_id, schema_comment,"
+        + " properties, audit_info, current_version, last_version, deleted_at) VALUES "
+        + "<foreach collection='schemaMetas' item='po' separator=','>"
+        + "(#{po.schemaId}, #{po.schemaName}, #{po.metalakeId}, #{po.catalogId},"
+        + " #{po.schemaComment}, #{po.properties}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt})"
+        + "</foreach>"
+        + " ON DUPLICATE KEY UPDATE"
+        + " schema_name = VALUES(schema_name),"
+        + " metalake_id = VALUES(metalake_id),"
+        + " catalog_id = VALUES(catalog_id),"
+        + " schema_comment = VALUES(schema_comment),"
+        + " properties = VALUES(properties),"
+        + " audit_info = VALUES(audit_info),"
+        + " current_version = VALUES(current_version),"
+        + " last_version = VALUES(last_version),"
+        + " deleted_at = VALUES(deleted_at)"
+        + "</script>";
+  }
+
   public String updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
     return "UPDATE "
@@ -226,12 +285,18 @@ public class SchemaMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteSchemaMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   public String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react'
 import { Collapse, Descriptions, Space, Spin, Tag, Typography, Flex, Tooltip, Divider, Tabs } from 'antd'
 import { useSearchParams } from 'next/navigation'
 import { formatToDateTime, isValidDate } from '@/lib/utils/date'
+import AssociatedTable from '@/components/AssociatedTable'
 import Icons from '@/components/Icons'
 import { useAppSelector } from '@/lib/hooks/useStore'
 
@@ -180,13 +181,21 @@ const FunctionImplTabs = ({ impls }) => {
 
 export default function FunctionDetailsPage() {
   const searchParams = useSearchParams()
+  const currentMetalake = searchParams.get('metalake')
+  const catalog = searchParams.get('catalog')
+  const schema = searchParams.get('schema')
   const functionName = searchParams.get('function')
+  const auth = useAppSelector(state => state.auth)
+  const { anthEnable } = auth
   const store = useAppSelector(state => state.metalakes)
   const functionData = store.activatedDetails
   const [activeDefinitionKeys, setActiveDefinitionKeys] = useState([])
+  const [activeTab, setActiveTab] = useState('Definitions')
+  const hasFunctionRoleContext = Boolean(currentMetalake && catalog && schema && functionName)
 
   useEffect(() => {
     setActiveDefinitionKeys([])
+    setActiveTab('Definitions')
   }, [functionName])
 
   const definitions = functionData?.definitions || []
@@ -268,16 +277,28 @@ export default function FunctionDetailsPage() {
           <div className='max-h-[60vh] overflow-auto'>
             <Tabs
               data-refer='details-tabs'
-              defaultActiveKey={'Definitions'}
-              items={[{ label: 'Definitions', key: 'Definitions' }]}
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              items={[
+                { label: 'Definitions', key: 'Definitions' },
+                ...(anthEnable ? [{ label: 'Associated Roles', key: 'Associated Roles' }] : [])
+              ]}
             />
-            {definitions.length === 0 ? (
-              <span className='text-slate-400'>No definitions</span>
-            ) : (
-              <Collapse
-                items={definitionItems}
-                activeKey={activeDefinitionKeys}
-                onChange={keys => setActiveDefinitionKeys(Array.isArray(keys) ? keys : [keys])}
+            {activeTab === 'Definitions' &&
+              (definitions.length === 0 ? (
+                <span className='text-slate-400'>No definitions</span>
+              ) : (
+                <Collapse
+                  items={definitionItems}
+                  activeKey={activeDefinitionKeys}
+                  onChange={keys => setActiveDefinitionKeys(Array.isArray(keys) ? keys : [keys])}
+                />
+              ))}
+            {anthEnable && activeTab === 'Associated Roles' && hasFunctionRoleContext && (
+              <AssociatedTable
+                metalake={currentMetalake}
+                metadataObjectType={'function'}
+                metadataObjectFullName={`${catalog}.${schema}.${functionName}`}
               />
             )}
           </div>

@@ -909,6 +909,70 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             ClickHouseUtils.getSortOrders("c1"));
     Assertions.assertTrue(partitionSql.contains("PARTITION BY `c1`"));
 
+    String yearPartitionSql =
+        ops.buildCreateSql(
+            "t_year",
+            new JdbcColumn[] {col},
+            null,
+            propsWithPartition,
+            new Transform[] {Transforms.year("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+    Assertions.assertTrue(yearPartitionSql.contains("PARTITION BY toYear(`c1`)"));
+
+    String monthPartitionSql =
+        ops.buildCreateSql(
+            "t_month",
+            new JdbcColumn[] {col},
+            null,
+            propsWithPartition,
+            new Transform[] {Transforms.month("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+    Assertions.assertTrue(monthPartitionSql.contains("PARTITION BY toYYYYMM(`c1`)"));
+
+    String dayPartitionSql =
+        ops.buildCreateSql(
+            "t_day",
+            new JdbcColumn[] {col},
+            null,
+            propsWithPartition,
+            new Transform[] {Transforms.day("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+    Assertions.assertTrue(dayPartitionSql.contains("PARTITION BY toDate(`c1`)"));
+
+    String multiPartitionSql =
+        ops.buildCreateSql(
+            "t_multi",
+            new JdbcColumn[] {col},
+            null,
+            propsWithPartition,
+            new Transform[] {Transforms.year("c1"), Transforms.day("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+    Assertions.assertTrue(
+        multiPartitionSql.contains("PARTITION BY tuple(toYear(`c1`), toDate(`c1`))"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.buildCreateSql(
+                    "t_bucket",
+                    new JdbcColumn[] {col},
+                    null,
+                    propsWithPartition,
+                    new Transform[] {Transforms.bucket(8, new String[] {"c1"})},
+                    Distributions.NONE,
+                    indexes,
+                    ClickHouseUtils.getSortOrders("c1")));
+    Assertions.assertEquals("Unsupported partition transform: bucket", exception.getMessage());
+
     // distribution not NONE
     Assertions.assertThrows(
         IllegalArgumentException.class,

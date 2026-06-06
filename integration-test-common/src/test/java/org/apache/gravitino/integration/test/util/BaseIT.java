@@ -119,11 +119,15 @@ public class BaseIT {
   public static final String DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/clickhouse-jdbc-0.7.1-all.jar";
 
+  public static final String DOWNLOAD_SQLITE_JDBC_DRIVER_URL =
+      "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar";
+
   public static final Map<String, Pattern> SUPPORTED_CLEAN_CONFLICTS_DRIVER_TYPES =
       ImmutableMap.of(
           "mysql", Pattern.compile("mysql-connector-java-([\\d.]+)\\.jar"),
           "postgresql", Pattern.compile("postgresql-([\\d.]+)\\.jar"),
-          "clickhouse", Pattern.compile("clickhouse-jdbc-([\\d.]+)(-all)?\\.jar"));
+          "clickhouse", Pattern.compile("clickhouse-jdbc-([\\d.]+)(-all)?\\.jar"),
+          "sqlite", Pattern.compile("sqlite-jdbc-([\\d.]+)\\.jar"));
 
   private TestDatabaseName META_DATA;
   private MySQLContainer MYSQL_CONTAINER;
@@ -201,7 +205,8 @@ public class BaseIT {
     String[] driverUrls = {
       DOWNLOAD_MYSQL_JDBC_DRIVER_URL,
       DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL,
-      DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL
+      DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL,
+      DOWNLOAD_SQLITE_JDBC_DRIVER_URL
     };
     String[] dirs = getJdbcDriverDownloadDirs();
     downloadJdbcDrivers(driverUrls, dirs);
@@ -327,8 +332,13 @@ public class BaseIT {
     }
   }
 
-  @BeforeAll
-  public void startIntegrationTest() throws Exception {
+  /**
+   * Starts the Gravitino server (embedded or external) and initialises the admin client. Extracted
+   * from {@link #startIntegrationTest()} so that subclasses can call it directly without triggering
+   * virtual-dispatch through overriding {@code @BeforeAll} overrides (e.g. {@code
+   * SparkEnvIT.startIntegrationTest()} which is intentionally empty).
+   */
+  protected void startServer() throws Exception {
     testMode =
         System.getProperty(ITUtils.TEST_MODE) == null
             ? ITUtils.EMBEDDED_TEST_MODE
@@ -368,12 +378,20 @@ public class BaseIT {
 
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
-    if (ignoreLanceAuxRestService && ignoreIcebergAuxRestService) {
-      customConfigs.put(
-          AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-              + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
-          "");
+
+    List<String> auxServicesList = new ArrayList<>();
+    if (!ignoreIcebergAuxRestService) {
+      auxServicesList.add("iceberg-rest");
     }
+    if (!ignoreLanceAuxRestService) {
+      auxServicesList.add("lance-rest");
+    }
+    String auxServices = String.join(",", auxServicesList);
+
+    customConfigs.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+        auxServices);
     if (!ignoreLanceAuxRestService) {
       customConfigs.put(
           LANCE_CONFIG_PREFIX + METALAKE_NAME.getKey(),
@@ -415,6 +433,8 @@ public class BaseIT {
 
     List<String> authenticators = new ArrayList<>();
     String authenticatorStr = customConfigs.get(Configs.AUTHENTICATORS.getKey());
+    LOG.info("Creating authenticator {}", authenticatorStr);
+
     if (authenticatorStr != null) {
       authenticators = COMMA.splitToList(authenticatorStr);
     }
@@ -447,6 +467,11 @@ public class BaseIT {
     } else {
       client = GravitinoAdminClient.builder(serverUri).build();
     }
+  }
+
+  @BeforeAll
+  public void startIntegrationTest() throws Exception {
+    startServer();
   }
 
   @AfterAll

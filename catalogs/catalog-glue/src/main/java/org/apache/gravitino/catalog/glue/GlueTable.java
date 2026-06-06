@@ -18,13 +18,12 @@
  */
 package org.apache.gravitino.catalog.glue;
 
-import static org.apache.gravitino.catalog.glue.GlueConstants.INPUT_FORMAT;
+import static org.apache.gravitino.catalog.glue.GlueConstants.INPUT_FORMAT_CLASS;
 import static org.apache.gravitino.catalog.glue.GlueConstants.LOCATION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.OUTPUT_FORMAT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_LIB;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_NAME;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_PARAMETER_PREFIX;
-import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -176,12 +175,10 @@ public class GlueTable extends BaseTable {
     if (glueTable.hasParameters()) {
       properties.putAll(glueTable.parameters());
     }
-    if (StringUtils.isNotBlank(glueTable.tableType())) {
-      properties.put(TABLE_TYPE, glueTable.tableType());
-    }
+
     if (sd != null) {
       putIfNotBlank(properties, LOCATION, sd.location());
-      putIfNotBlank(properties, INPUT_FORMAT, sd.inputFormat());
+      putIfNotBlank(properties, INPUT_FORMAT_CLASS, sd.inputFormat());
       putIfNotBlank(properties, OUTPUT_FORMAT, sd.outputFormat());
       if (sd.serdeInfo() != null) {
         putIfNotBlank(properties, SERDE_LIB, sd.serdeInfo().serializationLibrary());
@@ -248,5 +245,45 @@ public class GlueTable extends BaseTable {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  /**
+   * Sets the partitioning of the table. Package-private: only {@link GlueIcebergTableHelper} should
+   * call this to enrich a table loaded from Glue with Iceberg-specific partition metadata.
+   *
+   * @param partitioning the partitioning transforms
+   */
+  void setPartitioning(Transform[] partitioning) {
+    this.partitioning = partitioning;
+  }
+
+  /**
+   * Sets the sort orders of the table. Package-private: only {@link GlueIcebergTableHelper} should
+   * call this to enrich a table loaded from Glue with Iceberg-specific sort order metadata.
+   *
+   * @param sortOrders the sort orders
+   */
+  void setSortOrders(SortOrder[] sortOrders) {
+    this.sortOrders = sortOrders;
+  }
+
+  /**
+   * Sets the properties of the table. Package-private: only {@link GlueIcebergTableHelper} should
+   * call this to merge Iceberg metadata properties into a table loaded from Glue.
+   *
+   * @param properties the properties map
+   */
+  void setProperties(Map<String, String> properties) {
+    this.properties = properties;
+  }
+
+  /**
+   * Replaces the columns with types sourced from the Iceberg schema, which is authoritative for
+   * Iceberg tables. Glue stores some types (e.g. TIME) as "string", so this corrects the loss.
+   *
+   * @param columns the columns derived from the Iceberg table schema
+   */
+  void setColumns(Column[] columns) {
+    this.columns = columns;
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.ModelPO;
@@ -73,11 +74,17 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteModelMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteModelMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override

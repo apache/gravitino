@@ -1,0 +1,544 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+
+    get:
+      tags:
+        - view
+      summary: List views
+      operationId: listViews
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/EntityListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target schema does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - view
+      summary: Create view
+      operationId: createView
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ViewCreateRequest"
+            examples:
+              ViewCreateRequest:
+                $ref: "#/components/examples/ViewCreateRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ViewResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target schema does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+        "409":
+          description: Conflict - The target view already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                ViewAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/ViewAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/view"
+
+    get:
+      tags:
+        - view
+      summary: Get view
+      operationId: loadView
+      description: Return the specified view object
+      responses:
+        "200":
+          $ref: "#/components/responses/ViewResponse"
+        "404":
+          description: Not Found - The target view does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchViewException:
+                  $ref: "#/components/examples/NoSuchViewException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - view
+      summary: Update view
+      operationId: alterView
+      description: Update the specified view in a schema
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ViewUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ViewResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target view does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchViewException:
+                  $ref: "#/components/examples/NoSuchViewException"
+        "409":
+          description: Conflict - The target view already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                ViewAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/ViewAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - view
+      summary: Delete view
+      operationId: dropView
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target metalake or catalog does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  schemas:
+    SQLRepresentation:
+      type: object
+      required:
+        - type
+        - dialect
+        - sql
+      properties:
+        type:
+          type: string
+          enum:
+            - "sql"
+          description: The representation type discriminator
+        dialect:
+          type: string
+          description: The SQL dialect of this representation
+        sql:
+          type: string
+          description: The SQL text of the view
+
+    Representation:
+      oneOf:
+        - $ref: "#/components/schemas/SQLRepresentation"
+      discriminator:
+        propertyName: type
+        mapping:
+          sql: "#/components/schemas/SQLRepresentation"
+
+    View:
+      type: object
+      required:
+        - name
+        - audit
+        - columns
+        - representations
+      properties:
+        name:
+          type: string
+          description: The name of the view
+        comment:
+          type: string
+          description: The comment of the view
+          nullable: true
+        columns:
+          type: array
+          description: The output columns of the view
+          items:
+            $ref: "./tables.yaml#/components/schemas/Column"
+        representations:
+          type: array
+          description: The representations of the view, keyed by dialect
+          items:
+            $ref: "#/components/schemas/Representation"
+        defaultCatalog:
+          type: string
+          description: The default catalog used to resolve unqualified identifiers in the view representations
+          nullable: true
+        defaultSchema:
+          type: string
+          description: The default schema used to resolve unqualified identifiers in the view representations
+          nullable: true
+        properties:
+          type: object
+          description: The properties of the view
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+
+    ViewCreateRequest:
+      type: object
+      required:
+        - name
+        - representations
+      properties:
+        name:
+          type: string
+          description: The name of the view
+        comment:
+          type: string
+          description: The comment of the view
+          nullable: true
+        columns:
+          type: array
+          description: The output columns of the view
+          items:
+            $ref: "./tables.yaml#/components/schemas/Column"
+        representations:
+          type: array
+          description: The representations of the view, at least one is required
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Representation"
+        defaultCatalog:
+          type: string
+          description: The default catalog used to resolve unqualified identifiers in the view representations
+          nullable: true
+        defaultSchema:
+          type: string
+          description: The default schema used to resolve unqualified identifiers in the view representations
+          nullable: true
+        properties:
+          type: object
+          description: The properties of the view
+          nullable: true
+          default: {}
+          additionalProperties:
+            type: string
+
+    ViewUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ViewUpdateRequest"
+
+    ViewUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/RenameViewRequest"
+        - $ref: "#/components/schemas/SetViewPropertyRequest"
+        - $ref: "#/components/schemas/RemoveViewPropertyRequest"
+        - $ref: "#/components/schemas/ReplaceViewRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenameViewRequest"
+          setProperty: "#/components/schemas/SetViewPropertyRequest"
+          removeProperty: "#/components/schemas/RemoveViewPropertyRequest"
+          replaceView: "#/components/schemas/ReplaceViewRequest"
+
+    RenameViewRequest:
+      type: object
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "rename"
+        newName:
+          type: string
+          description: The new name of the view
+      example: {
+        "@type": "rename",
+        "newName": "view2"
+      }
+
+    SetViewPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "setProperty"
+        property:
+          type: string
+          description: The name of the property to set
+        value:
+          type: string
+          description: The value of the property to set
+      example: {
+        "@type": "setProperty",
+        "property": "key",
+        "value": "value"
+      }
+
+    RemoveViewPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "removeProperty"
+        property:
+          type: string
+          description: The name of the property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key"
+      }
+
+    ReplaceViewRequest:
+      type: object
+      description: |
+        Atomically replaces the body of a view. Columns, representations, default catalog, default
+        schema and comment are all replaced. The view name and properties are not affected.
+      required:
+        - "@type"
+        - representations
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "replaceView"
+        columns:
+          type: array
+          description: The new output columns of the view
+          items:
+            $ref: "./tables.yaml#/components/schemas/Column"
+        representations:
+          type: array
+          description: The new representations of the view, at least one is required
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Representation"
+        defaultCatalog:
+          type: string
+          description: The new default catalog, or null to unset it
+          nullable: true
+        defaultSchema:
+          type: string
+          description: The new default schema, or null to unset it
+          nullable: true
+        comment:
+          type: string
+          description: The new comment, or null to unset it
+          nullable: true
+      example: {
+        "@type": "replaceView",
+        "columns": [],
+        "representations": [
+          {
+            "type": "sql",
+            "dialect": "trino",
+            "sql": "SELECT 2"
+          }
+        ],
+        "defaultCatalog": "cat1",
+        "defaultSchema": "sch1",
+        "comment": "new comment"
+      }
+
+  responses:
+    ViewResponse:
+      description: Returns include the view object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              view:
+                $ref: "#/components/schemas/View"
+          examples:
+            ViewResponse:
+              $ref: "#/components/examples/ViewResponse"
+
+  examples:
+    ViewCreateRequest:
+      value: {
+        "name": "view1",
+        "comment": "This is a view",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long",
+            "comment": "id column",
+            "nullable": true
+          }
+        ],
+        "representations": [
+          {
+            "type": "sql",
+            "dialect": "trino",
+            "sql": "SELECT id FROM t"
+          }
+        ],
+        "properties": {
+          "key": "value"
+        }
+      }
+
+    ViewResponse:
+      value: {
+        "code": 0,
+        "view": {
+          "name": "view1",
+          "comment": "This is a view",
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2024-01-01T00:00:00Z",
+            "lastModifier": "gravitino",
+            "lastModifiedTime": "2024-01-01T00:00:00Z"
+          },
+          "columns": [
+            {
+              "name": "id",
+              "type": "long",
+              "comment": "id column",
+              "nullable": true
+            }
+          ],
+          "representations": [
+            {
+              "type": "sql",
+              "dialect": "trino",
+              "sql": "SELECT id FROM t"
+            }
+          ],
+          "properties": {
+            "key": "value"
+          }
+        }
+      }
+
+    ViewAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "ViewAlreadyExistsException",
+        "message": "Failed to operate view(s) [view1] operation [CREATE] under schema [test_schema], reason [ViewAlreadyExistsException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.ViewAlreadyExistsException: View already exists: view1",
+          "..."
+        ]
+      }
+
+    NoSuchViewException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchViewException",
+        "message": "Failed to operate view(s) [test_view] operation [LOAD] under schema [test_schema], reason [NoSuchViewException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchViewException: View test_view does not exist",
+          "..."
+        ]
+      }

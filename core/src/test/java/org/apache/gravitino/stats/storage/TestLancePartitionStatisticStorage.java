@@ -23,6 +23,8 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -47,9 +49,9 @@ import org.apache.gravitino.stats.PartitionStatisticsModification;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
+import org.apache.gravitino.stats.storage.LancePartitionStatisticStorage.DatasetHolder;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.lance.Dataset;
 import org.mockito.InOrder;
 
 public class TestLancePartitionStatisticStorage {
@@ -623,10 +625,10 @@ public class TestLancePartitionStatisticStorage {
       BufferAllocator allocator = spy(new RootAllocator(Long.MAX_VALUE));
       FieldUtils.writeField(storage, "allocator", allocator, true);
 
-      Cache<Long, Dataset> datasetCache = storage.getDatasetCache();
+      Cache<Long, DatasetHolder> datasetCache = storage.getDatasetCache();
       Assertions.assertNotNull(datasetCache);
 
-      Dataset dataset = mock(Dataset.class);
+      DatasetHolder holder = mock(DatasetHolder.class);
       VarCharVector buffer = new VarCharVector("test", allocator);
       buffer.allocateNew(1024);
 
@@ -635,19 +637,54 @@ public class TestLancePartitionStatisticStorage {
                 buffer.close();
                 return null;
               })
-          .when(dataset)
+          .when(holder)
           .close();
 
-      datasetCache.put(1L, dataset);
+      datasetCache.put(1L, holder);
 
       storage.close();
 
       Assertions.assertEquals(0, allocator.getAllocatedMemory());
 
-      InOrder inOrder = inOrder(dataset, allocator);
-      inOrder.verify(dataset).close();
+      InOrder inOrder = inOrder(holder, allocator);
+      inOrder.verify(holder).close();
       inOrder.verify(allocator).close();
 
+    } finally {
+      FileUtils.deleteDirectory(new File(location));
+    }
+  }
+
+  @Test
+  public void testDatasetCacheClosesPreviousHolderOnReplacement() throws Exception {
+    String location = Files.createTempDirectory("lance_stats_replace_cache").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+    properties.put("datasetCacheSize", "10");
+
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(1L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
+    LancePartitionStatisticStorage storage = new LancePartitionStatisticStorage(properties);
+
+    try {
+      Cache<Long, DatasetHolder> datasetCache = storage.getDatasetCache();
+      Assertions.assertNotNull(datasetCache);
+
+      DatasetHolder previousHolder = mock(DatasetHolder.class);
+      DatasetHolder newHolder = mock(DatasetHolder.class);
+
+      datasetCache.put(1L, previousHolder);
+      datasetCache.put(1L, newHolder);
+
+      verify(previousHolder, timeout(5000)).close();
+
+      storage.close();
+
+      verify(newHolder).close();
     } finally {
       FileUtils.deleteDirectory(new File(location));
     }

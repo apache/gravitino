@@ -17,7 +17,9 @@
 
 package org.apache.gravitino.server.web.filter.authorization;
 
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
+
 public interface AuthorizationExecutor {
 
-  boolean execute() throws Exception;
+  boolean execute(AuthorizationRequestContext authorizationRequestContext) throws Exception;
 }

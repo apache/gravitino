@@ -106,8 +106,7 @@ public class TestEntityChangeLogMapper {
         "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.ALTER);
     long jvmAfter = System.currentTimeMillis();
 
-    List<EntityChangeRecord> records =
-        entityChangeLogMapper.selectEntityChanges(jvmBefore - 1000L, 10);
+    List<EntityChangeRecord> records = entityChangeLogMapper.selectEntityChanges(0L, 10);
     Assertions.assertEquals(1, records.size());
     EntityChangeRecord record = records.get(0);
     Assertions.assertEquals("metalake1", record.getMetalakeName());

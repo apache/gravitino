@@ -27,6 +27,30 @@ import org.junit.jupiter.api.Test;
 public class TestCredentialFactory {
 
   @Test
+  void testAwsIrsaCredential() {
+    Map<String, String> awsIrsaCredentialInfo =
+        ImmutableMap.of(
+            AwsIrsaCredential.ACCESS_KEY_ID,
+            "accessKeyId",
+            AwsIrsaCredential.SECRET_ACCESS_KEY,
+            "secretAccessKey",
+            AwsIrsaCredential.SESSION_TOKEN,
+            "token");
+    long expireTime = 1000;
+    Credential awsIrsaCredential =
+        CredentialFactory.create(
+            AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE, awsIrsaCredentialInfo, expireTime);
+    Assertions.assertEquals(
+        AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE, awsIrsaCredential.credentialType());
+    Assertions.assertInstanceOf(AwsIrsaCredential.class, awsIrsaCredential);
+    AwsIrsaCredential awsIrsaCredential1 = (AwsIrsaCredential) awsIrsaCredential;
+    Assertions.assertEquals("accessKeyId", awsIrsaCredential1.accessKeyId());
+    Assertions.assertEquals("secretAccessKey", awsIrsaCredential1.secretAccessKey());
+    Assertions.assertEquals("token", awsIrsaCredential1.sessionToken());
+    Assertions.assertEquals(expireTime, awsIrsaCredential1.expireTimeInMs());
+  }
+
+  @Test
   void testS3TokenCredential() {
     Map<String, String> s3TokenCredentialInfo =
         ImmutableMap.of(
@@ -189,5 +213,27 @@ public class TestCredentialFactory {
     Assertions.assertEquals(storageAccountName, azureAccountKeyCredential.accountName());
     Assertions.assertEquals(storageAccountKey, azureAccountKeyCredential.accountKey());
     Assertions.assertEquals(expireTime, azureAccountKeyCredential.expireTimeInMs());
+  }
+
+  @Test
+  void testJdbcCredential() {
+    String jdbcUser = "test-user";
+    String jdbcPassword = "test-password";
+    Map<String, String> jdbcCredentialInfo =
+        ImmutableMap.of(
+            JdbcCredential.GRAVITINO_JDBC_USER,
+            jdbcUser,
+            JdbcCredential.GRAVITINO_JDBC_PASSWORD,
+            jdbcPassword);
+    long expireTime = 0;
+    Credential credential =
+        CredentialFactory.create(
+            JdbcCredential.JDBC_CREDENTIAL_TYPE, jdbcCredentialInfo, expireTime);
+    Assertions.assertEquals(JdbcCredential.JDBC_CREDENTIAL_TYPE, credential.credentialType());
+    Assertions.assertInstanceOf(JdbcCredential.class, credential);
+    JdbcCredential jdbcCredential = (JdbcCredential) credential;
+    Assertions.assertEquals(jdbcUser, jdbcCredential.jdbcUser());
+    Assertions.assertEquals(jdbcPassword, jdbcCredential.jdbcPassword());
+    Assertions.assertEquals(expireTime, jdbcCredential.expireTimeInMs());
   }
 }

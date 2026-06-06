@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.OwnerMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.OwnerMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -69,6 +70,15 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().insertOwnerRel(ownerRelPO);
   }
 
+  public static String batchInsertOwnerRels(@Param("ownerRelPOs") List<OwnerRelPO> ownerRelPOs) {
+    return getProvider().batchInsertOwnerRels(ownerRelPOs);
+  }
+
+  public static String batchSoftDeleteOwnerRelByMetadataObjects(
+      @Param("deletions") List<OwnerRelForDeletion> deletions) {
+    return getProvider().batchSoftDeleteOwnerRelByMetadataObjects(deletions);
+  }
+
   public static String softDeleteOwnerRelByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
@@ -89,8 +99,8 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().softDeleteOwnerRelByCatalogId(catalogId);
   }
 
-  public static String softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteOwnerRelBySchemaId(schemaId);
+  public static String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteOwnerRelBySchemaIds(schemaIds);
   }
 
   public static String deleteOwnerMetasByLegacyTimeline(
@@ -111,7 +121,13 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().selectOwnerByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 
-  public static String selectChangedOwners(@Param("updatedAtFrom") long updatedAtFrom) {
-    return getProvider().selectChangedOwners(updatedAtFrom);
+  public static String selectChangedOwners(
+      @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId) {
+    return getProvider().selectChangedOwners(lastConsumedUpdatedAt, lastConsumedUpdatedAtId);
+  }
+
+  public static String selectMaxChangedOwner() {
+    return getProvider().selectMaxChangedOwner();
   }
 }

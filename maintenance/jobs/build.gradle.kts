@@ -31,7 +31,7 @@ repositories {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
-val icebergVersion: String = libs.versions.iceberg4connector.get()
+val icebergVersion: String = libs.versions.iceberg4spark35.get()
 val sparkMajorVersion = "3.5"
 
 dependencies {
@@ -90,6 +90,9 @@ tasks.withType(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
   mergeServiceFiles()
+
+  // Exclude Java 21 multi-release classes to avoid ASM compatibility issues with shadow plugin
+  exclude("META-INF/versions/21/**")
 
   dependencies {
     relocate("com.google", "org.apache.gravitino.shaded.com.google")

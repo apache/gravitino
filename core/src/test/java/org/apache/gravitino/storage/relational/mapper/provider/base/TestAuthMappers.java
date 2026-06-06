@@ -337,6 +337,19 @@ public class TestAuthMappers {
             .withUpdatedAt(0L)
             .build();
     ownerMetaMapper.insertOwnerRel(ownerRelPO);
+    ownerMetaMapper.insertOwnerRel(
+        OwnerRelPO.builder()
+            .withMetalakeId(1L)
+            .withOwnerId(60L)
+            .withOwnerType("USER")
+            .withMetadataObjectId(201L)
+            .withMetadataObjectType("SCHEMA")
+            .withAuditIfo(auditInfo.toString())
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeleteAt(200L)
+            .withUpdatedAt(200L)
+            .build());
 
     // Set updated_at = 100 via direct SQL
     try (SqlSession sqlSession =
@@ -351,15 +364,27 @@ public class TestAuthMappers {
       throw new RuntimeException("Update failed", e);
     }
 
-    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(50L);
-    Assertions.assertEquals(1, changed.size());
+    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(0L, 0L);
+    Assertions.assertEquals(2, changed.size());
     Assertions.assertEquals(200L, changed.get(0).getMetadataObjectId());
     Assertions.assertEquals("SCHEMA", changed.get(0).getMetadataObjectType());
     Assertions.assertEquals(100L, changed.get(0).getUpdatedAt());
+    Assertions.assertEquals(201L, changed.get(1).getMetadataObjectId());
+    Assertions.assertEquals("SCHEMA", changed.get(1).getMetadataObjectType());
+    Assertions.assertEquals(200L, changed.get(1).getUpdatedAt());
 
-    // With the same timestamp, the row is returned again for timestamp-only polling.
-    List<ChangedOwnerInfo> sameTimestamp = ownerMetaMapper.selectChangedOwners(100L);
-    Assertions.assertEquals(1, sameTimestamp.size());
+    // Polling after the last seen tuple should not return the same row again.
+    List<ChangedOwnerInfo> sameTimestamp =
+        ownerMetaMapper.selectChangedOwners(changed.get(1).getUpdatedAt(), changed.get(1).getId());
+    Assertions.assertTrue(sameTimestamp.isEmpty());
+
+    ownerMetaMapper.softDeleteOwnerRelByOwnerIdAndType(60L, "USER");
+    List<ChangedOwnerInfo> softDeleted =
+        ownerMetaMapper.selectChangedOwners(changed.get(1).getUpdatedAt(), changed.get(1).getId());
+    Assertions.assertEquals(1, softDeleted.size());
+    Assertions.assertEquals(200L, softDeleted.get(0).getMetadataObjectId());
+    Assertions.assertEquals("SCHEMA", softDeleted.get(0).getMetadataObjectType());
+    Assertions.assertTrue(softDeleted.get(0).getUpdatedAt() > changed.get(1).getUpdatedAt());
   }
 
   private AuditInfo buildAuditInfo() {
