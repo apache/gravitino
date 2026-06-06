@@ -1,9 +1,9 @@
 ---
-title: "Iceberg compaction policy"
-slug: /iceberg-compaction-policy
+title: "Iceberg Compaction Policy"
+slug: "/iceberg-compaction-policy"
 date: 2026-03-05
-keyword: iceberg, compaction, policy, optimizer, Gravitino
-license: This software is licensed under the Apache License version 2.
+keyword: "iceberg, compaction, policy, optimizer, Gravitino"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 This policy supports `CATALOG`, `SCHEMA`, and `TABLE` metadata objects.
 
-## Policy content
+## Policy Content
 
 The typed content for `system_iceberg_compaction` supports the following fields:
 
@@ -28,7 +28,7 @@ The typed content for `system_iceberg_compaction` supports the following fields:
 | `maxPartitionNum` | No | `50` | Maximum number of partitions selected by optimizer. Must be `> 0`. |
 | `rewriteOptions` | No | `{}` | Additional rewrite options, expanded as `job.options.*` rules. |
 
-## Generated rules and properties
+## Generated Rules and Properties
 
 The policy content is converted to:
 
@@ -41,9 +41,9 @@ The policy content is converted to:
   - `max-partition-num=<maxPartitionNum>`
   - `job.options.<key>=<value>` for each rewrite option
 
-## Parameter tuning guide
+## Parameter Tuning Guide
 
-### Metric unit and threshold formula
+### Metric Unit and Threshold Formula
 
 `custom-data-file-mse` is expected to be in `byte^2`.
 
@@ -59,14 +59,14 @@ Default values use:
 - `ratio = 0.15`
 - `minDataFileMse = 405323966463344`
 
-### Trigger behavior
+### Trigger Behavior
 
 The trigger expression uses `>=`.
 
 - Set `minDeleteFileNumber = 1` to trigger when at least one delete file exists.
 - Set `minDeleteFileNumber > 1` to reduce compaction frequency for delete files.
 
-### Score weights
+### Score Weights
 
 Score is computed as:
 
@@ -76,7 +76,7 @@ Score is computed as:
 - Increase `deleteFileNumberWeight` if you want partitions with more delete files to be prioritized.
 - Keep both weights non-negative.
 
-### Recommended defaults for production start
+### Recommended Defaults for Production Start
 
 - `minDataFileMse = 405323966463344` (computed from 128 MiB and ratio `0.15`)
 - `minDeleteFileNumber = 1`
@@ -90,7 +90,7 @@ Recommended `rewriteOptions`:
 - `min-input-files = 5`
 - `delete-file-threshold = 1`
 
-## Create policy examples
+## Policy Examples
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -128,7 +128,7 @@ Policy policy =
 </TabItem>
 </Tabs>
 
-## Attach policy to metadata objects
+## Attach Policy to Metadata Objects
 
 After the policy is created, associate it with a catalog, schema, or table through standard policy association APIs.
 The optimizer will read the generated rules and properties to evaluate strategy triggering and job submission context.

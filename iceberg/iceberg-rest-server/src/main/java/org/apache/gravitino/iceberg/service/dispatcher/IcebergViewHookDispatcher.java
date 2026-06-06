@@ -53,10 +53,15 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   private static final Logger LOG = LoggerFactory.getLogger(IcebergViewHookDispatcher.class);
 
   private final IcebergViewOperationDispatcher dispatcher;
+  private final IcebergNamespaceOperationDispatcher namespaceDispatcher;
   private final String metalake;
 
-  public IcebergViewHookDispatcher(IcebergViewOperationDispatcher dispatcher, String metalake) {
+  public IcebergViewHookDispatcher(
+      IcebergViewOperationDispatcher dispatcher,
+      IcebergNamespaceOperationDispatcher namespaceDispatcher,
+      String metalake) {
     this.dispatcher = dispatcher;
+    this.namespaceDispatcher = namespaceDispatcher;
     this.metalake = metalake;
   }
 
@@ -76,7 +81,7 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
         namespace,
         createViewRequest.name(),
         context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+        GravitinoEnv.getInstance().internalOwnerDispatcher());
 
     return response;
   }
@@ -101,6 +106,8 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // another node may recreate the same view between the drop above and the
     // EntityStore delete, leaving a stale Gravitino entity if we blindly delete.
     bestEffortReconcileViewEntity(context, viewIdentifier);
+    IcebergOrphanSchemaCleanup.bestEffortCleanUp(
+        metalake, namespaceDispatcher, context, viewIdentifier.namespace());
   }
 
   @Override
@@ -181,7 +188,7 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
    * @param viewName The name of the view.
    */
   private void importView(String catalogName, Namespace namespace, String viewName) {
-    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().viewDispatcher();
+    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
     if (viewDispatcher != null) {
       try {
         viewDispatcher.loadView(

@@ -1,11 +1,11 @@
 ---
 title: "Optimizer Configuration"
-slug: /table-maintenance-service/optimizer-configuration
-keyword: table maintenance, optimizer, configuration, job template, spark
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/optimizer-configuration"
+keyword: "table maintenance, optimizer, configuration, job template, spark"
+license: "This software is licensed under the Apache License version 2."
 ---
 
-## Configuration layers
+## Configuration Layers
 
 Use these layers together:
 
@@ -15,7 +15,7 @@ Use these layers together:
 | Job submission `jobConf` | Per job run | `catalog_name`, `table_identifier`, `spark_*`, template-specific args |
 | Optimizer CLI config | CLI commands | `gravitino.optimizer.*` in `conf/gravitino-optimizer.conf` |
 
-## Server-side configuration
+## Server-side Configuration
 
 Set server-level runtime behavior in `gravitino.conf`.
 
@@ -28,7 +28,7 @@ gravitino.jobExecutor.local.sparkHome=/path/to/spark
 For local demo environments, you can reduce `gravitino.job.statusPullIntervalInMs` (for example
 `10000`) to get faster status updates. Restart Gravitino after changing this value.
 
-## Built-in update stats `jobConf`
+## Built-In Update Stats `jobConf`
 
 Use `builtin-iceberg-update-stats` with at least these keys:
 
@@ -53,7 +53,7 @@ Use `builtin-iceberg-update-stats` with at least these keys:
 `warehouse_location` can be empty for local filesystem testing. Set it to your warehouse URI
 for HDFS or cloud object storage environments.
 
-## Strategy submission configuration
+## Strategy Submission Configuration
 
 `submit-strategy-jobs` needs optimizer CLI config. This is a minimal working example:
 
@@ -81,7 +81,7 @@ gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","
 
 `--strategy-name` must be the policy name, for example `iceberg_compaction_default`.
 
-## Local filesystem note
+## Local Filesystem
 
 If your environment is local and not HDFS-based, set:
 
@@ -91,14 +91,14 @@ spark.hadoop.fs.defaultFS=file:///
 
 Without this, Spark jobs may try `hdfs://localhost:9000` and fail.
 
-## Recommended validation checklist
+## Validation Checklist
 
 - Job templates exist: `builtin-iceberg-update-stats`, `builtin-iceberg-rewrite-data-files`.
 - Policies are attached to target tables.
 - `submit-strategy-jobs` prints `SUBMIT` lines.
 - Rewrite logs show `Rewritten data files: <N>` where `N > 0` for non-empty tables.
 
-## Related docs
+## Related
 
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Extension Guide](./optimizer-extension-guide.md)

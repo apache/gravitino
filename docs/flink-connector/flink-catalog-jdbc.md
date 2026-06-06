@@ -1,15 +1,17 @@
 ---
-title: "Flink connector jdbc catalog"
-slug: /flink-connector/flink-catalog-jdbc
-keyword: flink connector jdbc catalog
+title: "Flink Connector: JDBC Catalog"
+slug: "/flink-connector/flink-catalog-jdbc"
+keyword: "flink connector jdbc catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 This document provides a comprehensive guide on configuring and using Apache Gravitino Flink connector to access the JDBC catalog managed by the Gravitino server.
 
 ## Capabilities
 
-### Supported JDBC Types
+### JDBC Types
 
 * MYSQL
 
@@ -121,7 +123,7 @@ SELECT * FROM jdbc_table_a;
      
 ```
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink JDBC connector configuration.
 

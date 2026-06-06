@@ -1,11 +1,11 @@
 ---
-title: "Apache Gravitino Trino connector Authentication"
-slug: /trino-connector/authentication
-keyword: gravitino connector trino authentication
+title: "Trino Connector Authentication"
+slug: "/trino-connector/authentication"
+keyword: "gravitino connector trino authentication"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Authentication
+## Introduction
 
 The Gravitino Trino connector supports authenticating to the Gravitino server using the same authentication mechanisms as the Gravitino Java client: Simple, OAuth2, and Kerberos. Authentication is configured through the Trino connector properties file using the `gravitino.client.*` prefix.
 
@@ -89,7 +89,7 @@ gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
 | `gravitino.client.kerberos.keytabFilePath` | Path to keytab file | (none)        | No (uses ticket cache if not specified) | 1.3.0         |
 
 
-### Example: Connecting to OAuth-protected Gravitino Server
+### Example: Connecting to OAuth-Protected Gravitino Server
 
 This example shows how to configure the Trino connector to connect to a Gravitino server protected by OAuth authentication.
 

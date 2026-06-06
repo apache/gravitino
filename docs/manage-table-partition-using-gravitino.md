@@ -1,9 +1,9 @@
 ---
-title: "Manage table partition using Apache Gravitino"
-slug: /manage-table-partition-using-gravitino
+title: "Manage Table Partitions"
+slug: "/manage-table-partition-using-gravitino"
 date: 2024-02-03
-keyword: table partition management
-license: This software is licensed under the Apache License version 2.
+keyword: "table partition management"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -13,13 +13,13 @@ import TabItem from '@theme/TabItem';
 
 Although many catalogs inherently manage partitions automatically, there are scenarios where manual partition management is necessary. Usage scenarios like managing the TTL (Time-To-Live) of partition data, gathering statistics on partition metadata, and optimizing queries through partition pruning. For these reasons, Apache Gravitino provides capabilities of partition management.
 
-### Requirements and limitations
+### Requirements and Limitations
 
-- Partition management is based on the partitioned table, so please ensure that you are operating on a partitioned table.
+- Partition management is based on the partitioned table, so ensure you are operating on a partitioned table.
 
 The following table shows the partition operations supported across various catalogs in Gravitino:
 
-| Operation             | Hive catalog | Iceberg catalog | Jdbc-Mysql catalog | Jdbc-PostgreSQL catalog | Jdbc-Doris catalog |
+| Operation             | Hive catalog | Iceberg catalog | Jdbc-MySQL catalog | Jdbc-PostgreSQL catalog | Jdbc-Doris catalog |
 |-----------------------|--------------|-----------------|--------------------|-------------------------|--------------------|
 | Add Partition         | &#10004;     | &#10008;        | &#10008;           | &#10008;                | &#10004;           |
 | Get Partition by Name | &#10004;     | &#10008;        | &#10008;           | &#10008;                | &#10004;           |
@@ -28,20 +28,20 @@ The following table shows the partition operations supported across various cata
 | Drop Partition        | &#10004;     | &#10008;        | &#10008;           | &#10008;                | &#10004;           | 
 
 :::tip[WELCOME FEEDBACK]
-If you need additional partition management support for a specific catalog, please feel free to [create an issue](https://github.com/apache/gravitino/issues/new/choose) on the [Gravitino repository](https://github.com/apache/gravitino).
+If you need additional partition management support for a specific catalog, [create an issue](https://github.com/apache/gravitino/issues/new/choose) on the [Gravitino repository](https://github.com/apache/gravitino).
 :::
 
-## Partition operations
+## Partition Operations
 
-### Add partition
+### Add Partition
 
-You must match the partition types you want to add with the table's [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning) types; Gravitino currently supports adding the following partition types:
+Match the partition types you want to add with the table's [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning) types; Gravitino supports adding the following partition types:
 
 | Partition Type | Description                                                                                                                                    |
 |----------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| identity       | An identity partition represents a result of identity [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning). |
-| range          | A range partition represents a result of range [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).        |
-| list           | A list partition represents a result of list [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).          |
+| identity       | An identity partition represents a result of identity [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning). |
+| range          | A range partition represents a result of range [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning).        |
+| list           | A list partition represents a result of list [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning).          |
 
 For JSON examples:
 
@@ -138,7 +138,7 @@ When adding an identity partition to a partitioned Hive table, the specified par
 ```
 
 :::note
-Each list in the lists must have the same length. The values in each list must correspond to the field definitions in the list [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).
+Each list in the lists must have the same length. The values in each list must correspond to the field definitions in the list [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning).
 :::
 
 </TabItem>
@@ -200,13 +200,13 @@ Partition partition =
 ```
 
 :::note
-Each list in the lists must have the same length. The values in each list must correspond to the field definitions in the list [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).
+Each list in the lists must have the same length. The values in each list must correspond to the field definitions in the list [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning).
 :::
 
 </TabItem>
 </Tabs>
 
-You can add a partition to a partitioned table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
+Add a partition to a partitioned table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
 The following is an example of adding an identity partition to a Hive partitioned table:
 
 <Tabs groupId='language' queryString>
@@ -270,9 +270,9 @@ Partition addedPartition =
 </TabItem>
 </Tabs>
 
-### Get a partition by name
+### Get a Partition by Name
 
-You can get a partition by its name via sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
+Get a partition by its name via sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
 The following is an example of getting a partition by its name:
 
 <Tabs groupId='language' queryString>
@@ -310,9 +310,9 @@ Partition Partition =
 </TabItem>
 </Tabs>
 
-### List partition names under a partitioned table
+### List Partition Names Under a Partitioned Table
 
-You can list all partition names under a partitioned table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
+List all partition names under a partitioned table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
 The following is an example of listing all the partition names under a partitioned table:
 
 <Tabs groupId='language' queryString>
@@ -346,7 +346,7 @@ String[] partitionNames =
 </TabItem>
 </Tabs>
 
-### List partitions under a partitioned table
+### List Partitions Under a Partitioned Table
 
 If you want to get more detailed information about the partitions under a partitioned table, you can list all partitions under a partitioned table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
 The following is an example of listing all the partitions under a partitioned table:
@@ -377,9 +377,9 @@ Partition[] partitions =
 </TabItem>
 </Tabs>
 
-### Drop a partition by name
+### Drop a Partition by Name
 
-You can drop a partition by its name via sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
+Drop a partition by its name via sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
 The following is an example of dropping a partition by its name:
 
 <Tabs groupId='language' queryString>

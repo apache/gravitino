@@ -1,9 +1,9 @@
 ---
-title: "Manage statistics in Gravitino"
-slug: /manage-statistics-in-gravitino
+title: "Manage Statistics"
+slug: "/manage-statistics-in-gravitino"
 date: 2025-08-21
-keyword: statistics management, statistics, statistic, Gravitino
-license: This software is licensed under the Apache License version 2.
+keyword: "statistics management, statistics, statistic, Gravitino"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -14,7 +14,7 @@ import TabItem from '@theme/TabItem';
 Starting from 1.0.0, Gravitino introduces statistics of tables and partitions.
 
 This document provides a brief introduction using both Gravitino Java client and
-REST APIs. If you want to know more about the statistics system in Gravitino, please refer to the
+REST APIs. If you want to know more about the statistics system in Gravitino, refer to the
 Javadoc and REST API documentation.
 
 Statistics only support the custom statistics, which names must start with `custom-`.
@@ -23,22 +23,22 @@ Gravitino will support built-in statistics in the future.
 The query engine uses statistics for cost-based optimization (CBO). Meanwhile, statistics can also
 be used for metadata action systems to trigger some jobs, such as compaction, data archiving, etc.
 
-You can create statistics. And then you can create policies based on statistics. Users can analyze the statistics
+Create statistics. And then you can create policies based on statistics. Users can analyze the statistics
 and policies to decide the next action. For example,
 you can create a statistic named `custom-tableLastModifiedTime` to record the last modified time of a table.
 Then you can create a policy to check if the table hasn't been modified for a long time, and archive the table data to
 cold storage.
 
-Currently, Gravitino doesn't handle the computation of the statistics, you need to compute the statistics
+Gravitino doesn't handle the computation of the statistics, you need to compute the statistics
 and update them to Gravitino. Gravitino can't judge the expiration of the statistics, 
-You need to ensure the statistics are up-to-date.
+Ensure the statistics are up-to-date.
 
 
-## Metadata object statistic operations
+## Metadata Object Statistic Operations
 
-### Update statistics of metadata objects
+### Update Statistics of Metadata Objects
 
-You can update the statistics of a metadata object by providing the statistics key and value.
+Update the statistics of a metadata object by providing the statistics key and value.
 Now only table statistics can be updated.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics`.
@@ -69,9 +69,9 @@ table.updateStatistics(updateStatistics);
 </TabItem>
 </Tabs>
 
-### List statistics of metadata objects
+### List Statistics of Metadata Objects
 
-You can list all the statistics of a metadata object.
+List all the statistics of a metadata object.
 Now only table statistics can be listed.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics`.
@@ -96,9 +96,9 @@ table.listStatistics();
 </TabItem>
 </Tabs>
 
-### Drop statistics of metadata objects
+### Drop Statistics of Metadata Objects
 
-You can drop the statistics of a metadata object by providing the statistics keys.
+Drop the statistics of a metadata object by providing the statistics keys.
 Now only table statistics can be dropped.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics`.
@@ -125,11 +125,11 @@ table.dropStatistics(statisticsToDrop);
 </TabItem>
 </Tabs>
 
-### Partition statistics operations
+### Partition Statistics Operations
 
-### Update statistics of partitions
+### Update Statistics of Partitions
 
-You can update the statistics of a partition by providing the statistics key and value. If the statistics
+Update the statistics of a partition by providing the statistics key and value. If the statistics
 already exist, it will be updated; otherwise, a new statistic will be created.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
@@ -166,10 +166,10 @@ table.updatePartitionStatistics(statisticsToUpdate);
 </Tabs>
 
 
-### List statistics of partitions
+### List Statistics of Partitions
 
-You can list the statistics of specified partitions.
-You can specify a range of partitions by providing the `from` and `to` parameters,
+List the statistics of specified partitions.
+Specify a range of partitions by providing the `from` and `to` parameters,
 and whether the range is inclusive using `fromInclusive` and `toInclusive` parameters.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
@@ -196,9 +196,9 @@ table.listPartitionStatistics(range);
 </Tabs>
 
 
-### Drop statistics of partitions
+### Drop Statistics of Partitions
 
-You can drop the statistics of specified partitions by providing the statistics keys.
+Drop the statistics of specified partitions by providing the statistics keys.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
 
@@ -232,7 +232,7 @@ table.dropPartitionStatistics(statisticsToDrop);
 </Tabs>
 
 
-### Server configuration
+### Server Configuration
 
 | Configuration item                              | Description                                                                                                                                                                                                                          | Default value                                                            | Required  | Since version |
 |-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|-----------|---------------|
@@ -328,9 +328,9 @@ gravitino.stats.partition.storageFactoryClass = org.apache.gravitino.stats.stora
 gravitino.stats.partition.storageOption.location = /data/lance
 ```
 
-### Implement a custom partition storage
+### Implement a Custom Partition Storage
 
-You can implement a custom partition storage by implementing the interface `org.apache.gravitino.stats.storage.PartitionStatisticStorageFactory` and
+Implement a custom partition storage by implementing the interface `org.apache.gravitino.stats.storage.PartitionStatisticStorageFactory` and
 setting the configuration item `gravitino.stats.partition.storageFactoryClass` to your class name.
 
 For example:

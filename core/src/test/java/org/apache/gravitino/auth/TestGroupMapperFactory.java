@@ -49,7 +49,7 @@ public class TestGroupMapperFactory {
 
     assertEquals(2, mappedGroups.size());
     List<String> groupNames =
-        mappedGroups.stream().map(UserGroup::getGroupname).collect(Collectors.toList());
+        mappedGroups.stream().map(UserGroup::getGroupName).collect(Collectors.toList());
     assertTrue(groupNames.contains("admin"));
     assertTrue(groupNames.contains("user"));
   }
@@ -66,7 +66,7 @@ public class TestGroupMapperFactory {
 
     assertEquals(2, mappedGroups.size());
     List<String> groupNames =
-        mappedGroups.stream().map(UserGroup::getGroupname).collect(Collectors.toList());
+        mappedGroups.stream().map(UserGroup::getGroupName).collect(Collectors.toList());
     assertTrue(groupNames.contains("admin"));
     assertTrue(groupNames.contains("user"));
   }
@@ -83,7 +83,7 @@ public class TestGroupMapperFactory {
 
     assertEquals(2, mappedGroups.size());
     List<String> groupNames =
-        mappedGroups.stream().map(UserGroup::getGroupname).collect(Collectors.toList());
+        mappedGroups.stream().map(UserGroup::getGroupName).collect(Collectors.toList());
     assertTrue(groupNames.contains("admin"));
     assertTrue(groupNames.contains("user"));
   }
@@ -136,7 +136,7 @@ public class TestGroupMapperFactory {
     List<UserGroup> mappedGroups = mapper.map(groups);
 
     assertEquals(1, mappedGroups.size());
-    assertEquals("custom:foo", mappedGroups.get(0).getGroupname());
+    assertEquals("custom:foo", mappedGroups.get(0).getGroupName());
   }
 
   @Test
