@@ -21,6 +21,7 @@ package org.apache.gravitino.connector;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.IOException;
@@ -85,6 +86,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private volatile Capability capability;
 
   private volatile Map<String, String> properties;
+
+  private volatile Map<String, String> credentialProps;
 
   private volatile CatalogCredentialManager catalogCredentialManager;
 
@@ -495,6 +498,31 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
       credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
     }
+  }
+
+  /**
+   * Returns only the credential (hidden) properties of this catalog. Unlike {@link #properties()},
+   * this method returns the properties whose {@link PropertyEntry} has {@code hidden=true}. These
+   * are intentionally excluded from the public catalog-info response so that sensitive values such
+   * as passwords and secret keys are not exposed to end-users, but they can be fetched by
+   * privileged engine connectors through a dedicated credentials endpoint.
+   *
+   * @return an immutable map of credential property key-value pairs.
+   */
+  public Map<String, String> credentialProperties() {
+    if (credentialProps == null) {
+      synchronized (this) {
+        if (credentialProps == null) {
+          Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
+          credentialProps =
+              ImmutableMap.copyOf(
+                  Maps.filterKeys(
+                      entity.getProperties(),
+                      key -> catalogPropertiesMetadata().isHiddenProperty(key)));
+        }
+      }
+    }
+    return credentialProps;
   }
 
   @Override

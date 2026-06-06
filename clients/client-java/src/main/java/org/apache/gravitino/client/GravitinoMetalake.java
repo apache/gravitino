@@ -73,6 +73,7 @@ import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
 import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
+import org.apache.gravitino.dto.responses.CatalogCredentialsResponse;
 import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -233,6 +234,31 @@ public class GravitinoMetalake extends MetalakeDTO
     resp.validate();
 
     return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
+  }
+
+  /**
+   * Returns the credential (sensitive) properties of the specified catalog. These are the
+   * properties marked as hidden in the catalog's metadata — e.g. {@code jdbc-password}, S3 secret
+   * keys — which are intentionally omitted from the standard {@link #loadCatalog(String)} response.
+   * Engine connectors (Trino, Spark) use this method to obtain credentials needed for data plane
+   * access.
+   *
+   * @param catalogName The name of the catalog.
+   * @return A map of credential property key-value pairs.
+   * @throws NoSuchCatalogException if the catalog does not exist.
+   */
+  public Map<String, String> loadCatalogCredentials(String catalogName)
+      throws NoSuchCatalogException {
+    CatalogCredentialsResponse resp =
+        restClient.get(
+            String.format(
+                "api/metalakes/%s/catalogs/%s/credentials",
+                RESTUtils.encodeString(this.name()), RESTUtils.encodeString(catalogName)),
+            CatalogCredentialsResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+    resp.validate();
+    return resp.getCredentials();
   }
 
   /**

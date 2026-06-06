@@ -165,6 +165,21 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
+   * Returns the credential (sensitive) properties of the specified catalog. These are the
+   * properties intentionally omitted from the standard {@link #loadCatalog(String)} response — e.g.
+   * {@code jdbc-password}, cloud storage secret keys. Engine connectors that need these values must
+   * call this method explicitly.
+   *
+   * @param catalogName The name of the catalog.
+   * @return A map of credential property key-value pairs.
+   * @throws NoSuchCatalogException if the catalog does not exist.
+   */
+  public Map<String, String> loadCatalogCredentials(String catalogName)
+      throws NoSuchCatalogException {
+    return getMetalake().loadCatalogCredentials(catalogName);
+  }
+
+  /**
    * Adds a new User.
    *
    * @param user The name of the User.

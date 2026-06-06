@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.trino.spi.TrinoException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -66,6 +67,28 @@ public class GravitinoCatalog {
     this.provider = catalog.provider();
     this.name = catalog.name();
     this.properties = catalog.properties();
+    Instant time =
+        catalog.auditInfo().lastModifiedTime() == null
+            ? catalog.auditInfo().createTime()
+            : catalog.auditInfo().lastModifiedTime();
+    lastModifiedTime = time.toEpochMilli();
+  }
+
+  /**
+   * Constructs a new GravitinoCatalog with the specified metalake, catalog, and extra properties
+   * merged in. Useful when credential properties must be supplied alongside catalog properties.
+   *
+   * @param metalake the name of the metalake
+   * @param catalog the catalog
+   * @param extraProps additional properties to merge into the catalog properties (e.g. credentials)
+   */
+  public GravitinoCatalog(String metalake, Catalog catalog, Map<String, String> extraProps) {
+    this.metalake = metalake;
+    this.provider = catalog.provider();
+    this.name = catalog.name();
+    Map<String, String> merged = new HashMap<>(catalog.properties());
+    merged.putAll(extraProps);
+    this.properties = merged;
     Instant time =
         catalog.auditInfo().lastModifiedTime() == null
             ? catalog.auditInfo().createTime()

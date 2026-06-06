@@ -501,6 +501,20 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         });
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public Map<String, String> getCatalogCredentials(NameIdentifier ident)
+      throws NoSuchCatalogException {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog();
+          baseCatalog.checkMetalakeInUse();
+          return baseCatalog.credentialProperties();
+        });
+  }
+
   /**
    * Creates a new catalog with the provided details.
    *

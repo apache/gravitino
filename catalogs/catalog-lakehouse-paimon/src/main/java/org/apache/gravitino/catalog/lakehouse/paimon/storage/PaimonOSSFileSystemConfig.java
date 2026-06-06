@@ -100,6 +100,6 @@ public class PaimonOSSFileSystemConfig extends Config {
                   "The secret key of the Aliyun oss",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .build();
 }

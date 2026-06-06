@@ -18,10 +18,16 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +37,7 @@ public class TestIcebergCatalogPropertiesMetadata {
   private IcebergCatalogPropertiesMetadata metadata;
 
   @BeforeEach
-  void setUp() {
+  public void setUp() {
     metadata = new IcebergCatalogPropertiesMetadata();
   }
 
@@ -71,5 +77,32 @@ public class TestIcebergCatalogPropertiesMetadata {
     Assertions.assertEquals(
         IcebergConfig.TABLE_METADATA_CACHE_CAPACITY.getDefaultValue(),
         metadata.getOrDefault(catalogProperties, IcebergConstants.TABLE_METADATA_CACHE_CAPACITY));
+  }
+
+  @Test
+  public void testJdbcPasswordIsHidden() {
+    assertTrue(metadata.isHiddenProperty(IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD));
+  }
+
+  @Test
+  public void testS3SecretAccessKeyIsHidden() {
+    assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  public void testOssAccessKeySecretIsHidden() {
+    assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
+  }
+
+  @Test
+  public void testAzureStorageAccountKeyIsHidden() {
+    assertTrue(metadata.isHiddenProperty(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
+  }
+
+  @Test
+  public void testNonSecretPropertiesAreNotHidden() {
+    assertFalse(metadata.isHiddenProperty(IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER));
+    assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
   }
 }
