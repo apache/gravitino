@@ -72,4 +72,72 @@ public class TestIcebergCatalogPropertiesMetadata {
         IcebergConfig.TABLE_METADATA_CACHE_CAPACITY.getDefaultValue(),
         metadata.getOrDefault(catalogProperties, IcebergConstants.TABLE_METADATA_CACHE_CAPACITY));
   }
+
+  @Test
+  void testRESTCatalogBackendClientTimeoutDefaultValues() {
+    Assertions.assertEquals(
+        IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS.getDefaultValue(),
+        metadata.getDefaultValue(
+            IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS.getDefaultValue(),
+        metadata.getDefaultValue(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testRESTCatalogBackendClientTimeoutsViaGetOrDefault() {
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(
+            IcebergCatalogPropertiesMetadata.CATALOG_BACKEND,
+            "rest",
+            IcebergCatalogPropertiesMetadata.URI,
+            "http://127.0.0.1:9001/iceberg");
+
+    Assertions.assertEquals(
+        IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS.getDefaultValue(),
+        metadata.getOrDefault(
+            catalogProperties, IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS.getDefaultValue(),
+        metadata.getOrDefault(
+            catalogProperties, IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
+
+    catalogProperties =
+        ImmutableMap.of(
+            IcebergCatalogPropertiesMetadata.CATALOG_BACKEND,
+            "rest",
+            IcebergCatalogPropertiesMetadata.URI,
+            "http://127.0.0.1:9001/iceberg",
+            IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS,
+            "1234",
+            IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS,
+            "5678");
+
+    Assertions.assertEquals(
+        1234,
+        metadata.getOrDefault(
+            catalogProperties, IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        5678,
+        metadata.getOrDefault(
+            catalogProperties, IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testRESTCatalogBackendClientTimeoutPropertiesAreTransformed() {
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(
+            IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS,
+            "1234",
+            IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS,
+            "5678");
+
+    Map<String, String> transformedProperties = metadata.transformProperties(catalogProperties);
+
+    Assertions.assertEquals(
+        "1234",
+        transformedProperties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "5678", transformedProperties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
 }

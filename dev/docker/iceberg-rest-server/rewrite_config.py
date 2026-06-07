@@ -29,6 +29,8 @@ env_map = {
     "GRAVITINO_ICEBERG_REST_JDBC_USER": "jdbc-user",
     "GRAVITINO_ICEBERG_REST_JDBC_PASSWORD": "jdbc-password",
     "GRAVITINO_ICEBERG_REST_WAREHOUSE": "warehouse",
+    "GRAVITINO_ICEBERG_REST_REST_CLIENT_CONNECTION_TIMEOUT_MS": "rest-client-connection-timeout-ms",
+    "GRAVITINO_ICEBERG_REST_REST_CLIENT_SOCKET_TIMEOUT_MS": "rest-client-socket-timeout-ms",
     # Credentials
     "GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS": "credential-providers",
     # GCS

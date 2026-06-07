@@ -549,17 +549,15 @@ public class TestCatalogWrapperForREST {
     RESTCatalog restCatalog = mock(RESTCatalog.class);
     when(restCatalog.properties())
         .thenReturn(
-            ImmutableMap.of(
-                IcebergConstants.URI,
-                "http://merged-from-remote-config:9999",
-                IcebergConstants.IO_IMPL,
-                "org.apache.iceberg.aws.s3.S3FileIO",
-                IcebergConstants.ICEBERG_S3_ENDPOINT,
-                "http://localhost:9000",
-                IcebergConstants.ICEBERG_ACCESS_DELEGATION,
-                "vended-credentials",
-                IcebergConstants.WAREHOUSE,
-                "s3://remote/warehouse"));
+            ImmutableMap.<String, String>builder()
+                .put(IcebergConstants.URI, "http://merged-from-remote-config:9999")
+                .put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO")
+                .put(IcebergConstants.ICEBERG_S3_ENDPOINT, "http://localhost:9000")
+                .put(IcebergConstants.ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+                .put(IcebergConstants.WAREHOUSE, "s3://remote/warehouse")
+                .put(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS, "10000")
+                .put(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS, "60000")
+                .build());
 
     // FederatedCatalogWrapper sources the client config from the remote RESTCatalog's properties().
     CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, restCatalog);
@@ -571,6 +569,10 @@ public class TestCatalogWrapperForREST {
         "http://localhost:9000", configToClients.get(IcebergConstants.ICEBERG_S3_ENDPOINT));
     Assertions.assertEquals(
         "vended-credentials", configToClients.get(IcebergConstants.ICEBERG_ACCESS_DELEGATION));
+    Assertions.assertFalse(
+        configToClients.containsKey(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertFalse(
+        configToClients.containsKey(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
   }
 
   @Test
