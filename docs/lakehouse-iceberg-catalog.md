@@ -71,11 +71,13 @@ If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to tr
 
 For the REST catalog backend, `warehouse` identifies the catalog in the Iceberg REST spec. In the Gravitino Iceberg REST server, `warehouse` maps to the catalog name. An empty value means the default catalog.
 
-`data-access` controls how the Iceberg REST client accesses table data when using a REST backend:
+The following properties tune REST backend behavior:
 
-| Property name  | Description                                                                                                             | Default value | Required | Since Version |
-|----------------|-------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `data-access`  | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`.              | (none)        | No       | 1.3.0         |
+| Property name                         | Description                                                                                                | Default value | Required | Since Version |
+|---------------------------------------|------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `data-access`                         | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`. | (none)        | No       | 1.3.0         |
+| `rest-client-connection-timeout-ms`   | The HTTP connection timeout in milliseconds for requests to the REST catalog backend.                      | 10000         | No       | 1.3.0         |
+| `rest-client-socket-timeout-ms`       | The HTTP socket timeout in milliseconds for requests to the REST catalog backend.                          | 60000         | No       | 1.3.0         |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.
@@ -92,6 +94,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "catalog-backend": "rest",
     "uri": "http://localhost:9001/iceberg",
+    "rest-client-connection-timeout-ms": "10000",
+    "rest-client-socket-timeout-ms": "60000",
     "data-access": "vended-credentials"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
