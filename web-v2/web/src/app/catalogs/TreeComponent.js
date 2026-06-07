@@ -231,6 +231,22 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
               )}
             </span>
           )
+        case 'custom-icons-glue':
+          return (
+            <span
+              role='img'
+              className='anticon'
+              onMouseEnter={e => onMouseEnter(e, catalog)}
+              onMouseLeave={e => onMouseLeave(e, catalog)}
+              onClick={e => handleClickIcon(e, catalog)}
+            >
+              {isHover !== key ? (
+                <Icons.glue className='size-4'></Icons.glue>
+              ) : (
+                <Icons.RotateCw className='h-4 w-3'></Icons.RotateCw>
+              )}
+            </span>
+          )
       }
     } else {
       return (
