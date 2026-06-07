@@ -25,6 +25,7 @@ import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -251,18 +252,14 @@ public class GravitinoCatalogManager {
       String gravitinoUri, Map<String, String> config) {
     String username = config.get(GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME);
     String password = config.get(GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD);
-    if (Strings.isNullOrEmpty(username)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Basic username is required. Please set %s",
-              GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME));
-    }
-    if (Strings.isNullOrEmpty(password)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Basic password is required. Please set %s",
-              GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD));
-    }
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(username),
+        "Basic username is required. Please set %s",
+        GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(password),
+        "Basic password is required. Please set %s",
+        GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD);
 
     Set<String> basicConfigKeys =
         Sets.newHashSet(

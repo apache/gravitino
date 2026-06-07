@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.security;
 
+import com.google.common.base.Preconditions;
 import io.trino.spi.connector.ConnectorSession;
 import java.io.File;
 import java.util.Locale;
@@ -249,14 +250,14 @@ public class GravitinoAuthProvider {
       GravitinoAdminClient.AdminClientBuilder builder, Map<String, String> config) {
     String username = config.get(BASIC_USERNAME_KEY);
     String password = config.get(BASIC_PASSWORD_KEY);
-    if (StringUtils.isBlank(username)) {
-      throw new IllegalArgumentException(
-          String.format("Basic username is required. Please set %s", BASIC_USERNAME_KEY));
-    }
-    if (StringUtils.isBlank(password)) {
-      throw new IllegalArgumentException(
-          String.format("Basic password is required. Please set %s", BASIC_PASSWORD_KEY));
-    }
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(username),
+        "Basic username is required. Please set %s",
+        BASIC_USERNAME_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(password),
+        "Basic password is required. Please set %s",
+        BASIC_PASSWORD_KEY);
     builder.withBasicAuth(username, password);
   }
 
