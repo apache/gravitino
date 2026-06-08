@@ -158,13 +158,13 @@ export const tableDefaultProps = {
     },
     {
       key: 'format',
-      defaultValue: '',
+      defaultValue: 'PARQUET',
       hide: ['iceberg'],
       select: ['TEXTFILE', 'SEQUENCEFILE', 'RCFILE', 'ORC', 'PARQUET', 'AVRO', 'JSON', 'CSV', 'REGEX']
     },
     {
       key: 'input-format',
-      defaultValue: 'org.apache.hadoop.mapred.TextInputFormat',
+      defaultValue: 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat',
       hide: ['iceberg'],
       defaultValueOptions: {
         TEXTFILE: 'org.apache.hadoop.mapred.TextInputFormat',
@@ -180,7 +180,7 @@ export const tableDefaultProps = {
     },
     {
       key: 'output-format',
-      defaultValue: 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+      defaultValue: 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat',
       hide: ['iceberg'],
       defaultValueOptions: {
         TEXTFILE: 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
@@ -196,7 +196,7 @@ export const tableDefaultProps = {
     },
     {
       key: 'serde-lib',
-      defaultValue: 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+      defaultValue: 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe',
       hide: ['iceberg'],
       defaultValueOptions: {
         TEXTFILE: 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
