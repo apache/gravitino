@@ -135,7 +135,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       throws RuntimeException {
     this.glueClient = GlueClientProvider.buildClient(config);
     String rawCatalogId = config.get(GlueConstants.AWS_GLUE_CATALOG_ID);
-    this.catalogId = (rawCatalogId != null && !rawCatalogId.isEmpty()) ? rawCatalogId : null;
+    this.catalogId = StringUtils.isNotBlank(rawCatalogId) ? rawCatalogId : null;
     this.defaultTableFormat =
         config.getOrDefault(
             GlueConstants.DEFAULT_TABLE_FORMAT, GlueConstants.DEFAULT_TABLE_FORMAT_VALUE);
