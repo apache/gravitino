@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
   id("java")
 }
@@ -44,12 +46,33 @@ dependencies {
 
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
-  testImplementation(libs.bundles.jwt)
+  // jjwt is resolved to 0.13.x on this module's test classpath (Trino forces it up). Only pull
+  // api + impl; the JSON serializer comes from jjwt-jackson:0.13.x which Trino already provides.
+  // Do NOT pull jjwt-gson:0.11.x (the bundle's default) — its stale 0.11.x serializer service is
+  // incompatible with the 0.13.x runtime and makes signWith().compact() fail.
+  testImplementation(libs.jwt.api)
+  testRuntimeOnly(libs.jwt.impl)
   testImplementation(libs.guava)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.slf4j.api)
-  testImplementation(platform("org.junit:junit-bom:5.9.1"))
+  // Trino 478's test stack forces JUnit to 6.0.0; pin the BOM to match so the platform launcher,
+  // engine and commons jars stay on the same version (a mismatch makes Gradle's TagFilter crash
+  // with NoSuchMethodError on CollectionUtils.toUnmodifiableList).
+  testImplementation(platform("org.junit:junit-bom:6.0.0"))
   testImplementation("org.junit.jupiter:junit-jupiter")
+  testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.withType<JavaCompile>().configureEach {
+  // Error Prone (2.10.0) is incompatible with the JDK 24 toolchain required by this Trino range.
+  options.errorprone.isEnabled.set(false)
+}
+
+tasks.withType<Test>().configureEach {
+  // JaCoCo 0.8.9 cannot instrument classes compiled for the JDK 24 toolchain used here.
+  extensions
+    .findByType(org.gradle.testing.jacoco.plugins.JacocoTaskExtension::class.java)
+    ?.isEnabled = false
 }
 
 tasks.test {
