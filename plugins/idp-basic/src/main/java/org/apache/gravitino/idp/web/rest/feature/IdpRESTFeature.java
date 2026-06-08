@@ -28,6 +28,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
+import org.apache.gravitino.idp.config.IdpConfigurationValidator;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
 import org.apache.gravitino.idp.web.rest.IdpGroupOperations;
@@ -59,6 +60,7 @@ public class IdpRESTFeature implements Feature {
   public boolean configure(FeatureContext context) {
     GravitinoEnv env = GravitinoEnv.getInstance();
     Config config = env.config();
+    IdpConfigurationValidator.validate(config);
     registerBasicAuthenticator(config);
 
     try {
