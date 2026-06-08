@@ -561,12 +561,16 @@ public class LanceTableOperations extends ManagedTableOperations {
                 Map<String, String> updatedProperties = new HashMap<>(current.properties());
                 updatedProperties.put(
                     LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
+                // Always use an empty column list: the dataset is confirmed empty at this version.
+                // Using current.columns() would preserve stale columns when the dataset schema was
+                // cleared externally, causing future VERSION_CHECK loads to return stale metadata
+                // permanently (the version sentinel would match but columns would be wrong).
                 return TableEntity.builder()
                     .withId(current.id())
                     .withName(current.name())
                     .withNamespace(current.namespace())
                     .withComment(current.comment())
-                    .withColumns(current.columns())
+                    .withColumns(List.of())
                     .withProperties(updatedProperties)
                     .withPartitioning(current.partitioning())
                     .withDistribution(current.distribution())
