@@ -1145,6 +1145,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @return The resolved properties.
    */
   private Map<String, String> getResolvedProperties(CatalogEntity entity) {
+    CatalogWrapper cachedWrapper = catalogCache.getIfPresent(entity.nameIdentifier());
+    if (cachedWrapper != null) {
+      BaseCatalog<?> cachedCatalog = cachedWrapper.catalog();
+      if (cachedCatalog != null && entity.equals(cachedCatalog.entity())) {
+        return cachedCatalog.properties();
+      }
+    }
+
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
