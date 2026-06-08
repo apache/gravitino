@@ -44,9 +44,13 @@ tests:
       - equal:
           path: spec.template.spec.serviceAccountName
           value: default
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
+<<<<<<< HEAD
           value: apache/gravitino-lance-rest:1.3.0-SNAPSHOT
+=======
+          pattern: "^apache/gravitino-lance-rest:.+"
+>>>>>>> 3b1249548 ([MINOR] fix(helm): Remove hardcoded version in chart unit tests (#11494))
       - contains:
           path: spec.template.spec.containers[0].env
           content:
