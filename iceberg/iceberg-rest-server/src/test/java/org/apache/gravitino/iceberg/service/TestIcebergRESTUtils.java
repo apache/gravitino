@@ -45,6 +45,8 @@ import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.types.Types.IntegerType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
@@ -317,5 +319,35 @@ public class TestIcebergRESTUtils {
             .config();
 
     Assertions.assertFalse(config.containsKey("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testRewriteTableCredentials() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    LoadCredentialsResponse upstream =
+        ImmutableLoadCredentialsResponse.builder()
+            .addCredentials(
+                IcebergRESTUtils.toRESTCredential(
+                    "s3://bucket/db/tbl/",
+                    ImmutableMap.of(
+                        "s3.session-token",
+                        "upstream-token",
+                        "s3.session-token-expires-at-ms",
+                        "123",
+                        "client.refresh-credentials-endpoint",
+                        "v1/upstream/namespaces/db/tables/tbl/credentials")))
+            .build();
+
+    LoadCredentialsResponse rewritten =
+        IcebergRESTUtils.rewriteTableCredentials("irc1", table, upstream);
+
+    Assertions.assertEquals(1, rewritten.credentials().size());
+    Credential credential = rewritten.credentials().get(0);
+    Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+    Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+    // The refresh endpoint is re-scoped to the IRC catalog, dropping the upstream-scoped one.
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        credential.config().get("client.refresh-credentials-endpoint"));
   }
 }
