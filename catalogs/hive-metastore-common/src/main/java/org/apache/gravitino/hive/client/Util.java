@@ -18,12 +18,22 @@
  */
 package org.apache.gravitino.hive.client;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
+
+import java.net.InetAddress;
+import java.net.URI;
+import java.util.Arrays;
 import java.util.Properties;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Util {
+
+  private static final Logger LOG = LoggerFactory.getLogger(Util.class);
 
   public static final String HIVE_CONFIG_RESOURCES = "hive.config.resources";
 
@@ -41,8 +51,45 @@ public class Util {
       }
 
       properties.forEach((k, v) -> config.set(k.toString(), v.toString()));
+      resolveMetastoreUriHosts(config);
     } catch (Exception e) {
       throw new RuntimeException("Failed to create configuration", e);
+    }
+  }
+
+  // Pre-resolve to IP so Hive's resolveUris() doesn't receive Docker FQDNs with underscores.
+  private static void resolveMetastoreUriHosts(Configuration config) {
+    String urisValue = config.get(HIVE_METASTORE_URIS);
+    if (StringUtils.isBlank(urisValue)) {
+      return;
+    }
+    String resolved =
+        Arrays.stream(urisValue.split(","))
+            .map(uri -> resolveUriHost(uri.trim()))
+            .collect(Collectors.joining(","));
+    config.set(HIVE_METASTORE_URIS, resolved);
+  }
+
+  private static String resolveUriHost(String uriStr) {
+    try {
+      URI uri = new URI(uriStr);
+      String host = uri.getHost();
+      if (StringUtils.isBlank(host)) {
+        return uriStr;
+      }
+      String ip = InetAddress.getByName(host).getHostAddress();
+      return new URI(
+              uri.getScheme(),
+              uri.getUserInfo(),
+              ip,
+              uri.getPort(),
+              uri.getPath(),
+              uri.getQuery(),
+              uri.getFragment())
+          .toString();
+    } catch (Exception e) {
+      LOG.warn("Failed to resolve metastore URI host for '{}', using original", uriStr, e);
+      return uriStr;
     }
   }
 }

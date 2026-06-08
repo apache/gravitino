@@ -27,7 +27,7 @@ performing the schema upgrade.
 
 Create a backup of your database. This will allow
 you to revert any changes made during the upgrade process if
-something goes wrong. 
+something goes wrong.
 
 #### MySQL
 
@@ -50,6 +50,13 @@ For PostgreSQL, you can use the following command to backup your database:
 
 ```shell
 pg_dump -U username -h hostname -d database_name -n schema_name -a -F c -f data_backup.sql
+```
+
+If you are running an Iceberg REST Catalog (IRC) service backed by a separate PostgreSQL database,
+back it up as well:
+
+```shell
+pg_dump -U username -h hostname -d irc_database_name -n schema_name -a -F c -f data_backup_irc.sql
 ```
 
 ### Step 3: Dump the Gravitino Database
@@ -147,5 +154,56 @@ version of Gravitino. This is accomplished by repeating steps (3) and
 upgraded schema, e.g. if you upgraded the schema to Gravitino 0.8.0 then
 you will want to compare your schema dump against the contents of
 `schema-0.8.0-<type>.sql`
+
+## Upgrading via Helm Chart
+
+:::note
+The Gravitino Helm chart does not currently support automatic schema migration. Before running
+`helm upgrade`, you must manually back up your database (see [Step 2](#step-2-backup-your-gravitino-instance))
+and apply the appropriate SQL upgrade scripts (see [Step 5](#step-5-apply-the-upgrade-scripts)).
+:::
+
+This section describes how to upgrade a Gravitino deployment managed by the Gravitino Helm chart
+
+### Step 1: Prepare the new values file
+
+Create a new values file for the target version (e.g., `values-<new-version>.yaml`) based on
+the previous one. Update `image.tag` to the target version and apply any version-specific field
+changes listed in the sections below.
+
+#### 1.2.0 → 1.3.0
+
+| Field                                         | 1.2.0                  | 1.3.0                 |
+| --------------------------------------------- | ---------------------- | --------------------- |
+| `image.tag`                                   | `1.2.0`                | `1.3.0`               |
+| `env.GRAVITINO_HOME`                          | `/root/gravitino`      | `/opt/gravitino`      |
+| `extraVolumeMounts[gravitino-log].mountPath`  | `/root/gravitino/logs` | `/opt/gravitino/logs` |
+
+Key points:
+- The `GRAVITINO_HOME` path changed from `/root/gravitino` to `/opt/gravitino`. Make sure
+  `extraVolumeMounts` and any other path references are updated consistently.
+
+### Step 2: Run the Helm upgrade
+
+```shell
+helm upgrade gravitino <path-to-gravitino-helm-chart>/gravitino-helm-<new-version>.tgz \
+  -n <namespace> \
+  -f values-<new-version>.yaml
+```
+
+### Step 3: Verify the rollout
+
+Check that all pods come up healthy with the new image:
+
+```shell
+kubectl rollout status deployment/<release-name>-gravitino-helm -n <namespace>
+kubectl get pods -n <namespace>
+```
+
+Confirm the running image tag matches the target version:
+
+```shell
+kubectl get pods -n <namespace> -o jsonpath='{.items[*].spec.containers[*].image}'
+```
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToUpgrade" alt="" />

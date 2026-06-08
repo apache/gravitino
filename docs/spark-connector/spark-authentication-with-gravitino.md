@@ -9,8 +9,8 @@ license: "This software is licensed under the Apache License version 2."
 
 Spark connector supports `simple` `oauth2` and `kerberos` authentication when accessing Gravitino server.
 
-| Property                     | Type   | Default Value | Description                                                                                                         | Required | Since Version    |
-|------------------------------|--------|---------------|---------------------------------------------------------------------------------------------------------------------|----------|------------------|
+| Property                     | Type   | Default Value | Description                                                                                                                 | Required | Since Version    |
+|------------------------------|--------|---------------|-----------------------------------------------------------------------------------------------------------------------------|----------|------------------|
 | spark.sql.gravitino.authType | string | `simple`      | The authentication mechanism for communicating with the Gravitino server. Supported values: `simple`, `oauth2`, `kerberos`. | No       | 0.7.0-incubating |
 
 ## Simple Mode

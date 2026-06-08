@@ -71,11 +71,13 @@ If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to tr
 
 For the REST catalog backend, `warehouse` identifies the catalog in the Iceberg REST spec. In the Gravitino Iceberg REST server, `warehouse` maps to the catalog name. An empty value means the default catalog.
 
-`data-access` controls how the Iceberg REST client accesses table data when using a REST backend:
+The following properties tune REST backend behavior:
 
-| Property name  | Description                                                                                                             | Default value | Required | Since Version |
-|----------------|-------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `data-access`  | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`.              | (none)        | No       | 1.3.0         |
+| Property name                         | Description                                                                                                | Default value | Required | Since Version |
+|---------------------------------------|------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `data-access`                         | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`. | (none)        | No       | 1.3.0         |
+| `rest-client-connection-timeout-ms`   | The HTTP connection timeout in milliseconds for requests to the REST catalog backend.                      | 10000         | No       | 1.3.0         |
+| `rest-client-socket-timeout-ms`       | The HTTP socket timeout in milliseconds for requests to the REST catalog backend.                          | 60000         | No       | 1.3.0         |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.
@@ -92,6 +94,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "catalog-backend": "rest",
     "uri": "http://localhost:9001/iceberg",
+    "rest-client-connection-timeout-ms": "10000",
+    "rest-client-socket-timeout-ms": "60000",
     "data-access": "vended-credentials"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
@@ -192,7 +196,7 @@ For other storages that are not managed by Gravitino directly, you can manage th
 
 | Configuration item | Description                                                                             | Default value | Required | Since Version    |
 |--------------------|-----------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `io-impl`          | The IO implementation for `FileIO` in Iceberg; use the fully qualified classname. | (none)        | No       | 0.6.0-incubating |
+| `io-impl`          | The IO implementation for `FileIO` in Iceberg; use the fully qualified classname.       | (none)        | No       | 0.6.0-incubating |
 
 To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
 
@@ -427,13 +431,13 @@ Pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configurat
 | `provider`                | The storage provider for table storage.                                               | (none)        | No       | No       | Yes       | 0.2.0         |
 | `format`                  | The format of table storage.                                                          | (none)        | No       | No       | Yes       | 0.2.0         |
 | `format-version`          | The format version of table storage.                                                  | (none)        | No       | No       | Yes       | 0.2.0         |
-| `comment`                 | The table comment; use the `comment` field in table meta instead.                  | (none)        | No       | Yes      | No        | 0.2.0         |
+| `comment`                 | The table comment; use the `comment` field in table meta instead.                     | (none)        | No       | Yes      | No        | 0.2.0         |
 | `creator`                 | The table creator.                                                                    | (none)        | No       | Yes      | No        | 0.2.0         |
 | `current-snapshot-id`     | The snapshot represents the current state of the table.                               | (none)        | No       | Yes      | No        | 0.2.0         |
 | `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                   | (none)        | No       | Yes      | No        | 0.2.0         |
-| `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.               | (none)        | No       | Yes      | No        | 0.2.0         |
+| `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.                      | (none)        | No       | Yes      | No        | 0.2.0         |
 | `identifier-fields`       | The identifier fields for defining the table.                                         | (none)        | No       | Yes      | No        | 0.2.0         |
-| `write.distribution-mode` | Defines distribution of write data; use `distribution` in table meta instead.  | (none)        | No       | Yes      | No        | 0.2.0         |
+| `write.distribution-mode` | Defines distribution of write data; use `distribution` in table meta instead.         | (none)        | No       | Yes      | No        | 0.2.0         |
 
 ### Table Indexes
 
