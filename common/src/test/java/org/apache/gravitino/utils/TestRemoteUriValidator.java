@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestRemoteUriValidator {
-  private static final String ALLOW_LOCAL_ADDRESS_CONFIG = "test.allow-local-address";
+  private static final String BLOCK_UNSAFE_ADDRESS_CONFIG = "test.block-unsafe-address";
 
   @Test
   public void testRejectLocalAddressesByDefault() {
@@ -32,60 +32,60 @@ public class TestRemoteUriValidator {
             IllegalArgumentException.class,
             () ->
                 RemoteUriValidator.validate(
-                    new URI("http://127.0.0.1/"), false, ALLOW_LOCAL_ADDRESS_CONFIG));
+                    new URI("http://127.0.0.1/"), true, BLOCK_UNSAFE_ADDRESS_CONFIG));
     Assertions.assertTrue(exception.getMessage().contains("Gravitino server side"));
-    Assertions.assertTrue(exception.getMessage().contains(ALLOW_LOCAL_ADDRESS_CONFIG));
+    Assertions.assertTrue(exception.getMessage().contains(BLOCK_UNSAFE_ADDRESS_CONFIG));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             RemoteUriValidator.validate(
-                new URI("http://localhost/"), false, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://localhost/"), true, BLOCK_UNSAFE_ADDRESS_CONFIG));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             RemoteUriValidator.validate(
-                new URI("http://169.254.169.254/"), false, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://169.254.169.254/"), true, BLOCK_UNSAFE_ADDRESS_CONFIG));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             RemoteUriValidator.validate(
-                new URI("http://10.0.0.1/"), false, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://10.0.0.1/"), true, BLOCK_UNSAFE_ADDRESS_CONFIG));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             RemoteUriValidator.validate(
-                new URI("http://172.16.0.1/"), false, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://172.16.0.1/"), true, BLOCK_UNSAFE_ADDRESS_CONFIG));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             RemoteUriValidator.validate(
-                new URI("http://192.168.0.1/"), false, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://192.168.0.1/"), true, BLOCK_UNSAFE_ADDRESS_CONFIG));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             RemoteUriValidator.validate(
-                new URI("http://100.100.100.200/"), false, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://100.100.100.200/"), true, BLOCK_UNSAFE_ADDRESS_CONFIG));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             RemoteUriValidator.validate(
-                new URI("http://[fd00::1]/"), false, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://[fd00::1]/"), true, BLOCK_UNSAFE_ADDRESS_CONFIG));
   }
 
   @Test
-  public void testAllowLocalAddressesWhenConfigured() {
+  public void testAllowUnsafeAddressesWhenBlockingDisabled() {
     Assertions.assertDoesNotThrow(
         () ->
             RemoteUriValidator.validate(
-                new URI("http://127.0.0.1/"), true, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://127.0.0.1/"), false, BLOCK_UNSAFE_ADDRESS_CONFIG));
     Assertions.assertDoesNotThrow(
         () ->
             RemoteUriValidator.validate(
-                new URI("http://localhost/"), true, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://localhost/"), false, BLOCK_UNSAFE_ADDRESS_CONFIG));
     Assertions.assertDoesNotThrow(
         () ->
             RemoteUriValidator.validate(
-                new URI("http://192.168.0.1/"), true, ALLOW_LOCAL_ADDRESS_CONFIG));
+                new URI("http://192.168.0.1/"), false, BLOCK_UNSAFE_ADDRESS_CONFIG));
   }
 }

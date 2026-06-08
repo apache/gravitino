@@ -99,7 +99,7 @@ public class JobManager implements JobOperationDispatcher {
 
   private final long jobStagingDirKeepTimeInMs;
 
-  private final boolean allowLocalAddressForRemoteUri;
+  private final boolean blockUnsafeAddressForRemoteUri;
 
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
@@ -136,7 +136,7 @@ public class JobManager implements JobOperationDispatcher {
     }
 
     this.jobStagingDirKeepTimeInMs = config.get(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS);
-    this.allowLocalAddressForRemoteUri = config.get(Configs.JOB_REMOTE_URI_ALLOW_LOCAL_ADDRESS);
+    this.blockUnsafeAddressForRemoteUri = config.get(Configs.JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS);
     if (jobStagingDirKeepTimeInMs < JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS) {
       LOG.warn(
           "The job staging directory keep time is set to {} ms, the number is too small, "
@@ -441,7 +441,7 @@ public class JobManager implements JobOperationDispatcher {
     // also downloading any necessary files from the URIs specified in the job template.
     JobTemplate jobTemplate =
         createRuntimeJobTemplate(
-            jobTemplateEntity, jobConf, jobStagingDir, allowLocalAddressForRemoteUri);
+            jobTemplateEntity, jobConf, jobStagingDir, blockUnsafeAddressForRemoteUri);
 
     // Submit the job template to the job executor
     String jobExecutionId;
@@ -676,7 +676,7 @@ public class JobManager implements JobOperationDispatcher {
   public static JobTemplate createRuntimeJobTemplate(
       JobTemplateEntity jobTemplateEntity, Map<String, String> jobConf, File stagingDir) {
     return createRuntimeJobTemplate(
-        jobTemplateEntity, jobConf, stagingDir, false /* allowLocalAddressForRemoteUri */);
+        jobTemplateEntity, jobConf, stagingDir, true /* blockUnsafeAddressForRemoteUri */);
   }
 
   @VisibleForTesting
@@ -684,7 +684,7 @@ public class JobManager implements JobOperationDispatcher {
       JobTemplateEntity jobTemplateEntity,
       Map<String, String> jobConf,
       File stagingDir,
-      boolean allowLocalAddressForRemoteUri) {
+      boolean blockUnsafeAddressForRemoteUri) {
     String name = jobTemplateEntity.name();
     String comment = jobTemplateEntity.comment();
 
@@ -694,7 +694,7 @@ public class JobManager implements JobOperationDispatcher {
             replacePlaceholder(content.executable(), jobConf),
             stagingDir,
             TIMEOUT_IN_MS,
-            allowLocalAddressForRemoteUri);
+            blockUnsafeAddressForRemoteUri);
 
     List<String> args =
         content.arguments().stream()
@@ -723,7 +723,7 @@ public class JobManager implements JobOperationDispatcher {
                           replacePlaceholder(script, jobConf),
                           stagingDir,
                           TIMEOUT_IN_MS,
-                          allowLocalAddressForRemoteUri))
+                          blockUnsafeAddressForRemoteUri))
               .collect(Collectors.toList());
 
       return ShellJobTemplate.builder()
@@ -748,7 +748,7 @@ public class JobManager implements JobOperationDispatcher {
                           replacePlaceholder(jar, jobConf),
                           stagingDir,
                           TIMEOUT_IN_MS,
-                          allowLocalAddressForRemoteUri))
+                          blockUnsafeAddressForRemoteUri))
               .collect(Collectors.toList());
 
       List<String> files =
@@ -759,7 +759,7 @@ public class JobManager implements JobOperationDispatcher {
                           replacePlaceholder(file, jobConf),
                           stagingDir,
                           TIMEOUT_IN_MS,
-                          allowLocalAddressForRemoteUri))
+                          blockUnsafeAddressForRemoteUri))
               .collect(Collectors.toList());
 
       List<String> archives =
@@ -770,7 +770,7 @@ public class JobManager implements JobOperationDispatcher {
                           replacePlaceholder(archive, jobConf),
                           stagingDir,
                           TIMEOUT_IN_MS,
-                          allowLocalAddressForRemoteUri))
+                          blockUnsafeAddressForRemoteUri))
               .collect(Collectors.toList());
 
       Map<String, String> configs =
@@ -825,26 +825,26 @@ public class JobManager implements JobOperationDispatcher {
   @VisibleForTesting
   static List<String> fetchFilesFromUri(List<String> uris, File stagingDir, int timeoutInMs) {
     return fetchFilesFromUri(
-        uris, stagingDir, timeoutInMs, false /* allowLocalAddressForRemoteUri */);
+        uris, stagingDir, timeoutInMs, true /* blockUnsafeAddressForRemoteUri */);
   }
 
   @VisibleForTesting
   static List<String> fetchFilesFromUri(
-      List<String> uris, File stagingDir, int timeoutInMs, boolean allowLocalAddressForRemoteUri) {
+      List<String> uris, File stagingDir, int timeoutInMs, boolean blockUnsafeAddressForRemoteUri) {
     return uris.stream()
-        .map(uri -> fetchFileFromUri(uri, stagingDir, timeoutInMs, allowLocalAddressForRemoteUri))
+        .map(uri -> fetchFileFromUri(uri, stagingDir, timeoutInMs, blockUnsafeAddressForRemoteUri))
         .collect(Collectors.toList());
   }
 
   @VisibleForTesting
   static String fetchFileFromUri(String uri, File stagingDir, int timeoutInMs) {
     return fetchFileFromUri(
-        uri, stagingDir, timeoutInMs, false /* allowLocalAddressForRemoteUri */);
+        uri, stagingDir, timeoutInMs, true /* blockUnsafeAddressForRemoteUri */);
   }
 
   @VisibleForTesting
   static String fetchFileFromUri(
-      String uri, File stagingDir, int timeoutInMs, boolean allowLocalAddressForRemoteUri) {
+      String uri, File stagingDir, int timeoutInMs, boolean blockUnsafeAddressForRemoteUri) {
     try {
       URI fileUri = new URI(uri);
       String scheme = Optional.ofNullable(fileUri.getScheme()).orElse("file");
@@ -856,8 +856,8 @@ public class JobManager implements JobOperationDispatcher {
         case "ftp":
           RemoteUriValidator.validate(
               fileUri,
-              allowLocalAddressForRemoteUri,
-              String.format("'%s' to true", Configs.JOB_REMOTE_URI_ALLOW_LOCAL_ADDRESS_KEY));
+              blockUnsafeAddressForRemoteUri,
+              String.format("'%s' to false", Configs.JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY));
           FileUtils.copyURLToFile(fileUri.toURL(), destFile, timeoutInMs, timeoutInMs);
           break;
 

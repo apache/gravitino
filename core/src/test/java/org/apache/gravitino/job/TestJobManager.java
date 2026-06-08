@@ -970,7 +970,7 @@ public class TestJobManager {
   }
 
   @Test
-  public void testFetchFileFromUriShouldAllowLocalhostWhenConfigured() throws Exception {
+  public void testFetchFileFromUriShouldAllowLocalhostWhenBlockingDisabled() throws Exception {
     File stagingDir = new File(testStagingDir);
     Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
     HttpServer server = createLoopbackHttpServer("job artifact");
@@ -981,7 +981,7 @@ public class TestJobManager {
 
       String fetchedFile =
           JobManager.fetchFileFromUri(
-              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000, true);
+              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000, false);
 
       Assertions.assertEquals("job artifact", Files.readString(Path.of(fetchedFile)));
     } finally {
@@ -992,7 +992,10 @@ public class TestJobManager {
   private static void assertRemoteUriBlockedMessage(RuntimeException exception) {
     Assertions.assertTrue(exception.getCause().getMessage().contains("Gravitino server side"));
     Assertions.assertTrue(
-        exception.getCause().getMessage().contains(Configs.JOB_REMOTE_URI_ALLOW_LOCAL_ADDRESS_KEY));
+        exception
+            .getCause()
+            .getMessage()
+            .contains(Configs.JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY));
   }
 
   @Test

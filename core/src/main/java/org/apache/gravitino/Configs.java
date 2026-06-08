@@ -551,19 +551,18 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
-  public static final String JOB_REMOTE_URI_ALLOW_LOCAL_ADDRESS_KEY =
-      "gravitino.job.remoteUri.allowLocalAddress";
+  public static final String JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY =
+      "gravitino.job.remoteUri.blockUnsafeAddress";
 
-  public static final ConfigEntry<Boolean> JOB_REMOTE_URI_ALLOW_LOCAL_ADDRESS =
-      new ConfigBuilder(JOB_REMOTE_URI_ALLOW_LOCAL_ADDRESS_KEY)
+  public static final ConfigEntry<Boolean> JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS =
+      new ConfigBuilder(JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY)
           .doc(
-              "Whether to allow job file remote URIs to resolve to local, private, link-local, "
-                  + "or cloud metadata addresses from the Gravitino server side. This is disabled "
-                  + "by default to prevent SSRF. Set it to true only when the URI is trusted and "
-                  + "must be fetched from local or private addresses.")
+              "Whether to block job file remote URIs from resolving to unsafe addresses from the "
+                  + "Gravitino server side. This is enabled by default to prevent SSRF. Set it "
+                  + "to false only when the URI is trusted and access is required.")
           .version(ConfigConstants.VERSION_1_3_0)
           .booleanConf()
-          .createWithDefault(false);
+          .createWithDefault(true);
 
   public static final ConfigEntry<String> SCHEMA_SEPARATOR =
       new ConfigBuilder("gravitino.schema.separator")

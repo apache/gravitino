@@ -134,11 +134,11 @@ public class TestFetchFileUtils {
 
     Assertions.assertTrue(exception.getMessage().contains("Gravitino server side"));
     Assertions.assertTrue(
-        exception.getMessage().contains(KerberosConfig.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY));
+        exception.getMessage().contains(KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY));
   }
 
   @Test
-  public void testRemoteFetchShouldAllowLocalhostWhenConfigured() throws Exception {
+  public void testRemoteFetchShouldAllowLocalhostWhenBlockingDisabled() throws Exception {
     File destFile = new File(tempDir, "allowed");
     HttpServer server = createLoopbackHttpServer("keytab");
 
@@ -151,7 +151,7 @@ public class TestFetchFileUtils {
           destFile,
           10,
           new Configuration(),
-          true);
+          false);
 
       Assertions.assertEquals("keytab", Files.readString(destFile.toPath()));
     } finally {

@@ -48,8 +48,8 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
 
   public static final String FETCH_TIMEOUT_SEC = HiveConstants.FETCH_TIMEOUT_SEC;
 
-  public static final String KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS =
-      HiveConstants.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS;
+  public static final String KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS =
+      HiveConstants.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS;
 
   public static final String LIST_ALL_TABLES = HiveConstants.LIST_ALL_TABLES;
 
@@ -114,14 +114,14 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
               PropertyEntry.integerOptionalPropertyEntry(
                   FETCH_TIMEOUT_SEC, "The timeout to fetch key tab", false, 60, false))
           .put(
-              KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS,
+              KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS,
               PropertyEntry.booleanPropertyEntry(
-                  KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS,
-                  "Whether to allow Kerberos keytab fetch from local or private addresses from "
-                      + "the Gravitino server side. This is disabled by default to prevent SSRF.",
+                  KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS,
+                  "Whether to block Kerberos keytab fetch from unsafe addresses from the Gravitino "
+                      + "server side. This is enabled by default to prevent SSRF.",
                   false /* required */,
                   false /* immutable */,
-                  false /* defaultValue */,
+                  true /* defaultValue */,
                   false /* hidden */,
                   false /* reserved */))
           .put(

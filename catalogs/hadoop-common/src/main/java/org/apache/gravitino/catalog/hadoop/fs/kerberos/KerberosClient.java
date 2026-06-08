@@ -127,7 +127,7 @@ public class KerberosClient implements Closeable {
         keytabFile,
         fetchKeytabFileTimeout,
         hadoopConf,
-        kerberosConfig.allowKeytabFetchLocalAddress());
+        kerberosConfig.blockKeytabFetchUnsafeAddress());
 
     return keytabFile;
   }

@@ -37,8 +37,8 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final String FETCH_TIMEOUT_SEC_KEY =
       "authentication.kerberos.keytab-fetch-timeout-sec";
 
-  public static final String KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY =
-      "authentication.kerberos.keytab-fetch-allow-local-address";
+  public static final String KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY =
+      "authentication.kerberos.keytab-fetch-block-unsafe-address";
 
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
@@ -72,16 +72,15 @@ public class KerberosConfig extends AuthenticationConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
 
-  public static final ConfigEntry<Boolean> KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_ENTRY =
-      new ConfigBuilder(KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY)
+  public static final ConfigEntry<Boolean> KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_ENTRY =
+      new ConfigBuilder(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY)
           .doc(
-              "Whether to allow the Kerberos keytab URI to resolve to local, private, link-local, "
-                  + "or cloud metadata addresses from the Gravitino server side. This is disabled "
-                  + "by default to prevent SSRF. Set it to true only when the URI is trusted and "
-                  + "must be fetched from local or private addresses.")
+              "Whether to block the Kerberos keytab URI from resolving to unsafe addresses from "
+                  + "the Gravitino server side. This is enabled by default to prevent SSRF. Set "
+                  + "it to false only when the URI is trusted and access is required.")
           .version(ConfigConstants.VERSION_1_3_0)
           .booleanConf()
-          .createWithDefault(false);
+          .createWithDefault(true);
 
   public KerberosConfig(Map<String, String> properties) {
     super(properties);
@@ -104,8 +103,8 @@ public class KerberosConfig extends AuthenticationConfig {
     return get(FETCH_TIMEOUT_SEC_ENTRY);
   }
 
-  public boolean allowKeytabFetchLocalAddress() {
-    return get(KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_ENTRY);
+  public boolean blockKeytabFetchUnsafeAddress() {
+    return get(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_ENTRY);
   }
 
   public static final Map<String, PropertyEntry<?>> KERBEROS_PROPERTY_ENTRIES =
@@ -143,14 +142,14 @@ public class KerberosConfig extends AuthenticationConfig {
                   60 /* defaultValue */,
                   false /* hidden */))
           .put(
-              KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY,
+              KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY,
               PropertyEntry.booleanPropertyEntry(
-                  KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY,
-                  "Whether to allow Kerberos keytab fetch from local or private addresses from "
-                      + "the Gravitino server side. This is disabled by default to prevent SSRF.",
+                  KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY,
+                  "Whether to block Kerberos keytab fetch from unsafe addresses from the Gravitino "
+                      + "server side. This is enabled by default to prevent SSRF.",
                   false /* required */,
                   false /* immutable */,
-                  false /* defaultValue */,
+                  true /* defaultValue */,
                   false /* hidden */,
                   false /* reserved */))
           .build();

@@ -104,7 +104,7 @@ public class KerberosClient implements Closeable {
         keyTabUri,
         keytabFile,
         fetchKeytabFileTimeout,
-        kerberosConfig.allowKeytabFetchLocalAddress());
+        kerberosConfig.blockKeytabFetchUnsafeAddress());
 
     return keytabFile;
   }

@@ -28,41 +28,40 @@ public final class RemoteUriValidator {
   private RemoteUriValidator() {}
 
   /**
-   * Resolves the host in the given URI and rejects local or private addresses unless explicitly
-   * allowed.
+   * Resolves the host in the given URI and rejects unsafe addresses when blocking is enabled.
    *
    * @param uri The remote URI to validate.
-   * @param allowLocalAddress Whether local and private addresses are allowed.
-   * @param allowLocalAddressHint The configuration hint that enables local and private addresses.
+   * @param blockUnsafeAddress Whether unsafe addresses should be blocked.
+   * @param blockUnsafeAddressHint The configuration hint that disables unsafe address blocking.
    * @throws IOException If host resolution fails.
-   * @throws IllegalArgumentException If the URI has no host or resolves to a blocked address.
+   * @throws IllegalArgumentException If the URI has no host or resolves to an unsafe address.
    */
-  public static void validate(URI uri, boolean allowLocalAddress, String allowLocalAddressHint)
+  public static void validate(URI uri, boolean blockUnsafeAddress, String blockUnsafeAddressHint)
       throws IOException {
     String host = uri.getHost();
     if (host == null) {
       throw new IllegalArgumentException("URI has no host: " + uri);
     }
 
-    if (allowLocalAddress) {
+    if (!blockUnsafeAddress) {
       return;
     }
 
     InetAddress[] addresses = InetAddress.getAllByName(host);
     for (InetAddress address : addresses) {
-      if (isBlockedAddress(address)) {
+      if (isUnsafeAddress(address)) {
         throw new IllegalArgumentException(
             String.format(
                 "URI '%s' resolves to blocked address %s from the Gravitino server side. "
                     + "Access to local, private, link-local, multicast, unspecified, and cloud "
                     + "metadata addresses is disabled by default to prevent SSRF. If this URI is "
                     + "trusted and this access is required, set %s.",
-                uri, address.getHostAddress(), allowLocalAddressHint));
+                uri, address.getHostAddress(), blockUnsafeAddressHint));
       }
     }
   }
 
-  private static boolean isBlockedAddress(InetAddress address) {
+  private static boolean isUnsafeAddress(InetAddress address) {
     if (address.isLoopbackAddress()
         || address.isLinkLocalAddress()
         || address.isSiteLocalAddress()

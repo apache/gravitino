@@ -29,7 +29,7 @@ import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.CL
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.DEFAULT_CATALOG;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.FETCH_TIMEOUT_SEC;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS;
+import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEY_TAB_URI;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
@@ -109,7 +109,7 @@ class TestHiveCatalogOperations {
     Assertions.assertFalse(propertyEntryMap.get(PRINCIPAL).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CHECK_INTERVAL_SEC).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(FETCH_TIMEOUT_SEC).isRequired());
-    Assertions.assertFalse(propertyEntryMap.get(KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_NAME).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_NAME).isImmutable());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_REGION_CODE).isRequired());

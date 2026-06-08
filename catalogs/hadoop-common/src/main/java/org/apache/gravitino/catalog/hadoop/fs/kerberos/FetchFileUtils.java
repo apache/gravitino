@@ -36,7 +36,7 @@ public class FetchFileUtils {
 
   public static void fetchFileFromUri(
       String fileUri, File destFile, int timeout, Configuration conf) throws IOException {
-    fetchFileFromUri(fileUri, destFile, timeout, conf, false /* allowLocalAddressForRemoteUri */);
+    fetchFileFromUri(fileUri, destFile, timeout, conf, true /* blockUnsafeAddressForRemoteUri */);
   }
 
   public static void fetchFileFromUri(
@@ -44,7 +44,7 @@ public class FetchFileUtils {
       File destFile,
       int timeout,
       Configuration conf,
-      boolean allowLocalAddressForRemoteUri)
+      boolean blockUnsafeAddressForRemoteUri)
       throws IOException {
     try {
       URI uri = new URI(fileUri);
@@ -56,8 +56,8 @@ public class FetchFileUtils {
         case "ftp":
           RemoteUriValidator.validate(
               uri,
-              allowLocalAddressForRemoteUri,
-              String.format("'%s' to true", KerberosConfig.KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY));
+              blockUnsafeAddressForRemoteUri,
+              String.format("'%s' to false", KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY));
           FileUtils.copyURLToFile(uri.toURL(), destFile, timeout * 1000, timeout * 1000);
           break;
 

@@ -38,8 +38,8 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final String FETCH_TIMEOUT_SEC_KEY =
       "authentication.kerberos.keytab-fetch-timeout-sec";
 
-  public static final String KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY =
-      "authentication.kerberos.keytab-fetch-allow-local-address";
+  public static final String KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY =
+      "authentication.kerberos.keytab-fetch-block-unsafe-address";
 
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
@@ -73,16 +73,15 @@ public class KerberosConfig extends AuthenticationConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
-  public static final ConfigEntry<Boolean> KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_ENTRY =
-      new ConfigBuilder(KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_KEY)
+  public static final ConfigEntry<Boolean> KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_ENTRY =
+      new ConfigBuilder(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY)
           .doc(
-              "Whether to allow the Kerberos keytab URI to resolve to local, private, link-local, "
-                  + "or cloud metadata addresses from the Gravitino server side. This is disabled "
-                  + "by default to prevent SSRF. Set it to true only when the URI is trusted and "
-                  + "must be fetched from local or private addresses.")
+              "Whether to block the Kerberos keytab URI from resolving to unsafe addresses from "
+                  + "the Gravitino server side. This is enabled by default to prevent SSRF. Set "
+                  + "it to false only when the URI is trusted and access is required.")
           .version(ConfigConstants.VERSION_1_3_0)
           .booleanConf()
-          .createWithDefault(false);
+          .createWithDefault(true);
 
   public KerberosConfig(Properties properties, Configuration configuration) {
     super(properties, configuration);
@@ -105,7 +104,7 @@ public class KerberosConfig extends AuthenticationConfig {
     return get(FETCH_TIMEOUT_SEC_ENTRY);
   }
 
-  public boolean allowKeytabFetchLocalAddress() {
-    return get(KEYTAB_FETCH_ALLOW_LOCAL_ADDRESS_ENTRY);
+  public boolean blockKeytabFetchUnsafeAddress() {
+    return get(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_ENTRY);
   }
 }
