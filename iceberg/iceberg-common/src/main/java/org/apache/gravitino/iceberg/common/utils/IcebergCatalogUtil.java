@@ -145,6 +145,7 @@ public class IcebergCatalogUtil {
 
     // REST catalog must use forward access token from the user request
     properties.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
+    applyRestCatalogHttpTimeoutProperties(icebergConfig, properties);
 
     properties.forEach(hdfsConfiguration::set);
     restCatalog.setConf(hdfsConfiguration);
@@ -164,6 +165,19 @@ public class IcebergCatalogUtil {
   @VisibleForTesting
   public static void applyDefaultResolvingFileIO(Map<String, String> properties) {
     properties.putIfAbsent(IcebergConstants.IO_IMPL, ResolvingFileIO.class.getName());
+  }
+
+  @VisibleForTesting
+  static void applyRestCatalogHttpTimeoutProperties(
+      IcebergConfig icebergConfig, Map<String, String> properties) {
+    properties.put(
+        IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS,
+        String.valueOf(
+            icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS)));
+    properties.put(
+        IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS,
+        String.valueOf(
+            icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS)));
   }
 
   @VisibleForTesting
