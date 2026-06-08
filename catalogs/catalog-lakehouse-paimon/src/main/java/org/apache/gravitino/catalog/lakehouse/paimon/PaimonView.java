@@ -43,7 +43,7 @@ final class PaimonView implements View {
   static final String DEFAULT_CATALOG_PROPERTY = "gravitino.view.default-catalog";
   static final String DEFAULT_SCHEMA_PROPERTY = "gravitino.view.default-schema";
 
-  private static final String PAIMON_VIEW_QUERY = "query";
+  private static final String PAIMON_VIEW_QUERY = PaimonConstants.VIEW_QUERY_DIALECT;
 
   private final String name;
   @Nullable private final String comment;
