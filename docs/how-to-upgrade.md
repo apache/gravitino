@@ -52,13 +52,15 @@ For PostgreSQL, you can use the following command to backup your database:
 pg_dump -U username -h hostname -d database_name -n schema_name -Fc -f data_backup.dump
 ```
 The `-Fc` option produces a compressed binary dump in PostgreSQL's
-custom format, which can be restored with `pg_restore`.
+custom format, which can be restored with `pg_restore`. Unlike a
+schema-only dump, this backup includes both schema and data, which
+is necessary for a full rollback.
 
 If you are running an Iceberg REST Catalog (IRC) service backed by a separate PostgreSQL database,
 back it up as well:
 
 ```shell
-pg_dump -U username -h hostname -d irc_database_name -n schema_name -a -F c -f data_backup_irc.sql
+pg_dump -U username -h hostname -d irc_database_name -n schema_name -Fc -f data_backup_irc.dump
 ```
 
 ### Step 3: Dump the Gravitino Database
@@ -90,6 +92,10 @@ For PostgreSQL, you can use the following command to dump the database schema to
 ```shell
 pg_dump -U username -h hostname -d database_name -n schema_name -s -f schema-x.y.z-postgresql.sql
 ```
+
+Note: The `-s` flag dumps schema-only in plain SQL format. This is
+different from the `-Fc` custom format used in Step 2 for backup,
+which produces a binary dump that must be restored with `pg_restore`.
 
 ### Step 4: Determine Differences Between the Existing Schema and the Official Schema
 
@@ -214,6 +220,9 @@ kubectl get pods -n <namespace> -o jsonpath='{.items[*].spec.containers[*].image
 
 ## Rollback if Upgrade Fails
 
+> **Important:** Stop the Gravitino server before restoring the database
+> to avoid data corruption from concurrent writes.
+
 If you encounter errors during the upgrade process, you can
 restore your database from the backup created in Step 2.
 
@@ -224,7 +233,7 @@ backup contains `DROP TABLE` statements by default (via `--opt`),
 so it will replace the upgraded tables automatically:
 
 ```shell
-mysql -u username -h hostname <db_name> < backup.sql
+mysql -u username -h hostname --database=db_name < backup.sql
 ```
 
 ### H2
@@ -244,8 +253,13 @@ restoring them in one transaction. This is safer than manually
 dropping the schema first:
 
 ```shell
-pg_restore -U username -h hostname -d database_name --clean --if-exists --single-transaction data_backup.dump
+pg_restore -U username -h hostname -d database_name -n schema_name --clean --if-exists --single-transaction data_backup.dump
 ```
+
+Note: `pg_restore --clean` only drops objects that are present in the
+dump file. If the upgrade scripts added new tables or sequences not
+present in the backup, those objects will not be removed automatically.
+Verify the schema matches the expected state after restoring.
 
 After restoring, verify that your Gravitino instance starts
 successfully with the restored database before attempting the
