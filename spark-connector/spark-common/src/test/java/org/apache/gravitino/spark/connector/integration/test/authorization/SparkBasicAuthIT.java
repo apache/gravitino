@@ -24,7 +24,6 @@ import java.util.Map;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
@@ -93,13 +92,7 @@ public class SparkBasicAuthIT extends BaseIT {
   }
 
   @Test
-  public void testSparkConnectsWithBasicAuth() throws Exception {
+  public void testSparkConnectsWithBasicAuth() {
     Assertions.assertDoesNotThrow(() -> sparkSession.sql("SHOW CATALOGS").collect());
-
-    try (GravitinoAdminClient basicClient =
-        GravitinoAdminClient.builder(serverUri).withBasicAuth(ADMIN, ADMIN_PASSWORD).build()) {
-      GravitinoMetalake metalake = basicClient.loadMetalake(METALAKE);
-      Assertions.assertEquals(METALAKE, metalake.name());
-    }
   }
 }

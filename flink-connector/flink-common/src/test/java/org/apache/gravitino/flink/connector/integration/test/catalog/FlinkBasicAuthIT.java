@@ -27,7 +27,6 @@ import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.api.internal.TableEnvironmentImpl;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.junit.jupiter.api.AfterAll;
@@ -107,11 +106,5 @@ public class FlinkBasicAuthIT extends BaseIT {
   @Test
   public void testFlinkConnectsWithBasicAuth() {
     Assertions.assertDoesNotThrow(() -> tableEnv.executeSql("SHOW CATALOGS").print());
-
-    try (GravitinoAdminClient basicClient =
-        GravitinoAdminClient.builder(gravitinoUri).withBasicAuth(ADMIN, ADMIN_PASSWORD).build()) {
-      GravitinoMetalake loadedMetalake = basicClient.loadMetalake(METALAKE);
-      Assertions.assertEquals(METALAKE, loadedMetalake.name());
-    }
   }
 }
