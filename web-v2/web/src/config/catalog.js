@@ -140,6 +140,11 @@ export const tableDefaultProps = {
   ],
   glue: [
     {
+      key: 'location',
+      defaultValue: '',
+      description: 'Table storage location, e.g. s3://my-bucket/path'
+    },
+    {
       key: 'table-format',
       defaultValue: '',
       select: ['ICEBERG', 'HIVE'],
@@ -148,16 +153,19 @@ export const tableDefaultProps = {
     {
       key: 'metadata_location',
       defaultValue: '',
+      hide: ['hive'],
       description: 'Iceberg metadata file path'
     },
     {
       key: 'format',
       defaultValue: '',
+      hide: ['iceberg'],
       select: ['TEXTFILE', 'SEQUENCEFILE', 'RCFILE', 'ORC', 'PARQUET', 'AVRO', 'JSON', 'CSV', 'REGEX']
     },
     {
       key: 'input-format',
       defaultValue: 'org.apache.hadoop.mapred.TextInputFormat',
+      hide: ['iceberg'],
       defaultValueOptions: {
         TEXTFILE: 'org.apache.hadoop.mapred.TextInputFormat',
         SEQUENCEFILE: 'org.apache.hadoop.mapred.SequenceFileInputFormat',
@@ -173,6 +181,7 @@ export const tableDefaultProps = {
     {
       key: 'output-format',
       defaultValue: 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+      hide: ['iceberg'],
       defaultValueOptions: {
         TEXTFILE: 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
         SEQUENCEFILE: 'org.apache.hadoop.mapred.SequenceFileOutputFormat',
@@ -188,6 +197,7 @@ export const tableDefaultProps = {
     {
       key: 'serde-lib',
       defaultValue: 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+      hide: ['iceberg'],
       defaultValueOptions: {
         TEXTFILE: 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
         SEQUENCEFILE: 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
