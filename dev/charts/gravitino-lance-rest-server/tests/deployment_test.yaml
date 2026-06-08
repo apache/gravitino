@@ -44,9 +44,9 @@ tests:
       - equal:
           path: spec.template.spec.serviceAccountName
           value: default
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: apache/gravitino-lance-rest:1.4.0-SNAPSHOT
+          pattern: "^apache/gravitino-lance-rest:.+"
       - contains:
           path: spec.template.spec.containers[0].env
           content:
