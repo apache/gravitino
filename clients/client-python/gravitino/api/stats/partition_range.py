@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 from gravitino.api.rel.expressions.named_reference import (
     PARTITION_NAME_FIELD,
@@ -30,15 +30,15 @@ from gravitino.api.rel.expressions.sorts.sort_orders import SortOrder, SortOrder
 from gravitino.utils.precondition import Precondition
 
 
-@dataclass(frozen=True)
+@dataclass()
 class PartitionRange:
     DEFAULT_COMPARATOR: ClassVar[SortOrder] = SortOrders.of(
         PARTITION_NAME_FIELD, SortDirection.ASCENDING
     )
-    _lower_partition_name: Optional[str] = None
-    _lower_bound_type: Optional[BoundType] = None
-    _upper_partition_name: Optional[str] = None
-    _upper_bound_type: Optional[BoundType] = None
+    _lower_partition_name: str | None = None
+    _lower_bound_type: BoundType | None = None
+    _upper_partition_name: str | None = None
+    _upper_bound_type: BoundType | None = None
     _comparator: SortOrder = DEFAULT_COMPARATOR
 
     class BoundType(Enum):
@@ -52,7 +52,7 @@ class PartitionRange:
         cls,
         upper_partition_name: str,
         upper_bound_type: BoundType,
-        comparator: Optional[SortOrder] = None,
+        comparator: SortOrder = DEFAULT_COMPARATOR,
     ) -> "PartitionRange":
         """
         Creates a PartitionRange which only has upper bound partition name with a specific comparator type.
@@ -77,8 +77,6 @@ class PartitionRange:
             upper_partition_name.strip() != "",
             "Upper partition name cannot be empty",
         )
-        if comparator is None:
-            comparator = cls.DEFAULT_COMPARATOR
 
         return PartitionRange(
             _upper_partition_name=upper_partition_name,
@@ -91,7 +89,7 @@ class PartitionRange:
         cls,
         lower_partition_name: str,
         lower_bound_type: BoundType,
-        comparator: Optional[SortOrder] = None,
+        comparator: SortOrder = DEFAULT_COMPARATOR,
     ) -> "PartitionRange":
         """
         Creates a PartitionRange which only has lower bound partition name with a specific comparator type.
@@ -99,7 +97,7 @@ class PartitionRange:
         Args:
             lower_partition_name (str): the lower partition name.
             lower_bound_type (BoundType): the type of the lower bound (open or closed).
-            comparator (Optional[SortOrder], optional): the comparator to use for this range.
+            comparator (SortOrder): the comparator to use for this range.
 
         Returns:
             PartitionRange: a PartitionRange with the lower partition name and the specified comparator type.
@@ -116,8 +114,6 @@ class PartitionRange:
             lower_partition_name.strip() != "",
             "Lower partition name cannot be empty",
         )
-        if comparator is None:
-            comparator = cls.DEFAULT_COMPARATOR
 
         return PartitionRange(
             _lower_partition_name=lower_partition_name,
@@ -132,7 +128,7 @@ class PartitionRange:
         lower_bound_type: BoundType,
         upper_partition_name: str,
         upper_bound_type: BoundType,
-        comparator: Optional[SortOrder] = None,
+        comparator: SortOrder = DEFAULT_COMPARATOR,
     ) -> "PartitionRange":
         """
         Creates a PartitionRange which has both lower and upper partition names with a specific comparator type.
@@ -142,7 +138,7 @@ class PartitionRange:
             lower_bound_type (BoundType): the type of the lower bound (open or closed).
             upper_partition_name (str):  the upper partition name.
             upper_bound_type (BoundType): the type of the upper bound (open or closed).
-            comparator (Optional[SortOrder], optional): the comparator to use for this range.
+            comparator (SortOrder): the comparator to use for this range.
 
         Returns:
             PartitionRange: a PartitionRange with both lower and upper partition names
@@ -174,9 +170,6 @@ class PartitionRange:
             "Upper partition name cannot be empty",
         )
 
-        if comparator is None:
-            comparator = cls.DEFAULT_COMPARATOR
-
         return PartitionRange(
             _lower_partition_name=lower_partition_name,
             _lower_bound_type=lower_bound_type,
@@ -185,39 +178,39 @@ class PartitionRange:
             _comparator=comparator,
         )
 
-    def lower_partition_name(self) -> Optional[str]:
+    def lower_partition_name(self) -> str | None:
         """
         Returns the lower partition name if it exists.
 
         Returns:
-            Optional[str]: an Optional containing the lower partition name if it exists, otherwise None.
+            str | None: an Optional containing the lower partition name if it exists, otherwise None.
         """
         return self._lower_partition_name
 
-    def upper_partition_name(self) -> Optional[str]:
+    def upper_partition_name(self) -> str | None:
         """
         Returns the upper partition name if it exists.
 
         Returns:
-            Optional[str]: an Optional containing the upper partition name if it exists, otherwise None
+            str | None: an Optional containing the upper partition name if it exists, otherwise None
         """
         return self._upper_partition_name
 
-    def lower_bound_type(self) -> Optional[BoundType]:
+    def lower_bound_type(self) -> BoundType | None:
         """
         Returns the type of the lower bound if it exists.
 
         Returns:
-            Optional[BoundType]: an Optional containing the lower bound type if it exists, otherwise None.
+            BoundType | None: an Optional containing the lower bound type if it exists, otherwise None.
         """
         return self._lower_bound_type
 
-    def upper_bound_type(self) -> Optional[BoundType]:
+    def upper_bound_type(self) -> BoundType | None:
         """
         Returns the type of the upper bound if it exists.
 
         Returns:
-            Optional[BoundType]: an Optional containing the upper bound type if it exists, otherwise None.
+            BoundType | None: an Optional containing the upper bound type if it exists, otherwise None.
         """
         return self._upper_bound_type
 
@@ -232,4 +225,4 @@ class PartitionRange:
 
 
 # A PartitionRange that includes all partitions.
-ALL_PARTITIONS = PartitionRange(_comparator=PartitionRange.DEFAULT_COMPARATOR)
+ALL_PARTITIONS = PartitionRange()
