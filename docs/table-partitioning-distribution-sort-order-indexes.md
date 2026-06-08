@@ -55,11 +55,11 @@ To create a distribution(bucketed) table, you should use the following three com
 
 - Strategy. It defines how Gravitino distributes table data across partitions.
 
-| Distribution strategy | Description                                                                                                                                                                    | JSON    | Java             |
-|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|------------------|
-| hash                  | Distribution table using hash. Gravitino distributes table data into buckets based on the hash value of the key.                                                               | `hash`  | `Strategy.HASH`  |
-| range                 | Distribution table using range. Gravitino distributes table data into buckets based on a specified range or interval of values.                                                | `range` | `Strategy.RANGE` |
-| even                  | Distributes table data evenly across partitions. `even` implements Doris's `random` distribution. | `even`  | `Strategy.EVEN`  |
+| Distribution strategy | Description                                                                                                                     | JSON    | Java             |
+|-----------------------|---------------------------------------------------------------------------------------------------------------------------------|---------|------------------|
+| hash                  | Distribution table using hash. Gravitino distributes table data into buckets based on the hash value of the key.                | `hash`  | `Strategy.HASH`  |
+| range                 | Distribution table using range. Gravitino distributes table data into buckets based on a specified range or interval of values. | `range` | `Strategy.RANGE` |
+| even                  | Distributes table data evenly across partitions. `even` implements Doris's `random` distribution.                               | `even`  | `Strategy.EVEN`  |
 
 - number. It defines how many buckets you use to distribution the table.
 - funcArgs. It defines the arguments of the strategy, the argument must be an [expression](./expression.md).
