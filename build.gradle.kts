@@ -336,12 +336,16 @@ subprojects {
   apply(plugin = "maven-publish")
   apply(plugin = "java")
 
-  // Force upgrade commons-beanutils/snappy-java for all subprojects to resolve outdated transitive versions
+  // Force upgrade commons-beanutils/snappy-java/slf4j-api for all subprojects to resolve outdated transitive versions
   // commons-beanutils: pulled by Hadoop, Hive, Spark, Flink, etc.
   // snappy-java: pulled by Hadoop, Kafka, Iceberg, etc.
+  // slf4j-api: log4j-slf4j2-impl:2.25.4 requires 2.0.17, while the catalog pins 2.0.16; without
+  //   this force different subprojects resolve to different versions and both jars end up in the
+  //   distribution lib directory simultaneously. Force to 2.0.17 so all subprojects converge.
   configurations.all {
     resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
     resolutionStrategy.force("org.xerial.snappy:snappy-java:$snappyJavaVersion")
+    resolutionStrategy.force("org.slf4j:slf4j-api:2.0.17")
   }
 
   repositories {
