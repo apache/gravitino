@@ -399,6 +399,7 @@ public class TestGravitinoPaimonCatalog {
     TableCatalog mockTableCatalog = mock(TableCatalog.class);
     when(mockCatalog.asTableCatalog()).thenReturn(mockTableCatalog);
     when(mockTableCatalog.purgeTable(any())).thenReturn(true);
+    when(mockCatalog.asViewCatalog()).thenThrow(new UnsupportedOperationException("no views"));
 
     TestablePaimonCatalog cat = new TestablePaimonCatalog(mockFlinkCatalog, mockCatalog);
     ObjectPath path = new ObjectPath("mydb", "mytable");
