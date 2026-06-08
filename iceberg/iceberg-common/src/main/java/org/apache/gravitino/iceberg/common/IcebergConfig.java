@@ -230,6 +230,28 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .booleanConf()
           .createWithDefault(true);
 
+  /** HTTP connection timeout in milliseconds for the REST catalog backend. */
+  public static final ConfigEntry<Integer> REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS =
+      new ConfigBuilder(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS)
+          .alternatives(
+              Collections.singletonList(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS))
+          .doc("HTTP connection timeout in milliseconds for the REST catalog backend.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(10000);
+
+  /** HTTP socket timeout in milliseconds for the REST catalog backend. */
+  public static final ConfigEntry<Integer> REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS =
+      new ConfigBuilder(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS)
+          .alternatives(
+              Collections.singletonList(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS))
+          .doc("HTTP socket timeout in milliseconds for the REST catalog backend.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(60000);
+
   public static final ConfigEntry<String> GRAVITINO_URI =
       new ConfigBuilder(IcebergConstants.GRAVITINO_URI)
           .doc(

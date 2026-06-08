@@ -99,7 +99,11 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   @Override
   public DescribeTableResponse describeTable(
-      String tableId, String delimiter, Optional<Long> version, boolean checkDeclared) {
+      String tableId,
+      String delimiter,
+      Optional<Long> version,
+      boolean checkDeclared,
+      boolean loadDetailedMetadata) {
     if (!version.isEmpty()) {
       throw new UnsupportedOperationException(
           "Describing specific table version is not supported. It should be null to indicate the"
@@ -126,7 +130,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     response.setMetadata(table.properties());
     response.setProperties(table.properties());
     response.setLocation(table.properties().get(LANCE_LOCATION));
-    response.setSchema(toJsonArrowSchema(table.columns()));
+    if (loadDetailedMetadata) {
+      response.setSchema(toJsonArrowSchema(table.columns()));
+    }
     response.setVersion(
         Optional.ofNullable(table.properties().get(LANCE_TABLE_VERSION))
             .map(Long::valueOf)

@@ -41,7 +41,7 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.jaxrs.json.provider)
-  implementation(libs.lance)
+  implementation(libs.arrow.vector)
   implementation(libs.lance.namespace.core) {
     exclude(group = "org.lance", module = "lance-core")
     exclude(group = "com.google.guava", module = "guava") // provided by gravitino

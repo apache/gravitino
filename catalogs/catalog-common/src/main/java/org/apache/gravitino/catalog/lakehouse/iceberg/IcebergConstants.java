@@ -104,6 +104,21 @@ public class IcebergConstants {
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
   public static final String ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME = "default-catalog-name";
   public static final String ICEBERG_REST_DISABLE_REST_AUTHZ = "disable-rest-authz";
+  /** Gravitino config key for REST catalog backend HTTP connection timeout. */
+  public static final String REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS =
+      "rest-client-connection-timeout-ms";
+
+  /** Gravitino config key for REST catalog backend HTTP socket timeout. */
+  public static final String REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS =
+      "rest-client-socket-timeout-ms";
+
+  /** Iceberg REST client property key for HTTP connection timeout. */
+  public static final String ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS =
+      "rest.client.connection-timeout-ms";
+
+  /** Iceberg REST client property key for HTTP socket timeout. */
+  public static final String ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS =
+      "rest.client.socket-timeout-ms";
 
   public static final String TABLE_METADATA_CACHE_IMPL = "table-metadata-cache-impl";
   public static final String TABLE_METADATA_CACHE_CAPACITY = "table-metadata-cache-capacity";

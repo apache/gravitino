@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.iceberg.service;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
@@ -109,5 +112,44 @@ public class TestIcebergCatalogWrapperManagerForREST {
         exception
             .getMessage()
             .contains("gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider"));
+  }
+
+  @Test
+  public void testCreateFederatedWrapperForRestBackend() {
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.URI,
+                "http://localhost:8181"));
+
+    CatalogWrapperForREST wrapper = newManager().createCatalogWrapper("test", icebergConfig);
+
+    Assertions.assertInstanceOf(FederatedCatalogWrapper.class, wrapper);
+  }
+
+  @Test
+  public void testCreateBaseWrapperForNonRestBackend() {
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+
+    CatalogWrapperForREST wrapper = newManager().createCatalogWrapper("test", icebergConfig);
+
+    Assertions.assertFalse(wrapper instanceof FederatedCatalogWrapper);
+    Assertions.assertEquals(CatalogWrapperForREST.class, wrapper.getClass());
+  }
+
+  private static IcebergCatalogWrapperManager newManager() {
+    Map<String, String> config = Maps.newHashMap();
+    IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
+    configProvider.initialize(config);
+    return new IcebergCatalogWrapperManager(
+        config, configProvider, false, configProvider.getMetalakeName());
   }
 }

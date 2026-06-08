@@ -14,9 +14,11 @@ This document outlines how users can manage metadata within Apache Gravitino usi
 
 [Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`. By default, it is [http://localhost:8090](http://localhost:8090).
 
-## Web V2 (UI Version 1.2.0)
+## Web V2 (UI Version 1.3.0)
 
-Starting with version 1.2.0, Gravitino introduces Web V2. By default, the template does not set `GRAVITINO_USE_WEB_V2`, so the container or environment controls which UI is used. To force the v1 UI, explicitly set it to `false`; to enable the v2 UI, set it to `true` (for example: `export GRAVITINO_USE_WEB_V2=true`). If you want to enable Web V2 from the server env file, set the following environment variable in `conf/gravitino-env.sh` before starting the server:
+Starting with version 1.3.0, Gravitino introduces Web V2. By default, Gravitino uses Web V2 (`GRAVITINO_USE_WEB_V2=true` when unset). To switch back to the legacy v1 UI, explicitly set `GRAVITINO_USE_WEB_V2=false`. To force Web V2 explicitly, set it to `true`.
+
+If you want to configure this from the server env file, set the following environment variable in `conf/gravitino-env.sh` before starting the server:
 
 ```bash
 # In <path-to-gravitino>/conf/gravitino-env.sh
@@ -31,7 +33,7 @@ After changing this value, restart the Gravitino server for the change to take e
 
 ## Web V2
 
-The sections below describe the Web V2 (requires `GRAVITINO_USE_WEB_V2=true` to enable).
+The sections below describe the Web V2. This is the default UI; set `GRAVITINO_USE_WEB_V2=false` to use the legacy v1 UI.
 The Web V2 introduces additional modules (such as Jobs, Job Templates, Data Compliance, and Access) and expands table creation and editing to support more complex data types across providers.
 
 Data Compliance includes **Tags** and **Policies**. The **Access** module is visible only when `gravitino.authorization.enable=true` and includes **Users**, **User Groups**, and **Roles**.

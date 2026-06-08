@@ -56,4 +56,9 @@ public abstract class FlinkPaimonHiveBackendIT extends FlinkPaimonCatalogIT {
   protected String getWarehouse() {
     return warehouse;
   }
+
+  @Override
+  protected boolean supportViewOperation() {
+    return true;
+  }
 }

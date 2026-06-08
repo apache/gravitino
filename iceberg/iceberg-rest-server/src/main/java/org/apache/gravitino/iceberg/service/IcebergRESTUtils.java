@@ -55,6 +55,8 @@ import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.responses.ErrorResponse;
+import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
+import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -178,14 +180,56 @@ public class IcebergRESTUtils {
 
     List<org.apache.iceberg.rest.credentials.Credential> restCredentials = new ArrayList<>();
     for (StorageCredential credential : credentials) {
-      Map<String, String> filteredConfig =
-          CredentialPropertyUtils.filterCredentialProperties(credential.config());
-      filteredConfig.putAll(buildRefreshProps(catalogName, tableIdentifier, filteredConfig));
       restCredentials.add(
-          toRESTCredential(credential.prefix(), ImmutableMap.copyOf(filteredConfig)));
+          rewriteCredential(
+              catalogName, tableIdentifier, credential.prefix(), credential.config()));
     }
 
     return List.copyOf(restCredentials);
+  }
+
+  /**
+   * Rewrites credentials returned by an upstream REST catalog so their {@code
+   * *.refresh-credentials-endpoint} entries point at this IRC instance instead of the upstream
+   * catalog. Without this, a federated {@code getTableCredentials} would return refresh endpoints
+   * scoped to the remote catalog's prefix, inconsistent with the loadTable/createTable paths that
+   * already rewrite via {@link #buildStorageCreds}.
+   *
+   * @param catalogName IRC catalog name used to build refresh paths
+   * @param tableIdentifier table receiving the credentials
+   * @param upstream the credentials response returned by the upstream REST catalog
+   * @return a credentials response with IRC-local refresh endpoints
+   */
+  public static LoadCredentialsResponse rewriteTableCredentials(
+      String catalogName, TableIdentifier tableIdentifier, LoadCredentialsResponse upstream) {
+    ImmutableLoadCredentialsResponse.Builder builder = ImmutableLoadCredentialsResponse.builder();
+    for (org.apache.iceberg.rest.credentials.Credential credential : upstream.credentials()) {
+      builder.addCredentials(
+          rewriteCredential(
+              catalogName, tableIdentifier, credential.prefix(), credential.config()));
+    }
+    return builder.build();
+  }
+
+  /**
+   * Filters an upstream credential's config to recognized credential properties and re-applies
+   * IRC-local refresh-endpoint properties, dropping any refresh endpoint scoped to the upstream
+   * catalog.
+   *
+   * @param catalogName IRC catalog name used to build refresh paths
+   * @param tableIdentifier table receiving the credential
+   * @param prefix storage location prefix for the credential
+   * @param config upstream credential config
+   * @return an Iceberg REST credential with IRC-local refresh endpoints
+   */
+  private static org.apache.iceberg.rest.credentials.Credential rewriteCredential(
+      String catalogName,
+      TableIdentifier tableIdentifier,
+      String prefix,
+      Map<String, String> config) {
+    Map<String, String> filteredConfig = CredentialPropertyUtils.filterCredentialProperties(config);
+    filteredConfig.putAll(buildRefreshProps(catalogName, tableIdentifier, filteredConfig));
+    return toRESTCredential(prefix, ImmutableMap.copyOf(filteredConfig));
   }
 
   public static <T> Response ok(T t) {

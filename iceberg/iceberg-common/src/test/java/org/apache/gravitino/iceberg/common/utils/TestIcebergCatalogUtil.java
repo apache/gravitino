@@ -225,4 +225,47 @@ public class TestIcebergCatalogUtil {
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", properties.get(IcebergConstants.IO_IMPL));
   }
+
+  @Test
+  void testApplyRestCatalogHttpTimeoutPropertiesUsesDefaults() {
+    Map<String, String> properties = new HashMap<>();
+
+    IcebergCatalogUtil.applyRestCatalogHttpTimeoutProperties(
+        new IcebergConfig(new HashMap<>()), properties);
+
+    Assertions.assertEquals(
+        "10000", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "60000", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testApplyRestCatalogHttpTimeoutPropertiesUsesConfiguredValues() {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS.getKey(), "1234");
+    config.put(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS.getKey(), "5678");
+    Map<String, String> properties = new HashMap<>();
+
+    IcebergCatalogUtil.applyRestCatalogHttpTimeoutProperties(new IcebergConfig(config), properties);
+
+    Assertions.assertEquals(
+        "1234", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "5678", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testApplyRestCatalogHttpTimeoutPropertiesUsesIcebergPropertyAliases() {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS, "2345");
+    config.put(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS, "6789");
+    Map<String, String> properties = new HashMap<>();
+
+    IcebergCatalogUtil.applyRestCatalogHttpTimeoutProperties(new IcebergConfig(config), properties);
+
+    Assertions.assertEquals(
+        "2345", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "6789", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
 }
