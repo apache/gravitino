@@ -40,6 +40,7 @@ import static org.apache.gravitino.rel.types.Types.TimestampType;
 import static org.apache.gravitino.rel.types.Types.UUIDType;
 import static org.apache.gravitino.rel.types.Types.VarCharType;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -442,9 +443,13 @@ final class GlueIcebergTableHelper {
           TableChange.UpdateColumnType upd = (TableChange.UpdateColumnType) change;
           Preconditions.checkArgument(
               upd.fieldName().length == 1, "Nested column type updates are not supported");
+          org.apache.iceberg.types.Type newIcebergType = toIcebergType(upd.getNewDataType());
+          Preconditions.checkArgument(
+              newIcebergType instanceof org.apache.iceberg.types.Type.PrimitiveType,
+              "Iceberg only supports primitive type promotion via updateColumn, got: %s",
+              upd.getNewDataType().simpleString());
           update.updateColumn(
-              upd.fieldName()[0],
-              (org.apache.iceberg.types.Type.PrimitiveType) toIcebergType(upd.getNewDataType()));
+              upd.fieldName()[0], (org.apache.iceberg.types.Type.PrimitiveType) newIcebergType);
         } else if (change instanceof TableChange.UpdateColumnComment) {
           TableChange.UpdateColumnComment upd = (TableChange.UpdateColumnComment) change;
           Preconditions.checkArgument(
@@ -578,13 +583,15 @@ final class GlueIcebergTableHelper {
   // Type conversion (Gravitino -> Iceberg)
   // ---------------------------------------------------------------------------
 
-  private static Schema toIcebergSchema(Column[] columns) {
+  @VisibleForTesting
+  static Schema toIcebergSchema(Column[] columns) {
     List<Types.NestedField> fields = new ArrayList<>();
-    // Field IDs are assigned sequentially starting from 0. This is the Iceberg convention
-    // for initial schema creation. Schema evolution reuses existing IDs from the table.
+    // Top-level columns use ordinal IDs (0, 1, ...). Nested field IDs start after that range
+    // so all IDs are unique within the schema, as required by the Schema constructor.
+    int[] nextId = {columns.length};
     for (int i = 0; i < columns.length; i++) {
       Column col = columns[i];
-      org.apache.iceberg.types.Type icebergType = toIcebergType(col.dataType());
+      org.apache.iceberg.types.Type icebergType = toIcebergType(col.dataType(), nextId);
       if (col.nullable()) {
         fields.add(Types.NestedField.optional(i, col.name(), icebergType, col.comment()));
       } else {
@@ -595,6 +602,42 @@ final class GlueIcebergTableHelper {
   }
 
   private static org.apache.iceberg.types.Type toIcebergType(Type type) {
+    int[] nextId = {0};
+    return toIcebergType(type, nextId);
+  }
+
+  private static org.apache.iceberg.types.Type toIcebergType(Type type, int[] nextId) {
+    if (type instanceof ListType) {
+      ListType listType = (ListType) type;
+      org.apache.iceberg.types.Type elementType = toIcebergType(listType.elementType(), nextId);
+      int elementId = nextId[0]++;
+      return listType.elementNullable()
+          ? Types.ListType.ofOptional(elementId, elementType)
+          : Types.ListType.ofRequired(elementId, elementType);
+    }
+    if (type instanceof MapType) {
+      MapType mapType = (MapType) type;
+      org.apache.iceberg.types.Type keyType = toIcebergType(mapType.keyType(), nextId);
+      org.apache.iceberg.types.Type valueType = toIcebergType(mapType.valueType(), nextId);
+      int keyId = nextId[0]++;
+      int valueId = nextId[0]++;
+      return mapType.valueNullable()
+          ? Types.MapType.ofOptional(keyId, valueId, keyType, valueType)
+          : Types.MapType.ofRequired(keyId, valueId, keyType, valueType);
+    }
+    if (type instanceof StructType) {
+      StructType structType = (StructType) type;
+      List<Types.NestedField> nestedFields = new ArrayList<>();
+      for (StructType.Field field : structType.fields()) {
+        org.apache.iceberg.types.Type fieldType = toIcebergType(field.type(), nextId);
+        int fieldId = nextId[0]++;
+        nestedFields.add(
+            field.nullable()
+                ? Types.NestedField.optional(fieldId, field.name(), fieldType, field.comment())
+                : Types.NestedField.required(fieldId, field.name(), fieldType, field.comment()));
+      }
+      return Types.StructType.of(nestedFields);
+    }
     if (type instanceof BooleanType) {
       return Types.BooleanType.get();
     }
