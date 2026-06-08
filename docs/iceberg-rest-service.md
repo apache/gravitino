@@ -296,10 +296,10 @@ Refer to [OAuth2 Configuration](./security/how-to-authenticate#server-configurat
 
 When enabling OAuth2 and leveraging a dynamic configuration provider to retrieve catalog information from the Gravitino server, use the following configuration parameters to establish OAuth2 authentication for secure communication with the Gravitino server:
 
-| Configuration item                                   | Description                                                                         | Default value         | Required          | Since Version |
-|------------------------------------------------------|-------------------------------------------------------------------------------------|-----------------------|-------------------|---------------|
+| Configuration item                                   | Description                                                                                      | Default value         | Required          | Since Version |
+|------------------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------------|-------------------|---------------|
 | `gravitino.iceberg-rest.gravitino-auth-type`         | The auth type for communicating with the Gravitino server. Supported values: `simple`, `oauth2`. | `simple`              | No                | 1.0.0         |
-| `gravitino.iceberg-rest.gravitino-simple.user-name`  | The username when using `simple` auth type.                                         | `iceberg-rest-server` | No                | 1.0.0         |
+| `gravitino.iceberg-rest.gravitino-simple.user-name`  | The username when using `simple` auth type.                                                      | `iceberg-rest-server` | No                | 1.0.0         |
 | `gravitino.iceberg-rest.gravitino-oauth2.server-uri` | The OAuth2 server uri address.                                                      | (none)                | Yes, for `oauth2` | 1.0.0         | 
 | `gravitino.iceberg-rest.gravitino-oauth2.credential` | The credential to request the OAuth2 token.                                         | (none)                | Yes, for `oauth2` | 1.0.0         | 
 | `gravitino.iceberg-rest.gravitino-oauth2.token-path` | The path for token of the default OAuth server.                                     | (none)                | Yes, for `oauth2` | 1.0.0         | 
@@ -525,7 +525,7 @@ For storages not managed by Gravitino directly, configure them through custom ca
 
 | Configuration item               | Description                                                                             | Default value | Required | Since Version    |
 |----------------------------------|-----------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg; use the fully qualified classname. | (none)        | No       | 0.6.0-incubating |
+| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg; use the fully qualified classname.       | (none)        | No       | 0.6.0-incubating |
 
 To pass custom properties such as `security-token` to your custom `FileIO`, configure them via `gravitino.iceberg-rest.security-token`. The `security-token` is included in the properties when the `FileIO` initialize method is invoked.
 
