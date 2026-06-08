@@ -113,7 +113,7 @@ export default function CreateCatalogDialog({ ...props }) {
   )
 
   const isHidden = prop => {
-    const { parentField, hide, required, key } = prop
+    const { parentField, hide, key } = prop
     switch (parentField) {
       case 'catalog-backend':
         return catalogBackend && hide && hide.includes(catalogBackend)
