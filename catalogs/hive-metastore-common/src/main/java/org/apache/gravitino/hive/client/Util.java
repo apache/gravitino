@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.hive.client;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
+
 import java.net.InetAddress;
 import java.net.URI;
 import java.util.Arrays;
@@ -34,7 +36,6 @@ public class Util {
   private static final Logger LOG = LoggerFactory.getLogger(Util.class);
 
   public static final String HIVE_CONFIG_RESOURCES = "hive.config.resources";
-  private static final String HIVE_METASTORE_URIS = "hive.metastore.uris";
 
   public static void updateConfigurationFromProperties(
       Properties properties, Configuration config) {
@@ -77,7 +78,14 @@ public class Util {
         return uriStr;
       }
       String ip = InetAddress.getByName(host).getHostAddress();
-      return new URI(uri.getScheme(), null, ip, uri.getPort(), uri.getPath(), null, null)
+      return new URI(
+              uri.getScheme(),
+              uri.getUserInfo(),
+              ip,
+              uri.getPort(),
+              uri.getPath(),
+              uri.getQuery(),
+              uri.getFragment())
           .toString();
     } catch (Exception e) {
       LOG.warn("Failed to resolve metastore URI host for '{}', using original", uriStr, e);
