@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.factories.CatalogFactory;
@@ -40,6 +42,9 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+import org.apache.gravitino.rel.Dialects;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -102,6 +107,28 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   // ---------------------------------------------------------------------------
   // DDL — route through Gravitino (single source of truth)
   // ---------------------------------------------------------------------------
+
+  @Override
+  protected List<String> viewDialectFallbackOrder() {
+    return Arrays.asList(Dialects.FLINK, Dialects.HIVE, PaimonConstants.VIEW_QUERY_DIALECT);
+  }
+
+  @Override
+  protected Representation[] buildViewRepresentations(ResolvedCatalogView view) {
+    String sql = view.getExpandedQuery();
+    return new Representation[] {
+      SQLRepresentation.builder().withDialect(Dialects.FLINK).withSql(sql).build(),
+      SQLRepresentation.builder()
+          .withDialect(PaimonConstants.VIEW_QUERY_DIALECT)
+          .withSql(sql)
+          .build()
+    };
+  }
+
+  @Override
+  protected boolean dropTableEntry(NameIdentifier ident) {
+    return catalog().asTableCatalog().purgeTable(ident);
+  }
 
   @VisibleForTesting
   static Map<String, String> distributionToProperties(Distribution distribution) {
@@ -186,21 +213,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @Override
   public Optional<Factory> getFactory() {
     return paimonCatalog.getFactory();
-  }
-
-  @Override
-  public void dropTable(ObjectPath tablePath, boolean ignoreIfNotExists)
-      throws TableNotExistException, CatalogException {
-    boolean dropped =
-        catalog()
-            .asTableCatalog()
-            .purgeTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
-    if (!dropped && !ignoreIfNotExists) {
-      throw new TableNotExistException(catalogName(), tablePath);
-    }
-    if (dropped) {
-      invalidateNativeTableCache(tablePath);
-    }
   }
 
   @Override
