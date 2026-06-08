@@ -157,7 +157,7 @@ final class GlueIcebergTableHelper {
     icebergProps.put(IcebergConstants.AWS_S3_REGION, region);
 
     String catalogId = config.get(GlueConstants.AWS_GLUE_CATALOG_ID);
-    if (catalogId != null) {
+    if (catalogId != null && !catalogId.isEmpty()) {
       icebergProps.put(GLUE_ID, catalogId);
     }
 
