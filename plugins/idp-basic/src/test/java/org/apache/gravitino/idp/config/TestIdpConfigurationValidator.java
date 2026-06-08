@@ -20,8 +20,8 @@
 package org.apache.gravitino.idp.config;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Lists;
 import org.apache.gravitino.Config;
@@ -35,10 +35,10 @@ class TestIdpConfigurationValidator {
   void testSimpleAndAuthFails() {
     Config config = newConfig(true, AuthenticatorType.SIMPLE.name().toLowerCase());
 
-    IllegalStateException exception =
-        assertThrows(IllegalStateException.class, () -> IdpConfigurationValidator.validate(config));
+    SystemExitException exception =
+        assertThrows(SystemExitException.class, () -> validateWithExitGuard(config));
 
-    assertTrue(exception.getMessage().contains("cannot be used with Simple authentication"));
+    assertEquals(1, exception.status());
   }
 
   @Test
@@ -46,7 +46,7 @@ class TestIdpConfigurationValidator {
     Config config = new Config(false) {};
     config.set(Configs.ENABLE_AUTHORIZATION, true);
 
-    assertThrows(IllegalStateException.class, () -> IdpConfigurationValidator.validate(config));
+    assertThrows(SystemExitException.class, () -> validateWithExitGuard(config));
   }
 
   @Test
@@ -68,5 +68,40 @@ class TestIdpConfigurationValidator {
     config.set(Configs.ENABLE_AUTHORIZATION, authorizationEnabled);
     config.set(Configs.AUTHENTICATORS, Lists.newArrayList(authenticators));
     return config;
+  }
+
+  @SuppressWarnings("removal")
+  private static void validateWithExitGuard(Config config) {
+    SecurityManager original = System.getSecurityManager();
+    System.setSecurityManager(
+        new SecurityManager() {
+          @Override
+          public void checkExit(int status) {
+            throw new SystemExitException(status);
+          }
+
+          @Override
+          public void checkPermission(java.security.Permission perm) {
+            // Allow test execution.
+          }
+        });
+    try {
+      IdpConfigurationValidator.validate(config);
+    } finally {
+      System.setSecurityManager(original);
+    }
+  }
+
+  private static final class SystemExitException extends SecurityException {
+    private final int status;
+
+    private SystemExitException(int status) {
+      super("System.exit(" + status + ")");
+      this.status = status;
+    }
+
+    private int status() {
+      return status;
+    }
   }
 }

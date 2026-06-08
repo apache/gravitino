@@ -22,9 +22,13 @@ package org.apache.gravitino.idp.config;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Validates server configuration before the built-in IdP plugin starts. */
 public final class IdpConfigurationValidator {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IdpConfigurationValidator.class);
 
   private IdpConfigurationValidator() {}
 
@@ -32,7 +36,6 @@ public final class IdpConfigurationValidator {
    * Validates that the server configuration is compatible with the built-in IdP plugin.
    *
    * @param config The server configuration.
-   * @throws IllegalStateException if Simple authentication is enabled together with authorization.
    */
   public static void validate(Config config) {
     if (!config.get(Configs.ENABLE_AUTHORIZATION)) {
@@ -42,10 +45,11 @@ public final class IdpConfigurationValidator {
         config.get(Configs.AUTHENTICATORS).stream()
             .anyMatch(name -> AuthenticatorType.SIMPLE.name().equalsIgnoreCase(name.trim()));
     if (usesSimple) {
-      throw new IllegalStateException(
+      LOG.error(
           "Built-in IdP cannot be used with Simple authentication when authorization is enabled. "
               + "Remove 'simple' from gravitino.authenticators (default is simple), "
               + "or disable gravitino.authorization.enable.");
+      System.exit(1);
     }
   }
 }
