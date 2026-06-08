@@ -24,7 +24,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations           | Description                                                                                | Default value | Required | Since Version    |
 |-------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-provider-type`          | `gravitino.iceberg-rest.credential-provider-type`      | Deprecated; use `credential-providers` instead.                                     | (none)        | Yes      | 0.7.0-incubating |
+| `credential-provider-type`          | `gravitino.iceberg-rest.credential-provider-type`      | Deprecated; use `credential-providers` instead.                                            | (none)        | Yes      | 0.7.0-incubating |
 | `credential-providers`              | `gravitino.iceberg-rest.credential-providers`          | The credential provider types, separated by comma.                                         | (none)        | Yes      | 0.8.0-incubating |
 | `credential-cache-expire-ratio`     | `gravitino.iceberg-rest.credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino remove credential from the cache. | 0.15          | No       | 0.8.0-incubating |
 | `credential-cache-max-size`         | `gravitino.iceberg-rest.cache-max-size`                | Max size for the credential cache.                                                         | 10000         | No       | 0.8.0-incubating |
@@ -146,7 +146,7 @@ An GCS token is a token credential with scoped privileges, by leveraging GCS [Cr
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                | Default value                       | Required | Since Version    |
 |-------------------------------------|---------------------------------------------------|------------------------------------------------------------|-------------------------------------|----------|------------------|
 | `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `gcs-token` for GCS token credential.                      | (none)                              | Yes      | 0.8.0-incubating |
-| `gcs-credential-file-path`          | `gravitino.iceberg-rest.gcs-credential-file-path` | Deprecated; use `gcs-service-account-file` instead. | GCS Application default credential. | No       | 0.7.0-incubating |
+| `gcs-credential-file-path`          | `gravitino.iceberg-rest.gcs-credential-file-path` | Deprecated; use `gcs-service-account-file` instead.        | GCS Application default credential. | No       | 0.7.0-incubating |
 | `gcs-service-account-file`          | `gravitino.iceberg-rest.gcs-service-account-file` | The location of GCS credential file.                       | GCS Application default credential. | No       | 0.8.0-incubating |
 
 :::note

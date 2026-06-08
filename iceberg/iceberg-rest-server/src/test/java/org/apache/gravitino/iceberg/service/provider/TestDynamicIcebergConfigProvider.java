@@ -248,6 +248,9 @@ public class TestDynamicIcebergConfigProvider {
     catalogProperties.put("catalog.backend-name", "custom_backend");
     catalogProperties.put("gravitino.bypass.custom-k1", "custom-v1");
     catalogProperties.put("custom-k2", "custom-v2");
+    catalogProperties.put(
+        IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS, "1234");
+    catalogProperties.put(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS, "5678");
 
     IcebergConfig icebergConfig =
         DynamicIcebergConfigProvider.getIcebergConfigFromCatalogProperties(catalogProperties);
@@ -256,6 +259,20 @@ public class TestDynamicIcebergConfigProvider {
     Assertions.assertTrue(icebergConfig.getIcebergCatalogProperties().containsKey("custom-k2"));
     Assertions.assertEquals(
         icebergConfig.getIcebergCatalogProperties().get("catalog.backend-name"), "custom_backend");
+    Assertions.assertEquals(
+        1234, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        5678, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "1234",
+        icebergConfig
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "5678",
+        icebergConfig
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
   }
 
   @Test
