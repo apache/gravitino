@@ -1,6 +1,6 @@
 ---
-title: "Iceberg catalog"
-slug: /lakehouse-iceberg-catalog
+title: "Iceberg Catalog"
+slug: "/lakehouse-iceberg-catalog"
 keywords:
   - lakehouse
   - iceberg
@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 
-### Requirements and limitations
+### Requirements and Limitations
 
 :::info
 Builds with Apache Iceberg `1.11.0`. The Apache Iceberg table format version is `2` by default.
@@ -23,7 +23,7 @@ Builds with Apache Iceberg `1.11.0`. The Apache Iceberg table format version is 
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Works as a catalog proxy, supporting `Hive`, `JDBC` and `REST` as catalog backend.
 - Supports DDL operations for Iceberg schemas and tables.
@@ -32,7 +32,7 @@ Builds with Apache Iceberg `1.11.0`. The Apache Iceberg table format version is 
 - Supports Kerberos or simple authentication for Iceberg catalog with Hive backend.
 - Supports table metadata cache.
 
-### Catalog properties
+### Catalog Properties
 
 | Property name          | Description                                                                                                                                                                                             | Default value                                                                  | Required                                  | Since Version |
 |------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------------------------------|---------------|
@@ -49,7 +49,7 @@ If you are using the Gravitino with Trino, you can pass the Trino Iceberg connec
 If you are using the Gravitino with Spark, you can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
 
 
-#### JDBC backend
+#### JDBC Backend
 
 If you are using JDBC backend, you must provide properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`.
 
@@ -63,19 +63,21 @@ If you are using JDBC backend, you must provide properties like `jdbc-user`, `jd
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
 :::caution
-You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-iceberg/libs` directory If you are using JDBC backend.
+Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-iceberg/libs` directory If you are using JDBC backend.
 If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDMS like `Mysql`, you should create Iceberg meta tables explicitly.
 :::
 
-#### REST catalog backend
+#### REST Catalog Backend
 
 For the REST catalog backend, `warehouse` identifies the catalog in the Iceberg REST spec. In the Gravitino Iceberg REST server, `warehouse` maps to the catalog name. An empty value means the default catalog.
 
-`data-access` controls how the Iceberg REST client accesses table data when using a REST backend:
+The following properties tune REST backend behavior:
 
-| Property name  | Description                                                                                                             | Default value | Required | Since Version |
-|----------------|-------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `data-access`  | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`.              | (none)        | No       | 1.3.0         |
+| Property name                         | Description                                                                                                | Default value | Required | Since Version |
+|---------------------------------------|------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `data-access`                         | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`. | (none)        | No       | 1.3.0         |
+| `rest-client-connection-timeout-ms`   | The HTTP connection timeout in milliseconds for requests to the REST catalog backend.                      | 10000         | No       | 1.3.0         |
+| `rest-client-socket-timeout-ms`       | The HTTP socket timeout in milliseconds for requests to the REST catalog backend.                          | 60000         | No       | 1.3.0         |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.
@@ -92,6 +94,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "catalog-backend": "rest",
     "uri": "http://localhost:9001/iceberg",
+    "rest-client-connection-timeout-ms": "10000",
+    "rest-client-socket-timeout-ms": "60000",
     "data-access": "vended-credentials"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
@@ -186,13 +190,13 @@ Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs
 Since Gravitino 1.1.0, the Gravitino Iceberg Azure bundle jar has already included the Iceberg Azure bundle jar, no need to download and include it separately.
 :::
 
-#### Other storages
+#### Other Storage
 
 For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
 
 | Configuration item | Description                                                                             | Default value | Required | Since Version    |
 |--------------------|-----------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `io-impl`          | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0-incubating |
+| `io-impl`          | The IO implementation for `FileIO` in Iceberg; use the fully qualified classname.       | (none)        | No       | 0.6.0-incubating |
 
 To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
 
@@ -200,7 +204,7 @@ To pass custom properties such as `security-token` to your custom `FileIO`, you 
 Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
-#### Catalog backend security
+#### Catalog Backend Security
 
 Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
 
@@ -214,7 +218,7 @@ Users can use the following properties to configure the security of the catalog 
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                   | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                       | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
 
-#### Table metadata cache
+#### Table Metadata Cache
 
 Gravitino features a pluggable cache system for updating or retrieving table metadata in the cache. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
 
@@ -226,24 +230,24 @@ Gravitino features a pluggable cache system for updating or retrieving table met
 
 Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
 
-### Catalog operations
+### Catalog Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - doesn't support cascade drop schema.
 - supports hierarchical (multi-level) schemas, mapping each level to an Iceberg namespace level. See [Hierarchical schema](#hierarchical-schema).
 
-### Schema properties
+### Schema Properties
 
 You could put properties except `comment`.
 
-### Schema operations
+### Schema Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ### Hierarchical schema
 
@@ -335,11 +339,11 @@ children: List[str] = catalog.as_schemas().list_schemas(parent_schema="a:b")
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Doesn't support column default value.
 
-### Table partitions
+### Table Partitions
 
 Supports transforms:
 
@@ -356,7 +360,7 @@ Iceberg doesn't support multi fields in `BucketTransform`.
 Iceberg doesn't support `ApplyTransform`, `RangeTransform`, and `ListTransform`.
 :::
 
-### Table sort orders
+### Table Sort Orders
 
 supports expressions:
 
@@ -373,7 +377,7 @@ supports expressions:
 For `bucket` and `truncate`, the first argument must be integer literal, and the second argument must be field reference.
 :::
 
-### Table distributions
+### Table Distributions
 
 - Support `HashDistribution`, which distribute data by partition key.
 - Support `RangeDistribution`, which distribute data by partition key or sort key for a SortOrder table.
@@ -383,7 +387,7 @@ For `bucket` and `truncate`, the first argument must be integer literal, and the
 If you doesn't specify distribution expressions, the table distribution will be adjusted to `RangeDistribution` for a sort order table, to `HashDistribution` for a partition table.
 :::
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type    | Apache Iceberg Type         |
 |-------------------|-----------------------------|
@@ -410,9 +414,9 @@ Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `U
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-### Table properties
+### Table Properties
 
-You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configuration/) to Gravitino when creating an Iceberg table.
+Pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configuration/) to Gravitino when creating an Iceberg table.
 
 :::note
 **Reserved**: Fields that cannot be passed to the Gravitino server.
@@ -426,23 +430,23 @@ You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/co
 | `provider`                | The storage provider for table storage.                                               | (none)        | No       | No       | Yes       | 0.2.0         |
 | `format`                  | The format of table storage.                                                          | (none)        | No       | No       | Yes       | 0.2.0         |
 | `format-version`          | The format version of table storage.                                                  | (none)        | No       | No       | Yes       | 0.2.0         |
-| `comment`                 | The table comment, please use `comment` field in table meta instead.                  | (none)        | No       | Yes      | No        | 0.2.0         |
+| `comment`                 | The table comment; use the `comment` field in table meta instead.                     | (none)        | No       | Yes      | No        | 0.2.0         |
 | `creator`                 | The table creator.                                                                    | (none)        | No       | Yes      | No        | 0.2.0         |
 | `current-snapshot-id`     | The snapshot represents the current state of the table.                               | (none)        | No       | Yes      | No        | 0.2.0         |
 | `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                   | (none)        | No       | Yes      | No        | 0.2.0         |
-| `sort-order`              | Iceberg table sort order, please use `SortOrder` in table meta instead.               | (none)        | No       | Yes      | No        | 0.2.0         |
+| `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.                      | (none)        | No       | Yes      | No        | 0.2.0         |
 | `identifier-fields`       | The identifier fields for defining the table.                                         | (none)        | No       | Yes      | No        | 0.2.0         |
-| `write.distribution-mode` | Defines distribution of write data, please use `distribution` in table meta instead.  | (none)        | No       | Yes      | No        | 0.2.0         |
+| `write.distribution-mode` | Defines distribution of write data; use `distribution` in table meta instead.         | (none)        | No       | Yes      | No        | 0.2.0         |
 
-### Table indexes
+### Table Indexes
 
 - Doesn't support table indexes.
 
-### Table operations
+### Table Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Supports operations:
 
@@ -468,19 +472,19 @@ If you update a nullability column to non nullability, there may be compatibilit
 
 ## View
 
-### View capabilities
+### View Capabilities
 
 - Supports list, create, load, alter, and drop for views managed by the underlying Iceberg REST, JDBC, or Hive backend.
 - Supports dialects such as `trino`, `spark`, and `hive`.
 - Can preserve multiple SQL representations for the same logical view.
 
-### View operations
+### View Operations
 
 Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for more details.
 
-## HDFS configuration
+## HDFS Configuration
 
-You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
+Place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
 
 :::info
 Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hadoop 3.x clusters.

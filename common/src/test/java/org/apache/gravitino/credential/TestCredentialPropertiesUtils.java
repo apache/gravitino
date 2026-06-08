@@ -38,7 +38,9 @@ public class TestCredentialPropertiesUtils {
             CredentialPropertyUtils.ICEBERG_S3_SECRET_ACCESS_KEY,
             "secret",
             CredentialPropertyUtils.ICEBERG_S3_TOKEN,
-            "token");
+            "token",
+            CredentialPropertyUtils.ICEBERG_S3_TOKEN_EXPIRES_AT_MS,
+            "100");
     Assertions.assertEquals(expectedProperties, icebergProperties);
 
     S3SecretKeyCredential secretKeyCredential = new S3SecretKeyCredential("key", "secret");
@@ -65,7 +67,9 @@ public class TestCredentialPropertiesUtils {
             CredentialPropertyUtils.ICEBERG_OSS_ACCESS_KEY_SECRET,
             "secret",
             CredentialPropertyUtils.ICEBERG_OSS_SECURITY_TOKEN,
-            "security-token");
+            "security-token",
+            CredentialPropertyUtils.ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS,
+            "100");
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
 
@@ -80,14 +84,67 @@ public class TestCredentialPropertiesUtils {
     Map<String, String> icebergProperties =
         CredentialPropertyUtils.toIcebergProperties(adlsTokenCredential);
 
-    String sasTokenKey =
-        String.format(
-            "%s.%s.%s",
-            CredentialPropertyUtils.ICEBERG_ADLS_TOKEN,
-            storageAccountName,
-            ADLSTokenCredential.ADLS_DOMAIN);
+    String adlsHost = storageAccountName + "." + ADLSTokenCredential.ADLS_DOMAIN;
+    String sasTokenKey = CredentialPropertyUtils.ICEBERG_ADLS_TOKEN + "." + adlsHost;
 
-    Map<String, String> expectedProperties = ImmutableMap.of(sasTokenKey, sasToken);
+    Map<String, String> expectedProperties =
+        ImmutableMap.of(
+            sasTokenKey,
+            sasToken,
+            CredentialPropertyUtils.ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsHost,
+            String.valueOf(expireTimeInMS));
     Assertions.assertEquals(expectedProperties, icebergProperties);
+  }
+
+  @Test
+  void testBuildRefreshEndpointsForS3() {
+    Map<String, String> credentialProperties =
+        ImmutableMap.of(
+            CredentialPropertyUtils.ICEBERG_S3_TOKEN, "token",
+            CredentialPropertyUtils.ICEBERG_S3_TOKEN_EXPIRES_AT_MS, "123");
+
+    Map<String, String> refreshEndpointProperties =
+        CredentialPropertyUtils.buildRefreshProps("irc1", "db", "tbl", credentialProperties);
+
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        refreshEndpointProperties.get(
+            CredentialPropertyUtils.ICEBERG_CLIENT_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testBuildRefreshEndpointsForGCS() {
+    Map<String, String> credentialProperties =
+        ImmutableMap.of(
+            CredentialPropertyUtils.ICEBERG_GCS_TOKEN, "token",
+            CredentialPropertyUtils.ICEBERG_GCS_TOKEN_EXPIRES_AT, "123");
+
+    Map<String, String> refreshEndpointProperties =
+        CredentialPropertyUtils.buildRefreshProps("irc1", "db", "tbl", credentialProperties);
+
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        refreshEndpointProperties.get(
+            CredentialPropertyUtils.ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testBuildRefreshEndpointsForADLS() {
+    String adlsHost = "storage.dfs.core.windows.net";
+    String sasTokenKey = CredentialPropertyUtils.ICEBERG_ADLS_TOKEN + "." + adlsHost;
+    Map<String, String> credentialProperties =
+        ImmutableMap.of(
+            sasTokenKey,
+            "sas-token",
+            CredentialPropertyUtils.ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsHost,
+            "123");
+
+    Map<String, String> refreshEndpointProperties =
+        CredentialPropertyUtils.buildRefreshProps("irc1", "db", "tbl", credentialProperties);
+
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        refreshEndpointProperties.get(
+            CredentialPropertyUtils.ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT));
   }
 }

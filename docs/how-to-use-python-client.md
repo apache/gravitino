@@ -1,11 +1,11 @@
 ---
-title: "How to use Apache Gravitino Python client"
-slug: /how-to-use-gravitino-python-client
+title: "Python Client"
+slug: "/how-to-use-gravitino-python-client"
 date: 2024-05-09
-keyword: Gravitino Python client
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino Python client"
+license: "This software is licensed under the Apache License version 2."
 ---
-# Apache Gravitino Python client
+## Introduction
 
 Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
 It manages the metadata directly in different sources, types, and regions, also provides users
@@ -15,15 +15,15 @@ Gravitino Python client helps data scientists easily manage metadata using Pytho
 
 ![gravitino-python-client-introduction](./assets/gravitino-python-client-introduction.png)
 
-## Use Guidance
+## Usage
 
-You can use Gravitino Python client library with Spark, PyTorch, Tensorflow, Ray and Python environment.
+Use Gravitino Python client library with Spark, PyTorch, Tensorflow, Ray and Python environment.
 
 First of all, You must have a Gravitino server set up and run, You can refer document of
 [How to install Gravitino](./how-to-install.md) to build Gravitino server from source code and
 install it in your local.
 
-### Apache Gravitino Python client API
+### Python Client API
 
 ```shell
 pip install apache-gravitino
@@ -32,7 +32,7 @@ pip install apache-gravitino
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 
-### Apache Gravitino Fileset Example
+### Fileset Example
 
 We offer a playground environment to help you quickly understand how to use Gravitino Python
 client to manage non-tabular data on HDFS via Fileset in Gravitino. You can refer to the
@@ -63,9 +63,9 @@ contains the following code snippets:
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.
 
-## How to develop Apache Gravitino Python Client
+## Python Client Development
 
-You can ues any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
+Use any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
 
 ### Prerequisites
 
@@ -73,7 +73,7 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 + Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
   environment ready for building.
 
-### Build and testing
+### Build and Test
 
 1. Clone the Gravitino project.
 
@@ -121,7 +121,7 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
     ./gradlew :clients:client-python:deploy
     ```
    
-### IDE specific settings
+### IDE Specific Settings
 
 #### JetBrains IntelliJ IDEA
 
@@ -129,7 +129,7 @@ We use Conda Environment to manage Python Environment, to configure Python
 SDK, you need to:
 
 1. Make sure you installed [Python Plugin](https://plugins.jetbrains.com/plugin/631-python).
-2. Make sure you followed the step to build python module in [Build and testing](#build-and-testing)
+2. Make sure you followed the step to build python module in [Build and Test](#build-and-test)
 3. Make sure you are at the root directory of Gravitino Git repository. 
 4. Find conda executable by executing this command
 
@@ -162,9 +162,9 @@ And you will see a new Python SDK is added, and it has several packages installe
 
 9. Done! Now, open any python files and start developing Gravitino Python Client.
 
-##### Note about running integration tests of Gravitino Python client in IntelliJ IDEA.
+##### Running Integration Tests in IntelliJ IDEA
 
-Since integration tests require Gravitino Java distribution, so you can not run tests with IntelliJ
+Since integration tests require Gravitino Java distribution, so you cannot run tests with IntelliJ
 [Run tests button](https://www.jetbrains.com/help/idea/performing-tests.html),
 Please execute this gradle task with [Gradle Plugin](https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html)
 or in command line to run integration tests.

@@ -66,3 +66,8 @@ web/.next
 .venv/
 .worktrees/
 .claude/settings.local.json
+
+# Vim swap files
+*.swp
+*.swo
+.*.sw?

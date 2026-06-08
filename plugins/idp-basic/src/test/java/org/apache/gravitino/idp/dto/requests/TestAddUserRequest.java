@@ -64,6 +64,9 @@ public class TestAddUserRequest {
         () -> new AddUserRequest("user:name", VALID_PASSWORD).validate());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new AddUserRequest("test_user", "short").validate());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new AddUserRequest("a".repeat(129), VALID_PASSWORD).validate());
   }
 
   @Test
