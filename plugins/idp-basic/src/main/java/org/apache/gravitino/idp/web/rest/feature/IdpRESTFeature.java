@@ -26,9 +26,9 @@ import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
-import org.apache.gravitino.idp.config.IdpConfigurationValidator;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
 import org.apache.gravitino.idp.web.rest.IdpGroupOperations;
@@ -60,7 +60,7 @@ public class IdpRESTFeature implements Feature {
   public boolean configure(FeatureContext context) {
     GravitinoEnv env = GravitinoEnv.getInstance();
     Config config = env.config();
-    IdpConfigurationValidator.validate(config);
+    validateConfiguration(config);
     registerBasicAuthenticator(config);
 
     try {
@@ -76,6 +76,27 @@ public class IdpRESTFeature implements Feature {
     context.register(IdpGroupOperations.class);
     context.register(IdpAuthorizationFilter.class);
     return true;
+  }
+
+  /**
+   * Validates that the server configuration is compatible with the built-in IdP plugin.
+   *
+   * @param config The server configuration.
+   */
+  static void validateConfiguration(Config config) {
+    if (!config.get(Configs.ENABLE_AUTHORIZATION)) {
+      return;
+    }
+    boolean usesSimple =
+        config.get(Configs.AUTHENTICATORS).stream()
+            .anyMatch(name -> AuthenticatorType.SIMPLE.name().equalsIgnoreCase(name.trim()));
+    if (usesSimple) {
+      LOG.error(
+          "Built-in IdP cannot be used with Simple authentication when authorization is enabled. "
+              + "Remove 'simple' from gravitino.authenticators (default is simple), "
+              + "or disable gravitino.authorization.enable.");
+      System.exit(1);
+    }
   }
 
   private static void registerBasicAuthenticator(Config config) {

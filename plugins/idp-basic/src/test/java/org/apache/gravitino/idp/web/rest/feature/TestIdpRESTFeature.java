@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.config;
+package org.apache.gravitino.idp.web.rest.feature;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,7 +29,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.junit.jupiter.api.Test;
 
-class TestIdpConfigurationValidator {
+class TestIdpRESTFeature {
 
   @Test
   void testSimpleAndAuthFails() {
@@ -53,14 +53,14 @@ class TestIdpConfigurationValidator {
   void testSimpleNoAuthOk() {
     Config config = newConfig(false, AuthenticatorType.SIMPLE.name().toLowerCase());
 
-    assertDoesNotThrow(() -> IdpConfigurationValidator.validate(config));
+    assertDoesNotThrow(() -> IdpRESTFeature.validateConfiguration(config));
   }
 
   @Test
   void testOAuthAndAuthOk() {
     Config config = newConfig(true, AuthenticatorType.OAUTH.name().toLowerCase());
 
-    assertDoesNotThrow(() -> IdpConfigurationValidator.validate(config));
+    assertDoesNotThrow(() -> IdpRESTFeature.validateConfiguration(config));
   }
 
   private static Config newConfig(boolean authorizationEnabled, String... authenticators) {
@@ -86,7 +86,7 @@ class TestIdpConfigurationValidator {
           }
         });
     try {
-      IdpConfigurationValidator.validate(config);
+      IdpRESTFeature.validateConfiguration(config);
     } finally {
       System.setSecurityManager(original);
     }
