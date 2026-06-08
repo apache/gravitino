@@ -22,6 +22,17 @@ plugins {
   id("java")
 }
 
+configurations.configureEach {
+  resolutionStrategy.force(
+    "org.testcontainers:testcontainers:1.21.4",
+    "com.github.docker-java:docker-java-api:3.4.2",
+    "com.github.docker-java:docker-java-transport:3.4.2",
+    "com.github.docker-java:docker-java-transport-zerodep:3.4.2"
+  )
+  exclude(group = "io.jsonwebtoken", module = "jjwt-gson")
+  exclude(group = "org.apache.logging.log4j", module = "log4j-to-slf4j")
+}
+
 // Test against the highest supported Trino version.
 val minTrinoVersion = 473
 val maxTrinoVersion = 478
@@ -40,11 +51,24 @@ java {
 }
 
 dependencies {
+  testImplementation(project(":api"))
+  testImplementation(project(":catalogs:catalog-common"))
+  testImplementation(project(":common"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":core"))
+  testImplementation(project(":server-common"))
+
   testImplementation("io.trino:trino-iceberg:$trinoVersion")
+  testImplementation("io.trino:trino-hdfs:$trinoVersion")
   testImplementation("io.trino:trino-testing:$trinoVersion")
   testImplementation("io.trino:trino-main:$trinoVersion")
 
   testImplementation(project(":integration-test-common", "testArtifacts"))
+
+  testImplementation(libs.awaitility)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.postgresql)
 
   // jjwt is resolved to 0.13.x on this module's test classpath (Trino forces it up). Only pull
   // api + impl; the JSON serializer comes from jjwt-jackson:0.13.x which Trino already provides.
@@ -52,6 +76,7 @@ dependencies {
   // incompatible with the 0.13.x runtime and makes signWith().compact() fail.
   testImplementation(libs.jwt.api)
   testRuntimeOnly(libs.jwt.impl)
+  testRuntimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
   testImplementation(libs.guava)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.slf4j.api)
@@ -78,7 +103,7 @@ tasks.withType<Test>().configureEach {
 tasks.test {
   useJUnitPlatform()
   // These ITs require the built distribution (deploy mode) and a server subprocess.
-  val skipITs = project.hasProperty("skipITs")
-  val skipTests = project.hasProperty("skipTests")
-  onlyIf { !skipITs && !skipTests }
+  val skipITs = providers.gradleProperty("skipITs").map(String::toBoolean).orElse(false)
+  val skipTests = providers.gradleProperty("skipTests").map(String::toBoolean).orElse(false)
+  onlyIf { !skipITs.get() && !skipTests.get() }
 }

@@ -66,6 +66,7 @@ if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) 
 }
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("iceberg:iceberg-rest-trino-it")
 include("lance:lance-common")
 include("lance:lance-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
@@ -80,7 +81,6 @@ if (!skipTrinoConnector) {
     "trino-connector:trino-connector-452-468",
     "trino-connector:trino-connector-469-472",
     "trino-connector:trino-connector-473-478",
-    "trino-connector:trino-iceberg-rest-it",
     "trino-connector:integration-test"
   )
 } else {
