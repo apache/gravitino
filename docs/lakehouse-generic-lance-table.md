@@ -101,14 +101,14 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 
 Required and optional properties for tables in a Generic Lakehouse Catalog:
 
-| Property              | Description                                                                                                                                                                                                                                                                                                                                     | Default  | Required     | Since Version |
-|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|---------------|
-| `format`              | Table format: `lance`, only `lance` is fully supported.                                                                                                                                                                                                                                                                                         | (none)   | Yes          | 1.1.0         |
-| `location`            | Storage path for table metadata and data, Lance supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                                 | (none)   | Conditional* | 1.1.0         |
-| `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                        | false    | No           | 1.1.0         |
-| `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                                   | `CREATE` | No           | 1.1.0         |
-| `lance.register`      | Whether it is a register table operation. If it's `true`, This API will not create data directory actually and it's the user's responsibility to create and manage the data directory. `false` it will actually create a table.                                                                                                                 | false    | No           | 1.1.0         |
-| `lance.storage.xxxx`  | Any additional storage-specific properties required by Lance format (e.g., S3 credentials, HDFS configs). Replace `xxxx` with actual property names. For example, we can use `lance.storage.aws_access_key_id` to set S3 aws_access_key_id when using a S3 location, for detail, refer to https://lancedb.com/docs/storage/integrations/        | (none)   | No           | 1.1.0         |
+| Property              | Description                                                                                                                                                                                                                                                                                                                               | Default  | Required     | Since Version |
+|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|---------------|
+| `format`              | Table format: `lance`, only `lance` is fully supported.                                                                                                                                                                                                                                                                                   | (none)   | Yes          | 1.1.0         |
+| `location`            | Storage path for table metadata and data, Lance supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                           | (none)   | Conditional* | 1.1.0         |
+| `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                  | false    | No           | 1.1.0         |
+| `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                             | `CREATE` | No           | 1.1.0         |
+| `lance.register`      | Whether it is a register table operation. If it's `true`, This API will not create data directory actually and it's the user's responsibility to create and manage the data directory. `false` it will actually create a table.                                                                                                           | false    | No           | 1.1.0         |
+| `lance.storage.xxxx`  | Any additional storage-specific properties required by Lance format (e.g., S3 credentials, HDFS configs). Replace `xxxx` with actual property names. For example, we can use `lance.storage.aws_access_key_id` to set S3 aws_access_key_id when using a S3 location, for detail, refer to https://lancedb.com/docs/storage/integrations/  | (none)   | No           | 1.1.0         |
 
 - `CREATE`: Create a new table, fail if the table already exists.
 - `EXIST_OK`: Create a new table if it does not exist, otherwise do nothing.
@@ -117,6 +117,27 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 **Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
 
 Also set additional properties specific to your lakehouse format or custom requirements.
+
+### Schema Refresh
+
+For Lance tables, Gravitino stores table columns in its metadata store. Some Lance writers can also
+update the dataset directly at the Lance location. To keep Gravitino metadata in sync, the Generic
+Lakehouse catalog supports catalog-level schema refresh modes:
+
+| Mode                  | Behavior                                                                                                                                                                                                                                                                         |
+|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `DECLARED_AND_EMPTY`  | Default. Refreshes schema from the Lance dataset for two cases: (1) declared tables (`lance.declared=true`) whose schema has not yet been written to Gravitino; (2) tables whose Gravitino column list is empty, for example tables registered before their schema was captured. |
+| `VERSION_CHECK`       | Opens the Lance dataset on every `loadTable`, compares the dataset version with `lance.version`, and refreshes columns when the version has changed.                                                                                                                             |
+
+Use `VERSION_CHECK` only when tables may be modified directly through the Lance path outside
+Gravitino. It adds a dataset version check to every `loadTable` call.
+
+:::note Zero-column Lance dataset
+If a Lance dataset genuinely has no columns, `DECLARED_AND_EMPTY` mode records the checked dataset
+version (`lance.version`) on the first `loadTable` call. Subsequent loads skip opening the dataset
+as long as the stored version is unchanged. Once columns are written to the dataset, the next
+`VERSION_CHECK` load or an explicit `alterTable` will detect the change and repair the schema.
+:::
 
 ### Table Operations
 

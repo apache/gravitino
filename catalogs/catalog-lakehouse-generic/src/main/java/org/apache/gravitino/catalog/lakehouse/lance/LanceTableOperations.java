@@ -20,31 +20,41 @@ package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.apache.arrow.memory.RootAllocator;
+import java.util.stream.IntStream;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.connector.GenericColumn;
 import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -53,6 +63,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
 import org.lance.WriteParams;
@@ -72,6 +83,41 @@ public class LanceTableOperations extends ManagedTableOperations {
     CREATE,
     EXIST_OK,
     OVERWRITE
+  }
+
+  /**
+   * Controls when Gravitino refreshes a Lance table's stored columns from the underlying dataset.
+   *
+   * <p>{@link #DECLARED_AND_EMPTY} is the default. It covers two complementary repair cases:
+   *
+   * <ul>
+   *   <li><b>Declared tables</b> ({@code lance.declared=true}): metadata-only tables whose schema
+   *       has not yet been written to Gravitino (e.g. Spark staged-create flow).
+   *   <li><b>Empty stored columns</b>: tables where Gravitino has no column metadata but the Lance
+   *       dataset at the table's location already carries a real schema (e.g. tables registered via
+   *       the register-table path before schema was captured).
+   * </ul>
+   *
+   * <p><b>Zero-column Lance dataset:</b> when the dataset has no columns, Gravitino records the
+   * checked dataset version ({@code lance.version}) without modifying stored columns. Subsequent
+   * {@code loadTable} calls skip the dataset open because the stored version acts as a "confirmed
+   * empty" marker. The dataset is re-examined only after the stored version changes (for example
+   * via an explicit {@code alterTable}) or when the mode is switched to {@link #VERSION_CHECK}.
+   */
+  public enum SchemaRefreshMode {
+    /**
+     * Default mode. Refreshes stored columns from the Lance dataset for declared tables ({@code
+     * lance.declared=true}) and for tables whose Gravitino column list is empty. Also repairs
+     * empty-column tables that were registered before their schema was captured.
+     */
+    DECLARED_AND_EMPTY,
+    /**
+     * Opens the Lance dataset on every {@code loadTable}, compares the dataset version with the
+     * stored {@code lance.version}, and refreshes columns when the version has changed. The version
+     * is the sole gating factor: if the version is unchanged the schema read is skipped even when
+     * stored columns are empty.
+     */
+    VERSION_CHECK
   }
 
   private final EntityStore store;
@@ -112,6 +158,68 @@ public class LanceTableOperations extends ManagedTableOperations {
   public void setCatalogProperties(Map<String, String> catalogProperties) {
     this.catalogProperties =
         catalogProperties == null ? Map.of() : ImmutableMap.copyOf(catalogProperties);
+  }
+
+  @Override
+  public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    Table table = super.loadTable(ident);
+    // Spark staged create can write the actual schema only to the Lance dataset path. Refresh
+    // Gravitino metadata when the stored table is declared-only, empty, or configured to track
+    // Lance dataset versions.
+    boolean declaredOnly = isDeclaredOnly(table);
+    boolean emptySchema = table.columns().length == 0;
+    SchemaRefreshMode refreshMode = schemaRefreshMode();
+    if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
+      return table;
+    }
+    // Empty-schema table that was already confirmed against a stored version: skip the dataset
+    // open. The stored lance.version acts as a "checked at this version" marker written on the
+    // first confirmation. VERSION_CHECK mode does not take this shortcut — it opens the dataset
+    // every time to compare the current version.
+    if (!declaredOnly
+        && emptySchema
+        && StringUtils.isNotBlank(table.properties().get(LanceConstants.LANCE_TABLE_VERSION))
+        && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
+      return table;
+    }
+
+    String location = table.properties().get(Table.PROPERTY_LOCATION);
+    if (StringUtils.isBlank(location)) {
+      return table;
+    }
+
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    Column[] columns;
+    long datasetVersion;
+    try (Dataset dataset = openDataset(location, storageOptions)) {
+      datasetVersion = dataset.version();
+      if (refreshMode == SchemaRefreshMode.VERSION_CHECK
+          && !declaredOnly
+          && !isDatasetVersionChanged(table, datasetVersion)) {
+        return table;
+      }
+      columns = extractColumns(dataset.getSchema());
+    } catch (Exception e) {
+      LOG.debug(
+          "Failed to load Lance schema from location {} for table {}. Return stored metadata.",
+          location,
+          ident,
+          e);
+      return table;
+    }
+
+    if (columns.length == 0) {
+      // Dataset is genuinely empty: record the checked version so future DECLARED_AND_EMPTY loads
+      // can skip the dataset open (see the early-return above). Declared tables are excluded
+      // because their lance.declared flag is the authoritative "not yet written" signal.
+      if (!declaredOnly) {
+        return recordCheckedEmptyVersion(ident, datasetVersion);
+      }
+      return table;
+    }
+
+    return repairTableMetadata(ident, columns, datasetVersion);
   }
 
   @Override
@@ -184,26 +292,18 @@ public class LanceTableOperations extends ManagedTableOperations {
     // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
-    GenericTable table = (GenericTable) super.alterTable(ident, changes);
-    Map<String, String> updatedProperties = new HashMap<>(table.properties());
-    updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
-    return GenericTable.builder()
-        .withName(table.name())
-        .withColumns(table.columns())
-        .withComment(table.comment())
-        .withProperties(updatedProperties)
-        .withAuditInfo(table.auditInfo())
-        .withPartitioning(table.partitioning())
-        .withSortOrders(table.sortOrder())
-        .withDistribution(table.distribution())
-        .withIndexes(table.index())
-        .build();
+    TableChange[] metadataChanges = Arrays.copyOf(changes, changes.length + 1);
+    metadataChanges[changes.length] =
+        TableChange.setProperty(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
+    return super.alterTable(ident, metadataChanges);
   }
 
   @Override
   public boolean purgeTable(NameIdentifier ident) {
     try {
-      Table table = loadTable(ident);
+      // Use super.loadTable to avoid triggering an unnecessary schema-refresh (which may open the
+      // dataset) for a table that is about to be deleted anyway.
+      Table table = super.loadTable(ident);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
@@ -238,7 +338,8 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   public boolean dropTable(NameIdentifier ident) {
     try {
-      Table table = loadTable(ident);
+      // Use super.loadTable to skip schema-refresh overhead when dropping.
+      Table table = super.loadTable(ident);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
@@ -324,7 +425,6 @@ public class LanceTableOperations extends ManagedTableOperations {
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
     try (Dataset ignored =
         Dataset.write()
-            .allocator(new RootAllocator())
             .schema(convertColumnsToArrowSchema(columns))
             .uri(location)
             .mode(WriteParams.WriteMode.CREATE)
@@ -365,7 +465,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
   }
 
-  private org.apache.arrow.vector.types.pojo.Schema convertColumnsToArrowSchema(Column[] columns) {
+  private Schema convertColumnsToArrowSchema(Column[] columns) {
     List<Field> fields =
         Arrays.stream(columns)
             .map(
@@ -373,7 +473,198 @@ public class LanceTableOperations extends ManagedTableOperations {
                     LanceDataTypeConverter.CONVERTER.toArrowField(
                         col.name(), col.dataType(), col.nullable()))
             .collect(Collectors.toList());
-    return new org.apache.arrow.vector.types.pojo.Schema(fields);
+    return new Schema(fields);
+  }
+
+  private SchemaRefreshMode schemaRefreshMode() {
+    return Optional.ofNullable(catalogProperties.get(LanceConstants.LANCE_SCHEMA_REFRESH_MODE))
+        .map(mode -> mode.trim().replace('-', '_').toUpperCase())
+        .map(SchemaRefreshMode::valueOf)
+        .orElse(SchemaRefreshMode.DECLARED_AND_EMPTY);
+  }
+
+  private boolean isDeclaredOnly(Table table) {
+    return isDeclaredOnly(table.properties());
+  }
+
+  private boolean isDeclaredOnly(Map<String, String> properties) {
+    return Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_DECLARED))
+        .map(Boolean::parseBoolean)
+        .orElse(false);
+  }
+
+  private boolean isDatasetVersionChanged(Table table, long datasetVersion) {
+    return isDatasetVersionChanged(table.properties(), datasetVersion);
+  }
+
+  private boolean isDatasetVersionChanged(Map<String, String> properties, long datasetVersion) {
+    String version = properties.get(LanceConstants.LANCE_TABLE_VERSION);
+    if (StringUtils.isBlank(version)) {
+      return true;
+    }
+
+    try {
+      return Long.parseLong(version) != datasetVersion;
+    } catch (NumberFormatException e) {
+      return true;
+    }
+  }
+
+  private Column[] extractColumns(Schema arrowSchema) {
+    return arrowSchema.getFields().stream()
+        .map(
+            field ->
+                Column.of(
+                    field.getName(),
+                    LanceDataTypeConverter.CONVERTER.toGravitino(field),
+                    null,
+                    field.isNullable(),
+                    false,
+                    DEFAULT_VALUE_NOT_SET))
+        .toArray(Column[]::new);
+  }
+
+  private Table repairTableMetadata(NameIdentifier ident, Column[] columns, long datasetVersion) {
+    try {
+      TableEntity tableEntity =
+          store.update(
+              ident,
+              TableEntity.class,
+              Entity.EntityType.TABLE,
+              current -> {
+                if (!needsSchemaRefresh(current, datasetVersion)) {
+                  return current;
+                }
+                return replaceColumnsFromDataset(current, columns, datasetVersion);
+              });
+      return toGenericTable(tableEntity);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTableException(e, "Table %s does not exist", ident);
+    } catch (EntityAlreadyExistsException e) {
+      throw new IllegalArgumentException("Failed to repair table " + ident, e);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to repair table " + ident, e);
+    }
+  }
+
+  private Table recordCheckedEmptyVersion(NameIdentifier ident, long datasetVersion) {
+    try {
+      TableEntity tableEntity =
+          store.update(
+              ident,
+              TableEntity.class,
+              Entity.EntityType.TABLE,
+              current -> {
+                if (!isDatasetVersionChanged(current.properties(), datasetVersion)) {
+                  return current;
+                }
+                Map<String, String> updatedProperties = new HashMap<>(current.properties());
+                updatedProperties.put(
+                    LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
+                // Always use an empty column list: the dataset is confirmed empty at this version.
+                // Using current.columns() would preserve stale columns when the dataset schema was
+                // cleared externally, causing future VERSION_CHECK loads to return stale metadata
+                // permanently (the version sentinel would match but columns would be wrong).
+                return TableEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withColumns(List.of())
+                    .withProperties(updatedProperties)
+                    .withPartitioning(current.partitioning())
+                    .withDistribution(current.distribution())
+                    .withSortOrders(current.sortOrders())
+                    .withIndexes(current.indexes())
+                    .withAuditInfo(
+                        AuditInfo.builder()
+                            .withCreator(current.auditInfo().creator())
+                            .withCreateTime(current.auditInfo().createTime())
+                            .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                            .withLastModifiedTime(Instant.now())
+                            .build())
+                    .build();
+              });
+      return toGenericTable(tableEntity);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTableException(e, "Table %s does not exist", ident);
+    } catch (EntityAlreadyExistsException e) {
+      throw new IllegalArgumentException("Failed to record empty version for table " + ident, e);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to record empty version for table " + ident, e);
+    }
+  }
+
+  private boolean needsSchemaRefresh(TableEntity tableEntity, long datasetVersion) {
+    return isDeclaredOnly(tableEntity.properties())
+        || tableEntity.columns().isEmpty()
+        || isDatasetVersionChanged(tableEntity.properties(), datasetVersion);
+  }
+
+  private TableEntity replaceColumnsFromDataset(
+      TableEntity tableEntity, Column[] columns, long datasetVersion) {
+    Map<String, String> updatedProperties = new HashMap<>(tableEntity.properties());
+    updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
+    updatedProperties.remove(LanceConstants.LANCE_TABLE_DECLARED);
+
+    AuditInfo columnAuditInfo =
+        AuditInfo.builder()
+            .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+            .withCreateTime(Instant.now())
+            .build();
+    List<ColumnEntity> columnEntities =
+        IntStream.range(0, columns.length)
+            .mapToObj(
+                i ->
+                    ColumnEntity.toColumnEntity(
+                        columns[i], i, idGenerator.nextId(), columnAuditInfo))
+            .collect(Collectors.toList());
+
+    return TableEntity.builder()
+        .withId(tableEntity.id())
+        .withName(tableEntity.name())
+        .withNamespace(tableEntity.namespace())
+        .withComment(tableEntity.comment())
+        .withColumns(columnEntities)
+        .withProperties(updatedProperties)
+        .withPartitioning(tableEntity.partitioning())
+        .withDistribution(tableEntity.distribution())
+        .withSortOrders(tableEntity.sortOrders())
+        .withIndexes(tableEntity.indexes())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(tableEntity.auditInfo().creator())
+                .withCreateTime(tableEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .build();
+  }
+
+  private GenericTable toGenericTable(TableEntity tableEntity) {
+    return GenericTable.builder()
+        .withName(tableEntity.name())
+        .withComment(tableEntity.comment())
+        .withColumns(
+            tableEntity.columns().stream().map(this::toGenericColumn).toArray(Column[]::new))
+        .withProperties(tableEntity.properties())
+        .withAuditInfo(tableEntity.auditInfo())
+        .withSortOrders(tableEntity.sortOrders())
+        .withPartitioning(tableEntity.partitioning())
+        .withDistribution(tableEntity.distribution())
+        .withIndexes(tableEntity.indexes())
+        .build();
+  }
+
+  private GenericColumn toGenericColumn(ColumnEntity columnEntity) {
+    return GenericColumn.builder()
+        .withName(columnEntity.name())
+        .withComment(columnEntity.comment())
+        .withAutoIncrement(columnEntity.autoIncrement())
+        .withNullable(columnEntity.nullable())
+        .withType(columnEntity.dataType())
+        .withDefaultValue(columnEntity.defaultValue())
+        .build();
   }
 
   /**
@@ -435,8 +726,10 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   Dataset openDataset(String location, Map<String, String> storageOptions) {
+    // Do not pass an explicit allocator: OpenDatasetBuilder then sets selfManagedAllocator=true
+    // so Dataset.close() will release the off-heap memory. Passing new RootAllocator() sets
+    // selfManagedAllocator=false and leaks the allocator on every call.
     return Dataset.open()
-        .allocator(new RootAllocator())
         .uri(location)
         .readOptions(new ReadOptions.Builder().setStorageOptions(storageOptions).build())
         .build();
