@@ -215,7 +215,7 @@ class TestGravitinoLanceModeParsing {
     GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
 
     DescribeTableResponse response =
-        operations.describeTable("catalog.schema.table", ".", Optional.empty(), true);
+        operations.describeTable("catalog.schema.table", ".", Optional.empty(), true, true);
 
     Assertions.assertEquals(Boolean.TRUE, response.getIsOnlyDeclared());
     Assertions.assertEquals(Boolean.FALSE, response.getManagedVersioning());

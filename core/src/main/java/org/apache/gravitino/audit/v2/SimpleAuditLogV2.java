@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.AuditLog;
+import org.apache.gravitino.audit.AuditLogRedactor;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.ListEvent;
@@ -106,7 +107,7 @@ public class SimpleAuditLogV2 implements AuditLog {
     Map<String, String> info = customInfo();
     List<String> parts = new ArrayList<>();
     if (info != null) {
-      info.forEach((k, v) -> parts.add(k + "=" + v));
+      info.forEach((k, v) -> parts.add(k + "=" + AuditLogRedactor.redactValue(k, v)));
     }
     if (event instanceof ListEvent) {
       int count = ((ListEvent) event).resultCount();

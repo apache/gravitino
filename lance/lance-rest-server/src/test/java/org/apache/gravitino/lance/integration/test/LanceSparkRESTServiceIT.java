@@ -182,6 +182,10 @@ public class LanceSparkRESTServiceIT extends BaseIT {
 
     Table table = catalog.asTableCatalog().loadTable(tableIdentifier);
     assertTableLocationAndFormat(table, schemaName, tableName);
+    Assertions.assertEquals(2, table.columns().length);
+    Assertions.assertEquals(
+        Set.of("id", "score"),
+        Arrays.stream(table.columns()).map(column -> column.name()).collect(Collectors.toSet()));
   }
 
   @Test
