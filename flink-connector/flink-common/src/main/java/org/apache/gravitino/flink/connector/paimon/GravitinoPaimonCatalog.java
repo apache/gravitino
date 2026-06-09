@@ -171,11 +171,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   // ---------------------------------------------------------------------------
 
   @Override
-  public void open() throws CatalogException {
-    super.open(); // opens realCatalog() == paimonCatalog, so paimonCatalog.open() is called here
-  }
-
-  @Override
   public void close() throws CatalogException {
     super.close(); // closes realCatalog() == paimonCatalog
   }
