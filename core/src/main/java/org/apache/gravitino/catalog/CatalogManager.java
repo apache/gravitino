@@ -582,7 +582,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               // instance,
               // we need to clean up the entity stored.
               try {
-                store.delete(ident, EntityType.CATALOG, true);
+                if (store.delete(ident, EntityType.CATALOG, true)) {
+                  // This cleanup deletion writes a DROP record to the entity change log. Mark it as
+                  // a local mutation so the change-log poller consumes that record's token instead
+                  // of one meant for a later mutation of the same identifier. Without this, the
+                  // poller could treat a subsequent local change as remote and spuriously
+                  // invalidate (and asynchronously close) a cached catalog wrapper that is still in
+                  // use, causing a NullPointerException.
+                  markLocalMutation(ident);
+                }
               } catch (IOException e4) {
                 LOG.error("Failed to clean up catalog {}", ident, e4);
               }
