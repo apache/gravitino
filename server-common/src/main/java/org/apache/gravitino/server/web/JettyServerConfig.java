@@ -25,9 +25,12 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -207,12 +210,13 @@ public final class JettyServerConfig {
           .stringConf()
           .createWithDefault("JKS");
 
-  public static final ConfigEntry<Optional<String>> CUSTOM_FILTERS =
+  public static final ConfigEntry<List<String>> CUSTOM_FILTERS =
       new ConfigBuilder("customFilters")
           .doc("Comma separated list of filter class names to apply to the APIs")
           .version(ConfigConstants.VERSION_0_4_0)
           .stringConf()
-          .createWithOptional();
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
   public static final ConfigEntry<Boolean> ENABLE_CORS_FILTER =
       new ConfigBuilder("enableCorsFilter")
           .doc("Enable cross origin resource share filter")
@@ -375,10 +379,11 @@ public final class JettyServerConfig {
     this.enableClientAuth = internalConfig.get(ENABLE_CLIENT_AUTH);
 
     this.customFilters =
-        internalConfig
-            .get(CUSTOM_FILTERS)
-            .map(filters -> Collections.unmodifiableSet(Sets.newHashSet(filters.split(SPLITTER))))
-            .orElse(Collections.emptySet());
+        Collections.unmodifiableSet(
+            internalConfig.get(CUSTOM_FILTERS).stream()
+                .filter(filter -> !filter.equals("\"\""))
+                .filter(filter -> !filter.equals("''"))
+                .collect(Collectors.toCollection(() -> new LinkedHashSet<>())));
 
     this.keyStoreType = internalConfig.get(SSL_KEYSTORE_TYPE);
     this.trustStoreType = internalConfig.get(SSL_TRUST_STORE_TYPE);

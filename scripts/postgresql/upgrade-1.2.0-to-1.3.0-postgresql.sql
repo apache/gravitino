@@ -151,3 +151,35 @@ COMMENT ON COLUMN idp_user_group_rel.group_id IS 'idp group id';
 COMMENT ON COLUMN idp_user_group_rel.current_version IS 'idp relation current version';
 COMMENT ON COLUMN idp_user_group_rel.last_version IS 'idp relation last version';
 COMMENT ON COLUMN idp_user_group_rel.deleted_at IS 'idp relation deleted at';
+
+CREATE TABLE IF NOT EXISTS iceberg_cleanup_job (
+  id                BIGINT        NOT NULL PRIMARY KEY,
+  catalog_id        BIGINT        NOT NULL,
+  namespace         VARCHAR(512)  NOT NULL,
+  table_name        VARCHAR(256)  NOT NULL,
+  metadata_location TEXT          NOT NULL,
+  file_io_impl      VARCHAR(256)  NOT NULL,
+  file_io_props     TEXT          NOT NULL,
+  state             VARCHAR(16)   NOT NULL,
+  attempts          INT           NOT NULL DEFAULT 0,
+  last_error        VARCHAR(2048),
+  heartbeat_at      BIGINT        NOT NULL DEFAULT 0,
+  created_by        VARCHAR(128)  NOT NULL,
+  updated_at        BIGINT        NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_state_updated ON iceberg_cleanup_job (state, updated_at);
+CREATE INDEX IF NOT EXISTS idx_object ON iceberg_cleanup_job (catalog_id, namespace, table_name, state);
+COMMENT ON TABLE iceberg_cleanup_job IS 'async Iceberg table cleanup jobs';
+COMMENT ON COLUMN iceberg_cleanup_job.id IS 'globally unique cleanup job id';
+COMMENT ON COLUMN iceberg_cleanup_job.catalog_id IS 'globally unique id of the owning catalog, stable across catalog rename';
+COMMENT ON COLUMN iceberg_cleanup_job.namespace IS 'namespace of the table to be cleaned up';
+COMMENT ON COLUMN iceberg_cleanup_job.table_name IS 'name of the table to be cleaned up';
+COMMENT ON COLUMN iceberg_cleanup_job.metadata_location IS 'location of the table metadata file to purge';
+COMMENT ON COLUMN iceberg_cleanup_job.file_io_impl IS 'FileIO implementation class used to access the table files';
+COMMENT ON COLUMN iceberg_cleanup_job.file_io_props IS 'JSON-encoded FileIO properties';
+COMMENT ON COLUMN iceberg_cleanup_job.state IS 'PENDING | RUNNING | SUCCEEDED | FAILED';
+COMMENT ON COLUMN iceberg_cleanup_job.attempts IS 'number of processing attempts made so far';
+COMMENT ON COLUMN iceberg_cleanup_job.last_error IS 'truncated reason for the most recent failure, NULL until a job fails';
+COMMENT ON COLUMN iceberg_cleanup_job.heartbeat_at IS 'last heartbeat from the worker, 0 when not running';
+COMMENT ON COLUMN iceberg_cleanup_job.created_by IS 'principal that requested the drop (audit)';
+COMMENT ON COLUMN iceberg_cleanup_job.updated_at IS 'last state change, drives poll ordering and old finished-job cleanup';

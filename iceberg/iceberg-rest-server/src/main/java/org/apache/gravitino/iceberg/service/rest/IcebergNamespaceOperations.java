@@ -104,7 +104,10 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace parentNamespace =
-        parent.isEmpty() ? Namespace.empty() : RESTUtil.decodeNamespace(parent);
+        parent.isEmpty()
+            ? Namespace.empty()
+            : RESTUtil.decodeNamespace(
+                parent, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "List Iceberg namespaces, catalog: {}, parentNamespace: {}", catalogName, parentNamespace);
     try {
@@ -142,7 +145,8 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("Load Iceberg namespace, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -173,7 +177,8 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("Check Iceberg namespace exists, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -207,7 +212,8 @@ public class IcebergNamespaceOperations {
           String namespace) {
     // todo check if table exists in namespace after table ops is added
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("Drop Iceberg namespace, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -269,7 +275,8 @@ public class IcebergNamespaceOperations {
           String namespace,
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Update Iceberg namespace, catalog: {}, namespace: {}, updateNamespacePropertiesRequest: {}",
         catalogName,
@@ -310,7 +317,8 @@ public class IcebergNamespaceOperations {
       @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Register Iceberg table, catalog: {}, namespace: {}, registerTableRequest: {}, "
             + "accessDelegation: {}, isCredentialVending: {}",

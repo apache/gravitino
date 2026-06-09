@@ -30,6 +30,8 @@ replay_pid*
 !.idea/vcs.xml
 **/.vscode
 **/build
+# Zed editor's Java language server (Eclipse JDT) compiles classes into bin/ for code intelligence
+**/bin
 gen
 **/.DS_Store
 **/*.iml

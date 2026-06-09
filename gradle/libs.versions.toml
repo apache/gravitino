@@ -47,7 +47,6 @@ hadoop3-aliyun = "3.3.6"
 hadoop3-thirdparty = "1.1.1"
 hadoop-minikdc = "3.3.6"
 re2j = "1.7"
-htrace-core4 = "4.1.0-incubating"
 httpclient = "4.4.1"
 httpclient5 = "5.4.4"
 httpcore5 = "5.3.4"
@@ -65,8 +64,11 @@ commons-beanutils = "1.11.0"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
-iceberg = '1.10.1' # used for Gravitino Iceberg catalog and Iceberg REST service
-iceberg4connector = "1.6.1" # used for compile connectors like Spark, Flink, etc
+iceberg = '1.11.0'
+# Last Iceberg release compatible with Spark 3.3; Spark 3.3 deploy ITs cover basic CRUD only.
+iceberg4spark33 = "1.8.1"
+iceberg4spark34 = "1.11.0"
+iceberg4spark35 = "1.11.0"
 paimon = '1.2.0'
 spark33 = "3.3.4"
 spark34 = "3.4.3"
@@ -110,8 +112,8 @@ flinkjdbc18 = "3.2.0-1.18"
 flinkjdbc119 = "3.3.0-1.19"
 flinkjdbc120 = "3.3.0-1.20"
 iceberg4flink18 = "1.9.2"
-iceberg4flink119 = "1.9.2"
-iceberg4flink120 = "1.9.2"
+iceberg4flink119 = "1.10.2"
+iceberg4flink120 = "1.11.0"
 paimon4flink18 = "1.2.0"
 paimon4flink119 = "1.2.0"
 paimon4flink120 = "1.2.0"
@@ -160,6 +162,7 @@ ql-expression = "4.0.3"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
+aws-dynamodb = { group = "software.amazon.awssdk", name = "dynamodb", version.ref = "awssdk" }
 aws-glue = { group = "software.amazon.awssdk", name = "glue", version.ref = "awssdk" }
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
 aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", version.ref = "awssdk" }
@@ -235,7 +238,6 @@ hadoop3-abs = { group = "org.apache.hadoop", name = "hadoop-azure", version.ref 
 hadoop3-shaded-guava = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-guava", version.ref = "hadoop3-thirdparty" }
 hadoop3-shaded-protobuf = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-protobuf_3_7", version.ref = "hadoop3-thirdparty" }
 re2j = { group = "com.google.re2j", name = "re2j", version.ref = "re2j" }
-htrace-core4 = { group = "org.apache.htrace", name = "htrace-core4", version.ref = "htrace-core4" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }

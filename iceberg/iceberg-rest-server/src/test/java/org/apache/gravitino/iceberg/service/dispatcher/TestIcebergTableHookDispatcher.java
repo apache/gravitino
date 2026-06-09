@@ -185,6 +185,36 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
+  public void testDropTableReimportsEntityWhenTableExistsAfterDrop() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    when(mockDispatcher.tableExists(mockContext, tableId)).thenReturn(true);
+
+    hookDispatcher.dropTable(mockContext, tableId, false);
+
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+    NameIdentifier expectedIdentifier =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    verify(mockEntityStore, never()).delete(expectedIdentifier, Entity.EntityType.TABLE);
+    verify(mockTableDispatcher).loadTable(expectedIdentifier);
+  }
+
+  @Test
+  public void testDropTableReimportsEntityWhenTableIsRecreatedDuringDelete() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    when(mockDispatcher.tableExists(mockContext, tableId)).thenReturn(false, true);
+
+    hookDispatcher.dropTable(mockContext, tableId, false);
+
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+    NameIdentifier expectedIdentifier =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
+    verify(mockEntityStore).delete(expectedIdentifier, Entity.EntityType.TABLE);
+    verify(mockTableDispatcher).loadTable(expectedIdentifier);
+  }
+
+  @Test
   public void testDropTableIgnoresNoSuchEntityException() throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
 
@@ -202,16 +232,12 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
-  public void testDropTableThrowsRuntimeExceptionOnIOException() throws IOException {
+  public void testDropTableIgnoresReconciliationIOException() throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
 
     doThrow(new IOException("IO error")).when(mockEntityStore).delete(any(), any());
 
-    RuntimeException exception =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> hookDispatcher.dropTable(mockContext, tableId, false));
-
-    Assertions.assertTrue(exception.getMessage().contains("io exception when deleting table"));
+    Assertions.assertDoesNotThrow(() -> hookDispatcher.dropTable(mockContext, tableId, false));
     verify(mockDispatcher).dropTable(mockContext, tableId, false);
   }
 
@@ -240,6 +266,58 @@ public class TestIcebergTableHookDispatcher {
         IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, source, ":");
     verify(mockEntityStore)
         .update(eq(sourceIdentifier), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testRenameTableReconcilesSourceAndDestinationEntities() throws IOException {
+    TableIdentifier source = TableIdentifier.of("schema1", "old_table");
+    TableIdentifier dest = TableIdentifier.of("schema2", "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+
+    TableEntity mockTableEntity = mock(TableEntity.class);
+    when(mockTableEntity.id()).thenReturn(1L);
+    when(mockTableEntity.columns()).thenReturn(Collections.emptyList());
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("original_creator").withCreateTime(Instant.now()).build();
+    when(mockTableEntity.auditInfo()).thenReturn(auditInfo);
+    when(mockEntityStore.update(any(), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenReturn(mockTableEntity);
+    when(mockDispatcher.tableExists(mockContext, source)).thenReturn(false, false);
+    when(mockDispatcher.tableExists(mockContext, dest)).thenReturn(true);
+
+    hookDispatcher.renameTable(mockContext, request);
+
+    NameIdentifier sourceIdentifier =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, source, ":");
+    NameIdentifier destIdentifier =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, dest, ":");
+    verify(mockEntityStore).delete(sourceIdentifier, Entity.EntityType.TABLE);
+    verify(mockTableDispatcher).loadTable(destIdentifier);
+  }
+
+  @Test
+  public void testRenameTableIgnoresReconciliationImportFailure() throws IOException {
+    TableIdentifier source = TableIdentifier.of("schema1", "old_table");
+    TableIdentifier dest = TableIdentifier.of("schema2", "new_table");
+    RenameTableRequest request =
+        RenameTableRequest.builder().withSource(source).withDestination(dest).build();
+
+    TableEntity mockTableEntity = mock(TableEntity.class);
+    when(mockTableEntity.id()).thenReturn(1L);
+    when(mockTableEntity.columns()).thenReturn(Collections.emptyList());
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("original_creator").withCreateTime(Instant.now()).build();
+    when(mockTableEntity.auditInfo()).thenReturn(auditInfo);
+    when(mockEntityStore.update(any(), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenReturn(mockTableEntity);
+    when(mockDispatcher.tableExists(mockContext, dest)).thenReturn(true);
+    doThrow(new RuntimeException("import failed")).when(mockTableDispatcher).loadTable(any());
+
+    Assertions.assertDoesNotThrow(() -> hookDispatcher.renameTable(mockContext, request));
+
+    verify(mockDispatcher).renameTable(mockContext, request);
+    verify(mockTableDispatcher).loadTable(any());
   }
 
   @Test

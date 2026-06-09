@@ -27,6 +27,7 @@ import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -110,5 +111,17 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkHiveTypeConverter();
+  }
+
+  @Override
+  protected org.apache.spark.sql.connector.catalog.Table createSparkView(
+      Identifier ident,
+      View gravitinoView,
+      org.apache.spark.sql.connector.catalog.Table sparkTable) {
+    return new SparkHiveView(
+        gravitinoView,
+        (HiveTable) sparkTable,
+        (HiveTableCatalog) sparkCatalog,
+        getSparkTypeConverter());
   }
 }

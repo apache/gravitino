@@ -120,3 +120,51 @@ class TestRoleManagement(IntegrationTestEnv):
         names = self._gravitino_client.list_role_names()
         self.assertIn("role_a", names)
         self.assertIn("role_b", names)
+
+    def test_grant_revoke_roles_to_user(self):
+        self._gravitino_client.create_role("user_role")
+        self._gravitino_client.add_user("alice")
+
+        granted = self._gravitino_client.grant_roles_to_user(["user_role"], "alice")
+        self.assertIn("user_role", granted.roles())
+
+        revoked = self._gravitino_client.revoke_roles_from_user(["user_role"], "alice")
+        self.assertNotIn("user_role", revoked.roles())
+
+    def test_grant_revoke_roles_to_group(self):
+        self._gravitino_client.create_role("group_role")
+        self._gravitino_client.add_group("engineers")
+
+        granted = self._gravitino_client.grant_roles_to_group(
+            ["group_role"], "engineers"
+        )
+        self.assertIn("group_role", granted.roles())
+
+        revoked = self._gravitino_client.revoke_roles_from_group(
+            ["group_role"], "engineers"
+        )
+        self.assertNotIn("group_role", revoked.roles())
+
+    def test_grant_revoke_privileges_to_role(self):
+        self._gravitino_client.create_role("priv_role")
+
+        privileges = [Privileges.allow("USE_CATALOG")]
+        securable_obj = SecurableObjects.of_metalake(self._metalake_name, privileges)
+
+        granted = self._gravitino_client.grant_privileges_to_role(
+            "priv_role", securable_obj, privileges
+        )
+        self.assertEqual("priv_role", granted.name())
+        self.assertGreater(len(granted.securable_objects()), 0)
+        granted_privs = granted.securable_objects()[0].privileges()
+        granted_names = [p.name().name for p in granted_privs]
+        self.assertIn("USE_CATALOG", granted_names)
+
+        revoked = self._gravitino_client.revoke_privileges_from_role(
+            "priv_role", securable_obj, privileges
+        )
+        self.assertEqual("priv_role", revoked.name())
+        revoked_objs = revoked.securable_objects()
+        if revoked_objs:
+            revoked_names = [p.name().name for p in revoked_objs[0].privileges()]
+            self.assertNotIn("USE_CATALOG", revoked_names)

@@ -1468,6 +1468,148 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
     }
   }
 
+  /**
+   * Reproduces GitHub issue #11297: after {@code revokePrivilegesFromRole} removes the last
+   * privilege from a role's securable schema, {@code
+   * listEntitiesByRelation(METADATA_OBJECT_ROLE_REL)} must not return the stale role from cache.
+   *
+   * <p>Flow: create schema + role → list binding roles (populates cache) → update role to remove
+   * securable object (simulates revoke) → list binding roles again → must reflect the change.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testRevokePrivilegeInvalidatesMetadataObjectRoleRelCache(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "test_schema",
+                auditInfo);
+        store.put(schema, false);
+
+        SecurableObject catalogObject = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+        SecurableObject schemaObject =
+            SecurableObjects.ofSchema(
+                catalogObject, "test_schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+
+        RoleEntity role =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("test_role")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(schemaObject))
+                .build();
+        store.put(role, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm up the METADATA_OBJECT_ROLE_REL cache (simulates listBindingRoleNames after grant)
+        List<RoleEntity> rolesBeforeRevoke =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertEquals(1, rolesBeforeRevoke.size());
+        Assertions.assertEquals("test_role", rolesBeforeRevoke.get(0).name());
+
+        // Verify the relation is in cache when cache is enabled
+        if (enableCache && store instanceof RelationalEntityStore) {
+          RelationalEntityStore relStore = (RelationalEntityStore) store;
+          if (relStore.getCache() instanceof CaffeineEntityCache) {
+            CaffeineEntityCache caffeineCache = (CaffeineEntityCache) relStore.getCache();
+            List<Entity> cachedRoles =
+                caffeineCache
+                    .getCacheData()
+                    .getIfPresent(
+                        EntityCacheRelationKey.of(
+                            schema.nameIdentifier(),
+                            Entity.EntityType.SCHEMA,
+                            SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL));
+            Assertions.assertNotNull(cachedRoles, "Cache should be populated after first fetch");
+            Assertions.assertEquals(1, cachedRoles.size());
+          }
+        }
+
+        // Simulate revokePrivilegesFromRole: update the role to remove the schema securable object.
+        // RelationalEntityStore.update() calls cache.invalidate(roleIdent, ROLE) afterwards,
+        // which must also invalidate the schema's METADATA_OBJECT_ROLE_REL cache entry.
+        store.update(
+            role.nameIdentifier(),
+            RoleEntity.class,
+            Entity.EntityType.ROLE,
+            existing ->
+                RoleEntity.builder()
+                    .withId(existing.id())
+                    .withName(existing.name())
+                    .withNamespace(existing.namespace())
+                    .withProperties(existing.properties())
+                    .withAuditInfo(existing.auditInfo())
+                    .withSecurableObjects(Lists.newArrayList()) // all privileges revoked
+                    .build());
+
+        // Verify METADATA_OBJECT_ROLE_REL cache is gone when cache is enabled
+        if (enableCache && store instanceof RelationalEntityStore) {
+          RelationalEntityStore relStore = (RelationalEntityStore) store;
+          if (relStore.getCache() instanceof CaffeineEntityCache) {
+            CaffeineEntityCache caffeineCache = (CaffeineEntityCache) relStore.getCache();
+            List<Entity> cachedAfterRevoke =
+                caffeineCache
+                    .getCacheData()
+                    .getIfPresent(
+                        EntityCacheRelationKey.of(
+                            schema.nameIdentifier(),
+                            Entity.EntityType.SCHEMA,
+                            SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL));
+            Assertions.assertNull(
+                cachedAfterRevoke,
+                "METADATA_OBJECT_ROLE_REL cache must be invalidated after role update");
+          }
+        }
+
+        // The key correctness check: listEntitiesByRelation must not return the revoked role
+        List<RoleEntity> rolesAfterRevoke =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertTrue(
+            rolesAfterRevoke.isEmpty(),
+            "listEntitiesByRelation must return empty after revoking the last privilege from role");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
   private FunctionEntity createFunctionEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
     FunctionParam param1 = FunctionParams.of("param1", Types.IntegerType.get());

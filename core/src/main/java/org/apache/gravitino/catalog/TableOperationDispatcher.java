@@ -123,8 +123,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       schemaDispatcher.loadSchema(schemaIdent);
 
       // Import the table.
-      entityCombinedTable =
-          TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
+      try {
+        entityCombinedTable =
+            TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
+      } catch (EntityAlreadyExistsException e) {
+        // HA race: another Gravitino node concurrently imported this table. Reload from the
+        // entity store to pick up the entity stored by the winning node.
+        LOG.info(
+            "Table {} was concurrently imported by another node; reloading from store.", ident);
+        entityCombinedTable =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        if (!entityCombinedTable.imported()) {
+          throw new UnsupportedOperationException(
+              "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+                  + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
+        }
+      }
     }
 
     // Update the column entities in Gravitino store if the columns are different from the ones
@@ -477,10 +491,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     try {
       store.put(tableEntity, true);
     } catch (EntityAlreadyExistsException e) {
-      LOG.error("Failed to import table {} with id {} to the store.", identifier, uid, e);
-      throw new UnsupportedOperationException(
-          "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-              + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import the table entity to the store.", e);
