@@ -16,27 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.hive.kerberos;
+package org.apache.gravitino.utils;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.File;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 public class TestFetchFileUtils {
+
+  // The hdfs happy path is exercised reflectively against Hadoop and is covered by the catalog
+  // Kerberos integration tests; the common module has no Hadoop on its test classpath, so here we
+  // only assert that an hdfs uri without a Hadoop configuration is rejected.
+  private static final String UNSAFE_HINT = "'demo.block-unsafe-address' to false";
 
   @TempDir File tempDir;
 
@@ -46,9 +53,21 @@ public class TestFetchFileUtils {
     Assertions.assertTrue(srcFile.createNewFile());
     File destFile = new File(tempDir, "dest");
 
-    FetchFileUtils.fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, new Configuration());
+    FetchFileUtils.fetchFileFromUri(
+        srcFile.toURI().toString(), destFile, 10, null, true, UNSAFE_HINT);
     Assertions.assertTrue(Files.isSymbolicLink(destFile.toPath()));
-    Assertions.assertEquals(srcFile.toPath(), Files.readSymbolicLink(destFile.toPath()));
+    Assertions.assertEquals(
+        srcFile.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
+  }
+
+  @Test
+  public void testMissingLocalFileShouldFail() {
+    File destFile = new File(tempDir, "dest_missing");
+    String uri = new File(tempDir, "does-not-exist-" + UUID.randomUUID()).toURI().toString();
+
+    Assertions.assertThrows(
+        IOException.class,
+        () -> FetchFileUtils.fetchFileFromUri(uri, destFile, 10, null, true, UNSAFE_HINT));
   }
 
   @Test
@@ -69,7 +88,7 @@ public class TestFetchFileUtils {
                   try {
                     barrier.await(30, TimeUnit.SECONDS);
                     FetchFileUtils.fetchFileFromUri(
-                        srcFile.toURI().toString(), destFile, 10, new Configuration());
+                        srcFile.toURI().toString(), destFile, 10, null, true, UNSAFE_HINT);
                   } catch (Exception e) {
                     throw new RuntimeException(e);
                   }
@@ -83,7 +102,8 @@ public class TestFetchFileUtils {
     }
 
     Assertions.assertTrue(Files.isSymbolicLink(destFile.toPath()));
-    Assertions.assertEquals(srcFile.toPath(), Files.readSymbolicLink(destFile.toPath()));
+    Assertions.assertEquals(
+        srcFile.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
   }
 
   @Test
@@ -91,17 +111,16 @@ public class TestFetchFileUtils {
     File srcFile = new File(tempDir, "source_idempotent");
     Assertions.assertTrue(srcFile.createNewFile());
     File destFile = new File(tempDir, "dest_idempotent");
-
-    Configuration conf = new Configuration();
     String uri = srcFile.toURI().toString();
 
-    FetchFileUtils.fetchFileFromUri(uri, destFile, 10, conf);
+    FetchFileUtils.fetchFileFromUri(uri, destFile, 10, null, true, UNSAFE_HINT);
     Assertions.assertTrue(Files.isSymbolicLink(destFile.toPath()));
 
-    // Second call to the same dest should succeed without error
-    FetchFileUtils.fetchFileFromUri(uri, destFile, 10, conf);
+    // Second call to the same dest should succeed without error.
+    FetchFileUtils.fetchFileFromUri(uri, destFile, 10, null, true, UNSAFE_HINT);
     Assertions.assertTrue(Files.isSymbolicLink(destFile.toPath()));
-    Assertions.assertEquals(srcFile.toPath(), Files.readSymbolicLink(destFile.toPath()));
+    Assertions.assertEquals(
+        srcFile.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
   }
 
   @Test
@@ -112,13 +131,15 @@ public class TestFetchFileUtils {
     Assertions.assertTrue(srcFileB.createNewFile());
     File destFile = new File(tempDir, "dest_replace");
 
-    Configuration conf = new Configuration();
+    FetchFileUtils.fetchFileFromUri(
+        srcFileA.toURI().toString(), destFile, 10, null, true, UNSAFE_HINT);
+    Assertions.assertEquals(
+        srcFileA.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
 
-    FetchFileUtils.fetchFileFromUri(srcFileA.toURI().toString(), destFile, 10, conf);
-    Assertions.assertEquals(srcFileA.toPath(), Files.readSymbolicLink(destFile.toPath()));
-
-    FetchFileUtils.fetchFileFromUri(srcFileB.toURI().toString(), destFile, 10, conf);
-    Assertions.assertEquals(srcFileB.toPath(), Files.readSymbolicLink(destFile.toPath()));
+    FetchFileUtils.fetchFileFromUri(
+        srcFileB.toURI().toString(), destFile, 10, null, true, UNSAFE_HINT);
+    Assertions.assertEquals(
+        srcFileB.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
   }
 
   @Test
@@ -130,11 +151,10 @@ public class TestFetchFileUtils {
             IllegalArgumentException.class,
             () ->
                 FetchFileUtils.fetchFileFromUri(
-                    "http://127.0.0.1:8090/keytab", destFile, 10, new Configuration()));
+                    "http://127.0.0.1:8090/keytab", destFile, 10, null, true, UNSAFE_HINT));
 
     Assertions.assertTrue(exception.getMessage().contains("Gravitino server side"));
-    Assertions.assertTrue(
-        exception.getMessage().contains(KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY));
+    Assertions.assertTrue(exception.getMessage().contains(UNSAFE_HINT));
   }
 
   @Test
@@ -149,14 +169,63 @@ public class TestFetchFileUtils {
       FetchFileUtils.fetchFileFromUri(
           String.format("http://127.0.0.1:%d/keytab", port),
           destFile,
-          10,
-          new Configuration(),
-          false);
+          30000 /* 30s connect/read timeout in milliseconds */,
+          null,
+          false,
+          UNSAFE_HINT);
 
       Assertions.assertEquals("keytab", Files.readString(destFile.toPath()));
     } finally {
       server.stop(0);
     }
+  }
+
+  @Test
+  public void testHdfsSchemeWithoutConfShouldFail() {
+    File destFile = new File(tempDir, "dest_hdfs");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            FetchFileUtils.fetchFileFromUri(
+                "hdfs://namenode/keytab", destFile, 10, null, true, UNSAFE_HINT));
+  }
+
+  @Test
+  public void testUnsupportedSchemeShouldFail() {
+    File destFile = new File(tempDir, "dest_scp");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            FetchFileUtils.fetchFileFromUri(
+                "scp://host/keytab", destFile, 10, null, true, UNSAFE_HINT));
+  }
+
+  @Test
+  public void testReturnsDestinationAbsolutePath() throws Exception {
+    File srcFile = new File(tempDir, "source_return");
+    Assertions.assertTrue(srcFile.createNewFile());
+    File destFile = new File(tempDir, "dest_return");
+
+    String returned =
+        FetchFileUtils.fetchFileFromUri(
+            srcFile.toURI().toString(), destFile, 10, null, true, UNSAFE_HINT);
+    Assertions.assertEquals(destFile.getAbsolutePath(), returned);
+  }
+
+  @Test
+  public void testRemoveLock() throws Exception {
+    File srcFile = new File(tempDir, "source_lock");
+    Assertions.assertTrue(srcFile.createNewFile());
+    File destFile = new File(tempDir, "dest_lock");
+
+    FetchFileUtils.fetchFileFromUri(
+        srcFile.toURI().toString(), destFile, 10, null, true, UNSAFE_HINT);
+    // removeLock should be a no-op-safe cleanup that does not throw and does not affect the link.
+    FetchFileUtils.removeLock(destFile);
+    Path destPath = destFile.toPath();
+    Assertions.assertTrue(Files.isSymbolicLink(destPath));
   }
 
   private HttpServer createLoopbackHttpServer(String response) throws Exception {

@@ -26,7 +26,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -61,10 +60,10 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.FetchFileUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.gravitino.utils.RemoteUriValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -847,34 +846,14 @@ public class JobManager implements JobOperationDispatcher {
       String uri, File stagingDir, int timeoutInMs, boolean blockUnsafeAddressForRemoteUri) {
     try {
       URI fileUri = new URI(uri);
-      String scheme = Optional.ofNullable(fileUri.getScheme()).orElse("file");
       File destFile = new File(stagingDir, new File(fileUri.getPath()).getName());
-
-      switch (scheme) {
-        case "http":
-        case "https":
-        case "ftp":
-          RemoteUriValidator.validate(
-              fileUri,
-              blockUnsafeAddressForRemoteUri,
-              String.format("'%s' to false", Configs.JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY));
-          FileUtils.copyURLToFile(fileUri.toURL(), destFile, timeoutInMs, timeoutInMs);
-          break;
-
-        case "file":
-          java.nio.file.Path sourcePath = new File(fileUri.getPath()).toPath();
-          if (!Files.exists(sourcePath)) {
-            throw new IOException(
-                String.format("Source file does not exist: %s", sourcePath.toAbsolutePath()));
-          }
-          Files.createSymbolicLink(destFile.toPath(), sourcePath);
-          break;
-
-        default:
-          throw new IllegalArgumentException("Unsupported scheme: " + scheme);
-      }
-
-      return destFile.getAbsolutePath();
+      return FetchFileUtils.fetchFileFromUri(
+          uri,
+          destFile,
+          timeoutInMs,
+          null /* hadoopConf: job file URIs never use the hdfs scheme */,
+          blockUnsafeAddressForRemoteUri,
+          String.format("'%s' to false", Configs.JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY));
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
     }

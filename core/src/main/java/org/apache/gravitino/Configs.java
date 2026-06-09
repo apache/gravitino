@@ -552,7 +552,7 @@ public class Configs {
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
   public static final String JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY =
-      "gravitino.job.remoteUri.blockUnsafeAddress";
+      "gravitino.job.blockUnsafeRemoteUri";
 
   public static final ConfigEntry<Boolean> JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS =
       new ConfigBuilder(JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY)
