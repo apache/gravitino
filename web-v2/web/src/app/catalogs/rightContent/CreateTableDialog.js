@@ -417,7 +417,7 @@ export default function CreateTableDialog({ ...props }) {
                 const fields = item.fieldName || item.fieldNames.map(f => f[0])
                 form.setFieldValue(['partitions', idxPartiton, 'strategy'], item.strategy)
                 form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fields)
-                form.setFieldValue(['partitions', idxPartiton, 'number'], item.width || item.number)
+                form.setFieldValue(['partitions', idxPartiton, 'number'], item.numBuckets || item.width || item.number)
                 idxPartiton++
               })
             }

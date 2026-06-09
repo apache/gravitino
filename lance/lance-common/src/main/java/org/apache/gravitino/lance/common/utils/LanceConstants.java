@@ -40,6 +40,7 @@ public class LanceConstants {
   public static final String LANCE_TABLE_VERSION = "lance.version";
   // Mark whether the table is declared only in metadata without creating a Lance dataset.
   public static final String LANCE_TABLE_DECLARED = "lance.declared";
+  public static final String LANCE_SCHEMA_REFRESH_MODE = "lance.schema-refresh-mode";
 
   public static final String LANCE_TABLE_FORMAT = "lance";
 }

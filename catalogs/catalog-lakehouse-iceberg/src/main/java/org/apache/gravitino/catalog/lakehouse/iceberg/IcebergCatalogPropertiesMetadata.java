@@ -127,7 +127,19 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                     + " remote-signing.",
                 false,
                 null,
-                false));
+                false),
+            integerOptionalPropertyEntry(
+                IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS,
+                "HTTP connection timeout in milliseconds for the REST catalog backend",
+                false /* immutable */,
+                10000 /* defaultValue */,
+                false /* hidden */),
+            integerOptionalPropertyEntry(
+                IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS,
+                "HTTP socket timeout in milliseconds for the REST catalog backend",
+                false /* immutable */,
+                60000 /* defaultValue */,
+                false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(S3PropertiesMetadata.PROPERTY_ENTRIES);

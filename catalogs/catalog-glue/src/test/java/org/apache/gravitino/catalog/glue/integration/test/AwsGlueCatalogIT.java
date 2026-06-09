@@ -19,6 +19,8 @@
 package org.apache.gravitino.catalog.glue.integration.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
@@ -87,6 +89,68 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
       config.put(GlueConstants.WAREHOUSE, "s3://" + bucket + "/warehouse");
     }
     return config;
+  }
+
+  @Test
+  void testCreateIcebergTableWithComplexTypes() {
+    String bucket = System.getenv("AWS_S3_TEST_BUCKET");
+    String schema = "glue_it_" + System.nanoTime();
+    ops.createSchema(NameIdentifier.of("ml", "cat", schema), null, Collections.emptyMap());
+
+    Map<String, String> props = new HashMap<>();
+    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
+    props.put(GlueConstants.LOCATION, "s3://" + bucket + "/" + schema + "/");
+
+    Column[] cols = {
+      Column.of("tags", Types.ListType.nullable(Types.StringType.get()), "list col"),
+      Column.of(
+          "scores",
+          Types.MapType.of(Types.StringType.get(), Types.DoubleType.get(), false),
+          "map col"),
+      Column.of(
+          "info",
+          Types.StructType.of(
+              Types.StructType.Field.of("name", Types.StringType.get(), true, null),
+              Types.StructType.Field.of("age", Types.IntegerType.get(), false, null)),
+          "struct col"),
+    };
+
+    ops.createTable(
+        NameIdentifier.of("ml", "cat", schema, "ice_complex"),
+        cols,
+        null,
+        props,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    try {
+      Table loaded = ops.loadTable(NameIdentifier.of("ml", "cat", schema, "ice_complex"));
+      assertEquals(3, loaded.columns().length);
+
+      assertEquals("list col", loaded.columns()[0].comment());
+      Types.ListType listType = (Types.ListType) loaded.columns()[0].dataType();
+      assertEquals(Types.StringType.get(), listType.elementType());
+      assertTrue(listType.elementNullable());
+
+      assertEquals("map col", loaded.columns()[1].comment());
+      Types.MapType mapType = (Types.MapType) loaded.columns()[1].dataType();
+      assertEquals(Types.StringType.get(), mapType.keyType());
+      assertEquals(Types.DoubleType.get(), mapType.valueType());
+      assertFalse(mapType.valueNullable());
+
+      assertEquals("struct col", loaded.columns()[2].comment());
+      Types.StructType structType = (Types.StructType) loaded.columns()[2].dataType();
+      assertEquals(2, structType.fields().length);
+      assertEquals("name", structType.fields()[0].name());
+      assertEquals(Types.StringType.get(), structType.fields()[0].type());
+      assertEquals("age", structType.fields()[1].name());
+      assertEquals(Types.IntegerType.get(), structType.fields()[1].type());
+    } finally {
+      ops.dropTable(NameIdentifier.of("ml", "cat", schema, "ice_complex"));
+      ops.dropSchema(NameIdentifier.of("ml", "cat", schema), false);
+    }
   }
 
   @Test

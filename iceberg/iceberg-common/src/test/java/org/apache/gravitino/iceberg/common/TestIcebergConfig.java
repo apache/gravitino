@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.common;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Assertions;
@@ -98,5 +99,76 @@ public class TestIcebergConfig {
     Assertions.assertEquals(300, config.get(IcebergConfig.ASYNC_CLEANUP_HEARTBEAT_TIMEOUT_SECS));
     Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_MAX_ATTEMPTS));
     Assertions.assertEquals(720, config.get(IcebergConfig.ASYNC_CLEANUP_RETENTION_HOURS));
+  }
+
+  @Test
+  public void testRESTCatalogBackendClientTimeoutDefaults() {
+    IcebergConfig icebergConfig = new IcebergConfig(ImmutableMap.of());
+
+    Assertions.assertEquals(
+        10000, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        60000, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
+    Assertions.assertEquals(
+        IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS.getDefaultValue(),
+        icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS.getDefaultValue(),
+        icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  public void testRESTCatalogBackendClientTimeoutConfigKeys() {
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS.getKey(),
+                "1234",
+                IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS.getKey(),
+                "5678"));
+
+    Assertions.assertEquals(
+        1234, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        5678, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  public void testRESTCatalogBackendClientTimeoutIcebergPropertyAliases() {
+    IcebergConfig icebergConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS,
+                "2345",
+                IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS,
+                "6789"));
+
+    Assertions.assertEquals(
+        2345, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        6789, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  public void testRESTCatalogBackendClientTimeoutRejectsNonPositiveValues() {
+    IcebergConfig zeroConnectionTimeoutConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS.getKey(), "0"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            zeroConnectionTimeoutConfig.get(
+                IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+
+    IcebergConfig negativeSocketTimeoutConfig =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS.getKey(), "-1"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            negativeSocketTimeoutConfig.get(
+                IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
   }
 }

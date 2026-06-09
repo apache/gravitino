@@ -1,8 +1,10 @@
 ---
-title: "Getting started with Apache Gravitino"
-slug: /getting-started/index
+title: "Getting Started"
+slug: "/getting-started/index"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 There are several options for getting started with Apache Gravitino.
 
@@ -31,7 +33,7 @@ If you want to access the instance remotely, be sure to read
 [Accessing Gravitino on AWS externally](./aws-remote-access.md).
 :::
 
-## Environment preparation
+## Environment Preparation
 
 ### AWS
 
@@ -116,7 +118,7 @@ To work on the GCP platform, follow these steps:
 
    You should see information about the OpenJDK version.
 
-### Local workstation
+### Local Workstation
 
 To build and install Gravitino locally on a macOS or a Linux workstation,
 follow these steps:
@@ -134,7 +136,7 @@ follow these steps:
 
 ## Install Gravitino
 
-You can install Gravitino from the binary release packages or the container images.
+Install Gravitino from the binary release packages or the container images.
 Follow [how-to-install](../how-to-install.md).
 
 Or you can install Gravitino from scratch.
@@ -161,7 +163,7 @@ using the RESTful APIs to create and modify metadata.
 
 :::tip
 The following examples use `localhost` as the host name.
-You may need to revise it based on your environment.
+Revise based on your environment.
 :::
 
 1. Create a Metalake:
@@ -226,7 +228,7 @@ You may need to revise it based on your environment.
    be adapted to your environment.
    :::
 
-## Next steps
+## Next Steps
 
 - Delve deeper into the [documentation](https://gravitino.apache.org/docs/latest)
   for advanced features and configuration options.

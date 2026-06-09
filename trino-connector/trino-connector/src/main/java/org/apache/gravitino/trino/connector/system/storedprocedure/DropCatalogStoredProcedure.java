@@ -79,9 +79,11 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
   /**
    * Drops the specified catalog.
    *
+   * <p>If the catalog is not present in the local connector cache, falls back to a server-side drop
+   * so that catalogs that failed to load can still be removed.
+   *
    * @param catalogName the name of the catalog to drop
-   * @param ignoreNotExist whether to ignore if the catalog does not exist (only checked when the
-   *     catalog cannot be found initially)
+   * @param ignoreNotExist whether to ignore if the catalog does not exist
    * @throws TrinoException if the catalog does not exist and ignoreNotExist is false
    */
   public void dropCatalog(String catalogName, boolean ignoreNotExist) {
@@ -90,14 +92,23 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
           catalogConnectorManager.getCatalogConnector(
               catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
       if (catalogConnector == null) {
-        if (ignoreNotExist) {
-          return;
+        boolean dropped =
+            catalogConnectorManager.getMetalake(metalake).dropCatalog(catalogName, true);
+        if (!dropped) {
+          if (ignoreNotExist) {
+            return;
+          }
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
+              "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
         }
-
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
-            "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
+        LOG.info(
+            "Drop catalog {} in metalake {} from server (no local connector) successfully.",
+            catalogName,
+            metalake);
+        return;
       }
+
       // Always ignore "ignoreNotExist" inside Metalake.dropCatalog()
       // because we already handled the null check above.
       catalogConnector.getMetalake().dropCatalog(catalogName, true);

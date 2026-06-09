@@ -1,13 +1,15 @@
 ---
-title: "Manage relational metadata using Apache Gravitino"
-slug: /manage-relational-metadata-using-gravitino
+title: "Manage Relational Metadata"
+slug: "/manage-relational-metadata-using-gravitino"
 date: 2023-12-10
-keyword: Gravitino relational metadata manage
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino relational metadata manage"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+
+## Introduction
 
 This page introduces how to manage relational metadata by Apache Gravitino, relational metadata refers
 to relational catalog, schema, table, partitions, and views. Through Gravitino, you can create, edit, and
@@ -18,7 +20,7 @@ For dedicated view examples and APIs, see [Manage view metadata using Gravitino]
 In this document, Gravitino uses Apache Hive catalog as an example to show how to manage
 relational metadata by Gravitino. Other relational catalogs are similar to Hive catalog,
 but they may have some differences, especially in catalog property, table property, and column type.
-For more details, please refer to the related doc.
+For more details, refer to the related doc.
 
 - [**Apache Hive**](./apache-hive-catalog.md)
 - [**MySQL**](./jdbc-mysql-catalog.md)
@@ -41,9 +43,9 @@ Assuming:
  - Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
  - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
 
-## Catalog operations
+## Catalog Operations
 
-### Create a catalog
+### Create a Catalog
 
 :::caution
 It is not recommended to use one data source to create multiple catalogs, 
@@ -57,12 +59,12 @@ This is a Flink limitation. For example, `catalog_hive` is valid, but `1_catalog
 
 :::tip
 The code below is an example of creating a Hive catalog. For other relational catalogs, the code is
-similar, but the catalog type, provider, and properties may be different. For more details, please refer to the related doc.
+similar, but the catalog type, provider, and properties may be different. For more details, refer to the related doc.
 
 For relational catalog, you must specify the catalog `type` as `RELATIONAL` when creating a catalog.
 :::
 
-You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
+Create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or use the Gravitino Java client. The following is an example of creating a catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -120,7 +122,7 @@ gravitino_client.create_catalog(name="catalog",
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following catalog providers:
+Gravitino supports the following catalog providers:
 
 | Catalog provider    | Catalog property                                                                        |
 |---------------------|-----------------------------------------------------------------------------------------|
@@ -138,9 +140,9 @@ Currently, Gravitino supports the following catalog providers:
 | `jdbc-hologres`     | [Hologres catalog property](./jdbc-hologres-catalog.md#catalog-properties)              |
 | `lakehouse-generic` | [Lakehouse generic catalog property](./lakehouse-generic-catalog.md#catalog-properties) |
 
-### Load a catalog
+### Load a Catalog
 
-You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a catalog:
+Load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client. The following is an example of loading a catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -172,9 +174,9 @@ catalog = gravitino_client.load_catalog("catalog")
 </TabItem>
 </Tabs>
 
-### Alter a catalog
+### Alter a Catalog
 
-You can modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a catalog:
+Modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client. The following is an example of altering a catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -221,7 +223,7 @@ catalog = gravitino_client.alterCatalog("catalog", *changes)
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a catalog:
+Gravitino supports the following changes to a catalog:
 
 | Supported modification | JSON                                                         | Java                                          |
 |------------------------|--------------------------------------------------------------|-----------------------------------------------|
@@ -239,7 +241,7 @@ Therefore, do not change the catalog's URI unless you fully understand the conse
 
 :::
 
-### Enable a catalog
+### Enable a Catalog
 
 Catalog has a reserved property - `in-use`, which indicates whether the catalog is available for use. By default, the `in-use` property is set to `true`.
 To enable a disabled catalog, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client.
@@ -282,7 +284,7 @@ gravitino_client.enable_catalog("catalog")
 This operation does nothing if the catalog is already enabled.
 :::
 
-### Disable a catalog
+### Disable a Catalog
 
 Once a catalog is disabled:
 - Users can only [list](#list-all-catalogs-in-a-metalake), [load](#load-a-catalog), [drop](#drop-a-catalog), or [enable](#enable-a-catalog) it.
@@ -328,9 +330,9 @@ gravitino_client.disable_catalog("catalog")
 This operation does nothing if the catalog is already disabled.
 :::
 
-### Drop a catalog
+### Drop a Catalog
 
-Deleting a catalog by "force" is not a default behavior, so please make sure:
+Deleting a catalog by "force" is not a default behavior, so make sure:
 
 - There are no schemas under the catalog. Otherwise, you will get an error.
 - The catalog is [disabled](#disable-a-catalog). Otherwise, you will get an error.
@@ -341,7 +343,7 @@ Deleting a catalog by "force" will:
 - Delete the catalog itself even if it is enabled.
 - Not delete the external resources (such as database, table, etc.) associated with sub-entities unless they are managed (such as managed fileset).
 
-You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
+Remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client. The following is an example of dropping a catalog:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -378,9 +380,9 @@ gravitino_client.drop_catalog(name="catalog", force=False)
 </TabItem>
 </Tabs>
 
-### List all catalogs in a metalake
+### List All Catalogs in a Metalake
 
-You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs in
+List all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or use the Gravitino Java client. The following is an example of listing all the catalogs in
 a metalake:
 
 <Tabs groupId="language" queryString>
@@ -415,9 +417,9 @@ catalog_names = gravitino_client.list_catalogs()
 </TabItem>
 </Tabs>
 
-### List all catalogs' information in a metalake
+### List All Catalog Information in a Metalake
 
-You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
+List all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -452,15 +454,15 @@ catalogs_info = gravitino_client.list_catalogs_info()
 </Tabs>
 
 
-## Schema operations
+## Schema Operations
 
 :::tip
 Users should create a metalake and a catalog, then ensure that the metalake and catalog are enabled before operating schemas.
 :::
 
-### Create a schema
+### Create a Schema
 
-You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
+Create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or use the Gravitino Java client. The following is an example of creating a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -508,7 +510,7 @@ catalog.as_schemas().create_schema(name="schema",
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following schema property:
+Gravitino supports the following schema property:
 
 | Catalog provider    | Schema property                                                                       |
 |---------------------|---------------------------------------------------------------------------------------|
@@ -526,9 +528,9 @@ Currently, Gravitino supports the following schema property:
 | `jdbc-hologres`     | [Hologres schema property](./jdbc-hologres-catalog.md#schema-properties)              |
 | `lakehouse-generic` | [Lakehouse generic schema property](./lakehouse-generic-catalog.md#schema-properties) |
 
-### Load a schema
+### Load a Schema
 
-You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
+Create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or use the Gravitino Java client. The following is an example of loading a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -563,9 +565,9 @@ schema: Schema = catalog.as_schemas().load_schema(name="schema")
 </TabItem>
 </Tabs>
 
-### Alter a schema
+### Alter a Schema
 
-You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
+Change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or use the Gravitino Java client. The following is an example of modifying a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -620,15 +622,16 @@ schema_new: Schema = catalog.as_schemas().alter_schema("schema",
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a schema:
+Gravitino supports the following changes to a schema:
 
 | Supported modification | JSON                                                         | Java                                          |
 |------------------------|--------------------------------------------------------------|-----------------------------------------------|
 | Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `SchemaChange.setProperty("key1", "value1")`  |
 | Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`         |
 
-### Drop a schema
-You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
+### Drop a Schema
+
+Remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or use the Gravitino Java client. The following is an example of dropping a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -667,11 +670,11 @@ catalog.as_schemas().drop_schema("schema", cascade=True)
 </Tabs>
 
 If `cascade` is true, Gravitino will drop all tables under the schema. Otherwise, Gravitino will throw an exception if there are tables under the schema. 
-Some catalogs may not support cascading deletion of a schema, please refer to the related doc for more details.
+Some catalogs may not support cascading deletion of a schema, refer to the related doc for more details.
 
-### List all schemas under a catalog
+### List All Schemas Under a Catalog
 
-You can list all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of listing all the schemas
+List all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or use the Gravitino Java client. The following is an example of listing all the schemas
     in a catalog:
 
 
@@ -708,15 +711,15 @@ schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 </TabItem>
 </Tabs>
 
-## Table operations
+## Table Operations
 
 :::tip
 Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before before operating tables.
 :::
 
-### Create a table
+### Create a Table
 
-You can create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of creating a table:
+Create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or use the Gravitino Java client. The following is an example of creating a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -854,7 +857,7 @@ TableCatalog tableCatalog = catalog.asTableCatalog();
 // table properties of other catalogs.
 Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .put("format", "ORC")
-        // For more table properties, please refer to the related doc.
+        // For more table properties, refer to the related doc.
         .build();
 
 tableCatalog.createTable(
@@ -886,14 +889,14 @@ tableCatalog.createTable(
 The provided example demonstrates table creation but isn't directly executable in Gravitino, since not all catalogs fully support these capabilities.
 :::
 
-In order to create a table, you need to provide the following information:
+To create a table, you need to provide the following information:
 
 - Table column name and type
 - Table column default value (optional)
 - Table column auto-increment (optional)
 - Table property (optional)
 
-#### Apache Gravitino table column type
+#### Table Column Type
 
 The following types that Gravitino supports:
 
@@ -939,7 +942,7 @@ represented by ExternalType.
 The following shows the data structure of an external type in JSON and Java, enabling easy retrieval of its string value.
 
 <Tabs groupId='language' queryString>
-  <TabItem value="Json" label="Json">
+  <TabItem value="Json" label="JSON">
 
 ```json
 {
@@ -967,7 +970,7 @@ that the client does not recognize, it will be treated as an unparsed type on th
 The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
 
 <Tabs groupId='language' queryString>
-  <TabItem value="Json" label="Json">
+  <TabItem value="Json" label="JSON">
 
 ```json
 {
@@ -987,7 +990,7 @@ String unparsedValue = ((UnparsedType) type).unparsedType();
   </TabItem>
 </Tabs>
 
-#### Table column default value
+#### Table Column Default Value
 
 When defining a table column, you can specify a [literal](./expression.md#literal) or an [expression](./expression.md) as the default value. The default value typically applies to new rows that are inserted into the table by the underlying catalog.
 
@@ -1009,7 +1012,7 @@ The following is a table of the column default value that Gravitino supports for
 | `jdbc-hologres`      | &#10004;                |
 | `lakehouse-generic`  | &#10008;                |
 
-#### Table column auto-increment
+#### Table Column Auto-increment
 
 Auto-increment provides a convenient way to ensure that each row in a table has a unique identifier without the need for manually managing identifier allocation.
 The following table shows the column auto-increment that Gravitino supports for different catalogs:
@@ -1030,7 +1033,7 @@ The following table shows the column auto-increment that Gravitino supports for 
 | `jdbc-hologres`     | &#10008;                                                                         |
 | `lakehouse-generic` | &#10008;                                                                         |
 
-#### Table property and type mapping
+#### Table Property and Type Mapping
 
 The following is the table property that Gravitino supports:
 
@@ -1048,9 +1051,9 @@ The following is the table property that Gravitino supports:
 | `jdbc-starrocks`    | [StarRocks table property](./jdbc-starrocks-catalog.md#table-properties)                                                                                                                                                   | [StarRocks type mapping](./jdbc-starrocks-catalog.md#table-column-types)                                                                                    |
 | `jdbc-clickhouse`   | [ClickHouse table property](./jdbc-clickhouse-catalog.md#table-properties)                                                                                                                                                 | [ClickHouse type mapping](./jdbc-clickhouse-catalog.md#table-column-types)                                                                                  |
 | `jdbc-hologres`     | [Hologres table property](./jdbc-hologres-catalog.md#table-properties)                                                                                                                                                     | [Hologres type mapping](./jdbc-hologres-catalog.md#table-column-types)                                                                                      |
-| `lakehouse-generic` | Lakehouse generic table property depends on specific table implementation, for Lance table, please refer to [doc](./lakehouse-generic-lance-table.md#table-properties), other table format, please refer to related docs.  | Lakehouse generic type mapping. Similar to table properties, for Lance table, please refer to [docs](./lakehouse-generic-lance-table.md#data-type-mappings) |
+| `lakehouse-generic` | Lakehouse generic table property depends on specific table implementation, for Lance table, refer to [doc](./lakehouse-generic-lance-table.md#table-properties), other table format, refer to related docs.                | Lakehouse generic type mapping. Similar to table properties, for Lance table, refer to [docs](./lakehouse-generic-lance-table.md#data-type-mappings)        |
 
-#### Table partitioning, distribution, sort ordering and indexes
+#### Table Partitioning, Distribution, Sort Ordering and Indexes
 
 In addition to the basic settings, Gravitino supports the following features:
 
@@ -1061,15 +1064,15 @@ In addition to the basic settings, Gravitino supports the following features:
 | Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/1.4.0-SNAPSHOT/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)               |
 | Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/1.4.0-SNAPSHOT/api/java/org/apache/gravitino/rel/indexes/Index.html)                                 |
 
-For more information, please see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
+For more information, see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-distribution-sort-order-indexes.md).
 
 :::note
-The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, please refer to the related doc.
+The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, refer to the related doc.
 :::
 
-### Load a table
+### Load a Table
 
-You can load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a table:
+Load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or use the Gravitino Java client. The following is an example of loading a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1101,9 +1104,9 @@ tableCatalog.loadTable(NameIdentifier.of("schema", "table"));
 - When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
 :::
 
-### Alter a table
+### Alter a Table
 
-You can modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a table:
+Modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or use the Gravitino Java client. The following is an example of modifying a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1142,7 +1145,7 @@ Table t = tableCatalog.alterTable(NameIdentifier.of("schema", "table"),
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a table:
+Gravitino supports the following changes to a table:
 
 | Supported modification               | JSON                                                                                                                                                                                                                                                         | Java                                                                                         |
 |--------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
@@ -1159,9 +1162,9 @@ Currently, Gravitino supports the following changes to a table:
 | Update the position of a column      | `{"@type":"updateColumnPosition","fieldName": ["name"], "newPosition":"default"}`                                                                                                                                                                            | `TableChange.updateColumnPosition(...)`                                                      |
 | Update the default value of a column | `{"@type":"updateColumnDefaultValue","fieldName": ["name"], "newDefaultValue":{"type":"literal","dataType":"varchar(100)","value":"new default value}}`                                                                                                      | `TableChange.updateColumnDefaultValue(...)`                                                  |
 
-### Drop a table
+### Drop a Table
 
-You can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a table:
+Remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or use the Gravitino Java client. The following is an example of dropping a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1202,9 +1205,9 @@ There are two ways to remove a table: `dropTable` and `purgeTable`:
 
 Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysql, jdbc-postgresql and lakehouse-paimon catalog doesn't support.
 
-### List all tables under a schema
+### List All Tables Under a Schema
 
-You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of listing all the tables in a schema:
+List all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or use the Gravitino Java client. The following is an example of listing all the tables in a schema:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1232,7 +1235,7 @@ NameIdentifier[] identifiers =
 </TabItem>
 </Tabs>
 
-## View operations
+## View Operations
 
 View metadata is documented separately in [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md),
 including create, load, alter, drop, and list examples for the REST API and Java client.

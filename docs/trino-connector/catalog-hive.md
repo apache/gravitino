@@ -1,9 +1,11 @@
 ---
-title: "Apache Gravitino Trino connector - Hive catalog"
-slug: /trino-connector/catalog-hive
-keyword: gravitino connector trino
+title: "Trino Connector: Hive Catalog"
+slug: "/trino-connector/catalog-hive"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 The Hive catalog allows Trino querying data stored in an Apache Hive data warehouse.
 
@@ -35,9 +37,9 @@ per catalog:
 - TEXTFILE
 
 
-## Schema operations
+## Schema Operations
 
-### Create a schema 
+### Create a Schema
 
 Users can create a schema with properties through Apache Gravitino Trino connector as follows:
 
@@ -45,11 +47,11 @@ Users can create a schema with properties through Apache Gravitino Trino connect
 CREATE SCHEMA catalog.schema_name 
 ```
 
-## Table operations
+## Table Operations
 
-### Create table
+### Create Table
 
-The Gravitino Trino connector currently supports basic Hive table creation statements, such as defining fields,
+The Gravitino Trino connector supports basic Hive table creation statements, such as defining fields,
 allowing null values, and adding comments. The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
 
 :::note
@@ -67,7 +69,7 @@ CREATE TABLE catalog.schema_name.table_name
 ```
 
 
-### Alter table
+### Alter Table
 
 Support for the following alter table operations:
 
@@ -81,7 +83,7 @@ Support for the following alter table operations:
 ### Select
 
 The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
-Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
+It doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
 ### Update
 
@@ -98,13 +100,13 @@ Transactional Hive tables with ORC format support "row-by-row" deletion, in whic
 
 See also [more limitation](https://trino.io/docs/current/connector/hive.html#data-management).
 
-## Schema and table properties
+## Schema and Table Properties
 
-You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE"
+Set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE"
 statement.
 
 
-### Create a schema with properties
+### Create a Schema with Properties
 
 Users can use the following example to create a schema with properties: 
 
@@ -124,7 +126,7 @@ The following tables are the properties supported by the Hive schema:
 Reserved properties: A reserved property is one can't be set by users but can be read by users.
 
 
-### Create a table with properties
+### Create a Table with Properties
 
 Users can use the following example to create a table with properties: 
 
@@ -164,9 +166,9 @@ The following properties are automatically added and managed as reserved propert
 | external       | Indicate whether it's an external table | 0.2.0         |
 | table_type     | The type of Hive table                  | 0.2.0         |
 
-## Basic usage examples
+## Examples
 
-You need to do the following steps before you can use the Hive catalog in Trino through Gravitino.
+Complete the following steps before you can use the Hive catalog in Trino through Gravitino:
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `hive_test`,
 then you can use the following code to create them in Gravitino:
@@ -192,7 +194,7 @@ curl -X POST \
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
 ```
 
-For More information about the Hive catalog, please refer to [Hive catalog](../apache-hive-catalog.md).
+For More information about the Hive catalog, refer to [Hive catalog](../apache-hive-catalog.md).
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
 
@@ -222,7 +224,7 @@ The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `hive_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
-### Creating tables and schemas
+### Create Tables and Schemas
 
 Create a new schema named `database_01` in `hive_test` catalog.
 
@@ -256,7 +258,7 @@ WITH (
 );
 ```
 
-### Writing data
+### Write Data
 
 Insert data into the table `table_01`:
 
@@ -317,7 +319,7 @@ MERGE INTO hive_test.database_01.test_acid t USING hive_test.database_01.table_0
               VALUES (3, s.name, s.salary);
 ```
 
-### Querying data
+### Query Data
 
 Query the `table_01` table:
 
@@ -325,7 +327,7 @@ Query the `table_01` table:
 SELECT * FROM hive_test.database_01.table_01;
 ```
 
-### Modify a table
+### Modify a Table
 
 Add a new column `age` to the `table_01` table:
 
@@ -359,7 +361,7 @@ Drop a table:
 DROP TABLE hive_test.database_01.table_01;
 ```
 
-## HDFS config and permissions
+## HDFS Config and Permissions
 
 For basic setups, the Apache Gravitino Trino connector configures the HDFS client
 using catalog configurations. It supports configuring the HDFS client with `hdfs-site.xml`
@@ -367,7 +369,7 @@ and `core-site.xml` files via the `trino.bypass.hive.config.resources` setting i
 
 Before running any `Insert` statements for Hive tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.
-You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config,
+Override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config,
 replacing hdfs_user with the appropriate username:
 
 ```text
@@ -377,7 +379,7 @@ replacing hdfs_user with the appropriate username:
 ## S3
 
 When using AWS S3 within the Hive catalog, users need to configure the Trino Hive connector's
-AWS S3-related properties in the catalog's properteis. Please refer to the documentation
+AWS S3-related properties in the catalog's properties. Refer to the documentation
 of [Hive connector with Amazon S3](https://trino.io/docs/current/connector/hive-s3.html).
 
 To create a Hive catalog with AWS S3 configuration in the Trino CLI, use the following command:

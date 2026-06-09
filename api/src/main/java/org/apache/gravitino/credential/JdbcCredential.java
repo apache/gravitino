@@ -110,6 +110,6 @@ public class JdbcCredential implements Credential {
     Preconditions.checkArgument(jdbcPassword != null, "JDBC password should not be null");
     // JDBC credentials are static (no server-issued expiry). expireTimeInMs must always be 0.
     Preconditions.checkArgument(
-        expireTimeInMs == 0, "The expire time of JdbcCredential should be 0");
+        expireTimeInMs == 0, "The expiration time of JdbcCredential should be 0");
   }
 }
