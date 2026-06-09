@@ -76,6 +76,23 @@ CREATE CATALOG gravitino_irc WITH (
 );
 ```
 
+### Basic Authentication
+
+```sql
+CREATE CATALOG gravitino_irc WITH (
+  'type'                     = 'iceberg',
+  'catalog-type'             = 'rest',
+  'uri'                      = 'http://<gravitino-host>:9001/iceberg',
+  'rest.auth.type'           = 'basic',
+  'rest.auth.basic.username' = '<username>',
+  'rest.auth.basic.password' = '<password>',
+  'io-impl'                  = 'org.apache.iceberg.aws.s3.S3FileIO',
+  's3.region'                = 'us-east-1',
+  's3.access-key-id'         = '<access-key>',
+  's3.secret-access-key'     = '<secret-key>'
+);
+```
+
 ### OAuth2 Authentication
 
 ```sql
