@@ -69,11 +69,10 @@ public final class IdpRESTUtils {
 
   public static Response handleException(
       String resourceType, IdpOperationType op, String name, Exception e) {
-    String formatted = StringUtils.isBlank(name) ? "" : " [" + name + "]";
     String errorMsg =
         String.format(
-            "Failed to operate built-in IdP %s %s operation [%s], reason [%s]",
-            resourceType, formatted, op.name(), e.getMessage());
+            "Failed to operate built-in IdP %s [%s] operation [%s], reason [%s]",
+            resourceType, StringUtils.defaultString(name), op.name(), e.getMessage());
     LOG.warn(errorMsg, e);
     return toErrorResponse(errorMsg, e);
   }
