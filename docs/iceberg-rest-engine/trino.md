@@ -51,7 +51,7 @@ iceberg.file-format=PARQUET
 iceberg.compression-codec=ZSTD
 ```
 
-### With Basic authentication
+### Basic Authentication
 
 Requires Trino **481+**. Trino has no native Basic mode for Iceberg REST; pass `Authorization`
 via HTTP headers.

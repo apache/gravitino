@@ -76,7 +76,7 @@ CREATE CATALOG gravitino_irc WITH (
 );
 ```
 
-### With Basic authentication
+### Basic Authentication
 
 ```sql
 CREATE CATALOG gravitino_irc WITH (

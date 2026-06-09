@@ -78,7 +78,7 @@ be supplied via environment variables (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_
 instance profile, in which case the explicit credential lines can be omitted.
 :::
 
-### With Basic authentication
+### Basic Authentication
 
 If Gravitino uses [built-in IDP](../security/how-to-use-built-in-idp.md) Basic authentication,
 add the auth properties to `$SPARK_HOME/conf/spark-defaults.conf`:
