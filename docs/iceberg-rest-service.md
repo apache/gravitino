@@ -47,11 +47,11 @@ The following Iceberg REST API features are not implemented:
 
 Choose one of these deployment modes:
 
-| Mode | Package | Classpath | Access control |
-|------|---------|-----------|----------------|
-| Standalone server | Gravitino Iceberg REST server package | `libs` | No |
-| Standalone server | Gravitino server package | `iceberg-rest-server/libs` | No |
-| Auxiliary service | Gravitino server package | `iceberg-rest-server/libs` | Yes |
+| Mode              | Package                               | Classpath                  | Access control |
+|-------------------|---------------------------------------|----------------------------|----------------|
+| Standalone server | Gravitino Iceberg REST server package | `libs`                     | No             |
+| Standalone server | Gravitino server package              | `iceberg-rest-server/libs` | No             |
+| Auxiliary service | Gravitino server package              | `iceberg-rest-server/libs` | Yes            |
 
 ### Package Build
 
