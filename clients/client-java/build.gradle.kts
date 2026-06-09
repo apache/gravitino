@@ -44,6 +44,7 @@ dependencies {
 
   testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":plugins:idp-basic"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 

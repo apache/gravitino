@@ -78,6 +78,13 @@ export default function CreateCatalogDialog({ ...props }) {
   const dispatch = useAppDispatch()
   const isShowTestConnect = ['fileset', 'model'].includes(catalogType) || currentProvider === 'lakehouse-generic'
 
+  const isRequiredField = prop => {
+    return (
+      prop.required ||
+      (prop.key === 'warehouse' && currentProvider === 'lakehouse-iceberg' && ['hive', 'jdbc'].includes(catalogBackend))
+    )
+  }
+
   const defaultValues = {
     name: '',
     type: catalogType,
@@ -107,14 +114,14 @@ export default function CreateCatalogDialog({ ...props }) {
   )
 
   const isHidden = prop => {
-    const { parentField, hide, required, key } = prop
+    const { parentField, hide, key } = prop
     switch (parentField) {
       case 'catalog-backend':
         return catalogBackend && hide && hide.includes(catalogBackend)
       case 'authentication.type':
         return !authType || (hide && hide.includes(authType))
       default:
-        return !(!editCatalog || ['region', 'location'].includes(key) || required)
+        return !(!editCatalog || ['region', 'location'].includes(key) || isRequiredField(prop))
     }
   }
 
@@ -522,11 +529,7 @@ export default function CreateCatalogDialog({ ...props }) {
                             key={idx}
                             rules={[
                               {
-                                required:
-                                  prop.required ||
-                                  (prop.key === 'warehouse' &&
-                                    currentProvider === 'lakehouse-iceberg' &&
-                                    ['hive', 'jdbc'].includes(catalogBackend))
+                                required: isRequiredField(prop)
                               }
                             ]}
                             messageVariables={{ label: prop.label.toLowerCase() }}
