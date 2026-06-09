@@ -366,6 +366,9 @@ This example shows how to enable built-in Basic authentication.
 
 - Gravitino distribution package (includes the idp-basic plugin on the server classpath)
 
+Built-in IdP is **incompatible** with the `simple` authenticator (the default). When the
+`idp-basic` plugin is enabled, `gravitino.authenticators` must not include `simple`.
+
 **Configuration:**
 
 Append the following to `conf/gravitino.conf`:
