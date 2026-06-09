@@ -55,6 +55,11 @@ public class GravitinoCatalogStoreFactoryOptions {
 
   public static final String AUTH_TYPE = "gravitino.client.auth.type";
   public static final String OAUTH2 = "oauth2";
+  public static final String BASIC = "basic";
+
+  // Basic auth config keys
+  public static final String BASIC_USERNAME = "gravitino.client.basic.username";
+  public static final String BASIC_PASSWORD = "gravitino.client.basic.password";
 
   // OAuth2 config keys
   public static final String OAUTH2_SERVER_URI = "gravitino.client.oauth2.serverUri";

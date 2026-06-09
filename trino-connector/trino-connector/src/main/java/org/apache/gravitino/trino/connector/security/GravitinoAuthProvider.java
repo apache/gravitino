@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.security;
 
+import com.google.common.base.Preconditions;
 import io.trino.spi.connector.ConnectorSession;
 import java.io.File;
 import java.util.Locale;
@@ -53,6 +54,14 @@ public class GravitinoAuthProvider {
    */
   public static final String FORWARD_SESSION_USER_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.forwardUser";
+
+  /** Built-in IdP username configuration key for Basic authentication. */
+  public static final String BASIC_USERNAME_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "basic.username";
+
+  /** Built-in IdP password configuration key for Basic authentication. */
+  public static final String BASIC_PASSWORD_KEY =
+      GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "basic.password";
 
   /** OAuth2 server URI configuration key. */
   public static final String OAUTH_SERVER_URI_KEY =
@@ -90,6 +99,7 @@ public class GravitinoAuthProvider {
   /** Authentication types supported by the Trino connector. */
   public enum AuthType {
     SIMPLE,
+    BASIC,
     OAUTH2,
     KERBEROS,
     NONE
@@ -117,6 +127,9 @@ public class GravitinoAuthProvider {
       switch (authType) {
         case SIMPLE:
           buildSimpleAuth(builder, config.getUser());
+          break;
+        case BASIC:
+          buildBasicAuth(builder, clientConfig);
           break;
         case OAUTH2:
           builder.withOAuth(buildOAuthProvider(clientConfig));
@@ -202,7 +215,8 @@ public class GravitinoAuthProvider {
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
           String.format(
-              "Invalid authentication type: %s. Valid values are: simple, oauth2, kerberos, none",
+              "Invalid authentication type: %s. Valid values are: simple, basic, oauth2, kerberos,"
+                  + " none",
               authTypeStr),
           e);
     }
@@ -210,6 +224,8 @@ public class GravitinoAuthProvider {
 
   private static void removeAuthSpecificKeys(Map<String, String> clientConfig) {
     clientConfig.remove(AUTH_TYPE_KEY);
+    clientConfig.remove(BASIC_USERNAME_KEY);
+    clientConfig.remove(BASIC_PASSWORD_KEY);
     clientConfig.remove(OAUTH_SERVER_URI_KEY);
     clientConfig.remove(OAUTH_CREDENTIAL_KEY);
     clientConfig.remove(OAUTH_PATH_KEY);
@@ -228,6 +244,21 @@ public class GravitinoAuthProvider {
     } else {
       builder.withSimpleAuth();
     }
+  }
+
+  private static void buildBasicAuth(
+      GravitinoAdminClient.AdminClientBuilder builder, Map<String, String> config) {
+    String username = config.get(BASIC_USERNAME_KEY);
+    String password = config.get(BASIC_PASSWORD_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(username),
+        "Basic username is required. Please set %s",
+        BASIC_USERNAME_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(password),
+        "Basic password is required. Please set %s",
+        BASIC_PASSWORD_KEY);
+    builder.withBasicAuth(username, password);
   }
 
   private static DefaultOAuth2TokenProvider buildOAuthProvider(Map<String, String> config) {
