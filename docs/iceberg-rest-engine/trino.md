@@ -51,6 +51,36 @@ iceberg.file-format=PARQUET
 iceberg.compression-codec=ZSTD
 ```
 
+### With Basic authentication
+
+Requires Trino **481+**. Trino has no native Basic mode for Iceberg REST; pass `Authorization`
+via HTTP headers.
+
+```shell
+echo -n '<username>:<password>' | base64
+```
+
+```properties
+connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=http://<gravitino-host>:9001/iceberg
+
+# Basic authentication
+iceberg.rest-catalog.http-headers=Authorization: Basic <base64-credentials>
+
+# Native S3 filesystem (Trino 430+)
+fs.native-s3.enabled=true
+s3.region=us-east-1
+s3.aws-access-key=<access-key>
+s3.aws-secret-key=<secret-key>
+
+# Table defaults
+iceberg.file-format=PARQUET
+iceberg.compression-codec=ZSTD
+```
+
+Replace `<base64-credentials>` with the output of `echo -n '<username>:<password>' | base64`.
+
 ### With OAuth2 authentication
 
 ```properties

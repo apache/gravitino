@@ -1,7 +1,7 @@
 ---
 title: How to use built-in IDP
 slug: /security/how-to-use-built-in-idp
-keyword: security authentication idp basic spark flink trino connector
+keyword: security authentication idp
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -250,6 +250,13 @@ gravitino.client.basic.password=${password}
 ---
 
 ## Engines using Basic authentication for Iceberg REST catalog
+
+Connect Spark, Flink, and Trino directly to the Gravitino Iceberg REST (IRC) endpoint at
+`http://<gravitino-host>:9001/iceberg/`. No Gravitino engine connector plugin is required.
+Configure only the Basic auth properties below. See
+[Connect Spark via Iceberg REST](../iceberg-rest-engine/spark.md),
+[Connect Flink via Iceberg REST](../iceberg-rest-engine/flink.md), and
+[Connect Trino via Iceberg REST](../iceberg-rest-engine/trino.md) for full IRC setup.
 
 ### Spark
 

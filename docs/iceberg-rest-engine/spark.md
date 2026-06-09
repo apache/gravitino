@@ -78,6 +78,38 @@ be supplied via environment variables (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_
 instance profile, in which case the explicit credential lines can be omitted.
 :::
 
+### With Basic authentication
+
+If Gravitino uses [built-in IDP](../security/how-to-use-built-in-idp.md) Basic authentication,
+add the auth properties to `$SPARK_HOME/conf/spark-defaults.conf`:
+
+```properties
+# Iceberg extensions
+spark.sql.extensions                                      org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+
+# Gravitino IRC catalog
+spark.sql.catalog.gravitino_irc                           org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.gravitino_irc.type                      rest
+spark.sql.catalog.gravitino_irc.uri                       http://<gravitino-host>:9001/iceberg
+
+# Basic authentication
+spark.sql.catalog.gravitino_irc.rest.auth.type            basic
+spark.sql.catalog.gravitino_irc.rest.auth.basic.username  <username>
+spark.sql.catalog.gravitino_irc.rest.auth.basic.password  <password>
+
+# S3 FileIO
+spark.sql.catalog.gravitino_irc.io-impl                   org.apache.iceberg.aws.s3.S3FileIO
+spark.sql.catalog.gravitino_irc.s3.region                 us-east-1
+spark.sql.catalog.gravitino_irc.s3.access-key-id          <access-key>
+spark.sql.catalog.gravitino_irc.s3.secret-access-key      <secret-key>
+
+# Hadoop S3A (for s3a:// paths)
+spark.hadoop.fs.s3a.impl                                  org.apache.hadoop.fs.s3a.S3AFileSystem
+
+# Set as default catalog (optional)
+spark.sql.defaultCatalog                                  gravitino_irc
+```
+
 ### With OAuth2 authentication
 
 If Gravitino is configured with OAuth2, add the auth properties to the same
