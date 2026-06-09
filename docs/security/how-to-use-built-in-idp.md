@@ -1,7 +1,7 @@
 ---
 title: How to use built-in IDP
 slug: /security/how-to-use-built-in-idp
-keyword: security authentication idp
+keyword: security authentication idp basic spark flink trino connector
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -211,6 +211,80 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```
 
 For full request and response definitions, see the [Built-in IDP OpenAPI](../open-api/idp/openapi.yaml).
+
+---
+
+## Engines using Basic authentication
+
+Configure Basic credentials on each engine connector. See
+[Spark authentication](../spark-connector/spark-authentication-with-gravitino.md),
+[Flink authentication](../flink-connector/flink-authentication-with-gravitino.md), and
+[Trino authentication](../trino-connector/authentication.md) for full connector setup.
+
+### Spark
+
+```properties
+spark.sql.gravitino.authType=basic
+spark.sql.gravitino.basic.username=${username}
+spark.sql.gravitino.basic.password=${password}
+```
+
+### Flink
+
+```yaml
+table.catalog-store.gravitino.gravitino.client.auth.type: basic
+table.catalog-store.gravitino.gravitino.client.basic.username: ${username}
+table.catalog-store.gravitino.gravitino.client.basic.password: ${password}
+```
+
+### Trino
+
+In `etc/catalog/gravitino.properties`:
+
+```properties
+gravitino.client.authType=basic
+gravitino.client.basic.username=${username}
+gravitino.client.basic.password=${password}
+```
+
+---
+
+## Engines using Basic authentication for Iceberg REST catalog
+
+### Spark
+
+```properties
+spark.sql.catalog.<catalog-name>.rest.auth.type=basic
+spark.sql.catalog.<catalog-name>.rest.auth.basic.username=${username}
+spark.sql.catalog.<catalog-name>.rest.auth.basic.password=${password}
+```
+
+### Flink
+
+```sql
+'rest.auth.type' = 'basic',
+'rest.auth.basic.username' = '${username}',
+'rest.auth.basic.password' = '${password}'
+```
+
+### Trino
+
+Requires Trino **481+**. Trino has no native Basic mode for Iceberg REST; pass
+`Authorization` via HTTP headers.
+
+Generate Base64 once:
+
+```shell
+echo -n '${username}:${password}' | base64
+```
+
+In `etc/catalog/<catalog-name>.properties`:
+
+```properties
+iceberg.rest-catalog.http-headers=Authorization: Basic <base64-credentials>
+```
+
+Replace `<base64-credentials>` with the output of `echo -n '${username}:${password}' | base64`.
 
 ---
 
