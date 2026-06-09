@@ -606,9 +606,9 @@ public class TestJwksTokenValidator {
       assertEquals("test-subject", userPrincipal.getName());
       assertEquals(2, userPrincipal.getGroups().size());
       assertTrue(
-          userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group1")));
+          userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupName().equals("group1")));
       assertTrue(
-          userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group2")));
+          userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupName().equals("group2")));
     }
   }
 

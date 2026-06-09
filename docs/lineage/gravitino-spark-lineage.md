@@ -1,7 +1,7 @@
 ---
-title: "Gravitino Spark Lineage support"
-slug: /lineage/gravitino-spark-lineage
-keyword: Gravitino Spark OpenLineage
+title: "Spark Lineage"
+slug: "/lineage/gravitino-spark-lineage"
+keyword: "Gravitino Spark OpenLineage"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -16,7 +16,7 @@ By leveraging OpenLineage Spark plugin, Gravitino provides a separate Spark plug
 - Supports extract Gravitino dataset from GVFS.
 - Supports Gravitino spark connector and non Gravitino Spark connector.
 
-## Gravitino dataset
+## Gravitino Dataset
 
 The Gravitino OpenLineage Spark plugin transforms the Gravitino metalake name into the dataset namespace. The dataset name varies by dataset type when generating lineage information.
 
@@ -56,7 +56,7 @@ For GVFS location, this plugin adds `fileset-location` facets which contains the
 }
 ```
 
-## How to use 
+## Getting Started
 
 1. Download [Gravitino OpenLineage plugin jar](https://github.com/datastrato/gravitino-openlineage-plugins/tree/main/spark-plugin/) and place it to the classpath of Spark.
 2. Add configuration to the Spark to enable lineage collection.
@@ -78,7 +78,7 @@ Configuration example For Spark shell:
 --conf spark.openlineage.columnLineage.datasetLineageEnabled=true 
 ```
 
-Please refer to [OpenLineage Spark guides](https://openlineage.io/docs/guides/spark/) and [Gravitino Spark connector](/spark-connector/spark-connector.md) for more details. Additionally, Gravitino provides following configurations for lineage. 
+Refer to [OpenLineage Spark guides](https://openlineage.io/docs/guides/spark/) and [Gravitino Spark connector](/spark-connector/spark-connector.md) for more details. Additionally, Gravitino provides following configurations for lineage. 
 
 <table>
   <thead>

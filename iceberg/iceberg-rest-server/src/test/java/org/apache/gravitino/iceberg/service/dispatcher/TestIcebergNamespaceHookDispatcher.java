@@ -67,21 +67,65 @@ public class TestIcebergNamespaceHookDispatcher {
   private IcebergNamespaceHookDispatcher hookDispatcher;
   private IcebergNamespaceOperationDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
+  private OwnerDispatcher mockInternalOwnerDispatcher;
+  private SchemaDispatcher mockSchemaDispatcher;
+  private SchemaDispatcher mockInternalSchemaDispatcher;
+  private TableDispatcher mockTableDispatcher;
+  private TableDispatcher mockInternalTableDispatcher;
   private EntityStore mockEntityStore;
   private LockManager mockLockManager;
   private IcebergRequestContext mockContext;
+
+  private OwnerDispatcher previousOwnerDispatcher;
+  private OwnerDispatcher previousInternalOwnerDispatcher;
+  private SchemaDispatcher previousSchemaDispatcher;
+  private SchemaDispatcher previousInternalSchemaDispatcher;
+  private TableDispatcher previousTableDispatcher;
+  private TableDispatcher previousInternalTableDispatcher;
+  private EntityStore previousEntityStore;
+  private LockManager previousLockManager;
 
   @BeforeEach
   public void setUp() throws IllegalAccessException {
     mockDispatcher = mock(IcebergNamespaceOperationDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
-    SchemaDispatcher mockSchemaDispatcher = mock(SchemaDispatcher.class);
-    TableDispatcher mockTableDispatcher = mock(TableDispatcher.class);
+    mockInternalOwnerDispatcher = mock(OwnerDispatcher.class);
+    mockSchemaDispatcher = mock(SchemaDispatcher.class);
+    mockInternalSchemaDispatcher = mock(SchemaDispatcher.class);
+    mockTableDispatcher = mock(TableDispatcher.class);
+    mockInternalTableDispatcher = mock(TableDispatcher.class);
+
+    previousOwnerDispatcher =
+        (OwnerDispatcher) FieldUtils.readField(GravitinoEnv.getInstance(), "ownerDispatcher", true);
+    previousInternalOwnerDispatcher =
+        (OwnerDispatcher)
+            FieldUtils.readField(GravitinoEnv.getInstance(), "internalOwnerDispatcher", true);
+    previousSchemaDispatcher =
+        (SchemaDispatcher)
+            FieldUtils.readField(GravitinoEnv.getInstance(), "schemaDispatcher", true);
+    previousInternalSchemaDispatcher =
+        (SchemaDispatcher)
+            FieldUtils.readField(GravitinoEnv.getInstance(), "internalSchemaDispatcher", true);
+    previousTableDispatcher =
+        (TableDispatcher) FieldUtils.readField(GravitinoEnv.getInstance(), "tableDispatcher", true);
+    previousInternalTableDispatcher =
+        (TableDispatcher)
+            FieldUtils.readField(GravitinoEnv.getInstance(), "internalTableDispatcher", true);
+    previousEntityStore =
+        (EntityStore) FieldUtils.readField(GravitinoEnv.getInstance(), "entityStore", true);
+    previousLockManager =
+        (LockManager) FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockInternalOwnerDispatcher, true);
+    FieldUtils.writeField(
         GravitinoEnv.getInstance(), "schemaDispatcher", mockSchemaDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", mockInternalSchemaDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", mockTableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTableDispatcher", mockInternalTableDispatcher, true);
 
     mockEntityStore = mock(EntityStore.class);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", mockEntityStore, true);
@@ -105,11 +149,29 @@ public class TestIcebergNamespaceHookDispatcher {
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", null, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "ownerDispatcher", previousOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalOwnerDispatcher",
+        previousInternalOwnerDispatcher,
+        true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "schemaDispatcher", previousSchemaDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalSchemaDispatcher",
+        previousInternalSchemaDispatcher,
+        true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "tableDispatcher", previousTableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalTableDispatcher",
+        previousInternalTableDispatcher,
+        true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", previousEntityStore, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", previousLockManager, true);
 
     Class<?> holderClass =
         Arrays.stream(IcebergRESTServerContext.class.getDeclaredClasses())
@@ -129,7 +191,7 @@ public class TestIcebergNamespaceHookDispatcher {
     when(mockDispatcher.createNamespace(mockContext, mockRequest)).thenReturn(mockResponse);
 
     doThrow(new RuntimeException("Set owner failed"))
-        .when(mockOwnerDispatcher)
+        .when(mockInternalOwnerDispatcher)
         .setOwners(any(), any(), any(), any());
 
     RuntimeException thrown =
@@ -137,6 +199,7 @@ public class TestIcebergNamespaceHookDispatcher {
             RuntimeException.class, () -> hookDispatcher.createNamespace(mockContext, mockRequest));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createNamespace(mockContext, mockRequest);
+    verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
   }
 
   @Test
@@ -150,7 +213,7 @@ public class TestIcebergNamespaceHookDispatcher {
         .thenReturn(mockResponse);
 
     doThrow(new RuntimeException("Set owner failed"))
-        .when(mockOwnerDispatcher)
+        .when(mockInternalOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
     RuntimeException thrown =
@@ -159,6 +222,7 @@ public class TestIcebergNamespaceHookDispatcher {
             () -> hookDispatcher.registerTable(mockContext, namespace, mockRequest));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).registerTable(mockContext, namespace, mockRequest);
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test
@@ -172,15 +236,18 @@ public class TestIcebergNamespaceHookDispatcher {
 
     // Schema import (loadSchema) throwing must propagate so the caller learns the namespace
     // exists in Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
-    SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
-    doThrow(new RuntimeException("Import failed")).when(schemaDispatcher).loadSchema(any());
+    doThrow(new RuntimeException("Import failed"))
+        .when(mockInternalSchemaDispatcher)
+        .loadSchema(any());
 
     RuntimeException thrown =
         Assertions.assertThrows(
             RuntimeException.class, () -> hookDispatcher.createNamespace(mockContext, mockRequest));
 
     Assertions.assertEquals("Import failed", thrown.getMessage());
+    verify(mockInternalOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
+    verify(mockSchemaDispatcher, never()).loadSchema(any());
   }
 
   @Test
@@ -195,8 +262,9 @@ public class TestIcebergNamespaceHookDispatcher {
 
     // Table import (loadTable) throwing must propagate so the caller learns the table exists in
     // Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
-    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
-    doThrow(new RuntimeException("Import failed")).when(tableDispatcher).loadTable(any());
+    doThrow(new RuntimeException("Import failed"))
+        .when(mockInternalTableDispatcher)
+        .loadTable(any());
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -204,7 +272,9 @@ public class TestIcebergNamespaceHookDispatcher {
             () -> hookDispatcher.registerTable(mockContext, namespace, mockRequest));
 
     Assertions.assertEquals("Import failed", thrown.getMessage());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+    verify(mockTableDispatcher, never()).loadTable(any());
   }
 
   @Test
@@ -248,8 +318,9 @@ public class TestIcebergNamespaceHookDispatcher {
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<MetadataObject>> captor = ArgumentCaptor.forClass(List.class);
-    verify(mockOwnerDispatcher)
+    verify(mockInternalOwnerDispatcher)
         .setOwners(eq(TEST_METALAKE), captor.capture(), eq(TEST_USER), eq(Owner.Type.USER));
+    verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
     List<String> names =
         captor.getValue().stream().map(MetadataObject::fullName).collect(Collectors.toList());
     Assertions.assertEquals(

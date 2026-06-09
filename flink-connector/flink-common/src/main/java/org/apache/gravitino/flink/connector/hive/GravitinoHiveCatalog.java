@@ -41,6 +41,7 @@ import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -160,6 +161,8 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       return super.toFlinkTable(table, tablePath);
     } catch (NoSuchTableException e) {
       // Fall through to check views.
+    } catch (ForbiddenException e) {
+      throw new TableNotExistException(catalogName(), tablePath, e);
     } catch (Exception e) {
       LOG.warn("Failed to load table {} from catalog {}", tablePath, catalogName(), e);
       throw new CatalogException(e);

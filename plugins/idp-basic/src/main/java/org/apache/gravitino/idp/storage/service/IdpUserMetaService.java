@@ -24,11 +24,14 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.po.IdpUserWithGroupsPO;
 import org.apache.gravitino.idp.storage.relational.utils.IdpExceptionUtils;
+import org.apache.gravitino.idp.storage.relational.utils.IdpPOConverters;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -56,6 +59,17 @@ public class IdpUserMetaService {
       throw new NotFoundException("IdP user not found: %s", username);
     }
     return userPO;
+  }
+
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getIdpUser")
+  public IdpUser getIdpUser(String username) {
+    IdpUserWithGroupsPO userWithGroups =
+        SessionUtils.getWithoutCommit(
+            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUserWithGroups(username));
+    if (userWithGroups == null) {
+      throw new NotFoundException("IdP user not found: %s", username);
+    }
+    return IdpPOConverters.fromIdpUserWithGroupsPO(userWithGroups);
   }
 
   @Monitored(

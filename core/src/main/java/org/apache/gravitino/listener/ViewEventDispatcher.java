@@ -74,7 +74,11 @@ public class ViewEventDispatcher implements ViewDispatcher {
     eventBus.dispatchEvent(new ListViewPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] identifiers = dispatcher.listViews(namespace);
-      eventBus.dispatchEvent(new ListViewEvent(PrincipalUtils.getCurrentUserName(), namespace));
+      eventBus.dispatchEvent(
+          new ListViewEvent(
+              PrincipalUtils.getCurrentUserName(),
+              namespace,
+              identifiers != null ? identifiers.length : -1));
       return identifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(

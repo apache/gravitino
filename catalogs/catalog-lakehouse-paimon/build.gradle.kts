@@ -106,6 +106,7 @@ dependencies {
 
   constraints {
     implementation(libs.snakeyaml)
+    implementation(libs.woodstox.core)
   }
 
   implementation(libs.hadoop3.common) {
@@ -149,6 +150,7 @@ dependencies {
     exclude("org.apache.hive", "hive-vector-code-gen")
     exclude("org.apache.ivy")
     exclude("org.apache.logging.log4j")
+    exclude("org.apache.tomcat.embed")
     exclude("org.apache.zookeeper")
     exclude("org.codehaus.groovy")
     exclude("org.datanucleus")
