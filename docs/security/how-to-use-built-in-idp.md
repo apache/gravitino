@@ -303,20 +303,9 @@ Replace `<base64-credentials>` with the output of `echo -n '${username}:${passwo
 ## End-to-end setup
 
 The following steps provision Gravitino and engines so a named user can connect with Basic
-credentials. Replace `http://localhost:8090`, usernames, passwords, and metalake names with values
-that match your deployment.
-
-Set shell variables once for the examples below:
-
-```shell
-GRAVITINO_URI=http://localhost:8090
-IRC_URI=http://localhost:9001/iceberg
-ADMIN=admin
-ADMIN_PASSWORD='Passw0rd-Admin12'
-METALAKE=example
-ENGINE_USER=alice
-ENGINE_PASSWORD='Passw0rd-Alice12'
-```
+credentials. The examples use service admin `admin` / `Passw0rd-Admin12`, engine user
+`alice` / `Passw0rd-Alice12`, metalake `example`, and Gravitino at `http://localhost:8090`.
+Replace these with values that match your deployment.
 
 ### 1. Admin initialization
 
@@ -344,8 +333,8 @@ ENGINE_PASSWORD='Passw0rd-Alice12'
 
    ```shell
    curl -s -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Authorization: Basic $(echo -n "${ADMIN}:${ADMIN_PASSWORD}" | base64)" \
-     "${GRAVITINO_URI}/api/version"
+     -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
+     http://localhost:8090/api/version
    ```
 
 ### 2. Create users
@@ -356,9 +345,9 @@ Create a built-in IdP user for each engine or operator account. Service admins c
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n "${ADMIN}:${ADMIN_PASSWORD}" | base64)" \
-  -d "{\"user\":\"${ENGINE_USER}\",\"password\":\"${ENGINE_PASSWORD}\"}" \
-  "${GRAVITINO_URI}/api/idp/users"
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
+  -d '{"user":"alice","password":"Passw0rd-Alice12"}' \
+  http://localhost:8090/api/idp/users
 ```
 
 ### 3. Create a metalake
@@ -370,9 +359,9 @@ can create metalakes (see [Access control](access-control.md)). See also
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n "${ADMIN}:${ADMIN_PASSWORD}" | base64)" \
-  -d "{\"name\":\"${METALAKE}\",\"comment\":\"Basic auth example\",\"properties\":{}}" \
-  "${GRAVITINO_URI}/api/metalakes"
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
+  -d '{"name":"example","comment":"Basic auth example","properties":{}}' \
+  http://localhost:8090/api/metalakes
 ```
 
 Create catalogs in this metalake before engines can query data. See
@@ -387,9 +376,9 @@ step 2:
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n "${ADMIN}:${ADMIN_PASSWORD}" | base64)" \
-  -d "{\"name\":\"${ENGINE_USER}\"}" \
-  "${GRAVITINO_URI}/api/metalakes/${METALAKE}/users"
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
+  -d '{"name":"alice"}' \
+  http://localhost:8090/api/metalakes/example/users
 ```
 
 Grant roles or ownership as needed so the user can access catalogs and metadata. See
