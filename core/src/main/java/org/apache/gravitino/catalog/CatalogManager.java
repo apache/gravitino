@@ -1145,8 +1145,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @return The resolved properties.
    */
   private Map<String, String> getResolvedProperties(CatalogEntity entity) {
-    BaseCatalog<?> catalog = loadCatalogAndWrap(entity.nameIdentifier()).catalog();
-    return catalog.properties();
+    CatalogWrapper catalogWrapper = loadCatalogAndWrap(entity.nameIdentifier());
+    return catalogWrapper.classLoader.withClassLoader(
+        cl -> catalogWrapper.catalog.properties(), RuntimeException.class);
   }
 
   private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
