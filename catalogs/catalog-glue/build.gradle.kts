@@ -44,6 +44,7 @@ dependencies {
   implementation(libs.iceberg.api)
   implementation(libs.iceberg.aws)
   implementation(libs.iceberg.core)
+  runtimeOnly(project(":bundles:aws"))
   implementation(libs.slf4j.api)
 
   annotationProcessor(libs.lombok)
