@@ -260,10 +260,18 @@ public class HTTPClient implements RESTClient {
       if (params != null) {
         params.forEach(builder::addParameter);
       }
-      return builder.build();
+
+      URI requestUri = builder.build();
+
+      if (requestUri.getScheme() == null || requestUri.getHost() == null) {
+        throw new RESTException(
+            "Invalid request URI built from base URI %s and path %s: %s", uri, path, requestUri);
+      }
+
+      return requestUri;
     } catch (URISyntaxException e) {
       throw new RESTException(
-          "Failed to create request URI from base %s, params %s", baseUri, params);
+          e, "Failed to create request URI from base %s, path %s, params %s", uri, path, params);
     }
   }
 
