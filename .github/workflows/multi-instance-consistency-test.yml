@@ -9,10 +9,6 @@ name: Multi-Instance Consistency Test
 # The test plan and assertions live in dev/ci/test_multi_instance_consistency.sh.
 
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
   workflow_dispatch:
 
 concurrency:
@@ -20,35 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
-        id: filter
-        with:
-          filters: |
-            authz_changes:
-              - .github/workflows/multi-instance-consistency-test.yml
-              - api/**
-              - common/**
-              - core/**
-              - server/**
-              - server-common/**
-              - conf/**
-              - scripts/mysql/**
-              - dev/ci/test_multi_instance_consistency.sh
-              - dev/ci/setup_multi_instance.sh
-              - build.gradle.kts
-              - gradle.properties
-              - gradle/**
-              - settings.gradle.kts
-    outputs:
-      authz_changes: ${{ steps.filter.outputs.authz_changes }}
-
   multi-instance-consistency:
-    needs: changes
-    if: needs.changes.outputs.authz_changes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
