@@ -39,11 +39,13 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
@@ -54,10 +56,10 @@ import org.slf4j.LoggerFactory;
  * authentication, and authorization enabled.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class TrinoIcebergRestAuthorizationITBase extends BaseIT {
+public abstract class TrinoIcebergRESTAuthorizationITBase extends BaseIT {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TrinoIcebergRestAuthorizationITBase.class);
+      LoggerFactory.getLogger(TrinoIcebergRESTAuthorizationITBase.class);
   private static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
 
   protected static final String METALAKE_NAME = "test_metalake";
@@ -96,6 +98,12 @@ public abstract class TrinoIcebergRestAuthorizationITBase extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
+    // This IT boots the Gravitino server with the Iceberg REST auxiliary service and drives it
+    // through Trino's native REST connector, which only works against the packaged distribution in
+    // deploy mode. The Java 24 / Trino module does not carry the server on its classpath, so the
+    // embedded path would fail with NoClassDefFoundError; skip it when not running in deploy mode.
+    Assumptions.assumeFalse(
+        ITUtils.isEmbedded(), "Trino Iceberg REST authorization IT only runs in deploy mode");
     containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
     tokenServer = new MockOAuthTokenServer(keyPair, SERVICE_AUDIENCE, SUPER_USER);
     tokenServer.start();

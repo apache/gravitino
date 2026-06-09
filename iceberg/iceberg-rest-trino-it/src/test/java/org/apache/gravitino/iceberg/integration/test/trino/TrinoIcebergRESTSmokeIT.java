@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-public class TrinoIcebergRestSmokeIT extends TrinoIcebergRestAuthorizationITBase {
+public class TrinoIcebergRESTSmokeIT extends TrinoIcebergRESTAuthorizationITBase {
 
   @BeforeAll
   public void setupTrino() throws Exception {

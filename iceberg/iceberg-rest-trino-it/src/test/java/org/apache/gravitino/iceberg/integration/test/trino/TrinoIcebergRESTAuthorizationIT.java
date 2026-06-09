@@ -35,7 +35,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class TrinoIcebergRestAuthorizationIT extends TrinoIcebergRestAuthorizationITBase {
+public class TrinoIcebergRESTAuthorizationIT extends TrinoIcebergRESTAuthorizationITBase {
 
   private static final String ROLE = "trino_role";
 
