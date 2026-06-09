@@ -319,6 +319,9 @@ fresh Gravitino deployment.
    gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
+   Built-in IdP is incompatible with the `simple` authenticator. When the `idp-basic` plugin is
+   enabled, `gravitino.authenticators` must not include `simple`.
+
 2. Export the initial service admin password before starting Gravitino:
 
    ```bash
