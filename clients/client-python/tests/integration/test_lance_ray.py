@@ -44,6 +44,7 @@ LANCE_REST_BASE_URL = f"http://localhost:{LANCE_REST_PORT}/lance"
 # standalone lance-rest conf file.
 MAIN_CONF_FILE = "conf/gravitino.conf"
 LANCE_REST_METALAKE_KEY = "gravitino.lance-rest.gravitino-metalake"
+KEEP_GRAVITINO_CONF_ENV = "LANCE_RAY_KEEP_GRAVITINO_CONF"
 
 
 def _missing_lance_ray_deps() -> Optional[str]:
@@ -64,9 +65,9 @@ _MISSING_LANCE_RAY_DEPS = _missing_lance_ray_deps()
 @unittest.skipIf(
     _MISSING_LANCE_RAY_DEPS is not None,
     f"lance-ray test deps not installed: {_MISSING_LANCE_RAY_DEPS}. "
-    "Install with: pip install -e .[lance] (or pip install ray lance-ray "
-    "lance-namespace). Requires the Gravitino server to expose a lance-rest "
-    "auxiliary service backed by lance-namespace-core >= 0.7.5.",
+    "Install with: pip install -r clients/client-python/requirements-dev.txt "
+    "(or pip install -e .[lance]). Requires the Gravitino server to expose a "
+    "lance-rest auxiliary service backed by lance-namespace-core >= 0.7.5.",
 )
 class TestLanceRayIntegration(IntegrationTestEnv):
     """End-to-end test for the lance-ray Python client against a Gravitino-backed
@@ -74,9 +75,11 @@ class TestLanceRayIntegration(IntegrationTestEnv):
     ``read_lance`` flow from the upstream lance-ray docs.
     """
 
-    # Metalake name is fixed because the lance-rest aux service binds to a
-    # single metalake from gravitino.conf. The per-test table name still gets
-    # a random suffix to keep individual test methods isolated.
+    # Metalake name is fixed (not randomized) so back-to-back runs in the
+    # same Gravitino process can detect that the lance-rest aux service is
+    # already bound and skip the costly server restart. The per-test table
+    # name still gets a random suffix to keep individual test methods
+    # isolated.
     METALAKE_NAME: str = "lance_ray_test_metalake"
     CATALOG_NAME: str = "lance_catalog"
     SCHEMA_NAME: str = "schema"
@@ -99,8 +102,8 @@ class TestLanceRayIntegration(IntegrationTestEnv):
         # Bind the lance-rest aux service to our test metalake. If the same
         # binding is already present (e.g. an earlier run in the same Gradle
         # session left it there), skip the conf write and the restart. This
-        # avoids appending the same conf entry twice if a prior failed run
-        # already left the binding behind.
+        # avoids restarting Gravitino in the middle of the IT suite when the
+        # test class is replayed, which would briefly disrupt other ITs.
         if not cls._lance_metalake_already_bound():
             cls._append_conf(cls._lance_rest_config(), cls.main_conf_path)
             cls.appended_lance_rest_conf = True
@@ -119,7 +122,7 @@ class TestLanceRayIntegration(IntegrationTestEnv):
         # so a skipped run leaves no fixtures behind.
         skip_reason = cls._check_lance_namespace_compat()
         if skip_reason is not None:
-            cls._reset_lance_rest_conf()
+            cls._reset_lance_rest_conf_if_needed()
             raise unittest.SkipTest(skip_reason)
 
         cls.gravitino_admin_client = GravitinoAdminClient("http://localhost:8090")
@@ -180,7 +183,7 @@ class TestLanceRayIntegration(IntegrationTestEnv):
             failures.append(("drop metalake", e))
 
         try:
-            cls._reset_lance_rest_conf()
+            cls._reset_lance_rest_conf_if_needed()
         except Exception as e:  # pylint: disable=broad-exception-caught
             failures.append(("reset lance-rest conf", e))
 
@@ -263,8 +266,18 @@ class TestLanceRayIntegration(IntegrationTestEnv):
         return {LANCE_REST_METALAKE_KEY: cls.METALAKE_NAME}
 
     @classmethod
-    def _reset_lance_rest_conf(cls) -> None:
+    def _should_keep_lance_rest_conf(cls) -> bool:
+        return os.environ.get(KEEP_GRAVITINO_CONF_ENV, "").lower() == "true"
+
+    @classmethod
+    def _reset_lance_rest_conf_if_needed(cls) -> None:
         if not cls.appended_lance_rest_conf or cls.main_conf_path is None:
+            return
+        if cls._should_keep_lance_rest_conf():
+            logger.info(
+                "Keeping lance-rest Gravitino conf because %s=true",
+                KEEP_GRAVITINO_CONF_ENV,
+            )
             return
         cls._reset_conf(cls._lance_rest_config(), cls.main_conf_path)
         cls.appended_lance_rest_conf = False
@@ -289,10 +302,8 @@ class TestLanceRayIntegration(IntegrationTestEnv):
 
     def test_write_read_filter_via_lance_ray(self):
         # Imports are deferred so the skipIf decorator handles missing deps
-        # cleanly without import errors at module load time. The lance/ray
-        # extras live in `requirements-lance.txt` (and `setup.py`'s `lance`
-        # extra), so they aren't present in the default `dev` install used by
-        # pylint — silence the resulting import-error.
+        # cleanly without import errors at module load time. The matrix runner
+        # also swaps lance-ray versions in isolated venvs, so keep imports local.
         # pylint: disable=import-outside-toplevel,import-error
         import ray
         from lance_ray import read_lance, write_lance

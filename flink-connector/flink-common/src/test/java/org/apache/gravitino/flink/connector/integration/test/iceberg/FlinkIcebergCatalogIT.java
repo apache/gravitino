@@ -67,6 +67,11 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
     return false;
   }
 
+  @Override
+  protected boolean supportViewOperation() {
+    return true;
+  }
+
   @BeforeAll
   public void before() {
     Preconditions.checkArgument(metalake != null, "metalake should not be null");

@@ -1,9 +1,9 @@
 ---
-title: Connect Flink via Iceberg REST
-sidebar_label: Flink
+title: "Connect Flink to Iceberg REST"
+sidebar_label: "Flink"
 ---
 
-# Connecting Apache Flink via Iceberg REST
+## Introduction
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly — without installing a Gravitino-specific
@@ -51,18 +51,18 @@ sql-client.execution.result-mode: tableau
 results in a full-screen pager.
 :::
 
-### Starting the Flink SQL Client
+### Start the Flink SQL Client
 
 ```bash
 $FLINK_HOME/bin/sql-client.sh
 ```
 
-## Registering the catalog
+## Register the Catalog
 
 At the Flink SQL Client prompt, run the following `CREATE CATALOG` statement. Replace
 `<gravitino-host>` with your Gravitino server address and supply your S3 credentials.
 
-### Without authentication
+### No Authentication
 
 ```sql
 CREATE CATALOG gravitino_irc WITH (
@@ -93,7 +93,7 @@ CREATE CATALOG gravitino_irc WITH (
 );
 ```
 
-### With OAuth2 authentication
+### OAuth2 Authentication
 
 ```sql
 CREATE CATALOG gravitino_irc WITH (
@@ -129,33 +129,33 @@ See [gravitino-irc-quickstart](https://github.com/markhoerth/gravitino-irc-quick
 complete local development environment using MinIO.
 :::
 
-## Usage examples
+## Examples
 
-### Use the catalog
+### Use the Catalog
 
 ```sql
 USE CATALOG gravitino_irc;
 ```
 
-### List databases
+### List Databases
 
 ```sql
 SHOW DATABASES;
 ```
 
-### List tables
+### List Tables
 
 ```sql
 SHOW TABLES IN <namespace>;
 ```
 
-### Query a table
+### Query a Table
 
 ```sql
 SELECT * FROM <namespace>.<table>;
 ```
 
-### Create a table
+### Create a Table
 
 ```sql
 CREATE TABLE gravitino_irc.<namespace>.new_table (
@@ -165,13 +165,13 @@ CREATE TABLE gravitino_irc.<namespace>.new_table (
 );
 ```
 
-### Insert data
+### Insert Data
 
 ```sql
 INSERT INTO gravitino_irc.<namespace>.new_table VALUES (1, 'example', CURRENT_TIMESTAMP);
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

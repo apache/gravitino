@@ -55,9 +55,9 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
-import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
@@ -97,14 +97,13 @@ import org.slf4j.LoggerFactory;
  *       correctness — TTL eviction only bounds memory. User/group role snapshots use write-based
  *       TTLs through {@link CaffeineGravitinoCache}; loaded role policies use access-based TTLs
  *       through {@link JcasbinLoadedRolesCache}.
- *   <li><b>Eventual-consistency caches</b> — {@link #metadataIdCache} and {@link #ownerRelCache}. A
- *       single background poller ({@link #changePoller}) drains {@code entity_change_log} and
- *       {@code owner_meta} change rows since a high-water-mark cursor and invalidates the affected
- *       keys. Other Gravitino nodes therefore observe ALTER/DROP and owner changes within one poll
- *       interval.
+ *   <li><b>Eventual-consistency caches</b> — {@link #metadataIdCache} and {@link #ownerRelCache}.
+ *       The global entity change log poller dispatches {@code entity_change_log} batches to {@link
+ *       #changePoller}, while {@link #changePoller} polls {@code owner_meta}. Other Gravitino nodes
+ *       therefore observe ALTER/DROP and owner changes within one poll interval.
  * </ol>
  *
- * <p>The pollers are best-effort and intentionally cheap; see {@link JcasbinChangePoller} for the
+ * <p>The pollers are best-effort and intentionally cheap; see {@link JcasbinChangeListener} for the
  * contracts they rely on (most notably that {@code entity_change_log.full_name} is the pre-mutation
  * name).
  *
@@ -159,7 +158,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private JcasbinAuthorizationLookups lookups;
 
   /** Background HA invalidator for {@link #metadataIdCache} and {@link #ownerRelCache}. */
-  private JcasbinChangePoller changePoller;
+  private JcasbinChangeListener changePoller;
 
   @Override
   public void initialize() {
@@ -200,7 +199,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     metadataIdCache = new CaffeineGravitinoCache<>(ttlMs, metadataIdCacheSize);
     ownerRelCache = new CaffeineGravitinoCache<>(ttlMs, ownerCacheSize);
     lookups = new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
-    changePoller = new JcasbinChangePoller(metadataIdCache, ownerRelCache, pollIntervalSecs);
+    changePoller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, pollIntervalSecs);
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    if (entityStore instanceof SupportsEntityChangeLog) {
+      ((SupportsEntityChangeLog) entityStore).registerEntityChangeLogListener(changePoller);
+    }
     changePoller.start();
   }
 
@@ -553,6 +556,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public void close() throws IOException {
     if (changePoller != null) {
+      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+      if (entityStore instanceof SupportsEntityChangeLog) {
+        ((SupportsEntityChangeLog) entityStore).unregisterEntityChangeLogListener(changePoller);
+      }
       changePoller.close();
     }
     if (userRoleCache != null) {
@@ -863,6 +870,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * Returns true when the cached owner type and ID match the given principal or one of the
    * principal's groups. The user id is resolved via the version-validated {@link #loadUserInfo}
    * cache so back-to-back ownership checks in the same request do not re-query {@code user_meta}.
+   * Group ids are resolved via {@link #loadGroupInfo}, which deduplicates within the request via
+   * {@code requestContext.groupInfoCache} and avoids loading full group entity objects.
    */
   private boolean ownerMatchesUserOrGroups(
       Optional<OwnerInfo> owner,
@@ -881,9 +890,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (!Entity.EntityType.GROUP.name().equalsIgnoreCase(ownerInfo.getOwnerType())) {
       return false;
     }
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    for (GroupEntity groupEntity : resolveCurrentUserGroups(metalake, entityStore)) {
-      if (Objects.equals(groupEntity.id(), ownerInfo.getOwnerId())) {
+    for (String groupName : principalGroupNames(principal)) {
+      Optional<GroupUpdatedAt> groupInfo = loadGroupInfo(metalake, groupName, requestContext);
+      if (groupInfo.isPresent() && groupInfo.get().getGroupId() == ownerInfo.getOwnerId()) {
         return true;
       }
     }
@@ -1025,24 +1034,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * or has no groups.
    */
   private List<String> currentPrincipalGroupNames() {
-    Principal principal = PrincipalUtils.getCurrentPrincipal();
-    if (!(principal instanceof UserPrincipal)) {
-      return new ArrayList<>();
-    }
-    List<UserGroup> groups = ((UserPrincipal) principal).getGroups();
-    if (groups.isEmpty()) {
-      return new ArrayList<>();
-    }
-    return groups.stream().map(UserGroup::getGroupname).collect(Collectors.toList());
+    return principalGroupNames(PrincipalUtils.getCurrentPrincipal());
   }
 
-  /**
-   * Resolves GroupEntity objects for the current principal's groups, skipping any that are stale or
-   * not found in the store. Used by owner checks that need full group entities instead of only
-   * group names.
-   */
-  private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
-    Principal principal = PrincipalUtils.getCurrentPrincipal();
+  private List<String> principalGroupNames(Principal principal) {
     if (!(principal instanceof UserPrincipal)) {
       return new ArrayList<>();
     }
@@ -1050,11 +1045,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (groups.isEmpty()) {
       return new ArrayList<>();
     }
-    List<NameIdentifier> groupIdents =
-        groups.stream()
-            .map(g -> NameIdentifierUtil.ofGroup(metalake, g.getGroupname()))
-            .collect(Collectors.toList());
-    return entityStore.batchGet(groupIdents, Entity.EntityType.GROUP, GroupEntity.class);
+    return groups.stream().map(UserGroup::getGroupName).collect(Collectors.toList());
   }
 
   private void versionCheckAndLoadRoles(

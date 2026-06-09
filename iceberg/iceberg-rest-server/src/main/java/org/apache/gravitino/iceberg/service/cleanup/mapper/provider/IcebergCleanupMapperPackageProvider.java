@@ -25,9 +25,15 @@ import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapp
 import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
 
 /**
- * Registers the Iceberg async-cleanup mapper into the Gravitino entity store's MyBatis
- * configuration via {@link java.util.ServiceLoader}, so the cleanup job store reuses the shared
- * relational backend rather than opening its own JDBC connections.
+ * Lists the Iceberg async-cleanup mappers so the cleanup job store can register them into the
+ * Gravitino entity store's shared MyBatis configuration and reuse the shared relational backend
+ * rather than opening its own JDBC connections.
+ *
+ * <p>This implements {@link MapperPackageProvider} but is invoked directly (not via {@link
+ * java.util.ServiceLoader}): in deploy mode the iceberg-rest-server runs in an isolated
+ * auxiliary-service class loader that core's service lookup cannot see into, so {@link
+ * org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore} consults this provider when
+ * it registers the mappers.
  */
 public class IcebergCleanupMapperPackageProvider implements MapperPackageProvider {
 

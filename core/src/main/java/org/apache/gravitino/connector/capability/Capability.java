@@ -97,6 +97,19 @@ public interface Capability {
     return DEFAULT.managedStorage(scope);
   }
 
+  /**
+   * Check if the catalog supports hierarchical (nested) schemas. A hierarchical schema is a schema
+   * that can contain sub-schemas, addressed by a logical name using the configured external
+   * separator (e.g. {@code "A:B:C"}). Catalogs that only support flat schemas (such as Hive or JDBC
+   * catalogs) should keep the default unsupported result so that listing schemas under a parent
+   * schema is rejected instead of returning misleading data.
+   *
+   * @return The capability of the hierarchical schema support.
+   */
+  default CapabilityResult supportsHierarchicalSchema() {
+    return DEFAULT.supportsHierarchicalSchema();
+  }
+
   /** The default implementation of the capability. */
   class DefaultCapability implements Capability {
 
@@ -152,6 +165,12 @@ public interface Capability {
 
       return CapabilityResult.unsupported(
           String.format("The %s entity is not fully managed by Gravitino.", scope));
+    }
+
+    @Override
+    public CapabilityResult supportsHierarchicalSchema() {
+      return CapabilityResult.unsupported(
+          "The catalog does not support hierarchical (nested) schemas.");
     }
   }
 }

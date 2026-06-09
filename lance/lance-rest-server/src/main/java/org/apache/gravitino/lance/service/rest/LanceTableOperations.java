@@ -96,10 +96,15 @@ public class LanceTableOperations {
       boolean shouldCheckDeclared =
           Optional.ofNullable(checkDeclared)
               .orElse(request != null && Boolean.TRUE.equals(request.getCheckDeclared()));
+      // loadDetailedMetadata defaults to true when absent so callers that omit the field
+      // still receive the full schema in the response.
+      boolean shouldLoadDetailedMetadata =
+          request == null || !Boolean.FALSE.equals(request.getLoadDetailedMetadata());
       DescribeTableResponse response =
           lanceNamespace
               .asTableOps()
-              .describeTable(tableId, delimiter, version, shouldCheckDeclared);
+              .describeTable(
+                  tableId, delimiter, version, shouldCheckDeclared, shouldLoadDetailedMetadata);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);

@@ -81,7 +81,7 @@ public class KerberosAuthenticator implements Authenticator {
       // "HTTP/host" from "HTTP/host@REALM")
       String mapperType = config.get(KerberosConfig.PRINCIPAL_MAPPER);
       String regexPattern = config.get(KerberosConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
-      this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
+      this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern, config);
 
       gssManager =
           Subject.doAs(

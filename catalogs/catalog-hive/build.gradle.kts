@@ -60,7 +60,6 @@ dependencies {
   implementation(libs.hadoop3.shaded.protobuf)
   implementation(libs.commons.configuration2)
   implementation(libs.re2j)
-  implementation(libs.htrace.core4)
   implementation(libs.slf4j.api)
   implementation(libs.woodstox.core)
 

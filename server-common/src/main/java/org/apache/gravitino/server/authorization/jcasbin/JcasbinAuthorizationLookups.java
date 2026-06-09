@@ -35,8 +35,8 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * falls back to a shared {@link GravitinoCache} on a request miss, and finally issues a single DB
  * query on a cache miss. A successful DB fetch populates both tiers so subsequent calls — in this
  * request and later ones — hit the cache. The two underlying caches are invalidated externally by
- * {@link JcasbinChangePoller} (HA peers) and by the {@link
- * org.apache.gravitino.authorization.GravitinoAuthorizer#handleMetadataOwnerChange} / {@link
+ * the global entity change log poller, {@link JcasbinChangeListener} (owner changes), and by the
+ * {@link org.apache.gravitino.authorization.GravitinoAuthorizer#handleMetadataOwnerChange} / {@link
  * org.apache.gravitino.authorization.GravitinoAuthorizer#handleEntityNameIdMappingChange} hooks
  * (local mutations).
  */
@@ -94,9 +94,8 @@ public class JcasbinAuthorizationLookups {
 
   /**
    * Two-tier owner lookup: request-level dedup first, then the shared {@code ownerRelCache}, and
-   * finally a single {@code owner_meta} query. Positive DB fetches populate both tiers; missing
-   * owners are cached only for the current request to avoid pinning a cross-request negative result
-   * through a missed invalidation.
+   * finally a single {@code owner_meta} query. Both positive and negative DB results populate both
+   * tiers so subsequent calls — within this request and from later requests — avoid a repeat query.
    */
   public Optional<OwnerInfo> resolveOwnerId(
       Long metadataId,
@@ -104,16 +103,9 @@ public class JcasbinAuthorizationLookups {
       AuthorizationRequestContext requestContext) {
     return requestContext.computeOwnerIfAbsent(
         metadataId,
-        id -> {
-          try {
-            // Use the cache's atomic loader so concurrent misses on the same id collapse to one DB
-            // query. The loader throws for missing owners so only positive results land in the
-            // long-lived cache; negatives are confined to the per-request map above.
-            return ownerRelCache.get(id, k -> loadOwner(k, metadataType));
-          } catch (NoSuchOwnerException e) {
-            return Optional.empty();
-          }
-        });
+        // Use the cache's atomic loader so concurrent misses on the same id collapse to one DB
+        // query. Both present and absent results are cached so later requests skip the DB entirely.
+        id -> ownerRelCache.get(id, k -> loadOwner(k, metadataType)));
   }
 
   private static Optional<OwnerInfo> loadOwner(Long id, MetadataObject.Type metadataType) {
@@ -121,15 +113,6 @@ public class JcasbinAuthorizationLookups {
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
             m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
-    if (ownerInfo == null) {
-      throw new NoSuchOwnerException();
-    }
-    return Optional.of(ownerInfo);
-  }
-
-  private static final class NoSuchOwnerException extends RuntimeException {
-    private NoSuchOwnerException() {
-      super(null, null, false, false);
-    }
+    return Optional.ofNullable(ownerInfo);
   }
 }

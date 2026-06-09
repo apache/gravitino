@@ -31,7 +31,11 @@ Before you call `/api/idp/*`, ensure the following:
    gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
    ```
 
-2. **Service admin passwords** — Built-in IDP requires every username in
+2. **Server authenticator** — Built-in IdP is **incompatible** with the `simple` authenticator
+   (the default). When the `idp-basic` plugin is enabled, `gravitino.authenticators` must not
+   include `simple`.
+
+3. **Service admin passwords** — Built-in IDP requires every username in
    `gravitino.authorization.serviceAdmins` to have a password stored in `idp_user_meta` before you
    can call management APIs.
 
@@ -61,9 +65,10 @@ Before you call `/api/idp/*`, ensure the following:
 
 Set service admins in `gravitino.conf` (see also [Prerequisites](#prerequisites)):
 
-| Configuration item                      | Description                                                                         | Example |
-|-----------------------------------------|-------------------------------------------------------------------------------------|---------|
-| `gravitino.authorization.serviceAdmins` | Comma-separated service admin that can call built-in IDP management APIs          | `admin` |
+| Configuration item                        | Description                                                                         | Example |
+|-------------------------------------------|-------------------------------------------------------------------------------------|---------|
+| `gravitino.server.rest.extensionPackages` | Registers built-in IdP REST APIs                                                    | `org.apache.gravitino.idp.web.rest.feature` |
+| `gravitino.authorization.serviceAdmins`   | Comma-separated service admin that can call built-in IDP management APIs            | `admin` |
 
 Example:
 
