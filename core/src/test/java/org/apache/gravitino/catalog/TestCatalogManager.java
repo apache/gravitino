@@ -436,7 +436,6 @@ public class TestCatalogManager {
 
     catalogManager.createCatalog(relIdent, Catalog.Type.RELATIONAL, provider, "comment", props);
     catalogManager.createCatalog(fileIdent, Catalog.Type.FILESET, provider, "comment", props);
-    catalogManager.getCatalogCache().invalidateAll();
 
     Catalog[] catalogs = catalogManager.listCatalogsInfo(relIdent.namespace());
     Assertions.assertEquals(2, catalogs.length);
@@ -452,17 +451,6 @@ public class TestCatalogManager {
         Assertions.assertEquals(Catalog.Type.FILESET, catalog.type());
       }
     }
-
-    CatalogManager.CatalogWrapper relWrapper =
-        catalogManager.getCatalogCache().getIfPresent(relIdent);
-    CatalogManager.CatalogWrapper fileWrapper =
-        catalogManager.getCatalogCache().getIfPresent(fileIdent);
-    Assertions.assertNotNull(relWrapper);
-    Assertions.assertNotNull(fileWrapper);
-
-    catalogManager.listCatalogsInfo(relIdent.namespace());
-    Assertions.assertSame(relWrapper, catalogManager.getCatalogCache().getIfPresent(relIdent));
-    Assertions.assertSame(fileWrapper, catalogManager.getCatalogCache().getIfPresent(fileIdent));
 
     // Test list under non-existed metalake
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
