@@ -29,7 +29,6 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
-import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
@@ -63,12 +62,8 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
         config.put("iceberg.jdbc-catalog.connection-password", jdbc.jdbcPassword());
       } else if (credential instanceof S3SecretKeyCredential) {
         S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
-        config.put("fs.s3a.access.key", s3.accessKeyId());
-        config.put("fs.s3a.secret.key", s3.secretAccessKey());
-      } else if (credential instanceof OSSSecretKeyCredential) {
-        OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
-        config.put("fs.oss.accessKeyId", oss.accessKeyId());
-        config.put("fs.oss.accessKeySecret", oss.secretAccessKey());
+        config.put("hive.s3.aws-access-key", s3.accessKeyId());
+        config.put("hive.s3.aws-secret-key", s3.secretAccessKey());
       } else if (credential instanceof AzureAccountKeyCredential) {
         AzureAccountKeyCredential azure = (AzureAccountKeyCredential) credential;
         config.put(
