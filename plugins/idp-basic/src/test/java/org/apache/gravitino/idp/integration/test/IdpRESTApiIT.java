@@ -37,6 +37,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
@@ -48,6 +49,7 @@ import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -59,6 +61,10 @@ import org.junit.jupiter.api.Test;
  * API surface against each relational backend.
  */
 public class IdpRESTApiIT extends BaseIT {
+
+  /** RSA public key used only to satisfy OAuth authenticator initialization in this IT. */
+  private static final String OAUTH_PUBLIC_SIGN_KEY =
+      "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA02WlnekWmY5osrFoIsye9AjujNcsiycb7bBNxTi0ISv9p7tjP0SgAT5RJlmA5vMOck83tcJiCnzsRnfSFBED7sovstzQi5YvDdjucaa+im3AV/rhYe/27RXXy9LC0Q7yNnicJbX7Bg34n7V6dUNIBbh2hDVMPndPM5v4N0k/7ofUPghnGlQIpGx30/w3YbIwwYN9TxAMQau+Ffgcqp7ZIlSIDcHVGyx2VA24xzboRvN4X5AxPWkK7XI245bFqa2VCn1NqUXWRYbDvE5BSXK5gIQ3iuFlsi4swQMPurZmXPDCG9KBTNUa0CcHuS7cmQqdlOPxWAD9U5lyOXOg0IiotQIDAQAB";
 
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String ADMIN = "admin";
@@ -84,6 +90,11 @@ public class IdpRESTApiIT extends BaseIT {
     configs.put(Configs.CACHE_ENABLED.getKey(), String.valueOf(false));
     configs.put(Configs.STORE_DELETE_AFTER_TIME.getKey(), String.valueOf(20 * 60 * 1000L));
     configs.put(Configs.SERVICE_ADMINS.getKey(), ADMIN);
+    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
+    configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), "service1");
+    configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), OAUTH_PUBLIC_SIGN_KEY);
+    configs.put(OAuthConfig.DEFAULT_SERVER_URI.getKey(), "test");
+    configs.put(OAuthConfig.DEFAULT_TOKEN_PATH.getKey(), "test");
     configs.put(
         Configs.REST_API_EXTENSION_PACKAGES.getKey(), IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE);
     registerCustomConfigs(configs);
@@ -117,8 +128,8 @@ public class IdpRESTApiIT extends BaseIT {
   @Test
   void testIdpAuthorization() throws Exception {
     Assertions.assertEquals(200, get("/version", ADMIN, ADMIN_PASSWORD).statusCode());
-    // No Authorization: simple authenticator allows anonymous access; IdP filter rejects.
-    assertError(403, get("/idp/users/" + USER1, null, null), ErrorConstants.FORBIDDEN_CODE);
+    // No Authorization: OAuth rejects the request before the IdP filter runs.
+    Assertions.assertEquals(401, get("/idp/users/" + USER1, null, null).statusCode());
 
     postUser(USER2, USER_PASSWORD);
     assertError(
