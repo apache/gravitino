@@ -22,13 +22,13 @@ Deployment summary:
 - Release name: {{ .Release.Name }}
 - Service name: {{ .Values.service.name }}
 - Replicas: {{ .Values.replicas }}
-- Metadata backend: {{ if .Values.mysql.enabled }}MySQL (in-chart){{ else if .Values.postgresql.enabled }}PostgreSQL (in-chart){{ else if and .Values.entity.jdbcUrl (ne .Values.entity.jdbcUrl "jdbc:h2") }}External ({{ .Values.entity.jdbcUrl }}){{ else }}Embedded H2 (testing only){{ end }}
+- Metadata backend: {{ if .Values.mysql.enabled }}MySQL (in-chart){{ else if .Values.postgresql.enabled }}PostgreSQL (in-chart){{ else if and .Values.entity.jdbcUrl (not (hasPrefix "jdbc:h2" .Values.entity.jdbcUrl)) }}External ({{ .Values.entity.jdbcUrl }}){{ else }}Embedded H2 (testing only){{ end }}
 - Persistence: {{ if .Values.persistence.enabled }}Enabled ({{ .Values.persistence.size }}){{ else }}Disabled (emptyDir){{ end }}
 - Iceberg REST server: {{ if contains "iceberg-rest" .Values.auxService.names }}Enabled on port {{ .Values.icebergRest.httpPort | default 9001 }}{{ else }}Disabled{{ end }}
 - Authentication: {{ .Values.authenticators | default "simple (anonymous)" }}
 - Service type: {{ .Values.service.type }}
 
-{{- if and (not .Values.mysql.enabled) (not .Values.postgresql.enabled) (or (not .Values.entity.jdbcUrl) (eq .Values.entity.jdbcUrl "jdbc:h2")) }}
+{{- if and (not .Values.mysql.enabled) (not .Values.postgresql.enabled) (or (not .Values.entity.jdbcUrl) (hasPrefix "jdbc:h2" .Values.entity.jdbcUrl)) }}
 
 WARNING: This deployment uses the embedded H2 metadata backend on an
 emptyDir volume. All metadata will be lost when the pod restarts. For

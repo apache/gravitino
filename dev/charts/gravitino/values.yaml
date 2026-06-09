@@ -375,10 +375,20 @@ visibleConfigsItems: {}
   # gravitino.custom.example.password: "exampleR0cks!"
   # gravitino.custom.example.auth.type: simple
 
-## Additional Gravitino configuration items in gravitino.conf can be added
+## Additional Gravitino configuration items in gravitino.conf can be added.
+## Any key-value pair listed here will be appended verbatim to the rendered
+## gravitino.conf file. This is useful for settings not yet exposed as
+## structured values.yaml paths.
+##
+## Example — configuring event listeners (requires a valid EventListenerPlugin
+## implementation class on the server classpath):
+##
+##   additionalConfigItems:
+##     gravitino.eventListener.names: "audit,sync"
+##     gravitino.eventListener.audit.class: "com.example.AuditEventListener"
+##     gravitino.eventListener.sync.class: "com.example.SyncEventListener"
 ##
 additionalConfigItems: {}
-#  gravitino.eventListener.names: "audit,sync"
 
 ## Additional volumes
 ##
@@ -468,7 +478,7 @@ additionalLog4j2Properties:
 initScript: |
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/start-gravitino.sh
+  /bin/bash ${GRAVITINO_HOME}/docker/docker-entrypoint.sh
 
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
 ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.

@@ -28,7 +28,7 @@ visibleConfigsItems:
   gravitino.custom.example.auth.type: simple
 
 additionalConfigItems:
-  gravitino.eventListener.names: "audit,sync"
+  gravitino.server.shutdown.timeout: "5000"
 
 extraVolumeMounts:
   - name: gravitino-log
