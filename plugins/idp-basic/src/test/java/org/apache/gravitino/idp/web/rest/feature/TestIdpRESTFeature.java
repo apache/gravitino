@@ -32,8 +32,8 @@ import org.junit.jupiter.api.Test;
 class TestIdpRESTFeature {
 
   @Test
-  void testSimpleAndAuthFails() {
-    Config config = newConfig(true, AuthenticatorType.SIMPLE.name().toLowerCase());
+  void testSimpleFails() {
+    Config config = newConfig(AuthenticatorType.SIMPLE.name().toLowerCase());
 
     SystemExitException exception =
         assertThrows(SystemExitException.class, () -> validateWithExitGuard(config));
@@ -42,30 +42,21 @@ class TestIdpRESTFeature {
   }
 
   @Test
-  void testDefaultSimpleAndAuthFails() {
+  void testDefaultSimpleFails() {
     Config config = new Config(false) {};
-    config.set(Configs.ENABLE_AUTHORIZATION, true);
 
     assertThrows(SystemExitException.class, () -> validateWithExitGuard(config));
   }
 
   @Test
-  void testSimpleNoAuthOk() {
-    Config config = newConfig(false, AuthenticatorType.SIMPLE.name().toLowerCase());
+  void testOAuthOk() {
+    Config config = newConfig(AuthenticatorType.OAUTH.name().toLowerCase());
 
     assertDoesNotThrow(() -> IdpRESTFeature.validateConfiguration(config));
   }
 
-  @Test
-  void testOAuthAndAuthOk() {
-    Config config = newConfig(true, AuthenticatorType.OAUTH.name().toLowerCase());
-
-    assertDoesNotThrow(() -> IdpRESTFeature.validateConfiguration(config));
-  }
-
-  private static Config newConfig(boolean authorizationEnabled, String... authenticators) {
+  private static Config newConfig(String... authenticators) {
     Config config = new Config(false) {};
-    config.set(Configs.ENABLE_AUTHORIZATION, authorizationEnabled);
     config.set(Configs.AUTHENTICATORS, Lists.newArrayList(authenticators));
     return config;
   }

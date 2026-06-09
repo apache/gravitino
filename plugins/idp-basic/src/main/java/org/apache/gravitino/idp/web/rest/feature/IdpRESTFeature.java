@@ -84,17 +84,13 @@ public class IdpRESTFeature implements Feature {
    * @param config The server configuration.
    */
   static void validateConfiguration(Config config) {
-    if (!config.get(Configs.ENABLE_AUTHORIZATION)) {
-      return;
-    }
     boolean usesSimple =
         config.get(Configs.AUTHENTICATORS).stream()
             .anyMatch(name -> AuthenticatorType.SIMPLE.name().equalsIgnoreCase(name.trim()));
     if (usesSimple) {
       LOG.error(
-          "Built-in IdP cannot be used with Simple authentication when authorization is enabled. "
-              + "Remove 'simple' from gravitino.authenticators (default is simple), "
-              + "or disable gravitino.authorization.enable.");
+          "Built-in IdP is incompatible with Simple authentication. "
+              + "Remove 'simple' from gravitino.authenticators (default is simple).");
       System.exit(1);
     }
   }
