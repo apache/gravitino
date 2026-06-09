@@ -56,6 +56,14 @@ public class CredentialPropertyUtils {
 
   private static final String GCS_OAUTH_2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
 
+  @VisibleForTesting static final String ICEBERG_JDBC_USER = "jdbc.user";
+  @VisibleForTesting static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
+
+  private static final String PAIMON_S3_ACCESS_KEY = "s3.access-key";
+  private static final String PAIMON_S3_SECRET_KEY = "s3.secret-key";
+  private static final String PAIMON_OSS_ACCESS_KEY_ID = "fs.oss.accessKeyId";
+  private static final String PAIMON_OSS_ACCESS_KEY_SECRET = "fs.oss.accessKeySecret";
+
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
           .put(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN)
@@ -108,8 +116,8 @@ public class CredentialPropertyUtils {
     for (Credential credential : credentials) {
       if (credential instanceof JdbcCredential) {
         JdbcCredential jdbc = (JdbcCredential) credential;
-        props.put("jdbc.user", jdbc.jdbcUser());
-        props.put("jdbc.password", jdbc.jdbcPassword());
+        props.put(ICEBERG_JDBC_USER, jdbc.jdbcUser());
+        props.put(ICEBERG_JDBC_PASSWORD, jdbc.jdbcPassword());
       } else {
         Map<String, String> converted = toIcebergProperties(credential);
         if (converted.isEmpty()) {
@@ -134,16 +142,16 @@ public class CredentialPropertyUtils {
     for (Credential credential : credentials) {
       if (credential instanceof JdbcCredential) {
         JdbcCredential jdbc = (JdbcCredential) credential;
-        props.put("jdbc.user", jdbc.jdbcUser());
-        props.put("jdbc.password", jdbc.jdbcPassword());
+        props.put(ICEBERG_JDBC_USER, jdbc.jdbcUser());
+        props.put(ICEBERG_JDBC_PASSWORD, jdbc.jdbcPassword());
       } else if (credential instanceof S3SecretKeyCredential) {
         S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
-        props.put("s3.access-key", s3.accessKeyId());
-        props.put("s3.secret-key", s3.secretAccessKey());
+        props.put(PAIMON_S3_ACCESS_KEY, s3.accessKeyId());
+        props.put(PAIMON_S3_SECRET_KEY, s3.secretAccessKey());
       } else if (credential instanceof OSSSecretKeyCredential) {
         OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
-        props.put("fs.oss.accessKeyId", oss.accessKeyId());
-        props.put("fs.oss.accessKeySecret", oss.secretAccessKey());
+        props.put(PAIMON_OSS_ACCESS_KEY_ID, oss.accessKeyId());
+        props.put(PAIMON_OSS_ACCESS_KEY_SECRET, oss.secretAccessKey());
       } else {
         LOG.warn(
             "Received unrecognized credential type '{}' for Paimon catalog, skipping",

@@ -32,7 +32,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
-import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.annotation.Evolving;
@@ -509,9 +508,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    * @return true if backfill is enabled
    */
   protected boolean shouldBackfillCredential() {
-    Config serverConfig = GravitinoEnv.getInstance().config();
-    return serverConfig != null
-        && Boolean.TRUE.equals(serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES));
+    return Boolean.TRUE.equals(
+        GravitinoEnv.getInstance().config().get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES));
   }
 
   @Evolving

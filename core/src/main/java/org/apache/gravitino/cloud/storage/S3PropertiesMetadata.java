@@ -37,7 +37,7 @@ public class S3PropertiesMetadata {
                   "S3 access key ID",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
               stringOptionalPropertyEntry(
