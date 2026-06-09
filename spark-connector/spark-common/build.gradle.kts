@@ -97,12 +97,6 @@ dependencies {
   // catalog-glue uses `implementation` (not `api`) so the SDK is not transitively exposed here.
   testImplementation(libs.aws.glue)
   testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":plugins:idp-basic")) {
-    exclude(module = "api")
-    exclude(module = "common")
-    exclude(module = "core")
-    exclude(module = "server-common")
-  }
 
   testImplementation(libs.hive2.common) {
     exclude("org.apache.curator")

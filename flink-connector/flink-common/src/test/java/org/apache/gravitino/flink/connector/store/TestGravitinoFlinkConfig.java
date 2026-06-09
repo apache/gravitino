@@ -21,35 +21,17 @@ package org.apache.gravitino.flink.connector.store;
 
 import static org.apache.flink.table.factories.FactoryUtil.createCatalogStoreFactoryHelper;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactory.extractClientConfig;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.common.collect.ImmutableMap;
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.factories.CatalogStoreFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.factories.TableFactoryUtil;
-import org.apache.gravitino.exceptions.RESTException;
-import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoFlinkConfig {
-
-  private static final String GRAVITINO_URI = "http://127.0.0.1:8090";
-  private static final String METALAKE = "flink";
-
-  @AfterEach
-  void tearDown() {
-    try {
-      GravitinoCatalogManager.get().close();
-    } catch (IllegalStateException ignore) {
-      // GravitinoCatalogManager was not created in this test.
-    }
-  }
 
   @Test
   void testDefaultClientConfig() {
@@ -76,21 +58,6 @@ public class TestGravitinoFlinkConfig {
     Map<String, String> clientConfig = extractGrivitinoClientConfig(configuration);
     Assertions.assertEquals(clientConfig.get("gravitino.client.socketTimeoutMs"), "1000");
     Assertions.assertEquals(clientConfig.get("gravitino.client.connectionTimeoutMs"), "2000");
-  }
-
-  @Test
-  void testCreateWithBasicAuth() {
-    Map<String, String> config =
-        new HashMap<>(
-            ImmutableMap.of(
-                GravitinoCatalogStoreFactoryOptions.AUTH_TYPE,
-                "basic",
-                GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME,
-                "alice",
-                GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD,
-                "secret"));
-    assertThrows(
-        RESTException.class, () -> GravitinoCatalogManager.create(GRAVITINO_URI, METALAKE, config));
   }
 
   private Map<String, String> extractGrivitinoClientConfig(Configuration configuration) {

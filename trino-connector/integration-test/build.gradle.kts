@@ -38,12 +38,6 @@ dependencies {
   testImplementation(project(":common"))
   testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":plugins:idp-basic")) {
-    exclude(module = "api")
-    exclude(module = "common")
-    exclude(module = "core")
-    exclude(module = "server-common")
-  }
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 

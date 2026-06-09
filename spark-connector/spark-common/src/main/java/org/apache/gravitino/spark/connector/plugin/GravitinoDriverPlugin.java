@@ -191,7 +191,17 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private static GravitinoClient createGravitinoClient(
+  /**
+   * Creates a Gravitino client using authentication settings from the Spark configuration.
+   *
+   * @param uri Gravitino REST server URI
+   * @param metalake Gravitino metalake name
+   * @param sparkConf Spark configuration containing auth settings
+   * @param sparkUser Spark session user for simple authentication
+   * @param clientConfig additional Gravitino client configuration
+   * @return configured Gravitino client
+   */
+  public static GravitinoClient createGravitinoClient(
       String uri,
       String metalake,
       SparkConf sparkConf,
