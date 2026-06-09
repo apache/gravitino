@@ -22,7 +22,7 @@ Deployment summary:
 - Release name: {{ .Release.Name }}
 - Service name: {{ .Values.service.name }}
 - Replicas: {{ .Values.replicas }}
-- Metadata backend: {{ if .Values.mysql.enabled }}MySQL (in-chart){{ else if .Values.postgresql.enabled }}PostgreSQL (in-chart){{ else if and .Values.entity.jdbcUrl (not (hasPrefix "jdbc:h2" .Values.entity.jdbcUrl)) }}External ({{ .Values.entity.jdbcUrl }}){{ else }}Embedded H2 (testing only){{ end }}
+- Metadata backend: {{ if .Values.mysql.enabled }}MySQL (in-chart){{ else if .Values.postgresql.enabled }}PostgreSQL (in-chart){{ else if and .Values.entity.jdbcUrl (not (hasPrefix "jdbc:h2" .Values.entity.jdbcUrl)) }}External (configured via entity.jdbcUrl){{ else }}Embedded H2 (testing only){{ end }}
 - Persistence: {{ if .Values.persistence.enabled }}Enabled ({{ .Values.persistence.size }}){{ else }}Disabled (emptyDir){{ end }}
 - Iceberg REST server: {{ if contains "iceberg-rest" .Values.auxService.names }}Enabled on port {{ .Values.icebergRest.httpPort | default 9001 }}{{ else }}Disabled{{ end }}
 - Authentication: {{ .Values.authenticators | default "simple (anonymous)" }}
@@ -79,9 +79,9 @@ To view the rendered gravitino.conf:
 
 To access the Gravitino server locally:
 
-  kubectl -n {{ include "gravitino.namespace" . }} port-forward svc/{{ .Values.service.name }} 8090:8090
+  kubectl -n {{ include "gravitino.namespace" . }} port-forward svc/{{ .Values.service.name }} {{ .Values.service.port }}:{{ .Values.service.targetPort }}
 
-Then open http://localhost:8090 in a browser.
+Then open http://localhost:{{ .Values.service.port }} in a browser.
 
 For production deployment patterns, see:
 https://gravitino.apache.org/docs/latest/chart
