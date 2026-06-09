@@ -142,6 +142,10 @@ public class IdpRESTApiIT extends BaseIT {
         post("/idp/users", new AddUserRequest(USER1, " ")),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
     assertError(
+        400,
+        post("/idp/users", new AddUserRequest("a".repeat(129), USER_PASSWORD)),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertError(
         409,
         post("/idp/users", new AddUserRequest(USER1, USER_PASSWORD)),
         ErrorConstants.ALREADY_EXISTS_CODE);
@@ -179,6 +183,10 @@ public class IdpRESTApiIT extends BaseIT {
 
     assertError(
         409, post("/idp/groups", new AddGroupRequest(GROUP1)), ErrorConstants.ALREADY_EXISTS_CODE);
+    assertError(
+        400,
+        post("/idp/groups", new AddGroupRequest("a".repeat(129))),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
     assertError(
         404,
         get("/idp/groups/" + MISSING_GROUP, ADMIN, ADMIN_PASSWORD),

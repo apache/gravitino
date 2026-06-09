@@ -1,13 +1,15 @@
 ---
-title: "How to use CORS"
-slug: /security/how-to-use-cors
-keyword: security cors
+title: "CORS"
+slug: "/security/how-to-use-cors"
+keyword: "security cors"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Cross-origin resource filter
+## Introduction
 
-### Server configuration
+Cross-Origin Resource Sharing (CORS) is a browser security mechanism that controls which web origins can call the Gravitino HTTP API. Without CORS configuration, browsers block requests from a web UI hosted on a different origin than the Gravitino server. Configure CORS when the Gravitino web UI or any other browser-based client runs on a different host, port, or protocol than the server.
+
+## Server Configuration
 
 | Configuration item                                 | Description                                                                                                                                                                                                                            | Default value                                 | Required | Since version |
 |----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|
@@ -21,7 +23,7 @@ license: "This software is licensed under the Apache License version 2."
 | `gravitino.server.webserver.exposedHeaders`        | A comma separated list of allowed HTTP headers exposed on the client. The default value is the empty list.                                                                                                                             | ''(empty string)                              | No       | 0.4.0         |
 | `gravitino.server.webserver.chainPreflight`        | If true chained preflight requests for normal handling (as an OPTION request). Otherwise, the filter responds to the preflight. The default is true.                                                                                   | `true`                                        | No       | 0.4.0         |
 
-### Apache Iceberg REST service's configuration
+## Apache Iceberg REST Service Configuration
 
 | Configuration item                             | Description                                                                                                                                                                                                  | Default value                                 | Required | Since version |
 |------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|

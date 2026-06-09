@@ -83,7 +83,8 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public boolean isMetalakeUser(String metalake, AuthorizationRequestContext requestContext) {
-    AccessControlDispatcher dispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
+    AccessControlDispatcher dispatcher =
+        GravitinoEnv.getInstance().internalAccessControlDispatcher();
     if (dispatcher != null) {
       try {
         dispatcher.getUser(metalake, PrincipalUtils.getCurrentUserName());

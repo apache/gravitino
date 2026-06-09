@@ -20,6 +20,9 @@ package org.apache.gravitino.catalog.glue;
 
 import static org.apache.gravitino.catalog.glue.GlueIcebergTableHelper.fromIcebergType;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -128,6 +131,64 @@ class TestGlueIcebergTableHelper {
     assertEquals("age", structType.fields()[1].name());
     assertEquals(Types.IntegerType.get(), structType.fields()[1].type());
     assertEquals(false, structType.fields()[1].nullable());
+  }
+
+  // -------------------------------------------------------------------------
+  // toIcebergSchema — complex types
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testToIcebergSchemaWithListType() {
+    Column col =
+        GlueColumn.builder()
+            .withName("col_list")
+            .withType(Types.ListType.nullable(Types.StringType.get()))
+            .build();
+    Schema schema = GlueIcebergTableHelper.toIcebergSchema(new Column[] {col});
+
+    NestedField field = schema.findField("col_list");
+    assertInstanceOf(ListType.class, field.type());
+    ListType listType = (ListType) field.type();
+    assertEquals(StringType.get(), listType.elementType());
+    assertTrue(listType.isElementOptional());
+  }
+
+  @Test
+  void testToIcebergSchemaWithMapType() {
+    Column col =
+        GlueColumn.builder()
+            .withName("col_map")
+            .withType(Types.MapType.of(Types.StringType.get(), Types.LongType.get(), false))
+            .build();
+    Schema schema = GlueIcebergTableHelper.toIcebergSchema(new Column[] {col});
+
+    NestedField field = schema.findField("col_map");
+    assertInstanceOf(MapType.class, field.type());
+    MapType mapType = (MapType) field.type();
+    assertEquals(StringType.get(), mapType.keyType());
+    assertEquals(LongType.get(), mapType.valueType());
+    assertFalse(mapType.isValueOptional());
+  }
+
+  @Test
+  void testToIcebergSchemaWithStructType() {
+    Types.StructType gravitinoStruct =
+        Types.StructType.of(
+            Types.StructType.Field.of("name", Types.StringType.get(), true, "the name"),
+            Types.StructType.Field.of("age", Types.IntegerType.get(), false, null));
+    Column col = GlueColumn.builder().withName("col_struct").withType(gravitinoStruct).build();
+    Schema schema = GlueIcebergTableHelper.toIcebergSchema(new Column[] {col});
+
+    NestedField field = schema.findField("col_struct");
+    assertInstanceOf(StructType.class, field.type());
+    StructType structType = (StructType) field.type();
+    assertEquals(2, structType.fields().size());
+    assertEquals("name", structType.fields().get(0).name());
+    assertEquals(StringType.get(), structType.fields().get(0).type());
+    assertTrue(structType.fields().get(0).isOptional());
+    assertEquals("age", structType.fields().get(1).name());
+    assertEquals(IntegerType.get(), structType.fields().get(1).type());
+    assertFalse(structType.fields().get(1).isOptional());
   }
 
   // -------------------------------------------------------------------------

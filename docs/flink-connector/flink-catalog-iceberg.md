@@ -1,16 +1,18 @@
 ---
-title: "Flink connector Iceberg catalog"
-slug: /flink-connector/flink-catalog-iceberg
-keyword: flink connector iceberg catalog
+title: "Flink Connector: Iceberg Catalog"
+slug: "/flink-connector/flink-catalog-iceberg"
+keyword: "flink connector iceberg catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 The Apache Gravitino Flink connector can be used to read and write Iceberg tables, with the metadata managed by the Gravitino server.
 To enable the Flink connector, you must download the Iceberg Flink runtime JAR and place it in the Flink classpath.
 
 ## Capabilities
 
-#### Supported DML and DDL operations:
+### DML and DDL Operations
 
 - `CREATE CATALOG`
 - `CREATE DATABASE`
@@ -20,7 +22,7 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 - `INSERT INTO & OVERWRITE`
 - `SELECT`
 
-#### Operations not supported:
+### Unsupported Operations
 
 - Partition operations
 - View operations
@@ -46,7 +48,7 @@ Place the following JAR files in the lib directory of your Flink installation:
 | 1.19          | `iceberg-flink-runtime-1.19-${iceberg-version}.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | `iceberg-flink-runtime-1.20-${iceberg-version}.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
 
-## SQL example
+## SQL Example
 
 ```sql
 
@@ -70,7 +72,7 @@ SELECT * FROM sample WHERE data = 'B';
 
 ```
 
-## Catalog properties
+## Catalog Properties
 
 The Gravitino Flink connector transforms the following properties in a catalog to Flink connector configuration.
 

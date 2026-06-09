@@ -1,6 +1,6 @@
 ---
-title: "StarRocks catalog"
-slug: /jdbc-starrocks-catalog
+title: "StarRocks Catalog"
+slug: "/jdbc-starrocks-catalog"
 keywords:
 - jdbc
 - starrocks
@@ -17,28 +17,28 @@ Apache Gravitino provides the ability to manage [StarRocks](https://www.starrock
 
 :::caution
 Gravitino saves some system information in table comments, like
-`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 :::
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the StarRocks instance.
 - Supports metadata management of StarRocks (3.3.x).
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
-### Catalog properties
+### Catalog Properties
 
-You can pass to a StarRocks data source any property that isn't defined by Gravitino by adding
+Pass to a StarRocks data source any property that isn't defined by Gravitino by adding
 `gravitino.bypass.` prefix as a catalog property. For example, catalog property
 `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
-You can check the relevant data source configuration in
+Check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
 more details.
 
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the StarRocks catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the StarRocks catalog has the following properties:
 
 | Configuration item      | Description                                                                                                                                                         | Default value | Required | Since Version   |
 |-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------------|
@@ -78,35 +78,35 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 **Recommended driver versions:**
 - `mysql-connector-java-8.0.16` or higher
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the StarRocks database.
 - Supports creating schema.
 - Supports dropping schema.
 
-### Schema properties
+### Schema Properties
 
 As StarRocks can't get thr properties after set, So now we do not support set Schema properties.  
 
-### Schema operations
+### Schema Operations
 
-Please refer to
+Refer to
 [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the StarRocks table.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
-#### Table column types
+#### Table Column Types
 
 | Gravitino Type | StarRocks Type |
 |----------------|----------------|
@@ -130,24 +130,24 @@ StarRocks doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `Interv
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 1.0.0.
 
 :::note
-Gravitino can not load StarRocks `array`, `map` and `struct` type correctly, because StarRocks doesn't support these types in JDBC.
+Gravitino cannot load StarRocks `array`, `map` and `struct` type correctly, because StarRocks doesn't support these types in JDBC.
 :::
 
 
-### Table column auto-increment
+### Table Column Auto-Increment
 
 Unsupported for now.
 
-### Table properties
+### Table Properties
 
 - StarRocks supports table properties, and you can set them in the table properties.
 - Only supports StarRocks table properties and doesn't support user-defined properties.
 
-### Table indexes
+### Table Indexes
 
 Unsupported
 
-### Table partitioning
+### Table Partitioning
 
 The StarRocks catalog supports partitioned tables. 
 Users can create partitioned tables in the StarRocks catalog with specific partitioning attributes. It is also supported to pre-assign partitions when creating StarRocks tables. 
@@ -160,20 +160,20 @@ Note that although Gravitino supports several partitioning strategies, StarRocks
 The `fieldName` specified in the partitioning attributes must be the name of columns defined in the table.
 :::
 
-### Table distribution
+### Table Distribution
 
-Users can also specify the distribution strategy when creating tables in the StarRocks catalog. Currently, the StarRocks catalog supports the following distribution strategies:
+Users can also specify the distribution strategy when creating tables in the StarRocks catalog. The StarRocks catalog supports the following distribution strategies:
 - `HASH`
 - `RANDOM`
 
 For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it. More information about the distribution strategy defined in Gravitino can be found [here](./table-partitioning-distribution-sort-order-indexes.md#table-distribution).
 
 
-### Table operations
+### Table Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations:
 
@@ -190,7 +190,7 @@ Please be aware that:
  - Not all table alteration operations can be processed in batches.
  - Schema changes, such as adding/modifying/dropping columns can be processed in batches.
  - The schema alteration in StarRocks is asynchronous. You might get an outdated schema if you
-   execute a schema query immediately after the alteration. It is recommended to pause briefly
-   after the schema alteration. Gravitino will add the schema alteration status into
-   the schema information in the upcoming version to solve this problem.
+   execute a schema query immediately after the alteration. Pause briefly
+   after the alteration. Gravitino will surface the schema-alteration status in the
+   schema information in an upcoming release to solve this.
 - StarRocks has limited support for [alert table properties](https://docs.starrocks.io/docs/3.3/sql-reference/sql-statements/table_bucket_part_index/ALTER_TABLE/#modify-table-properties), And it suggests modify one property at a time.  

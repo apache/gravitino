@@ -134,7 +134,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     this.glueClient = GlueClientProvider.buildClient(config);
-    this.catalogId = config.get(GlueConstants.AWS_GLUE_CATALOG_ID);
+    String rawCatalogId = config.get(GlueConstants.AWS_GLUE_CATALOG_ID);
+    this.catalogId = StringUtils.isNotBlank(rawCatalogId) ? rawCatalogId : null;
     this.defaultTableFormat =
         config.getOrDefault(
             GlueConstants.DEFAULT_TABLE_FORMAT, GlueConstants.DEFAULT_TABLE_FORMAT_VALUE);
@@ -377,12 +378,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         try {
           GlueIcebergTableHelper.loadTable(icebergGlueCatalog, dbName, ident.name(), table);
         } catch (Exception e) {
-          LOG.warn(
-              "Failed to load Iceberg metadata for table {}.{}. "
-                  + "Partitioning and sort order information may be incomplete.",
-              dbName,
-              ident.name(),
-              e);
+          LOG.warn("Failed to load Iceberg metadata for table {}.{}", dbName, ident.name(), e);
         }
       }
 

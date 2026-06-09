@@ -1,13 +1,15 @@
 ---
-title: "Apache Gravitino Trino connector development"
-slug: /trino-connector/development
-keyword: gravitino connector development
+title: "Trino Connector Development"
+slug: "/trino-connector/development"
+keyword: "gravitino connector development"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 This document guides you through developing the Apache Gravitino Trino connector locally.
 
-## Multi-version architecture
+## Multi-version Architecture
 
 The Gravitino Trino connector supports multiple Trino versions (see [Requirements](requirements.md)). The source code is organized into a shared base module and several version-segment modules:
 
@@ -56,7 +58,7 @@ curl -X POST -H "Content-Type: application/json" -d '{"name":"mysql_catalog3","t
 Change `localhost`, `port`, and the names of metalake and catalogs to match your environment.
 :::
 
-## Development environment
+## Development Environment
 
 ### IDEA
 
@@ -339,5 +341,5 @@ If a compile error occurs due to `The following artifacts could not be resolved:
    Download the `trino-cli` jar from the [Trino release page](https://trino.io/docs/469/client/cli.html). Use the CLI version that matches your Trino server version.
    :::
 
-10. You can now develop the Gravitino Trino connector in the Gravitino project and debug it in the Trino project.
+10. Develop the Gravitino Trino connector in the Gravitino project and debug it in the Trino project.
     ![](../assets/trino/show-catalogs.jpg)

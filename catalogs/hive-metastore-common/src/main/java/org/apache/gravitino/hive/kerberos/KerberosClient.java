@@ -198,4 +198,17 @@ public class KerberosClient implements java.io.Closeable {
   public void setHiveClient(HiveClient client) {
     this.hiveClient = client;
   }
+
+  /**
+   * Returns the real (non-proxy) {@link UserGroupInformation} that was obtained after Kerberos
+   * login via keytab. Used by callers that need to bind the JAAS Subject to the current thread
+   * (e.g., via {@code ugi.doAs(...)}) before performing a Kerberos-protected RPC call.
+   *
+   * @return the real login UGI.
+   * @throws IllegalStateException if {@link #login()} has not been called yet.
+   */
+  public UserGroupInformation getRealLoginUgi() {
+    Preconditions.checkState(realLoginUgi != null, "KerberosClient.login() has not been called");
+    return realLoginUgi;
+  }
 }
