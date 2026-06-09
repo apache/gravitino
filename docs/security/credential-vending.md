@@ -181,7 +181,7 @@ Since Gravitino 1.1.0, the above Gravitino Iceberg cloud bundle jars have alread
 
 The classpath of the server:
 
-- Iceberg REST server: the classpath differs in different deploy mode, refer to [Server management](../iceberg-rest-service.md#server-management) part.
+- Iceberg REST server: the classpath differs by deployment mode; see the [Deployment](../iceberg-rest-service.md#deployment) section.
 - Fileset catalog: `catalogs/fileset/libs/`
 
 ## Example
