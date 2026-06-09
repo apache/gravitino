@@ -19,10 +19,9 @@
 package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.apache.gravitino.integration.test.util.BaseIT.setEnv;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -30,6 +29,8 @@ import org.apache.gravitino.client.GravitinoVersion;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +39,10 @@ public class BasicAuthOperationsIT extends BaseIT {
 
   private static final String ADMIN = "admin";
   private static final String ADMIN_PASSWORD = "Passw0rd-For-Admin1";
+
+  public void setGravitinoAdminClient(GravitinoAdminClient client) {
+    this.client = client;
+  }
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -51,19 +56,23 @@ public class BasicAuthOperationsIT extends BaseIT {
         Configs.REST_API_EXTENSION_PACKAGES.getKey(), IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE);
     registerCustomConfigs(configs);
     super.startIntegrationTest();
+
+    client = GravitinoAdminClient.builder(serverUri).withBasicAuth(ADMIN, ADMIN_PASSWORD).build();
+  }
+
+  @AfterAll
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    super.stopIntegrationTest();
   }
 
   @Test
-  void testBasicAuth() {
-    try (GravitinoAdminClient basicClient =
-        GravitinoAdminClient.builder(serverUri).withBasicAuth(ADMIN, ADMIN_PASSWORD).build()) {
-      GravitinoVersion gravitinoVersion = basicClient.serverVersion();
-      assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
-      assertFalse(gravitinoVersion.compileDate().isEmpty());
-      if (testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
-        final String gitCommitId = readGitCommitIdFromGitFile();
-        assertEquals(gitCommitId, gravitinoVersion.gitCommit());
-      }
+  public void testAuthenticationApi() throws Exception {
+    GravitinoVersion gravitinoVersion = client.serverVersion();
+    Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
+    Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
+    if (testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
+      final String gitCommitId = readGitCommitIdFromGitFile();
+      Assertions.assertEquals(gitCommitId, gravitinoVersion.gitCommit());
     }
   }
 }
