@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.KeyPairGenerator;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -62,10 +63,6 @@ import org.junit.jupiter.api.Test;
  */
 public class IdpRESTApiIT extends BaseIT {
 
-  /** RSA public key used only to satisfy OAuth authenticator initialization in this IT. */
-  private static final String OAUTH_PUBLIC_SIGN_KEY =
-      "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA02WlnekWmY5osrFoIsye9AjujNcsiycb7bBNxTi0ISv9p7tjP0SgAT5RJlmA5vMOck83tcJiCnzsRnfSFBED7sovstzQi5YvDdjucaa+im3AV/rhYe/27RXXy9LC0Q7yNnicJbX7Bg34n7V6dUNIBbh2hDVMPndPM5v4N0k/7ofUPghnGlQIpGx30/w3YbIwwYN9TxAMQau+Ffgcqp7ZIlSIDcHVGyx2VA24xzboRvN4X5AxPWkK7XI245bFqa2VCn1NqUXWRYbDvE5BSXK5gIQ3iuFlsi4swQMPurZmXPDCG9KBTNUa0CcHuS7cmQqdlOPxWAD9U5lyOXOg0IiotQIDAQAB";
-
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String ADMIN = "admin";
   private static final String ADMIN_PASSWORD = "Passw0rd-For-Admin1";
@@ -92,7 +89,7 @@ public class IdpRESTApiIT extends BaseIT {
     configs.put(Configs.SERVICE_ADMINS.getKey(), ADMIN);
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
     configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), "service1");
-    configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), OAUTH_PUBLIC_SIGN_KEY);
+    configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), oauthPublicSignKey());
     configs.put(OAuthConfig.DEFAULT_SERVER_URI.getKey(), "test");
     configs.put(OAuthConfig.DEFAULT_TOKEN_PATH.getKey(), "test");
     configs.put(
@@ -373,5 +370,11 @@ public class IdpRESTApiIT extends BaseIT {
 
   private static int errorCode(HttpResponse<String> response) throws Exception {
     return JsonUtils.objectMapper().readTree(response.body()).get("code").asInt();
+  }
+
+  private static String oauthPublicSignKey() throws Exception {
+    KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+    generator.initialize(2048);
+    return Base64.getEncoder().encodeToString(generator.generateKeyPair().getPublic().getEncoded());
   }
 }
