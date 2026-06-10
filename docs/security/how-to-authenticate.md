@@ -373,11 +373,9 @@ This example shows how to enable built-in Basic authentication.
 **Prerequisites:**
 
 - Gravitino distribution package (includes the idp-basic plugin on the server classpath)
-- Built-in IdP is **incompatible** with the `simple` authenticator (the default). When the
-  `idp-basic` plugin is enabled, `gravitino.authenticators` must not include `simple`.
-- For Web UI limitations with Basic authentication, see
-  [built-in IDP Web UI](how-to-use-built-in-idp.md#web-ui). For browser-based sign-in, configure
-  [OAuth mode](#oauth-mode).
+
+Built-in IdP is **incompatible** with the `simple` authenticator (the default). When the
+`idp-basic` plugin is enabled, `gravitino.authenticators` must not include `simple`.
 
 **Configuration:**
 

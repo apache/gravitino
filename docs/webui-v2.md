@@ -55,9 +55,9 @@ The Web V2 landing page depends on both the authentication mode and whether auth
   ![oauth-login](./assets/webui-v2/oauth-login.png)
 
 :::note
-Built-in IDP Basic authentication is not supported in the Web UI. The UI does not collect username
-and password for this mode. Use the REST API, Java/Python clients, or engine connectors instead.
-See [built-in IDP Web UI](security/how-to-use-built-in-idp.md#web-ui).
+Built-in IDP Basic authentication is not supported in the Web UI. The UI does not collect
+username and password for this mode. Use the REST API, Java/Python clients, or engine connectors
+instead. See [built-in IDP Web UI](security/how-to-use-built-in-idp.md#web-ui).
 :::
 
 ### Metalakes
