@@ -27,11 +27,16 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.apache.gravitino.Catalog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Helper class to generate specific credential properties for different table format and engine.
  */
 public class CredentialPropertyUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(CredentialPropertyUtils.class);
 
   @VisibleForTesting static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
   @VisibleForTesting static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
@@ -76,6 +81,14 @@ public class CredentialPropertyUtils {
   static final String ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
       "gcs.oauth2.refresh-credentials-endpoint";
 
+  @VisibleForTesting static final String ICEBERG_JDBC_USER = "jdbc.user";
+  @VisibleForTesting static final String ICEBERG_JDBC_PASSWORD = "jdbc.password";
+
+  private static final String PAIMON_S3_ACCESS_KEY = "s3.access-key";
+  private static final String PAIMON_S3_SECRET_KEY = "s3.secret-key";
+  private static final String PAIMON_OSS_ACCESS_KEY_ID = "fs.oss.accessKeyId";
+  private static final String PAIMON_OSS_ACCESS_KEY_SECRET = "fs.oss.accessKeySecret";
+
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
           .put(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN)
@@ -99,6 +112,78 @@ public class CredentialPropertyUtils {
           .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
           .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
           .build();
+
+  /**
+   * Returns credentials from the given catalog, or an empty array if the catalog does not support
+   * credential vending.
+   *
+   * @param catalog the Gravitino catalog client
+   * @return credentials, never null
+   */
+  public static Credential[] getCredentials(Catalog catalog) {
+    try {
+      return catalog.supportsCredentials().getCredentials();
+    } catch (UnsupportedOperationException e) {
+      LOG.debug("Catalog does not support credential vending, skipping injection", e);
+      return new Credential[0];
+    }
+  }
+
+  /**
+   * Injects vended credentials into Iceberg catalog properties. JDBC credentials are applied
+   * directly; all other credential types are converted via {@link
+   * #toIcebergProperties(Credential)}.
+   *
+   * @param credentials the credentials to apply
+   * @param props the mutable properties map to update
+   */
+  public static void applyIcebergCredentials(Credential[] credentials, Map<String, String> props) {
+    for (Credential credential : credentials) {
+      if (credential instanceof JdbcCredential) {
+        JdbcCredential jdbc = (JdbcCredential) credential;
+        props.put(ICEBERG_JDBC_USER, jdbc.jdbcUser());
+        props.put(ICEBERG_JDBC_PASSWORD, jdbc.jdbcPassword());
+      } else {
+        Map<String, String> converted = toIcebergProperties(credential);
+        if (converted.isEmpty()) {
+          LOG.warn(
+              "Received unrecognized credential type '{}' for Iceberg catalog, skipping",
+              credential.getClass().getName());
+        } else {
+          props.putAll(converted);
+        }
+      }
+    }
+  }
+
+  /**
+   * Injects vended credentials into Paimon catalog properties. Supports JDBC, S3, and OSS
+   * credential types.
+   *
+   * @param credentials the credentials to apply
+   * @param props the mutable properties map to update
+   */
+  public static void applyPaimonCredentials(Credential[] credentials, Map<String, String> props) {
+    for (Credential credential : credentials) {
+      if (credential instanceof JdbcCredential) {
+        JdbcCredential jdbc = (JdbcCredential) credential;
+        props.put(ICEBERG_JDBC_USER, jdbc.jdbcUser());
+        props.put(ICEBERG_JDBC_PASSWORD, jdbc.jdbcPassword());
+      } else if (credential instanceof S3SecretKeyCredential) {
+        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
+        props.put(PAIMON_S3_ACCESS_KEY, s3.accessKeyId());
+        props.put(PAIMON_S3_SECRET_KEY, s3.secretAccessKey());
+      } else if (credential instanceof OSSSecretKeyCredential) {
+        OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
+        props.put(PAIMON_OSS_ACCESS_KEY_ID, oss.accessKeyId());
+        props.put(PAIMON_OSS_ACCESS_KEY_SECRET, oss.secretAccessKey());
+      } else {
+        LOG.warn(
+            "Received unrecognized credential type '{}' for Paimon catalog, skipping",
+            credential.getClass().getName());
+      }
+    }
+  }
 
   /**
    * Transforms a specific credential into a map of Iceberg properties.

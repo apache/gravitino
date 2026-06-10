@@ -86,6 +86,14 @@ curl -v -X GET \
   http://localhost:8090/api/version
 ```
 
+:::note
+The Web UI does not provide a username/password login form for built-in IDP Basic authentication.
+Use REST clients, the Java/Python client, or engine connectors instead. See
+[built-in IDP Web UI](how-to-use-built-in-idp.md#web-ui), the
+[Web UI initial page](../webui.md#initial-page), and the
+[Web V2 initial page](../webui-v2.md#initial-page).
+:::
+
 ### OAuth Mode
 
 Gravitino supports external OAuth 2.0 servers with two token validation methods:

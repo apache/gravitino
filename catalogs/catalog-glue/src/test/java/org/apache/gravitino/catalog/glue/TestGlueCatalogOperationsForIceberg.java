@@ -236,21 +236,38 @@ class TestGlueCatalogOperationsForIceberg {
   }
 
   @Test
-  void testAlterTable_icebergRenameThrows() {
+  void testAlterIcebergTableRename() {
+    String newName = "ice1_renamed";
     software.amazon.awssdk.services.glue.model.Table rawTable =
         software.amazon.awssdk.services.glue.model.Table.builder()
             .name(TABLE)
             .parameters(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE))
             .storageDescriptor(StorageDescriptor.builder().build())
             .build();
+    software.amazon.awssdk.services.glue.model.Table renamedTable =
+        software.amazon.awssdk.services.glue.model.Table.builder()
+            .name(newName)
+            .parameters(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE))
+            .storageDescriptor(StorageDescriptor.builder().build())
+            .build();
 
     when(mockClient.getTable(any(GetTableRequest.class)))
-        .thenReturn(GetTableResponse.builder().table(rawTable).build());
+        .thenReturn(GetTableResponse.builder().table(rawTable).build())
+        .thenReturn(GetTableResponse.builder().table(renamedTable).build());
+    when(mockIcebergCatalog.loadTable(TableIdentifier.of(DB, newName)))
+        .thenThrow(new RuntimeException("no iceberg metadata"));
+    when(mockClient.getPartitions(any(GetPartitionsRequest.class)))
+        .thenReturn(GetPartitionsResponse.builder().build());
 
     NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> ops.alterTable(ident, TableChange.rename("new_table_name")));
+    GlueTable result = ops.alterTable(ident, TableChange.rename(newName));
+
+    ArgumentCaptor<TableIdentifier> fromCaptor = ArgumentCaptor.forClass(TableIdentifier.class);
+    ArgumentCaptor<TableIdentifier> toCaptor = ArgumentCaptor.forClass(TableIdentifier.class);
+    verify(mockIcebergCatalog).renameTable(fromCaptor.capture(), toCaptor.capture());
+    assertEquals(TableIdentifier.of(DB, TABLE), fromCaptor.getValue());
+    assertEquals(TableIdentifier.of(DB, newName), toCaptor.getValue());
+    assertEquals(newName, result.name());
   }
 
   @Test

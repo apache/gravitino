@@ -21,12 +21,19 @@ package org.apache.gravitino.spark.connector.glue;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
+import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
@@ -34,8 +41,10 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -177,6 +186,43 @@ public class TestGravitinoGlueCatalog {
   }
 
   // -------------------------------------------------------------------------
+  // Test applyS3Credential (credential vending)
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testApplyS3CredentialInjectsHadoopProperties() {
+    Catalog mockCatalog = mock(Catalog.class);
+    S3SecretKeyCredential s3Cred = new S3SecretKeyCredential("test-access-key", "test-secret-key");
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {s3Cred});
+
+    Map<String, String> props = new HashMap<>();
+    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props);
+
+    Assertions.assertEquals("test-access-key", props.get("hadoop.fs.s3a.access.key"));
+    Assertions.assertEquals("test-secret-key", props.get("hadoop.fs.s3a.secret.key"));
+    Assertions.assertEquals(
+        "test-access-key", vended.get(GluePropertiesConverter.AWS_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "test-secret-key", vended.get(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testApplyS3CredentialReturnsEmptyWhenNoCredentials() {
+    Catalog mockCatalog = mock(Catalog.class);
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {});
+
+    Map<String, String> props = new HashMap<>();
+    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props);
+
+    Assertions.assertTrue(props.isEmpty());
+    Assertions.assertTrue(vended.isEmpty());
+  }
+
+  // -------------------------------------------------------------------------
   // Test converter methods
   // -------------------------------------------------------------------------
 
@@ -199,6 +245,50 @@ public class TestGravitinoGlueCatalog {
   void testGetSparkTransformConverter() {
     SparkTransformConverter transformer = gravitinoGlueCatalog.getSparkTransformConverter();
     Assertions.assertNotNull(transformer);
+  }
+
+  // -------------------------------------------------------------------------
+  // Test invalidateTable propagates to icebergGlueCatalog
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testInvalidateTableCallsBothCatalogsWhenIcebergInitialized() throws Exception {
+    TableCatalog mockSparkCatalog = mock(TableCatalog.class);
+    SparkCatalog mockIcebergCatalog = mock(SparkCatalog.class);
+    Identifier ident = Identifier.of(new String[] {"db"}, "tbl");
+
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockSparkCatalog;
+            icebergGlueCatalog = mockIcebergCatalog;
+          }
+        };
+
+    catalog.invalidateTable(ident);
+
+    verify(mockSparkCatalog).invalidateTable(ident);
+    verify(mockIcebergCatalog).invalidateTable(ident);
+  }
+
+  @Test
+  void testInvalidateTableCallsOnlySparkCatalogWhenIcebergNotInitialized() throws Exception {
+    TableCatalog mockSparkCatalog = mock(TableCatalog.class);
+    SparkCatalog mockIcebergCatalog = mock(SparkCatalog.class);
+    Identifier ident = Identifier.of(new String[] {"db"}, "tbl");
+
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockSparkCatalog;
+            // icebergGlueCatalog left null (not initialized)
+          }
+        };
+
+    catalog.invalidateTable(ident);
+
+    verify(mockSparkCatalog).invalidateTable(ident);
+    verify(mockIcebergCatalog, never()).invalidateTable(any());
   }
 
   // -------------------------------------------------------------------------
