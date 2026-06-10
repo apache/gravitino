@@ -104,12 +104,6 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
       Optional<Long> version,
       boolean checkDeclared,
       boolean loadDetailedMetadata) {
-    if (!version.isEmpty()) {
-      throw new UnsupportedOperationException(
-          "Describing specific table version is not supported. It should be null to indicate the"
-              + " latest version.");
-    }
-
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
