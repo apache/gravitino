@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
@@ -42,8 +43,6 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
   // Gravitino catalog property keys for AWS Glue
   private static final String PROP_AWS_REGION = "aws-region";
   private static final String PROP_AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
-  private static final String PROP_AWS_ACCESS_KEY_ID = "aws-access-key-id";
-  private static final String PROP_AWS_SECRET_ACCESS_KEY = "aws-secret-access-key";
   private static final String PROP_AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
 
   // Trino Hive connector configuration keys for Glue
@@ -82,16 +81,7 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
       config.put(HIVE_METASTORE_GLUE_CATALOG_ID, catalogId);
     }
 
-    String accessKey = catalog.getProperty(PROP_AWS_ACCESS_KEY_ID, null);
-    String secretKey = catalog.getProperty(PROP_AWS_SECRET_ACCESS_KEY, null);
-    if (accessKey != null && secretKey != null) {
-      // Glue metastore credentials
-      config.put(HIVE_METASTORE_GLUE_ACCESS_KEY, accessKey);
-      config.put(HIVE_METASTORE_GLUE_SECRET_KEY, secretKey);
-      // S3 credentials for data access
-      config.put(HIVE_S3_ACCESS_KEY, accessKey);
-      config.put(HIVE_S3_SECRET_KEY, secretKey);
-    }
+    applyS3Credential(credentials, config);
 
     String endpoint = catalog.getProperty(PROP_AWS_GLUE_ENDPOINT, null);
     if (StringUtils.isNotBlank(endpoint)) {
@@ -99,6 +89,19 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
     }
 
     return config;
+  }
+
+  static void applyS3Credential(Credential[] credentials, Map<String, String> config) {
+    for (Credential credential : credentials) {
+      if (credential instanceof S3SecretKeyCredential) {
+        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
+        config.put(HIVE_METASTORE_GLUE_ACCESS_KEY, s3.accessKeyId());
+        config.put(HIVE_METASTORE_GLUE_SECRET_KEY, s3.secretAccessKey());
+        config.put(HIVE_S3_ACCESS_KEY, s3.accessKeyId());
+        config.put(HIVE_S3_SECRET_KEY, s3.secretAccessKey());
+        return;
+      }
+    }
   }
 
   @Override

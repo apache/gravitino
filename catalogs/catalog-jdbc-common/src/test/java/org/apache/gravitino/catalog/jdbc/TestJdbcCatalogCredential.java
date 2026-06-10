@@ -110,6 +110,38 @@ public class TestJdbcCatalogCredential {
   }
 
   @Test
+  void testJdbcCatalogDefaultCredentialProvidersWithEmptyPassword() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Empty-string password (e.g. StarRocks default) should still register the credential provider
+    Map<String, String> jdbcProps = Maps.newHashMap();
+    jdbcProps.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:9030/");
+    jdbcProps.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    jdbcProps.put(JdbcConfig.USERNAME.getKey(), "root");
+    jdbcProps.put(JdbcConfig.PASSWORD.getKey(), "");
+
+    CatalogEntity jdbcEntity =
+        CatalogEntity.builder()
+            .withId(7L)
+            .withName("jdbc-catalog-empty-password")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(TestableJdbcCatalog.Type.RELATIONAL)
+            .withProvider("jdbc-starrocks")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcProps)
+            .build();
+
+    TestableJdbcCatalog jdbcCatalog = new TestableJdbcCatalog();
+    jdbcCatalog.withCatalogConf(jdbcProps).withCatalogEntity(jdbcEntity);
+    Map<String, String> properties = jdbcCatalog.propertiesWithCredentialProviders();
+
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertEquals(JdbcCredential.JDBC_CREDENTIAL_TYPE, credentialProviders);
+  }
+
+  @Test
   void testJdbcCatalogNoCredentialProvidersWithoutPassword() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

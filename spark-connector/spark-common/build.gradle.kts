@@ -176,6 +176,10 @@ val glueLibsApiUrl =
 val downloadGlueHiveJars by
 tasks.registering {
   glueHiveJarsDir?.let { outputs.dir(it) }
+  onlyIf {
+    val outputDir = file(glueHiveJarsDir ?: return@onlyIf false)
+    outputDir.listFiles()?.none { it.name.endsWith(".jar") } ?: true
+  }
   doLast {
     val outputDir = file(glueHiveJarsDir ?: return@doLast)
     outputDir.mkdirs()
