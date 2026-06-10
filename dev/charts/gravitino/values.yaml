@@ -522,7 +522,13 @@ ingress:
   #      - chart-gravitino.local
   # Gateway API (HTTPRoute) settings. Used only when type is "gateway".
   # hosts (above) become the HTTPRoute hostnames and rule paths; annotations are reused.
+  # In gateway mode each path's pathType is mapped to a Gateway API match type:
+  #   Exact                  -> Exact
+  #   Prefix                 -> PathPrefix
+  #   ImplementationSpecific -> PathPrefix (Gateway API has no equivalent; treated as a prefix match)
+  # Any other value fails template rendering (RegularExpression is not supported).
   gateway:
+    # Only gateway.networking.k8s.io/v1 (the GA version) is supported and tested.
     apiVersion: gateway.networking.k8s.io/v1
     # Parent Gateway(s) this HTTPRoute attaches to.
     parentRefs: []

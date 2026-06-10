@@ -17,7 +17,7 @@
 # under the License.
 #
 
-suite: test gravitino iceberg rest server httproute
+suite: test gravitino httproute
 templates:
   - httproute.yaml
 tests:
@@ -37,7 +37,7 @@ tests:
 
   - it: renders a Gateway API HTTPRoute when type is gateway
     release:
-      name: iceberg-rest
+      name: gravitino
     set:
       ingress:
         enabled: true
@@ -45,9 +45,9 @@ tests:
         annotations:
           example.com/route: "true"
         hosts:
-          - host: iceberg-rest.example.com
+          - host: gravitino.example.com
             paths:
-              - path: /iceberg
+              - path: /gravitino
                 pathType: Prefix
               - path: /exact
                 pathType: Exact
@@ -63,7 +63,7 @@ tests:
           of: HTTPRoute
       - equal:
           path: metadata.name
-          value: iceberg-rest-gravitino-iceberg-rest-server-helm
+          value: gravitino-gravitino-helm
       - equal:
           path: metadata.annotations["example.com/route"]
           value: "true"
@@ -78,13 +78,13 @@ tests:
           value: https
       - contains:
           path: spec.hostnames
-          content: iceberg-rest.example.com
+          content: gravitino.example.com
       - equal:
           path: spec.rules[0].matches[0].path.type
           value: PathPrefix
       - equal:
           path: spec.rules[0].matches[0].path.value
-          value: /iceberg
+          value: /gravitino
       - equal:
           path: spec.rules[1].matches[0].path.type
           value: Exact
@@ -93,10 +93,10 @@ tests:
           value: /exact
       - equal:
           path: spec.rules[0].backendRefs[0].name
-          value: iceberg-rest-gravitino-iceberg-rest-server-helm
+          value: gravitino-gravitino-helm
       - equal:
           path: spec.rules[0].backendRefs[0].port
-          value: 9001
+          value: 8090
 
   - it: maps ImplementationSpecific pathType to PathPrefix in gateway mode
     set:
@@ -104,7 +104,7 @@ tests:
         enabled: true
         type: gateway
         hosts:
-          - host: iceberg-rest.example.com
+          - host: gravitino.example.com
             paths:
               - path: /
                 pathType: ImplementationSpecific
@@ -125,7 +125,7 @@ tests:
         enabled: true
         type: gateway
         hosts:
-          - host: iceberg-rest.example.com
+          - host: gravitino.example.com
             paths:
               - path: /api
         gateway:
@@ -142,7 +142,7 @@ tests:
         enabled: true
         type: gateway
         hosts:
-          - host: iceberg-rest.example.com
+          - host: gravitino.example.com
             paths:
               - path: /re
                 pathType: RegularExpression

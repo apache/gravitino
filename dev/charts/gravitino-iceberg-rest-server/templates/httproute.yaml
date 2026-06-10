@@ -47,9 +47,15 @@ spec:
   rules:
     {{- range .Values.ingress.hosts }}
     {{- range .paths }}
+    {{- $pathType := .pathType | default "Prefix" }}
+    {{- if or (eq $pathType "Prefix") (eq $pathType "PathPrefix") (eq $pathType "ImplementationSpecific") }}
+    {{- $pathType = "PathPrefix" }}
+    {{- else if ne $pathType "Exact" }}
+    {{- fail (printf "ingress.hosts[].paths[].pathType %q is not supported when ingress.type is \"gateway\"; use Exact, Prefix, or ImplementationSpecific" $pathType) }}
+    {{- end }}
     - matches:
         - path:
-            type: {{ if eq (.pathType | default "") "Exact" }}Exact{{ else }}PathPrefix{{ end }}
+            type: {{ $pathType }}
             value: {{ .path | quote }}
       backendRefs:
         - name: {{ $fullName }}
