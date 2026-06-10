@@ -16,10 +16,72 @@
   specific language governing permissions and limitations
   under the License.
   */}}
-🚀 {{ $.Chart.Name }} has been installed. Check its status by running:
+🚀 Apache Gravitino has been installed in namespace {{ include "gravitino.namespace" . }}.
+
+Deployment summary:
+- Release name: {{ .Release.Name }}
+- Service name: {{ .Values.service.name }}
+- Replicas: {{ .Values.replicas }}
+- Metadata backend: {{ if .Values.mysql.enabled }}MySQL (in-chart){{ else if .Values.postgresql.enabled }}PostgreSQL (in-chart){{ else if and .Values.entity.jdbcUrl (not (hasPrefix "jdbc:h2" .Values.entity.jdbcUrl)) }}External (configured via entity.jdbcUrl){{ else }}Embedded H2 (testing only){{ end }}
+- Persistence: {{ if .Values.persistence.enabled }}Enabled ({{ .Values.persistence.size }}){{ else }}Disabled (emptyDir){{ end }}
+- Iceberg REST server: {{ if contains "iceberg-rest" .Values.auxService.names }}Enabled on port {{ .Values.icebergRest.httpPort | default 9001 }}{{ else }}Disabled{{ end }}
+- Authentication: {{ .Values.authenticators | default "simple (anonymous)" }}
+- Service type: {{ .Values.service.type }}
+
+{{- if and (not .Values.mysql.enabled) (not .Values.postgresql.enabled) (or (not .Values.entity.jdbcUrl) (hasPrefix "jdbc:h2" .Values.entity.jdbcUrl)) }}
+
+WARNING: This deployment uses the embedded H2 metadata backend on an
+emptyDir volume. All metadata will be lost when the pod restarts. For
+any non-throwaway use, configure an external metadata backend (MySQL
+or PostgreSQL) via the entity.* values, or enable an in-chart database
+via mysql.enabled or postgresql.enabled.
+{{- end }}
+
+{{- if and (contains "iceberg-rest" .Values.auxService.names) (not .Values.icebergRest.catalogConfigProvider) (eq (.Values.icebergRest.catalogBackend | default "memory") "memory") }}
+
+WARNING: The Iceberg REST server is enabled with the default in-memory
+catalog backend. Tables registered through this server will be lost
+when the pod restarts. For real use, configure icebergRest.catalogConfigProvider
+to use the dynamic-config-provider with a persistent metadata backend,
+or set icebergRest.catalogBackend to jdbc or hive with a persistent store.
+{{- end }}
+
+{{- if or (eq .Values.authenticators "") (eq .Values.authenticators "simple") }}
+
+WARNING: Authentication is set to simple mode (anonymous). The deployed
+server accepts all requests without credentials. Configure authenticators
+to "oauth" or "kerberos" before exposing the server beyond a trusted
+network.
+{{- end }}
+
+{{- if and .Values.mysql.enabled (or (eq .Values.mysql.auth.rootPassword "admin") (eq .Values.mysql.auth.password "gravitino")) }}
+
+WARNING: The in-chart MySQL is using default credentials (root password
+"admin" and/or user password "gravitino"). Override mysql.auth.rootPassword
+and mysql.auth.password (or set mysql.auth.existingSecret) before any
+non-trial deployment.
+{{- end }}
+
+{{- if and .Values.postgresql.enabled (eq .Values.postgresql.auth.password "gravitino") }}
+
+WARNING: The in-chart PostgreSQL is using the default password "gravitino".
+Override postgresql.auth.password (or set postgresql.auth.existingSecret)
+before any non-trial deployment.
+{{- end }}
+
+To check pod status:
 
   kubectl get pods --namespace {{ include "gravitino.namespace" . }}
 
-Check the "gravitino.conf" by running:
+To view the rendered gravitino.conf:
 
   kubectl get cm {{ include "gravitino.fullname" . }} -n {{ include "gravitino.namespace" . }} -o json | jq -r '.data["gravitino.conf"]'
+
+To access the Gravitino server locally:
+
+  kubectl -n {{ include "gravitino.namespace" . }} port-forward svc/{{ .Values.service.name }} {{ .Values.service.port }}:{{ .Values.service.targetPort }}
+
+Then open http://localhost:{{ .Values.service.port }} in a browser.
+
+For production deployment patterns, see:
+https://gravitino.apache.org/docs/latest/chart
