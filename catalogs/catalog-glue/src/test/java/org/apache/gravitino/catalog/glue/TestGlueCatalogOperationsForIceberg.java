@@ -236,7 +236,7 @@ class TestGlueCatalogOperationsForIceberg {
   }
 
   @Test
-  void testAlterTable_icebergRenameCallsIcebergRenameTable() {
+  void testAlterIcebergTableRename() {
     String newName = "ice1_renamed";
     software.amazon.awssdk.services.glue.model.Table rawTable =
         software.amazon.awssdk.services.glue.model.Table.builder()
