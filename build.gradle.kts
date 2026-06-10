@@ -342,6 +342,10 @@ subprojects {
   configurations.all {
     resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
     resolutionStrategy.force("org.xerial.snappy:snappy-java:$snappyJavaVersion")
+
+    // Exclude log4j 1.x (CVE-2020-9493, CVSS 9.8) pulled transitively by Hive and Hadoop.
+    // The safe log4j-1.2-api bridge from Log4j 2.x is already included in the log4j bundle.
+    exclude(group = "log4j", module = "log4j")
   }
 
   repositories {
