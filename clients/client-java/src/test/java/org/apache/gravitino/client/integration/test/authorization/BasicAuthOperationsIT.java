@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoVersion;
+import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -52,6 +53,7 @@ public class BasicAuthOperationsIT extends BaseIT {
     configs.put(Configs.CACHE_ENABLED.getKey(), String.valueOf(false));
     configs.put(Configs.STORE_DELETE_AFTER_TIME.getKey(), String.valueOf(20 * 60 * 1000L));
     configs.put(Configs.SERVICE_ADMINS.getKey(), ADMIN);
+    configs.put(Configs.AUTHENTICATORS.getKey(), BasicAuthenticator.class.getCanonicalName());
     configs.put(
         Configs.REST_API_EXTENSION_PACKAGES.getKey(), IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE);
     registerCustomConfigs(configs);
