@@ -1426,9 +1426,8 @@ public class CatalogHive2IT extends BaseIT {
 
     // Rename the table and move it to the target schema
     String newTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX + "_renamed");
-    catalog
-        .asTableCatalog()
-        .alterTable(tableIdentifier, TableChange.rename(newTableName, targetSchemaName));
+    TableChange renameTableChange = TableChange.rename(newTableName, targetSchemaName);
+    catalog.asTableCatalog().alterTable(tableIdentifier, renameTableChange);
 
     // Verify the table is loadable from the new schema via Gravitino API
     NameIdentifier newTableIdentifier = NameIdentifier.of(targetSchemaName, newTableName);
@@ -1459,14 +1458,10 @@ public class CatalogHive2IT extends BaseIT {
             createProperties(),
             Transforms.EMPTY_TRANSFORM);
 
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    TableChange renameChange = TableChange.rename(anotherTable + "_moved", "non_existent_schema");
     Assertions.assertThrows(
-        NoSuchSchemaException.class,
-        () ->
-            catalog
-                .asTableCatalog()
-                .alterTable(
-                    anotherTableId,
-                    TableChange.rename(anotherTable + "_moved", "non_existent_schema")));
+        NoSuchSchemaException.class, () -> tableCatalog.alterTable(anotherTableId, renameChange));
 
     // Clean up the target schema
     catalog.asSchemas().dropSchema(targetSchemaName, true);
