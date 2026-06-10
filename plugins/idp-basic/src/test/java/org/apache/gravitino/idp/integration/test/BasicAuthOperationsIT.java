@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.client.integration.test.authorization;
+package org.apache.gravitino.idp.integration.test;
 
 import static org.apache.gravitino.integration.test.util.BaseIT.setEnv;
 
