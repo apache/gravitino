@@ -56,9 +56,6 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           .put(KerberosConfig.CHECK_INTERVAL_SEC_KEY, KerberosConfig.CHECK_INTERVAL_SEC_KEY)
           .put(KerberosConfig.FETCH_TIMEOUT_SEC_KEY, KerberosConfig.FETCH_TIMEOUT_SEC_KEY)
           .put(
-              KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY,
-              KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY)
-          .put(
               AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
               AuthenticationConfig.IMPERSONATION_ENABLE_KEY)
           .put(AuthenticationConfig.AUTH_TYPE_KEY, AuthenticationConfig.AUTH_TYPE_KEY)

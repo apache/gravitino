@@ -63,6 +63,7 @@ import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.utils.FetchFileUtils;
 import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.CommonProperties;
@@ -102,6 +103,7 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void initialize() {
+    FetchFileUtils.setBlockUnsafeRemoteUri(serverConfig.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
     gravitinoEnv.initializeFullComponents(serverConfig);
 
     JettyServerConfig jettyServerConfig =

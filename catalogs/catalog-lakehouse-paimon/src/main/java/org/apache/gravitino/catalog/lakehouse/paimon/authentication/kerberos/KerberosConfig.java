@@ -37,9 +37,6 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final String FETCH_TIMEOUT_SEC_KEY =
       "authentication.kerberos.keytab-fetch-timeout-sec";
 
-  public static final String KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY =
-      "authentication.kerberos.keytab-fetch-block-unsafe-address";
-
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
           .doc("The principal of the Kerberos connection")
@@ -72,16 +69,6 @@ public class KerberosConfig extends AuthenticationConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
 
-  public static final ConfigEntry<Boolean> KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_ENTRY =
-      new ConfigBuilder(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY)
-          .doc(
-              "Whether to block the Kerberos keytab URI from resolving to unsafe addresses from "
-                  + "the Gravitino server side. This is enabled by default to prevent SSRF. Set "
-                  + "it to false only when the URI is trusted and access is required.")
-          .version(ConfigConstants.VERSION_1_3_0)
-          .booleanConf()
-          .createWithDefault(true);
-
   public KerberosConfig(Map<String, String> properties) {
     super(properties);
     loadFromMap(properties, k -> true);
@@ -101,10 +88,6 @@ public class KerberosConfig extends AuthenticationConfig {
 
   public int getFetchTimeoutSec() {
     return get(FETCH_TIMEOUT_SEC_ENTRY);
-  }
-
-  public boolean blockKeytabFetchUnsafeAddress() {
-    return get(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_ENTRY);
   }
 
   public static final Map<String, PropertyEntry<?>> KERBEROS_PROPERTY_ENTRIES =
@@ -141,16 +124,5 @@ public class KerberosConfig extends AuthenticationConfig {
                   false /* immutable */,
                   60 /* defaultValue */,
                   false /* hidden */))
-          .put(
-              KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY,
-              PropertyEntry.booleanPropertyEntry(
-                  KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY,
-                  "Whether to block Kerberos keytab fetch from unsafe addresses from the Gravitino "
-                      + "server side. This is enabled by default to prevent SSRF.",
-                  false /* required */,
-                  false /* immutable */,
-                  true /* defaultValue */,
-                  false /* hidden */,
-                  false /* reserved */))
           .build();
 }

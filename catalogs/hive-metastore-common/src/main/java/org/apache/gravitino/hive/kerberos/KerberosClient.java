@@ -175,15 +175,7 @@ public class KerberosClient implements java.io.Closeable {
     File keytabFile = new File(path);
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
     FetchFileUtils.fetchFileFromUri(
-        keyTabUri,
-        keytabFile,
-        fetchKeytabFileTimeout * 1000,
-        hadoopConf,
-        kerberosConfig.blockKeytabFetchUnsafeAddress(),
-        String.format(
-            "'%s' to false, or set 'kerberos.keytab-fetch-block-unsafe-address' to false for "
-                + "Hive catalog properties",
-            KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY));
+        keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf);
     return keytabFile;
   }
 

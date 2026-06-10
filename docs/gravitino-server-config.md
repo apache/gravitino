@@ -142,7 +142,6 @@ The following table lists the job configuration items:
 | `gravitino.job.executor`               | The executor to run jobs. By default it is `local`; users can implement their own executor and set it here.                                                                        | `local`                        | No       | 1.0.0         |
 | `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging files of the finished job in the job staging directory. The minimum recommended value is 10 minutes if you are not testing.           | `604800000` (7 days)           | No       | 1.0.0         |
 | `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor. The minimum recommended value is 1 minute if you are not testing.                                       | `300000` (5 minutes)           | No       | 1.0.0         |
-| `gravitino.job.blockUnsafeRemoteUri`   | Whether to block job file remote URIs from resolving to unsafe addresses from the Gravitino server side. Disable this only for trusted URIs that require access to such addresses. | `true`                         | No       | 1.3.0         |
 
 ### Tree Lock Configuration
 
@@ -306,6 +305,10 @@ appender.audit_file.strategy.delete.ifLastModified.age = 90d
 ### Security Configuration
 
 Refer to [security](security/security.md) for HTTPS and authentication configurations.
+
+| Configuration Item                | Description                                                                                                                                                                                                                                          | Default Value | Required | Since Version |
+|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.blockUnsafeRemoteUri`  | Whether to block remote file URIs from resolving to unsafe addresses from the Gravitino server side. This applies to job files and catalog files such as Kerberos keytabs. Disable this only for trusted URIs that require access to such addresses. | `true`        | No       | 1.3.0         |
 
 ### Metrics Configuration
 

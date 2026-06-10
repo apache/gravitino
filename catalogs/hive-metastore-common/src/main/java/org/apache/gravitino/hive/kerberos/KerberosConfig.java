@@ -38,9 +38,6 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final String FETCH_TIMEOUT_SEC_KEY =
       "authentication.kerberos.keytab-fetch-timeout-sec";
 
-  public static final String KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY =
-      "authentication.kerberos.keytab-fetch-block-unsafe-address";
-
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
           .doc("The principal of the Kerberos connection")
@@ -73,16 +70,6 @@ public class KerberosConfig extends AuthenticationConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
-  public static final ConfigEntry<Boolean> KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_ENTRY =
-      new ConfigBuilder(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY)
-          .doc(
-              "Whether to block the Kerberos keytab URI from resolving to unsafe addresses from "
-                  + "the Gravitino server side. This is enabled by default to prevent SSRF. Set "
-                  + "it to false only when the URI is trusted and access is required.")
-          .version(ConfigConstants.VERSION_1_3_0)
-          .booleanConf()
-          .createWithDefault(true);
-
   public KerberosConfig(Properties properties, Configuration configuration) {
     super(properties, configuration);
     loadFromMap((Map) properties, k -> true);
@@ -102,9 +89,5 @@ public class KerberosConfig extends AuthenticationConfig {
 
   public int getFetchTimeoutSec() {
     return get(FETCH_TIMEOUT_SEC_ENTRY);
-  }
-
-  public boolean blockKeytabFetchUnsafeAddress() {
-    return get(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_ENTRY);
   }
 }

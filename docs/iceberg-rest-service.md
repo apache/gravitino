@@ -64,6 +64,8 @@ There are distinct configuration files for standalone and auxiliary server: `gra
 
 Starting with version `0.6.0-incubating`, the prefix `gravitino.auxService.iceberg-rest.` for auxiliary server configurations has been deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the latter will take precedence. The configurations listed below use the `gravitino.iceberg-rest.` prefix.
 
+The server-level `gravitino.blockUnsafeRemoteUri` configuration controls whether remote files such as Kerberos keytabs may resolve to unsafe addresses. It defaults to `true`. Configure it in `gravitino-iceberg-rest-server.conf` for standalone mode or `gravitino.conf` for auxiliary mode.
+
 ### Enable Iceberg REST Service
 
 | Configuration item                 | Description                                                                                                                                                                                                                            | Default value | Required | Since Version |
@@ -403,7 +405,6 @@ The detailed configuration items are as follows:
 | `gravitino.iceberg-rest.authentication.kerberos.keytab-uri`                        | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                                  | (none)         | required if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos.                                                                                   | 0.7.0-incubating |
 | `gravitino.iceberg-rest.authentication.kerberos.check-interval-sec`                | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                          | 60             | No                                                                                                                                                                   | 0.7.0-incubating |
 | `gravitino.iceberg-rest.authentication.kerberos.keytab-fetch-timeout-sec`          | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                              | 60             | No                                                                                                                                                                   | 0.7.0-incubating |
-| `gravitino.iceberg-rest.authentication.kerberos.keytab-fetch-block-unsafe-address` | Whether to block the Kerberos keytab URI from resolving to unsafe addresses from the Gravitino server side. Disable this only for trusted URIs that require access to such addresses.                                                                   | true           | No                                                                                                                                                                   | 1.3.0            |
 
 ### Credential Vending
 

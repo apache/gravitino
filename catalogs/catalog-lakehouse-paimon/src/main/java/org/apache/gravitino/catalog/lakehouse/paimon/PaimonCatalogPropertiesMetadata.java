@@ -90,9 +90,6 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           .put(KerberosConfig.KEY_TAB_URI_KEY, KerberosConfig.KEY_TAB_URI_KEY)
           .put(KerberosConfig.CHECK_INTERVAL_SEC_KEY, KerberosConfig.CHECK_INTERVAL_SEC_KEY)
           .put(KerberosConfig.FETCH_TIMEOUT_SEC_KEY, KerberosConfig.FETCH_TIMEOUT_SEC_KEY)
-          .put(
-              KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY,
-              KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY)
           .put(AuthenticationConfig.AUTH_TYPE_KEY, AuthenticationConfig.AUTH_TYPE_KEY)
           .build();
 

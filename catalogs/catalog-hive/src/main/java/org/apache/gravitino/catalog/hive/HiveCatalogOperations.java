@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.hive;
 
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEY_TAB_URI;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
@@ -31,7 +30,6 @@ import static org.apache.gravitino.catalog.hive.TableType.EXTERNAL_TABLE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static org.apache.gravitino.hive.kerberos.AuthenticationConfig.IMPERSONATION_ENABLE_KEY;
-import static org.apache.gravitino.hive.kerberos.KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY;
 import static org.apache.gravitino.hive.kerberos.KerberosConfig.KEY_TAB_URI_KEY;
 import static org.apache.gravitino.hive.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
@@ -126,7 +124,6 @@ public class HiveCatalogOperations
           METASTORE_URIS, HIVE_METASTORE_URIS,
           IMPERSONATION_ENABLE, IMPERSONATION_ENABLE_KEY,
           KEY_TAB_URI, KEY_TAB_URI_KEY,
-          KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS, KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY,
           PRINCIPAL, PRINCIPAL_KEY);
 
   /**

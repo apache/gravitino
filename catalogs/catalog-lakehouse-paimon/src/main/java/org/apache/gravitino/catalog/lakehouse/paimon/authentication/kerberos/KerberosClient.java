@@ -105,9 +105,7 @@ public class KerberosClient implements Closeable {
         keyTabUri,
         keytabFile,
         fetchKeytabFileTimeout * 1000,
-        null /* hadoopConf: Paimon keytab URIs never use the hdfs scheme */,
-        kerberosConfig.blockKeytabFetchUnsafeAddress(),
-        String.format("'%s' to false", KerberosConfig.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS_KEY));
+        null /* hadoopConf: Paimon keytab URIs never use the hdfs scheme */);
 
     return keytabFile;
   }

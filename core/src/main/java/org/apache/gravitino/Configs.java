@@ -29,6 +29,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
+import org.apache.gravitino.utils.FetchFileUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 public class Configs {
@@ -551,15 +552,13 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
-  public static final String JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY =
-      "gravitino.job.blockUnsafeRemoteUri";
-
-  public static final ConfigEntry<Boolean> JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS =
-      new ConfigBuilder(JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY)
+  public static final ConfigEntry<Boolean> BLOCK_UNSAFE_REMOTE_URI =
+      new ConfigBuilder(FetchFileUtils.BLOCK_UNSAFE_REMOTE_URI_CONFIG)
           .doc(
-              "Whether to block job file remote URIs from resolving to unsafe addresses from the "
-                  + "Gravitino server side. This is enabled by default to prevent SSRF. Set it "
-                  + "to false only when the URI is trusted and access is required.")
+              "Whether to block remote file URIs from resolving to unsafe addresses from the "
+                  + "Gravitino server side. This applies to job files and catalog files such as "
+                  + "Kerberos keytabs. This is enabled by default to prevent SSRF. Set it to false "
+                  + "only when the URI is trusted and access is required.")
           .version(ConfigConstants.VERSION_1_3_0)
           .booleanConf()
           .createWithDefault(true);

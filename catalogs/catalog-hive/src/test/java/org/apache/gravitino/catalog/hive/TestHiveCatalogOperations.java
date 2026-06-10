@@ -29,7 +29,6 @@ import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.CL
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.DEFAULT_CATALOG;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.FETCH_TIMEOUT_SEC;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.KEY_TAB_URI;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
@@ -89,7 +88,7 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(26, propertyEntryMap.size());
+    Assertions.assertEquals(25, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
@@ -109,7 +108,6 @@ class TestHiveCatalogOperations {
     Assertions.assertFalse(propertyEntryMap.get(PRINCIPAL).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CHECK_INTERVAL_SEC).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(FETCH_TIMEOUT_SEC).isRequired());
-    Assertions.assertFalse(propertyEntryMap.get(KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_NAME).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_NAME).isImmutable());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_REGION_CODE).isRequired());

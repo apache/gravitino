@@ -30,8 +30,6 @@ public class HiveConstants {
   public static final String PRINCIPAL = "kerberos.principal";
   public static final String CHECK_INTERVAL_SEC = "kerberos.check-interval-sec";
   public static final String FETCH_TIMEOUT_SEC = "kerberos.keytab-fetch-timeout-sec";
-  public static final String KEYTAB_FETCH_BLOCK_UNSAFE_ADDRESS =
-      "kerberos.keytab-fetch-block-unsafe-address";
   public static final String LIST_ALL_TABLES = "list-all-tables";
 
   // table properties

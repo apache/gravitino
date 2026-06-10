@@ -44,6 +44,9 @@ import org.apache.commons.io.FileUtils;
  */
 public final class FetchFileUtils {
 
+  /** The server configuration that controls unsafe remote URI blocking. */
+  public static final String BLOCK_UNSAFE_REMOTE_URI_CONFIG = "gravitino.blockUnsafeRemoteUri";
+
   /**
    * Per-destination lock map used to serialize concurrent symlink creation for the same destination
    * file. Keyed by the normalized absolute destination path string to avoid races caused by
@@ -53,7 +56,18 @@ public final class FetchFileUtils {
    */
   private static final ConcurrentHashMap<String, Object> SYMLINK_LOCKS = new ConcurrentHashMap<>();
 
+  private static volatile boolean blockUnsafeRemoteUri = true;
+
   private FetchFileUtils() {}
+
+  /**
+   * Sets whether remote URIs that resolve to unsafe addresses should be blocked.
+   *
+   * @param blockUnsafeRemoteUri whether to block unsafe remote URIs
+   */
+  public static void setBlockUnsafeRemoteUri(boolean blockUnsafeRemoteUri) {
+    FetchFileUtils.blockUnsafeRemoteUri = blockUnsafeRemoteUri;
+  }
 
   /**
    * Removes the per-destination lock entry for the given file. Should be called when the
@@ -75,19 +89,11 @@ public final class FetchFileUtils {
    *     downloads
    * @param hadoopConf an {@code org.apache.hadoop.conf.Configuration} instance, required only for
    *     the {@code hdfs} scheme; may be {@code null} when no {@code hdfs} URI is fetched
-   * @param blockUnsafeAddress whether to reject remote URIs that resolve to unsafe addresses
-   * @param blockUnsafeAddressHint the configuration hint appended to the validation error message
-   *     to tell the caller how to disable unsafe-address blocking
    * @return the absolute path of {@code destFile}
    * @throws IOException if the file cannot be fetched
    */
   public static String fetchFileFromUri(
-      String fileUri,
-      File destFile,
-      int timeoutMs,
-      @Nullable Object hadoopConf,
-      boolean blockUnsafeAddress,
-      String blockUnsafeAddressHint)
+      String fileUri, File destFile, int timeoutMs, @Nullable Object hadoopConf)
       throws IOException {
     try {
       URI uri = new URI(fileUri);
@@ -97,7 +103,10 @@ public final class FetchFileUtils {
         case "http":
         case "https":
         case "ftp":
-          RemoteUriValidator.validate(uri, blockUnsafeAddress, blockUnsafeAddressHint);
+          RemoteUriValidator.validate(
+              uri,
+              blockUnsafeRemoteUri,
+              String.format("'%s' to false", BLOCK_UNSAFE_REMOTE_URI_CONFIG));
           FileUtils.copyURLToFile(uri.toURL(), destFile, timeoutMs, timeoutMs);
           break;
 

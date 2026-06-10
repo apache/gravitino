@@ -98,8 +98,6 @@ public class JobManager implements JobOperationDispatcher {
 
   private final long jobStagingDirKeepTimeInMs;
 
-  private final boolean blockUnsafeAddressForRemoteUri;
-
   @VisibleForTesting final ScheduledExecutorService cleanUpExecutor;
 
   @VisibleForTesting final ScheduledExecutorService statusPullExecutor;
@@ -135,7 +133,6 @@ public class JobManager implements JobOperationDispatcher {
     }
 
     this.jobStagingDirKeepTimeInMs = config.get(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS);
-    this.blockUnsafeAddressForRemoteUri = config.get(Configs.JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS);
     if (jobStagingDirKeepTimeInMs < JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS) {
       LOG.warn(
           "The job staging directory keep time is set to {} ms, the number is too small, "
@@ -438,9 +435,7 @@ public class JobManager implements JobOperationDispatcher {
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values, and
     // also downloading any necessary files from the URIs specified in the job template.
-    JobTemplate jobTemplate =
-        createRuntimeJobTemplate(
-            jobTemplateEntity, jobConf, jobStagingDir, blockUnsafeAddressForRemoteUri);
+    JobTemplate jobTemplate = createRuntimeJobTemplate(jobTemplateEntity, jobConf, jobStagingDir);
 
     // Submit the job template to the job executor
     String jobExecutionId;
@@ -674,26 +669,13 @@ public class JobManager implements JobOperationDispatcher {
   @VisibleForTesting
   public static JobTemplate createRuntimeJobTemplate(
       JobTemplateEntity jobTemplateEntity, Map<String, String> jobConf, File stagingDir) {
-    return createRuntimeJobTemplate(
-        jobTemplateEntity, jobConf, stagingDir, true /* blockUnsafeAddressForRemoteUri */);
-  }
-
-  @VisibleForTesting
-  static JobTemplate createRuntimeJobTemplate(
-      JobTemplateEntity jobTemplateEntity,
-      Map<String, String> jobConf,
-      File stagingDir,
-      boolean blockUnsafeAddressForRemoteUri) {
     String name = jobTemplateEntity.name();
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
     String executable =
         fetchFileFromUri(
-            replacePlaceholder(content.executable(), jobConf),
-            stagingDir,
-            TIMEOUT_IN_MS,
-            blockUnsafeAddressForRemoteUri);
+            replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
 
     List<String> args =
         content.arguments().stream()
@@ -719,10 +701,7 @@ public class JobManager implements JobOperationDispatcher {
               .map(
                   script ->
                       fetchFileFromUri(
-                          replacePlaceholder(script, jobConf),
-                          stagingDir,
-                          TIMEOUT_IN_MS,
-                          blockUnsafeAddressForRemoteUri))
+                          replacePlaceholder(script, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       return ShellJobTemplate.builder()
@@ -743,11 +722,7 @@ public class JobManager implements JobOperationDispatcher {
           content.jars().stream()
               .map(
                   jar ->
-                      fetchFileFromUri(
-                          replacePlaceholder(jar, jobConf),
-                          stagingDir,
-                          TIMEOUT_IN_MS,
-                          blockUnsafeAddressForRemoteUri))
+                      fetchFileFromUri(replacePlaceholder(jar, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       List<String> files =
@@ -755,10 +730,7 @@ public class JobManager implements JobOperationDispatcher {
               .map(
                   file ->
                       fetchFileFromUri(
-                          replacePlaceholder(file, jobConf),
-                          stagingDir,
-                          TIMEOUT_IN_MS,
-                          blockUnsafeAddressForRemoteUri))
+                          replacePlaceholder(file, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       List<String> archives =
@@ -766,10 +738,7 @@ public class JobManager implements JobOperationDispatcher {
               .map(
                   archive ->
                       fetchFileFromUri(
-                          replacePlaceholder(archive, jobConf),
-                          stagingDir,
-                          TIMEOUT_IN_MS,
-                          blockUnsafeAddressForRemoteUri))
+                          replacePlaceholder(archive, jobConf), stagingDir, TIMEOUT_IN_MS))
               .collect(Collectors.toList());
 
       Map<String, String> configs =
@@ -823,27 +792,13 @@ public class JobManager implements JobOperationDispatcher {
 
   @VisibleForTesting
   static List<String> fetchFilesFromUri(List<String> uris, File stagingDir, int timeoutInMs) {
-    return fetchFilesFromUri(
-        uris, stagingDir, timeoutInMs, true /* blockUnsafeAddressForRemoteUri */);
-  }
-
-  @VisibleForTesting
-  static List<String> fetchFilesFromUri(
-      List<String> uris, File stagingDir, int timeoutInMs, boolean blockUnsafeAddressForRemoteUri) {
     return uris.stream()
-        .map(uri -> fetchFileFromUri(uri, stagingDir, timeoutInMs, blockUnsafeAddressForRemoteUri))
+        .map(uri -> fetchFileFromUri(uri, stagingDir, timeoutInMs))
         .collect(Collectors.toList());
   }
 
   @VisibleForTesting
   static String fetchFileFromUri(String uri, File stagingDir, int timeoutInMs) {
-    return fetchFileFromUri(
-        uri, stagingDir, timeoutInMs, true /* blockUnsafeAddressForRemoteUri */);
-  }
-
-  @VisibleForTesting
-  static String fetchFileFromUri(
-      String uri, File stagingDir, int timeoutInMs, boolean blockUnsafeAddressForRemoteUri) {
     try {
       URI fileUri = new URI(uri);
       File destFile = new File(stagingDir, new File(fileUri.getPath()).getName());
@@ -851,9 +806,7 @@ public class JobManager implements JobOperationDispatcher {
           uri,
           destFile,
           timeoutInMs,
-          null /* hadoopConf: job file URIs never use the hdfs scheme */,
-          blockUnsafeAddressForRemoteUri,
-          String.format("'%s' to false", Configs.JOB_REMOTE_URI_BLOCK_UNSAFE_ADDRESS_KEY));
+          null /* hadoopConf: job file URIs never use the hdfs scheme */);
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
     }
