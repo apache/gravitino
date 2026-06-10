@@ -440,14 +440,25 @@ Refer to [Access Control](./security/access-control.md) for the complete list of
 
 ### Storage
 
+If `gravitino.iceberg-rest.io-impl` is not configured, the Iceberg REST service uses
+`org.apache.iceberg.io.ResolvingFileIO`, which selects a `FileIO` implementation based
+on the URI scheme:
+
+- S3: `s3`, `s3a`, or `s3n`
+- OSS: `oss`
+- GCS: `gs` or `gcs`
+- ADLS: `abfs`, `abfss`, `wasb`, or `wasbs`
+- To override the default, explicitly configure `gravitino.iceberg-rest.io-impl`.
+- Ensure that the corresponding storage bundle is available in the Iceberg REST server classpath.
+
 #### S3
 
-| Configuration item                            | Description                                                                                                                                                                                                         | Default value | Required                                       | Since Version    |
-|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------------------------|------------------|
-| `gravitino.iceberg-rest.io-impl`              | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aws.s3.S3FileIO` for S3.                                                                                                                     | (none)        | No                                             | 0.6.0-incubating |
-| `gravitino.iceberg-rest.s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No                                             | 0.6.0-incubating |
-| `gravitino.iceberg-rest.s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)        | No                                             | 0.6.0-incubating |
-| `gravitino.iceberg-rest.s3-path-style-access` | Whether to use path style access for S3.                                                                                                                                                                            | false         | No                                             | 0.9.0-incubating |
+| Configuration item                            | Description                                                                                                                                                                                                         | Default value                           | Required | Since Version    |
+|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
+| `gravitino.iceberg-rest.io-impl`              | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.aws.s3.S3FileIO` to explicitly use S3FileIO.                                                                                           | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
+| `gravitino.iceberg-rest.s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)                                  | No       | 0.6.0-incubating |
+| `gravitino.iceberg-rest.s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)                                  | No       | 0.6.0-incubating |
+| `gravitino.iceberg-rest.s3-path-style-access` | Whether to use path style access for S3.                                                                                                                                                                            | false                                   | No       | 0.9.0-incubating |
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
@@ -461,11 +472,11 @@ Refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for c
 
 #### OSS
 
-| Configuration item                                | Description                                                                                                                                                                                           | Default value   | Required                                             | Since Version    |
-|---------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|------------------------------------------------------|------------------|
-| `gravitino.iceberg-rest.io-impl`                  | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aliyun.oss.OSSFileIO` for OSS.                                                                                                 | (none)          | No                                                   | 0.6.0-incubating |
-| `gravitino.iceberg-rest.oss-endpoint`             | The endpoint of Aliyun OSS service.                                                                                                                                                                   | (none)          | No                                                   | 0.7.0-incubating |
-| `gravitino.iceberg-rest.oss-region`               | The region of the OSS service, like `oss-cn-hangzhou`, only used when `credential-providers` is `oss-token`.                                                                                          | (none)          | No                                                   | 0.8.0-incubating |
+| Configuration item                    | Description                                                                                                                     | Default value                           | Required | Since Version    |
+|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
+| `gravitino.iceberg-rest.io-impl`      | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.aliyun.oss.OSSFileIO` to explicitly use OSSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
+| `gravitino.iceberg-rest.oss-endpoint` | The endpoint of Aliyun OSS service.                                                                                             | (none)                                  | No       | 0.7.0-incubating |
+| `gravitino.iceberg-rest.oss-region`   | The region of the OSS service, like `oss-cn-hangzhou`, only used when `credential-providers` is `oss-token`.                    | (none)                                  | No       | 0.8.0-incubating |
 
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.iceberg-rest.client.security-token`.
 
@@ -481,9 +492,9 @@ Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_na
 
 Supports using static GCS credential file or generating GCS token to access GCS data.
 
-| Configuration item                                | Description                                                                                        | Default value | Required | Since Version    |
-|---------------------------------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.io-impl`                  | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.6.0-incubating |
+| Configuration item               | Description                                                                                                                  | Default value                           | Required | Since Version    |
+|----------------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
+| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.iceberg-rest.gcs.project-id`.
 
@@ -499,9 +510,9 @@ Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_na
 
 #### ADLS
 
-| Configuration item                                  | Description                                                                                                                                                                                        | Default value | Required | Since Version    |
-|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.io-impl`                    | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.azure.adlsv2.ADLSFileIO` for ADLS.                                                                                          | (none)        | Yes      | 0.8.0-incubating |
+| Configuration item               | Description                                                                                                                         | Default value                           | Required | Since Version    |
+|----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
+| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.azure.adlsv2.ADLSFileIO` to explicitly use ADLSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.8.0-incubating |
 
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 
@@ -523,9 +534,9 @@ Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hado
 
 For storages not managed by Gravitino directly, configure them through custom catalog properties.
 
-| Configuration item               | Description                                                                             | Default value | Required | Since Version    |
-|----------------------------------|-----------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg; use the fully qualified classname.       | (none)        | No       | 0.6.0-incubating |
+| Configuration item               | Description                                                                                                               | Default value                           | Required | Since Version    |
+|----------------------------------|---------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
+| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg. Use the fully qualified class name to override the default implementation. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
 
 To pass custom properties such as `security-token` to your custom `FileIO`, configure them via `gravitino.iceberg-rest.security-token`. The `security-token` is included in the properties when the `FileIO` initialize method is invoked.
 
