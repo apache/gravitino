@@ -15,12 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""Tests for per-request token isolation (Task 6).
+"""Tests for per-request identity isolation (Task 6).
 
-GravitinoContext.rest_client() must return a client carrying the token from
-the current HTTP request, not the shared startup token, when an Authorization
-header is present.  This ensures concurrent multi-principal sessions are fully
-isolated in HTTP transport mode.
+GravitinoContext.rest_client() must forward the current HTTP request's raw
+Authorization header (any scheme) to Gravitino, not the shared startup token,
+so concurrent multi-principal sessions stay fully isolated in HTTP mode.
 """
 
 import unittest
@@ -28,37 +27,15 @@ from unittest.mock import MagicMock, patch
 
 from mcp_server.core.context import (
     GravitinoContext,
-    _extract_bearer_token,
-    _get_request_token,
+    _get_request_authorization,
 )
 from mcp_server.core.setting import Setting
 
 
-class TestExtractBearerToken(unittest.TestCase):
-    """Unit tests for the token extraction helper."""
+class TestGetRequestAuthorization(unittest.TestCase):
+    """Unit tests for _get_request_authorization() (HTTP context extraction)."""
 
-    def test_well_formed_bearer_header(self):
-        self.assertEqual(
-            _extract_bearer_token("Bearer mytoken123"), "mytoken123"
-        )
-
-    def test_case_insensitive_bearer(self):
-        self.assertEqual(_extract_bearer_token("bearer MYTOKEN"), "MYTOKEN")
-
-    def test_empty_header_returns_empty(self):
-        self.assertEqual(_extract_bearer_token(""), "")
-
-    def test_non_bearer_scheme_returns_empty(self):
-        self.assertEqual(_extract_bearer_token("Basic dXNlcjpwYXNz"), "")
-
-    def test_only_scheme_no_token_returns_empty(self):
-        self.assertEqual(_extract_bearer_token("Bearer"), "")
-
-
-class TestGetRequestToken(unittest.TestCase):
-    """Unit tests for _get_request_token() (HTTP context extraction)."""
-
-    def test_returns_token_when_http_request_available(self):
+    def test_returns_raw_bearer_header(self):
         mock_request = MagicMock()
         mock_request.headers.get.return_value = "Bearer request-token-xyz"
 
@@ -66,9 +43,22 @@ class TestGetRequestToken(unittest.TestCase):
             "fastmcp.server.dependencies.get_http_request",
             return_value=mock_request,
         ):
-            token = _get_request_token()
+            authorization = _get_request_authorization()
 
-        self.assertEqual(token, "request-token-xyz")
+        self.assertEqual(authorization, "Bearer request-token-xyz")
+
+    def test_returns_raw_basic_header_verbatim(self):
+        """Basic (simple auth) headers must pass through unchanged, not be dropped."""
+        mock_request = MagicMock()
+        mock_request.headers.get.return_value = "Basic YWxpY2U6ZHVtbXk="
+
+        with patch(
+            "fastmcp.server.dependencies.get_http_request",
+            return_value=mock_request,
+        ):
+            authorization = _get_request_authorization()
+
+        self.assertEqual(authorization, "Basic YWxpY2U6ZHVtbXk=")
 
     def test_returns_empty_when_no_http_context(self):
         """Simulates stdio mode where get_http_request raises LookupError."""
@@ -76,9 +66,9 @@ class TestGetRequestToken(unittest.TestCase):
             "fastmcp.server.dependencies.get_http_request",
             side_effect=LookupError("no request context"),
         ):
-            token = _get_request_token()
+            authorization = _get_request_authorization()
 
-        self.assertEqual(token, "")
+        self.assertEqual(authorization, "")
 
     def test_returns_empty_when_no_authorization_header(self):
         mock_request = MagicMock()
@@ -88,13 +78,13 @@ class TestGetRequestToken(unittest.TestCase):
             "fastmcp.server.dependencies.get_http_request",
             return_value=mock_request,
         ):
-            token = _get_request_token()
+            authorization = _get_request_authorization()
 
-        self.assertEqual(token, "")
+        self.assertEqual(authorization, "")
 
 
-class TestGravitinoContextPerRequestToken(unittest.TestCase):
-    """GravitinoContext.rest_client() isolates per-request tokens."""
+class TestGravitinoContextPerRequestAuthorization(unittest.TestCase):
+    """GravitinoContext.rest_client() isolates per-request identities."""
 
     def _make_context(self, startup_token: str = "") -> GravitinoContext:
         return GravitinoContext(
@@ -105,12 +95,12 @@ class TestGravitinoContextPerRequestToken(unittest.TestCase):
             )
         )
 
-    def test_per_request_token_overrides_startup_token(self):
-        """When an HTTP request carries a token, it takes priority over the startup token."""
+    def test_per_request_header_overrides_startup_token(self):
+        """An HTTP request's Authorization header takes priority over the startup token."""
         ctx = self._make_context(startup_token="startup-token")
 
         mock_request = MagicMock()
-        mock_request.headers.get.return_value = "Bearer request-token"
+        mock_request.headers.get.return_value = "Basic YWxpY2U6ZHVtbXk="
 
         with patch(
             "fastmcp.server.dependencies.get_http_request",
@@ -119,10 +109,10 @@ class TestGravitinoContextPerRequestToken(unittest.TestCase):
             client = ctx.rest_client()
 
         headers = dict(client._catalog_operation.rest_client.headers)
-        self.assertEqual(headers.get("authorization"), "Bearer request-token")
+        self.assertEqual(headers.get("authorization"), "Basic YWxpY2U6ZHVtbXk=")
 
-    def test_falls_back_to_default_client_when_no_request_token(self):
-        """When no per-request token exists, the shared default client (startup token) is used."""
+    def test_falls_back_to_default_client_when_no_request_header(self):
+        """With no per-request header, the shared default client (startup token) is used."""
         ctx = self._make_context(startup_token="startup-token")
 
         with patch(
@@ -135,23 +125,23 @@ class TestGravitinoContextPerRequestToken(unittest.TestCase):
         self.assertIs(client, ctx._default_client)
 
     def test_two_concurrent_requests_get_different_clients(self):
-        """Different request tokens must produce different client instances."""
+        """Different request identities must produce different client instances."""
         ctx = self._make_context()
 
-        def make_mock(token: str) -> MagicMock:
+        def make_mock(authorization: str) -> MagicMock:
             m = MagicMock()
-            m.headers.get.return_value = f"Bearer {token}"
+            m.headers.get.return_value = authorization
             return m
 
         with patch(
             "fastmcp.server.dependencies.get_http_request",
-            return_value=make_mock("alice-token"),
+            return_value=make_mock("Basic YWxpY2U6ZHVtbXk="),
         ):
             client_alice = ctx.rest_client()
 
         with patch(
             "fastmcp.server.dependencies.get_http_request",
-            return_value=make_mock("bob-token"),
+            return_value=make_mock("Basic Ym9iOmR1bW15"),
         ):
             client_bob = ctx.rest_client()
 
@@ -160,7 +150,7 @@ class TestGravitinoContextPerRequestToken(unittest.TestCase):
         )
         bob_headers = dict(client_bob._catalog_operation.rest_client.headers)
         self.assertEqual(
-            alice_headers.get("authorization"), "Bearer alice-token"
+            alice_headers.get("authorization"), "Basic YWxpY2U6ZHVtbXk="
         )
-        self.assertEqual(bob_headers.get("authorization"), "Bearer bob-token")
+        self.assertEqual(bob_headers.get("authorization"), "Basic Ym9iOmR1bW15")
         self.assertIsNot(client_alice, client_bob)

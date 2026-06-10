@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import base64
+import binascii
 import json
 import logging
 from datetime import datetime, timezone
@@ -25,15 +27,25 @@ _audit_logger = logging.getLogger("gravitino.mcp.audit")
 def _extract_principal(authorization: str) -> str:
     """Derive a display principal from a raw Authorization header value.
 
-    - "Bearer <token>" → "bearer:<first-8-chars-of-token>"
-    - empty / missing  → "anonymous"
+    - "Basic <base64(user:secret)>" → "<user>"  (Gravitino simple auth)
+    - "Bearer <token>"              → "bearer:<first-8-chars-of-token>"
+    - empty / missing / unparsable  → "anonymous"
     """
     if not authorization:
         return "anonymous"
     parts = authorization.split()
-    if len(parts) == 2 and parts[0].lower() == "bearer":
-        token = parts[1]
-        return f"bearer:{token[:8]}"
+    if len(parts) != 2:
+        return "anonymous"
+    scheme, credential = parts[0].lower(), parts[1]
+    if scheme == "basic":
+        try:
+            decoded = base64.b64decode(credential).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError, ValueError):
+            return "anonymous"
+        user = decoded.split(":", 1)[0]
+        return user if user else "anonymous"
+    if scheme == "bearer":
+        return f"bearer:{credential[:8]}"
     return "anonymous"
 
 

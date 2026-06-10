@@ -62,10 +62,20 @@ from mcp_server.client.topic_operation import TopicOperation
 
 # pylint: disable=too-many-instance-attributes
 class PlainRESTClientOperation(GravitinoOperation):
-    def __init__(self, metalake_name: str, uri: str, token: str = ""):
+    def __init__(self, metalake_name: str, uri: str, authorization: str = ""):
+        """Create a REST client for one identity.
+
+        Args:
+            metalake_name: Name of the metalake.
+            uri: Gravitino server URI.
+            authorization: Full ``Authorization`` header value forwarded verbatim
+                on every request (for example ``"Bearer <token>"`` for OAuth2 or
+                ``"Basic <base64(user:dummy)>"`` for simple auth). Empty string
+                means anonymous (no header sent).
+        """
         headers = {}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
+        if authorization:
+            headers["Authorization"] = authorization
         _rest_client = httpx.AsyncClient(base_url=uri, headers=headers)
         self._catalog_operation = PlainRESTClientCatalogOperation(
             metalake_name, _rest_client

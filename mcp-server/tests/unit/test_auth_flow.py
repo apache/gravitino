@@ -24,27 +24,39 @@ from mcp_server.core.context import GravitinoContext
 from mcp_server.core.setting import Setting
 
 
-class TestTokenInjection(unittest.TestCase):
-    """Verify Bearer token is correctly injected into the httpx client."""
+class TestAuthorizationInjection(unittest.TestCase):
+    """Verify the Authorization header is forwarded verbatim to the httpx client."""
 
-    def test_token_sets_authorization_header(self):
-        """When a token is provided, the httpx client carries Authorization: Bearer."""
+    def test_bearer_authorization_header(self):
+        """A Bearer authorization value is forwarded unchanged."""
         client = PlainRESTClientOperation(
-            "my_metalake", "http://localhost:8090", token="my-secret-token"
+            "my_metalake",
+            "http://localhost:8090",
+            authorization="Bearer my-secret-token",
         )
         headers = dict(client._catalog_operation.rest_client.headers)
         self.assertEqual(headers.get("authorization"), "Bearer my-secret-token")
 
-    def test_empty_token_no_authorization_header(self):
-        """When token is empty, no Authorization header is added."""
+    def test_basic_authorization_header(self):
+        """A Basic authorization value (simple auth) is forwarded unchanged."""
         client = PlainRESTClientOperation(
-            "my_metalake", "http://localhost:8090", token=""
+            "my_metalake",
+            "http://localhost:8090",
+            authorization="Basic YWxpY2U6ZHVtbXk=",
+        )
+        headers = dict(client._catalog_operation.rest_client.headers)
+        self.assertEqual(headers.get("authorization"), "Basic YWxpY2U6ZHVtbXk=")
+
+    def test_empty_authorization_no_header(self):
+        """When authorization is empty, no Authorization header is added."""
+        client = PlainRESTClientOperation(
+            "my_metalake", "http://localhost:8090", authorization=""
         )
         headers = dict(client._catalog_operation.rest_client.headers)
         self.assertNotIn("authorization", headers)
 
-    def test_no_token_argument_no_authorization_header(self):
-        """When token argument is omitted entirely, no Authorization header is added."""
+    def test_no_authorization_argument_no_header(self):
+        """When authorization argument is omitted, no Authorization header is added."""
         client = PlainRESTClientOperation(
             "my_metalake", "http://localhost:8090"
         )

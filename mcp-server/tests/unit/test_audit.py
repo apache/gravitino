@@ -108,6 +108,23 @@ class TestExtractPrincipal(unittest.TestCase):
     def test_short_token_uses_full_token(self):
         self.assertEqual(audit._extract_principal("Bearer abc"), "bearer:abc")
 
+    def test_basic_auth_decodes_user(self):
+        """Simple auth header 'Basic base64(alice:dummy)' -> principal 'alice'."""
+        # base64("alice:dummy") == "YWxpY2U6ZHVtbXk="
+        self.assertEqual(
+            audit._extract_principal("Basic YWxpY2U6ZHVtbXk="), "alice"
+        )
+
+    def test_basic_auth_invalid_base64_returns_anonymous(self):
+        self.assertEqual(
+            audit._extract_principal("Basic not-valid-base64!!"), "anonymous"
+        )
+
+    def test_unknown_scheme_returns_anonymous(self):
+        self.assertEqual(
+            audit._extract_principal("Negotiate abc123"), "anonymous"
+        )
+
 
 class TestAuditMiddlewareIntegration(unittest.TestCase):
     """Integration tests: AuditMiddleware emits records via the full MCP tool path."""
