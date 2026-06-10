@@ -22,17 +22,14 @@ import static org.apache.gravitino.integration.test.util.BaseIT.setEnv;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.security.KeyPairGenerator;
-import java.util.Base64;
 import java.util.Map;
 import org.apache.gravitino.Configs;
-import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoVersion;
+import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -56,13 +53,7 @@ public class BasicAuthOperationsIT extends BaseIT {
     configs.put(Configs.CACHE_ENABLED.getKey(), String.valueOf(false));
     configs.put(Configs.STORE_DELETE_AFTER_TIME.getKey(), String.valueOf(20 * 60 * 1000L));
     configs.put(Configs.SERVICE_ADMINS.getKey(), ADMIN);
-    // IdpRESTFeature rejects "simple" (calls System.exit); use oauth so the server starts cleanly.
-    // BasicAuthenticator is registered on top by the IDP plugin regardless of this config.
-    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
-    configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), "service1");
-    configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), oauthPublicSignKey());
-    configs.put(OAuthConfig.DEFAULT_SERVER_URI.getKey(), "test");
-    configs.put(OAuthConfig.DEFAULT_TOKEN_PATH.getKey(), "test");
+    configs.put(Configs.AUTHENTICATORS.getKey(), BasicAuthenticator.class.getCanonicalName());
     configs.put(
         Configs.REST_API_EXTENSION_PACKAGES.getKey(), IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE);
     registerCustomConfigs(configs);
@@ -74,12 +65,6 @@ public class BasicAuthOperationsIT extends BaseIT {
   @AfterAll
   public void stopIntegrationTest() throws IOException, InterruptedException {
     super.stopIntegrationTest();
-  }
-
-  private static String oauthPublicSignKey() throws Exception {
-    KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
-    generator.initialize(2048);
-    return Base64.getEncoder().encodeToString(generator.generateKeyPair().getPublic().getEncoded());
   }
 
   @Test
