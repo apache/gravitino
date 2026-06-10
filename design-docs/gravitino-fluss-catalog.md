@@ -266,12 +266,12 @@ The solid arrows show the metadata control plane. The dotted arrows show how the
 
 Add a Fluss adapter to `flink-connector/flink` with the same pattern used by the existing Iceberg, Paimon, Hive, and JDBC adapters.
 
-| Component                                                    | Responsibility                                               |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| `org.apache.gravitino.flink.connector.fluss.GravitinoFlussCatalogFactory` | Implements `BaseCatalogFactory`; returns `factoryIdentifier() = "fluss"`, `gravitinoCatalogProvider() = "fluss"`, and `Catalog.Type.RELATIONAL`. |
-| `org.apache.gravitino.flink.connector.fluss.FlussPropertiesConverter` | Converts `bootstrap.servers`, Flink bypass properties, and Fluss table properties between Gravitino and Flink. |
-| `org.apache.gravitino.flink.connector.fluss.GravitinoFlussCatalog` | Extends Gravitino Flink `BaseCatalog`; wraps a native `org.apache.fluss.flink.catalog.FlinkCatalog` as the real catalog. |
-| `META-INF/services/org.apache.flink.table.factories.Factory` | Registers `GravitinoFlussCatalogFactory` so `GravitinoCatalogStore` can discover `provider=fluss`. |
+| Component                                                    | Responsibility                                                                                                                                             |
+| ------------------------------------------------------------ |------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `org.apache.gravitino.flink.connector.fluss.GravitinoFlussCatalogFactory` | Implements `BaseCatalogFactory`; returns `factoryIdentifier() = "gravitino-fluss"`, `gravitinoCatalogProvider() = "fluss"`, and `Catalog.Type.RELATIONAL`. |
+| `org.apache.gravitino.flink.connector.fluss.FlussPropertiesConverter` | Converts `bootstrap.servers`, Flink bypass properties, and Fluss table properties between Gravitino and Flink.                                             |
+| `org.apache.gravitino.flink.connector.fluss.GravitinoFlussCatalog` | Extends Gravitino Flink `BaseCatalog`; wraps a native `org.apache.fluss.flink.catalog.FlinkCatalog` as the real catalog.                                   |
+| `META-INF/services/org.apache.flink.table.factories.Factory` | Registers `GravitinoFlussCatalogFactory` so `GravitinoCatalogStore` can discover `provider=fluss`.                                                         |
 
 The Flink runtime flow is:
 
