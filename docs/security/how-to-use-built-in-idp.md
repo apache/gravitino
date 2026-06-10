@@ -328,8 +328,8 @@ Replace these with values that match your deployment.
    ```
 
    Built-in IdP is **incompatible** with the `simple` authenticator. Remove `simple` from
-   `gravitino.authenticators` (the default). The Web UI does not support built-in IDP Basic login
-   (see [Web UI](#web-ui)).
+   `gravitino.authenticators` (the default). For example, use `oauth` when the Web UI authenticates
+   through an external IdP; see [How to authenticate](how-to-authenticate.md).
 
 2. Before the first start, set the initial service admin password (see
    [password rules](#password-and-username-rules)):
