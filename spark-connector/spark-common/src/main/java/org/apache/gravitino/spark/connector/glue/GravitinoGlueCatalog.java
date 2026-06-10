@@ -61,7 +61,7 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 public class GravitinoGlueCatalog extends BaseCatalog {
 
   // Lazily initialized Iceberg GlueCatalog for Iceberg tables
-  private volatile SparkCatalog icebergGlueCatalog;
+  volatile SparkCatalog icebergGlueCatalog;
 
   // Store original config for Iceberg catalog initialization
   private String catalogName;
@@ -168,6 +168,22 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkHiveTypeConverter();
+  }
+
+  /**
+   * Invalidates both the Hive backend and the Iceberg backend caches for the given table.
+   *
+   * <p>{@link BaseCatalog} only calls {@code sparkCatalog.invalidateTable}, which clears the {@link
+   * HiveTableCatalog} cache. The Iceberg {@link SparkCatalog} maintains its own {@code
+   * CachingCatalog} that must be invalidated separately after any table mutation (ALTER, DROP,
+   * PURGE, RENAME) to avoid stale schema errors on subsequent reads.
+   */
+  @Override
+  public void invalidateTable(Identifier ident) {
+    super.invalidateTable(ident);
+    if (icebergGlueCatalog != null) {
+      icebergGlueCatalog.invalidateTable(ident);
+    }
   }
 
   /**
