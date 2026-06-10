@@ -1,0 +1,42 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Dev scenario for the Apache Gravitino Helm chart.
+#
+# Mirrors the development sample gravitino.conf in
+# docs/gravitino-server-config.md#development.
+#
+# Defaults from the chart's values.yaml are appropriate for local
+# development with the embedded H2 metadata backend. This file opts in
+# to the Iceberg REST server in auxiliary mode with the dynamic config
+# provider so the IRC server federates the local Gravitino metalake.
+#
+# Authentication remains the default "simple" mode (anonymous user).
+# To enable OAuth or Kerberos, see prod-values.yaml or the canonical
+# samples in docs/gravitino-server-config.md.
+#
+# Apply with:
+#   helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm \
+#     --version <VERSION> -n gravitino --create-namespace \
+#     -f https://raw.githubusercontent.com/apache/gravitino/main/dev/charts/gravitino/resources/scenarios/dev-values.yaml
+
+icebergRest:
+  catalogConfigProvider: dynamic-config-provider
+  dynamicConfigProvider:
+    metalake: test
