@@ -42,6 +42,14 @@ gravitino.server.webserver.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.server.webserver.responseHeaderSize = 131072
 
+#Web server (https)
+# gravitino.server.webserver.enableHttps = true
+# gravitino.server.webserver.httpsPort = 8433
+#Configures keystore
+# gravitino.server.webserver.keyStorePath = localFilePath
+# gravitino.server.webserver.keyStorePassword = localhost
+# gravitino.server.webserver.managerPassword = localhost
+
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
 # The entity store to use, we only supports relational
 gravitino.entity.store = relational
@@ -98,8 +106,9 @@ gravitino.iceberg-rest.catalog-backend = memory
 gravitino.iceberg-rest.warehouse = /tmp/
 # If authorization is enabled, you must use dynamic config provider for Iceberg REST server
 # gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
-# URI of the Gravitino server that the dynamic config provider will call to fetch catalog configs
-# gravitino.iceberg-rest.gravitino-uri = http://localhost:8090
+# URI of the Gravitino server that the dynamic config provider will call to fetch catalog configs (http or https)
+gravitino.iceberg-rest.gravitino-uri = http://localhost:8090
+# gravitino.iceberg-rest.gravitino-uri = https://localhost:8433
 # Metalake name used by the dynamic config provider when querying Gravitino for Iceberg catalogs
 # gravitino.iceberg-rest.gravitino-metalake = <metalake-name>
 # Default Iceberg catalog name to use when clients do not specify one
@@ -115,7 +124,8 @@ gravitino.lance-rest.httpPort = 9101
 # THE CONFIGURATION FOR Lance namespace backend
 # The backend Lance namespace for Lance REST service, it's recommended to use Gravitino
 gravitino.lance-rest.namespace-backend = gravitino
-# The uri of the Lance REST service gravitino namespace backend
+# The uri of the Lance REST service gravitino namespace backend (http or https)
 gravitino.lance-rest.gravitino-uri = http://localhost:8090
+# gravitino.lance-rest.gravitino-uri = https://localhost:8433
 # The metalake name used for Lance REST service gravitino namespace backend, please create the metalake first before using it, and configure the metalake name here.
 # gravitino.lance-rest.gravitino-metalake = metalake

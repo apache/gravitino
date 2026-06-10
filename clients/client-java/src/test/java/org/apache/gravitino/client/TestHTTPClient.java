@@ -353,6 +353,24 @@ public class TestHTTPClient {
     }
   }
 
+  @Test
+  public void testBuildWithoutTLSConfigurer() {
+    HTTPClient client = HTTPClient.builder(ImmutableMap.of()).uri("http://localhost").build();
+
+    Assertions.assertNotNull(client);
+  }
+
+  @Test
+  public void testBuildWithTLSConfigurer() {
+    HTTPClient client =
+        HTTPClient.builder(ImmutableMap.of())
+            .uri("https://localhost")
+            .withTlsConfigurer(new TLSConfigurer() {})
+            .build();
+
+    Assertions.assertNotNull(client);
+  }
+
   public static void testHttpMethodOnSuccess(
       Method method, boolean hasRequestBody, boolean hasResponseBody)
       throws JsonProcessingException {
