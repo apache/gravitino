@@ -24,10 +24,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /opt/gravitino
 
-COPY packages/gravitino /opt/gravitino
+COPY --chmod=775 packages/gravitino /opt/gravitino
 
-RUN chmod -R g+rwX /opt/gravitino \
-    && chmod +x /opt/gravitino/docker/docker-entrypoint.sh \
+RUN chmod +x /opt/gravitino/docker/docker-entrypoint.sh \
     && useradd -u 1000 -g 0 -M -s /sbin/nologin gravitino
 
 EXPOSE 8090
