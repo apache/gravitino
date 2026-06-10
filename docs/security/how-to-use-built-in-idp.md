@@ -21,12 +21,12 @@ request and response schemas, see the [Built-in IDP OpenAPI](../open-api/idp/ope
 
 ## Web UI
 
-The Gravitino Web UI (v1 and Web V2) does **not** support signing in with built-in IDP Basic
-credentials. Configure `gravitino.authenticators` with
-`org.apache.gravitino.idp.auth.BasicAuthenticator` for server and client Basic authentication.
-Login pages only handle `simple` (username-only when authorization is enabled) and `oauth`
-(OIDC/OAuth) flows. Use the REST API, [Java/Python clients](how-to-authenticate.md#basic-mode), or
-engine connectors for Basic authentication.
+Built-in IdP is **incompatible** with the `simple` authenticator (the default). The Web UI does not
+support signing in with built-in IDP Basic credentials. Login pages only handle `simple`
+(username-only when authorization is enabled) and `oauth` (OIDC/OAuth) flows. If you need the Web UI
+while built-in IdP is enabled, prefer [OAuth mode](how-to-authenticate.md#oauth-mode). For Basic
+authentication, use the REST API, [Java/Python clients](how-to-authenticate.md#basic-mode), or
+engine connectors instead.
 
 ---
 
