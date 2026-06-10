@@ -19,6 +19,15 @@ and prefer [HTTPS](how-to-use-https.md) when credentials travel over the network
 This guide describes how to enable and operate the management APIs in `plugins:idp-basic`. For
 request and response schemas, see the [Built-in IDP OpenAPI](../open-api/idp/openapi.yaml).
 
+### Web UI
+
+The Gravitino Web UI (v1 and Web V2) does **not** support signing in with built-in IDP Basic
+credentials. Login pages only handle `simple` (username-only when authorization is enabled) and
+`oauth` (OIDC/OAuth) flows. Use the REST API, [Java/Python clients](how-to-authenticate.md), or
+engine connectors for Basic authentication. To access the Web UI with interactive login, configure
+[OAuth mode](how-to-authenticate.md#oauth-mode) with an external identity provider, or use `simple`
+mode only in development scenarios where the username-only flow is acceptable.
+
 ---
 
 ## Prerequisites
@@ -319,8 +328,9 @@ Replace these with values that match your deployment.
    ```
 
    Built-in IdP is **incompatible** with the `simple` authenticator. Remove `simple` from
-   `gravitino.authenticators` (the default). For example, use `oauth` when the Web UI authenticates
-   through an external IdP; see [How to authenticate](how-to-authenticate.md).
+   `gravitino.authenticators` (the default). The Web UI does not support built-in IDP Basic login
+   (see [Web UI](#web-ui)). Use `oauth` when the Web UI should authenticate through an external IdP;
+   see [How to authenticate](how-to-authenticate.md).
 
 2. Before the first start, set the initial service admin password (see
    [password rules](#password-and-username-rules)):

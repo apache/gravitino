@@ -22,6 +22,10 @@ The web UI homepage displayed in Gravitino depends on the configuration paramete
 
 Set parameter for `gravitino.authenticators`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode). Simple mode is the default authentication option. If multiple authenticators are set, the first one is taken by default.
 
+Built-in IDP **Basic** authentication is not supported in the Web UI. The login flow only covers
+`simple` and `oauth`. For Basic mode, use REST APIs or clients; see
+[Built-in IDP — Web UI](security/how-to-use-built-in-idp.md#web-ui).
+
 :::tip
 After changing the configuration, make sure to restart the Gravitino server.
 
