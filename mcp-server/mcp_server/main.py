@@ -46,6 +46,12 @@ def _init_logging(setting: Setting):
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    # Separate file handler for structured audit records (one JSON line per entry).
+    audit_handler = logging.FileHandler("gravitino-mcp-audit.log")
+    audit_handler.setLevel(logging.INFO)
+    audit_handler.setFormatter(logging.Formatter("%(message)s"))
+    logging.getLogger("gravitino.mcp.audit").addHandler(audit_handler)
+    logging.getLogger("gravitino.mcp.audit").propagate = False
 
 
 def _comma_separated_set(value) -> set:
