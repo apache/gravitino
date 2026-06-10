@@ -35,3 +35,32 @@ class PlainRESTClientSchemaOperation(SchemaOperation):
             f"/catalogs/{encode_path_segment(catalog_name)}/schemas"
         )
         return extract_content_from_response(response, "identifiers", [])
+
+    async def create_schema(
+        self, catalog_name: str, name: str, comment: str, properties: dict
+    ) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}/schemas",
+            json={"name": name, "comment": comment, "properties": properties},
+        )
+        return extract_content_from_response(response, "schema", {})
+
+    async def alter_schema(
+        self, catalog_name: str, schema_name: str, updates: list
+    ) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "schema", {})
+
+    async def drop_schema(self, catalog_name: str, schema_name: str) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+        )
+        return extract_content_from_response(response, "dropped", False)

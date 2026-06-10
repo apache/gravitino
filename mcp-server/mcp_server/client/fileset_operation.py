@@ -80,3 +80,32 @@ class FilesetOperation(ABC):
             str: JSON-formatted string containing list of files in the fileset
         """
         pass
+
+    @abstractmethod
+    async def create_fileset(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        fileset_type: str,
+        storage_location: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def alter_fileset(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        fileset_name: str,
+        updates: list,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def drop_fileset(
+        self, catalog_name: str, schema_name: str, fileset_name: str
+    ) -> str:
+        pass

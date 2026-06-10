@@ -69,10 +69,32 @@ class MockCatalogOperation(CatalogOperation):
     async def get_list_of_catalogs(self) -> str:
         return "mock_catalogs"
 
+    async def create_catalog(
+        self, name, catalog_type, provider, comment, properties
+    ) -> str:
+        return f"mock_catalog_created: {name}, {catalog_type}, {provider}"
+
+    async def alter_catalog(self, catalog_name, updates) -> str:
+        return f"mock_catalog_altered: {catalog_name} with updates {updates}"
+
+    async def drop_catalog(self, catalog_name) -> str:
+        return f"mock_catalog_dropped: {catalog_name}"
+
 
 class MockSchemaOperation(SchemaOperation):
     async def get_list_of_schemas(self, catalog_name: str) -> str:
         return "mock_schemas"
+
+    async def create_schema(
+        self, catalog_name, name, comment, properties
+    ) -> str:
+        return f"mock_schema_created: {catalog_name}.{name}"
+
+    async def alter_schema(self, catalog_name, schema_name, updates) -> str:
+        return f"mock_schema_altered: {catalog_name}.{schema_name} with updates {updates}"
+
+    async def drop_schema(self, catalog_name, schema_name) -> str:
+        return f"mock_schema_dropped: {catalog_name}.{schema_name}"
 
 
 class MockTableOperation(TableOperation):
@@ -85,6 +107,23 @@ class MockTableOperation(TableOperation):
         self, catalog_name: str, schema_name: str, table_name: str
     ) -> str:
         return "mock_table"
+
+    # pylint: disable=R0917
+    async def create_table(
+        self, catalog_name, schema_name, name, comment, columns, properties
+    ) -> str:
+        return f"mock_table_created: {catalog_name}.{schema_name}.{name}"
+
+    async def alter_table(
+        self, catalog_name, schema_name, table_name, updates
+    ) -> str:
+        return (
+            f"mock_table_altered: {catalog_name}.{schema_name}.{table_name} "
+            f"with updates {updates}"
+        )
+
+    async def drop_table(self, catalog_name, schema_name, table_name) -> str:
+        return f"mock_table_dropped: {catalog_name}.{schema_name}.{table_name}"
 
 
 class MockFilesetOperation(FilesetOperation):
@@ -109,6 +148,34 @@ class MockFilesetOperation(FilesetOperation):
         sub_path: str = "/",
     ) -> str:
         return "mock_files_in_fileset"
+
+    # pylint: disable=R0917
+    async def create_fileset(
+        self,
+        catalog_name,
+        schema_name,
+        name,
+        fileset_type,
+        storage_location,
+        comment,
+        properties,
+    ) -> str:
+        return f"mock_fileset_created: {catalog_name}.{schema_name}.{name}"
+
+    async def alter_fileset(
+        self, catalog_name, schema_name, fileset_name, updates
+    ) -> str:
+        return (
+            f"mock_fileset_altered: {catalog_name}.{schema_name}.{fileset_name} "
+            f"with updates {updates}"
+        )
+
+    async def drop_fileset(
+        self, catalog_name, schema_name, fileset_name
+    ) -> str:
+        return (
+            f"mock_fileset_dropped: {catalog_name}.{schema_name}.{fileset_name}"
+        )
 
 
 class MockPolicyOperation(PolicyOperation):
@@ -170,6 +237,38 @@ class MockModelOperation(ModelOperation):
     ) -> str:
         return "mock_model_version_by_alias"
 
+    async def register_model(
+        self, catalog_name, schema_name, name, comment, properties
+    ) -> str:
+        return f"mock_model_registered: {catalog_name}.{schema_name}.{name}"
+
+    async def delete_model(self, catalog_name, schema_name, model_name) -> str:
+        return f"mock_model_deleted: {catalog_name}.{schema_name}.{model_name}"
+
+    # pylint: disable=R0917
+    async def link_model_version(
+        self,
+        catalog_name,
+        schema_name,
+        model_name,
+        uri,
+        aliases,
+        comment,
+        properties,
+    ) -> str:
+        return (
+            f"mock_model_version_linked: {catalog_name}.{schema_name}.{model_name} "
+            f"uri={uri} aliases={aliases}"
+        )
+
+    async def delete_model_version(
+        self, catalog_name, schema_name, model_name, version
+    ) -> str:
+        return (
+            f"mock_model_version_deleted: {catalog_name}.{schema_name}.{model_name} "
+            f"version={version}"
+        )
+
 
 class MockTopicOperation(TopicOperation):
     async def list_of_topics(self, catalog_name: str, schema_name: str) -> str:
@@ -179,6 +278,22 @@ class MockTopicOperation(TopicOperation):
         self, catalog_name: str, schema_name: str, topic_name: str
     ) -> str:
         return "mock_topic"
+
+    async def create_topic(
+        self, catalog_name, schema_name, name, comment, properties
+    ) -> str:
+        return f"mock_topic_created: {catalog_name}.{schema_name}.{name}"
+
+    async def alter_topic(
+        self, catalog_name, schema_name, topic_name, updates
+    ) -> str:
+        return (
+            f"mock_topic_altered: {catalog_name}.{schema_name}.{topic_name} "
+            f"with updates {updates}"
+        )
+
+    async def delete_topic(self, catalog_name, schema_name, topic_name) -> str:
+        return f"mock_topic_deleted: {catalog_name}.{schema_name}.{topic_name}"
 
 
 class MockTagOperation(TagOperation):

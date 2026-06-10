@@ -143,3 +143,97 @@ def load_fileset_tools(mcp: FastMCP):
         return await client.as_fileset_operation().list_files_in_fileset(
             catalog_name, schema_name, fileset_name, location_name, sub_path
         )
+
+    # pylint:disable=too-many-positional-arguments
+    @mcp.tool(tags={"fileset"})
+    async def create_fileset(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        fileset_type: str,
+        storage_location: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        """
+        Create a new fileset within a schema.
+
+        Authorization is enforced by Gravitino: a principal without the
+        required grant receives an authorization denial.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            name (str): Name of the fileset to create.
+            fileset_type (str): Fileset type, one of "managed" or "external".
+            storage_location (str): Storage location URI, e.g. "file:/tmp/fileset1".
+            comment (str): Human-readable description.
+            properties (dict): Fileset configuration properties.
+
+        Returns:
+            str: JSON-formatted string containing the created fileset.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_fileset_operation().create_fileset(
+            catalog_name,
+            schema_name,
+            name,
+            fileset_type,
+            storage_location,
+            comment,
+            properties,
+        )
+
+    @mcp.tool(tags={"fileset"})
+    async def alter_fileset(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        fileset_name: str,
+        updates: list,
+    ) -> str:
+        """
+        Alter an existing fileset.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            fileset_name (str): Name of the fileset to alter.
+            updates (list): List of update operations. Example:
+                [
+                  {"@type": "rename", "newName": "new_fileset"},
+                  {"@type": "updateComment", "newComment": "updated"},
+                  {"@type": "setProperty", "property": "k", "value": "v"}
+                ]
+
+        Returns:
+            str: JSON-formatted string containing the altered fileset.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_fileset_operation().alter_fileset(
+            catalog_name, schema_name, fileset_name, updates
+        )
+
+    @mcp.tool(tags={"fileset"})
+    async def drop_fileset(
+        ctx: Context, catalog_name: str, schema_name: str, fileset_name: str
+    ) -> str:
+        """
+        Drop a fileset by its name.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            fileset_name (str): Name of the fileset to drop.
+
+        Returns:
+            str: JSON-formatted string indicating whether the fileset was dropped.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_fileset_operation().drop_fileset(
+            catalog_name, schema_name, fileset_name
+        )

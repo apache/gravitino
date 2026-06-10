@@ -55,3 +55,31 @@ class TableOperation(ABC):
             str: JSON-formatted string containing full table metadata
         """
         pass
+
+    @abstractmethod
+    async def create_table(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        columns: list,
+        properties: dict,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def alter_table(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        updates: list,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def drop_table(
+        self, catalog_name: str, schema_name: str, table_name: str
+    ) -> str:
+        pass
