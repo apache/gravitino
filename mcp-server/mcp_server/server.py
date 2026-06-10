@@ -43,15 +43,14 @@ from mcp_server.tools import load_tools
 
 
 def _get_principal_from_request() -> str:
-    """Extract the principal from the current HTTP request's Authorization header.
+    """Derive a display principal from the current HTTP request's Authorization header.
 
-    Returns "anonymous" in stdio mode (no HTTP request) or when no token is present.
+    Returns "anonymous" in stdio mode or when no token is present.
     """
     try:
         from fastmcp.server.dependencies import get_http_request
 
-        request = get_http_request()
-        authorization = request.headers.get("authorization", "")
+        authorization = get_http_request().headers.get("authorization", "")
         return audit._extract_principal(authorization)
     except Exception:  # noqa: BLE001 – stdio mode or no request context
         return "anonymous"
