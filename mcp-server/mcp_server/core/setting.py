@@ -33,3 +33,14 @@ class Setting:
     tags: Set[str] = field(default_factory=set)
     transport: str = DefaultSetting.default_transport
     mcp_url: str = DefaultSetting.default_mcp_url
+    # Bearer token forwarded to Gravitino on every request.
+    # Empty string means anonymous (no Authorization header sent).
+    token: str = ""
+
+    def __str__(self) -> str:
+        token_display = "***" if self.token else ""
+        return (
+            f"Setting(metalake={self.metalake}, gravitino_uri={self.gravitino_uri}, "
+            f"tags={self.tags}, transport={self.transport}, mcp_url={self.mcp_url}, "
+            f"token={token_display})"
+        )

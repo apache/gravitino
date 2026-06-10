@@ -17,6 +17,7 @@
 
 import argparse
 import logging
+import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
 from mcp_server.server import GravitinoMCPServer
@@ -30,6 +31,7 @@ def do_main():
         tags=args.include_tool_tags,
         transport=args.transport,
         mcp_url=args.mcp_url,
+        token=args.token,
     )
     _init_logging(setting)
     logging.info("Gravitino MCP server setting: %s", setting)
@@ -94,6 +96,15 @@ def _parse_args():
         type=str,
         default=DefaultSetting.default_mcp_url,
         help=f"The url of MCP server if using http transport. (default: {DefaultSetting.default_mcp_url})",
+    )
+
+    parser.add_argument(
+        "--token",
+        type=str,
+        default=os.environ.get("GRAVITINO_TOKEN", ""),
+        help="Bearer token forwarded as Authorization header to Gravitino on every request. "
+        "Can also be set via the GRAVITINO_TOKEN environment variable. "
+        "When omitted, requests are sent without authentication.",
     )
 
     args = parser.parse_args()

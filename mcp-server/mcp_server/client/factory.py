@@ -29,7 +29,7 @@ class RESTClientFactory:
 
     @classmethod
     def create_rest_client(
-        cls, metalake_name: str, uri: str
+        cls, metalake_name: str, uri: str, token: str = ""
     ) -> "PlainRESTClientOperation":
         """
         Create a new rest client instance with the specified parameters.
@@ -37,11 +37,12 @@ class RESTClientFactory:
         Args:
             metalake_name: Name of the metalake
             uri: URI of the Gravitino server endpoint
+            token: Bearer token for Authorization header (empty = anonymous)
 
         Returns:
             New instance of the configured rest client class
         """
-        return cls._rest_client_class(metalake_name, uri)
+        return cls._rest_client_class(metalake_name, uri, token)
 
     @classmethod
     def set_rest_client(cls, rest_client_class: type) -> None:

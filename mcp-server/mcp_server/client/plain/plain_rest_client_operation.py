@@ -62,8 +62,11 @@ from mcp_server.client.topic_operation import TopicOperation
 
 # pylint: disable=too-many-instance-attributes
 class PlainRESTClientOperation(GravitinoOperation):
-    def __init__(self, metalake_name: str, uri: str):
-        _rest_client = httpx.AsyncClient(base_url=uri)
+    def __init__(self, metalake_name: str, uri: str, token: str = ""):
+        headers = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        _rest_client = httpx.AsyncClient(base_url=uri, headers=headers)
         self._catalog_operation = PlainRESTClientCatalogOperation(
             metalake_name, _rest_client
         )
