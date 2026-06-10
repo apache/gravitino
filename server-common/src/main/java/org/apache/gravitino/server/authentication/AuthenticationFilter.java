@@ -38,6 +38,9 @@ import org.apache.gravitino.utils.PrincipalUtils;
 
 public class AuthenticationFilter implements Filter {
 
+  private static final String ICEBERG_HEALTH_CHECK_PATH = "/iceberg/health";
+  private static final String LANCE_HEALTH_CHECK_PATH = "/lance/health";
+
   private final List<Authenticator> filterAuthenticators;
 
   public AuthenticationFilter() {
@@ -56,13 +59,24 @@ public class AuthenticationFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     try {
+      HttpServletRequest req = (HttpServletRequest) request;
+      // Skip authentication for health check endpoints so that
+      // Kubernetes probes and monitoring systems can check
+      // service status without credentials.
+      String requestUri = req.getRequestURI();
+      if (requestUri != null
+          && (requestUri.equals(ICEBERG_HEALTH_CHECK_PATH)
+              || requestUri.equals(LANCE_HEALTH_CHECK_PATH))) {
+        chain.doFilter(request, response);
+        return;
+      }
+
       List<Authenticator> authenticators;
       if (filterAuthenticators == null || filterAuthenticators.isEmpty()) {
         authenticators = ServerAuthenticator.getInstance().authenticators();
       } else {
         authenticators = filterAuthenticators;
       }
-      HttpServletRequest req = (HttpServletRequest) request;
       Enumeration<String> headerData = req.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
       byte[] authData = null;
       if (headerData.hasMoreElements()) {

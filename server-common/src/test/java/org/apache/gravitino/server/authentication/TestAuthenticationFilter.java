@@ -122,4 +122,37 @@ public class TestAuthenticationFilter {
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
   }
+
+  @Test
+  public void testDoFilterSkipsHealthCheckEndpoint() throws ServletException, IOException {
+    Authenticator authenticator = mock(Authenticator.class);
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getRequestURI()).thenReturn("/iceberg/health");
+    // Should skip authentication and directly proceed to filter chain
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockChain).doFilter(mockRequest, mockResponse);
+    // Authenticator should never be called
+    verify(authenticator, never()).supportsToken(any());
+    verify(authenticator, never()).authenticateToken(any());
+  }
+
+  @Test
+  public void testDoFilterSkipsHealthCheckEndpointWithPrefix()
+      throws ServletException, IOException {
+    Authenticator authenticator = mock(Authenticator.class);
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getRequestURI()).thenReturn("/lance/health");
+    // Should skip authentication and directly proceed to filter chain
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+    verify(mockChain).doFilter(mockRequest, mockResponse);
+    // Authenticator should never be called
+    verify(authenticator, never()).supportsToken(any());
+    verify(authenticator, never()).authenticateToken(any());
+  }
 }
