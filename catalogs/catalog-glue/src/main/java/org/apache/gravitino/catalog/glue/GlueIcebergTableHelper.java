@@ -392,19 +392,22 @@ final class GlueIcebergTableHelper {
    * @param dbName the Glue database name
    * @param tableName the table name
    * @param changes the table changes to apply
-   * @return the final table name (differs from {@code tableName} only when a rename is applied)
+   * @return the final {@link TableIdentifier} (differs from the input only when a rename is
+   *     applied, including cross-schema renames)
    */
-  static String alterTable(
+  static TableIdentifier alterTable(
       Catalog icebergCatalog, String dbName, String tableName, TableChange... changes) {
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
         Preconditions.checkArgument(
             changes.length == 1, "RenameTable cannot be combined with other table changes");
-        String newName = ((TableChange.RenameTable) change).getNewName();
-        icebergCatalog.renameTable(
-            TableIdentifier.of(dbName, tableName), TableIdentifier.of(dbName, newName));
-        LOG.info("Renamed Iceberg table {}.{} to {}", dbName, tableName, newName);
-        return newName;
+        TableChange.RenameTable rename = (TableChange.RenameTable) change;
+        String newDbName = rename.getNewSchemaName().orElse(dbName);
+        String newName = rename.getNewName();
+        TableIdentifier to = TableIdentifier.of(newDbName, newName);
+        icebergCatalog.renameTable(TableIdentifier.of(dbName, tableName), to);
+        LOG.info("Renamed Iceberg table {}.{} to {}.{}", dbName, tableName, newDbName, newName);
+        return to;
       }
     }
 
@@ -498,7 +501,7 @@ final class GlueIcebergTableHelper {
       update.commit();
       LOG.info("Altered Iceberg table {}.{} properties via Iceberg SDK", dbName, tableName);
     }
-    return tableName;
+    return TableIdentifier.of(dbName, tableName);
   }
 
   // ---------------------------------------------------------------------------
