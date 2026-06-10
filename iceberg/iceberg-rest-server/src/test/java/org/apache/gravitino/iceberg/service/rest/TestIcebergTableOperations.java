@@ -37,6 +37,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
@@ -183,9 +184,12 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     JsonNode planResponse = verifyPlanTableScanSucc(namespace, "plan_scan_table", snapshotId);
 
     Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
-    Assertions.assertTrue(planResponse.has("plan-tasks"));
-    Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
-    Assertions.assertTrue(planResponse.get("plan-tasks").size() > 0);
+    Assertions.assertTrue(planResponse.has("file-scan-tasks"));
+    Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
+    Assertions.assertTrue(planResponse.get("file-scan-tasks").size() > 0);
+    Assertions.assertFalse(
+        planResponse.has("plan-tasks"),
+        "Iceberg 1.11+ plan scan must not emit legacy plan-tasks JSON");
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
@@ -229,8 +233,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         verifyPlanTableScanSuccWithRange(
             namespace, "incremental_scan_valid_table", startSnapshotId, endSnapshotId);
     Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
-    Assertions.assertTrue(planResponse.has("plan-tasks"));
-    Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
+    Assertions.assertTrue(planResponse.has("file-scan-tasks"));
+    Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
+    Assertions.assertFalse(
+        planResponse.has("plan-tasks"),
+        "Iceberg 1.11+ plan scan must not emit legacy plan-tasks JSON");
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
@@ -493,7 +500,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private Response doLoadTableWithSnapshots(Namespace ns, String name, String snapshots) {
     String path =
-        IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/tables/" + name;
+        IcebergRestTestUtil.NAMESPACE_PATH
+            + "/"
+            + RESTUtil.encodeNamespace(ns, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8)
+            + "/tables/"
+            + name;
     Map<String, String> queryParams = ImmutableMap.of("snapshots", snapshots);
     return getIcebergClientBuilder(path, Optional.of(queryParams)).get();
   }

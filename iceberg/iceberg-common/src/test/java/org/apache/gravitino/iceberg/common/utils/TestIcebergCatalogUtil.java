@@ -19,21 +19,30 @@
 
 package org.apache.gravitino.iceberg.common.utils;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestIcebergCatalogUtil {
+
+  @TempDir private Path warehouse;
 
   @Test
   void testLoadCatalog() {
@@ -118,6 +127,48 @@ public class TestIcebergCatalogUtil {
   }
 
   @Test
+  void testJdbcCatalogDefaultStrictModeRejectsImplicitNamespace() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(
+        CatalogProperties.URI, "jdbc:sqlite:file:strict_default?mode=memory&cache=shared");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, warehouse.toString());
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    // jdbc.strict-mode is intentionally not set; default should be true
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    TableIdentifier identifier = TableIdentifier.of(Namespace.of("absent_ns"), "t");
+    // Strict mode must reject creating a table in a namespace that does not exist.
+    Assertions.assertThrows(
+        NoSuchNamespaceException.class, () -> catalog.createTable(identifier, schema));
+  }
+
+  @Test
+  void testJdbcCatalogExplicitStrictModeDisabledAllowsImplicitNamespace() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(
+        CatalogProperties.URI, "jdbc:sqlite:file:strict_disabled?mode=memory&cache=shared");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, warehouse.toString());
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    // Explicitly disable strict mode; loadJdbcCatalog must not override it back to true.
+    properties.put(IcebergConstants.ICEBERG_JDBC_STRICT_MODE, "false");
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    TableIdentifier identifier = TableIdentifier.of(Namespace.of("implicit_ns"), "t");
+    // With strict mode disabled the namespace is created implicitly, so this must succeed.
+    Assertions.assertNotNull(catalog.createTable(identifier, schema));
+  }
+
+  @Test
   void testValidLoadCustomCatalog() {
     Catalog catalog;
     Map<String, String> config = new HashMap<>();
@@ -173,5 +224,48 @@ public class TestIcebergCatalogUtil {
 
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", properties.get(IcebergConstants.IO_IMPL));
+  }
+
+  @Test
+  void testApplyRestCatalogHttpTimeoutPropertiesUsesDefaults() {
+    Map<String, String> properties = new HashMap<>();
+
+    IcebergCatalogUtil.applyRestCatalogHttpTimeoutProperties(
+        new IcebergConfig(new HashMap<>()), properties);
+
+    Assertions.assertEquals(
+        "10000", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "60000", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testApplyRestCatalogHttpTimeoutPropertiesUsesConfiguredValues() {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS.getKey(), "1234");
+    config.put(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS.getKey(), "5678");
+    Map<String, String> properties = new HashMap<>();
+
+    IcebergCatalogUtil.applyRestCatalogHttpTimeoutProperties(new IcebergConfig(config), properties);
+
+    Assertions.assertEquals(
+        "1234", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "5678", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testApplyRestCatalogHttpTimeoutPropertiesUsesIcebergPropertyAliases() {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS, "2345");
+    config.put(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS, "6789");
+    Map<String, String> properties = new HashMap<>();
+
+    IcebergCatalogUtil.applyRestCatalogHttpTimeoutProperties(new IcebergConfig(config), properties);
+
+    Assertions.assertEquals(
+        "2345", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "6789", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
   }
 }

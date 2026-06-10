@@ -29,6 +29,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -61,7 +62,9 @@ final class IcebergLoadAuthzHandlerHelper {
 
       AuthorizationMetadata authMetadata = parameter.getAnnotation(AuthorizationMetadata.class);
       if (authMetadata != null && authMetadata.type() == EntityType.SCHEMA) {
-        namespace = RESTUtil.decodeNamespace(String.valueOf(args[i]));
+        namespace =
+            RESTUtil.decodeNamespace(
+                String.valueOf(args[i]), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
       }
     }
 

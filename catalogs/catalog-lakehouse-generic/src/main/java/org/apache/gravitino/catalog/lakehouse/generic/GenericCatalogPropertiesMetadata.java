@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.catalog.lakehouse.generic;
 
+import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
 import com.google.common.collect.ImmutableList;
@@ -28,6 +30,7 @@ import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.catalog.lakehouse.lance.LanceTableOperations;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -49,6 +52,15 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "The Lance storage options managed by the catalog.",
                 false /* immutable */,
                 null, /* defaultValue */
+                false /* hidden */,
+                false /* reserved */),
+            enumPropertyEntry(
+                LANCE_SCHEMA_REFRESH_MODE,
+                "Controls when Lance table schemas are refreshed from the underlying dataset.",
+                false /* required */,
+                false /* immutable */,
+                LanceTableOperations.SchemaRefreshMode.class,
+                LanceTableOperations.SchemaRefreshMode.DECLARED_AND_EMPTY,
                 false /* hidden */,
                 false /* reserved */));
 

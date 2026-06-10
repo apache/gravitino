@@ -88,9 +88,14 @@ public interface GravitinoAuthorizer extends Closeable {
    *
    * @param type user or group
    * @param nameIdentifier name of user or group
+   * @param requestContext authorization request context; enables per-request dedup with other
+   *     authorization calls in the same request
    * @return authorization result
    */
-  boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier);
+  boolean isSelf(
+      Entity.EntityType type,
+      NameIdentifier nameIdentifier,
+      AuthorizationRequestContext requestContext);
 
   /**
    * Determine whether the user is the metalake user.
@@ -154,6 +159,26 @@ public interface GravitinoAuthorizer extends Closeable {
     } catch (Exception e) {
       throw new RuntimeException("Can not get Role Entity", e);
     }
+  }
+
+  /**
+   * Called when the role assignments of a user change.
+   *
+   * @param metalake the metalake name
+   * @param userName the user name
+   */
+  default void handleUserRoleRelChange(String metalake, String userName) {
+    // default no-op for backward compatibility
+  }
+
+  /**
+   * Called when the role assignments of a group change.
+   *
+   * @param metalake the metalake name
+   * @param groupName the group name
+   */
+  default void handleGroupRoleRelChange(String metalake, String groupName) {
+    // default no-op for backward compatibility
   }
 
   /**

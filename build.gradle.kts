@@ -69,6 +69,9 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
 }
 
 val skipWeb: Boolean = (project.findProperty("skipWeb") as? String)?.toBoolean() ?: false
+val distributionPackageDir = layout.projectDirectory.dir("distribution/package")
+val distributionPackageAllDir = layout.projectDirectory.dir("distribution/package-all")
+val subprojectJarOutputDirs = subprojects.map { it.layout.buildDirectory.dir("libs") }
 
 project.extra["extraJvmArgs"] =
   listOf(
@@ -339,6 +342,10 @@ subprojects {
   configurations.all {
     resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
     resolutionStrategy.force("org.xerial.snappy:snappy-java:$snappyJavaVersion")
+
+    // Exclude log4j 1.x (CVE-2020-9493, CVSS 9.8) pulled transitively by Hive and Hadoop.
+    // The safe log4j-1.2-api bridge from Log4j 2.x is already included in the log4j bundle.
+    exclude(group = "log4j", module = "log4j")
   }
 
   repositories {
@@ -735,6 +742,7 @@ tasks.rat {
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
     "docs/**/*.md",
+    ".claude/**",
     "gradle/wrapper/gradle-wrapper.properties",
     "lineage/src/test/java/org/apache/gravitino/lineage/source/TestLineageOperations.java",
     "spark-connector/spark-common/src/test/resources/**",
@@ -790,6 +798,12 @@ jacoco {
 tasks {
   val projectDir = layout.projectDirectory
   val outputDir = projectDir.dir("distribution")
+  val cleanDistributionPackage by registering(Delete::class) {
+    group = "gravitino distribution"
+    delete(distributionPackageDir, distributionPackageAllDir)
+    delete(subprojectJarOutputDirs)
+  }
+
   val compileDistribution by registering {
     val dependencies =
       mutableListOf(
@@ -808,10 +822,12 @@ tasks {
       dependencies.add(":web:web:build")
       dependencies.add(":web-v2:web:build")
     }
+    dependsOn(cleanDistributionPackage)
     dependsOn(dependencies)
 
     group = "gravitino distribution"
-    outputs.dir(projectDir.dir("distribution/package"))
+    outputs.dir(distributionPackageDir)
+    outputs.dir(distributionPackageAllDir)
     doLast {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
@@ -867,8 +883,8 @@ tasks {
 
       // Copy the all directory distribution/package to distribution/package-all
       copy {
-        from(projectDir.dir("distribution/package"))
-        into(projectDir.dir("distribution/package-all"))
+        from(distributionPackageDir)
+        into(distributionPackageAllDir)
       }
 
       // remove catalogs-contrib modules from distribution/package
@@ -978,6 +994,7 @@ tasks {
 
   val assembleDistribution by registering(Tar::class) {
     dependsOn(
+      compileDistribution,
       ":trino-connector:trino-connector-435-439:assembleTrinoConnector",
       ":trino-connector:trino-connector-440-445:assembleTrinoConnector",
       ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
@@ -990,7 +1007,7 @@ tasks {
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
-    from(compileDistribution.map { it.outputs.files.single() })
+    from(distributionPackageDir)
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-$version-bin.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
@@ -1207,6 +1224,32 @@ tasks {
 
   clean {
     dependsOn(cleanDistribution)
+  }
+}
+
+gradle.projectsEvaluated {
+  val cleanDistributionPackageTask = rootProject.tasks.named("cleanDistributionPackage")
+  val distributionPackagePaths =
+    listOf(distributionPackageDir, distributionPackageAllDir)
+      .map { it.asFile.toPath().toAbsolutePath().normalize() }
+  val subprojectJarOutputPaths =
+    subprojectJarOutputDirs.map { it.get().asFile.toPath().toAbsolutePath().normalize() }
+
+  allprojects {
+    tasks.withType<Jar>().configureEach {
+      mustRunAfter(cleanDistributionPackageTask)
+    }
+
+    tasks.withType<Copy>().configureEach {
+      val copyDestinationDir = destinationDir ?: return@configureEach
+      val destinationPath = copyDestinationDir.toPath().toAbsolutePath().normalize()
+      if (distributionPackagePaths.any { destinationPath.startsWith(it) }) {
+        dependsOn(cleanDistributionPackageTask)
+      }
+      if (subprojectJarOutputPaths.any { destinationPath.startsWith(it) }) {
+        mustRunAfter(cleanDistributionPackageTask)
+      }
+    }
   }
 }
 

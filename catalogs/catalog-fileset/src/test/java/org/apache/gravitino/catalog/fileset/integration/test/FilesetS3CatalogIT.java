@@ -107,7 +107,7 @@ public class FilesetS3CatalogIT extends FilesetCatalogIT {
     LOG.info("Secret key: " + secretKey);
 
     s3Endpoint =
-        String.format("http://%s:%d", gravitinoLocalStackContainer.getContainerIpAddress(), 4566);
+        String.format("http://localhost:%d", gravitinoLocalStackContainer.getMappedPort(4566));
   }
 
   @BeforeAll
@@ -132,6 +132,7 @@ public class FilesetS3CatalogIT extends FilesetCatalogIT {
     conf.set("fs.s3a.access.key", accessKey);
     conf.set("fs.s3a.secret.key", secretKey);
     conf.set("fs.s3a.endpoint", s3Endpoint);
+    conf.set("fs.s3a.path.style.access", "true");
     conf.set(
         "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
     fileSystem = FileSystem.get(URI.create(String.format("s3a://%s", bucketName)), conf);
@@ -180,6 +181,7 @@ public class FilesetS3CatalogIT extends FilesetCatalogIT {
     map.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
     map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
     map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
+    map.put(S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS, "true");
     map.put(FILESYSTEM_PROVIDERS, "s3");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
@@ -201,6 +203,7 @@ public class FilesetS3CatalogIT extends FilesetCatalogIT {
     catalogProps.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
     catalogProps.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
     catalogProps.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
+    catalogProps.put(S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS, "true");
     catalogProps.put(FILESYSTEM_PROVIDERS, "s3");
 
     Catalog localCatalog =

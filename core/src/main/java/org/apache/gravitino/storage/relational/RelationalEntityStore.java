@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -57,13 +58,15 @@ import org.slf4j.LoggerFactory;
  * MySQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
  * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
  */
-public class RelationalEntityStore implements EntityStore, SupportsRelationOperations {
+public class RelationalEntityStore
+    implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
           Configs.DEFAULT_ENTITY_RELATIONAL_STORE, JDBCBackend.class.getCanonicalName());
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
+  private EntityChangeLogPoller entityChangeLogPoller;
   private EntityCache cache;
 
   @VisibleForTesting
@@ -85,6 +88,17 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
+
+    // The change-log poller is a side module of the entity store: it polls the entity_change_log
+    // table this store writes to, dispatches batches to registered listeners (e.g. for cross-node
+    // cache invalidation), and prunes expired rows. Like the garbage collector, it is owned and
+    // lifecycle-managed by the store itself.
+    this.entityChangeLogPoller =
+        new EntityChangeLogPoller(
+            config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
+            TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
+            TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
+    this.entityChangeLogPoller.start();
   }
 
   private RelationalBackend createRelationalEntityBackend(Config config) {
@@ -199,8 +213,19 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   }
 
   @Override
+  public void registerEntityChangeLogListener(EntityChangeLogListener listener) {
+    entityChangeLogPoller.registerListener(listener);
+  }
+
+  @Override
+  public void unregisterEntityChangeLogListener(EntityChangeLogListener listener) {
+    entityChangeLogPoller.unregisterListener(listener);
+  }
+
+  @Override
   public void close() throws IOException {
     cache.clear();
+    entityChangeLogPoller.close();
     garbageCollector.close();
     backend.close();
   }

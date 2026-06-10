@@ -1,15 +1,17 @@
 ---
-title: "Apache Gravitino Trino connector UDF support"
-slug: /trino-connector/udf-support
-keyword: gravitino connector trino udf function
+title: "Trino Connector UDF Support"
+slug: "/trino-connector/udf-support"
+keyword: "gravitino connector trino udf function"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 The Gravitino Trino connector supports user-defined functions (UDFs) registered in Apache Gravitino.
 Functions with `RuntimeType.TRINO` and SQL language implementations are automatically exposed as
 [Trino language functions](https://trino.io/docs/current/routines/function.html), making them available for use in Trino queries.
 
-## How it works
+## Mechanism
 
 When Gravitino catalogs contain registered functions, the Trino connector:
 
@@ -24,7 +26,7 @@ Functions registered with other runtimes (e.g., `SPARK`) are **not** visible in 
 - The Gravitino catalog must support function operations (i.e., implement `FunctionCatalog`).
 - Functions must be registered in Gravitino via the Gravitino client or REST API before they can be queried from Trino.
 
-## Registering a UDF
+## Register a UDF
 
 Use the Gravitino Java client to register a function:
 
@@ -43,7 +45,7 @@ functionCatalog.registerFunction(
                 FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "RETURN x + 1")))));
 ```
 
-## Querying UDFs from Trino
+## Query UDFs from Trino
 
 Once registered, the function appears in Trino:
 
@@ -58,7 +60,7 @@ SELECT catalog.my_schema.add_one(5);
 
 ## Limitations
 
-- **Read-only**: The Trino connector currently supports listing and invoking Gravitino UDFs. Creating or dropping functions via Trino SQL (`CREATE FUNCTION` / `DROP FUNCTION`) is not yet supported.
+- **Read-only**: The Trino connector supports listing and invoking Gravitino UDFs. Creating or dropping functions via Trino SQL (`CREATE FUNCTION` / `DROP FUNCTION`) is not yet supported.
 - **SQL only**: Only SQL-language implementations are mapped. Java and Python implementations are not exposed to Trino.
 - **TRINO runtime only**: Only functions with `RuntimeType.TRINO` are visible. Functions registered with `RuntimeType.SPARK` or other runtimes are filtered out.
 - **Type mapping**: Function parameter and return types are converted from Gravitino types to Trino types. Unsupported types will cause the function to be skipped with a warning log.

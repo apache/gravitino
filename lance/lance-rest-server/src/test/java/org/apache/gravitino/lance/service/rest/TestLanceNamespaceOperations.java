@@ -633,7 +633,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     DescribeTableResponse createTableResponse = new DescribeTableResponse();
     createTableResponse.setLocation("/path/to/describe_table");
     createTableResponse.setMetadata(ImmutableMap.of("key", "value"));
-    when(tableOps.describeTable(any(), any(), any(), anyBoolean())).thenReturn(createTableResponse);
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean(), anyBoolean()))
+        .thenReturn(createTableResponse);
 
     DescribeTableRequest tableRequest = new DescribeTableRequest();
     Response resp =
@@ -649,11 +650,11 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(createTableResponse.getLocation(), response.getLocation());
     Assertions.assertEquals(createTableResponse.getMetadata(), response.getMetadata());
     Mockito.verify(tableOps)
-        .describeTable(eq(tableIds), eq(delimiter), eq(Optional.empty()), eq(true));
+        .describeTable(eq(tableIds), eq(delimiter), eq(Optional.empty()), eq(true), eq(true));
 
     // Test not found exception
     Mockito.reset(tableOps);
-    when(tableOps.describeTable(any(), any(), any(), anyBoolean()))
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean(), anyBoolean()))
         .thenThrow(new TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/describe", tableIds))
@@ -664,7 +665,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     // Test runtime exception
     Mockito.reset(tableOps);
-    when(tableOps.describeTable(any(), any(), any(), anyBoolean()))
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean(), anyBoolean()))
         .thenThrow(new RuntimeException("Runtime exception"));
     resp =
         target(String.format("/v1/table/%s/describe", tableIds))
