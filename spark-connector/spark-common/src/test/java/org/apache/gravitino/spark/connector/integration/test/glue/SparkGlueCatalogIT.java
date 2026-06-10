@@ -391,6 +391,29 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   }
 
   @Test
+  void testRenameIcebergTable() {
+    String oldName = "test_iceberg_rename_old";
+    String newName = "test_iceberg_rename_new";
+    dropTableIfExists(oldName);
+    dropTableIfExists(newName);
+
+    sql(getCreateSimpleTableString(oldName) + " USING iceberg");
+    sql(String.format("INSERT INTO %s VALUES (1, 'before_rename', 10)", oldName));
+
+    Assertions.assertTrue(tableExists(oldName));
+    Assertions.assertFalse(tableExists(newName));
+
+    sql(String.format("ALTER TABLE %s RENAME TO %s", oldName, newName));
+
+    Assertions.assertFalse(tableExists(oldName));
+    Assertions.assertTrue(tableExists(newName));
+
+    List<String> tableData = getTableData(newName);
+    Assertions.assertFalse(tableData.isEmpty());
+    Assertions.assertEquals("1,before_rename,10", tableData.get(0));
+  }
+
+  @Test
   void testCreateTableWithComment() {
     String tableName = "test_table_with_comment";
     dropTableIfExists(tableName);
