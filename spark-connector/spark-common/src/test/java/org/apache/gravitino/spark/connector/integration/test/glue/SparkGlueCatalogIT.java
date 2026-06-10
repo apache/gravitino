@@ -390,6 +390,38 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
     Assertions.assertEquals("1,name1,25", tableData.get(0));
   }
 
+  /**
+   * Regression test for https://github.com/apache/gravitino/issues/11534.
+   *
+   * <p>After ALTER TABLE ADD COLUMNS on an Iceberg table, querying the new column must succeed.
+   * Previously, icebergGlueCatalog's CachingCatalog was never invalidated after alterTable, causing
+   * {@code IllegalStateException: Couldn't find <newCol> in [<oldCols>]}.
+   */
+  @Test
+  void testIcebergAlterTableAddColumnCacheInvalidation() {
+    String tableName = "test_iceberg_alter_cache";
+    dropTableIfExists(tableName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (id INT COMMENT 'id', name STRING COMMENT 'name') USING iceberg",
+            tableName));
+    sql(String.format("INSERT INTO %s VALUES (1, 'Alice')", tableName));
+
+    // Warm up the Iceberg SparkCatalog's CachingCatalog with an initial read
+    List<String> before = getTableData(tableName);
+    Assertions.assertEquals(1, before.size());
+    Assertions.assertEquals("1,Alice", before.get(0));
+
+    // Add a column — must invalidate icebergGlueCatalog cache
+    sql(String.format("ALTER TABLE %s ADD COLUMNS (age INT)", tableName));
+
+    // Before the fix this threw:
+    //   IllegalStateException: Couldn't find age#N in [id#N, name#N]
+    List<String> after = getQueryData(String.format("SELECT id, name, age FROM %s", tableName));
+    Assertions.assertEquals(1, after.size());
+    Assertions.assertEquals("1,Alice,NULL", after.get(0));
+  }
+
   @Test
   void testRenameIcebergTable() {
     String oldName = "test_iceberg_rename_old";
