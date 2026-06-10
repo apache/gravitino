@@ -31,7 +31,11 @@ Before you call `/api/idp/*`, ensure the following:
    gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
    ```
 
-2. **Service admin passwords** — Built-in IDP requires every username in
+2. **Server authenticator** — Built-in IdP is **incompatible** with the `simple` authenticator
+   (the default). When the `idp-basic` plugin is enabled, `gravitino.authenticators` must not
+   include `simple`.
+
+3. **Service admin passwords** — Built-in IDP requires every username in
    `gravitino.authorization.serviceAdmins` to have a password stored in `idp_user_meta` before you
    can call management APIs.
 
@@ -61,9 +65,10 @@ Before you call `/api/idp/*`, ensure the following:
 
 Set service admins in `gravitino.conf` (see also [Prerequisites](#prerequisites)):
 
-| Configuration item                      | Description                                                                         | Example |
-|-----------------------------------------|-------------------------------------------------------------------------------------|---------|
-| `gravitino.authorization.serviceAdmins` | Comma-separated service admin that can call built-in IDP management APIs          | `admin` |
+| Configuration item                        | Description                                                                         | Example |
+|-------------------------------------------|-------------------------------------------------------------------------------------|---------|
+| `gravitino.server.rest.extensionPackages` | Registers built-in IdP REST APIs                                                    | `org.apache.gravitino.idp.web.rest.feature` |
+| `gravitino.authorization.serviceAdmins`   | Comma-separated service admin that can call built-in IDP management APIs            | `admin` |
 
 Example:
 
@@ -211,6 +216,294 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```
 
 For full request and response definitions, see the [Built-in IDP OpenAPI](../open-api/idp/openapi.yaml).
+
+---
+
+## Engines using Basic authentication
+
+Configure Basic credentials on each engine connector. See
+[Spark authentication](../spark-connector/spark-authentication-with-gravitino.md),
+[Flink authentication](../flink-connector/flink-authentication-with-gravitino.md), and
+[Trino authentication](../trino-connector/authentication.md) for full connector setup.
+
+### Spark
+
+```properties
+spark.sql.gravitino.authType=basic
+spark.sql.gravitino.basic.username=${username}
+spark.sql.gravitino.basic.password=${password}
+```
+
+### Flink
+
+```yaml
+table.catalog-store.gravitino.gravitino.client.auth.type: basic
+table.catalog-store.gravitino.gravitino.client.basic.username: ${username}
+table.catalog-store.gravitino.gravitino.client.basic.password: ${password}
+```
+
+### Trino
+
+In `etc/catalog/gravitino.properties`:
+
+```properties
+gravitino.client.authType=basic
+gravitino.client.basic.username=${username}
+gravitino.client.basic.password=${password}
+```
+
+---
+
+## Engines using Basic authentication for Iceberg REST catalog
+
+Connect Spark, Flink, and Trino directly to the Gravitino Iceberg REST (IRC) endpoint at
+`http://<gravitino-host>:9001/iceberg/`. No Gravitino engine connector plugin is required.
+Configure only the Basic auth properties below. See
+[Connect Spark via Iceberg REST](../iceberg-rest-engine/spark.md),
+[Connect Flink via Iceberg REST](../iceberg-rest-engine/flink.md), and
+[Connect Trino via Iceberg REST](../iceberg-rest-engine/trino.md) for full IRC setup.
+
+### Spark
+
+```properties
+spark.sql.catalog.<catalog-name>.rest.auth.type=basic
+spark.sql.catalog.<catalog-name>.rest.auth.basic.username=${username}
+spark.sql.catalog.<catalog-name>.rest.auth.basic.password=${password}
+```
+
+### Flink
+
+```sql
+'rest.auth.type' = 'basic',
+'rest.auth.basic.username' = '${username}',
+'rest.auth.basic.password' = '${password}'
+```
+
+### Trino
+
+Requires Trino **481+**. Trino has no native Basic mode for Iceberg REST; pass
+`Authorization` via HTTP headers.
+
+Generate Base64 once:
+
+```shell
+echo -n '${username}:${password}' | base64
+```
+
+In `etc/catalog/<catalog-name>.properties`:
+
+```properties
+iceberg.rest-catalog.http-headers=Authorization: Basic <base64-credentials>
+```
+
+Replace `<base64-credentials>` with the output of `echo -n '${username}:${password}' | base64`.
+
+---
+
+## End-to-end setup
+
+The following steps provision Gravitino and engines so a named user can connect with Basic
+credentials. The examples use service admin `admin` / `Passw0rd-Admin12`, engine user
+`alice` / `Passw0rd-Alice12`, metalake `example`, and Gravitino at `http://localhost:8090`.
+Replace these with values that match your deployment.
+
+### 1. Admin initialization
+
+1. Append the following to `gravitino.conf` (see also [Prerequisites](#prerequisites) and
+   [Configuration](#configuration)):
+
+   ```properties
+   gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
+   gravitino.authorization.enable = true
+   gravitino.authorization.serviceAdmins = admin
+   ```
+
+   Built-in IdP is **incompatible** with the `simple` authenticator. Remove `simple` from
+   `gravitino.authenticators` (the default). For example, use `oauth` when the Web UI authenticates
+   through an external IdP; see [How to authenticate](how-to-authenticate.md).
+
+2. Before the first start, set the initial service admin password (see
+   [password rules](#password-and-username-rules)):
+
+   ```shell
+   export GRAVITINO_INITIAL_ADMIN_PASSWORD='Passw0rd-Admin12'
+   ```
+
+3. Start Gravitino and verify the service admin can call the API:
+
+   ```shell
+   curl -s -H "Accept: application/vnd.gravitino.v1+json" \
+     -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
+     http://localhost:8090/api/version
+   ```
+
+### 2. Create users
+
+Create a built-in IdP user for each engine or operator account. Service admins call
+`/api/idp/users` (see [Add a user](#add-a-user)):
+
+```shell
+curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
+  -d '{"user":"alice","password":"Passw0rd-Alice12"}' \
+  http://localhost:8090/api/idp/users
+```
+
+### 3. Create a metalake
+
+Create a metalake with a service admin account. When authorization is enabled, only service admins
+can create metalakes (see [Access control](access-control.md)). See also
+[Manage metalakes](../manage-metalake-using-gravitino.md#create-a-metalake).
+
+```shell
+curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
+  -d '{"name":"example","comment":"Basic auth example","properties":{}}' \
+  http://localhost:8090/api/metalakes
+```
+
+Create catalogs in this metalake before engines can query data. See
+[Manage relational metadata](../manage-relational-metadata-using-gravitino.md).
+
+### 4. Add users to the metalake
+
+Register the engine user in the metalake authorization namespace (see
+[Add a user](access-control.md#add-a-user)). The username must match a built-in IdP user created in
+step 2:
+
+```shell
+curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
+  -d '{"name":"alice"}' \
+  http://localhost:8090/api/metalakes/example/users
+```
+
+Grant roles or ownership as needed so the user can access catalogs and metadata. See
+[Access control](access-control.md).
+
+### 5. Configure engines to use Basic authentication
+
+Configure each engine with `http://localhost:8090`, metalake `example`, and user `alice` /
+`Passw0rd-Alice12` from step 2. Deploy the Gravitino connector for each engine first; see
+[Spark authentication](../spark-connector/spark-authentication-with-gravitino.md),
+[Flink authentication](../flink-connector/flink-authentication-with-gravitino.md), and
+[Trino authentication](../trino-connector/authentication.md).
+
+#### Spark
+
+```shell
+$SPARK_HOME/bin/spark-sql \
+  --conf spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin \
+  --conf spark.sql.gravitino.uri=http://localhost:8090 \
+  --conf spark.sql.gravitino.metalake=example \
+  --conf spark.sql.gravitino.authType=basic \
+  --conf spark.sql.gravitino.basic.username=alice \
+  --conf spark.sql.gravitino.basic.password=Passw0rd-Alice12 \
+  -e "SHOW CATALOGS;"
+```
+
+#### Flink
+
+```shell
+$FLINK_HOME/bin/sql-client.sh \
+  -D table.catalog-store.kind=gravitino \
+  -D table.catalog-store.gravitino.gravitino.uri=http://localhost:8090 \
+  -D table.catalog-store.gravitino.gravitino.metalake=example \
+  -D table.catalog-store.gravitino.gravitino.client.auth.type=basic \
+  -D table.catalog-store.gravitino.gravitino.client.basic.username=alice \
+  -D table.catalog-store.gravitino.gravitino.client.basic.password=Passw0rd-Alice12
+```
+
+#### Trino
+
+Create `etc/catalog/gravitino.properties`:
+
+```properties
+connector.name=gravitino
+gravitino.uri=http://localhost:8090
+gravitino.metalake=example
+gravitino.client.authType=basic
+gravitino.client.basic.username=alice
+gravitino.client.basic.password=Passw0rd-Alice12
+```
+
+Set `catalog.management=dynamic` in `etc/config.properties`, restart Trino, then verify:
+
+```shell
+$TRINO_HOME/bin/launcher restart
+java -jar trino-cli.jar --server http://localhost:8080 --user alice \
+  --execute "SHOW CATALOGS"
+```
+
+### 6. Access Iceberg REST catalog with Basic authentication
+
+Connect engines directly to `http://localhost:9001/iceberg`. No Gravitino connector plugin is
+required. Use user `alice` / `Passw0rd-Alice12` from step 2. See
+[Connect Spark via Iceberg REST](../iceberg-rest-engine/spark.md),
+[Connect Flink via Iceberg REST](../iceberg-rest-engine/flink.md), and
+[Connect Trino via Iceberg REST](../iceberg-rest-engine/trino.md) for full IRC setup.
+
+#### Spark
+
+```shell
+$SPARK_HOME/bin/spark-sql \
+  --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+  --conf spark.sql.catalog.gravitino_irc=org.apache.iceberg.spark.SparkCatalog \
+  --conf spark.sql.catalog.gravitino_irc.type=rest \
+  --conf spark.sql.catalog.gravitino_irc.uri=http://localhost:9001/iceberg \
+  --conf spark.sql.catalog.gravitino_irc.rest.auth.type=basic \
+  --conf spark.sql.catalog.gravitino_irc.rest.auth.basic.username=alice \
+  --conf spark.sql.catalog.gravitino_irc.rest.auth.basic.password=Passw0rd-Alice12 \
+  -e "SHOW NAMESPACES IN gravitino_irc;"
+```
+
+#### Flink
+
+```shell
+cat > /tmp/flink-irc.sql <<'EOF'
+CREATE CATALOG gravitino_irc WITH (
+  'type'                     = 'iceberg',
+  'catalog-type'             = 'rest',
+  'uri'                      = 'http://localhost:9001/iceberg',
+  'rest.auth.type'           = 'basic',
+  'rest.auth.basic.username' = 'alice',
+  'rest.auth.basic.password' = 'Passw0rd-Alice12'
+);
+USE CATALOG gravitino_irc;
+SHOW DATABASES;
+EOF
+
+$FLINK_HOME/bin/sql-client.sh -f /tmp/flink-irc.sql
+```
+
+#### Trino
+
+Requires Trino **481+**. Trino has no native Basic mode for Iceberg REST; pass `Authorization`
+via HTTP headers.
+
+```shell
+echo -n 'alice:Passw0rd-Alice12' | base64
+```
+
+Create `etc/catalog/gravitino_irc.properties`:
+
+```properties
+connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=http://localhost:9001/iceberg
+iceberg.rest-catalog.http-headers=Authorization: Basic YWxpc2U6UGFzc3cwcmQtQWxpY2UxMg==
+```
+
+Restart Trino and verify:
+
+```shell
+$TRINO_HOME/bin/launcher restart
+java -jar trino-cli.jar --server http://localhost:8080 --user alice \
+  --execute "SHOW SCHEMAS FROM gravitino_irc"
+```
 
 ---
 

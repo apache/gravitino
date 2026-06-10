@@ -28,4 +28,4 @@ Multi-metalake mode (`gravitino.use-single-metalake=false`) is supported on Trin
 
 ## Authentication
 
-The Gravitino Trino connector supports authenticating to the Gravitino server using Simple, OAuth, and Kerberos authentication. For detailed authentication configuration, refer to [Trino Connector Authentication](./authentication.md).
+The Gravitino Trino connector supports authenticating to the Gravitino server using Simple, Basic, OAuth, and Kerberos authentication. For detailed authentication configuration, refer to [Trino Connector Authentication](./authentication.md).
