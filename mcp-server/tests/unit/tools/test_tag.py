@@ -98,3 +98,15 @@ class TestTagTool(unittest.TestCase):
                 )
 
         asyncio.run(_test_disassociate_tag_from_metadata(self.mcp))
+
+    def test_destructive_tag_tools_disabled_by_default(self):
+        async def _test_destructive_tag_tools_disabled_by_default(mcp_server):
+            tool_names = {tool.name for tool in await mcp_server.list_tools()}
+
+            self.assertIn("get_tag_by_name", tool_names)
+            self.assertIn("list_of_tags", tool_names)
+            self.assertNotIn("create_tag", tool_names)
+            self.assertNotIn("alter_tag", tool_names)
+            self.assertNotIn("delete_tag", tool_names)
+
+        asyncio.run(_test_destructive_tag_tools_disabled_by_default(self.mcp))
