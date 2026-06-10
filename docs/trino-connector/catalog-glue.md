@@ -20,7 +20,7 @@ It supports both Hive-format and Iceberg-format tables on Amazon S3.
 ### Create a schema
 
 ```sql
-CREATE SCHEMA catalog.schema_name
+CREATE SCHEMA glue_test.schema_name;
 ```
 
 ## Table operations
@@ -237,103 +237,6 @@ The results are similar to:
 ```
 
 The `glue_test` catalog corresponds to the catalog created in Gravitino.
-
-### Creating schemas and tables
-
-Create a schema:
-
-```sql
-CREATE SCHEMA glue_test.db01;
-```
-
-Create a Hive-format Parquet table, partitioned by date:
-
-```sql
-CREATE TABLE glue_test.db01.orders
-(
-  order_id bigint,
-  customer varchar,
-  amount   decimal(10, 2),
-  order_dt date
-)
-WITH (
-  format         = 'PARQUET',
-  location       = 's3://my-bucket/warehouse/db01/orders',
-  partitioned_by = ARRAY['order_dt']
-);
-```
-
-Create an Iceberg-format table partitioned by hour:
-
-```sql
-CREATE TABLE glue_test.db01.events
-(
-  event_id bigint,
-  payload  varchar,
-  event_ts timestamp(6) with time zone
-)
-WITH (
-  type           = 'ICEBERG',
-  location       = 's3://my-bucket/warehouse/db01/events',
-  partitioned_by = ARRAY['hour(event_ts)']
-);
-```
-
-### Writing data
-
-Insert a row:
-
-```sql
-INSERT INTO glue_test.db01.orders (order_id, customer, amount, order_dt)
-VALUES (1, 'alice', 99.99, DATE '2024-01-01');
-```
-
-Insert from a query:
-
-```sql
-INSERT INTO glue_test.db01.orders
-SELECT order_id, customer, amount, order_dt FROM glue_test.db01.orders_staging;
-```
-
-Update an Iceberg table row:
-
-```sql
-UPDATE glue_test.db01.events SET payload = 'updated' WHERE event_id = 42;
-```
-
-Delete an entire Hive partition:
-
-```sql
-DELETE FROM glue_test.db01.orders WHERE order_dt = DATE '2024-01-01';
-```
-
-### Querying data
-
-```sql
-SELECT * FROM glue_test.db01.orders WHERE order_dt >= DATE '2024-01-01';
-```
-
-### Modifying a table
-
-Add a column:
-
-```sql
-ALTER TABLE glue_test.db01.orders ADD COLUMN region varchar;
-```
-
-Drop a column:
-
-```sql
-ALTER TABLE glue_test.db01.orders DROP COLUMN region;
-```
-
-### Dropping schemas and tables
-
-```sql
-DROP TABLE glue_test.db01.orders;
-
-DROP SCHEMA glue_test.db01;
-```
 
 ## Data type mapping
 

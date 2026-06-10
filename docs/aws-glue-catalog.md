@@ -42,7 +42,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 | `aws-access-key-id`      | AWS access key ID for static credential authentication. When omitted, the default credential chain is used.                                                                                                 | (none)                   | No       | No        | 1.3.0         |
 | `aws-secret-access-key`  | AWS secret access key paired with `aws-access-key-id`. When omitted, the default credential chain is used.                                                                                                  | (none)                   | No       | No        | 1.3.0         |
 | `aws-glue-endpoint`      | Custom Glue endpoint URL for VPC endpoints or LocalStack testing (e.g. `http://localhost:4566`).                                                                                                            | (none)                   | No       | No        | 1.3.0         |
-| `warehouse`              | Base storage path used as the warehouse when no explicit `location` is specified at table creation time (e.g. `s3://my-bucket/warehouse`). Table location is derived as `warehouse/database/table`. Required for Iceberg table creation. | (none) | Yes | No | 1.3.0 |
+| `warehouse`              | Base storage path used as the warehouse when no explicit `location` is specified at table creation time (e.g. `s3://my-bucket/warehouse`). Table location is derived as `warehouse/database/table`. Either `warehouse` or a per-table `location` must be set. | (none) | No | No | 1.3.0 |
 | `default-table-format`   | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`.                                                                                                  | `hive`                   | No       | No        | 1.3.0         |
 | `table-format-filter`    | Comma-separated list of table formats exposed by `listTables()` and `loadTable()`. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. Use to restrict visible table types.                     | `all`                    | No       | No        | 1.3.0         |
 
@@ -50,9 +50,10 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 **Authentication priority**: Static credentials (`aws-access-key-id` + `aws-secret-access-key`) take precedence over the default credential chain (environment variables, instance profile, container credentials).
 :::
 
-When you use Gravitino with Trino, you can pass the Trino connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.metastore.glue.region` to pass the `hive.metastore.glue.region` to the Gravitino Glue catalog in Trino runtime.
+### Passing connector configuration
 
-When you use Gravitino with Spark, you can pass the Spark connector configuration using prefix `spark.bypass.`.
+- When using Gravitino with Trino, pass additional Trino connector properties using the `trino.bypass.` prefix. For example, `trino.bypass.hive.metastore.glue.max-connections` sets `hive.metastore.glue.max-connections` in the Trino runtime.
+- When using Gravitino with Spark, pass additional Spark connector properties using the `spark.bypass.` prefix.
 
 ### Catalog operations
 
@@ -78,9 +79,9 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 - The Glue catalog supports creating, updating, and deleting tables in the AWS Glue Data Catalog.
 - All entries in the Glue `Table.parameters()` pass through Gravitino intact, so downstream tools can correctly identify the table format.
-- Doesn't support column default value.
-- Doesn't support NOT NULL constraints on columns.
-- Doesn't support table indexes.
+- Does not support column default value.
+- Does not support NOT NULL constraints on columns.
+- Does not support table indexes.
 
 ### Table partitioning
 
@@ -163,10 +164,6 @@ The following table lists predefined table properties for a Glue table. Addition
 :::note
 All entries in the Glue `Table.parameters()` pass through Gravitino's API layer intact. This ensures `table_type=ICEBERG`, `metadata_location=s3://...`, `spark.sql.sources.provider=delta`, and any other format indicators survive Gravitino's metadata proxy layer.
 :::
-
-### Table indexes
-
-- Doesn't support table indexes.
 
 ### Table operations
 
