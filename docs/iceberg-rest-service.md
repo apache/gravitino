@@ -39,8 +39,6 @@ The following Iceberg REST API features are not implemented:
 - Pagination.
 - View registration.
 
-<a id="server-management"></a>
-
 ## Deployment
 
 ### Deployment Modes
@@ -86,8 +84,6 @@ The standalone Iceberg REST server package has the following layout:
     |── libs/                                   # Gravitino Iceberg REST server dependencies libraries.
     |── logs/                                   # Gravitino Iceberg REST server logs. Automatically created after the server starts.
 ```
-
-<a id="iceberg-rest-server-configuration"></a>
 
 ## Configuration
 
@@ -242,8 +238,6 @@ If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-
 | `gravitino.iceberg-rest.catalog-backend-impl` | The fully-qualified class name of a custom catalog implementation, only worked if `catalog-backend` is `custom`.              | (none)        | No       | 0.7.0-incubating |
 
 If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a corresponding jar file to the classpath and load a custom Iceberg Catalog implementation by specifying the `catalog-backend-impl` property.
-
-<a id="multiple-catalog-backend-support"></a>
 
 ### Multi-Catalog Configuration
 
@@ -731,8 +725,6 @@ Example tuning:
 - Medium workloads: `GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`
 - Higher concurrency or catalog counts: increase heap and metaspace accordingly.
 
-<a id="start-the-iceberg-rest-server"></a>
-
 ## Service Startup and Verification
 
 ### Auxiliary Service
@@ -760,8 +752,6 @@ curl http://127.0.0.1:9001/iceberg/v1/config
 ```
 
 Example response: `{"defaults":{},"overrides":{}, "endpoints":["GET /v1/{prefix}/namespaces", ...]}%`.
-
-<a id="docker-instructions"></a>
 
 ## Docker
 
@@ -833,8 +823,6 @@ sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-serve
 ### Playground
 
 Try Spark with the Gravitino Iceberg REST catalog service in the [playground](./how-to-use-the-playground.md#apache-iceberg-rest-service).
-
-<a id="enable-access-control"></a>
 
 ## Access Control Tutorial
 
