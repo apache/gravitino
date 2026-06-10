@@ -357,7 +357,8 @@ public class HTTPClient implements RESTClient {
           "Received a malformed path for a REST request: %s. Paths should not start with /", path);
     }
 
-    HttpUriRequestBase request = new HttpUriRequestBase(method.name(), buildUri(path, queryParams));
+    URI requestUri = buildUri(path, queryParams);
+    HttpUriRequestBase request = new HttpUriRequestBase(method.name(), requestUri);
 
     if (requestBody instanceof Map) {
       // encode maps as form data, application/x-www-form-urlencoded
@@ -374,13 +375,6 @@ public class HTTPClient implements RESTClient {
       request.setHeader(
           AuthConstants.HTTP_HEADER_AUTHORIZATION,
           new String(authDataProvider.getTokenData(), StandardCharsets.UTF_8));
-    }
-
-    URI requestUri;
-    try {
-      requestUri = request.getUri();
-    } catch (URISyntaxException e) {
-      throw new RESTException(e, "Invalid URI while processing %s request", method);
     }
 
     try (CloseableHttpResponse response = httpClient.execute(request)) {
@@ -441,16 +435,6 @@ public class HTTPClient implements RESTClient {
           "Failed to execute request to Gravitino server while processing %s request: %s",
           method,
           requestUri);
-    } catch (NullPointerException e) {
-      if ("Endpoint".equals(e.getMessage())) {
-        throw new RESTException(
-            e,
-            "Failed to determine target endpoint while processing %s request: %s",
-            method,
-            requestUri);
-      }
-
-      throw e;
     }
   }
 
