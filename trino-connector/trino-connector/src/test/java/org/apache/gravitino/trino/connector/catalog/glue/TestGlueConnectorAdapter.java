@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -57,16 +58,15 @@ class TestGlueConnectorAdapter {
             "aws-region", "us-east-1",
             "warehouse", "s3://my-bucket/warehouse",
             "aws-glue-catalog-id", "123456789",
-            "aws-access-key-id", "test-access-key",
-            "aws-secret-access-key", "test-secret-key",
             "aws-glue-endpoint", "https://glue.custom.endpoint");
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(
             "test_glue", "glue", "test catalog", Catalog.Type.RELATIONAL, properties);
     GlueConnectorAdapter adapter = new GlueConnectorAdapter();
+    Credential[] credentials = {new S3SecretKeyCredential("test-access-key", "test-secret-key")};
     Map<String, String> config =
         adapter.buildInternalConnectorConfig(
-            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
+            new GravitinoCatalog("test", mockCatalog), credentials);
 
     Assertions.assertEquals("123456789", config.get("hive.metastore.glue.catalogid"));
     Assertions.assertEquals("test-access-key", config.get("hive.metastore.glue.aws-access-key"));

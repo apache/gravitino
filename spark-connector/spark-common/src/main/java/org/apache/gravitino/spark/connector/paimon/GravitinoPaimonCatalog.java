@@ -22,6 +22,7 @@ package org.apache.gravitino.spark.connector.paimon;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -42,6 +43,8 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     TableCatalog paimonCatalog = new SparkCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
+    CredentialPropertyUtils.applyPaimonCredentials(
+        CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
     paimonCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return paimonCatalog;
   }
