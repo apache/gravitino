@@ -380,8 +380,9 @@ final class GlueIcebergTableHelper {
   /**
    * Alters an Iceberg table via the Iceberg SDK.
    *
-   * <p>Delegates schema changes to {@link UpdateSchema} and property changes to {@link
-   * UpdateProperties}.
+   * <p>Supports {@link TableChange.RenameTable}, {@link TableChange.ColumnChange}, {@link
+   * TableChange.SetProperty}, and {@link TableChange.RemoveProperty}. A rename is an exclusive
+   * operation and cannot be combined with other changes.
    *
    * <p><b>Note:</b> Schema changes and property changes are committed in two separate transactions.
    * If the schema commit succeeds but the property commit fails, the table is left in a partially
@@ -391,9 +392,22 @@ final class GlueIcebergTableHelper {
    * @param dbName the Glue database name
    * @param tableName the table name
    * @param changes the table changes to apply
+   * @return the final table name (differs from {@code tableName} only when a rename is applied)
    */
-  static void alterTable(
+  static String alterTable(
       Catalog icebergCatalog, String dbName, String tableName, TableChange... changes) {
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.RenameTable) {
+        Preconditions.checkArgument(
+            changes.length == 1, "RenameTable cannot be combined with other table changes");
+        String newName = ((TableChange.RenameTable) change).getNewName();
+        icebergCatalog.renameTable(
+            TableIdentifier.of(dbName, tableName), TableIdentifier.of(dbName, newName));
+        LOG.info("Renamed Iceberg table {}.{} to {}", dbName, tableName, newName);
+        return newName;
+      }
+    }
+
     Table table = icebergCatalog.loadTable(TableIdentifier.of(dbName, tableName));
 
     boolean hasSchemaChange = false;
@@ -484,6 +498,7 @@ final class GlueIcebergTableHelper {
       update.commit();
       LOG.info("Altered Iceberg table {}.{} properties via Iceberg SDK", dbName, tableName);
     }
+    return tableName;
   }
 
   // ---------------------------------------------------------------------------

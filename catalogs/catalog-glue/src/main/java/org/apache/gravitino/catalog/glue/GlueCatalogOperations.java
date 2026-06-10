@@ -595,8 +595,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     if (hasMetadataLocation && !isSdkManaged) {
       return alterRegisterModeIcebergTable(ident, dbName, rawGlueTable, changes);
     }
-    GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
-    return loadTable(ident);
+    String finalName =
+        GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
+    NameIdentifier finalIdent =
+        finalName.equals(ident.name()) ? ident : NameIdentifier.of(ident.namespace(), finalName);
+    return loadTable(finalIdent);
   }
 
   private GlueTable alterRegisterModeIcebergTable(
