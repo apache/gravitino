@@ -35,3 +35,19 @@ class SchemaOperation(ABC):
             str: JSON-formatted string containing catalog information.
         """
         pass
+
+    @abstractmethod
+    async def create_schema(
+        self, catalog_name: str, name: str, comment: str, properties: dict
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def alter_schema(
+        self, catalog_name: str, schema_name: str, updates: list
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def drop_schema(self, catalog_name: str, schema_name: str) -> str:
+        pass

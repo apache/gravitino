@@ -106,3 +106,39 @@ class ModelOperation(ABC):
             str: JSON-formatted string containing full model version metadata
         """
         pass
+
+    @abstractmethod
+    async def register_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def delete_model(
+        self, catalog_name: str, schema_name: str, model_name: str
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def link_model_version(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        uri: str,
+        aliases: list,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def delete_model_version(
+        self, catalog_name: str, schema_name: str, model_name: str, version: int
+    ) -> str:
+        pass

@@ -53,3 +53,30 @@ class TopicOperation(ABC):
             str: JSON-formatted string containing full topic metadata
         """
         pass
+
+    @abstractmethod
+    async def create_topic(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def alter_topic(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        topic_name: str,
+        updates: list,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def delete_topic(
+        self, catalog_name: str, schema_name: str, topic_name: str
+    ) -> str:
+        pass

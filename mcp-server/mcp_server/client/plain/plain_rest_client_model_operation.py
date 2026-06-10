@@ -16,7 +16,10 @@
 # under the License.
 
 from mcp_server.client import ModelOperation
-from mcp_server.client.plain.utils import encode_path_segment
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    extract_content_from_response,
+)
 
 
 class PlainRESTClientModelOperation(ModelOperation):
@@ -81,3 +84,66 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/aliases/{encode_path_segment(alias)}"
         )
         return response.json().get("modelVersion", {})
+
+    async def register_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/models",
+            json={"name": name, "comment": comment, "properties": properties},
+        )
+        return extract_content_from_response(response, "model", {})
+
+    async def delete_model(
+        self, catalog_name: str, schema_name: str, model_name: str
+    ) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
+        )
+        return extract_content_from_response(response, "deleted", False)
+
+    async def link_model_version(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        uri: str,
+        aliases: list,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}/versions",
+            json={
+                "uri": uri,
+                "aliases": aliases,
+                "comment": comment,
+                "properties": properties,
+            },
+        )
+        return extract_content_from_response(response, "modelVersion", {})
+
+    async def delete_model_version(
+        self, catalog_name: str, schema_name: str, model_name: str, version: int
+    ) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
+            f"/versions/{encode_path_segment(version)}"
+        )
+        return extract_content_from_response(response, "deleted", False)

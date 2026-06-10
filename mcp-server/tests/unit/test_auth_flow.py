@@ -45,7 +45,9 @@ class TestTokenInjection(unittest.TestCase):
 
     def test_no_token_argument_no_authorization_header(self):
         """When token argument is omitted entirely, no Authorization header is added."""
-        client = PlainRESTClientOperation("my_metalake", "http://localhost:8090")
+        client = PlainRESTClientOperation(
+            "my_metalake", "http://localhost:8090"
+        )
         headers = dict(client._catalog_operation.rest_client.headers)
         self.assertNotIn("authorization", headers)
 

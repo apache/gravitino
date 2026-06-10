@@ -34,3 +34,38 @@ class PlainRESTClientCatalogOperation(CatalogOperation):
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs?details=true"
         )
         return extract_content_from_response(response, "catalogs", [])
+
+    async def create_catalog(
+        self,
+        name: str,
+        catalog_type: str,
+        provider: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs",
+            json={
+                "name": name,
+                "type": catalog_type,
+                "provider": provider,
+                "comment": comment,
+                "properties": properties,
+            },
+        )
+        return extract_content_from_response(response, "catalog", {})
+
+    async def alter_catalog(self, catalog_name: str, updates: list) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "catalog", {})
+
+    async def drop_catalog(self, catalog_name: str) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+        )
+        return extract_content_from_response(response, "dropped", False)

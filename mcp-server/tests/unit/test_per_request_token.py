@@ -38,7 +38,9 @@ class TestExtractBearerToken(unittest.TestCase):
     """Unit tests for the token extraction helper."""
 
     def test_well_formed_bearer_header(self):
-        self.assertEqual(_extract_bearer_token("Bearer mytoken123"), "mytoken123")
+        self.assertEqual(
+            _extract_bearer_token("Bearer mytoken123"), "mytoken123"
+        )
 
     def test_case_insensitive_bearer(self):
         self.assertEqual(_extract_bearer_token("bearer MYTOKEN"), "MYTOKEN")
@@ -153,8 +155,12 @@ class TestGravitinoContextPerRequestToken(unittest.TestCase):
         ):
             client_bob = ctx.rest_client()
 
-        alice_headers = dict(client_alice._catalog_operation.rest_client.headers)
+        alice_headers = dict(
+            client_alice._catalog_operation.rest_client.headers
+        )
         bob_headers = dict(client_bob._catalog_operation.rest_client.headers)
-        self.assertEqual(alice_headers.get("authorization"), "Bearer alice-token")
+        self.assertEqual(
+            alice_headers.get("authorization"), "Bearer alice-token"
+        )
         self.assertEqual(bob_headers.get("authorization"), "Bearer bob-token")
         self.assertIsNot(client_alice, client_bob)

@@ -25,7 +25,9 @@ from fastmcp import Client
 
 from mcp_server.client.factory import RESTClientFactory
 from mcp_server.client.plain.exception import GravitinoException
-from mcp_server.client.plain.plain_rest_client_operation import PlainRESTClientOperation
+from mcp_server.client.plain.plain_rest_client_operation import (
+    PlainRESTClientOperation,
+)
 from mcp_server.core import audit
 from mcp_server.core.setting import Setting
 from mcp_server.server import GravitinoMCPServer
@@ -54,7 +56,9 @@ class TestAuditEmit(unittest.TestCase):
 
     def test_allow_record_structure(self):
         """emit() writes a JSON record with all required fields on allow."""
-        audit.emit(principal="bearer:abc12345", tool="list_catalogs", outcome="allow")
+        audit.emit(
+            principal="bearer:abc12345", tool="list_catalogs", outcome="allow"
+        )
 
         self.assertEqual(len(self.log_records), 1)
         record = json.loads(self.log_records[0])
@@ -79,7 +83,9 @@ class TestAuditEmit(unittest.TestCase):
 
     def test_anonymous_principal(self):
         """emit() works with anonymous principal."""
-        audit.emit(principal="anonymous", tool="get_list_of_catalogs", outcome="allow")
+        audit.emit(
+            principal="anonymous", tool="get_list_of_catalogs", outcome="allow"
+        )
         record = json.loads(self.log_records[0])
         self.assertEqual(record["principal"], "anonymous")
 
@@ -172,6 +178,7 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 class _CapturingHandler(logging.Handler):
     """Logging handler that stores formatted messages in a list."""
