@@ -89,7 +89,8 @@ curl -v -X GET \
 :::note
 The Web UI does not provide a username/password login form for built-in IDP Basic authentication.
 Use REST clients, the Java/Python client, or engine connectors instead. See
-[Built-in IDP — Web UI](how-to-use-built-in-idp.md#web-ui) and
+[built-in IDP Web UI](how-to-use-built-in-idp.md#web-ui), the
+[Web UI initial page](../webui.md#initial-page), and the
 [Web V2 initial page](../webui-v2.md#initial-page).
 :::
 
@@ -372,12 +373,11 @@ This example shows how to enable built-in Basic authentication.
 **Prerequisites:**
 
 - Gravitino distribution package (includes the idp-basic plugin on the server classpath)
-
-Built-in IdP is **incompatible** with the `simple` authenticator (the default). When the
-`idp-basic` plugin is enabled, `gravitino.authenticators` must not include `simple`.
-
-The Web UI does not support built-in IDP Basic login. Use REST or client APIs for this mode, or
-configure [OAuth mode](#oauth-mode) if you need browser-based sign-in.
+- Built-in IdP is **incompatible** with the `simple` authenticator (the default). When the
+  `idp-basic` plugin is enabled, `gravitino.authenticators` must not include `simple`.
+- For Web UI limitations with Basic authentication, see
+  [built-in IDP Web UI](how-to-use-built-in-idp.md#web-ui). For browser-based sign-in, configure
+  [OAuth mode](#oauth-mode).
 
 **Configuration:**
 
