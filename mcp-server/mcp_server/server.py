@@ -16,21 +16,69 @@
 # under the License.
 
 import asyncio
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 from urllib.parse import urlparse
 
+import mcp.types as mt
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import (
     LoggingMiddleware,
 )
+from fastmcp.server.middleware.middleware import (
+    CallNext,
+    Middleware,
+    MiddlewareContext,
+)
 from fastmcp.server.middleware.timing import TimingMiddleware
+from fastmcp.tools.base import ToolResult
 
+from mcp_server.core import audit
 from mcp_server.core.context import GravitinoContext
 from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
+
+
+def _get_principal_from_request() -> str:
+    """Extract the principal from the current HTTP request's Authorization header.
+
+    Returns "anonymous" in stdio mode (no HTTP request) or when no token is present.
+    """
+    try:
+        from fastmcp.server.dependencies import get_http_request
+
+        request = get_http_request()
+        authorization = request.headers.get("authorization", "")
+        return audit._extract_principal(authorization)
+    except Exception:  # noqa: BLE001 – stdio mode or no request context
+        return "anonymous"
+
+
+class AuditMiddleware(Middleware):
+    """Emit a structured audit record for every tool invocation."""
+
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        tool_name = context.message.name if context.message else "unknown"
+        principal = _get_principal_from_request()
+        try:
+            result = await call_next(context)
+            audit.emit(principal=principal, tool=tool_name, outcome="allow")
+            return result
+        except Exception as exc:
+            audit.emit(
+                principal=principal,
+                tool=tool_name,
+                outcome="deny",
+                error_type=type(exc).__name__,
+            )
+            raise
 
 
 def _create_lifespan_manager(gravitino_context: GravitinoContext):
@@ -56,10 +104,10 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
             lifespan=_create_lifespan_manager(GravitinoContext(setting)),
         )
 
+    mcp.add_middleware(AuditMiddleware())
     mcp.add_middleware(
         LoggingMiddleware(include_payloads=True, max_payload_length=1000)
     )
-
     mcp.add_middleware(TimingMiddleware())
     mcp.add_middleware(
         ErrorHandlingMiddleware(
