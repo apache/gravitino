@@ -28,6 +28,7 @@ import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.service.LanceAuthenticationFilter;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -63,7 +64,13 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     LanceConfig lanceConfig = new LanceConfig(properties);
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
 
-    server = new JettyServer();
+    server =
+        new JettyServer() {
+          @Override
+          protected javax.servlet.Filter createAuthenticationFilter() {
+            return new LanceAuthenticationFilter();
+          }
+        };
     // Get MetricsSystem directly from GravitinoEnv for zero-overhead access
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false);
