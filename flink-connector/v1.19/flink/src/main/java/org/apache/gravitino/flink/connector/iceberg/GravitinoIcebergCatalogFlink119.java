@@ -20,12 +20,10 @@
 package org.apache.gravitino.flink.connector.iceberg;
 
 import java.util.Map;
-import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
-import org.apache.iceberg.flink.FlinkCatalogFactory;
 
 /** {@link GravitinoIcebergCatalog} implementation for Flink 1.19. */
 public class GravitinoIcebergCatalogFlink119 extends GravitinoIcebergCatalog {
@@ -43,17 +41,11 @@ public class GravitinoIcebergCatalogFlink119 extends GravitinoIcebergCatalog {
         schemaAndTablePropertiesConverter,
         partitionConverter,
         catalogOptions,
-        createIcebergCatalog(catalogName, icebergCatalogProperties));
+        icebergCatalogProperties);
   }
 
   @Override
   protected CatalogCompat catalogCompat() {
     return DefaultCatalogCompat.INSTANCE;
-  }
-
-  private static AbstractCatalog createIcebergCatalog(
-      String catalogName, Map<String, String> icebergCatalogProperties) {
-    return asAbstractCatalog(
-        new FlinkCatalogFactory().createCatalog(catalogName, icebergCatalogProperties));
   }
 }

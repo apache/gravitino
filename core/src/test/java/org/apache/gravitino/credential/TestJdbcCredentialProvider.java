@@ -143,7 +143,7 @@ public class TestJdbcCredentialProvider {
   }
 
   @Test
-  void testEmptyPasswordReturnsEmptyOptional() {
+  void testEmptyPasswordReturnsCredential() {
     Map<String, String> catalogProperties =
         ImmutableMap.of(
             JdbcCredential.GRAVITINO_JDBC_USER,
@@ -157,7 +157,8 @@ public class TestJdbcCredentialProvider {
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
     Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
-    Assertions.assertFalse(credential.isPresent());
+    Assertions.assertTrue(credential.isPresent());
+    Assertions.assertEquals("", ((JdbcCredential) credential.get()).jdbcPassword());
   }
 
   @Test
@@ -167,8 +168,8 @@ public class TestJdbcCredentialProvider {
   }
 
   @Test
-  void testJdbcCredentialConstructorBlankPasswordThrows() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> new JdbcCredential("user", ""));
+  void testJdbcCredentialConstructorNullPasswordThrows() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new JdbcCredential("user", null));
   }
 
   @Test
