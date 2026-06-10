@@ -24,7 +24,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
@@ -58,7 +60,22 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
     config.put("hive.metastore.uri", metastoreUri);
     config.put("hive.security", "allow-all");
     config.put("fs.hadoop.enabled", "true");
+    applyS3Credential(credentials, config);
     return config;
+  }
+
+  static void applyS3Credential(Credential[] credentials, Map<String, String> config) {
+    for (Credential credential : credentials) {
+      if (credential instanceof S3SecretKeyCredential) {
+        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
+        config.put("hive.s3.aws-access-key", s3.accessKeyId());
+        config.put("hive.s3.aws-secret-key", s3.secretAccessKey());
+      } else if (credential instanceof AzureAccountKeyCredential) {
+        AzureAccountKeyCredential azure = (AzureAccountKeyCredential) credential;
+        config.put("hive.azure.abfs-storage-account", azure.accountName());
+        config.put("hive.azure.abfs-access-key", azure.accountKey());
+      }
+    }
   }
 
   @Override

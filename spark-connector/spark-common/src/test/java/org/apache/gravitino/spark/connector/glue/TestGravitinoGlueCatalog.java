@@ -25,8 +25,13 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
+import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
@@ -174,6 +179,43 @@ public class TestGravitinoGlueCatalog {
 
     org.apache.spark.sql.connector.catalog.Table result = catalog.loadSparkTable(ident);
     Assertions.assertSame(mockSparkTable, result);
+  }
+
+  // -------------------------------------------------------------------------
+  // Test applyS3Credential (credential vending)
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testApplyS3CredentialInjectsHadoopProperties() {
+    Catalog mockCatalog = mock(Catalog.class);
+    S3SecretKeyCredential s3Cred = new S3SecretKeyCredential("test-access-key", "test-secret-key");
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {s3Cred});
+
+    Map<String, String> props = new HashMap<>();
+    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props);
+
+    Assertions.assertEquals("test-access-key", props.get("hadoop.fs.s3a.access.key"));
+    Assertions.assertEquals("test-secret-key", props.get("hadoop.fs.s3a.secret.key"));
+    Assertions.assertEquals(
+        "test-access-key", vended.get(GluePropertiesConverter.AWS_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "test-secret-key", vended.get(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY));
+  }
+
+  @Test
+  void testApplyS3CredentialReturnsEmptyWhenNoCredentials() {
+    Catalog mockCatalog = mock(Catalog.class);
+    SupportsCredentials supportsCredentials = mock(SupportsCredentials.class);
+    when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    when(supportsCredentials.getCredentials()).thenReturn(new Credential[] {});
+
+    Map<String, String> props = new HashMap<>();
+    Map<String, String> vended = GravitinoGlueCatalog.applyS3Credential(mockCatalog, props);
+
+    Assertions.assertTrue(props.isEmpty());
+    Assertions.assertTrue(vended.isEmpty());
   }
 
   // -------------------------------------------------------------------------
