@@ -364,8 +364,3 @@ def load_tag_tool(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().list_metadata_by_tag(tag_name)
-
-    mcp.disable(
-        names={"create_tag", "alter_tag", "delete_tag"},
-        components={"tool"},
-    )
