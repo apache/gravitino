@@ -136,7 +136,11 @@ public class GravitinoEnv {
 
   private FilesetDispatcher filesetDispatcher;
 
+  private FilesetDispatcher internalFilesetDispatcher;
+
   private TopicDispatcher topicDispatcher;
+
+  private TopicDispatcher internalTopicDispatcher;
 
   private ModelDispatcher modelDispatcher;
 
@@ -363,12 +367,34 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the internal FilesetDispatcher associated with the Gravitino environment.
+   *
+   * @return The internal FilesetDispatcher instance.
+   */
+  public FilesetDispatcher internalFilesetDispatcher() {
+    Preconditions.checkArgument(
+        internalFilesetDispatcher != null, "GravitinoEnv is not initialized.");
+    return internalFilesetDispatcher;
+  }
+
+  /**
    * Get the TopicDispatcher associated with the Gravitino environment.
    *
    * @return The TopicDispatcher instance.
    */
   public TopicDispatcher topicDispatcher() {
     return topicDispatcher;
+  }
+
+  /**
+   * Get the internal TopicDispatcher associated with the Gravitino environment.
+   *
+   * @return The internal TopicDispatcher instance.
+   */
+  public TopicDispatcher internalTopicDispatcher() {
+    Preconditions.checkArgument(
+        internalTopicDispatcher != null, "GravitinoEnv is not initialized.");
+    return internalTopicDispatcher;
   }
 
   /**
@@ -649,6 +675,7 @@ public class GravitinoEnv {
     // CatalogManager registers its own change-log listener with the entity store (when the store
     // supports it), so no poller wiring is needed here.
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    this.internalCatalogDispatcher = catalogManager;
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);
     this.internalCatalogDispatcher = catalogNormalizeDispatcher;
@@ -661,6 +688,7 @@ public class GravitinoEnv {
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.internalSchemaDispatcher = schemaOperationDispatcher;
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
     this.internalSchemaDispatcher = schemaNormalizeDispatcher;
@@ -670,6 +698,7 @@ public class GravitinoEnv {
 
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.internalTableDispatcher = tableOperationDispatcher;
     TableNormalizeDispatcher tableNormalizeDispatcher =
         new TableNormalizeDispatcher(tableOperationDispatcher, catalogManager);
     TableOperationDispatcher internalTableOperationDispatcher =
@@ -691,6 +720,7 @@ public class GravitinoEnv {
 
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.internalFilesetDispatcher = filesetOperationDispatcher;
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
         new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
     FilesetEventDispatcher filesetEventDispatcher =
@@ -699,6 +729,7 @@ public class GravitinoEnv {
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.internalTopicDispatcher = topicOperationDispatcher;
     TopicNormalizeDispatcher topicNormalizeDispatcher =
         new TopicNormalizeDispatcher(topicOperationDispatcher, catalogManager);
     TopicEventDispatcher topicEventDispatcher =
@@ -731,6 +762,7 @@ public class GravitinoEnv {
     // privilege support is finalized.
     ViewOperationDispatcher viewOperationDispatcher =
         new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
+    this.internalViewDispatcher = viewOperationDispatcher;
     ViewNormalizeDispatcher viewNormalizeDispatcher =
         new ViewNormalizeDispatcher(viewOperationDispatcher, catalogManager);
     ViewOperationDispatcher internalViewOperationDispatcher =
