@@ -203,6 +203,66 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanWithCredentialVending(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "plan_scan_cred_vending", true);
+
+    dummyEventListener.clearEvent();
+    TableMetadata metadata = getTableMeta(namespace, "plan_scan_cred_vending");
+    Long snapshotId = metadata.ref(SnapshotRef.MAIN_BRANCH).snapshotId();
+
+    PlanTableScanRequest request = buildPlanTableScanRequest(snapshotId);
+    Response response =
+        doPlanTableScanWithAccessDelegation(
+            namespace, "plan_scan_cred_vending", request, "vended-credentials");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanRemoteSigningNotSupported(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "plan_scan_remote_signing", true);
+
+    TableMetadata metadata = getTableMeta(namespace, "plan_scan_remote_signing");
+    Long snapshotId = metadata.ref(SnapshotRef.MAIN_BRANCH).snapshotId();
+
+    PlanTableScanRequest request = buildPlanTableScanRequest(snapshotId);
+    Response response =
+        doPlanTableScanWithAccessDelegation(
+            namespace, "plan_scan_remote_signing", request, "remote-signing");
+    Assertions.assertEquals(406, response.getStatus());
+    String errorBody = response.readEntity(String.class);
+    Assertions.assertTrue(
+        errorBody.contains("remote signing") || errorBody.contains("remote-signing"),
+        "Error message should mention remote signing: " + errorBody);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanInvalidAccessDelegation(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "plan_scan_invalid_delegation", true);
+
+    TableMetadata metadata = getTableMeta(namespace, "plan_scan_invalid_delegation");
+    Long snapshotId = metadata.ref(SnapshotRef.MAIN_BRANCH).snapshotId();
+
+    PlanTableScanRequest request = buildPlanTableScanRequest(snapshotId);
+    Response response =
+        doPlanTableScanWithAccessDelegation(
+            namespace, "plan_scan_invalid_delegation", request, "invalid-value");
+    Assertions.assertEquals(400, response.getStatus());
+    String errorBody = response.readEntity(String.class);
+    Assertions.assertTrue(
+        errorBody.contains("vended-credentials") && errorBody.contains("illegal"),
+        "Error message should mention valid values: " + errorBody);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
   void testPlanTableScanWithIncrementalAppendScanValidRange(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
     verifyCreateTableSucc(namespace, "incremental_scan_valid_table", true);
@@ -495,6 +555,14 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private Response doPlanTableScan(Namespace ns, String tableName, PlanTableScanRequest request) {
     Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/plan"));
+    return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response doPlanTableScanWithAccessDelegation(
+      Namespace ns, String tableName, PlanTableScanRequest request, String accessDelegation) {
+    Invocation.Builder builder =
+        getTableClientBuilder(ns, Optional.of(tableName + "/plan"))
+            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, accessDelegation);
     return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
