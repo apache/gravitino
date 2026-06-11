@@ -5,6 +5,8 @@ keyword: spark connector glue catalog aws
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Overview
+
 With the Apache Gravitino Spark connector, accessing data or managing metadata in AWS Glue Data Catalog becomes straightforward, enabling seamless federation queries across Glue catalogs.
 
 ## Capabilities
@@ -18,7 +20,7 @@ Supports most DDL and DML operations in SparkSQL, except such operations:
 - `CREATE TABLE LIKE` clause
 - `TRUNCATE TABLE` clause
 
-## Table format support
+## Table Format Support
 
 The Glue catalog supports mixed table formats within a single database:
 
@@ -90,7 +92,7 @@ The AWS SDK JARs in the directory are loaded in Spark's `IsolatedClientLoader` t
 conflicts with `hadoop-aws`.
 :::
 
-## Creating a catalog
+## Create a Catalog
 
 Use the Gravitino REST API or the Gravitino CLI to create a Glue catalog:
 
@@ -111,7 +113,7 @@ curl -X POST -H "Content-Type: application/json" \
 
 For more information about the Glue catalog properties, refer to [AWS Glue catalog](../aws-glue-catalog.md).
 
-## SQL example
+## SQL Example
 
 ```sql
 -- Suppose glue_catalog is the Glue catalog name managed by Gravitino
@@ -155,9 +157,9 @@ SELECT * FROM orders WHERE order_ts >= DATE '2024-01-01';
 Time-based partition transforms (`days()`, `hours()`, `months()`, `years()`) can be specified in `CREATE TABLE`, but `INSERT` into such Iceberg tables is not currently supported through the Gravitino Spark Glue connector. Use identity partitioning (e.g. `PARTITIONED BY (order_ts)`) when writes are required.
 :::
 
-## Catalog properties
+## Catalog Properties
 
-Gravitino Spark connector transforms the following property names defined in catalog properties to Spark Hive/Iceberg connector configuration.
+The Gravitino Spark connector maps the following catalog property names to Spark Hive/Iceberg connector configuration.
 
 | Property name in Gravitino catalog properties | Spark Hive connector configuration | Description                                 | Since Version |
 |-----------------------------------------------|------------------------------------|---------------------------------------------|---------------|
@@ -178,7 +180,7 @@ For Iceberg tables, Gravitino properties are mapped to Iceberg GlueCatalog confi
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed directly to the Spark Hive connector. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass `hive.exec.dynamic.partition.mode` to the Spark Hive connector.
 
-## S3 storage
+## S3 Storage
 
 When using AWS S3, configure S3 credentials as global Hadoop properties via Spark configuration:
 

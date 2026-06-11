@@ -5,6 +5,8 @@ keyword: gravitino connector trino glue aws
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Overview
+
 The Glue catalog allows Trino to query data stored in tables registered in the AWS Glue Data Catalog.
 It supports both Hive-format and Iceberg-format tables on Amazon S3.
 
@@ -15,17 +17,17 @@ It supports both Hive-format and Iceberg-format tables on Amazon S3.
   See [AWS IAM permissions](../aws-glue-catalog.md#aws-iam-permissions) for the required policy.
 - Data files stored on Amazon S3.
 
-## Schema operations
+## Schema Operations
 
-### Create a schema
+### Create a Schema
 
 ```sql
 CREATE SCHEMA glue_test.schema_name;
 ```
 
-## Table operations
+## Table Operations
 
-### Create a Hive-format table
+### Create a Hive-Format Table
 
 The default table format is Hive. The following example creates an ORC-format partitioned table:
 
@@ -62,7 +64,7 @@ WITH (
 );
 ```
 
-### Create an Iceberg-format table
+### Create an Iceberg-Format Table
 
 Set `type = 'ICEBERG'` to create an Iceberg table. Iceberg tables support richer partition transforms.
 
@@ -96,7 +98,7 @@ Supported Iceberg partition transform expressions in `partitioned_by`:
 `CREATE OR REPLACE TABLE AS SELECT` is not supported. Use `DROP TABLE` followed by `CREATE TABLE AS SELECT` as an alternative.
 :::
 
-### Alter table
+### Alter Table
 
 The following alter table operations are supported:
 
@@ -153,9 +155,9 @@ DROP TABLE glue_test.db01.orders;
 DROP SCHEMA glue_test.db01;
 ```
 
-## Schema and table properties
+## Schema and Table Properties
 
-### Create a schema with properties
+### Create a Schema with Properties
 
 ```sql
 CREATE SCHEMA glue_test.db01
@@ -168,7 +170,7 @@ WITH (
 |------------|--------------------------|---------------|----------|---------------|
 | `location` | S3 location for the schema | (none)      | No       | 1.3.0         |
 
-### Create a table with properties
+### Create a Table with Properties
 
 ```sql
 CREATE TABLE glue_test.db01.table_name
@@ -196,11 +198,11 @@ CREATE TABLE glue_test.db01.table_name
 | `bucket_count`  | Number of buckets (required when `bucketed_by` is set)                      | (none)        | No       | 1.3.0         |
 | `sorted_by`     | Sort order columns, e.g. `ARRAY['col ASC NULLS LAST', 'col2 DESC']`        | (none)        | No       | 1.3.0         |
 
-## Basic usage examples
+## Examples
 
-The following steps show how to use the Glue catalog in Trino through Gravitino.
+Follow these steps to use the Glue catalog in Trino through Gravitino.
 
-### Create a catalog in Gravitino
+### Create a Catalog in Gravitino
 
 Use the Trino CLI to create the catalog. Assuming the metalake is `test` and the catalog name is `glue_test`:
 
@@ -217,7 +219,7 @@ CALL gravitino.system.create_catalog(
 
 For more information about the Glue catalog, refer to [AWS Glue catalog](../aws-glue-catalog.md).
 
-### Connect and list catalogs
+### Connect and List Catalogs
 
 Set `gravitino.metalake` to `test` and start the Trino container. Then list catalogs:
 
@@ -239,7 +241,7 @@ The results are similar to:
 
 The `glue_test` catalog corresponds to the catalog created in Gravitino.
 
-## Data type mapping
+## Data Type Mapping
 
 The Glue connector extends the Hive data type mapping with additional support for Iceberg types.
 
@@ -270,9 +272,9 @@ The Glue connector extends the Hive data type mapping with additional support fo
 `TIME` and `TIMESTAMP WITH TIME ZONE` are available for Iceberg-format tables only. Hive-format tables use millisecond-precision `TIMESTAMP` without time zone.
 :::
 
-## Passing Trino connector configuration
+## Trino Connector Configuration
 
-Gravitino passes catalog properties to the underlying Trino Hive connector. You can supply additional Trino connector properties using the `trino.bypass.` prefix:
+Gravitino passes catalog properties to the underlying Trino Hive connector. Supply additional Trino connector properties using the `trino.bypass.` prefix:
 
 ```sql
 CALL gravitino.system.create_catalog(

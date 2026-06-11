@@ -10,9 +10,9 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Apache Gravitino offers the capability to utilize [AWS Glue Data Catalog](https://aws.amazon.com/glue/) as a catalog for metadata management.
+Apache Gravitino uses [AWS Glue Data Catalog](https://aws.amazon.com/glue/) as a metadata catalog.
 
-### Requirements and limitations
+### Requirements and Limitations
 
 * The Glue catalog requires network access to the AWS Glue API.
 * Gravitino uses the AWS SDK v2 to communicate with Glue.
@@ -23,7 +23,7 @@ The Glue catalog is case-insensitive for schema and table names. AWS Glue folds 
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 The Glue catalog supports creating, updating, and deleting databases and tables in the AWS Glue Data Catalog.
 
@@ -31,9 +31,9 @@ The Glue catalog supports creating, updating, and deleting databases and tables 
 - Supports Hive-format table partitioning, bucketing, and sort orders.
 - Does not support views. Glue views (tables with `TableType=VIRTUAL_VIEW`) are filtered out.
 
-### Catalog properties
+### Catalog Properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Glue catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Glue catalog has the following properties:
 
 | Property Name            | Description                                                                                                                                                                                                 | Default Value            | Required | Immutable | Since Version |
 |--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|----------|-----------|---------------|
@@ -50,32 +50,32 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 **Authentication priority**: Static credentials (`aws-access-key-id` + `aws-secret-access-key`) take precedence over the default credential chain (environment variables, instance profile, container credentials).
 :::
 
-### Passing connector configuration
+### Connector Configuration
 
 - When using Gravitino with Trino, pass additional Trino connector properties using the `trino.bypass.` prefix. For example, `trino.bypass.hive.metastore.glue.max-connections` sets `hive.metastore.glue.max-connections` in the Trino runtime.
 - When using Gravitino with Spark, pass additional Spark connector properties using the `spark.bypass.` prefix.
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 The Glue catalog supports creating, updating, and deleting databases in the AWS Glue Data Catalog.
 
-### Schema properties
+### Schema Properties
 
 The Glue catalog does not define predefined schema properties beyond `comment`. You can define your own key-value pair properties and transmit them to the underlying Glue database.
 
-### Schema operations
+### Schema Operations
 
 See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations).
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - The Glue catalog supports creating, updating, and deleting tables in the AWS Glue Data Catalog.
 - All entries in the Glue `Table.parameters()` pass through Gravitino intact, so downstream tools can correctly identify the table format.
@@ -83,9 +83,9 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 - Does not support NOT NULL constraints on columns.
 - Does not support table indexes.
 
-### Table partitioning
+### Table Partitioning
 
-The Glue catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). Users can create partitioned tables in the Glue catalog with the specific partitioning attribute.
+The Glue catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). Create partitioned tables in the Glue catalog by specifying the partitioning attribute.
 
 The supported partitioning strategies depend on the table format:
 
@@ -96,16 +96,16 @@ The supported partitioning strategies depend on the table format:
 The `fieldName` specified in the partitioning attribute must be the name of a column defined in the table.
 :::
 
-### Table sort orders and distributions
+### Table Sort Orders and Distributions
 
-The Glue catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Users can create bucketed sorted tables in the Glue catalog with specific `distribution` and `sortOrders` attributes.
+The Glue catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Create bucketed sorted tables by setting the `distribution` and `sortOrders` attributes.
 Although Gravitino supports several distribution strategies, AWS Glue inherently only supports a single distribution strategy (clustered by column). Therefore the Glue catalog only supports `Hash` distribution.
 
 :::caution
 The `fieldName` specified in the `distribution` and `sortOrders` attribute must be the name of a column defined in the table.
 :::
 
-### Table column types
+### Table Column Types
 
 The Glue catalog supports all data types defined in the [Hive Language Manual](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types).
 The following table lists the data types mapped from the Glue catalog to Gravitino.
@@ -137,10 +137,10 @@ The following table lists the data types mapped from the Glue catalog to Graviti
 The data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Glue catalog.
 :::
 
-### Table properties
+### Table Properties
 
 Table properties supply or set metadata for the underlying Glue tables.
-The following table lists predefined table properties for a Glue table. Additionally, you can define your own key-value pair properties and transmit them to the underlying Glue database.
+The following table lists predefined table properties for a Glue table. Additional key-value properties pass through to the underlying Glue database.
 
 :::note
 **Reserved**: Fields that cannot be passed to the Gravitino server.
@@ -162,14 +162,14 @@ The following table lists predefined table properties for a Glue table. Addition
 | `comment`               | Used to store a table comment.                                                                                                             | (none)                                                                                | No       | Yes      | No        | 1.3.0         |
 
 :::note
-All entries in the Glue `Table.parameters()` pass through Gravitino's API layer intact. This ensures `table_type=ICEBERG`, `metadata_location=s3://...`, `spark.sql.sources.provider=delta`, and any other format indicators survive Gravitino's metadata proxy layer.
+All entries in the Glue `Table.parameters()` pass through Gravitino's API layer intact. This passthrough ensures `table_type=ICEBERG`, `metadata_location=s3://...`, `spark.sql.sources.provider=delta`, and any other format indicators survive Gravitino's metadata proxy layer.
 :::
 
-### Table operations
+### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter operations
+#### Alter Operations
 
 Gravitino has already defined a unified set of [metadata operation interfaces](./manage-relational-metadata-using-gravitino.md#alter-a-table), and the following table lists the mapping relationship between Glue alter operations and Gravitino table update requests.
 
@@ -208,21 +208,21 @@ The Glue catalog supports partition operations via `SupportsPartitions` for Hive
 Only `IdentityPartition` is supported because the Glue partition model is Hive-style key=value.
 :::
 
-## Iceberg table support
+## Iceberg Tables
 
 The Glue catalog supports creating and managing Iceberg-format tables through the Apache Iceberg SDK's `GlueCatalog`. When an Iceberg table is created, Gravitino writes the `metadata.json` file to S3 and registers the table in Glue with the correct `metadata_location` parameter, making it usable by Trino (Lakehouse connector), Spark, and other Iceberg-native query engines.
 
-### Creating an Iceberg table
+### Create an Iceberg Table
 
 Set `table-format=ICEBERG` in the table properties, or configure `default-table-format=iceberg` on the catalog to make all tables Iceberg by default.
 
 The `warehouse` catalog property must be configured. The table location is derived as `warehouse/database/table` when no explicit `location` is specified.
 
-### Registering an existing Iceberg table
+### Register an Existing Iceberg Table
 
 To register an Iceberg table that already exists in S3, set `metadata_location` to the path of the existing `metadata.json` file during `createTable()`. In this mode, Gravitino registers the table in Glue without creating new metadata.
 
-### Iceberg column types
+### Iceberg Column Types
 
 Iceberg tables use the Iceberg type system, which differs from Hive types. The following table lists the Gravitino types supported for Iceberg tables and how they map to Iceberg types:
 
@@ -250,7 +250,7 @@ Iceberg tables use the Iceberg type system, which differs from Hive types. The f
 | `map`                    | `map`                 |                                                     |
 | `struct`                 | `struct`              |                                                     |
 
-### Iceberg table alter operations
+### Iceberg Table Alter Operations
 
 For Iceberg tables, the following alter operations are supported:
 
@@ -275,7 +275,7 @@ Nested column operations (add, delete, rename, type update) are not supported fo
 
 ## Security
 
-### AWS IAM permissions
+### AWS IAM Permissions
 
 The IAM policy attached to the credential used by the Glue catalog must cover both Glue metadata access and S3 data access:
 
