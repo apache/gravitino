@@ -239,11 +239,10 @@ public abstract class TrinoIcebergRESTAuthorizationITBase extends BaseIT {
       if (tokenServer != null) {
         tokenServer.close();
       }
-      try {
-        super.stopIntegrationTest();
-      } finally {
-        containerSuite.close();
-      }
+      // Do not close the shared ContainerSuite here: it is a process-wide singleton whose
+      // PostgreSQL container may be reused by other tests in the same JVM. The suite cleans up its
+      // containers on JVM shutdown.
+      super.stopIntegrationTest();
     }
   }
 }

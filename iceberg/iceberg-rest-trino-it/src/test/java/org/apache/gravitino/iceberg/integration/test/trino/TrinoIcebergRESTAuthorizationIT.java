@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.integration.test.trino;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
@@ -39,6 +40,10 @@ public class TrinoIcebergRESTAuthorizationIT extends TrinoIcebergRESTAuthorizati
 
   private static final String ROLE = "trino_role";
 
+  // Substring of the message Gravitino's IRC authorization filter returns in the Iceberg REST 403
+  // response (see BaseMetadataAuthorizationMethodInterceptor); Trino surfaces it on the failure.
+  private static final String NOT_AUTHORIZED_MESSAGE = "is not authorized to perform operation";
+
   @BeforeAll
   public void setupTrino() throws Exception {
     catalogAsSuper.asSchemas().createSchema("db1", "", new HashMap<>());
@@ -50,7 +55,9 @@ public class TrinoIcebergRESTAuthorizationIT extends TrinoIcebergRESTAuthorizati
   @Test
   @Order(1)
   public void testNormalUserDeniedWithoutPrivileges() {
-    assertThrows(RuntimeException.class, () -> sql(NORMAL_CATALOG, "SELECT * FROM db1.shared"));
+    RuntimeException e =
+        assertThrows(RuntimeException.class, () -> sql(NORMAL_CATALOG, "SELECT * FROM db1.shared"));
+    assertAuthorizationDenied(e);
   }
 
   @Test
@@ -72,8 +79,28 @@ public class TrinoIcebergRESTAuthorizationIT extends TrinoIcebergRESTAuthorizati
   @Test
   @Order(3)
   public void testNormalUserDeniedCreateTable() {
-    assertThrows(
-        RuntimeException.class,
-        () -> sql(NORMAL_CATALOG, "CREATE TABLE db1.normal_made (id integer)"));
+    RuntimeException e =
+        assertThrows(
+            RuntimeException.class,
+            () -> sql(NORMAL_CATALOG, "CREATE TABLE db1.normal_made (id integer)"));
+    assertAuthorizationDenied(e);
+  }
+
+  /**
+   * Asserts that the failure originated from Gravitino's authorization layer (an Iceberg REST 403)
+   * rather than some unrelated error, by inspecting the whole exception cause chain.
+   *
+   * @param e the exception thrown by the denied Trino query
+   */
+  private static void assertAuthorizationDenied(RuntimeException e) {
+    StringBuilder messages = new StringBuilder();
+    for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+      if (cause.getMessage() != null) {
+        messages.append(cause.getMessage()).append('\n');
+      }
+    }
+    assertTrue(
+        messages.toString().contains(NOT_AUTHORIZED_MESSAGE),
+        "Expected an authorization failure but got: " + messages);
   }
 }
