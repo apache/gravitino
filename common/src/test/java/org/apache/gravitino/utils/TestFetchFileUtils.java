@@ -33,7 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,18 +50,13 @@ public class TestFetchFileUtils {
         "gravitino.fetchFile.blockUnsafeRemoteUri", FetchFileUtils.BLOCK_UNSAFE_REMOTE_URI_CONFIG);
   }
 
-  @AfterEach
-  public void resetBlockUnsafeRemoteUri() {
-    FetchFileUtils.setBlockUnsafeRemoteUri(true);
-  }
-
   @Test
   public void testLinkLocalFile() throws Exception {
     File srcFile = new File(tempDir, "source");
     Assertions.assertTrue(srcFile.createNewFile());
     File destFile = new File(tempDir, "dest");
 
-    FetchFileUtils.fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, null);
+    FetchFileUtils.fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, null, true);
     Assertions.assertTrue(Files.isSymbolicLink(destFile.toPath()));
     Assertions.assertEquals(
         srcFile.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
@@ -74,7 +68,7 @@ public class TestFetchFileUtils {
     String uri = new File(tempDir, "does-not-exist-" + UUID.randomUUID()).toURI().toString();
 
     Assertions.assertThrows(
-        IOException.class, () -> FetchFileUtils.fetchFileFromUri(uri, destFile, 10, null));
+        IOException.class, () -> FetchFileUtils.fetchFileFromUri(uri, destFile, 10, null, true));
   }
 
   @Test
@@ -94,7 +88,8 @@ public class TestFetchFileUtils {
                 () -> {
                   try {
                     barrier.await(30, TimeUnit.SECONDS);
-                    FetchFileUtils.fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, null);
+                    FetchFileUtils.fetchFileFromUri(
+                        srcFile.toURI().toString(), destFile, 10, null, true);
                   } catch (Exception e) {
                     throw new RuntimeException(e);
                   }
@@ -119,11 +114,11 @@ public class TestFetchFileUtils {
     File destFile = new File(tempDir, "dest_idempotent");
     String uri = srcFile.toURI().toString();
 
-    FetchFileUtils.fetchFileFromUri(uri, destFile, 10, null);
+    FetchFileUtils.fetchFileFromUri(uri, destFile, 10, null, true);
     Assertions.assertTrue(Files.isSymbolicLink(destFile.toPath()));
 
     // Second call to the same dest should succeed without error.
-    FetchFileUtils.fetchFileFromUri(uri, destFile, 10, null);
+    FetchFileUtils.fetchFileFromUri(uri, destFile, 10, null, true);
     Assertions.assertTrue(Files.isSymbolicLink(destFile.toPath()));
     Assertions.assertEquals(
         srcFile.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
@@ -137,11 +132,11 @@ public class TestFetchFileUtils {
     Assertions.assertTrue(srcFileB.createNewFile());
     File destFile = new File(tempDir, "dest_replace");
 
-    FetchFileUtils.fetchFileFromUri(srcFileA.toURI().toString(), destFile, 10, null);
+    FetchFileUtils.fetchFileFromUri(srcFileA.toURI().toString(), destFile, 10, null, true);
     Assertions.assertEquals(
         srcFileA.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
 
-    FetchFileUtils.fetchFileFromUri(srcFileB.toURI().toString(), destFile, 10, null);
+    FetchFileUtils.fetchFileFromUri(srcFileB.toURI().toString(), destFile, 10, null, true);
     Assertions.assertEquals(
         srcFileB.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
   }
@@ -155,7 +150,7 @@ public class TestFetchFileUtils {
             IllegalArgumentException.class,
             () ->
                 FetchFileUtils.fetchFileFromUri(
-                    "http://127.0.0.1:8090/keytab", destFile, 10, null));
+                    "http://127.0.0.1:8090/keytab", destFile, 10, null, true));
 
     Assertions.assertTrue(exception.getMessage().contains("Gravitino server side"));
     Assertions.assertTrue(
@@ -170,13 +165,12 @@ public class TestFetchFileUtils {
     try {
       server.start();
       int port = server.getAddress().getPort();
-      FetchFileUtils.setBlockUnsafeRemoteUri(false);
-
       FetchFileUtils.fetchFileFromUri(
           String.format("http://127.0.0.1:%d/keytab", port),
           destFile,
           30000 /* 30s connect/read timeout in milliseconds */,
-          null);
+          null,
+          false);
 
       Assertions.assertEquals("keytab", Files.readString(destFile.toPath()));
     } finally {
@@ -190,7 +184,7 @@ public class TestFetchFileUtils {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> FetchFileUtils.fetchFileFromUri("hdfs://namenode/keytab", destFile, 10, null));
+        () -> FetchFileUtils.fetchFileFromUri("hdfs://namenode/keytab", destFile, 10, null, true));
   }
 
   @Test
@@ -199,7 +193,7 @@ public class TestFetchFileUtils {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> FetchFileUtils.fetchFileFromUri("scp://host/keytab", destFile, 10, null));
+        () -> FetchFileUtils.fetchFileFromUri("scp://host/keytab", destFile, 10, null, true));
   }
 
   @Test
@@ -209,7 +203,7 @@ public class TestFetchFileUtils {
     File destFile = new File(tempDir, "dest_return");
 
     String returned =
-        FetchFileUtils.fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, null);
+        FetchFileUtils.fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, null, true);
     Assertions.assertEquals(destFile.getAbsolutePath(), returned);
   }
 

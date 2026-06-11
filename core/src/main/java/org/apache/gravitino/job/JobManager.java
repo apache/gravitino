@@ -45,6 +45,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.job.JobExecutor;
@@ -799,6 +800,13 @@ public class JobManager implements JobOperationDispatcher {
 
   @VisibleForTesting
   static String fetchFileFromUri(String uri, File stagingDir, int timeoutInMs) {
+    return fetchFileFromUri(
+        uri, stagingDir, timeoutInMs, GravitinoEnv.getInstance().blockUnsafeRemoteUri());
+  }
+
+  @VisibleForTesting
+  static String fetchFileFromUri(
+      String uri, File stagingDir, int timeoutInMs, boolean blockUnsafeRemoteUri) {
     try {
       URI fileUri = new URI(uri);
       File destFile = new File(stagingDir, new File(fileUri.getPath()).getName());
@@ -806,7 +814,8 @@ public class JobManager implements JobOperationDispatcher {
           uri,
           destFile,
           timeoutInMs,
-          null /* hadoopConf: job file URIs never use the hdfs scheme */);
+          null /* hadoopConf: job file URIs never use the hdfs scheme */,
+          blockUnsafeRemoteUri);
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
     }

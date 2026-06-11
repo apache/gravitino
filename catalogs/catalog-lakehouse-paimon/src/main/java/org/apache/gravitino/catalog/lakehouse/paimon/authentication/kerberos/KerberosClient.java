@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.utils.FetchFileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -105,7 +106,8 @@ public class KerberosClient implements Closeable {
         keyTabUri,
         keytabFile,
         fetchKeytabFileTimeout * 1000,
-        null /* hadoopConf: Paimon keytab URIs never use the hdfs scheme */);
+        null /* hadoopConf: Paimon keytab URIs never use the hdfs scheme */,
+        GravitinoEnv.getInstance().blockUnsafeRemoteUri());
 
     return keytabFile;
   }

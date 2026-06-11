@@ -845,7 +845,7 @@ public abstract class BaseGVFSOperations implements Closeable {
 
             FileSystem created;
             if (scheme.equals(SCHEME_HDFS)) {
-              created = new HDFSFileSystemProxy(actualFilePath, allProperties).getProxy();
+              created = new HDFSFileSystemProxy(actualFilePath, allProperties, true).getProxy();
             } else {
               created = provider.getFileSystem(actualFilePath, allProperties);
             }

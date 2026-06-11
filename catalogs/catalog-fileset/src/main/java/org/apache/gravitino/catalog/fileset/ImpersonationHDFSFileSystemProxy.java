@@ -40,10 +40,14 @@ public class ImpersonationHDFSFileSystemProxy extends HDFSFileSystemProxy {
    * @param path the HDFS path
    * @param config the configuration map of Gravitino
    * @param handler the handle of retrieving proxy user
+   * @param blockUnsafeRemoteUri whether to block remote URIs that resolve to unsafe addresses
    */
   public ImpersonationHDFSFileSystemProxy(
-      Path path, Map<String, String> config, ProxyUserHandler handler) {
-    super();
+      Path path,
+      Map<String, String> config,
+      ProxyUserHandler handler,
+      boolean blockUnsafeRemoteUri) {
+    super(blockUnsafeRemoteUri);
 
     Preconditions.checkArgument(handler != null, "ProxyUserHandler cannot be null");
     this.proxyUserHandler = handler;

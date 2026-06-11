@@ -51,10 +51,13 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   protected UserGroupInformation initUgi;
   private FileSystem fs;
   private Configuration configuration;
+  private final boolean blockUnsafeRemoteUri;
   protected boolean impersonationEnabled;
   protected String kerberosRealm;
 
-  protected HDFSFileSystemProxy() {}
+  protected HDFSFileSystemProxy(boolean blockUnsafeRemoteUri) {
+    this.blockUnsafeRemoteUri = blockUnsafeRemoteUri;
+  }
 
   /**
    * Create a HDFSAuthenticationFileSystem with the given path and configuration. Supports both
@@ -62,8 +65,10 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    *
    * @param path the HDFS path
    * @param config the configuration map of Gravitino
+   * @param blockUnsafeRemoteUri whether to block remote URIs that resolve to unsafe addresses
    */
-  public HDFSFileSystemProxy(Path path, Map<String, String> config) {
+  public HDFSFileSystemProxy(Path path, Map<String, String> config, boolean blockUnsafeRemoteUri) {
+    this(blockUnsafeRemoteUri);
     initFileSystem(path, config);
   }
 
@@ -167,7 +172,8 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   private UserGroupInformation initKerberosUgi(
       Map<String, String> properties, Configuration configuration) {
     try {
-      KerberosClient client = new KerberosClient(properties, configuration, true);
+      KerberosClient client =
+          new KerberosClient(properties, configuration, true, blockUnsafeRemoteUri);
       String keytabPath =
           String.format(GRAVITINO_KEYTAB_FORMAT, properties.getOrDefault(GRAVITINO_ID_KEY, ""));
       File keytabFile = client.saveKeyTabFileFromUri(keytabPath);

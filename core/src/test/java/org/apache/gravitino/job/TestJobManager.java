@@ -153,7 +153,6 @@ public class TestJobManager {
 
   @AfterEach
   public void tearDown() throws Exception {
-    FetchFileUtils.setBlockUnsafeRemoteUri(true);
     // Reset mocks to ensure test isolation
     if (mockedMetalake != null) {
       mockedMetalake.reset();
@@ -980,11 +979,10 @@ public class TestJobManager {
     try {
       server.start();
       int port = server.getAddress().getPort();
-      FetchFileUtils.setBlockUnsafeRemoteUri(false);
 
       String fetchedFile =
           JobManager.fetchFileFromUri(
-              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000);
+              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000, false);
 
       Assertions.assertEquals("job artifact", Files.readString(Path.of(fetchedFile)));
     } finally {

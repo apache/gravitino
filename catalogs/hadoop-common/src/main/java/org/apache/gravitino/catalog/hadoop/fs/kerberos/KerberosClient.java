@@ -47,13 +47,18 @@ public class KerberosClient implements Closeable {
   private final Map<String, String> conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
+  private final boolean blockUnsafeRemoteUri;
   private String kerberosRealm;
 
   public KerberosClient(
-      Map<String, String> conf, Configuration hadoopConf, boolean refreshCredentials) {
+      Map<String, String> conf,
+      Configuration hadoopConf,
+      boolean refreshCredentials,
+      boolean blockUnsafeRemoteUri) {
     this.conf = conf;
     this.hadoopConf = hadoopConf;
     this.refreshCredentials = refreshCredentials;
+    this.blockUnsafeRemoteUri = blockUnsafeRemoteUri;
   }
 
   public UserGroupInformation login(String keytabFilePath) throws IOException {
@@ -124,7 +129,7 @@ public class KerberosClient implements Closeable {
 
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
     FetchFileUtils.fetchFileFromUri(
-        keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf);
+        keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf, blockUnsafeRemoteUri);
 
     return keytabFile;
   }

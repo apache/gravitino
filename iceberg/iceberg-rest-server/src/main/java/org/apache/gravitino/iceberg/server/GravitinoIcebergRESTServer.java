@@ -25,7 +25,6 @@ import org.apache.gravitino.iceberg.RESTService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
-import org.apache.gravitino.utils.FetchFileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,15 +46,10 @@ public class GravitinoIcebergRESTServer {
   }
 
   private void initialize() {
-    configureRemoteUriValidation(serverConfig);
     gravitinoEnv.initializeBaseComponents(serverConfig);
     icebergRESTService.serviceInit(
         serverConfig.getConfigsWithPrefix(IcebergConfig.ICEBERG_CONFIG_PREFIX), false);
     ServerAuthenticator.getInstance().initialize(serverConfig);
-  }
-
-  static void configureRemoteUriValidation(ServerConfig serverConfig) {
-    FetchFileUtils.setBlockUnsafeRemoteUri(serverConfig.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
   }
 
   private void start() {

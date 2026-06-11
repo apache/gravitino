@@ -47,18 +47,7 @@ public final class FetchFileUtils {
   public static final String BLOCK_UNSAFE_REMOTE_URI_CONFIG =
       "gravitino.fetchFile.blockUnsafeRemoteUri";
 
-  private static volatile boolean blockUnsafeRemoteUri = true;
-
   private FetchFileUtils() {}
-
-  /**
-   * Sets whether remote URIs that resolve to unsafe addresses should be blocked.
-   *
-   * @param blockUnsafeRemoteUri whether to block unsafe remote URIs
-   */
-  public static void setBlockUnsafeRemoteUri(boolean blockUnsafeRemoteUri) {
-    FetchFileUtils.blockUnsafeRemoteUri = blockUnsafeRemoteUri;
-  }
 
   /**
    * Fetches the file referenced by {@code fileUri} into {@code destFile}.
@@ -69,11 +58,16 @@ public final class FetchFileUtils {
    *     downloads
    * @param hadoopConf an {@code org.apache.hadoop.conf.Configuration} instance, required only for
    *     the {@code hdfs} scheme; may be {@code null} when no {@code hdfs} URI is fetched
+   * @param blockUnsafeRemoteUri whether to block remote URIs that resolve to unsafe addresses
    * @return the absolute path of {@code destFile}
    * @throws IOException if the file cannot be fetched
    */
   public static String fetchFileFromUri(
-      String fileUri, File destFile, int timeoutMs, @Nullable Object hadoopConf)
+      String fileUri,
+      File destFile,
+      int timeoutMs,
+      @Nullable Object hadoopConf,
+      boolean blockUnsafeRemoteUri)
       throws IOException {
     try {
       URI uri = new URI(fileUri);

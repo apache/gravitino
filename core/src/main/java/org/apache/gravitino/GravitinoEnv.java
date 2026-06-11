@@ -545,6 +545,15 @@ public class GravitinoEnv {
     return config == null || config.get(Configs.CACHE_ENABLED);
   }
 
+  /**
+   * Returns whether remote URIs that resolve to unsafe addresses should be blocked.
+   *
+   * @return whether unsafe remote URIs should be blocked
+   */
+  public boolean blockUnsafeRemoteUri() {
+    return config == null || config.get(Configs.BLOCK_UNSAFE_REMOTE_URI);
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();

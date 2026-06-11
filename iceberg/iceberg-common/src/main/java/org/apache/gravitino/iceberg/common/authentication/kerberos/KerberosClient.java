@@ -30,6 +30,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.utils.FetchFileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -122,7 +123,11 @@ public class KerberosClient implements Closeable {
     // TODO: Make the configuration
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
     FetchFileUtils.fetchFileFromUri(
-        keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf);
+        keyTabUri,
+        keytabFile,
+        fetchKeytabFileTimeout * 1000,
+        hadoopConf,
+        GravitinoEnv.getInstance().blockUnsafeRemoteUri());
 
     return keytabFile;
   }
