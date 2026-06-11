@@ -125,6 +125,78 @@ class TestCompactionStrategyHandler {
   }
 
   @Test
+  void testShouldTriggerUsingTableMetadata() {
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Map<String, Object> rules = new HashMap<>();
+    rules.put(StrategyUtils.TRIGGER_EXPR, "sort_order_count > 0 && min_target_size > 100");
+    rules.put(StrategyUtils.SCORE_EXPR, "1");
+    Strategy metadataStrategy =
+        new Strategy() {
+          @Override
+          public String name() {
+            return "metadata-trigger-test";
+          }
+
+          @Override
+          public String strategyType() {
+            return CompactionStrategyHandler.NAME;
+          }
+
+          @Override
+          public Map<String, Object> rules() {
+            return rules;
+          }
+
+          @Override
+          public Map<String, String> properties() {
+            return Map.of();
+          }
+
+          @Override
+          public Map<String, String> jobOptions() {
+            return Map.of();
+          }
+
+          @Override
+          public String jobTemplateName() {
+            return "compaction-template";
+          }
+        };
+
+    // A sorted table whose property satisfies the threshold should trigger.
+    Table sorted = Mockito.mock(Table.class);
+    Mockito.when(sorted.partitioning())
+        .thenReturn(new org.apache.gravitino.rel.expressions.transforms.Transform[0]);
+    Mockito.when(sorted.sortOrder())
+        .thenReturn(new org.apache.gravitino.rel.expressions.sorts.SortOrder[1]);
+    Mockito.when(sorted.properties()).thenReturn(Map.of("min_target_size", "500"));
+    StrategyHandlerContext sortedContext =
+        StrategyHandlerContext.builder(tableId, metadataStrategy)
+            .withTableMetadata(sorted)
+            .withTableStatistics(List.of())
+            .build();
+    CompactionStrategyHandler sortedHandler = new CompactionStrategyHandler();
+    sortedHandler.initialize(sortedContext);
+    Assertions.assertTrue(sortedHandler.shouldTrigger());
+
+    // An unsorted table (sort_order_count == 0) must not trigger the same expression.
+    Table unsorted = Mockito.mock(Table.class);
+    Mockito.when(unsorted.partitioning())
+        .thenReturn(new org.apache.gravitino.rel.expressions.transforms.Transform[0]);
+    Mockito.when(unsorted.sortOrder())
+        .thenReturn(new org.apache.gravitino.rel.expressions.sorts.SortOrder[0]);
+    Mockito.when(unsorted.properties()).thenReturn(Map.of("min_target_size", "500"));
+    StrategyHandlerContext unsortedContext =
+        StrategyHandlerContext.builder(tableId, metadataStrategy)
+            .withTableMetadata(unsorted)
+            .withTableStatistics(List.of())
+            .build();
+    CompactionStrategyHandler unsortedHandler = new CompactionStrategyHandler();
+    unsortedHandler.initialize(unsortedContext);
+    Assertions.assertFalse(unsortedHandler.shouldTrigger());
+  }
+
+  @Test
   void testJobConfig() {
     NameIdentifier tableId = NameIdentifier.of("db", "table");
     Table tableMetadata = Mockito.mock(Table.class);

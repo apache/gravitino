@@ -42,6 +42,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.util.ExpressionEva
 import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StatisticsUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StrategyUtils;
+import org.apache.gravitino.maintenance.optimizer.recommender.util.TableMetadataTriggerExpressionUtils;
 import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,11 +137,11 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private boolean shouldTriggerForNonPartitionTable() {
-    return evaluateBool(triggerExpression(strategy), tableStatistics);
+    return evaluateBool(triggerExpression(strategy), List.of());
   }
 
   private StrategyEvaluation evaluateForNonPartitionTable() {
-    long score = evaluateLong(scoreExpression(strategy), tableStatistics);
+    long score = evaluateLong(scoreExpression(strategy), List.of());
     if (score <= 0) {
       return StrategyEvaluation.NO_EXECUTION;
     }
@@ -200,7 +201,7 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private long evaluateLong(String expression, List<StatisticEntry<?>> statistics) {
-    Map<String, Object> context = buildExpressionContext(strategy, statistics);
+    Map<String, Object> context = buildExpressionContext(statistics);
     try {
       return expressionEvaluator.evaluateLong(expression, context);
     } catch (RuntimeException e) {
@@ -210,7 +211,7 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private boolean evaluateBool(String expression, List<StatisticEntry<?>> statistics) {
-    Map<String, Object> context = buildExpressionContext(strategy, statistics);
+    Map<String, Object> context = buildExpressionContext(statistics);
     try {
       return expressionEvaluator.evaluateBool(expression, context);
     } catch (RuntimeException e) {
@@ -219,10 +220,27 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
     }
   }
 
-  private static Map<String, Object> buildExpressionContext(
-      Strategy strategy, List<StatisticEntry<?>> statistics) {
+  /**
+   * Build a combined evaluation context. The {@code statistics} argument varies per partition for
+   * partitioned tables; on top of it the shared table statistics, table metadata, and numeric rule
+   * values are merged so that {@code trigger-expr} and {@code score-expr} can reference all of
+   * them.
+   *
+   * @param statistics statistics of the unit being evaluated (a single partition, or empty for the
+   *     table-level evaluation)
+   * @return combined context
+   */
+  private Map<String, Object> buildExpressionContext(List<StatisticEntry<?>> statistics) {
     Map<String, Object> context = new HashMap<>();
     context.putAll(StatisticsUtils.buildStatisticsContext(statistics));
+    context.putAll(StatisticsUtils.buildStatisticsContext(tableStatistics));
+    context.putAll(TableMetadataTriggerExpressionUtils.buildTableMetadataContext(tableMetadata));
+    context.putAll(getRulesExpressionContext(strategy));
+    return context;
+  }
+
+  private static Map<String, Object> getRulesExpressionContext(Strategy strategy) {
+    Map<String, Object> context = new HashMap<>();
     strategy
         .rules()
         .forEach(
