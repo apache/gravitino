@@ -129,6 +129,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     return true;
   }
 
+  protected boolean supportsIcebergPartitionTransforms() {
+    return false;
+  }
+
   protected SparkTableInfoChecker getTableInfoChecker() {
     return SparkTableInfoChecker.create();
   }
@@ -1058,5 +1062,76 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   protected void checkParquetFile(SparkTableInfo tableInfo) {
     String location = tableInfo.getTableLocation();
     Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
+  }
+
+  protected List<SparkColumnInfo> getIcebergSimpleTableColumn() {
+    return Arrays.asList(
+        SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+        SparkColumnInfo.of("name", DataTypes.StringType, ""),
+        SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
+  }
+
+  protected String getCreateIcebergSimpleTableString(String tableName) {
+    return String.format(
+        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', ts TIMESTAMP)",
+        tableName);
+  }
+
+  @Test
+  @EnabledIf("supportsIcebergPartitionTransforms")
+  protected void testIcebergPartitions() {
+    Map<String, String> partitionPaths = new java.util.HashMap<>();
+    partitionPaths.put("years", "ts_year=2024");
+    partitionPaths.put("months", "ts_month=2024-01");
+    partitionPaths.put("days", "ts_day=2024-01-01");
+    partitionPaths.put("hours", "ts_hour=2024-01-01-12");
+
+    partitionPaths
+        .keySet()
+        .forEach(
+            func -> {
+              String tableName = String.format("test_iceberg_%s_partition_table", func);
+              dropTableIfExists(tableName);
+              String createTableSQL = getCreateIcebergSimpleTableString(tableName);
+              createTableSQL =
+                  createTableSQL + String.format(" USING iceberg PARTITIONED BY (%s(ts));", func);
+              sql(createTableSQL);
+              SparkTableInfo tableInfo = getTableInfo(tableName);
+              SparkTableInfoChecker checker =
+                  SparkTableInfoChecker.create()
+                      .withName(tableName)
+                      .withColumns(getIcebergSimpleTableColumn());
+              switch (func) {
+                case "years":
+                  checker.withYearPartition("ts");
+                  break;
+                case "months":
+                  checker.withMonthPartition("ts");
+                  break;
+                case "days":
+                  checker.withDayPartition("ts");
+                  break;
+                case "hours":
+                  checker.withHourPartition("ts");
+                  break;
+                default:
+                  throw new IllegalArgumentException("Unsupported partition function: " + func);
+              }
+              checker.check(tableInfo);
+
+              String insertData =
+                  String.format(
+                      "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00' as timestamp));",
+                      tableName);
+              sql(insertData);
+              List<String> queryResult = getTableData(tableName);
+              Assertions.assertEquals(1, queryResult.size());
+              Assertions.assertEquals("2,a,2024-01-01 12:00:00", queryResult.get(0));
+              String partitionExpression = partitionPaths.get(func);
+              // Iceberg stores data files under <location>/data/<partition>/
+              Path partitionPath =
+                  new Path(tableInfo.getTableLocation(), "data/" + partitionExpression);
+              checkDirExists(partitionPath);
+            });
   }
 }

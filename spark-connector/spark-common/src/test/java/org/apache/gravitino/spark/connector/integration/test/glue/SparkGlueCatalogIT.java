@@ -125,6 +125,11 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
     return false;
   }
 
+  @Override
+  protected boolean supportsIcebergPartitionTransforms() {
+    return true;
+  }
+
   @BeforeAll
   @Override
   protected void startUp() throws Exception {
