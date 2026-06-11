@@ -18,19 +18,32 @@
  */
 package org.apache.gravitino.lance.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import javax.servlet.ServletRequest;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
+import org.lance.namespace.model.ErrorResponse;
 
 /**
- * An {@link AuthenticationFilter} subclass for the Lance REST server that allows health check
- * endpoints to bypass authentication.
+ * An {@link AuthenticationFilter} subclass for the Lance REST server that:
+ *
+ * <ul>
+ *   <li>allows health check endpoints to bypass authentication;
+ *   <li>returns Lance-compatible JSON error responses on authentication failure instead of the
+ *       default HTML error pages.
+ * </ul>
  *
  * <p>The default {@link AuthenticationFilter} only whitelists /health, /api/health paths. This
  * subclass additionally permits /lance/health and /lance/health/* so that Kubernetes probes and
  * monitoring systems can reach the Lance health endpoint without credentials.
  */
 public class LanceAuthenticationFilter extends AuthenticationFilter {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Override
   protected boolean isHealthCheckRequest(ServletRequest request) {
@@ -46,5 +59,29 @@ public class LanceAuthenticationFilter extends AuthenticationFilter {
       return false;
     }
     return path.equals("/lance/health") || path.startsWith("/lance/health/");
+  }
+
+  @Override
+  protected void sendAuthErrorResponse(HttpServletResponse response, Exception exception)
+      throws IOException {
+    int status =
+        exception instanceof UnauthorizedException
+            ? HttpServletResponse.SC_UNAUTHORIZED
+            : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+    String message = exception.getMessage();
+    if (message == null || message.isEmpty()) {
+      message = "Authentication failed";
+    }
+
+    ErrorResponse errorResponse = new ErrorResponse();
+    errorResponse.setCode(status);
+    errorResponse.setError(message);
+    errorResponse.setDetail("");
+    errorResponse.setInstance("");
+
+    response.setStatus(status);
+    response.setContentType("application/json");
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    MAPPER.writeValue(response.getWriter(), errorResponse);
   }
 }

@@ -19,16 +19,25 @@
 package org.apache.gravitino.lance.service;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import javax.servlet.ServletRequest;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.lance.namespace.model.ErrorResponse;
 
 public class TestLanceAuthenticationFilter {
+
+  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   /** Exposes the protected {@code isHealthCheckRequest} method for white-box testing. */
   private static class TestableFilter extends LanceAuthenticationFilter {
@@ -42,11 +51,14 @@ public class TestLanceAuthenticationFilter {
       strings = {
         "/lance/health",
         "/lance/health/live",
+        "/lance/health/ready",
         "/health",
         "/health/live",
+        "/health/ready",
         "/health.html",
         "/api/health",
-        "/api/health/live"
+        "/api/health/live",
+        "/api/health/ready"
       })
   public void testHealthPathsBypassAuth(String path) {
     TestableFilter filter = new TestableFilter();
@@ -76,5 +88,48 @@ public class TestLanceAuthenticationFilter {
     TestableFilter filter = new TestableFilter();
     ServletRequest nonHttpRequest = mock(ServletRequest.class);
     Assertions.assertFalse(filter.isHealth(nonHttpRequest));
+  }
+
+  @Test
+  public void testUnauthorizedErrorReturnsJson() throws Exception {
+    LanceAuthenticationFilter filter = new LanceAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new UnauthorizedException("The provided credentials did not support"));
+
+    verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    verify(response).setContentType("application/json");
+    verify(response).setCharacterEncoding("UTF-8");
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(401, errorResponse.getCode());
+    Assertions.assertEquals("The provided credentials did not support", errorResponse.getError());
+  }
+
+  @Test
+  public void testInternalServerErrorReturnsJson() throws Exception {
+    LanceAuthenticationFilter filter = new LanceAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(response, new RuntimeException("Something went wrong"));
+
+    verify(response).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(500, errorResponse.getCode());
+    Assertions.assertEquals("Something went wrong", errorResponse.getError());
   }
 }
