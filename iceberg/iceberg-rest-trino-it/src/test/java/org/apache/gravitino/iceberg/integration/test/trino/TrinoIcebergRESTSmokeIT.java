@@ -28,17 +28,22 @@ import org.junit.jupiter.api.Test;
 @Tag("gravitino-docker-test")
 public class TrinoIcebergRESTSmokeIT extends TrinoIcebergRESTAuthorizationITBase {
 
+  // Use a schema name distinct from the other IT classes: they share one PostgreSQL-backed Iceberg
+  // catalog (the shared ContainerSuite is intentionally not reset between classes), so a common
+  // namespace would collide across classes.
+  private static final String SCHEMA = "smoke_db";
+
   @BeforeAll
   public void setupTrino() throws Exception {
-    catalogAsSuper.asSchemas().createSchema("db1", "", new HashMap<>());
+    catalogAsSuper.asSchemas().createSchema(SCHEMA, "", new HashMap<>());
     startTrino();
   }
 
   @Test
   public void testCreateInsertSelectAsSuperUser() {
-    sql(SUPER_CATALOG, "CREATE TABLE db1.t1 (id integer, name varchar)");
-    sql(SUPER_CATALOG, "INSERT INTO db1.t1 VALUES (1, 'a'), (2, 'b')");
-    assertEquals(2L, sql(SUPER_CATALOG, "SELECT count(*) FROM db1.t1").getOnlyValue());
-    sql(SUPER_CATALOG, "DROP TABLE db1.t1");
+    sql(SUPER_CATALOG, "CREATE TABLE " + SCHEMA + ".t1 (id integer, name varchar)");
+    sql(SUPER_CATALOG, "INSERT INTO " + SCHEMA + ".t1 VALUES (1, 'a'), (2, 'b')");
+    assertEquals(2L, sql(SUPER_CATALOG, "SELECT count(*) FROM " + SCHEMA + ".t1").getOnlyValue());
+    sql(SUPER_CATALOG, "DROP TABLE " + SCHEMA + ".t1");
   }
 }

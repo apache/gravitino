@@ -228,19 +228,6 @@ public abstract class TrinoIcebergRESTAuthorizationITBase extends BaseIT {
       if (queryRunner != null) {
         queryRunner.close();
       }
-      // Drop the Iceberg schemas this class created so a sibling IT class that reuses the shared
-      // PostgreSQL-backed catalog starts from a clean namespace. Dropping the Gravitino metalake
-      // alone does not remove the namespaces from the Iceberg JDBC backend, and we intentionally
-      // do not tear down the shared ContainerSuite (see below) to reset it.
-      try {
-        if (catalogAsSuper != null) {
-          for (String schema : catalogAsSuper.asSchemas().listSchemas()) {
-            catalogAsSuper.asSchemas().dropSchema(schema, true);
-          }
-        }
-      } catch (Exception e) {
-        LOG.warn("Failed to drop test schemas", e);
-      }
       try {
         if (client != null) {
           client.dropMetalake(METALAKE_NAME, true);
@@ -253,8 +240,9 @@ public abstract class TrinoIcebergRESTAuthorizationITBase extends BaseIT {
         tokenServer.close();
       }
       // Do not close the shared ContainerSuite here: it is a process-wide singleton whose
-      // PostgreSQL container may be reused by other tests in the same JVM. The suite cleans up its
-      // containers on JVM shutdown.
+      // PostgreSQL container may be reused by other tests in the same JVM. Test classes that share
+      // its PostgreSQL-backed Iceberg catalog isolate themselves with distinct schema namespaces
+      // rather than resetting the container; the suite cleans up its containers on JVM shutdown.
       super.stopIntegrationTest();
     }
   }
