@@ -460,6 +460,13 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(location, loadTable.getLocation());
     Assertions.assertNotNull(loadTable.getVersion());
 
+    describeTableRequest.setVersion(loadTable.getVersion());
+    DescribeTableResponse versionedLoadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(versionedLoadTable);
+    Assertions.assertEquals(location, versionedLoadTable.getLocation());
+    Assertions.assertEquals(loadTable.getVersion(), versionedLoadTable.getVersion());
+    Assertions.assertEquals(loadTable.getStorageOptions(), versionedLoadTable.getStorageOptions());
+
     List<JsonArrowField> jsonArrowFields = loadTable.getSchema().getFields();
     for (int i = 0; i < jsonArrowFields.size(); i++) {
       JsonArrowField jsonArrowField = jsonArrowFields.get(i);
@@ -824,15 +831,6 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.describeTable(describeTableRequest));
     assertLanceErrorCode(describeException, ErrorCode.TABLE_NOT_FOUND);
-
-    describeTableRequest.setVersion(1L);
-    RuntimeException versionException =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> ns.describeTable(describeTableRequest));
-    Assertions.assertTrue(
-        versionException
-            .getMessage()
-            .contains("Describing specific table version is not supported"));
   }
 
   @Test
