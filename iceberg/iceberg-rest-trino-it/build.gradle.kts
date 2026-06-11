@@ -22,21 +22,25 @@ plugins {
   id("java")
 }
 
-configurations.configureEach {
-  resolutionStrategy.force(
-    "org.testcontainers:testcontainers:1.21.4",
-    "com.github.docker-java:docker-java-api:3.4.2",
-    "com.github.docker-java:docker-java-transport:3.4.2",
-    "com.github.docker-java:docker-java-transport-zerodep:3.4.2"
-  )
-  exclude(group = "io.jsonwebtoken", module = "jjwt-gson")
-  exclude(group = "org.apache.logging.log4j", module = "log4j-to-slf4j")
-}
+// Versions are centrally managed in gradle/libs.versions.toml.
+val testcontainersVersion: String = libs.versions.testcontainers.get()
+val dockerJavaVersion: String = libs.versions.docker.java.get()
 
 // This test-only module boots an in-process Trino query runner, so it only needs to run against a
 // single Trino version. Unlike the trino-connector modules (which must support a range of
 // versions), there is no need for the multi-version range machinery here.
-val trinoVersion = 478
+val trinoVersion: String = libs.versions.trino.iceberg.it.get()
+
+configurations.configureEach {
+  resolutionStrategy.force(
+    "org.testcontainers:testcontainers:$testcontainersVersion",
+    "com.github.docker-java:docker-java-api:$dockerJavaVersion",
+    "com.github.docker-java:docker-java-transport:$dockerJavaVersion",
+    "com.github.docker-java:docker-java-transport-zerodep:$dockerJavaVersion"
+  )
+  exclude(group = "io.jsonwebtoken", module = "jjwt-gson")
+  exclude(group = "org.apache.logging.log4j", module = "log4j-to-slf4j")
+}
 
 java {
   toolchain.languageVersion.set(JavaLanguageVersion.of(24))
