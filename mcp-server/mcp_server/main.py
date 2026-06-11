@@ -32,6 +32,8 @@ def do_main():
         transport=args.transport,
         mcp_url=args.mcp_url,
         token=args.token,
+        tls_cert=args.tls_cert,
+        tls_key=args.tls_key,
     )
     _init_logging(setting)
     logging.info("Gravitino MCP server setting: %s", setting)
@@ -91,9 +93,10 @@ def _parse_args():
     parser.add_argument(
         "--transport",
         type=str,
-        choices=["stdio", "http"],
+        choices=["stdio", "http", "streamable-http"],
         default=DefaultSetting.default_transport,
-        help=f"Transport protocol type: stdio (local), http (Streamable HTTP). "
+        help="Transport protocol type: stdio (local), http / streamable-http "
+        "(networked Streamable HTTP; the two names are equivalent). "
         f"(default: {DefaultSetting.default_transport})",
     )
 
@@ -101,7 +104,8 @@ def _parse_args():
         "--mcp-url",
         type=str,
         default=DefaultSetting.default_mcp_url,
-        help=f"The url of MCP server if using http transport. (default: {DefaultSetting.default_mcp_url})",
+        help="The url of MCP server if using http transport, http:// or https://. "
+        f"(default: {DefaultSetting.default_mcp_url})",
     )
 
     parser.add_argument(
@@ -111,6 +115,22 @@ def _parse_args():
         help="Bearer token forwarded as Authorization header to Gravitino on every request. "
         "Can also be set via the GRAVITINO_TOKEN environment variable. "
         "When omitted, requests are sent without authentication.",
+    )
+
+    parser.add_argument(
+        "--tls-cert",
+        type=str,
+        default="",
+        help="Path to the TLS certificate (PEM) for serving the HTTP endpoint "
+        "over HTTPS. Requires --tls-key. When omitted, the endpoint serves plain HTTP.",
+    )
+
+    parser.add_argument(
+        "--tls-key",
+        type=str,
+        default="",
+        help="Path to the TLS private key (PEM) for serving the HTTP endpoint "
+        "over HTTPS. Requires --tls-cert.",
     )
 
     args = parser.parse_args()
