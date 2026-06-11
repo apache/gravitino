@@ -120,14 +120,17 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
 def _parse_mcp_url(url: str) -> ():
     try:
         parsed = urlparse(url)
-        if parsed.scheme.lower() != "http":
-            raise ValueError(f"Not support: {parsed.scheme}，only support HTTP")
+        scheme = parsed.scheme.lower()
+        if scheme not in ("http", "https"):
+            raise ValueError(
+                f"Not supported: {parsed.scheme}, only http/https are supported"
+            )
 
         host = parsed.hostname or "0.0.0.0"
 
         port = parsed.port
         if port is None:
-            port = 80
+            port = 443 if scheme == "https" else 80
 
         path = parsed.path
         if not path.startswith("/"):
@@ -156,8 +159,29 @@ class GravitinoMCPServer:
 
     def _run_http(self):
         _host, _port, _path = _parse_mcp_url(self.setting.mcp_url)
-        asyncio.run(
-            self.mcp.run_async(
-                transport="http", host=_host, port=_port, path=_path
-            )
+        # FastMCP accepts "http" and "streamable-http" as equivalent aliases.
+        transport = (
+            "streamable-http"
+            if self.setting.transport == "streamable-http"
+            else "http"
         )
+
+        run_kwargs = {
+            "transport": transport,
+            "host": _host,
+            "port": _port,
+            "path": _path,
+        }
+
+        # Serve over TLS when both certificate and key are provided. FastMCP
+        # forwards uvicorn_config to the underlying uvicorn server.
+        if self.setting.tls_cert and self.setting.tls_key:
+            run_kwargs["uvicorn_config"] = {
+                "ssl_certfile": self.setting.tls_cert,
+                "ssl_keyfile": self.setting.tls_key,
+            }
+            logging.info(
+                "Serving MCP endpoint over TLS (cert=%s)", self.setting.tls_cert
+            )
+
+        asyncio.run(self.mcp.run_async(**run_kwargs))
