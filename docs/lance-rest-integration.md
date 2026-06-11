@@ -23,12 +23,12 @@ The following table outlines the tested compatibility between Gravitino versions
 | Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions                  |
 |--------------------------------|--------------------------------|-----------------------------------------------|
 | 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
-| 1.3.0                          | 0.2.0, 0.4.0                   | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
+| 1.3.0                          | 0.2.0, 0.4.0, 0.5.1            | 0.3.0 - 0.4.2 (0.2.0 conditionally supported) |
 
 :::note
 - These version entries show which versions are expected to work together.
 - For Gravitino 1.3.0, the explicitly verified release versions are
-  `lance-spark` (0.2.0, 0.4.0) and `lance-ray` (0.3.0, 0.4.2). `lance-ray`
+  `lance-spark` (0.2.0, 0.4.0, 0.5.1) and `lance-ray` (0.3.0, 0.4.2). `lance-ray`
   0.2.0 is conditionally supported only with the conditions described below.
 
 - **`lance-spark` 0.1.0 and 0.1.1 are not supported on Gravitino 1.3.0.**
@@ -67,7 +67,7 @@ matrix can be re-verified (and extended) without ad-hoc scripting:
 # The default list intentionally omits 0.1.0 / 0.1.1: those bundles call the
 # removed /create-empty endpoint and will fail with 404 against 1.3.0+.
 ./gradlew :lance:lance-rest-server:lanceSparkMatrixTest \
-    -PlanceSparkBundleVersions=0.2.0,0.4.0 \
+    -PlanceSparkBundleVersions=0.2.0,0.4.0,0.5.1 \
     -PskipDockerTests=true
 # Per-version JUnit reports land under
 # lance/lance-rest-server/build/reports/lance-spark-matrix/<version>/.
