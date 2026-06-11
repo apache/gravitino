@@ -64,7 +64,7 @@ There are distinct configuration files for standalone and auxiliary server: `gra
 
 Starting with version `0.6.0-incubating`, the prefix `gravitino.auxService.iceberg-rest.` for auxiliary server configurations has been deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the latter will take precedence. The configurations listed below use the `gravitino.iceberg-rest.` prefix.
 
-The server-level `gravitino.blockUnsafeRemoteUri` configuration controls whether remote files such as Kerberos keytabs may resolve to unsafe addresses. It defaults to `true`. Configure it in `gravitino-iceberg-rest-server.conf` for standalone mode or `gravitino.conf` for auxiliary mode.
+The server-level `gravitino.fetchFile.blockUnsafeRemoteUri` configuration controls whether remote files such as Kerberos keytabs may resolve to unsafe addresses. It defaults to `true`. Configure it in `gravitino-iceberg-rest-server.conf` for standalone mode or `gravitino.conf` for auxiliary mode.
 
 ### Enable Iceberg REST Service
 

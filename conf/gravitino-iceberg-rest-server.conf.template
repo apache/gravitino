@@ -20,7 +20,7 @@
 # THE CONFIGURATION FOR Iceberg REST SERVER
 gravitino.iceberg-rest.shutdown.timeout = 3000
 # Whether to block remote file URIs that resolve to unsafe addresses.
-gravitino.blockUnsafeRemoteUri = true
+gravitino.fetchFile.blockUnsafeRemoteUri = true
 
 # THE CONFIGURATION FOR Iceberg REST WEB SERVER
 # The host name of the built-in web server

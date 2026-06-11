@@ -25,7 +25,6 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +44,12 @@ public class TestFetchFileUtils {
   // Kerberos integration tests; the common module has no Hadoop on its test classpath, so here we
   // only assert that an hdfs uri without a Hadoop configuration is rejected.
   @TempDir File tempDir;
+
+  @Test
+  public void testBlockUnsafeRemoteUriConfigName() {
+    Assertions.assertEquals(
+        "gravitino.fetchFile.blockUnsafeRemoteUri", FetchFileUtils.BLOCK_UNSAFE_REMOTE_URI_CONFIG);
+  }
 
   @AfterEach
   public void resetBlockUnsafeRemoteUri() {
@@ -206,19 +211,6 @@ public class TestFetchFileUtils {
     String returned =
         FetchFileUtils.fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, null);
     Assertions.assertEquals(destFile.getAbsolutePath(), returned);
-  }
-
-  @Test
-  public void testRemoveLock() throws Exception {
-    File srcFile = new File(tempDir, "source_lock");
-    Assertions.assertTrue(srcFile.createNewFile());
-    File destFile = new File(tempDir, "dest_lock");
-
-    FetchFileUtils.fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, null);
-    // removeLock should be a no-op-safe cleanup that does not throw and does not affect the link.
-    FetchFileUtils.removeLock(destFile);
-    Path destPath = destFile.toPath();
-    Assertions.assertTrue(Files.isSymbolicLink(destPath));
   }
 
   private HttpServer createLoopbackHttpServer(String response) throws Exception {

@@ -306,9 +306,9 @@ appender.audit_file.strategy.delete.ifLastModified.age = 90d
 
 Refer to [security](security/security.md) for HTTPS and authentication configurations.
 
-| Configuration Item               | Description                                                                                                                                                                                                                                          | Default Value | Required | Since Version |
-|----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.blockUnsafeRemoteUri` | Whether to block remote file URIs from resolving to unsafe addresses from the Gravitino server side. This applies to job files and catalog files such as Kerberos keytabs. Disable this only for trusted URIs that require access to such addresses. | `true`        | No       | 1.3.0         |
+| Configuration Item                         | Description                                                                                                                                                                                                                                          | Default Value | Required | Since Version |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.fetchFile.blockUnsafeRemoteUri` | Whether to block remote file URIs from resolving to unsafe addresses from the Gravitino server side. This applies to job files and catalog files such as Kerberos keytabs. Disable this only for trusted URIs that require access to such addresses. | `true`        | No       | 1.3.0         |
 
 ### Metrics Configuration
 

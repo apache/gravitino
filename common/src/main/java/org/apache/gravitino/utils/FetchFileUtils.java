@@ -26,7 +26,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 
@@ -45,16 +44,8 @@ import org.apache.commons.io.FileUtils;
 public final class FetchFileUtils {
 
   /** The server configuration that controls unsafe remote URI blocking. */
-  public static final String BLOCK_UNSAFE_REMOTE_URI_CONFIG = "gravitino.blockUnsafeRemoteUri";
-
-  /**
-   * Per-destination lock map used to serialize concurrent symlink creation for the same destination
-   * file. Keyed by the normalized absolute destination path string to avoid races caused by
-   * different path spellings referring to the same file. Entries should be removed via {@link
-   * #removeLock(File)} when the destination file is deleted, so the map size stays bounded by the
-   * number of live consumers.
-   */
-  private static final ConcurrentHashMap<String, Object> SYMLINK_LOCKS = new ConcurrentHashMap<>();
+  public static final String BLOCK_UNSAFE_REMOTE_URI_CONFIG =
+      "gravitino.fetchFile.blockUnsafeRemoteUri";
 
   private static volatile boolean blockUnsafeRemoteUri = true;
 
@@ -67,17 +58,6 @@ public final class FetchFileUtils {
    */
   public static void setBlockUnsafeRemoteUri(boolean blockUnsafeRemoteUri) {
     FetchFileUtils.blockUnsafeRemoteUri = blockUnsafeRemoteUri;
-  }
-
-  /**
-   * Removes the per-destination lock entry for the given file. Should be called when the
-   * destination file is deleted (for example on a Kerberos client {@code close()}) to prevent
-   * unbounded map growth.
-   *
-   * @param destFile the destination file whose lock entry should be removed
-   */
-  public static void removeLock(File destFile) {
-    SYMLINK_LOCKS.remove(destFile.toPath().toAbsolutePath().normalize().toString());
   }
 
   /**
@@ -129,7 +109,7 @@ public final class FetchFileUtils {
     }
   }
 
-  private static void linkLocalFile(URI uri, File destFile) throws IOException {
+  private static synchronized void linkLocalFile(URI uri, File destFile) throws IOException {
     Path srcPath = new File(uri.getPath()).toPath().normalize();
     if (!Files.exists(srcPath)) {
       throw new IOException(
@@ -137,22 +117,19 @@ public final class FetchFileUtils {
     }
 
     Path destPath = destFile.toPath().toAbsolutePath().normalize();
-    Object lock = SYMLINK_LOCKS.computeIfAbsent(destPath.toString(), k -> new Object());
-    synchronized (lock) {
-      // Skip if the symlink already points to the correct target.
-      if (Files.isSymbolicLink(destPath)
-          && Files.readSymbolicLink(destPath).normalize().equals(srcPath)) {
-        return;
-      }
-      // Replace via a temporary symlink + rename to minimize the window where the destination path
-      // is absent (which could otherwise cause a concurrent reader, e.g. loginUserFromKeytab, to
-      // fail). REPLACE_EXISTING is used here; on common local filesystems (ext4, xfs, APFS) a
-      // same-directory rename is effectively atomic at the OS level.
-      Path tmpPath = destPath.resolveSibling(destPath.getFileName() + ".symlink.tmp");
-      Files.deleteIfExists(tmpPath);
-      Files.createSymbolicLink(tmpPath, srcPath);
-      Files.move(tmpPath, destPath, StandardCopyOption.REPLACE_EXISTING);
+    // Skip if the symlink already points to the correct target.
+    if (Files.isSymbolicLink(destPath)
+        && Files.readSymbolicLink(destPath).normalize().equals(srcPath)) {
+      return;
     }
+    // Replace via a temporary symlink + rename to minimize the window where the destination path
+    // is absent (which could otherwise cause a concurrent reader, e.g. loginUserFromKeytab, to
+    // fail). REPLACE_EXISTING is used here; on common local filesystems (ext4, xfs, APFS) a
+    // same-directory rename is effectively atomic at the OS level.
+    Path tmpPath = destPath.resolveSibling(destPath.getFileName() + ".symlink.tmp");
+    Files.deleteIfExists(tmpPath);
+    Files.createSymbolicLink(tmpPath, srcPath);
+    Files.move(tmpPath, destPath, StandardCopyOption.REPLACE_EXISTING);
   }
 
   /**

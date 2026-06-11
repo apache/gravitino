@@ -77,7 +77,7 @@ gravitino.cache.enableWeigher = true
 gravitino.cache.implementation = caffeine
 
 # Whether to block remote file URIs that resolve to unsafe addresses.
-gravitino.blockUnsafeRemoteUri = true
+gravitino.fetchFile.blockUnsafeRemoteUri = true
 
 # THE CONFIGURATION FOR authorization
 # Whether Gravitino enable authorization or not
