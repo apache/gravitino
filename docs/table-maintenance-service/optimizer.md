@@ -1,11 +1,11 @@
 ---
 title: "Table Maintenance Service (Optimizer)"
-slug: /table-maintenance-service/optimizer
-keyword: table maintenance, optimizer, statistics, metrics, monitor
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/optimizer"
+keyword: "table maintenance, optimizer, statistics, metrics, monitor"
+license: "This software is licensed under the Apache License version 2."
 ---
 
-## What is this service
+## Overview
 
 The Table Maintenance Service (Optimizer) automates table maintenance by connecting:
 
@@ -15,17 +15,17 @@ The Table Maintenance Service (Optimizer) automates table maintenance by connect
 
 The CLI commands and configuration keys use the `optimizer` name.
 
-## Alpha status and current limitations
+## Alpha Status and Limitations
 
-The current Table Maintenance Service is in **alpha** stage.
+The Table Maintenance Service is in **alpha** stage.
 
-Current limitations:
+Limitations:
 
 - It is operated through the optimizer CLI workflow.
 - The built-in maintenance strategy focuses on Iceberg table compaction.
-- Compaction support is currently limited to Iceberg tables with identity partition transforms.
+- Compaction support is limited to Iceberg tables with identity partition transforms.
 
-## Extensibility and roadmap
+## Extensibility and Roadmap
 
 Although the built-in capability is intentionally narrow in alpha, the framework is designed for
 extension:
@@ -39,7 +39,7 @@ See [Optimizer Extension Guide](./optimizer-extension-guide.md) for extension po
 Future versions will continue improving the out-of-the-box experience and evolve toward a more
 ready-to-use maintenance service.
 
-## Architecture overview
+## Architecture Overview
 
 The optimizer workflow is based on six parts:
 
@@ -62,7 +62,7 @@ Typical data flow:
 3. Submit jobs using a concrete template and `jobConf`.
 4. Track status and verify results on table metadata and logs.
 
-## Execution modes
+## Execution Modes
 
 | Mode | Main entry | Best for | Output |
 | --- | --- | --- | --- |
@@ -72,7 +72,7 @@ Typical data flow:
 Use built-in maintenance workflow when you want policy-driven server execution.
 Use CLI local calculator when you want to feed JSONL input directly.
 
-## Start here
+## Start Here
 
 - Configuration first: read [Optimizer Configuration](./optimizer-configuration.md).
 - Need custom integrations: read [Optimizer Extension Guide](./optimizer-extension-guide.md).
@@ -82,23 +82,23 @@ Use CLI local calculator when you want to feed JSONL input directly.
 
 ## Lifecycle
 
-### 1. Collect
+### Step 1: Collect
 
 Generate or ingest table and partition statistics/metrics.
 
-### 2. Evaluate
+### Step 2: Evaluate
 
 Apply policies and rules to decide whether maintenance should run.
 
-### 3. Submit
+### Step 3: Submit
 
 Pick a job template and submit job with concrete `jobConf`.
 
-### 4. Observe
+### Step 4: Observe
 
 Check REST job status and validate resulting statistics, metrics, or rewritten data files.
 
-## Configuration model
+## Configuration Model
 
 | Layer | Scope | Typical keys |
 | --- | --- | --- |
@@ -106,7 +106,7 @@ Check REST job status and validate resulting statistics, metrics, or rewritten d
 | Job submission `jobConf` | Per job run | `catalog_name`, `table_identifier`, `spark_*`, template-specific args |
 | Optimizer CLI config | CLI commands | `gravitino.optimizer.*` in `conf/gravitino-optimizer.conf` |
 
-## Terminology mapping
+## Terminology Mapping
 
 | Term | Example value | Used in |
 | --- | --- | --- |
@@ -116,12 +116,12 @@ Check REST job status and validate resulting statistics, metrics, or rewritten d
 
 For strategy submission, `--strategy-name` must use policy name, not policy type or strategy type.
 
-## Prerequisites and verification
+## Prerequisites and Verification
 
 Quick start prerequisites and success checks are documented in
 [Optimizer Quick Start and Verification](./optimizer-quick-start.md).
 
-## Related docs
+## Related
 
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer Extension Guide](./optimizer-extension-guide.md)

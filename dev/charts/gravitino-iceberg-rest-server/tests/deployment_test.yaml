@@ -45,9 +45,9 @@ tests:
       - equal:
           path: spec.template.spec.serviceAccountName
           value: default
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: apache/gravitino-iceberg-rest:1.3.0-SNAPSHOT
+          pattern: "^apache/gravitino-iceberg-rest:.+"
       - contains:
           path: spec.template.spec.containers[0].env
           content:

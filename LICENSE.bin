@@ -256,6 +256,9 @@
    Apache Commons Pool
    Air Compressor
    Airlift
+   AWS SDK for Java 2.0 Annotations
+   AWS SDK for Java 2.0
+   AWS EventStream for Java
    The Netty Project
    Open Telemetry
    Open Lineage

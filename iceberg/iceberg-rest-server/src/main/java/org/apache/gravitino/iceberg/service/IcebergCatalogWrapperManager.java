@@ -23,11 +23,13 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
@@ -127,7 +129,17 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   @VisibleForTesting
   protected CatalogWrapperForREST createCatalogWrapper(
       String catalogName, IcebergConfig icebergConfig) {
-    CatalogWrapperForREST rest = new CatalogWrapperForREST(catalogName, icebergConfig);
+    // When the backend is a federated Iceberg REST catalog, use FederatedCatalogWrapper so
+    // federation-aware behavior (FileIO property extraction, remote credential vending, remote
+    // /v1/config defaults) is applied through polymorphic dispatch rather than scattered
+    // instanceof checks. All other backends use the base CatalogWrapperForREST.
+    IcebergCatalogBackend backend =
+        IcebergCatalogBackend.valueOf(
+            icebergConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
+    CatalogWrapperForREST rest =
+        backend == IcebergCatalogBackend.REST
+            ? new FederatedCatalogWrapper(catalogName, icebergConfig)
+            : new CatalogWrapperForREST(catalogName, icebergConfig);
     AuthenticationConfig authenticationConfig =
         new AuthenticationConfig(icebergConfig.getAllConfig());
     if (authenticationConfig.isKerberosAuth() && rest.getCatalog() instanceof SupportsKerberos) {

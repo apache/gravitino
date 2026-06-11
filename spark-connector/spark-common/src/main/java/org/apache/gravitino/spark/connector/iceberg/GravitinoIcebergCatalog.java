@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
@@ -73,6 +74,8 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     String catalogBackendName = IcebergPropertiesUtils.getCatalogBackendName(properties);
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
+    CredentialPropertyUtils.applyIcebergCredentials(
+        CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
     TableCatalog icebergCatalog = new SparkCatalog();
     icebergCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return icebergCatalog;

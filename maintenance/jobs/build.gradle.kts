@@ -91,6 +91,9 @@ tasks.withType(ShadowJar::class.java) {
   archiveClassifier.set("")
   mergeServiceFiles()
 
+  // Exclude Java 21 multi-release classes to avoid ASM compatibility issues with shadow plugin
+  exclude("META-INF/versions/21/**")
+
   dependencies {
     relocate("com.google", "org.apache.gravitino.shaded.com.google")
     relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")

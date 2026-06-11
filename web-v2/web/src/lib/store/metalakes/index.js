@@ -92,18 +92,20 @@ const remapExpandedAndLoadedNodes = ({ getState, mapNode }) => {
 
 const mergeWithFunctionNodes = ({ tree, key, entities }) => {
   const existingNode = findInTree(tree, 'key', key)
+  const subSchemas = existingNode?.children?.filter(child => child?.node === 'schema') || []
   const functions = existingNode?.children?.filter(child => child?.node === 'function') || []
   const views = existingNode?.children?.filter(child => child?.node === 'view') || []
 
-  return _.uniqBy([...entities, ...functions, ...views], 'key')
+  return _.uniqBy([...subSchemas, ...entities, ...functions, ...views], 'key')
 }
 
 const mergeWithViewNodes = ({ tree, key, entities }) => {
   const existingNode = findInTree(tree, 'key', key)
+  const subSchemas = existingNode?.children?.filter(child => child?.node === 'schema') || []
   const tables = existingNode?.children?.filter(child => child?.node === 'table') || []
   const functions = existingNode?.children?.filter(child => child?.node === 'function') || []
 
-  return _.uniqBy([...tables, ...functions, ...entities], 'key')
+  return _.uniqBy([...subSchemas, ...tables, ...functions, ...entities], 'key')
 }
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
@@ -276,6 +278,19 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         dispatch(setLoadedNodes(loaded))
       }
     } else if (pathArr.length === 4) {
+      // Only fetch subschemas for iceberg catalog with jdbc backend
+      const catalogNode = findInTree(
+        getState().metalakes.metalakeTree,
+        'key',
+        `{{${metalake}}}{{${catalog}}}{{${type}}}`
+      )
+      const provider = catalogNode?.provider || catalogNode?.catalogType || null
+      const catalogBackend = catalogNode?.properties?.['catalog-backend']
+      const isIcebergJdbcCatalog = provider === 'lakehouse-iceberg' && catalogBackend === 'jdbc'
+
+      const childSchemasPromise = isIcebergJdbcCatalog
+        ? getSchemasApi({ metalake, catalog, parentSchema: schema })
+        : Promise.resolve(null)
       let entityPromise = Promise.resolve(null)
       switch (type) {
         case 'relational':
@@ -299,11 +314,31 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           ? getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' })
           : Promise.resolve(null)
 
-      const [funcResult, entityResult, viewResult] = await Promise.allSettled([
+      const [funcResult, entityResult, viewResult, childSchemasResult] = await Promise.allSettled([
         getFunctionsApi({ metalake, catalog, schema, details: false }),
         entityPromise,
-        viewsPromise
+        viewsPromise,
+        childSchemasPromise
       ])
+
+      const childSchemas =
+        childSchemasResult.status === 'fulfilled' && childSchemasResult.value
+          ? (childSchemasResult.value?.identifiers || []).map(schemaItem => {
+              const schemaName = schemaItem.name
+
+              return {
+                ...schemaItem,
+                node: 'schema',
+                id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaName}}}`,
+                key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaName}}}`,
+                path: `?${new URLSearchParams({ metalake, catalog, catalogType: type, schema: schemaName }).toString()}`,
+                name: schemaName,
+                title: schemaName,
+                tables: [],
+                children: []
+              }
+            })
+          : []
 
       const functions =
         funcResult.status === 'fulfilled'
@@ -415,7 +450,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         }
       }
 
-      result.data = [...entities, ...functions, ...views]
+      result.data = [...childSchemas, ...entities, ...functions, ...views]
     }
 
     return result
@@ -830,12 +865,12 @@ export const switchInUseCatalog = createAsyncThunk(
 
 export const fetchSchemas = createAsyncThunk(
   'appMetalakes/fetchSchemas',
-  async ({ init, page, metalake, catalog, catalogType }, { getState, dispatch }) => {
+  async ({ init, page, metalake, catalog, catalogType, parentSchema }, { getState, dispatch }) => {
     if (init) {
       await dispatch(resetTableData())
       await dispatch(setTableLoading(true))
     }
-    const [err, res] = await to(getSchemasApi({ metalake, catalog }))
+    const [err, res] = await to(getSchemasApi({ metalake, catalog, parentSchema }))
     await dispatch(setTableLoading(false))
 
     if (err || !res) {
@@ -847,11 +882,17 @@ export const fetchSchemas = createAsyncThunk(
 
       if (isCanceledRequest) {
         const catalogKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
-        const catalogNode = findInTree(getState().metalakes.metalakeTree, 'key', catalogKey)
-        const cachedSchemas = (catalogNode?.children || []).filter(item => item?.node === 'schema')
+
+        const parentKey = parentSchema
+          ? `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${parentSchema}}}`
+          : catalogKey
+        const parentNode = findInTree(getState().metalakes.metalakeTree, 'key', parentKey)
+        const cachedSchemas = (parentNode?.children || []).filter(item => item?.node === 'schema')
 
         if (cachedSchemas.length > 0) {
-          dispatch(setExpandedNodes([`{{${metalake}}}`, catalogKey]))
+          const expanded =
+            parentKey === catalogKey ? [`{{${metalake}}}`, catalogKey] : [`{{${metalake}}}`, catalogKey, parentKey]
+          dispatch(setExpandedNodes(expanded))
 
           return { schemas: cachedSchemas, page, init }
         }
@@ -863,39 +904,43 @@ export const fetchSchemas = createAsyncThunk(
     const { identifiers = [] } = res || {}
 
     const schemas = identifiers.map(schema => {
+      const schemaName = schema.name
+
       const schemaItem = findInTree(
         getState().metalakes.metalakeTree,
         'key',
-        `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema.name}}}`
+        `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schemaName}}}`
       )
 
       return {
         ...schema,
+        name: schemaName,
         node: 'schema',
-        id: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema.name}}}`,
-        key: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schema.name}}}`,
-        path: `?${new URLSearchParams({ metalake, catalog, catalogType, schema: schema.name }).toString()}`,
-        name: schema.name,
-        title: schema.name,
+        id: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schemaName}}}`,
+        key: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${schemaName}}}`,
+        path: `?${new URLSearchParams({ metalake, catalog, catalogType, schema: schemaName }).toString()}`,
+        title: schemaName,
         tables: schemaItem ? schemaItem.children : [],
         children: schemaItem ? schemaItem.children : []
       }
     })
 
     if (init) {
-      const catalogKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
+      const parentKey = parentSchema
+        ? `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${parentSchema}}}`
+        : `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
 
       // Always update tree nodes when init is true
       dispatch(
         setIntoTreeNodes({
-          key: catalogKey,
+          key: parentKey,
           data: schemas
         })
       )
 
-      // Add catalog to loadedNodes if not already present
-      if (!getState().metalakes.loadedNodes.includes(catalogKey)) {
-        dispatch(setLoadedNodes([...getState().metalakes.loadedNodes, catalogKey]))
+      // Add parent node to loadedNodes if not already present
+      if (!getState().metalakes.loadedNodes.includes(parentKey)) {
+        dispatch(setLoadedNodes([...getState().metalakes.loadedNodes, parentKey]))
       }
     }
 

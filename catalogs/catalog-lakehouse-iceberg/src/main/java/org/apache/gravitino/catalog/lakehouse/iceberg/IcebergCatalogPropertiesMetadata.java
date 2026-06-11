@@ -29,14 +29,15 @@ import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
+import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
-import org.apache.gravitino.storage.AzureProperties;
-import org.apache.gravitino.storage.OSSProperties;
-import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
@@ -89,41 +90,17 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
-                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-                "s3 access key ID",
+                GRAVITINO_JDBC_USER,
+                "JDBC user for Iceberg JDBC backend",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
-                S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
-                "s3 secret access key",
+                GRAVITINO_JDBC_PASSWORD,
+                "JDBC password for Iceberg JDBC backend",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
-                OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
-                "OSS access key ID",
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
-                OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
-                "OSS access key secret",
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
-                AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
-                "Azure storage account name",
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */),
-            stringOptionalPropertyEntry(
-                AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
-                "Azure storage account key",
-                false /* immutable */,
-                null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
                 "Table metadata cache implementation. Set to empty string(\"\") if "
@@ -150,9 +127,25 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                     + " remote-signing.",
                 false,
                 null,
-                false));
+                false),
+            integerOptionalPropertyEntry(
+                IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS,
+                "HTTP connection timeout in milliseconds for the REST catalog backend",
+                false /* immutable */,
+                10000 /* defaultValue */,
+                false /* hidden */),
+            integerOptionalPropertyEntry(
+                IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS,
+                "HTTP socket timeout in milliseconds for the REST catalog backend",
+                false /* immutable */,
+                60000 /* defaultValue */,
+                false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
+    result.putAll(S3PropertiesMetadata.PROPERTY_ENTRIES);
+    result.putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES);
+    result.putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES);
+    result.putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES);
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);

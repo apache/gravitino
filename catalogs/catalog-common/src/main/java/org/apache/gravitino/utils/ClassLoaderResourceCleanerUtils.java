@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.lang.reflect.Field;
 import java.util.IdentityHashMap;
 import java.util.Timer;
@@ -87,6 +88,21 @@ public class ClassLoaderResourceCleanerUtils {
       throws Exception {
     Class<?> fileSystemClass =
         Class.forName("org.apache.hadoop.fs.FileSystem", true, targetClassLoader);
+
+    // If FileSystem was resolved from a parent/AppClassLoader rather than the catalog's own
+    // classloader, its CACHE, Statistics cleaner, and MutableQuantiles scheduler are shared
+    // across all catalogs in the JVM. Operating on shared static state here would close every
+    // catalog's FileSystems and permanently terminate the global scheduler, breaking any
+    // subsequent catalog that uses Hadoop metrics. Skip cleanup for shared classes and let
+    // the JVM manage them.
+    if (!isOwnedByClassLoader(fileSystemClass, targetClassLoader)) {
+      LOG.debug(
+          "Hadoop FileSystem is owned by {}, not the target classloader {}; skipping shared-class cleanup",
+          fileSystemClass.getClassLoader(),
+          targetClassLoader);
+      return;
+    }
+
     MethodUtils.invokeStaticMethod(fileSystemClass, "closeAll");
 
     Class<?> mutableQuantilesClass =
@@ -94,16 +110,22 @@ public class ClassLoaderResourceCleanerUtils {
     Class<?> statisticsClass =
         Class.forName("org.apache.hadoop.fs.FileSystem$Statistics", true, targetClassLoader);
 
-    ScheduledExecutorService scheduler =
-        (ScheduledExecutorService)
-            FieldUtils.readStaticField(mutableQuantilesClass, "scheduler", true);
-    scheduler.shutdownNow();
-    Field statisticsCleanerField = FieldUtils.getField(statisticsClass, "STATS_DATA_CLEANER", true);
-    Object statisticsCleaner = statisticsCleanerField.get(null);
-    if (statisticsCleaner != null) {
-      ((Thread) statisticsCleaner).interrupt();
-      ((Thread) statisticsCleaner).setContextClassLoader(null);
-      ((Thread) statisticsCleaner).join();
+    if (isOwnedByClassLoader(mutableQuantilesClass, targetClassLoader)) {
+      ScheduledExecutorService scheduler =
+          (ScheduledExecutorService)
+              FieldUtils.readStaticField(mutableQuantilesClass, "scheduler", true);
+      scheduler.shutdownNow();
+    }
+
+    if (isOwnedByClassLoader(statisticsClass, targetClassLoader)) {
+      Field statisticsCleanerField =
+          FieldUtils.getField(statisticsClass, "STATS_DATA_CLEANER", true);
+      Object statisticsCleaner = statisticsCleanerField.get(null);
+      if (statisticsCleaner != null) {
+        ((Thread) statisticsCleaner).interrupt();
+        ((Thread) statisticsCleaner).setContextClassLoader(null);
+        ((Thread) statisticsCleaner).join();
+      }
     }
   }
 
@@ -246,19 +268,35 @@ public class ClassLoaderResourceCleanerUtils {
    * @param classLoader the classloader where AWS SDK is loaded
    */
   private static void closeResourceInAWS(ClassLoader classLoader) throws Exception {
-    // For Aws SDK metrics, unregister the metric admin MBean
     Class<?> awsSdkMetricsClass =
         Class.forName("com.amazonaws.metrics.AwsSdkMetrics", true, classLoader);
+    // AwsSdkMetrics holds a static MBeanServer registration. If the class was delegated to a
+    // parent/AppClassLoader, unregistering here would remove the MBean for the entire JVM.
+    if (!isOwnedByClassLoader(awsSdkMetricsClass, classLoader)) {
+      LOG.debug(
+          "AwsSdkMetrics is owned by {}, not {}; skipping MBean unregister",
+          awsSdkMetricsClass.getClassLoader(),
+          classLoader);
+      return;
+    }
     MethodUtils.invokeStaticMethod(awsSdkMetricsClass, "unregisterMetricAdminMBean");
   }
 
   private static void closeResourceInGCP(ClassLoader classLoader) throws Exception {
-    // For GCS
     Class<?> relocatedLogFactory =
         Class.forName(
             "org.apache.gravitino.gcp.shaded.org.apache.commons.logging.LogFactory",
             true,
             classLoader);
+    // The GCP shaded LogFactory is always bundled inside the GCP plugin; if it resolves to a
+    // different classloader, skip to avoid releasing a shared factory.
+    if (!isOwnedByClassLoader(relocatedLogFactory, classLoader)) {
+      LOG.debug(
+          "GCP shaded LogFactory is owned by {}, not {}; skipping release",
+          relocatedLogFactory.getClassLoader(),
+          classLoader);
+      return;
+    }
     MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
   }
 
@@ -272,12 +310,20 @@ public class ClassLoaderResourceCleanerUtils {
    * @param classLoader the classloader where Azure Blob File System is loaded
    */
   private static void closeResourceInAzure(ClassLoader classLoader) throws Exception {
-    // Clear timer in AbfsClientThrottlingAnalyzer
     Class<?> abfsClientThrottlingInterceptClass =
         Class.forName(
             "org.apache.hadoop.fs.azurebfs.services.AbfsClientThrottlingIntercept",
             true,
             classLoader);
+    // AbfsClientThrottlingIntercept holds a static singleton with Timers. If the ABFS class was
+    // delegated to a parent/AppClassLoader, cancelling its timers would break ABFS for the JVM.
+    if (!isOwnedByClassLoader(abfsClientThrottlingInterceptClass, classLoader)) {
+      LOG.debug(
+          "AbfsClientThrottlingIntercept is owned by {}, not {}; skipping Azure cleanup",
+          abfsClientThrottlingInterceptClass.getClassLoader(),
+          classLoader);
+      return;
+    }
     Object abfsClientThrottlingIntercept =
         FieldUtils.readStaticField(abfsClientThrottlingInterceptClass, "singleton", true);
 
@@ -291,14 +337,22 @@ public class ClassLoaderResourceCleanerUtils {
     Timer writeTimer = (Timer) FieldUtils.readField(writeThrottler, "timer", true);
     writeTimer.cancel();
 
-    // Release the LogFactory for the Azure shaded commons logging which has been relocated
-    // by the Azure SDK
     Class<?> relocatedLogFactory =
         Class.forName(
             "org.apache.gravitino.azure.shaded.org.apache.commons.logging.LogFactory",
             true,
             classLoader);
     MethodUtils.invokeStaticMethod(relocatedLogFactory, "release", classLoader);
+  }
+
+  /**
+   * Returns true if {@code clazz} was loaded directly by {@code classLoader} (not delegated to a
+   * parent). Use this before touching static fields that must belong to the catalog's own
+   * classloader to avoid accidentally mutating JVM-global shared state.
+   */
+  @VisibleForTesting
+  static boolean isOwnedByClassLoader(Class<?> clazz, ClassLoader classLoader) {
+    return classLoader != null && clazz.getClassLoader() == classLoader;
   }
 
   @FunctionalInterface

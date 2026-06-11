@@ -31,11 +31,15 @@ global:
 image:
   registry: docker.io
   repository: apache/gravitino
-  tag: 1.3.0-SNAPSHOT
+  tag: 1.4.0-SNAPSHOT
   pullPolicy: IfNotPresent
 
 ## MySQL chart configuration
 ## ref: https://github.com/bitnami/charts/blob/main/bitnami/mysql/values.yaml
+##
+## WARNING: The defaults below (auth.rootPassword=admin, auth.password=gravitino)
+## are for trial use only. Override both passwords, or use auth.existingSecret to
+## source credentials from a Kubernetes Secret, before any non-trial deployment.
 ##
 mysql:
   ## @param mysql.enabled Deploy MySQL container(s)
@@ -71,6 +75,10 @@ mysql:
 
 ## PostgreSQL chart configuration
 ## ref: https://github.com/bitnami/charts/blob/master/bitnami/postgresql/values.yaml
+##
+## WARNING: The default below (auth.password=gravitino) is for trial use only.
+## Override the password, or use auth.existingSecret to source credentials from
+## a Kubernetes Secret, before any non-trial deployment.
 ##
 postgresql:
   ## @param postgresql.enabled Deploy PostgreSQL container(s)
@@ -132,6 +140,23 @@ entity:
   ##
   jdbcPassword: gravitino
   storagePath: /opt/gravitino/data/jdbc
+  ## Maximum number of JDBC connections in the relational backend pool.
+  ## Leave unset to use the server default. Production recommendation: 200.
+  ##
+  maxConnections: ""
+
+## THE CONFIGURATION FOR Gravitino TREE LOCK
+##
+lock:
+  ## Maximum number of tree-lock nodes the lock manager will hold concurrently.
+  ## Used to tune tree-lock memory for high-concurrency deployments.
+  ## Leave unset to use the server default. Production recommendation: 500000.
+  ##
+  maxNodes: ""
+  ## Minimum number of tree-lock nodes the lock manager preserves across cleanup.
+  ## Leave unset to use the server default. Production recommendation: 5000.
+  ##
+  minNodes: ""
 
 ## THE CONFIGURATION FOR Gravitino SERVER
 ##
@@ -289,7 +314,11 @@ icebergRest:
   #   tenantId: ""
   #   clientId: ""
   #   clientSecret: ""
-  ## No need to configure extra Google Cloud Storage configuration
+  ## Google Cloud Storage (GCS) configuration
+  ## If your catalog uses GCS as the object store, you must set the
+  ## GOOGLE_APPLICATION_CREDENTIALS environment variable in the container (see the "env" section below).
+  ## Mount the service account key file into the pod via extraVolumes/extraVolumeMounts.
+  ## No additional Iceberg REST properties are required beyond the credential file.
   ##
   ## Catalog configuration provider class name
   ##
@@ -338,30 +367,52 @@ metrics:
 ## Custom Gravitino configuration items
 ##
 visibleConfigs: ""
-# visibleConfigs: "gravitino.datastrato.custom.authorization.ranger.admin.url,gravitino.datastrato.custom.authorization.ranger.username,gravitino.datastrato.custom.authorization.ranger.password,gravitino.datastrato.custom.authorization.ranger.auth.type"
+# visibleConfigs: "gravitino.custom.example.url,gravitino.custom.example.username,gravitino.custom.example.password,gravitino.custom.example.auth.type"
 
 visibleConfigsItems: {}
-  # gravitino.datastrato.custom.authorization.ranger.admin.url: "http://ranger:6080"
-  # gravitino.datastrato.custom.authorization.ranger.username: admin
-  # gravitino.datastrato.custom.authorization.ranger.password: "rangerR0cks!"
-  # gravitino.datastrato.custom.authorization.ranger.auth.type: simple
+  # gravitino.custom.example.url: "http://example:6080"
+  # gravitino.custom.example.username: admin
+  # gravitino.custom.example.password: "exampleR0cks!"
+  # gravitino.custom.example.auth.type: simple
 
-## Additional Gravitino configuration items in gravitino.conf can be added
+## Additional Gravitino configuration items in gravitino.conf can be added.
+## Any key-value pair listed here will be appended verbatim to the rendered
+## gravitino.conf file. This is useful for settings not yet exposed as
+## structured values.yaml paths.
+##
+## Example — configuring event listeners (requires a valid EventListenerPlugin
+## implementation class on the server classpath):
+##
+##   additionalConfigItems:
+##     gravitino.eventListener.names: "audit,sync"
+##     gravitino.eventListener.audit.class: "com.example.AuditEventListener"
+##     gravitino.eventListener.sync.class: "com.example.SyncEventListener"
 ##
 additionalConfigItems: {}
-#  gravitino.eventListener.names: "audit,sync"
 
 ## Additional volumes
 ##
 extraVolumes:
   - name: gravitino-log
     emptyDir: {}
+  ## Uncomment the following to mount a GCS service account key for catalogs using GCS as object store.
+  ## Create the secret first: kubectl create secret generic gcs-key --from-file=key.json=<path-to-key-file> -n gravitino
+  ##
+  # - name: gcs-key
+  #   secret:
+  #     secretName: gcs-key
 
 ## Additional volume mounts
 ##
 extraVolumeMounts:
   - name: gravitino-log
     mountPath: /opt/gravitino/logs
+  ## Uncomment the following to mount the GCS key into the container.
+  ## Ensure GOOGLE_APPLICATION_CREDENTIALS env is set to /etc/gcs/key.json (see env section).
+  ##
+  # - name: gcs-key
+  #   mountPath: /etc/gcs
+  #   readOnly: true
 
 ## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
 ## If you set enabled as "True", you need :
@@ -427,7 +478,7 @@ additionalLog4j2Properties:
 initScript: |
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/start-gravitino.sh
+  /bin/bash ${GRAVITINO_HOME}/docker/docker-entrypoint.sh
 
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
 ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
@@ -532,6 +583,11 @@ containerSecurityContext:
 env:
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
+  ## Uncomment the following if your catalog uses Google Cloud Storage (GCS) as the object store.
+  ## You must also mount the service account key file via extraVolumes and extraVolumeMounts.
+  ##
+  # - name: GOOGLE_APPLICATION_CREDENTIALS
+  #   value: /etc/gcs/key.json
 
 ## The envWithTpl array below has the same usage as "env", but is using the tpl function to support templatable string.
 ## This can be useful when you want to pass dynamic values to the Chart using the helm argument "--set <variable>=<value>"

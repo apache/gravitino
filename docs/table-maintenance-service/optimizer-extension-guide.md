@@ -1,13 +1,15 @@
 ---
 title: "Optimizer Extension Guide"
-slug: /table-maintenance-service/extension-guide
-keyword: table maintenance, optimizer, extension, provider, ServiceLoader
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/extension-guide"
+keyword: "table maintenance, optimizer, extension, provider, ServiceLoader"
+license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 Use this guide when built-in optimizer components do not match your environment and you need custom implementations.
 
-## Extension model
+## Extension Model
 
 Optimizer supports three loading patterns:
 
@@ -15,7 +17,7 @@ Optimizer supports three loading patterns:
 2. Class-name mapping for strategy handlers and job adapters.
 3. Typed SPI for `StatisticsCalculator` and `MetricsEvaluator`.
 
-## Extension points and config keys
+## Extension Points and Config Keys
 
 | Area | Interface / type | Config key | Loading mode |
 | --- | --- | --- | --- |
@@ -33,7 +35,7 @@ Optimizer supports three loading patterns:
 | Monitor callbacks | `MonitorCallback` | `gravitino.optimizer.monitor.callbacks` | `Provider` SPI by `name()` (comma-separated) |
 | CLI calculator | `StatisticsCalculator` | CLI `--calculator-name` | Typed SPI (`ServiceLoader<StatisticsCalculator>`) |
 
-## Implement a custom provider
+## Implement a Custom Provider
 
 Most extension points use `Provider`:
 
@@ -62,7 +64,7 @@ Requirements:
 
 ## Register with ServiceLoader
 
-### For `Provider` implementations
+### `Provider` Implementation
 
 Create file:
 
@@ -75,13 +77,13 @@ com.example.optimizer.MyStatisticsProvider
 com.example.optimizer.MyJobSubmitter
 ```
 
-### For `StatisticsCalculator`
+### `StatisticsCalculator` Implementation
 
 Create file:
 
 `META-INF/services/org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsCalculator`
 
-### For `MetricsEvaluator`
+### `MetricsEvaluator` Implementation
 
 Create file:
 
@@ -105,7 +107,7 @@ Notes:
 - `jobAdapter.<jobTemplate>.className` must match the target job template name.
 - `jobSubmitterConfig.*` entries are passed to job submitters as shared runtime options.
 
-## Package and deploy
+## Package and Deploy
 
 - Build a JAR containing your classes and `META-INF/services` files.
 - Put the JAR on optimizer runtime classpath, for example `${GRAVITINO_HOME}/optimizer/libs/`.
@@ -113,14 +115,14 @@ Notes:
 
 If you also extend Gravitino server job execution, see [Manage jobs in Gravitino](../manage-jobs-in-gravitino.md).
 
-## Validation checklist
+## Validation Checklist
 
 1. `--help` shows no load-time SPI errors.
 2. Commands using your extension run without `No ... found for provider name` errors.
 3. Strategy flow can resolve both handler and job adapter mappings.
 4. Dry-run (`submit-strategy-jobs --dry-run`) prints expected recommendations.
 
-## Related docs
+## Related
 
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)
