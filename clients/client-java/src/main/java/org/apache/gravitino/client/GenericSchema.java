@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
@@ -45,7 +46,7 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
   GenericSchema(SchemaDTO schemaDTO, RESTClient restClient, String metalake, String catalog) {
     this.schemaDTO = schemaDTO;
     MetadataObject schemaObject =
-        MetadataObjects.of(catalog, schemaDTO.name(), MetadataObject.Type.SCHEMA);
+        MetadataObjects.of(Arrays.asList(catalog, schemaDTO.name()), MetadataObject.Type.SCHEMA);
     this.objectTagOperations = new MetadataObjectTagOperations(metalake, schemaObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(metalake, schemaObject, restClient);
