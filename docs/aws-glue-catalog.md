@@ -42,7 +42,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 | `aws-access-key-id`      | AWS access key ID for static credential authentication. When omitted, the default credential chain is used.                                                                                                 | (none)                   | No       | No        | 1.3.0         |
 | `aws-secret-access-key`  | AWS secret access key paired with `aws-access-key-id`. When omitted, the default credential chain is used.                                                                                                  | (none)                   | No       | No        | 1.3.0         |
 | `aws-glue-endpoint`      | Custom Glue endpoint URL for VPC endpoints or LocalStack testing (e.g. `http://localhost:4566`).                                                                                                            | (none)                   | No       | No        | 1.3.0         |
-| `warehouse`              | Base storage path used as the warehouse when no explicit `location` is specified at table creation time (e.g. `s3://my-bucket/warehouse`). Table location is derived as `warehouse/database/table`. Either `warehouse` or a per-table `location` must be set. | (none) | No | No | 1.3.0 |
+| `warehouse`              | Base storage path used as the warehouse when no explicit `location` is specified at table creation time (e.g. `s3://my-bucket/warehouse`). Table location is derived as `warehouse/database/table`. | (none) | Yes | No | 1.3.0 |
 | `default-table-format`   | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`.                                                                                                  | `hive`                   | No       | No        | 1.3.0         |
 | `table-format-filter`    | Comma-separated list of table formats exposed by `listTables()` and `loadTable()`. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. Use to restrict visible table types.                     | `all`                    | No       | No        | 1.3.0         |
 
@@ -182,7 +182,8 @@ Gravitino has already defined a unified set of [metadata operation interfaces](.
 | `Remove Properties`      | `Remove a table property`      | 1.3.0         |
 
 :::caution
-Table rename is not supported. AWS Glue does not provide a rename operation; renaming would require recreating the table.
+Hive-format table rename is not supported. AWS Glue does not provide a native rename API for tables; renaming would require recreating the table.
+Iceberg-format table rename is supported.
 :::
 
 ##### Alter column

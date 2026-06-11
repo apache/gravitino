@@ -107,7 +107,8 @@ The following alter table operations are supported:
 - Set a table property
 
 :::caution
-Table rename is not supported. AWS Glue does not provide a rename operation for tables.
+Hive-format table rename is not supported. AWS Glue does not provide a native rename API for tables.
+Iceberg-format table rename is supported.
 :::
 
 ### Select

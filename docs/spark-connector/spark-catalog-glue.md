@@ -136,7 +136,7 @@ VALUES (1, 'John Doe', 30), (2, 'Jane Smith', 28);
 
 SELECT * FROM employees WHERE department = 'Engineering';
 
--- Create an Iceberg table
+-- Create an Iceberg table partitioned by order_ts (identity)
 CREATE TABLE IF NOT EXISTS orders (
     order_id BIGINT,
     customer STRING,
@@ -144,12 +144,16 @@ CREATE TABLE IF NOT EXISTS orders (
     order_ts TIMESTAMP
 )
 USING iceberg
-PARTITIONED BY (days(order_ts));
+PARTITIONED BY (order_ts);
 
 INSERT INTO orders VALUES (1, 'alice', 99.99, TIMESTAMP '2024-01-01 00:00:00');
 
 SELECT * FROM orders WHERE order_ts >= DATE '2024-01-01';
 ```
+
+:::note
+Time-based partition transforms (`days()`, `hours()`, `months()`, `years()`) can be specified in `CREATE TABLE`, but `INSERT` into such Iceberg tables is not currently supported through the Gravitino Spark Glue connector. Use identity partitioning (e.g. `PARTITIONED BY (order_ts)`) when writes are required.
+:::
 
 ## Catalog properties
 
@@ -176,14 +180,25 @@ Gravitino catalog property names with the prefix `spark.bypass.` are passed dire
 
 ## S3 storage
 
-When using AWS S3, configure S3 credentials via Spark configuration:
+When using AWS S3, configure S3 credentials as global Hadoop properties via Spark configuration:
 
 ```bash
 spark-submit \
-  --conf spark.sql.catalog.glue_catalog.fs.s3a.access.key=<your-access-key> \
-  --conf spark.sql.catalog.glue_catalog.fs.s3a.secret.key=<your-secret-key> \
+  --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+  --conf spark.hadoop.fs.s3a.access.key=<your-access-key> \
+  --conf spark.hadoop.fs.s3a.secret.key=<your-secret-key> \
+  --conf spark.hadoop.fs.s3a.endpoint.region=<your-region> \
+  --conf spark.hadoop.fs.s3.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+  --conf spark.hadoop.fs.s3.access.key=<your-access-key> \
+  --conf spark.hadoop.fs.s3.secret.key=<your-secret-key> \
   ...
 ```
+
+:::note
+Both `fs.s3a.*` and `fs.s3.*` must be configured. The AWS Glue Data Catalog Hive client stores table
+locations using the `s3://` scheme, while Spark uses `s3a://` for S3 access. Mapping both schemes to
+`S3AFileSystem` ensures Hive-format tables are readable.
+:::
 
 Alternatively, use `spark.bypass.` prefix in catalog properties to pass S3 configuration:
 
@@ -191,7 +206,7 @@ Alternatively, use `spark.bypass.` prefix in catalog properties to pass S3 confi
 {
   "properties": {
     "aws-region": "us-east-1",
-    "warehouse": "s3://my-bucket/warehouse",
+    "warehouse": "s3a://my-bucket/warehouse",
     "spark.bypass.fs.s3a.access.key": "<your-access-key>",
     "spark.bypass.fs.s3a.secret.key": "<your-secret-key>"
   }
