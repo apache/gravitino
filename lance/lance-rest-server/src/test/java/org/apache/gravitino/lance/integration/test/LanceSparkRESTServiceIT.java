@@ -334,8 +334,9 @@ public class LanceSparkRESTServiceIT extends BaseIT {
             UnsupportedOperationException.class,
             () ->
                 sql("ALTER TABLE %s.%s RENAME COLUMN score TO final_score", schemaName, tableName));
+    String msgLower = exception.getMessage().toLowerCase(Locale.ROOT);
     Assertions.assertTrue(
-        exception.getMessage().toLowerCase(Locale.ROOT).contains("not supported"),
+        msgLower.contains("not supported") || msgLower.contains("unsupported"),
         "Expected unsupported-operation message, but got: " + exception.getMessage());
 
     sql("INSERT INTO %s.%s VALUES (1, CAST(9.9 AS FLOAT))", schemaName, tableName);
