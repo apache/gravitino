@@ -460,6 +460,13 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(location, loadTable.getLocation());
     Assertions.assertNotNull(loadTable.getVersion());
 
+    describeTableRequest.setVersion(loadTable.getVersion());
+    DescribeTableResponse versionedLoadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(versionedLoadTable);
+    Assertions.assertEquals(location, versionedLoadTable.getLocation());
+    Assertions.assertEquals(loadTable.getVersion(), versionedLoadTable.getVersion());
+    Assertions.assertEquals(loadTable.getStorageOptions(), versionedLoadTable.getStorageOptions());
+
     List<JsonArrowField> jsonArrowFields = loadTable.getSchema().getFields();
     for (int i = 0; i < jsonArrowFields.size(); i++) {
       JsonArrowField jsonArrowField = jsonArrowFields.get(i);
@@ -824,15 +831,6 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.describeTable(describeTableRequest));
     assertLanceErrorCode(describeException, ErrorCode.TABLE_NOT_FOUND);
-
-    describeTableRequest.setVersion(1L);
-    RuntimeException versionException =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> ns.describeTable(describeTableRequest));
-    Assertions.assertTrue(
-        versionException
-            .getMessage()
-            .contains("Describing specific table version is not supported"));
   }
 
   @Test
@@ -882,7 +880,7 @@ public class LanceRESTServiceIT extends BaseIT {
     // Drop the table
     DropTableRequest dropTableRequest = new DropTableRequest();
     dropTableRequest.setId(ids);
-    Assertions.assertThrows(Exception.class, () -> ns.dropTable(dropTableRequest));
+    Assertions.assertDoesNotThrow(() -> ns.dropTable(dropTableRequest));
 
     // Describe the dropped table should fail
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
@@ -1012,6 +1010,55 @@ public class LanceRESTServiceIT extends BaseIT {
   private TableApi createTableApi() {
     ApiClient apiClient = new ApiClient().setBasePath(getLanceRestServiceUrl());
     return new TableApi(apiClient);
+  }
+
+  @Test
+  void testDropTableWhenLocationMissingOrNotCreated() {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    // Create table via register with non-existent location
+    List<String> registerIds = List.of(CATALOG_NAME, SCHEMA_NAME, "register_missing_location");
+    String missingLocation = tempDir + "/" + "register_missing_location/";
+    RegisterTableRequest registerTableRequest = new RegisterTableRequest();
+    registerTableRequest.setId(registerIds);
+    registerTableRequest.setLocation(missingLocation);
+    registerTableRequest.setMode("create");
+    RegisterTableResponse registerTableResponse =
+        Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
+    Assertions.assertEquals(missingLocation, registerTableResponse.getLocation());
+    Assertions.assertFalse(new File(missingLocation).exists());
+
+    DropTableRequest dropRegisteredTable = new DropTableRequest();
+    dropRegisteredTable.setId(registerIds);
+    Assertions.assertDoesNotThrow(() -> ns.dropTable(dropRegisteredTable));
+    DescribeTableRequest describeRegistered = new DescribeTableRequest();
+    describeRegistered.setId(registerIds);
+    Assertions.assertThrows(
+        LanceNamespaceException.class, () -> ns.describeTable(describeRegistered));
+
+    // Register table with an existing location, then delete the location before drop
+    List<String> existingIds = List.of(CATALOG_NAME, SCHEMA_NAME, "existing_then_deleted");
+    String existingLocation = tempDir + "/" + "existing_then_deleted/";
+    new File(existingLocation).mkdirs();
+    Assertions.assertTrue(new File(existingLocation).exists());
+
+    RegisterTableRequest existingRegisterRequest = new RegisterTableRequest();
+    existingRegisterRequest.setId(existingIds);
+    existingRegisterRequest.setLocation(existingLocation);
+    existingRegisterRequest.setMode("create");
+    Assertions.assertDoesNotThrow(() -> ns.registerTable(existingRegisterRequest));
+
+    FileUtils.deleteQuietly(new File(existingLocation));
+    Assertions.assertFalse(new File(existingLocation).exists());
+
+    DropTableRequest dropExistingTable = new DropTableRequest();
+    dropExistingTable.setId(existingIds);
+    Assertions.assertDoesNotThrow(() -> ns.dropTable(dropExistingTable));
+    DescribeTableRequest describeExisting = new DescribeTableRequest();
+    describeExisting.setId(existingIds);
+    Assertions.assertThrows(
+        LanceNamespaceException.class, () -> ns.describeTable(describeExisting));
   }
 
   private GravitinoMetalake createMetalake(String metalakeName) {

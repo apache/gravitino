@@ -47,12 +47,18 @@ download_gcs_connector() {
   rm "${temp_file}"
 }
 
-# Build the Gravitino project
-${gravitino_home}/gradlew clean build -x test
-
 rm -rf ${gravitino_home}/distribution
 # Prepare compile Gravitino packages
-${gravitino_home}/gradlew compileDistribution -x test
+${gravitino_home}/gradlew compileDistribution \
+  :bundles:aliyun-bundle:shadowJar \
+  :bundles:aws-bundle:shadowJar \
+  :bundles:gcp-bundle:shadowJar \
+  :bundles:azure-bundle:shadowJar \
+  :bundles:iceberg-gcp-bundle:shadowJar \
+  :bundles:iceberg-aws-bundle:shadowJar \
+  :bundles:iceberg-azure-bundle:shadowJar \
+  :bundles:iceberg-aliyun-bundle:shadowJar \
+  -x test
 
 # Removed old packages, Avoid multiple re-executions using the wrong file
 rm -rf "${gravitino_dir}/packages"

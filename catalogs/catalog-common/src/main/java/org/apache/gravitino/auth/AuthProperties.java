@@ -25,8 +25,15 @@ public class AuthProperties {
   public static final String GRAVITINO_CLIENT_AUTH_TYPE = "authType";
 
   public static final String SIMPLE_AUTH_TYPE = "simple";
+  public static final String BASIC_AUTH_TYPE = "basic";
   public static final String OAUTH2_AUTH_TYPE = "oauth2";
   public static final String KERBEROS_AUTH_TYPE = "kerberos";
+
+  /** The configuration key for the built-in IdP username used in Basic authentication. */
+  public static final String GRAVITINO_BASIC_USERNAME = "basic.username";
+
+  /** The configuration key for the built-in IdP password used in Basic authentication. */
+  public static final String GRAVITINO_BASIC_PASSWORD = "basic.password";
 
   // oauth2
   /** The configuration key for the URI of the default OAuth server. */
@@ -51,6 +58,10 @@ public class AuthProperties {
 
   public static boolean isSimple(String authType) {
     return authType == null || SIMPLE_AUTH_TYPE.equalsIgnoreCase(authType);
+  }
+
+  public static boolean isBasic(String authType) {
+    return BASIC_AUTH_TYPE.equalsIgnoreCase(authType);
   }
 
   private AuthProperties() {}

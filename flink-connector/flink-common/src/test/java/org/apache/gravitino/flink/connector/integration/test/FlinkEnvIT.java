@@ -25,7 +25,6 @@ import com.google.errorprone.annotations.FormatString;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.flink.configuration.Configuration;
@@ -258,14 +257,17 @@ public abstract class FlinkEnvIT extends BaseIT {
     action.accept(catalog);
   }
 
-  /** Iceberg requires deleting the table first, then deleting the schema. */
+  /** Iceberg requires deleting tables and views first, then deleting the schema. */
   protected static void clearTableInSchema() {
     TableResult result = sql("SHOW TABLES");
-    List<Row> rows = Lists.newArrayList(result.collect());
-    for (Row row : rows) {
-      String tableName = row.getField(0).toString();
-      TableResult deleteResult = sql("DROP TABLE IF EXISTS %s", tableName);
-      TestUtils.assertTableResult(deleteResult, ResultKind.SUCCESS);
+    for (Row row : Lists.newArrayList(result.collect())) {
+      TestUtils.assertTableResult(
+          sql("DROP TABLE IF EXISTS %s", row.getField(0).toString()), ResultKind.SUCCESS);
+    }
+    TableResult viewResult = sql("SHOW VIEWS");
+    for (Row row : Lists.newArrayList(viewResult.collect())) {
+      TestUtils.assertTableResult(
+          sql("DROP VIEW IF EXISTS %s", row.getField(0).toString()), ResultKind.SUCCESS);
     }
   }
 }

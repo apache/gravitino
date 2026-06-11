@@ -1,13 +1,15 @@
 ---
-title: "Manage metalake using Apache Gravitino"
-slug: /manage-metalake-using-gravitino
+title: "Manage Metalakes"
+slug: "/manage-metalake-using-gravitino"
 date: 2023-12-10
-keyword: Gravitino metalake manage
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino metalake manage"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+
+## Introduction
 
 This page introduces how to create, modify, view, and delete [metalakes](./glossary.md#metalake) by using Gravitino. 
 
@@ -17,7 +19,7 @@ You have installed and launched Gravitino. For more details, see [Get started](.
 
 Let's say, the access is [http://localhost:8090](http://localhost:8090).
 
-## Create a metalake
+## Create a Metalake
 
 To create a metalake, you can send a `POST` request to the `/api/metalakes` endpoint or use the Gravitino Admin client.
 
@@ -60,7 +62,7 @@ gravitino_admin_client.create_metalake(name="metalake",
 </TabItem>
 </Tabs>
 
-## Load a metalake
+## Load a Metalake
 
 To load a metalake, you can send a `GET` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
 
@@ -94,7 +96,7 @@ gravitino_admin_client.load_metalake("metalake")
 </TabItem>
 </Tabs>
 
-## Alter a metalake
+## Alter a Metalake
 
 To alter a metalake, you can send a `PUT` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
 
@@ -151,7 +153,7 @@ The following table outlines the supported modifications that you can make to a 
 | Set property           | `{"@type":"setProperty","property":"key1","value":"value1"}` | `MetalakeChange.setProperty("key1", "value1")` | `MetalakeChange.set_property("key1", "value1")` |
 | Remove property        | `{"@type":"removeProperty","property":"key1"}`               | `MetalakeChange.removeProperty("key1")`        | `MetalakeChange.remove_property("key1")`        |
 
-## Enable a metalake
+## Enable a Metalake
 
 Metalake has a reserved property - `in-use`, which indicates whether the metalake is available for use. By default, the `in-use` property is set to `true`.
 To enable a disabled metalake, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
@@ -194,7 +196,7 @@ gravitino_admin_client.enable_metalake("metalake")
 This operation does nothing if the metalake is already enabled.
 :::
 
-## Disable a metalake
+## Disable a Metalake
 
 Once a metalake is disabled:
  - Users can only [list](#list-all-metalakes), [load](#load-a-metalake), [drop](#drop-a-metalake), or [enable](#enable-a-metalake) it.
@@ -240,9 +242,9 @@ gravitino_admin_client.disable_metalake("metalake")
 This operation does nothing if the metalake is already disabled.
 :::
 
-## Drop a metalake
+## Drop a Metalake
 
-Deleting a metalake by "force" is not a default behavior, so please make sure:
+Deleting a metalake by "force" is not a default behavior, so make sure:
 
 - There are no catalogs under the metalake. Otherwise, you will get an error.
 - The metalake is [disabled](#disable-a-metalake). Otherwise, you will get an error.
@@ -285,7 +287,7 @@ gravitino_admin_client.drop_metalake("metalake", force=True)
 </TabItem>
 </Tabs>
 
-## List all metalakes
+## List All Metalakes
 
 To view all your metalakes, you can send a `GET` request to the `/api/metalakes` endpoint or use the Gravitino Admin client.
 

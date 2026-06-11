@@ -28,7 +28,8 @@ const { Text } = Typography
 function OidcLogin() {
   const [isLoading, setIsLoading] = useState(true)
   const [userManager, setUserManager] = useState(null)
-  const [error, setError] = useState(null)
+  const [initError, setInitError] = useState(null)
+  const [redirectError, setRedirectError] = useState(null)
 
   useEffect(() => {
     const initializeOidc = async () => {
@@ -37,7 +38,7 @@ function OidcLogin() {
         const provider = await oauthProviderFactory.getProvider()
 
         if (provider.getType() !== 'oidc') {
-          setError('OIDC provider not configured')
+          setInitError('OIDC provider not configured')
           setIsLoading(false)
 
           return
@@ -49,9 +50,10 @@ function OidcLogin() {
         }
 
         setUserManager(sharedUserManager)
+        setInitError(null)
         setIsLoading(false)
       } catch (error) {
-        setError(error.message || 'Failed to initialize OIDC')
+        setInitError(error.message || 'Failed to initialize OIDC')
         setIsLoading(false)
       }
     }
@@ -67,22 +69,23 @@ function OidcLogin() {
     )
   }
 
-  if (error) {
+  if (initError) {
     return (
       <Flex justify='center' className='my-4'>
-        <Alert message={error} type='error' showIcon />
+        <Alert message={initError} type='error' showIcon />
       </Flex>
     )
   }
 
   return (
     <Flex vertical align='center' gap={24} className='mt-4'>
-      <OidcLoginButton userManager={userManager} />
+      {redirectError && <Alert message={redirectError} type='error' showIcon style={{ width: '100%' }} />}
+      <OidcLoginButton userManager={userManager} onError={setRedirectError} />
     </Flex>
   )
 }
 
-function OidcLoginButton({ userManager }) {
+function OidcLoginButton({ userManager, onError }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   const handleLogin = async () => {
@@ -91,9 +94,11 @@ function OidcLoginButton({ userManager }) {
     }
 
     try {
+      onError(null)
       setIsLoggingIn(true)
       await userManager.signinRedirect()
     } catch (error) {
+      onError(error.message || 'Failed to redirect to the identity provider')
       setIsLoggingIn(false)
     }
   }

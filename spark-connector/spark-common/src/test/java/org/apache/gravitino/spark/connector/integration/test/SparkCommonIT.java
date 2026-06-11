@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -129,6 +130,11 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     return true;
   }
 
+  /** Returns whether this catalog supports Iceberg time-based partition transforms. */
+  protected boolean supportsIcebergPartitionTransforms() {
+    return false;
+  }
+
   protected SparkTableInfoChecker getTableInfoChecker() {
     return SparkTableInfoChecker.create();
   }
@@ -222,7 +228,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testLoadCatalogs() {
+  protected void testLoadCatalogs() {
     Set<String> catalogs = getCatalogs();
     Assertions.assertTrue(catalogs.contains(getCatalogName()));
   }
@@ -281,7 +287,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testDropSchema() {
+  protected void testDropSchema() {
     String testDatabaseName = "t_drop";
     dropDatabaseIfExists(testDatabaseName);
     Set<String> databases = getDatabases();
@@ -381,7 +387,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testRenameTable() {
+  protected void testRenameTable() {
     String tableName = "rename1";
     String newTableName = "rename2";
     dropTableIfExists(tableName);
@@ -408,7 +414,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testListTable() {
+  protected void testListTable() {
     String table1 = "list1";
     String table2 = "list2";
     dropTableIfExists(table1);
@@ -472,6 +478,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsSchemaEvolution")
   void testAlterTableAddAndDeleteColumn() {
     String tableName = "test_column";
     dropTableIfExists(tableName);
@@ -491,6 +498,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsSchemaEvolution")
   void testAlterTableUpdateColumnType() {
     String tableName = "test_column_type";
     dropTableIfExists(tableName);
@@ -508,6 +516,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsSchemaEvolution")
   void testAlterTableRenameColumn() {
     String tableName = "test_rename_column";
     dropTableIfExists(tableName);
@@ -858,7 +867,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testDropAndWriteTable() {
+  protected void testDropAndWriteTable() {
     String tableName = "drop_then_create_write_table";
 
     createSimpleTable(tableName);
@@ -1055,5 +1064,81 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   protected void checkParquetFile(SparkTableInfo tableInfo) {
     String location = tableInfo.getTableLocation();
     Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
+  }
+
+  /**
+   * Returns column definitions for a simple Iceberg table with integer, string, and timestamp
+   * columns.
+   */
+  protected List<SparkColumnInfo> getIcebergSimpleTableColumn() {
+    return Arrays.asList(
+        SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
+        SparkColumnInfo.of("name", DataTypes.StringType, ""),
+        SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
+  }
+
+  /** Returns the CREATE TABLE SQL for a simple Iceberg table with id, name, and ts columns. */
+  protected String getCreateIcebergSimpleTableString(String tableName) {
+    return String.format(
+        "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', ts TIMESTAMP)",
+        tableName);
+  }
+
+  @Test
+  @EnabledIf("supportsIcebergPartitionTransforms")
+  protected void testIcebergPartitions() {
+    Map<String, String> partitionPaths =
+        ImmutableMap.of(
+            "years", "name=a/name_trunc=a/id_bucket=4/ts_year=2024",
+            "months", "name=a/name_trunc=a/id_bucket=4/ts_month=2024-01",
+            "days", "name=a/name_trunc=a/id_bucket=4/ts_day=2024-01-01",
+            "hours", "name=a/name_trunc=a/id_bucket=4/ts_hour=2024-01-01-12");
+    partitionPaths
+        .keySet()
+        .forEach(
+            func -> {
+              String tableName = String.format("test_iceberg_%s_partition_table", func);
+              dropTableIfExists(tableName);
+              sql(
+                  getCreateIcebergSimpleTableString(tableName)
+                      + String.format(
+                          " USING iceberg PARTITIONED BY (name, truncate(1, name), bucket(16, id), %s(ts));",
+                          func));
+              SparkTableInfo tableInfo = getTableInfo(tableName);
+              SparkTableInfoChecker checker =
+                  SparkTableInfoChecker.create()
+                      .withName(tableName)
+                      .withColumns(getIcebergSimpleTableColumn())
+                      .withIdentifyPartition(Collections.singletonList("name"))
+                      .withTruncatePartition(1, "name")
+                      .withBucketPartition(16, Collections.singletonList("id"));
+              switch (func) {
+                case "years":
+                  checker.withYearPartition("ts");
+                  break;
+                case "months":
+                  checker.withMonthPartition("ts");
+                  break;
+                case "days":
+                  checker.withDayPartition("ts");
+                  break;
+                case "hours":
+                  checker.withHourPartition("ts");
+                  break;
+                default:
+                  throw new IllegalArgumentException("Unsupported partition function: " + func);
+              }
+              checker.check(tableInfo);
+
+              sql(
+                  String.format(
+                      "INSERT into %s values(2,'a',cast('2024-01-01 12:00:00' as timestamp));",
+                      tableName));
+              List<String> queryResult = getTableData(tableName);
+              Assertions.assertEquals(1, queryResult.size());
+              Assertions.assertEquals("2,a,2024-01-01 12:00:00", queryResult.get(0));
+              checkDirExists(
+                  new Path(tableInfo.getTableLocation(), "data/" + partitionPaths.get(func)));
+            });
   }
 }

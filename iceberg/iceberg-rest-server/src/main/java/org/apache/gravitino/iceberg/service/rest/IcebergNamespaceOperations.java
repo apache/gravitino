@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -101,7 +102,9 @@ public class IcebergNamespaceOperations {
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response listNamespaces(
       @DefaultValue("") @Encoded() @QueryParam("parent") String parent,
-      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix) {
+      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @QueryParam("pageToken") String pageToken,
+      @QueryParam("pageSize") Integer pageSize) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace parentNamespace =
         parent.isEmpty()
@@ -124,6 +127,9 @@ public class IcebergNamespaceOperations {
               response =
                   filterListNamespacesResponse(response, authContext.metalakeName(), catalogName);
             }
+            response =
+                IcebergPaginationHelper.paginateNamespaces(
+                    response, Optional.ofNullable(pageToken), Optional.ofNullable(pageSize));
             return IcebergRESTUtils.ok(response);
           });
     } catch (Exception e) {

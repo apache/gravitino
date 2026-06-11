@@ -41,6 +41,23 @@ public class TestIcebergPropertiesUtils {
   }
 
   @Test
+  void testRESTCatalogBackendClientTimeoutPropertiesAreMapped() {
+    Map<String, String> gravitinoProps =
+        ImmutableMap.of(
+            IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS,
+            "1000",
+            IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS,
+            "2000");
+    Map<String, String> icebergProps =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProps);
+
+    Assertions.assertEquals(
+        "1000", icebergProps.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "2000", icebergProps.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
   void testGetCatalogBackendName() {
     Map<String, String> catalogProperties =
         ImmutableMap.of(

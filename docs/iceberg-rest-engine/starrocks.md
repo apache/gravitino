@@ -1,9 +1,9 @@
 ---
-title: Connect StarRocks via Iceberg REST
-sidebar_label: StarRocks
+title: "Connect StarRocks to Iceberg REST"
+sidebar_label: "StarRocks"
 ---
 
-# Connecting StarRocks via Iceberg REST
+## Introduction
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly. This page describes how to configure StarRocks
@@ -39,7 +39,7 @@ PROPERTIES
 `client.factory` must be set explicitly for StarRocks to correctly initialize the Iceberg AWS client.
 :::
 
-## Usage examples
+## Examples
 
 ```sql
 SET CATALOG iceberg;
@@ -50,7 +50,7 @@ INSERT INTO t VALUES (1);
 SELECT * FROM t;
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

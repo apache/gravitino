@@ -81,10 +81,12 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
       AwsCredentials creds = baseCredentialsProvider.resolveCredentials();
       if (creds instanceof AwsSessionCredentials) {
         AwsSessionCredentials sessionCreds = (AwsSessionCredentials) creds;
-        long expiration =
-            sessionCreds.expirationTime().isPresent()
-                ? sessionCreds.expirationTime().get().toEpochMilli()
-                : 0L;
+        if (!sessionCreds.expirationTime().isPresent()) {
+          throw new IllegalStateException(
+              "AWS IRSA session credentials must include an expiration time for vended credential"
+                  + " refresh");
+        }
+        long expiration = sessionCreds.expirationTime().get().toEpochMilli();
         return new AwsIrsaCredential(
             sessionCreds.accessKeyId(),
             sessionCreds.secretAccessKey(),

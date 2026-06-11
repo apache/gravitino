@@ -79,6 +79,12 @@ public class IcebergPropertiesUtils {
         IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES,
         IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES);
     map.put(IcebergConstants.DATA_ACCESS, IcebergConstants.ICEBERG_ACCESS_DELEGATION);
+    map.put(
+        IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS,
+        IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS);
+    map.put(
+        IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS,
+        IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS);
 
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
 

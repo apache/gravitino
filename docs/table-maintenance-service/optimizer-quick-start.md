@@ -1,11 +1,11 @@
 ---
-title: "Optimizer Quick Start and Verification"
-slug: /table-maintenance-service/quick-start
-keyword: table maintenance, optimizer, quick start, compaction, update stats
-license: This software is licensed under the Apache License version 2.
+title: "Optimizer Quick Start"
+slug: "/table-maintenance-service/quick-start"
+keyword: "table maintenance, optimizer, quick start, compaction, update stats"
+license: "This software is licensed under the Apache License version 2."
 ---
 
-## Before running quick start
+## Before Running Quick Start
 
 - Prepare a running Gravitino server.
 - Ensure target metalake exists (examples use `test`).
@@ -17,14 +17,14 @@ license: This software is licensed under the Apache License version 2.
 
 For full config details, see [Optimizer Configuration](./optimizer-configuration.md).
 
-## Success criteria
+## Success Criteria
 
 - Update-stats job finishes and table statistics/metrics include `custom-data-file-mse` and
   `custom-delete-file-number`.
 - `submit-strategy-jobs` prints `SUBMIT` with a rewrite job ID.
 - Rewrite job log shows `Rewritten data files: <N>` where `N > 0` for non-empty tables.
 
-## Quick start A: built-in table maintenance workflow
+## Quick Start a: Built-in Table Maintenance Workflow
 
 This workflow uses:
 
@@ -32,7 +32,7 @@ This workflow uses:
 - Built-in update stats job template: `builtin-iceberg-update-stats`
 - Built-in rewrite data files job template: `builtin-iceberg-rewrite-data-files`
 
-### 1. Preflight checks
+### Step 1: Preflight Checks
 
 ```bash
 # Check metalake
@@ -49,7 +49,7 @@ Expected names include:
 
 If missing, verify `gravitino-jobs` JAR in `auxlib`, then restart Gravitino.
 
-### 2. Prepare demo metadata objects
+### Step 2: Prepare Demo Metadata Objects
 
 Create a REST Iceberg catalog, schema, and table:
 
@@ -94,7 +94,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/metalakes/test/catalogs/rest_catalog/schemas/db/tables
 ```
 
-### 3. Seed demo data (recommended)
+### Step 3: Seed Demo Data (Recommended)
 
 Use Spark SQL to create enough small files so compaction has visible effect:
 
@@ -110,7 +110,7 @@ ${SPARK_HOME}/bin/spark-sql \
       SELECT id, concat('name_', CAST(id AS STRING)) FROM range(0, 100000);"
 ```
 
-### 4. Create and attach built-in compaction policy
+### Step 4: Create and Attach Built-In Compaction Policy
 
 ```bash
 # Create policy
@@ -140,7 +140,7 @@ Verify association:
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies?details=true" | jq
 ```
 
-### 5. Submit built-in update stats job
+### Step 5: Submit Built-In Update Stats Job
 
 ```bash
 update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -168,7 +168,7 @@ update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+
 echo "update-stats job id: ${update_stats_job_id}"
 ```
 
-### 6. Trigger rewrite submission with `submit-strategy-jobs`
+### Step 6: Trigger Rewrite Submission with `submit-strategy-jobs`
 
 ```bash
 # Required optimizer CLI config for strategy submission.
@@ -218,7 +218,7 @@ strategy_job_id=$(echo "${submit_output}" | sed -n 's/.*jobId=\([^[:space:]]*\).
 echo "strategy rewrite job id: ${strategy_job_id}"
 ```
 
-### 7. Track status and verify results
+### Step 7: Track Status and Verify Results
 
 ```bash
 # Check job status by id
@@ -238,7 +238,7 @@ grep -E "Rewritten data files|Added data files|completed successfully" \
 By default, Gravitino pulls job status every `300000` ms (`gravitino.job.statusPullIntervalInMs`).
 REST status may lag real Spark process state by up to about 5 minutes.
 
-## Next read
+## Related
 
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer CLI Reference](./optimizer-cli-reference.md)

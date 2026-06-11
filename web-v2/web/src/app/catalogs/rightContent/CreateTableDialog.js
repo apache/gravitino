@@ -137,6 +137,27 @@ export default function CreateTableDialog({ ...props }) {
   const isSupportDefaultValue = defaultValueSupported.includes(provider)
   const dispatch = useAppDispatch()
 
+  const getActiveTableDefaultProps = () => {
+    const props = tableDefaultProps[provider] || []
+    if (provider !== 'glue') {
+      return props
+    }
+
+    const tableFormat = values?.['table-format']?.toLowerCase()
+
+    return props.filter(prop => {
+      if (!prop.hide?.length) {
+        return true
+      }
+
+      if (!tableFormat) {
+        return false
+      }
+
+      return !prop.hide.map(item => item.toLowerCase()).includes(tableFormat)
+    })
+  }
+
   useResetFormOnCloseModal({
     form,
     open
@@ -417,7 +438,7 @@ export default function CreateTableDialog({ ...props }) {
                 const fields = item.fieldName || item.fieldNames.map(f => f[0])
                 form.setFieldValue(['partitions', idxPartiton, 'strategy'], item.strategy)
                 form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fields)
-                form.setFieldValue(['partitions', idxPartiton, 'number'], item.width || item.number)
+                form.setFieldValue(['partitions', idxPartiton, 'number'], item.numBuckets || item.width || item.number)
                 idxPartiton++
               })
             }
@@ -749,8 +770,9 @@ export default function CreateTableDialog({ ...props }) {
             submitData.columns.forEach(col => {
               delete col.uniqueId
             })
-            if (tableDefaultProps[provider]) {
-              tableDefaultProps[provider].forEach(item => {
+            const activeDefaultProps = getActiveTableDefaultProps()
+            if (activeDefaultProps.length) {
+              activeDefaultProps.forEach(item => {
                 if (values[item.key]) {
                   submitData.properties[item.key] = values[item.key]
                 }
@@ -1570,7 +1592,7 @@ export default function CreateTableDialog({ ...props }) {
                     <div className='flex flex-col gap-2'>
                       {!editTable &&
                         tableDefaultProps[provider] &&
-                        tableDefaultProps[provider].map((prop, idx) => {
+                        getActiveTableDefaultProps().map((prop, idx) => {
                           const isLocationRequired =
                             prop.key === 'location' &&
                             provider === 'lakehouse-generic' &&

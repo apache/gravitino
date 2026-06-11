@@ -23,6 +23,7 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -36,6 +37,9 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -100,7 +104,36 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    return Optional.of(getIcebergConfigFromCatalogProperties(catalog.properties()));
+    // Sensitive credentials (e.g. jdbc-password) are marked hidden in PropertiesMetadata and
+    // filtered out of catalog.properties(). We need two different strategies to recover them:
+    //
+    // Auxiliary mode: the catalog is a BaseCatalog running in the same JVM as the Gravitino
+    // server. Call propertiesWithCredentialProviders() which returns the raw entity properties
+    // including all hidden fields.
+    //
+    // Standalone mode: the catalog is a client-side object obtained via the Gravitino REST API.
+    // Call getCredentials() to retrieve vended credentials, then inject any JdbcCredential
+    // fields into the properties map so the JDBC backend can connect.
+    Map<String, String> catalogProperties;
+    if (catalog instanceof BaseCatalog) {
+      catalogProperties = ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders();
+    } else {
+      catalogProperties = new HashMap<>(catalog.properties());
+      if (catalog instanceof SupportsCredentials) {
+        Arrays.stream(((SupportsCredentials) catalog).getCredentials())
+            .filter(c -> c instanceof JdbcCredential)
+            .map(c -> (JdbcCredential) c)
+            .findFirst()
+            .ifPresent(
+                jdbc -> {
+                  catalogProperties.putIfAbsent(
+                      IcebergConstants.GRAVITINO_JDBC_USER, jdbc.jdbcUser());
+                  catalogProperties.putIfAbsent(
+                      IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
+                });
+      }
+    }
+    return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));
   }
 
   /**
@@ -251,10 +284,10 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
     InternalCatalogFetcher(String metalake) {
       this.metalake = metalake;
-      CatalogDispatcher dispatcher = GravitinoEnv.getInstance().catalogDispatcher();
+      CatalogDispatcher dispatcher = GravitinoEnv.getInstance().internalCatalogDispatcher();
       Preconditions.checkState(
           dispatcher != null,
-          "CatalogDispatcher is not available. "
+          "Internal CatalogDispatcher is not available. "
               + "Internal catalog fetcher requires running within Gravitino server.");
       this.catalogDispatcher = dispatcher;
     }

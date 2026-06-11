@@ -45,6 +45,8 @@ export const checkCatalogIcon = ({ type, provider }) => {
           return 'custom-icons-lakehouse'
         case 'jdbc-clickhouse':
           return 'custom-icons-clickhouse'
+        case 'glue':
+          return 'custom-icons-glue'
         default:
           return 'bx:book'
       }
@@ -58,6 +60,8 @@ export const checkCatalogIcon = ({ type, provider }) => {
       return 'bx:book'
   }
 }
+
+export const sensitiveCatalogPropertyKeys = ['jdbc-password', 'aws-secret-access-key']
 
 export const tableDefaultProps = {
   hive: [
@@ -132,6 +136,79 @@ export const tableDefaultProps = {
       key: 'auto-increment-offset',
       defaultValue: '',
       description: 'autoIncrementOffsetDesc'
+    }
+  ],
+  glue: [
+    {
+      key: 'location',
+      defaultValue: '',
+      description: 'Table storage location, e.g. s3://my-bucket/path'
+    },
+    {
+      key: 'table-format',
+      defaultValue: '',
+      select: ['ICEBERG', 'HIVE'],
+      description: 'Table format: ICEBERG or HIVE'
+    },
+    {
+      key: 'metadata_location',
+      defaultValue: '',
+      hide: ['hive'],
+      description: 'Iceberg metadata file path'
+    },
+    {
+      key: 'format',
+      defaultValue: 'PARQUET',
+      hide: ['iceberg'],
+      select: ['TEXTFILE', 'SEQUENCEFILE', 'RCFILE', 'ORC', 'PARQUET', 'AVRO', 'JSON', 'CSV', 'REGEX']
+    },
+    {
+      key: 'input-format',
+      defaultValue: 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat',
+      hide: ['iceberg'],
+      defaultValueOptions: {
+        TEXTFILE: 'org.apache.hadoop.mapred.TextInputFormat',
+        SEQUENCEFILE: 'org.apache.hadoop.mapred.SequenceFileInputFormat',
+        RCFILE: 'org.apache.hadoop.hive.ql.io.RCFileInputFormat',
+        ORC: 'org.apache.hadoop.hive.ql.io.orc.OrcInputFormat',
+        PARQUET: 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat',
+        AVRO: 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat',
+        JSON: 'org.apache.hadoop.mapred.TextInputFormat',
+        CSV: 'org.apache.hadoop.mapred.TextInputFormat',
+        REGEX: 'org.apache.hadoop.mapred.TextInputFormat'
+      }
+    },
+    {
+      key: 'output-format',
+      defaultValue: 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat',
+      hide: ['iceberg'],
+      defaultValueOptions: {
+        TEXTFILE: 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+        SEQUENCEFILE: 'org.apache.hadoop.mapred.SequenceFileOutputFormat',
+        RCFILE: 'org.apache.hadoop.hive.ql.io.RCFileOutputFormat',
+        ORC: 'org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat',
+        PARQUET: 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat',
+        AVRO: 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat',
+        JSON: 'org.apache.hadoop.mapred.TextOutputFormat',
+        CSV: 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+        REGEX: 'org.apache.hadoop.mapred.TextOutputFormat'
+      }
+    },
+    {
+      key: 'serde-lib',
+      defaultValue: 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe',
+      hide: ['iceberg'],
+      defaultValueOptions: {
+        TEXTFILE: 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+        SEQUENCEFILE: 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+        RCFILE: 'org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe',
+        ORC: 'org.apache.hadoop.hive.ql.io.orc.OrcSerde',
+        PARQUET: 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe',
+        AVRO: 'org.apache.hadoop.hive.serde2.avro.AvroSerDe',
+        JSON: 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+        CSV: 'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe',
+        REGEX: 'org.apache.hadoop.hive.serde2.RegexSerDe'
+      }
     }
   ],
   'lakehouse-generic': [
@@ -282,6 +359,62 @@ export const rangerDefaultProps = [
 ]
 
 export const providerBase = {
+  glue: {
+    label: 'AWS Glue',
+    defaultProps: [
+      {
+        label: 'AWS Region',
+        key: 'aws-region',
+        value: '',
+        required: true,
+        description: 'AWS region, e.g. us-east-1'
+      },
+      {
+        label: 'Warehouse',
+        key: 'warehouse',
+        value: '',
+        required: true,
+        description: 'S3 base path, e.g. s3://my-bucket/warehouse'
+      },
+      {
+        label: 'AWS Glue Catalog ID',
+        key: 'aws-glue-catalog-id',
+        value: '',
+        description: "12-digit AWS account ID; defaults to caller's account"
+      },
+      {
+        label: 'AWS Access Key ID',
+        key: 'aws-access-key-id',
+        value: '',
+        description: 'Static credential; omit to use default credential chain'
+      },
+      {
+        label: 'AWS Secret Access Key',
+        key: 'aws-secret-access-key',
+        value: '',
+        description: 'Static credential paired with aws-access-key-id'
+      },
+      {
+        label: 'AWS Glue Endpoint',
+        key: 'aws-glue-endpoint',
+        value: '',
+        description: 'Custom endpoint URL, e.g. http://localhost:4566 for LocalStack'
+      },
+      {
+        label: 'Default Table Format',
+        key: 'default-table-format',
+        value: 'hive',
+        select: ['hive', 'iceberg'],
+        description: 'Default format for createTable()'
+      },
+      {
+        label: 'Table Format Filter',
+        key: 'table-format-filter',
+        value: 'all',
+        description: 'Comma-separated formats exposed by listTables()'
+      }
+    ]
+  },
   hive: {
     label: 'Apache Hive',
     defaultProps: [
@@ -760,6 +893,11 @@ export const relationalProviders = [
     label: 'Apache Hive',
     value: 'hive',
     description: 'A distributed, fault-tolerant data warehouse system'
+  },
+  {
+    label: 'AWS Glue',
+    value: 'glue',
+    description: 'A serverless metadata catalog for analytics and data lakes'
   },
   {
     label: 'Apache Hudi',

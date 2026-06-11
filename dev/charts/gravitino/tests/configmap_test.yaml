@@ -1,0 +1,299 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino configmap
+templates:
+  - configmap.yaml
+tests:
+  - it: renders default config files
+    release:
+      name: gravitino
+      namespace: gravitino-system
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.namespace
+          value: gravitino-system
+      - exists:
+          path: data["init.sh"]
+      - exists:
+          path: data["gravitino.conf"]
+      - exists:
+          path: data["log4j2.properties"]
+      - matchRegex:
+          path: data["init.sh"]
+          pattern: "docker-entrypoint\\.sh"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.server\\.webserver\\.httpPort = 8090"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.jdbcUrl = jdbc:h2"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "rootLogger\\.level = info"
+
+  - it: renders customized Gravitino and log4j configuration
+    release:
+      name: custom-gravitino
+    set:
+      webserver:
+        httpPort: 8099
+      visibleConfigs: "gravitino.visible.one"
+      visibleConfigsItems:
+        gravitino.visible.one: "{{ .Release.Name }}"
+      additionalConfigItems:
+        gravitino.custom.setting: "{{ .Values.entity.store }}"
+      log4j2Properties:
+        rootLoggerLevel: debug
+      additionalLog4j2Properties:
+        logger.custom.name: org.apache.gravitino.Custom
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.server\\.webserver\\.httpPort = 8099"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.server\\.visibleConfigs = gravitino\\.visible\\.one"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.visible\\.one = custom-gravitino"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.custom\\.setting = relational"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "rootLogger\\.level = debug"
+      - matchRegex:
+          path: data["log4j2.properties"]
+          pattern: "logger\\.custom\\.name = org\\.apache\\.gravitino\\.Custom"
+
+  - it: renders MySQL JDBC configuration when MySQL is enabled
+    release:
+      name: gravitino
+    set:
+      mysql:
+        enabled: true
+        auth:
+          database: gravitino_mysql
+          username: mysql_user
+          password: mysql_password
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.jdbcUrl = jdbc:mysql://gravitino-mysql:3306/gravitino_mysql"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.jdbcDriver = com\\.mysql\\.cj\\.jdbc\\.Driver"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.jdbcUser = mysql_user"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.jdbcPassword = mysql_password"
+
+  - it: renders PostgreSQL JDBC configuration when PostgreSQL is enabled
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: true
+        auth:
+          database: gravitino_pg
+          username: pg_user
+          password: pg_password
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.jdbcUrl = jdbc:postgresql://gravitino-postgresql:5432/gravitino_pg"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.jdbcDriver = org\\.postgresql\\.Driver"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.jdbcUser = pg_user"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.jdbcPassword = pg_password"
+
+  - it: does not render OAuth properties when authenticators is simple (default)
+    release:
+      name: gravitino
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticators = simple"
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\."
+
+  - it: renders OAuth properties only when authenticators contains oauth
+    release:
+      name: gravitino
+    set:
+      authenticators: oauth
+      authenticator:
+        oauth:
+          serviceAudience: my-audience
+          defaultSignKey: my-secret-key
+          serverUri: https://auth.example.com
+          tokenPath: /oauth/token
+          provider: oidc
+          clientId: my-client-id
+          authority: https://auth.example.com
+          scope: openid profile
+          jwksUri: https://auth.example.com/.well-known/jwks.json
+          tokenValidatorClass: org.apache.gravitino.server.authentication.JwksTokenValidator
+          principalFields: preferred_username,email
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticators = oauth"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.serviceAudience = my-audience"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.defaultSignKey = my-secret-key"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.serverUri = https://auth\\.example\\.com"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.tokenPath = /oauth/token"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.provider = oidc"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.clientId = my-client-id"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.jwksUri = https://auth\\.example\\.com/\\.well-known/jwks\\.json"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.tokenValidatorClass = org\\.apache\\.gravitino\\.server\\.authentication\\.JwksTokenValidator"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.principalFields = preferred_username,email"
+
+  - it: does not render empty OAuth sub-properties when only some are set
+    release:
+      name: gravitino
+    set:
+      authenticators: oauth
+      authenticator:
+        oauth:
+          serviceAudience: my-audience
+          provider: oidc
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.serviceAudience = my-audience"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.provider = oidc"
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.defaultSignKey"
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.serverUri"
+
+  - it: renders entity.maxConnections only when set
+    release:
+      name: gravitino
+    set:
+      entity:
+        maxConnections: 200
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.maxConnections = 200"
+
+  - it: does not render entity.maxConnections when empty (default)
+    release:
+      name: gravitino
+    asserts:
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.entity\\.store\\.relational\\.maxConnections"
+
+  - it: renders lock.maxNodes and lock.minNodes only when set
+    release:
+      name: gravitino
+    set:
+      lock:
+        maxNodes: 500000
+        minNodes: 5000
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.lock\\.maxNodes = 500000"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.lock\\.minNodes = 5000"
+
+  - it: does not render lock properties when empty (default)
+    release:
+      name: gravitino
+    asserts:
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.lock\\.maxNodes"
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.lock\\.minNodes"
+
+  - it: renders dynamicConfigProvider sub-properties conditionally
+    release:
+      name: gravitino
+    set:
+      icebergRest:
+        catalogConfigProvider: dynamic-config-provider
+        dynamicConfigProvider:
+          metalake: production
+    asserts:
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.iceberg-rest\\.catalog-config-provider = dynamic-config-provider"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.iceberg-rest\\.gravitino-metalake = production"
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.iceberg-rest\\.gravitino-uri"
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.iceberg-rest\\.default-catalog-name"
+
+  - it: does not render dynamicConfigProvider properties when not configured
+    release:
+      name: gravitino
+    asserts:
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.iceberg-rest\\.gravitino-uri"
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.iceberg-rest\\.gravitino-metalake"
+      - notMatchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.iceberg-rest\\.default-catalog-name"
