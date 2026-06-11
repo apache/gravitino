@@ -61,6 +61,12 @@ dependencies {
 
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
+  // Runtime dependencies of the inherited BaseIT/ITUtils harness. The testArtifacts dependency
+  // above only carries their compiled classes, not their transitive runtime deps, so these must be
+  // declared here (BaseIT uses Awaitility and commons-lang3; omitting them fails the ITs at runtime
+  // with NoClassDefFoundError).
+  testRuntimeOnly(libs.awaitility)
+  testRuntimeOnly(libs.commons.lang3)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.postgresql)
