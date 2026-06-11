@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -129,6 +130,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     return true;
   }
 
+  /** Returns whether this catalog supports Iceberg time-based partition transforms. */
   protected boolean supportsIcebergPartitionTransforms() {
     return false;
   }
@@ -1064,6 +1066,10 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Assertions.assertDoesNotThrow(() -> getSparkSession().read().parquet(location).printSchema());
   }
 
+  /**
+   * Returns column definitions for a simple Iceberg table with integer, string, and timestamp
+   * columns.
+   */
   protected List<SparkColumnInfo> getIcebergSimpleTableColumn() {
     return Arrays.asList(
         SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
@@ -1071,6 +1077,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
         SparkColumnInfo.of("ts", DataTypes.TimestampType, null));
   }
 
+  /** Returns the CREATE TABLE SQL for a simple Iceberg table with id, name, and ts columns. */
   protected String getCreateIcebergSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', ts TIMESTAMP)",
@@ -1080,7 +1087,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   @Test
   @EnabledIf("supportsIcebergPartitionTransforms")
   protected void testIcebergPartitions() {
-    Map<String, String> partitionPaths = new java.util.HashMap<>();
+    Map<String, String> partitionPaths = new HashMap<>();
     partitionPaths.put("years", "ts_year=2024");
     partitionPaths.put("months", "ts_month=2024-01");
     partitionPaths.put("days", "ts_day=2024-01-01");

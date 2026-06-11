@@ -24,6 +24,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -129,9 +130,10 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     return true;
   }
 
+  @Test
   @Override
   protected void testIcebergPartitions() {
-    Map<String, String> partitionPaths = new java.util.HashMap<>();
+    Map<String, String> partitionPaths = new HashMap<>();
     partitionPaths.put("years", "name=a/name_trunc=a/id_bucket=4/ts_year=2024");
     partitionPaths.put("months", "name=a/name_trunc=a/id_bucket=4/ts_month=2024-01");
     partitionPaths.put("days", "name=a/name_trunc=a/id_bucket=4/ts_day=2024-01-01");
