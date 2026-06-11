@@ -97,6 +97,13 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     this.namespaceWrapper = namespaceWrapper;
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p><b>Implementation note</b>: the {@code version} parameter is accepted but ignored; this
+   * implementation always returns metadata for the latest version of the table. A warning is logged
+   * when a non-empty version is supplied.
+   */
   @Override
   public DescribeTableResponse describeTable(
       String tableId,
@@ -104,6 +111,13 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
       Optional<Long> version,
       boolean checkDeclared,
       boolean loadDetailedMetadata) {
+    if (version.isPresent()) {
+      LOG.warn(
+          "describeTable: version={} requested for table {} but versioned describe is not "
+              + "implemented; returning latest version instead",
+          version.get(),
+          tableId);
+    }
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
