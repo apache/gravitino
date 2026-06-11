@@ -33,12 +33,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.rest.RESTRequest;
@@ -351,6 +353,57 @@ public class TestHTTPClient {
       Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
       Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());
     }
+  }
+
+  @Test
+  public void testConnectionRefusedThrowsMeaningfulException() {
+    GravitinoAdminClient client = GravitinoAdminClient.builder("http://localhost:1").build();
+
+    RESTException exception =
+        Assertions.assertThrows(RESTException.class, () -> client.listMetalakes());
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("Failed to connect to Gravitino server"),
+        exception.getMessage());
+
+    Assertions.assertTrue(exception.getMessage().contains("localhost"), exception.getMessage());
+  }
+
+  @Test
+  public void testUnresolvableHostThrowsMeaningfulException() {
+    GravitinoAdminClient client =
+        GravitinoAdminClient.builder("http://bad-host-that-does-not-exist.invalid:9090").build();
+
+    RESTException exception =
+        Assertions.assertThrows(RESTException.class, () -> client.listMetalakes());
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("Cannot resolve Gravitino server host"),
+        exception.getMessage());
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("bad-host-that-does-not-exist.invalid"),
+        exception.getMessage());
+  }
+
+  @Test
+  public void testInvalidBaseUriFailsBeforeHttpClientExecute() {
+    HTTPClient client = HTTPClient.builder(Collections.emptyMap()).uri("http://").build();
+
+    RESTException exception =
+        Assertions.assertThrows(
+            RESTException.class,
+            () ->
+                client.get(
+                    "api/metalakes/test",
+                    MetalakeResponse.class,
+                    Collections.emptyMap(),
+                    ErrorHandlers.metalakeErrorHandler()));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("Failed to create request URI")
+            || exception.getMessage().contains("Invalid Gravitino server URI"),
+        "Unexpected exception message: " + exception.getMessage());
   }
 
   public static void testHttpMethodOnSuccess(
