@@ -48,7 +48,7 @@ Glue client.
 :::note
 On AWS managed Spark environments such as Amazon EMR, the Hive libraries are already patched and
 the AWS Glue Data Catalog client is pre-installed. You can skip Steps 1 and 2 below.
-For a complete walkthrough on Amazon EMR, see [Verifying on Amazon EMR](#verifying-on-amazon-emr).
+For a complete walkthrough on Amazon EMR, see [Deploy on Amazon EMR](#deploy-on-amazon-emr).
 :::
 
 [spark-hive-glue-libs](https://github.com/datastrato/spark-hive-glue-libs) provides pre-built JARs
@@ -93,26 +93,23 @@ The AWS SDK JARs in the directory are loaded in Spark's `IsolatedClientLoader` t
 conflicts with `hadoop-aws`.
 :::
 
-## Verifying on Amazon EMR
+## Deploy on Amazon EMR
 
-This section walks through deploying and verifying the Gravitino Spark Glue connector on Amazon
-EMR 7.2.0 (Spark 3.5.1). On EMR the patched Hive libraries and AWS Glue Data Catalog client are
-pre-installed, so the manual JAR setup in [Setup](#setup) is not needed.
+Amazon EMR 7.x pre-installs the patched Hive libraries and the AWS Glue Data Catalog client,
+so the manual JAR setup described in [Setup](#setup) is not required.
 
 ### Prerequisites
 
-- AWS CLI configured with an IAM user or role that has `AmazonEMRFullAccessPolicy_v2` and EC2 permissions to create clusters
-- EC2 instance profile (`EMR_EC2_DefaultRole`) with Glue read and S3 read/write permissions (used by EMR nodes to access Glue and S3 without static credentials)
+- AWS CLI configured with an IAM user or role that has `AmazonEMRFullAccessPolicy_v2` and EC2 permissions
+- EC2 instance profile (`EMR_EC2_DefaultRole`) with Glue read and S3 read/write permissions
 - An S3 bucket for table storage (e.g. `s3://my-bucket/warehouse`)
-- A running Gravitino server reachable from the EMR cluster on port 8090
+- A Gravitino server reachable from the EMR cluster
 
 ### Step 1: Create an EMR cluster
 
-Run the following on your local machine:
-
 ```bash
 aws emr create-cluster \
-  --name "gravitino-glue-verify" \
+  --name "gravitino-glue" \
   --release-label emr-7.2.0 \
   --applications Name=Spark \
   --instance-type m5.xlarge \
@@ -128,56 +125,25 @@ The `spark-hive-site` configuration routes Spark's Hive metastore client to the 
 Catalog. The `for-use-with-amazon-emr-managed-policies=true` tag is required by
 `AmazonEMRFullAccessPolicy_v2`.
 
-Wait for the cluster to reach `WAITING` state:
+### Step 2: Add JARs to the Spark classpath
 
-```bash
-aws emr describe-cluster --cluster-id <cluster-id> \
-  --query 'Cluster.Status.State'
-```
+Follow the [Spark connector setup](spark-connector.md#usage) to obtain the
+`gravitino-spark-connector-runtime-3.5` JAR. On EMR, place it in `/usr/lib/spark/jars/` instead
+of a custom path — that directory is automatically on Spark's system classpath. Using `--jars` or
+`--driver-class-path` is not sufficient because the Gravitino plugin classloader must find the JAR
+at Spark startup.
 
-### Step 2: Deploy JARs to the EMR master node
+For Iceberg table support, also add the Iceberg Spark runtime JAR to `/usr/lib/spark/jars/`:
 
-SSH into the master node:
-
-```bash
-ssh -i <your-key.pem> hadoop@<emr-master-public-dns>
-```
-
-Download and install two JARs into `/usr/lib/spark/jars/`:
-
-**Gravitino connector JAR** — build from source or download from Maven Central, then copy:
-
-```bash
-sudo cp gravitino-spark-connector-runtime-3.5_2.12-<version>.jar /usr/lib/spark/jars/
-```
-
-**Iceberg Spark runtime JAR** — download version 1.10.1:
-
-```bash
-wget https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.10.1/iceberg-spark-runtime-3.5_2.12-1.10.1.jar
-sudo mv iceberg-spark-runtime-3.5_2.12-1.10.1.jar /usr/lib/spark/jars/
-```
+- [iceberg-spark-runtime-3.5_2.12](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-spark-runtime-3.5_2.12) version **1.10.1**
 
 :::warning
 Use `iceberg-spark-runtime` version **1.10.1**, not 1.11.0. EMR 7.2.0 ships with AWS SDK v2
 2.23.18, which does not include `RetryMode.ADAPTIVE_V2`. Iceberg 1.11.0 references this field
 at runtime and throws `NoSuchFieldError: ADAPTIVE_V2`.
-
-Both JARs must be placed in `/usr/lib/spark/jars/`. Using `--jars` or `--driver-class-path`
-does not work because the Gravitino plugin classloader requires them on the system classpath
-at Spark startup.
 :::
 
-### Step 3: Start the Gravitino server
-
-Gravitino requires Java 17. EMR defaults to Java 8, so set `JAVA_HOME` explicitly:
-
-```bash
-JAVA_HOME=/usr/lib/jvm/java-17-amazon-corretto.x86_64 \
-  /path/to/gravitino/bin/gravitino.sh start
-```
-
-### Step 4: Register a Glue catalog
+### Step 3: Create a Glue catalog
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -189,86 +155,50 @@ curl -X POST -H "Content-Type: application/json" \
       "aws-region": "<your-region>",
       "warehouse": "s3://<your-bucket>/warehouse"
     }
-  }' http://localhost:8090/api/metalakes/<metalake>/catalogs
+  }' http://<gravitino-host>:8090/api/metalakes/<metalake>/catalogs
 ```
 
-When running on EMR with an EC2 instance role, AWS credentials are picked up automatically.
-No static `aws-access-key-id` or `aws-secret-access-key` is needed.
+When running on EMR with an EC2 instance role, AWS credentials are picked up automatically —
+no static `aws-access-key-id` or `aws-secret-access-key` is needed.
 
-### Step 5: Run the verification
+### Step 4: Submit a Spark job
 
 :::warning
 Use `spark-submit`, not `spark-sql`. The `spark-sql` CLI does not initialize the Gravitino
 plugin classloader in the correct order, so registered catalogs will not appear in `SHOW CATALOGS`.
 :::
 
-Create a verification script `verify.py`:
+Pass the Gravitino plugin configuration via `spark-submit`:
+
+```bash
+spark-submit --master yarn \
+  --conf spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin \
+  --conf spark.sql.gravitino.uri=http://<gravitino-host>:8090 \
+  --conf spark.sql.gravitino.metalake=<metalake> \
+  --conf spark.sql.gravitino.enableIcebergSupport=true \
+  --conf spark.sql.catalogImplementation=hive \
+  --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+  --conf spark.hadoop.fs.s3.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+  your_job.py
+```
+
+The following PySpark snippet shows how to query Hive-format and Iceberg tables in the Glue catalog:
 
 ```python
 from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.getOrCreate()
 
-spark.sql("USE glue_catalog")
-spark.sql("CREATE DATABASE IF NOT EXISTS verify_db")
-spark.sql("USE verify_db")
+spark.sql("USE glue_catalog.mydb")
 
-# Hive-format Parquet table
-spark.sql("""
-  CREATE TABLE IF NOT EXISTS hive_test (id INT, name STRING)
-  PARTITIONED BY (dept STRING)
-  STORED AS PARQUET
-""")
-spark.sql("INSERT OVERWRITE TABLE hive_test PARTITION(dept='eng') VALUES (1, 'Alice')")
-spark.sql("SELECT * FROM hive_test").show()
+# Query a Hive-format table
+spark.sql("SELECT * FROM employees WHERE department = 'Engineering'").show()
 
-# Iceberg table
-spark.sql("""
-  CREATE TABLE IF NOT EXISTS iceberg_test (
-    order_id BIGINT, amount DECIMAL(10,2), ts TIMESTAMP
-  ) USING iceberg PARTITIONED BY (days(ts))
-""")
-spark.sql("INSERT INTO iceberg_test VALUES (1, 99.99, TIMESTAMP '2024-01-01 00:00:00')")
-spark.sql("SELECT * FROM iceberg_test WHERE ts >= DATE '2024-01-01'").show()
+# Query an Iceberg table
+spark.sql("SELECT * FROM orders WHERE order_ts >= DATE '2024-01-01'").show()
 
 spark.stop()
 ```
-
-Run it with:
-
-```bash
-spark-submit --master local[2] \
-  --conf spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin \
-  --conf spark.sql.gravitino.uri=http://localhost:8090 \
-  --conf spark.sql.gravitino.metalake=<metalake> \
-  --conf spark.sql.gravitino.enableIcebergSupport=true \
-  --conf spark.sql.catalogImplementation=hive \
-  --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
-  --conf spark.hadoop.fs.s3.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
-  verify.py
-```
-
-Expected output:
-
-```
-+---+-----+----+
-| id| name|dept|
-+---+-----+----+
-|  1|Alice| eng|
-+---+-----+----+
-
-+--------+------+-------------------+
-|order_id|amount|                 ts|
-+--------+------+-------------------+
-|       1| 99.99|2024-01-01 00:00:00|
-+--------+------+-------------------+
-```
-
-:::note
-You may see a WARN message about `GravitinoIcebergSparkSessionExtensions` failing to load
-`ExtendedDataSourceV2Strategy`. This is a Kyuubi-specific class not present on EMR and can be
-safely ignored — Iceberg queries work correctly despite the warning.
-:::
 
 ## Create a Catalog
 
