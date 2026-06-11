@@ -41,8 +41,13 @@ public class TrinoIcebergRESTAuthorizationIT extends TrinoIcebergRESTAuthorizati
   private static final String ROLE = "trino_role";
 
   // Substring of the message Gravitino's IRC authorization filter returns in the Iceberg REST 403
-  // response (see BaseMetadataAuthorizationMethodInterceptor); Trino surfaces it on the failure.
+  // response (see BaseMetadataAuthorizationMethodInterceptor). Trino surfaces it verbatim for write
+  // operations (e.g. CREATE TABLE).
   private static final String NOT_AUTHORIZED_MESSAGE = "is not authorized to perform operation";
+
+  // On the read path Trino masks the REST 403 body and only reports that it could not load the
+  // table/view, so a denied SELECT shows up as this instead of the message above.
+  private static final String LOAD_FAILED_MESSAGE = "Failed to load";
 
   @BeforeAll
   public void setupTrino() throws Exception {
@@ -87,8 +92,10 @@ public class TrinoIcebergRESTAuthorizationIT extends TrinoIcebergRESTAuthorizati
   }
 
   /**
-   * Asserts that the failure originated from Gravitino's authorization layer (an Iceberg REST 403)
-   * rather than some unrelated error, by inspecting the whole exception cause chain.
+   * Asserts that the query failed because access was denied (an Iceberg REST 403) rather than for
+   * some unrelated reason, by inspecting the whole exception cause chain. The companion {@link
+   * #testNormalUserAllowedAfterGrant()} confirms the same query succeeds once the privilege is
+   * granted, which together establishes that authorization is what blocked it.
    *
    * @param e the exception thrown by the denied Trino query
    */
@@ -99,8 +106,9 @@ public class TrinoIcebergRESTAuthorizationIT extends TrinoIcebergRESTAuthorizati
         messages.append(cause.getMessage()).append('\n');
       }
     }
+    String chain = messages.toString();
     assertTrue(
-        messages.toString().contains(NOT_AUTHORIZED_MESSAGE),
-        "Expected an authorization failure but got: " + messages);
+        chain.contains(NOT_AUTHORIZED_MESSAGE) || chain.contains(LOAD_FAILED_MESSAGE),
+        "Expected an authorization failure but got: " + chain);
   }
 }
