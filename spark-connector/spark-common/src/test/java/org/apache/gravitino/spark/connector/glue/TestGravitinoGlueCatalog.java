@@ -21,6 +21,8 @@ package org.apache.gravitino.spark.connector.glue;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -39,8 +41,10 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -241,6 +245,50 @@ public class TestGravitinoGlueCatalog {
   void testGetSparkTransformConverter() {
     SparkTransformConverter transformer = gravitinoGlueCatalog.getSparkTransformConverter();
     Assertions.assertNotNull(transformer);
+  }
+
+  // -------------------------------------------------------------------------
+  // Test invalidateTable propagates to icebergGlueCatalog
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testInvalidateTableCallsBothCatalogsWhenIcebergInitialized() throws Exception {
+    TableCatalog mockSparkCatalog = mock(TableCatalog.class);
+    SparkCatalog mockIcebergCatalog = mock(SparkCatalog.class);
+    Identifier ident = Identifier.of(new String[] {"db"}, "tbl");
+
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockSparkCatalog;
+            icebergGlueCatalog = mockIcebergCatalog;
+          }
+        };
+
+    catalog.invalidateTable(ident);
+
+    verify(mockSparkCatalog).invalidateTable(ident);
+    verify(mockIcebergCatalog).invalidateTable(ident);
+  }
+
+  @Test
+  void testInvalidateTableCallsOnlySparkCatalogWhenIcebergNotInitialized() throws Exception {
+    TableCatalog mockSparkCatalog = mock(TableCatalog.class);
+    SparkCatalog mockIcebergCatalog = mock(SparkCatalog.class);
+    Identifier ident = Identifier.of(new String[] {"db"}, "tbl");
+
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockSparkCatalog;
+            // icebergGlueCatalog left null (not initialized)
+          }
+        };
+
+    catalog.invalidateTable(ident);
+
+    verify(mockSparkCatalog).invalidateTable(ident);
+    verify(mockIcebergCatalog, never()).invalidateTable(any());
   }
 
   // -------------------------------------------------------------------------

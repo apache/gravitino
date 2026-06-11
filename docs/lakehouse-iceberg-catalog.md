@@ -101,7 +101,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-To access a non-default catalog, set `warehouse` to the catalog name. This uses a REST path like `http://127.0.0.1:9001/iceberg/v1/catalog/namespaces/db/tables/table`. See [Multi catalog](./iceberg-rest-service.md#multiple-catalog-backend-support) for details.
+To access a non-default catalog, set `warehouse` to the catalog name. This uses a REST path like `http://127.0.0.1:9001/iceberg/v1/catalog/namespaces/db/tables/table`. See [Multi-Catalog Configuration](./iceberg-rest-service.md#multi-catalog-configuration) for details.
 
 #### S3
 

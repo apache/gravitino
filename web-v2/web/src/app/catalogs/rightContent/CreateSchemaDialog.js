@@ -265,7 +265,16 @@ export default function CreateSchemaDialog({ ...props }) {
                   rules={[
                     { required: true },
                     { type: 'string', max: 64 },
-                    { pattern: isIcebergJdbcCatalog ? dynamicSchemaNameRegex : new RegExp(nameRegex) }
+                    { pattern: isIcebergJdbcCatalog ? dynamicSchemaNameRegex : new RegExp(nameRegex) },
+                    {
+                      validator: (_, value) => {
+                        if (!isGlueProvider || !value || !value.includes('-')) {
+                          return Promise.resolve()
+                        }
+
+                        return Promise.reject(new Error('Glue schema name does not support hyphen (-).'))
+                      }
+                    }
                   ]}
                   messageVariables={{ label: 'schema name' }}
                 >

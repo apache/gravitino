@@ -67,6 +67,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.glue.GlueClient;
@@ -595,8 +596,18 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     if (hasMetadataLocation && !isSdkManaged) {
       return alterRegisterModeIcebergTable(ident, dbName, rawGlueTable, changes);
     }
-    GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
-    return loadTable(ident);
+    TableIdentifier finalId =
+        GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
+    String newDbName = finalId.namespace().level(0);
+    NameIdentifier finalIdent;
+    if (newDbName.equals(dbName) && finalId.name().equals(ident.name())) {
+      finalIdent = ident;
+    } else {
+      String[] levels = ident.namespace().levels().clone();
+      levels[levels.length - 1] = newDbName;
+      finalIdent = NameIdentifier.of(Namespace.of(levels), finalId.name());
+    }
+    return loadTable(finalIdent);
   }
 
   private GlueTable alterRegisterModeIcebergTable(
