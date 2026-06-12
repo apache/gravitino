@@ -103,6 +103,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.utils.FileFetcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -200,6 +201,7 @@ public class GravitinoEnv {
   public void initializeBaseComponents(Config config) {
     LOG.info("Initializing Gravitino base environment...");
     this.config = config;
+    FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
     this.manageFullComponents = false;
     initBaseComponents();
     LOG.info("Gravitino base environment is initialized.");
@@ -213,6 +215,7 @@ public class GravitinoEnv {
   public void initializeFullComponents(Config config) {
     LOG.info("Initializing Gravitino full environment...");
     this.config = config;
+    FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
     this.manageFullComponents = true;
     initBaseComponents();
     initGravitinoServerComponents();
@@ -543,15 +546,6 @@ public class GravitinoEnv {
 
   public boolean cacheEnabled() {
     return config == null || config.get(Configs.CACHE_ENABLED);
-  }
-
-  /**
-   * Returns whether remote URIs that resolve to unsafe addresses should be blocked.
-   *
-   * @return whether unsafe remote URIs should be blocked
-   */
-  public boolean blockUnsafeRemoteUri() {
-    return config == null || config.get(Configs.BLOCK_UNSAFE_REMOTE_URI);
   }
 
   public void start() {

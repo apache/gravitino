@@ -29,7 +29,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
-import org.apache.gravitino.utils.FetchFileUtils;
+import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 public class Configs {
@@ -553,7 +553,7 @@ public class Configs {
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
   public static final ConfigEntry<Boolean> BLOCK_UNSAFE_REMOTE_URI =
-      new ConfigBuilder(FetchFileUtils.BLOCK_UNSAFE_REMOTE_URI_CONFIG)
+      new ConfigBuilder(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG)
           .doc(
               "Whether to block remote file URIs from resolving to unsafe addresses from the "
                   + "Gravitino server side. This applies to job files and catalog files such as "

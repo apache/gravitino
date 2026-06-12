@@ -75,7 +75,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.utils.FetchFileUtils;
+import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.awaitility.Awaitility;
@@ -938,6 +938,7 @@ public class TestJobManager {
   public void testFetchFileFromUriSsrfBlocked() {
     File stagingDir = new File(testStagingDir);
     Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
+    FileFetcher.get().initialize(true);
 
     // Loopback address
     RuntimeException e1 =
@@ -979,13 +980,15 @@ public class TestJobManager {
     try {
       server.start();
       int port = server.getAddress().getPort();
+      FileFetcher.get().initialize(false);
 
       String fetchedFile =
           JobManager.fetchFileFromUri(
-              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000, false);
+              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000);
 
       Assertions.assertEquals("job artifact", Files.readString(Path.of(fetchedFile)));
     } finally {
+      FileFetcher.get().initialize(true);
       server.stop(0);
     }
   }
@@ -993,7 +996,7 @@ public class TestJobManager {
   private static void assertRemoteUriBlockedMessage(RuntimeException exception) {
     Assertions.assertTrue(exception.getCause().getMessage().contains("Gravitino server side"));
     Assertions.assertTrue(
-        exception.getCause().getMessage().contains(FetchFileUtils.BLOCK_UNSAFE_REMOTE_URI_CONFIG));
+        exception.getCause().getMessage().contains(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG));
   }
 
   @Test

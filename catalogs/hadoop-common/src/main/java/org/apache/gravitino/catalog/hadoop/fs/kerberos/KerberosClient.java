@@ -34,7 +34,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.utils.FetchFileUtils;
+import org.apache.gravitino.utils.FileFetcher;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -47,18 +47,13 @@ public class KerberosClient implements Closeable {
   private final Map<String, String> conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
-  private final boolean blockUnsafeRemoteUri;
   private String kerberosRealm;
 
   public KerberosClient(
-      Map<String, String> conf,
-      Configuration hadoopConf,
-      boolean refreshCredentials,
-      boolean blockUnsafeRemoteUri) {
+      Map<String, String> conf, Configuration hadoopConf, boolean refreshCredentials) {
     this.conf = conf;
     this.hadoopConf = hadoopConf;
     this.refreshCredentials = refreshCredentials;
-    this.blockUnsafeRemoteUri = blockUnsafeRemoteUri;
   }
 
   public UserGroupInformation login(String keytabFilePath) throws IOException {
@@ -128,8 +123,8 @@ public class KerberosClient implements Closeable {
     }
 
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
-    FetchFileUtils.fetchFileFromUri(
-        keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf, blockUnsafeRemoteUri);
+    FileFetcher.get()
+        .fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf);
 
     return keytabFile;
   }

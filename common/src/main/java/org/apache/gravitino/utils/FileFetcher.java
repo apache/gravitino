@@ -30,10 +30,10 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 
 /**
- * Fetches a file referenced by a URI to a local destination. Supports {@code file}, {@code http},
- * {@code https}, {@code ftp} and {@code hdfs} schemes. This is the single shared implementation
- * used by the job manager and the Kerberos clients of the Hive, Iceberg, Hadoop and Paimon
- * catalogs.
+ * Singleton that fetches a file referenced by a URI to a local destination. Supports {@code file},
+ * {@code http}, {@code https}, {@code ftp} and {@code hdfs} schemes. This is the single shared
+ * implementation used by the job manager and the Kerberos clients of the Hive, Iceberg, Hadoop and
+ * Paimon catalogs.
  *
  * <p>The {@code hdfs} scheme is resolved reflectively against {@code
  * org.apache.hadoop.fs.FileSystem} so that this class can live in the {@code common} module, which
@@ -41,13 +41,37 @@ import org.apache.commons.io.FileUtils;
  * (for example the job manager and the Paimon catalog) simply pass {@code null} for the Hadoop
  * configuration.
  */
-public final class FetchFileUtils {
+public final class FileFetcher {
 
   /** The server configuration that controls unsafe remote URI blocking. */
   public static final String BLOCK_UNSAFE_REMOTE_URI_CONFIG =
       "gravitino.fetchFile.blockUnsafeRemoteUri";
 
-  private FetchFileUtils() {}
+  private volatile boolean blockUnsafeRemoteUri = true;
+
+  private FileFetcher() {}
+
+  private static class InstanceHolder {
+    private static final FileFetcher INSTANCE = new FileFetcher();
+  }
+
+  /**
+   * Returns the singleton file fetcher.
+   *
+   * @return the singleton file fetcher
+   */
+  public static FileFetcher get() {
+    return InstanceHolder.INSTANCE;
+  }
+
+  /**
+   * Initializes the file fetcher.
+   *
+   * @param blockUnsafeRemoteUri whether to block remote URIs that resolve to unsafe addresses
+   */
+  public void initialize(boolean blockUnsafeRemoteUri) {
+    this.blockUnsafeRemoteUri = blockUnsafeRemoteUri;
+  }
 
   /**
    * Fetches the file referenced by {@code fileUri} into {@code destFile}.
@@ -58,16 +82,11 @@ public final class FetchFileUtils {
    *     downloads
    * @param hadoopConf an {@code org.apache.hadoop.conf.Configuration} instance, required only for
    *     the {@code hdfs} scheme; may be {@code null} when no {@code hdfs} URI is fetched
-   * @param blockUnsafeRemoteUri whether to block remote URIs that resolve to unsafe addresses
    * @return the absolute path of {@code destFile}
    * @throws IOException if the file cannot be fetched
    */
-  public static String fetchFileFromUri(
-      String fileUri,
-      File destFile,
-      int timeoutMs,
-      @Nullable Object hadoopConf,
-      boolean blockUnsafeRemoteUri)
+  public String fetchFileFromUri(
+      String fileUri, File destFile, int timeoutMs, @Nullable Object hadoopConf)
       throws IOException {
     try {
       URI uri = new URI(fileUri);
@@ -103,7 +122,7 @@ public final class FetchFileUtils {
     }
   }
 
-  private static synchronized void linkLocalFile(URI uri, File destFile) throws IOException {
+  private synchronized void linkLocalFile(URI uri, File destFile) throws IOException {
     Path srcPath = new File(uri.getPath()).toPath().normalize();
     if (!Files.exists(srcPath)) {
       throw new IOException(
@@ -130,8 +149,8 @@ public final class FetchFileUtils {
    * Copies an {@code hdfs} file to the local destination reflectively, so that this class does not
    * require a compile-time dependency on Hadoop.
    */
-  private static void copyHdfsFileToLocal(
-      URI uri, File destFile, Optional<Object> hadoopConfiguration) throws IOException {
+  private void copyHdfsFileToLocal(URI uri, File destFile, Optional<Object> hadoopConfiguration)
+      throws IOException {
     Object configuration =
         hadoopConfiguration.orElseThrow(
             () ->

@@ -1386,10 +1386,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             () -> {
               if (scheme.equals(SCHEME_HDFS)) {
                 return new ImpersonationHDFSFileSystemProxy(
-                        path,
-                        config,
-                        PrincipalUtils::getCurrentUserName,
-                        GravitinoEnv.getInstance().blockUnsafeRemoteUri())
+                        path, config, PrincipalUtils::getCurrentUserName)
                     .getProxy();
               } else {
                 return provider.getFileSystem(path, config);
