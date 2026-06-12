@@ -64,7 +64,10 @@ public class TestRequiredPrivilegesCheck {
         relation("catalog.schema.table_a", Privilege.Name.MODIFY_TABLE, "denied table_a");
     Union plan =
         new Union(
-            JavaConverters.asScalaBuffer(Arrays.asList(tableB, tableASelect, tableAModify)).toSeq(),
+            JavaConverters.asScalaIteratorConverter(
+                    Arrays.asList(tableB, tableASelect, tableAModify).iterator())
+                .asScala()
+                .toSeq(),
             false,
             false);
 
