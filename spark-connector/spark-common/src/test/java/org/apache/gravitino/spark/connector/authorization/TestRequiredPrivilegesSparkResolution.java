@@ -92,6 +92,18 @@ public class TestRequiredPrivilegesSparkResolution {
   }
 
   @Test
+  void testInsertIntoDeniedTableReportsForbidden() {
+    ForbiddenException failure =
+        assertThrows(
+            ForbiddenException.class,
+            () -> spark.sql("INSERT INTO denied.db.t1 SELECT * FROM denied.db.t2"));
+
+    // Both the write target and the read source are denied and reported together.
+    assertTrue(failure.getMessage().contains("denied.db.t1: SELECT_TABLE"), failure.getMessage());
+    assertTrue(failure.getMessage().contains("denied.db.t2: SELECT_TABLE"), failure.getMessage());
+  }
+
+  @Test
   void testColumnReferenceReportsForbiddenInsteadOfUnresolvedColumn() {
     // The denied table exposes an empty placeholder schema, so "missing_col" cannot be resolved.
     // The post-hoc rule runs before checkAnalysis, so the authorization failure wins over the
