@@ -48,7 +48,7 @@ import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
-import org.apache.gravitino.spark.connector.authorization.AuthorizationTableProxy;
+import org.apache.gravitino.spark.connector.authorization.AuthorizationTable;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -263,7 +263,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       return loadViewAsTable(ident);
     } catch (ForbiddenException e) {
       Table sparkTable = loadSparkTable(ident);
-      return AuthorizationTableProxy.wrap(
+      return AuthorizationTable.wrap(
           sparkTable,
           String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
           Sets.newHashSet(Privilege.Name.SELECT_TABLE),
@@ -595,7 +595,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       gravitinoTable = loadGravitinoTableForWriting(ident);
     } catch (ForbiddenException e) {
       Table sparkTable = loadSparkTable(ident);
-      return AuthorizationTableProxy.wrap(
+      return AuthorizationTable.wrap(
           sparkTable,
           String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
           Sets.newHashSet(Privilege.Name.MODIFY_TABLE),

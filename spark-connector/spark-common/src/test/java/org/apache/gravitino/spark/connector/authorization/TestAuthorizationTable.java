@@ -29,44 +29,36 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.spark.sql.connector.catalog.SupportsRead;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCapability;
-import org.apache.spark.sql.connector.read.ScanBuilder;
 import org.apache.spark.sql.types.StructType;
-import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Test;
 
-public class TestAuthorizationTableProxy {
+public class TestAuthorizationTable {
 
   @Test
-  void testPreservesDelegateInterfacesAndRequiredPrivileges() {
-    SupportsRead delegate = mock(SupportsRead.class);
+  void testDelegatesTableMetadataAndRetainsRequiredPrivilegesWithoutDynamicProxy() {
+    Table delegate = mock(Table.class);
     StructType schema = new StructType().add("id", "int");
     Set<TableCapability> capabilities = ImmutableSet.of(TableCapability.BATCH_READ);
-    ScanBuilder scanBuilder = mock(ScanBuilder.class);
     ForbiddenException cause = new ForbiddenException("denied");
 
     when(delegate.name()).thenReturn("table_a");
     when(delegate.schema()).thenReturn(schema);
     when(delegate.capabilities()).thenReturn(capabilities);
-    when(delegate.newScanBuilder(org.mockito.ArgumentMatchers.any())).thenReturn(scanBuilder);
 
     Table table =
-        AuthorizationTableProxy.wrap(
+        AuthorizationTable.wrap(
             delegate,
             "catalog.schema.table_a",
             ImmutableSet.of(Privilege.Name.SELECT_TABLE),
             cause);
 
-    assertTrue(table instanceof SupportsRead);
     assertTrue(table instanceof SupportsRequiredPrivileges);
+    assertEquals(AuthorizationTable.class, table.getClass());
     assertEquals("table_a", table.name());
     assertSame(schema, table.schema());
     assertSame(capabilities, table.capabilities());
-    assertSame(
-        scanBuilder,
-        ((SupportsRead) table).newScanBuilder(new CaseInsensitiveStringMap(java.util.Map.of())));
 
     SupportsRequiredPrivileges deniedTable = (SupportsRequiredPrivileges) table;
     assertEquals("catalog.schema.table_a", deniedTable.tableIdentifier());

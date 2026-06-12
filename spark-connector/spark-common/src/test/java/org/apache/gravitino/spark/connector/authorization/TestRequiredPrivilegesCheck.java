@@ -88,7 +88,7 @@ public class TestRequiredPrivilegesCheck {
     when(delegate.schema()).thenReturn(new StructType().add("id", "int"));
     when(delegate.capabilities()).thenReturn(ImmutableSet.of(TableCapability.BATCH_READ));
     Table deniedTable =
-        AuthorizationTableProxy.wrap(
+        AuthorizationTable.wrap(
             delegate,
             identifier,
             ImmutableSet.of(privilege),
