@@ -28,12 +28,17 @@ from mcp_server.core.setting import Setting
 from mcp_server.main import _parse_args
 
 
+def _shared_rest_client(operation: PlainRESTClientOperation):
+    # pylint: disable=protected-access
+    return operation._catalog_operation.rest_client
+
+
 def _headers_of(operation: PlainRESTClientOperation):
-    return operation._catalog_operation.rest_client.headers
+    return _shared_rest_client(operation).headers
 
 
 def _close(operation: PlainRESTClientOperation):
-    asyncio.run(operation._catalog_operation.rest_client.aclose())
+    asyncio.run(_shared_rest_client(operation).aclose())
 
 
 class TestTokenInjection(unittest.TestCase):
