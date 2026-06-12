@@ -135,9 +135,8 @@ public class EventBus {
    * error.
    *
    * <p>When the primary operation fails, we want to notify listeners, but listener exceptions must
-   * NOT propagate and mask the original failure. This method catches and logs all exceptions
-   * (including {@link RuntimeException}, {@link Error}, etc.) to ensure the original exception can
-   * be properly thrown to the caller.
+   * NOT propagate and mask the original failure. This method catches and logs all {@link
+   * Exception}s to ensure the original exception can be properly thrown to the caller.
    *
    * <p>For every failure event that is <em>not</em> an {@link HttpRequestFailureEvent}, this method
    * also sets {@link RequestContext#markOperationFailureFired()} on the current thread. This lets

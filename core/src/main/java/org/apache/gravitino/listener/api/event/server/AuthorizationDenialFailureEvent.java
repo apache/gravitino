@@ -24,7 +24,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
@@ -32,8 +31,8 @@ import org.apache.gravitino.listener.api.event.OperationType;
 /**
  * Represents an authorization denial that occurred inside {@code
  * MetadataAuthorizationMethodInterceptor}: the request was authenticated but the authorization
- * executor returned {@code false} for the requested operation, or user validation raised a {@link
- * ForbiddenException}.
+ * executor returned {@code false} for the requested operation, or user validation raised a
+ * forbidden exception.
  *
  * <p>This event carries rich context about the denial — the authenticated user, the resource
  * identifier, the Java method name, and the authorization expression — so auditors can reconstruct
@@ -89,11 +88,7 @@ public final class AuthorizationDenialFailureEvent extends FailureEvent {
       String methodName,
       String expression,
       EventSource eventSource) {
-    super(
-        user,
-        accessMetadataName,
-        new ForbiddenException(
-            "Authorization denied for user '%s' on operation '%s'", user, methodName));
+    super(user, accessMetadataName, new AuthorizationDenialException(user, methodName));
     this.methodName = methodName;
     this.expression = expression != null ? expression : "";
     this.explicitEventSource = eventSource;
@@ -138,5 +133,22 @@ public final class AuthorizationDenialFailureEvent extends FailureEvent {
   /** Returns the authorization expression that was evaluated. */
   public String expression() {
     return expression;
+  }
+
+  /**
+   * A lightweight synthetic exception used as the {@link
+   * org.apache.gravitino.listener.api.event.FailureEvent#exception()} carrier. Stack trace
+   * collection is suppressed because authorization denials can be high-volume and the trace adds no
+   * diagnostic value for this event type.
+   */
+  public static final class AuthorizationDenialException extends RuntimeException {
+
+    private AuthorizationDenialException(String user, String methodName) {
+      super(
+          String.format("Authorization denied for user '%s' on operation '%s'", user, methodName),
+          null,
+          true,
+          false /* suppress stack trace */);
+    }
   }
 }

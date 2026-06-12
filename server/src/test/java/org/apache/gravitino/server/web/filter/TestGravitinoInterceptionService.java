@@ -319,11 +319,10 @@ public class TestGravitinoInterceptionService {
 
       assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
       // Event dispatched
-      ArgumentCaptor<org.apache.gravitino.listener.api.event.Event> captor =
-          ArgumentCaptor.forClass(org.apache.gravitino.listener.api.event.Event.class);
+      ArgumentCaptor<AuthorizationDenialFailureEvent> captor =
+          ArgumentCaptor.forClass(AuthorizationDenialFailureEvent.class);
       verify(mockEventBus).dispatchEvent(captor.capture());
-      Assertions.assertInstanceOf(AuthorizationDenialFailureEvent.class, captor.getValue());
-      AuthorizationDenialFailureEvent event = (AuthorizationDenialFailureEvent) captor.getValue();
+      AuthorizationDenialFailureEvent event = captor.getValue();
       assertEquals("tester", event.user());
       assertEquals("testMethod", event.methodName());
       // Flag set so HttpAuditFilter skips duplicate
@@ -377,11 +376,10 @@ public class TestGravitinoInterceptionService {
       Response response = (Response) interceptor.invoke(invocation);
 
       assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
-      ArgumentCaptor<org.apache.gravitino.listener.api.event.Event> captor =
-          ArgumentCaptor.forClass(org.apache.gravitino.listener.api.event.Event.class);
+      ArgumentCaptor<AuthorizationDenialFailureEvent> captor =
+          ArgumentCaptor.forClass(AuthorizationDenialFailureEvent.class);
       verify(mockEventBus).dispatchEvent(captor.capture());
-      Assertions.assertInstanceOf(AuthorizationDenialFailureEvent.class, captor.getValue());
-      AuthorizationDenialFailureEvent event = (AuthorizationDenialFailureEvent) captor.getValue();
+      AuthorizationDenialFailureEvent event = captor.getValue();
       assertEquals("outsider", event.user());
       Assertions.assertTrue(RequestContext.isOperationFailureFired());
     }

@@ -180,8 +180,9 @@ public class HttpAuditFilterIT extends BaseIT {
     Assertions.assertEquals(EventSource.GRAVITINO_SERVER, httpEvent.eventSource());
     Assertions.assertEquals(OperationType.UNKNOWN, httpEvent.operationType());
     Assertions.assertNull(httpEvent.identifier());
-    // HttpAuditFilter's finally runs outside Subject.doAs — getCurrentUserName() returns anonymous
-    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, httpEvent.user());
+    // Auth succeeds (valid Basic header) before Jersey rejects the body, so the principal
+    // attribute is set on the request and resolveUser() returns the authenticated username.
+    Assertions.assertEquals(userName, httpEvent.user());
     Map<String, String> malformedCustomInfo = httpEvent.customInfo();
     Assertions.assertEquals("POST", malformedCustomInfo.get("http.method"));
     Assertions.assertEquals("/api/metalakes", malformedCustomInfo.get("http.uri"));

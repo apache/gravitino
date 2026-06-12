@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web;
 
 import java.io.IOException;
 import java.security.Principal;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -64,9 +65,11 @@ import org.slf4j.LoggerFactory;
  * success event already in the audit log. Both entries are correct — the operation itself succeeded
  * but the response delivery failed — and are intentionally preserved.
  *
- * <p><strong>Health check exclusion:</strong> requests targeting {@code /health}, {@code
- * /health/*}, {@code /health.html}, {@code /api/health}, and {@code /api/health/*} are silently
- * passed through without audit logging to avoid polluting the audit log with probe traffic.
+ * <p><strong>Health check exclusion:</strong> requests matched by the configured {@link
+ * HealthCheckPathMatcher} are silently passed through without audit logging to avoid polluting the
+ * audit log with probe traffic. Pass a server-specific subclass (e.g. {@code
+ * IcebergHealthCheckPathMatcher}) when constructing this filter for a server that defines
+ * additional health endpoints.
  *
  * <p><strong>Exception escape:</strong> if an uncaught {@link Throwable} escapes from the filter
  * chain and the captured status is still 200 (i.e. no downstream component set an error code), the
@@ -78,11 +81,12 @@ public class HttpAuditFilter implements Filter {
   private static final Logger LOG = LoggerFactory.getLogger(HttpAuditFilter.class);
   private static final String X_FORWARDED_FOR = "X-Forwarded-For";
 
-  @Nullable private final EventBus eventBus;
+  private final Optional<EventBus> eventBus;
   private final EventSource eventSource;
+  private final HealthCheckPathMatcher healthCheckMatcher;
 
   /**
-   * Constructs an {@code HttpAuditFilter}.
+   * Constructs an {@code HttpAuditFilter} using the default {@link HealthCheckPathMatcher}.
    *
    * @param eventBus the event bus used to dispatch {@link HttpRequestFailureEvent}s; may be {@code
    *     null}, in which case the filter is a pass-through no-op (useful when no audit listener is
@@ -91,8 +95,25 @@ public class HttpAuditFilter implements Filter {
    *     every emitted {@link HttpRequestFailureEvent}.
    */
   public HttpAuditFilter(@Nullable EventBus eventBus, EventSource eventSource) {
-    this.eventBus = eventBus;
+    this(eventBus, eventSource, new HealthCheckPathMatcher());
+  }
+
+  /**
+   * Constructs an {@code HttpAuditFilter} with a custom {@link HealthCheckPathMatcher}.
+   *
+   * @param eventBus the event bus used to dispatch {@link HttpRequestFailureEvent}s; may be {@code
+   *     null}, in which case the filter is a pass-through no-op.
+   * @param eventSource identifies which server this filter instance is installed on.
+   * @param healthCheckMatcher determines which URI paths are health check probes; those paths are
+   *     excluded from audit logging to avoid polluting the audit log with probe traffic.
+   */
+  public HttpAuditFilter(
+      @Nullable EventBus eventBus,
+      EventSource eventSource,
+      HealthCheckPathMatcher healthCheckMatcher) {
+    this.eventBus = Optional.ofNullable(eventBus);
     this.eventSource = eventSource;
+    this.healthCheckMatcher = healthCheckMatcher;
   }
 
   @Override
@@ -102,7 +123,7 @@ public class HttpAuditFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     // Pass through when audit is not configured or request is not HTTP.
-    if (eventBus == null || !(request instanceof HttpServletRequest)) {
+    if (eventBus.isEmpty() || !(request instanceof HttpServletRequest)) {
       chain.doFilter(request, response);
       return;
     }
@@ -110,8 +131,12 @@ public class HttpAuditFilter implements Filter {
     HttpServletRequest httpRequest = (HttpServletRequest) request;
     // Defensive cleanup at request entry in case a pooled thread leaked stale state.
     RequestContext.resetOperationFailureFired();
-    if (isHealthCheckRequest(httpRequest)) {
-      chain.doFilter(request, response);
+    if (healthCheckMatcher.isHealthCheckPath(httpRequest.getRequestURI())) {
+      try {
+        chain.doFilter(request, response);
+      } finally {
+        RequestContext.resetOperationFailureFired();
+      }
       return;
     }
 
@@ -141,7 +166,7 @@ public class HttpAuditFilter implements Filter {
                     httpRequest.getRequestURI(),
                     status,
                     eventSource);
-            eventBus.dispatchEvent(event);
+            eventBus.get().dispatchEvent(event);
           }
         }
       } catch (Exception e) {
@@ -183,28 +208,23 @@ public class HttpAuditFilter implements Filter {
     // request.setAttribute before chain.doFilter). Absent attribute means auth was rejected
     // before any principal was established. PrincipalUtils.getCurrentUserName() must not be used
     // here — it returns "anonymous" when no Subject.doAs is active, making a rejected request
-    // indistinguishable from a legitimately anonymous one.
+    // indistinguishable from a legitimately anonymous one. Returns "unknown" instead.
     return "unknown";
   }
 
   private String resolveClientAddress(HttpServletRequest request) {
+    // Prefer the address already resolved by RequestContextFilter (installed on GravitinoServer).
+    // For servers that do not install RequestContextFilter (Iceberg REST, Lance REST), fall back to
+    // independent header parsing so the event still carries a meaningful client address.
+    String contextAddress = RequestContext.getRemoteAddress();
+    if (contextAddress != null) {
+      return contextAddress;
+    }
     String xForwardedFor = request.getHeader(X_FORWARDED_FOR);
     if (StringUtils.isNotBlank(xForwardedFor)) {
       return xForwardedFor.split(",")[0].trim();
     }
     return request.getRemoteAddr();
-  }
-
-  private boolean isHealthCheckRequest(HttpServletRequest request) {
-    String path = request.getRequestURI();
-    if (path == null) {
-      return false;
-    }
-    return path.equals("/health")
-        || path.startsWith("/health/")
-        || path.equals("/health.html")
-        || path.equals("/api/health")
-        || path.startsWith("/api/health/");
   }
 
   /**

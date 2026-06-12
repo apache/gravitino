@@ -31,6 +31,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergAuthenticationFilter;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.iceberg.service.IcebergHealthCheckPathMatcher;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore;
@@ -205,7 +206,11 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.addServlet(servlet, ICEBERG_SPEC);
     server.addCustomFilters(ICEBERG_SPEC);
     server.addFilter(
-        new HttpAuditFilter(eventBus, EventSource.GRAVITINO_ICEBERG_REST_SERVER), ICEBERG_SPEC);
+        new HttpAuditFilter(
+            eventBus,
+            EventSource.GRAVITINO_ICEBERG_REST_SERVER,
+            new IcebergHealthCheckPathMatcher()),
+        ICEBERG_SPEC);
     server.addSystemFilters(ICEBERG_SPEC);
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
