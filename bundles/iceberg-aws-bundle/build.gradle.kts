@@ -30,6 +30,8 @@ dependencies {
     exclude("*")
   }
   implementation(libs.iceberg.aws.bundle)
+  // Include Gravitino AWS credential providers (S3SecretKeyProvider, etc.) for credential vending
+  implementation(project(":bundles:aws"))
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -39,6 +41,11 @@ tasks.withType(ShadowJar::class.java) {
 
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))
+    // Exclude Gravitino modules to prevent class duplication with server classpath
+    exclude(project(":api"))
+    exclude(project(":common"))
+    exclude(project(":catalogs:catalog-common"))
+    exclude(project(":catalogs:hadoop-common"))
   }
 
   // Iceberg AWS bundle includes Log4j (before 1.10.1), so exclude to avoid conflicts
