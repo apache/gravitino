@@ -34,6 +34,10 @@ import pytest
 
 from tests.integration.gravitino_setup import GravitinoFixture
 
+# Fixtures receive other fixtures as same-named parameters; this is the standard
+# pytest pattern, not an accidental shadowing.
+# pylint: disable=redefined-outer-name
+
 _REQUIRED_ENV = ("GRAVITINO_URI", "MCP_URL", "MCP_METALAKE")
 
 

@@ -37,10 +37,10 @@ def basic_auth_header(user: str) -> str:
     return f"Basic {credential}"
 
 
-class GravitinoFixture:
+class GravitinoFixture:  # pylint: disable=too-many-instance-attributes
     """Sets up metalake/catalogs/user/role/grant via the Gravitino REST API."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-positional-arguments,too-many-arguments
         self,
         gravitino_uri: str,
         metalake: str,

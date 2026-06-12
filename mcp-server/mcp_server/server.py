@@ -16,7 +16,6 @@
 # under the License.
 
 import asyncio
-import contextlib
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -48,11 +47,15 @@ def _get_principal_from_request() -> str:
     Returns "anonymous" in stdio mode or when no token is present.
     """
     try:
+        # Imported lazily: only available within an HTTP request context.
+        # pylint: disable=import-outside-toplevel
         from fastmcp.server.dependencies import get_http_request
 
         authorization = get_http_request().headers.get("authorization", "")
+        # pylint: disable=protected-access
         return audit._extract_principal(authorization)
-    except Exception:  # noqa: BLE001 – stdio mode or no request context
+    except Exception:  # pylint: disable=broad-exception-caught
+        # stdio mode or no request context.
         return "anonymous"
 
 

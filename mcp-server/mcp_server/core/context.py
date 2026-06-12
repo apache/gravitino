@@ -28,10 +28,13 @@ def _get_request_authorization() -> str:
     the header is absent.
     """
     try:
+        # Imported lazily: only available within an HTTP request context.
+        # pylint: disable=import-outside-toplevel
         from fastmcp.server.dependencies import get_http_request
 
         return get_http_request().headers.get("authorization", "")
-    except Exception:  # noqa: BLE001 – stdio mode or missing request context
+    except Exception:  # pylint: disable=broad-exception-caught
+        # stdio mode or missing request context.
         return ""
 
 

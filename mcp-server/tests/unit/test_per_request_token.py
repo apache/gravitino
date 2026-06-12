@@ -31,6 +31,10 @@ from mcp_server.core.context import (
 )
 from mcp_server.core.setting import Setting
 
+# Tests intentionally exercise context/client internals (e.g. _default_client,
+# _catalog_operation) to assert per-request isolation; protected access is expected.
+# pylint: disable=protected-access
+
 
 class TestGetRequestAuthorization(unittest.TestCase):
     """Unit tests for _get_request_authorization() (HTTP context extraction)."""
@@ -145,7 +149,9 @@ class TestGravitinoContextPerRequestAuthorization(unittest.TestCase):
         ):
             client_bob = ctx.rest_client()
 
-        alice_headers = dict(client_alice._catalog_operation.rest_client.headers)
+        alice_headers = dict(
+            client_alice._catalog_operation.rest_client.headers
+        )
         bob_headers = dict(client_bob._catalog_operation.rest_client.headers)
         self.assertEqual(
             alice_headers.get("authorization"), "Basic YWxpY2U6ZHVtbXk="

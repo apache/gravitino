@@ -125,7 +125,8 @@ def test_moment3_audit_trail_attribution(gravitino_fixture, integration_env):
     asyncio.run(_list_catalog_names(ADMIN, mcp_url))
     try:
         asyncio.run(_attempt_write())
-    except Exception:  # noqa: BLE001 – expected denial
+    except Exception:  # pylint: disable=broad-exception-caught
+        # Expected denial for an unauthorized principal.
         pass
 
     # Give the server a moment to flush the audit handler.

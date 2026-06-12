@@ -42,11 +42,11 @@ class TestParseMcpUrl(unittest.TestCase):
         )
 
     def test_https_default_port(self):
-        host, port, path = _parse_mcp_url("https://mcphost/mcp")
+        _, port, _ = _parse_mcp_url("https://mcphost/mcp")
         self.assertEqual(port, 443)
 
     def test_http_default_port(self):
-        host, port, path = _parse_mcp_url("http://mcphost/mcp")
+        _, port, _ = _parse_mcp_url("http://mcphost/mcp")
         self.assertEqual(port, 80)
 
     def test_unsupported_scheme_rejected(self):

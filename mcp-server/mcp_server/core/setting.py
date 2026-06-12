@@ -27,7 +27,7 @@ class DefaultSetting:
 
 
 @dataclass
-class Setting:
+class Setting:  # pylint: disable=too-many-instance-attributes
     metalake: str
     gravitino_uri: str = DefaultSetting.default_gravitino_uri
     tags: Set[str] = field(default_factory=set)
