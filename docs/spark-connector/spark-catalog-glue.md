@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-With the Apache Gravitino Spark connector, accessing data or managing metadata in AWS Glue Data Catalog becomes straightforward, enabling seamless federation queries across Glue catalogs.
+With the Apache Gravitino Spark connector, accessing data or managing metadata in AWS Glue Data Catalog becomes straightforward, enabling seamless federated queries across Glue catalogs.
 
 ## Capabilities
 

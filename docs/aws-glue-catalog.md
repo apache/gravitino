@@ -50,11 +50,6 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 **Authentication priority**: Static credentials (`aws-access-key-id` + `aws-secret-access-key`) take precedence over the default credential chain (environment variables, instance profile, container credentials).
 :::
 
-### Connector Configuration
-
-- When using Gravitino with Trino, pass additional Trino connector properties using the `trino.bypass.` prefix. For example, `trino.bypass.hive.metastore.glue.max-connections` sets `hive.metastore.glue.max-connections` in the Trino runtime.
-- When using Gravitino with Spark, pass additional Spark connector properties using the `spark.bypass.` prefix.
-
 ### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
