@@ -46,6 +46,7 @@ import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
@@ -80,7 +81,9 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           GravitinoIcebergSparkSessionExtensions.class.getName(), ICEBERG_SPARK_EXTENSIONS);
   private final List<String> gravitinoPaimonExtensions = Arrays.asList(PAIMON_SPARK_EXTENSIONS);
 
-  private final List<String> gravitinoDriverExtensions = new ArrayList<>();
+  private final List<String> gravitinoDriverExtensions =
+      new ArrayList<>(
+          Collections.singletonList(GravitinoAuthorizationSparkSessionExtensions.class.getName()));
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
 

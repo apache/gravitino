@@ -48,6 +48,7 @@ import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.gravitino.spark.connector.authorization.AuthorizationTableProxy;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -260,6 +261,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     } catch (NoSuchTableException e) {
       // Not a table in Gravitino; try as a view.
       return loadViewAsTable(ident);
+    } catch (ForbiddenException e) {
+      Table sparkTable = loadSparkTable(ident);
+      return AuthorizationTableProxy.wrap(
+          sparkTable,
+          String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+          Sets.newHashSet(Privilege.Name.SELECT_TABLE),
+          e);
     }
     Table sparkTable = loadSparkTable(ident);
     return createSparkTable(
@@ -491,7 +499,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       String database = getDatabase(ident);
       return gravitinoCatalogClient
           .asTableCatalog()
-          .loadTable(NameIdentifier.of(database, ident.name()));
+          .loadTable(
+              NameIdentifier.of(database, ident.name()),
+              Sets.newHashSet(Privilege.Name.SELECT_TABLE));
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
@@ -580,7 +590,17 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   protected Table loadTableForWriting(Identifier ident)
       throws NoSuchTableException, ForbiddenException {
-    org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTableForWriting(ident);
+    org.apache.gravitino.rel.Table gravitinoTable;
+    try {
+      gravitinoTable = loadGravitinoTableForWriting(ident);
+    } catch (ForbiddenException e) {
+      Table sparkTable = loadSparkTable(ident);
+      return AuthorizationTableProxy.wrap(
+          sparkTable,
+          String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+          Sets.newHashSet(Privilege.Name.MODIFY_TABLE),
+          e);
+    }
     org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
     // Will create a catalog specific table
     return createSparkTable(
