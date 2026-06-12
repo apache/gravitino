@@ -58,6 +58,7 @@ import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -264,6 +265,51 @@ public class IcebergRESTUtils {
         Response.ok(loadTableResponse, MediaType.APPLICATION_JSON_TYPE);
     etag.ifPresent(responseBuilder::tag);
     return responseBuilder.build();
+  }
+
+  /**
+   * Builds an OK response with the ETag header derived from the view metadata location.
+   *
+   * @param loadViewResponse the view response to include in the body
+   * @return a Response with ETag header set
+   */
+  public static Response buildViewResponseWithETag(LoadViewResponse loadViewResponse) {
+    Optional<EntityTag> etag = generateETag(loadViewResponse.metadata().metadataFileLocation());
+    return buildViewResponseWithETag(loadViewResponse, etag);
+  }
+
+  /**
+   * Builds an OK response with the given ETag header.
+   *
+   * @param loadViewResponse the view response to include in the body
+   * @param etag the pre-computed ETag
+   * @return a Response with ETag header set if etag is present
+   */
+  public static Response buildViewResponseWithETag(
+      LoadViewResponse loadViewResponse, Optional<EntityTag> etag) {
+    Response.ResponseBuilder responseBuilder =
+        Response.ok(loadViewResponse, MediaType.APPLICATION_JSON_TYPE);
+    etag.ifPresent(responseBuilder::tag);
+    return responseBuilder.build();
+  }
+
+  /**
+   * Checks if the client's If-None-Match header value matches the current ETag.
+   *
+   * @param ifNoneMatch the If-None-Match header value from the client
+   * @param etag the current ETag
+   * @return true if the ETag matches (resource unchanged), false otherwise
+   */
+  public static boolean etagMatches(String ifNoneMatch, EntityTag etag) {
+    if (StringUtils.isBlank(ifNoneMatch)) {
+      return false;
+    }
+    // Strip quotes if present to compare the raw value
+    String clientEtag = ifNoneMatch.trim();
+    if (clientEtag.startsWith("\"") && clientEtag.endsWith("\"")) {
+      clientEtag = clientEtag.substring(1, clientEtag.length() - 1);
+    }
+    return etag.getValue().equals(clientEtag);
   }
 
   /**
