@@ -29,8 +29,11 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.spark.sql.connector.catalog.SupportsWrite;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCapability;
+import org.apache.spark.sql.connector.write.LogicalWriteInfo;
+import org.apache.spark.sql.connector.write.WriteBuilder;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 
@@ -64,5 +67,24 @@ public class TestAuthorizationTable {
     assertEquals("catalog.schema.table_a", deniedTable.tableIdentifier());
     assertEquals(ImmutableSet.of(Privilege.Name.SELECT_TABLE), deniedTable.requiredPrivileges());
     assertSame(cause, deniedTable.forbiddenException());
+  }
+
+  @Test
+  void testDelegatesWriteBuilderWithoutDynamicProxy() {
+    SupportsWrite delegate = mock(SupportsWrite.class);
+    LogicalWriteInfo writeInfo = mock(LogicalWriteInfo.class);
+    WriteBuilder writeBuilder = mock(WriteBuilder.class);
+    when(delegate.newWriteBuilder(writeInfo)).thenReturn(writeBuilder);
+
+    Table table =
+        AuthorizationTable.wrap(
+            delegate,
+            "catalog.schema.table_a",
+            ImmutableSet.of(Privilege.Name.MODIFY_TABLE),
+            new ForbiddenException("denied"));
+
+    assertTrue(table instanceof SupportsWrite);
+    assertEquals(AuthorizationTable.class, table.getClass());
+    assertSame(writeBuilder, ((SupportsWrite) table).newWriteBuilder(writeInfo));
   }
 }

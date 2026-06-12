@@ -26,8 +26,13 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
+import java.util.Collections;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.catalyst.expressions.Attribute;
+import org.apache.spark.sql.catalyst.plans.logical.AppendData;
+import org.apache.spark.sql.catalyst.plans.logical.LocalRelation;
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
 import org.apache.spark.sql.catalyst.plans.logical.Union;
 import org.apache.spark.sql.connector.catalog.Table;
@@ -37,6 +42,7 @@ import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 import scala.Option;
 import scala.collection.JavaConverters;
+import scala.collection.immutable.Map$;
 
 public class TestRequiredPrivilegesCheck {
 
@@ -78,6 +84,30 @@ public class TestRequiredPrivilegesCheck {
         "Missing required privileges for Spark tables: "
             + "[catalog.schema.table_a: MODIFY_TABLE, SELECT_TABLE; "
             + "catalog.schema.table_b: MODIFY_TABLE]",
+        exception.getMessage());
+  }
+
+  @Test
+  void testReportsDeniedWriteTarget() {
+    DataSourceV2Relation target =
+        (DataSourceV2Relation)
+            relation("catalog.schema.table_a", Privilege.Name.MODIFY_TABLE, "denied table_a");
+    LocalRelation query =
+        new LocalRelation(
+            JavaConverters.asScalaIteratorConverter(Collections.<Attribute>emptyList().iterator())
+                .asScala()
+                .toSeq(),
+            JavaConverters.asScalaIteratorConverter(Collections.<InternalRow>emptyList().iterator())
+                .asScala()
+                .toSeq(),
+            false);
+    AppendData plan = AppendData.byPosition(target, query, Map$.MODULE$.empty());
+
+    ForbiddenException exception =
+        assertThrows(ForbiddenException.class, () -> new RequiredPrivilegesCheck().apply(plan));
+
+    assertEquals(
+        "Missing required privileges for Spark tables: " + "[catalog.schema.table_a: MODIFY_TABLE]",
         exception.getMessage());
   }
 

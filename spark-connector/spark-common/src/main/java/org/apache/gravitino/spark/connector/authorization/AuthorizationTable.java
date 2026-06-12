@@ -24,13 +24,16 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.spark.sql.connector.catalog.SupportsWrite;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCapability;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.connector.write.LogicalWriteInfo;
+import org.apache.spark.sql.connector.write.WriteBuilder;
 import org.apache.spark.sql.types.StructType;
 
 /** A Spark table used during analysis to retain denied Gravitino privilege information. */
-public final class AuthorizationTable implements Table, SupportsRequiredPrivileges {
+public final class AuthorizationTable implements Table, SupportsWrite, SupportsRequiredPrivileges {
 
   private final Table delegate;
   private final String tableIdentifier;
@@ -89,6 +92,11 @@ public final class AuthorizationTable implements Table, SupportsRequiredPrivileg
   @Override
   public Set<TableCapability> capabilities() {
     return delegate.capabilities();
+  }
+
+  @Override
+  public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
+    return ((SupportsWrite) delegate).newWriteBuilder(info);
   }
 
   @Override

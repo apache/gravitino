@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
+import org.apache.spark.sql.catalyst.plans.logical.V2WriteCommand;
+import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation;
 import scala.runtime.AbstractFunction1;
 import scala.runtime.BoxedUnit;
@@ -42,16 +44,15 @@ public class RequiredPrivilegesCheck extends AbstractFunction1<LogicalPlan, Boxe
     plan.foreach(
         node -> {
           if (node instanceof DataSourceV2Relation) {
-            Object table = ((DataSourceV2Relation) node).table();
-            if (table instanceof SupportsRequiredPrivileges) {
-              SupportsRequiredPrivileges deniedTable = (SupportsRequiredPrivileges) table;
-              requiredPrivileges
-                  .computeIfAbsent(deniedTable.tableIdentifier(), ignored -> new TreeSet<>())
-                  .addAll(deniedTable.requiredPrivileges());
-              if (firstFailure[0] == null) {
-                firstFailure[0] = deniedTable.forbiddenException();
-              }
-            }
+            collectRequiredPrivileges(
+                ((DataSourceV2Relation) node).table(), requiredPrivileges, firstFailure);
+          }
+          if (node instanceof V2WriteCommand
+              && ((V2WriteCommand) node).table() instanceof DataSourceV2Relation) {
+            collectRequiredPrivileges(
+                ((DataSourceV2Relation) ((V2WriteCommand) node).table()).table(),
+                requiredPrivileges,
+                firstFailure);
           }
           return BoxedUnit.UNIT;
         });
@@ -71,5 +72,20 @@ public class RequiredPrivilegesCheck extends AbstractFunction1<LogicalPlan, Boxe
           firstFailure[0], "Missing required privileges for Spark tables: [%s]", requirements);
     }
     return BoxedUnit.UNIT;
+  }
+
+  private static void collectRequiredPrivileges(
+      Table table,
+      Map<String, Set<Privilege.Name>> requiredPrivileges,
+      ForbiddenException[] firstFailure) {
+    if (table instanceof SupportsRequiredPrivileges) {
+      SupportsRequiredPrivileges deniedTable = (SupportsRequiredPrivileges) table;
+      requiredPrivileges
+          .computeIfAbsent(deniedTable.tableIdentifier(), ignored -> new TreeSet<>())
+          .addAll(deniedTable.requiredPrivileges());
+      if (firstFailure[0] == null) {
+        firstFailure[0] = deniedTable.forbiddenException();
+      }
+    }
   }
 }
