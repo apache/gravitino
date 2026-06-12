@@ -89,7 +89,7 @@ public final class FetchFileUtils {
           break;
 
         case "hdfs":
-          copyHdfsFileToLocal(uri, destFile, hadoopConf);
+          copyHdfsFileToLocal(uri, destFile, Optional.ofNullable(hadoopConf));
           break;
 
         default:
@@ -130,19 +130,21 @@ public final class FetchFileUtils {
    * Copies an {@code hdfs} file to the local destination reflectively, so that this class does not
    * require a compile-time dependency on Hadoop.
    */
-  private static void copyHdfsFileToLocal(URI uri, File destFile, @Nullable Object hadoopConf)
-      throws IOException {
-    if (hadoopConf == null) {
-      throw new IllegalArgumentException(
-          String.format("A Hadoop configuration is required to fetch an 'hdfs' uri: %s", uri));
-    }
+  private static void copyHdfsFileToLocal(
+      URI uri, File destFile, Optional<Object> hadoopConfiguration) throws IOException {
+    Object configuration =
+        hadoopConfiguration.orElseThrow(
+            () ->
+                new IllegalArgumentException(
+                    String.format(
+                        "A Hadoop configuration is required to fetch an 'hdfs' uri: %s", uri)));
     try {
       Class<?> configurationClass = Class.forName("org.apache.hadoop.conf.Configuration");
       Class<?> fileSystemClass = Class.forName("org.apache.hadoop.fs.FileSystem");
       Class<?> pathClass = Class.forName("org.apache.hadoop.fs.Path");
 
       Object fileSystem =
-          fileSystemClass.getMethod("get", configurationClass).invoke(null, hadoopConf);
+          fileSystemClass.getMethod("get", configurationClass).invoke(null, configuration);
       Object srcPath = pathClass.getConstructor(URI.class).newInstance(uri);
       Object destPath = pathClass.getConstructor(URI.class).newInstance(destFile.toURI());
       fileSystemClass
