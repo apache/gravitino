@@ -720,18 +720,18 @@ public class GravitinoEnv {
 
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.internalFilesetDispatcher = filesetOperationDispatcher;
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
         new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
+    this.internalFilesetDispatcher = filesetNormalizeDispatcher;
     FilesetEventDispatcher filesetEventDispatcher =
         new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
     this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.internalTopicDispatcher = topicOperationDispatcher;
     TopicNormalizeDispatcher topicNormalizeDispatcher =
         new TopicNormalizeDispatcher(topicOperationDispatcher, catalogManager);
+    this.internalTopicDispatcher = topicNormalizeDispatcher;
     TopicEventDispatcher topicEventDispatcher =
         new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
     this.topicDispatcher = new TopicHookDispatcher(topicEventDispatcher);
