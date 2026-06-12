@@ -21,6 +21,9 @@ import unittest
 from unittest.mock import patch
 
 from mcp_server.client.factory import RESTClientFactory
+from mcp_server.client.plain.plain_rest_client_operation import (
+    PlainRESTClientOperation,
+)
 from mcp_server.core.setting import Setting
 from mcp_server.server import GravitinoMCPServer, _parse_mcp_url
 from tests.unit.tools import MockOperation
@@ -59,6 +62,10 @@ class TestRunHttpTransport(unittest.TestCase):
 
     def setUp(self):
         RESTClientFactory.set_rest_client(MockOperation)
+
+    def tearDown(self):
+        # Restore the default so this global mutation can't leak into other tests.
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
 
     def _run_and_capture(self, setting: Setting) -> dict:
         """Run the server with run_async patched; return the kwargs it was called with."""
@@ -111,14 +118,36 @@ class TestRunHttpTransport(unittest.TestCase):
             },
         )
 
-    def test_no_tls_when_only_cert_set(self):
-        """TLS requires both cert and key; a lone cert does not enable it."""
+    def test_lone_cert_rejected(self):
+        """TLS requires both cert and key; a lone cert is rejected."""
+        setting = Setting(
+            metalake="ml",
+            transport="http",
+            mcp_url="https://127.0.0.1:8443/mcp",
+            tls_cert="/path/to/cert.pem",
+            tls_key="",
+        )
+        with self.assertRaises(ValueError):
+            self._run_and_capture(setting)
+
+    def test_https_url_without_tls_rejected(self):
+        """An https URL without cert/key must not silently serve plain HTTP."""
+        setting = Setting(
+            metalake="ml",
+            transport="http",
+            mcp_url="https://127.0.0.1:8443/mcp",
+        )
+        with self.assertRaises(ValueError):
+            self._run_and_capture(setting)
+
+    def test_http_url_with_tls_rejected(self):
+        """TLS configured behind an http URL is a misconfiguration and rejected."""
         setting = Setting(
             metalake="ml",
             transport="http",
             mcp_url="http://127.0.0.1:8000/mcp",
             tls_cert="/path/to/cert.pem",
-            tls_key="",
+            tls_key="/path/to/key.pem",
         )
-        kwargs = self._run_and_capture(setting)
-        self.assertNotIn("uvicorn_config", kwargs)
+        with self.assertRaises(ValueError):
+            self._run_and_capture(setting)

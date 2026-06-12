@@ -20,12 +20,24 @@ import sys
 import unittest
 from unittest import mock
 
+from mcp_server.client.factory import RESTClientFactory
 from mcp_server.client.plain.plain_rest_client_operation import (
     PlainRESTClientOperation,
 )
 from mcp_server.core.context import GravitinoContext
 from mcp_server.core.setting import Setting
 from mcp_server.main import _parse_args
+
+
+class _RealFactoryTestCase(unittest.TestCase):
+    """Base for tests that inspect the real PlainRESTClientOperation.
+
+    Other test modules globally swap RESTClientFactory to MockOperation without
+    restoring it, so pin the real client here to stay order-independent.
+    """
+
+    def setUp(self):
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
 
 
 def _shared_rest_client(operation: PlainRESTClientOperation):
@@ -41,7 +53,7 @@ def _close(operation: PlainRESTClientOperation):
     asyncio.run(_shared_rest_client(operation).aclose())
 
 
-class TestAuthorizationInjection(unittest.TestCase):
+class TestAuthorizationInjection(_RealFactoryTestCase):
     """Verify the Authorization header is forwarded verbatim to the httpx client."""
 
     def test_bearer_authorization_header(self):
@@ -145,7 +157,7 @@ class TestTokenArgParsing(unittest.TestCase):
         self.assertEqual(args.token, "")
 
 
-class TestGravitinoContextTokenPropagation(unittest.TestCase):
+class TestGravitinoContextTokenPropagation(_RealFactoryTestCase):
     """Verify GravitinoContext passes token from Setting to the REST client."""
 
     def test_context_propagates_token(self):

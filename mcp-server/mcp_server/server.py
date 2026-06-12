@@ -163,6 +163,7 @@ class GravitinoMCPServer:
 
     def _run_http(self):
         _host, _port, _path = _parse_mcp_url(self.setting.mcp_url)
+        self._validate_tls_config()
         # FastMCP accepts "http" and "streamable-http" as equivalent aliases.
         transport = (
             "streamable-http"
@@ -189,3 +190,28 @@ class GravitinoMCPServer:
             )
 
         asyncio.run(self.mcp.run_async(**run_kwargs))
+
+    def _validate_tls_config(self):
+        """Reject inconsistent TLS configuration before starting the server.
+
+        Guards against serving plain HTTP on an ``https://`` URL (or TLS behind
+        an ``http://`` URL), and against providing only one of cert/key.
+        """
+        cert, key = self.setting.tls_cert, self.setting.tls_key
+        if bool(cert) != bool(key):
+            raise ValueError(
+                "Both --tls-cert and --tls-key must be provided together "
+                "(or neither)."
+            )
+        scheme = urlparse(self.setting.mcp_url).scheme.lower()
+        tls_enabled = bool(cert and key)
+        if scheme == "https" and not tls_enabled:
+            raise ValueError(
+                f"mcp_url '{self.setting.mcp_url}' uses https but TLS is not "
+                "configured; provide --tls-cert and --tls-key."
+            )
+        if scheme == "http" and tls_enabled:
+            raise ValueError(
+                "--tls-cert/--tls-key are set but mcp_url "
+                f"'{self.setting.mcp_url}' uses http; use an https URL."
+            )

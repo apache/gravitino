@@ -15,10 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
+import logging
 from collections import OrderedDict
 
 from mcp_server.client.factory import RESTClientFactory
 from mcp_server.core.setting import Setting
+
+_LOG = logging.getLogger(__name__)
 
 # Upper bound on the number of per-principal REST clients kept alive at once.
 # Each client owns an httpx connection pool; caching by Authorization header lets
@@ -26,6 +30,13 @@ from mcp_server.core.setting import Setting
 # per tool call, while the LRU bound keeps memory/sockets in check as principals
 # (e.g. rotating tokens) come and go.
 _MAX_CACHED_CLIENTS = 128
+
+
+def _log_close_failure(task: "asyncio.Task") -> None:
+    """Swallow and log errors from a background client-close task."""
+    exc = task.exception()
+    if exc is not None:
+        _LOG.warning("Failed to close evicted REST client: %s", exc)
 
 
 def _get_request_authorization() -> str:
@@ -96,5 +107,24 @@ class GravitinoContext:
         )
         self._clients_by_auth[authorization] = client
         if len(self._clients_by_auth) > _MAX_CACHED_CLIENTS:
-            self._clients_by_auth.popitem(last=False)
+            _, evicted = self._clients_by_auth.popitem(last=False)
+            self._schedule_close(evicted)
         return client
+
+    @staticmethod
+    def _schedule_close(client) -> None:
+        """Best-effort close of an evicted client's connection pool.
+
+        Closing is async; schedule it on the running event loop if there is one
+        (the normal HTTP-serving case). With no running loop (stdio mode/tests)
+        there is nothing to schedule and the client is left for GC.
+        """
+        close = getattr(client, "close", None)
+        if close is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        task = loop.create_task(close())
+        task.add_done_callback(_log_close_failure)

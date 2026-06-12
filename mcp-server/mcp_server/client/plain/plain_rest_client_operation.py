@@ -77,6 +77,8 @@ class PlainRESTClientOperation(GravitinoOperation):
         if authorization:
             headers["Authorization"] = authorization
         _rest_client = httpx.AsyncClient(base_url=uri, headers=headers)
+        # Kept so the shared connection pool can be closed (see close()).
+        self._rest_client = _rest_client
         self._catalog_operation = PlainRESTClientCatalogOperation(
             metalake_name, _rest_client
         )
@@ -107,6 +109,10 @@ class PlainRESTClientOperation(GravitinoOperation):
         self._statistic_operation = PlainRESTClientStatisticOperation(
             metalake_name, _rest_client
         )
+
+    async def close(self) -> None:
+        """Close the shared httpx client and release its connection pool."""
+        await self._rest_client.aclose()
 
     def as_catalog_operation(self) -> CatalogOperation:
         return self._catalog_operation

@@ -39,7 +39,9 @@ def _extract_principal(authorization: str) -> str:
     scheme, credential = parts[0].lower(), parts[1]
     if scheme == "basic":
         try:
-            decoded = base64.b64decode(credential).decode("utf-8")
+            decoded = base64.b64decode(credential, validate=True).decode(
+                "utf-8"
+            )
         except (binascii.Error, UnicodeDecodeError, ValueError):
             return "anonymous"
         user = decoded.split(":", 1)[0]
@@ -61,7 +63,10 @@ def emit(
     Args:
         principal: Identity derived from the request (e.g. "bearer:abc12345" or "anonymous").
         tool:      MCP tool name that was invoked.
-        outcome:   "allow" for successful calls, "deny" for authorization failures.
+        outcome:   "allow" for successful calls, "deny" for failed calls. Note the
+                   AuditMiddleware emits "deny" for any tool-call exception (an
+                   authorization denial being the common case), not only
+                   authorization failures; inspect error_type to disambiguate.
         error_type: Exception class name when outcome is "deny", empty otherwise.
     """
     record = {

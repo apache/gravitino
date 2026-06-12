@@ -102,8 +102,24 @@ def test_moment2_write_denied_for_readonly_principal(
                 },
             )
 
-    with pytest.raises(Exception):  # noqa: B017 – any tool error means denial
+    with pytest.raises(Exception) as exc_info:  # noqa: B017
         asyncio.run(_attempt_write())
+
+    # The failure must be an authorization denial, not an unrelated error
+    # (transport failure, missing tool, server crash, ...).
+    message = str(exc_info.value).lower()
+    assert any(
+        token in message
+        for token in (
+            "forbidden",
+            "unauthorized",
+            "not authorized",
+            "permission",
+            "denied",
+            "access",
+            "403",
+        )
+    ), f"expected an authorization denial, got: {exc_info.value!r}"
 
 
 def test_moment3_audit_trail_attribution(gravitino_fixture, integration_env):

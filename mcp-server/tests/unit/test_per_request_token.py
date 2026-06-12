@@ -25,6 +25,10 @@ so concurrent multi-principal sessions stay fully isolated in HTTP mode.
 import unittest
 from unittest.mock import MagicMock, patch
 
+from mcp_server.client.factory import RESTClientFactory
+from mcp_server.client.plain.plain_rest_client_operation import (
+    PlainRESTClientOperation,
+)
 from mcp_server.core import context as context_module
 from mcp_server.core.context import (
     GravitinoContext,
@@ -90,6 +94,12 @@ class TestGetRequestAuthorization(unittest.TestCase):
 
 class TestGravitinoContextPerRequestAuthorization(unittest.TestCase):
     """GravitinoContext.rest_client() isolates per-request identities."""
+
+    def setUp(self):
+        # These tests inspect the real PlainRESTClientOperation; other test
+        # modules swap the factory to MockOperation without restoring it, so pin
+        # the real client here to stay order-independent.
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
 
     def _make_context(self, startup_token: str = "") -> GravitinoContext:
         return GravitinoContext(
