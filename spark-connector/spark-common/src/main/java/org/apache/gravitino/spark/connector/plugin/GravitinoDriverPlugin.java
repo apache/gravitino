@@ -176,7 +176,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
   }
 
-  private void registerSqlExtensions(SparkConf conf) {
+  @VisibleForTesting
+  void registerSqlExtensions(SparkConf conf) {
     String extensionString = String.join(COMMA, gravitinoDriverExtensions);
     if (conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key())) {
       String sparkSessionExtensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
