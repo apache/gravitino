@@ -348,6 +348,19 @@ public class ErrorResponse extends BaseResponse {
         getStackTrace(throwable));
   }
 
+  /**
+   * Create a new unauthorized error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse unauthorized(String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.UNAUTHORIZED_CODE, type, message, getStackTrace(throwable));
+  }
+
   private static List<String> getStackTrace(Throwable throwable) {
     if (throwable == null) {
       return null;
