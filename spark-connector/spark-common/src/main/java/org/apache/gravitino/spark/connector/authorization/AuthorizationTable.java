@@ -20,97 +20,161 @@
 package org.apache.gravitino.spark.connector.authorization;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.spark.sql.connector.catalog.SupportsRead;
 import org.apache.spark.sql.connector.catalog.SupportsWrite;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCapability;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.connector.read.ScanBuilder;
 import org.apache.spark.sql.connector.write.LogicalWriteInfo;
 import org.apache.spark.sql.connector.write.WriteBuilder;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-/** A Spark table used during analysis to retain denied Gravitino privilege information. */
-public final class AuthorizationTable implements Table, SupportsWrite, SupportsRequiredPrivileges {
+/**
+ * A placeholder Spark table returned when the caller lacks the Gravitino privileges to load a
+ * table.
+ *
+ * <p>The connector does not load the real Spark table for a denied table, because that load would
+ * bypass the very authorization the caller is missing. Instead {@link #deny} records the table and
+ * its required privileges in a per-thread collector and returns this placeholder so Spark's {@code
+ * ResolveRelations} can finish resolving every relation in the query. {@link
+ * RequiredPrivilegesCheck} then drains the collector once resolution completes and reports all
+ * denied tables together, before analysis fails on anything else.
+ *
+ * <p>The metadata methods ({@link #name}, {@link #schema}, ...) return harmless placeholders so the
+ * relation can be built during resolution, while the data-access methods ({@link #newScanBuilder},
+ * {@link #newWriteBuilder}) fail closed: should the authorization check ever be bypassed, the table
+ * still cannot be read or written.
+ */
+public class AuthorizationTable implements Table, SupportsRead, SupportsWrite {
 
-  private final Table delegate;
-  private final String tableIdentifier;
-  private final Set<Privilege.Name> requiredPrivileges;
+  // Denied tables discovered while resolving the relations of a single query, keyed by the fully
+  // qualified table identifier. Held per-thread because Spark analyzes one query per thread, and
+  // drained by RequiredPrivilegesCheck once resolution completes.
+  private static final ThreadLocal<Map<String, Set<Privilege.Name>>> DENIED_TABLES =
+      ThreadLocal.withInitial(TreeMap::new);
+  private static final ThreadLocal<ForbiddenException> FIRST_FAILURE = new ThreadLocal<>();
+
+  private static final StructType EMPTY_SCHEMA = new StructType();
+  private static final Transform[] EMPTY_PARTITIONING = new Transform[0];
+  private static final Set<TableCapability> CAPABILITIES =
+      ImmutableSet.of(
+          TableCapability.BATCH_READ,
+          TableCapability.BATCH_WRITE,
+          TableCapability.TRUNCATE,
+          TableCapability.OVERWRITE_BY_FILTER,
+          TableCapability.OVERWRITE_DYNAMIC);
+
+  private final String name;
   private final ForbiddenException forbiddenException;
 
-  private AuthorizationTable(
-      Table delegate,
-      String tableIdentifier,
-      Set<Privilege.Name> requiredPrivileges,
-      ForbiddenException forbiddenException) {
-    this.delegate = delegate;
-    this.tableIdentifier = tableIdentifier;
-    this.requiredPrivileges = ImmutableSet.copyOf(requiredPrivileges);
+  private AuthorizationTable(String name, ForbiddenException forbiddenException) {
+    this.name = name;
     this.forbiddenException = forbiddenException;
   }
 
   /**
-   * Wraps a Spark table with the authorization failure that must be reported during analysis.
+   * Records a denied table for the current thread and returns a placeholder table to keep in the
+   * analyzed plan.
    *
-   * @param delegate the underlying Spark table
+   * @param name the simple table name surfaced to Spark
    * @param tableIdentifier the fully qualified Gravitino table identifier
-   * @param requiredPrivileges the privileges required to load the table
+   * @param requiredPrivileges the privileges required to use the table
    * @param forbiddenException the original authorization failure
-   * @return a table carrying the authorization failure
+   * @return a placeholder table carrying the authorization failure
    */
-  public static Table wrap(
-      Table delegate,
+  public static Table deny(
+      String name,
       String tableIdentifier,
       Set<Privilege.Name> requiredPrivileges,
       ForbiddenException forbiddenException) {
-    return new AuthorizationTable(
-        delegate, tableIdentifier, requiredPrivileges, forbiddenException);
+    DENIED_TABLES
+        .get()
+        .computeIfAbsent(tableIdentifier, ignored -> new TreeSet<>())
+        .addAll(requiredPrivileges);
+    if (FIRST_FAILURE.get() == null) {
+      FIRST_FAILURE.set(forbiddenException);
+    }
+    return new AuthorizationTable(name, forbiddenException);
+  }
+
+  /**
+   * Returns an aggregated authorization failure for every denied table collected on the current
+   * thread, then clears the collector. Returns {@link Optional#empty()} when no table was denied.
+   *
+   * @return the aggregated failure, or empty if there is none
+   */
+  public static Optional<ForbiddenException> drainFailure() {
+    Map<String, Set<Privilege.Name>> deniedTables = DENIED_TABLES.get();
+    if (deniedTables.isEmpty()) {
+      clear();
+      return Optional.empty();
+    }
+    ForbiddenException firstFailure = FIRST_FAILURE.get();
+    String requirements =
+        deniedTables.entrySet().stream()
+            .map(
+                entry ->
+                    entry.getKey()
+                        + ": "
+                        + entry.getValue().stream()
+                            .map(Privilege.Name::name)
+                            .collect(Collectors.joining(", ")))
+            .collect(Collectors.joining("; "));
+    clear();
+    return Optional.of(
+        new ForbiddenException(
+            firstFailure, "Missing required privileges for Spark tables: [%s]", requirements));
+  }
+
+  /** Clears the denied tables collected on the current thread. */
+  public static void clear() {
+    DENIED_TABLES.remove();
+    FIRST_FAILURE.remove();
   }
 
   @Override
   public String name() {
-    return delegate.name();
+    return name;
   }
 
   @Override
   public StructType schema() {
-    return delegate.schema();
+    return EMPTY_SCHEMA;
   }
 
   @Override
   public Transform[] partitioning() {
-    return delegate.partitioning();
+    return EMPTY_PARTITIONING;
   }
 
   @Override
   public Map<String, String> properties() {
-    return delegate.properties();
+    return Collections.emptyMap();
   }
 
   @Override
   public Set<TableCapability> capabilities() {
-    return delegate.capabilities();
+    return CAPABILITIES;
+  }
+
+  @Override
+  public ScanBuilder newScanBuilder(CaseInsensitiveStringMap options) {
+    throw forbiddenException;
   }
 
   @Override
   public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
-    return ((SupportsWrite) delegate).newWriteBuilder(info);
-  }
-
-  @Override
-  public String tableIdentifier() {
-    return tableIdentifier;
-  }
-
-  @Override
-  public Set<Privilege.Name> requiredPrivileges() {
-    return requiredPrivileges;
-  }
-
-  @Override
-  public ForbiddenException forbiddenException() {
-    return forbiddenException;
+    throw forbiddenException;
   }
 }

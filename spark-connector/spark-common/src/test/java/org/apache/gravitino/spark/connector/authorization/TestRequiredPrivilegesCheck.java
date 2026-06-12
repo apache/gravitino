@@ -20,63 +20,43 @@
 package org.apache.gravitino.spark.connector.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
-import java.util.Arrays;
-import java.util.Collections;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.ForbiddenException;
-import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.catalyst.expressions.Attribute;
-import org.apache.spark.sql.catalyst.plans.logical.AppendData;
-import org.apache.spark.sql.catalyst.plans.logical.LocalRelation;
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
-import org.apache.spark.sql.catalyst.plans.logical.Union;
-import org.apache.spark.sql.connector.catalog.Table;
-import org.apache.spark.sql.connector.catalog.TableCapability;
-import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation;
-import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.catalyst.plans.logical.OneRowRelation;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import scala.Option;
-import scala.collection.JavaConverters;
-import scala.collection.immutable.Map$;
 
 public class TestRequiredPrivilegesCheck {
 
-  @Test
-  void testReportsOneDeniedTable() {
-    LogicalPlan plan =
-        relation("catalog.schema.table_a", Privilege.Name.SELECT_TABLE, "denied table_a");
-
-    ForbiddenException exception =
-        assertThrows(ForbiddenException.class, () -> new RequiredPrivilegesCheck().apply(plan));
-
-    assertEquals(
-        "Missing required privileges for Spark tables: " + "[catalog.schema.table_a: SELECT_TABLE]",
-        exception.getMessage());
-    assertEquals("denied table_a", exception.getCause().getMessage());
+  @AfterEach
+  void clearCollector() {
+    AuthorizationTable.clear();
   }
 
   @Test
   void testReportsAllDeniedTablesInDeterministicOrder() {
-    LogicalPlan tableB =
-        relation("catalog.schema.table_b", Privilege.Name.MODIFY_TABLE, "denied table_b");
-    LogicalPlan tableASelect =
-        relation("catalog.schema.table_a", Privilege.Name.SELECT_TABLE, "denied table_a");
-    LogicalPlan tableAModify =
-        relation("catalog.schema.table_a", Privilege.Name.MODIFY_TABLE, "denied table_a");
-    Union plan =
-        new Union(
-            JavaConverters.asScalaIteratorConverter(
-                    Arrays.asList(tableB, tableASelect, tableAModify).iterator())
-                .asScala()
-                .toSeq(),
-            false,
-            false);
+    AuthorizationTable.deny(
+        "table_b",
+        "catalog.schema.table_b",
+        ImmutableSet.of(Privilege.Name.MODIFY_TABLE),
+        new ForbiddenException("denied table_b"));
+    AuthorizationTable.deny(
+        "table_a",
+        "catalog.schema.table_a",
+        ImmutableSet.of(Privilege.Name.SELECT_TABLE),
+        new ForbiddenException("denied table_a"));
+    AuthorizationTable.deny(
+        "table_a",
+        "catalog.schema.table_a",
+        ImmutableSet.of(Privilege.Name.MODIFY_TABLE),
+        new ForbiddenException("denied table_a"));
 
+    LogicalPlan plan = new OneRowRelation();
     ForbiddenException exception =
         assertThrows(ForbiddenException.class, () -> new RequiredPrivilegesCheck().apply(plan));
 
@@ -88,41 +68,8 @@ public class TestRequiredPrivilegesCheck {
   }
 
   @Test
-  void testReportsDeniedWriteTarget() {
-    DataSourceV2Relation target =
-        (DataSourceV2Relation)
-            relation("catalog.schema.table_a", Privilege.Name.MODIFY_TABLE, "denied table_a");
-    LocalRelation query =
-        new LocalRelation(
-            JavaConverters.asScalaIteratorConverter(Collections.<Attribute>emptyList().iterator())
-                .asScala()
-                .toSeq(),
-            JavaConverters.asScalaIteratorConverter(Collections.<InternalRow>emptyList().iterator())
-                .asScala()
-                .toSeq(),
-            false);
-    AppendData plan = AppendData.byPosition(target, query, Map$.MODULE$.empty());
-
-    ForbiddenException exception =
-        assertThrows(ForbiddenException.class, () -> new RequiredPrivilegesCheck().apply(plan));
-
-    assertEquals(
-        "Missing required privileges for Spark tables: " + "[catalog.schema.table_a: MODIFY_TABLE]",
-        exception.getMessage());
-  }
-
-  private static LogicalPlan relation(
-      String identifier, Privilege.Name privilege, String causeMessage) {
-    Table delegate = mock(Table.class);
-    when(delegate.name()).thenReturn(identifier);
-    when(delegate.schema()).thenReturn(new StructType().add("id", "int"));
-    when(delegate.capabilities()).thenReturn(ImmutableSet.of(TableCapability.BATCH_READ));
-    Table deniedTable =
-        AuthorizationTable.wrap(
-            delegate,
-            identifier,
-            ImmutableSet.of(privilege),
-            new ForbiddenException("%s", causeMessage));
-    return DataSourceV2Relation.create(deniedTable, Option.empty(), Option.empty());
+  void testReturnsPlanUnchangedWhenNothingDenied() {
+    LogicalPlan plan = new OneRowRelation();
+    assertSame(plan, new RequiredPrivilegesCheck().apply(plan));
   }
 }

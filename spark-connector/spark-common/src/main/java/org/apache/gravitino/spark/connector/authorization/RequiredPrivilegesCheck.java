@@ -19,73 +19,28 @@
 
 package org.apache.gravitino.spark.connector.authorization;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
-import java.util.stream.Collectors;
-import org.apache.gravitino.authorization.Privilege;
+import java.util.Optional;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
-import org.apache.spark.sql.catalyst.plans.logical.V2WriteCommand;
-import org.apache.spark.sql.connector.catalog.Table;
-import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation;
-import scala.runtime.AbstractFunction1;
-import scala.runtime.BoxedUnit;
+import org.apache.spark.sql.catalyst.rules.Rule;
 
-/** Checks a resolved Spark plan for tables with missing Gravitino privileges. */
-public class RequiredPrivilegesCheck extends AbstractFunction1<LogicalPlan, BoxedUnit> {
+/**
+ * A post-hoc resolution rule that reports the tables a query lacks Gravitino privileges for.
+ *
+ * <p>It runs after Spark's {@code ResolveRelations} has resolved every relation in the query, so
+ * all denied tables have been collected by {@link AuthorizationTable#deny}, but before {@code
+ * checkAnalysis} would fail the query for an unrelated reason (such as a column that cannot be
+ * resolved against a denied table's placeholder schema). This lets a single error list every
+ * inaccessible table and its required privileges instead of failing on the first one.
+ */
+public class RequiredPrivilegesCheck extends Rule<LogicalPlan> {
 
   @Override
-  public BoxedUnit apply(LogicalPlan plan) {
-    Map<String, Set<Privilege.Name>> requiredPrivileges = new TreeMap<>();
-    ForbiddenException[] firstFailure = new ForbiddenException[1];
-
-    plan.foreach(
-        node -> {
-          if (node instanceof DataSourceV2Relation) {
-            collectRequiredPrivileges(
-                ((DataSourceV2Relation) node).table(), requiredPrivileges, firstFailure);
-          }
-          if (node instanceof V2WriteCommand
-              && ((V2WriteCommand) node).table() instanceof DataSourceV2Relation) {
-            collectRequiredPrivileges(
-                ((DataSourceV2Relation) ((V2WriteCommand) node).table()).table(),
-                requiredPrivileges,
-                firstFailure);
-          }
-          return BoxedUnit.UNIT;
-        });
-
-    if (!requiredPrivileges.isEmpty()) {
-      String requirements =
-          requiredPrivileges.entrySet().stream()
-              .map(
-                  entry ->
-                      entry.getKey()
-                          + ": "
-                          + entry.getValue().stream()
-                              .map(Privilege.Name::name)
-                              .collect(Collectors.joining(", ")))
-              .collect(Collectors.joining("; "));
-      throw new ForbiddenException(
-          firstFailure[0], "Missing required privileges for Spark tables: [%s]", requirements);
+  public LogicalPlan apply(LogicalPlan plan) {
+    Optional<ForbiddenException> failure = AuthorizationTable.drainFailure();
+    if (failure.isPresent()) {
+      throw failure.get();
     }
-    return BoxedUnit.UNIT;
-  }
-
-  private static void collectRequiredPrivileges(
-      Table table,
-      Map<String, Set<Privilege.Name>> requiredPrivileges,
-      ForbiddenException[] firstFailure) {
-    if (table instanceof SupportsRequiredPrivileges) {
-      SupportsRequiredPrivileges deniedTable = (SupportsRequiredPrivileges) table;
-      requiredPrivileges
-          .computeIfAbsent(deniedTable.tableIdentifier(), ignored -> new TreeSet<>())
-          .addAll(deniedTable.requiredPrivileges());
-      if (firstFailure[0] == null) {
-        firstFailure[0] = deniedTable.forbiddenException();
-      }
-    }
+    return plan;
   }
 }

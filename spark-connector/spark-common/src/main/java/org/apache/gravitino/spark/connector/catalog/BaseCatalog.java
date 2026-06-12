@@ -262,9 +262,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       // Not a table in Gravitino; try as a view.
       return loadViewAsTable(ident);
     } catch (ForbiddenException e) {
-      Table sparkTable = loadSparkTable(ident);
-      return AuthorizationTable.wrap(
-          sparkTable,
+      // Do not load the underlying Spark table here: that load bypasses Gravitino authorization,
+      // which the caller is precisely missing. Return a standalone table that carries the failure
+      // so RequiredPrivilegesCheck can aggregate and report it during analysis.
+      return AuthorizationTable.deny(
+          ident.name(),
           String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
           Sets.newHashSet(Privilege.Name.SELECT_TABLE),
           e);
@@ -594,9 +596,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     try {
       gravitinoTable = loadGravitinoTableForWriting(ident);
     } catch (ForbiddenException e) {
-      Table sparkTable = loadSparkTable(ident);
-      return AuthorizationTable.wrap(
-          sparkTable,
+      // Do not load the underlying Spark table here: that load bypasses Gravitino authorization,
+      // which the caller is precisely missing. Return a standalone table that carries the failure
+      // so RequiredPrivilegesCheck can aggregate and report it during analysis.
+      return AuthorizationTable.deny(
+          ident.name(),
           String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
           Sets.newHashSet(Privilege.Name.MODIFY_TABLE),
           e);

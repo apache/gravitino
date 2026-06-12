@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
@@ -37,11 +38,12 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
-import org.apache.gravitino.spark.connector.authorization.SupportsRequiredPrivileges;
+import org.apache.gravitino.spark.connector.authorization.AuthorizationTable;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,6 +76,11 @@ public class TestBaseCatalogAuthorization {
     catalog = new TestCatalog(gravitinoCatalog, sparkCatalog);
   }
 
+  @AfterEach
+  void clearDeniedTables() {
+    AuthorizationTable.clear();
+  }
+
   @Test
   void testLoadTablePassesSelectTablePrivilege() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
@@ -95,17 +102,18 @@ public class TestBaseCatalogAuthorization {
   void testDeniedReadReturnsMarkedSparkTable() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
     NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
-    Table sparkTable = mock(Table.class);
     when(gravitinoTableCatalog.loadTable(
             eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.SELECT_TABLE))))
         .thenThrow(new ForbiddenException("denied"));
-    when(sparkCatalog.loadTable(identifier)).thenReturn(sparkTable);
 
     Table result = catalog.loadTable(identifier);
 
-    assertTrue(result instanceof SupportsRequiredPrivileges);
-    SupportsRequiredPrivileges deniedTable = (SupportsRequiredPrivileges) result;
-    assertSame(Privilege.Name.SELECT_TABLE, deniedTable.requiredPrivileges().iterator().next());
+    // The underlying Spark table is never loaded for a denied table; a placeholder is returned and
+    // the required privileges are collected for RequiredPrivilegesCheck to report during analysis.
+    assertTrue(result instanceof AuthorizationTable);
+    Optional<ForbiddenException> failure = AuthorizationTable.drainFailure();
+    assertTrue(failure.isPresent());
+    assertTrue(failure.get().getMessage().contains("table_a: SELECT_TABLE"));
   }
 
   @Test

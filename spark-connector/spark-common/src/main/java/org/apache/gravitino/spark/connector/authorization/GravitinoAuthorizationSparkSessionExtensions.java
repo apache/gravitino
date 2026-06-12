@@ -28,7 +28,9 @@ public class GravitinoAuthorizationSparkSessionExtensions
 
   @Override
   public Void apply(SparkSessionExtensions extensions) {
-    extensions.injectCheckRule(session -> new RequiredPrivilegesCheck());
+    // Post-hoc resolution runs after every relation is resolved but before checkAnalysis, so all
+    // denied tables are reported together rather than failing on the first resolution error.
+    extensions.injectPostHocResolutionRule(session -> new RequiredPrivilegesCheck());
     return null;
   }
 }
