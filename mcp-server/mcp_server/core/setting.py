@@ -35,7 +35,8 @@ class Setting:
     mcp_url: str = DefaultSetting.default_mcp_url
     # Bearer token forwarded to Gravitino on every request.
     # Empty string means anonymous (no Authorization header sent).
-    token: str = ""
+    # repr=False keeps the raw value out of the dataclass-generated __repr__.
+    token: str = field(default="", repr=False)
 
     def __str__(self) -> str:
         token_display = "***" if self.token else ""

@@ -15,13 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
+import sys
 import unittest
+from unittest import mock
 
 from mcp_server.client.plain.plain_rest_client_operation import (
     PlainRESTClientOperation,
 )
 from mcp_server.core.context import GravitinoContext
 from mcp_server.core.setting import Setting
+from mcp_server.main import _parse_args
+
+
+def _headers_of(operation: PlainRESTClientOperation):
+    return operation._catalog_operation.rest_client.headers
+
+
+def _close(operation: PlainRESTClientOperation):
+    asyncio.run(operation._catalog_operation.rest_client.aclose())
 
 
 class TestTokenInjection(unittest.TestCase):
@@ -32,26 +44,37 @@ class TestTokenInjection(unittest.TestCase):
         client = PlainRESTClientOperation(
             "my_metalake", "http://localhost:8090", token="my-secret-token"
         )
-        headers = dict(client._catalog_operation.rest_client.headers)
-        self.assertEqual(headers.get("authorization"), "Bearer my-secret-token")
+        try:
+            self.assertEqual(
+                _headers_of(client).get("Authorization"),
+                "Bearer my-secret-token",
+            )
+        finally:
+            _close(client)
 
     def test_empty_token_no_authorization_header(self):
         """When token is empty, no Authorization header is added."""
         client = PlainRESTClientOperation(
             "my_metalake", "http://localhost:8090", token=""
         )
-        headers = dict(client._catalog_operation.rest_client.headers)
-        self.assertNotIn("authorization", headers)
+        try:
+            self.assertIsNone(_headers_of(client).get("Authorization"))
+        finally:
+            _close(client)
 
     def test_no_token_argument_no_authorization_header(self):
         """When token argument is omitted entirely, no Authorization header is added."""
-        client = PlainRESTClientOperation("my_metalake", "http://localhost:8090")
-        headers = dict(client._catalog_operation.rest_client.headers)
-        self.assertNotIn("authorization", headers)
+        client = PlainRESTClientOperation(
+            "my_metalake", "http://localhost:8090"
+        )
+        try:
+            self.assertIsNone(_headers_of(client).get("Authorization"))
+        finally:
+            _close(client)
 
 
 class TestSettingTokenMasking(unittest.TestCase):
-    """Verify that the token is not exposed in Setting string representation."""
+    """Verify that the token is not exposed in Setting string representations."""
 
     def test_token_masked_in_str(self):
         """Token value must not appear in Setting.__str__."""
@@ -59,10 +82,45 @@ class TestSettingTokenMasking(unittest.TestCase):
         self.assertNotIn("super-secret-token-value", str(setting))
         self.assertIn("***", str(setting))
 
+    def test_token_not_in_repr(self):
+        """Token value must not appear in Setting.__repr__ either."""
+        setting = Setting(metalake="ml", token="super-secret-token-value")
+        self.assertNotIn("super-secret-token-value", repr(setting))
+
     def test_empty_token_shows_empty_in_str(self):
         """When no token is set, __str__ shows empty placeholder."""
         setting = Setting(metalake="ml", token="")
         self.assertNotIn("***", str(setting))
+
+
+class TestTokenArgParsing(unittest.TestCase):
+    """Verify --token CLI argument and GRAVITINO_TOKEN env var precedence."""
+
+    def test_env_var_used_when_token_omitted(self):
+        """GRAVITINO_TOKEN is used when --token is not passed."""
+        with mock.patch.dict(
+            "os.environ", {"GRAVITINO_TOKEN": "env-token"}
+        ), mock.patch.object(sys, "argv", ["prog", "--metalake", "ml"]):
+            args = _parse_args()
+        self.assertEqual(args.token, "env-token")
+
+    def test_cli_token_overrides_env_var(self):
+        """--token takes precedence over GRAVITINO_TOKEN when both are set."""
+        with mock.patch.dict(
+            "os.environ", {"GRAVITINO_TOKEN": "env-token"}
+        ), mock.patch.object(
+            sys, "argv", ["prog", "--metalake", "ml", "--token", "cli-token"]
+        ):
+            args = _parse_args()
+        self.assertEqual(args.token, "cli-token")
+
+    def test_no_token_anywhere_defaults_to_empty(self):
+        """Without --token and GRAVITINO_TOKEN, token defaults to empty string."""
+        with mock.patch.dict("os.environ", {}, clear=True), mock.patch.object(
+            sys, "argv", ["prog", "--metalake", "ml"]
+        ):
+            args = _parse_args()
+        self.assertEqual(args.token, "")
 
 
 class TestGravitinoContextTokenPropagation(unittest.TestCase):
@@ -77,8 +135,13 @@ class TestGravitinoContextTokenPropagation(unittest.TestCase):
         )
         ctx = GravitinoContext(setting)
         rest_client = ctx.rest_client()
-        headers = dict(rest_client._catalog_operation.rest_client.headers)
-        self.assertEqual(headers.get("authorization"), "Bearer ctx-token-xyz")
+        try:
+            self.assertEqual(
+                _headers_of(rest_client).get("Authorization"),
+                "Bearer ctx-token-xyz",
+            )
+        finally:
+            _close(rest_client)
 
     def test_context_anonymous_when_no_token(self):
         """Empty token in Setting → no Authorization header in REST calls."""
@@ -89,5 +152,7 @@ class TestGravitinoContextTokenPropagation(unittest.TestCase):
         )
         ctx = GravitinoContext(setting)
         rest_client = ctx.rest_client()
-        headers = dict(rest_client._catalog_operation.rest_client.headers)
-        self.assertNotIn("authorization", headers)
+        try:
+            self.assertIsNone(_headers_of(rest_client).get("Authorization"))
+        finally:
+            _close(rest_client)
