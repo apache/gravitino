@@ -96,7 +96,7 @@ def load_fileset_tools(mcp: FastMCP):
             catalog_name, schema_name, fileset_name
         )
 
-    # pylint:disable=too-many-positional-arguments
+    # pylint: disable=too-many-positional-arguments
     @mcp.tool(tags={"fileset"})
     async def list_files_in_fileset(
         ctx: Context,
@@ -144,7 +144,7 @@ def load_fileset_tools(mcp: FastMCP):
             catalog_name, schema_name, fileset_name, location_name, sub_path
         )
 
-    # pylint:disable=too-many-positional-arguments
+    # pylint: disable=too-many-positional-arguments
     @mcp.tool(tags={"fileset"})
     async def create_fileset(
         ctx: Context,

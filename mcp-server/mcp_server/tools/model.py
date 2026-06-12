@@ -284,7 +284,7 @@ def load_model_tools(mcp: FastMCP):
             catalog_name, schema_name, model_name
         )
 
-    # pylint:disable=too-many-positional-arguments
+    # pylint: disable=too-many-positional-arguments
     @mcp.tool(tags={"model"})
     async def link_model_version(
         ctx: Context,

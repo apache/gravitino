@@ -99,8 +99,12 @@ class TestTagTool(unittest.TestCase):
 
         asyncio.run(_test_disassociate_tag_from_metadata(self.mcp))
 
-    def test_write_tag_tools_enabled_and_protected_by_authz(self):
-        """Write tools are exposed; authorization is enforced by Gravitino, not by hiding."""
+    def test_write_tag_tools_are_exposed(self):
+        """Tag write tools are registered/exposed (not hidden).
+
+        Authorization enforcement is delegated to Gravitino and covered by the
+        live integration test, not asserted here; this only checks exposure.
+        """
 
         async def _test(mcp_server):
             tool_names = {tool.name for tool in await mcp_server.list_tools()}
