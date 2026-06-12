@@ -237,10 +237,23 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 ### View Capabilities
 
 - Supports list, create, load, alter, and drop for views stored in the Paimon catalog.
-- Each view must include exactly one SQL representation with dialect `query`, which serves as the canonical view definition.
-- Additional dialect-specific SQL representations (for example, `spark` or `trino`) can be provided alongside the required `query` representation.
+- Each view must include exactly one SQL representation with dialect `query`, which serves as the canonical view definition. At most one representation per dialect is allowed.
+- Additional dialect-specific SQL representations (for example, `flink`, `spark`) can be provided alongside the required `query` representation.
 - The `defaultCatalog` and `defaultSchema` fields are stored as Paimon view options and can be used to resolve unqualified identifiers in the SQL text.
 - View support depends on the selected Paimon backend and requires backend view API support.
+
+### Supported Alter Operations
+
+| Operation       | REST / JSON                                                                   | Java                                          |
+|-----------------|-------------------------------------------------------------------------------|-----------------------------------------------|
+| Rename view     | `{"@type":"rename","newName":"new_name"}`                                     | `ViewChange.rename("new_name")`               |
+| Set property    | `{"@type":"setProperty","property":"key","value":"value"}`                    | `ViewChange.setProperty("key", "value")`      |
+| Remove property | `{"@type":"removeProperty","property":"key"}`                                 | `ViewChange.removeProperty("key")`            |
+| Replace view    | Replace columns, representations, defaultCatalog, defaultSchema, comment      | `ViewChange.replaceView(...)`                 |
+
+:::note
+Rename cannot be combined with other changes in a single `alterView` call. Submit rename as a standalone request.
+:::
 
 ### View Operations
 

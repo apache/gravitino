@@ -237,9 +237,20 @@ Support for altering partitions is under development.
 
 - Supports list, create, load, alter, and drop for views stored in the Hive Metastore Service as `VIRTUAL_VIEW`.
 - Each view must contain exactly one SQL representation.
-- Supports the `hive`, `trino`, and `spark` dialects.
-- When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `trino`, or `spark` dialect.
-- For the `hive` dialect, `defaultCatalog` and `defaultSchema` must be `null`.
+- Supports the `hive`, `flink`, and `spark` dialects.
+- When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `flink`, or `spark` dialect.
+- For the `hive` and `flink` dialects, `defaultCatalog` and `defaultSchema` must be `null`.
+- The `flink` dialect requires at least one view property with the prefix `flink.` to be set. The Flink connector automatically sets `flink.schema.num-columns`; when using the REST API directly, set at least one `flink.*` property explicitly.
+- The `spark` dialect requires the view property `spark.sql.create.version` to be set; without it the view round-trips as the `hive` dialect on reload.
+
+### Supported Alter Operations
+
+| Operation       | REST / JSON                                                                   | Java                                          |
+|-----------------|-------------------------------------------------------------------------------|-----------------------------------------------|
+| Rename view     | `{"@type":"rename","newName":"new_name"}`                                     | `ViewChange.rename("new_name")`               |
+| Set property    | `{"@type":"setProperty","property":"key","value":"value"}`                    | `ViewChange.setProperty("key", "value")`      |
+| Remove property | `{"@type":"removeProperty","property":"key"}`                                 | `ViewChange.removeProperty("key")`            |
+| Replace view    | Replace columns, representations, comment in one update                       | `ViewChange.replaceView(...)`                 |
 
 ### View Operations
 
