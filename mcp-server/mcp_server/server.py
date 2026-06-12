@@ -54,8 +54,9 @@ def _get_principal_from_request() -> str:
         authorization = get_http_request().headers.get("authorization", "")
         # pylint: disable=protected-access
         return audit._extract_principal(authorization)
-    except Exception:  # pylint: disable=broad-exception-caught
-        # stdio mode or no request context.
+    except (LookupError, RuntimeError):
+        # No active HTTP request: stdio mode (get_http_request raises
+        # RuntimeError) or missing request context (LookupError).
         return "anonymous"
 
 
@@ -120,7 +121,7 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
     return mcp
 
 
-def _parse_mcp_url(url: str) -> ():
+def _parse_mcp_url(url: str) -> tuple[str, int, str]:
     try:
         parsed = urlparse(url)
         scheme = parsed.scheme.lower()

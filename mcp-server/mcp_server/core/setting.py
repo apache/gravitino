@@ -33,7 +33,9 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     tags: Set[str] = field(default_factory=set)
     transport: str = DefaultSetting.default_transport
     mcp_url: str = DefaultSetting.default_mcp_url
-    # Bearer token forwarded to Gravitino on every request.
+    # Static OAuth2 Bearer token. Sent on every request in stdio mode; in HTTP
+    # mode it is only the fallback used when an incoming request carries no
+    # Authorization header (per-request identity takes priority).
     # Empty string means anonymous (no Authorization header sent).
     # repr=False keeps the raw value out of the dataclass-generated __repr__.
     token: str = field(default="", repr=False)

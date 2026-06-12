@@ -112,7 +112,10 @@ def _parse_args():
         "--token",
         type=str,
         default=os.environ.get("GRAVITINO_TOKEN", ""),
-        help="Bearer token forwarded as Authorization header to Gravitino on every request. "
+        help="Static OAuth2 Bearer token used to authenticate to Gravitino. "
+        "In stdio mode it is sent on every request; in HTTP mode it is only the "
+        "fallback when an incoming request carries no Authorization header "
+        "(per-request identity takes priority). "
         "Can also be set via the GRAVITINO_TOKEN environment variable. "
         "When omitted, requests are sent without authentication.",
     )

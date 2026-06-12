@@ -25,6 +25,7 @@ so concurrent multi-principal sessions stay fully isolated in HTTP mode.
 import unittest
 from unittest.mock import MagicMock, patch
 
+from mcp_server.core import context as context_module
 from mcp_server.core.context import (
     GravitinoContext,
     _get_request_authorization,
@@ -158,3 +159,36 @@ class TestGravitinoContextPerRequestAuthorization(unittest.TestCase):
         )
         self.assertEqual(bob_headers.get("authorization"), "Basic Ym9iOmR1bW15")
         self.assertIsNot(client_alice, client_bob)
+
+    def test_same_principal_reuses_cached_client(self):
+        """Repeated calls from the same principal reuse one cached client."""
+        ctx = self._make_context()
+
+        mock_request = MagicMock()
+        mock_request.headers.get.return_value = "Basic YWxpY2U6ZHVtbXk="
+
+        with patch(
+            "fastmcp.server.dependencies.get_http_request",
+            return_value=mock_request,
+        ):
+            first = ctx.rest_client()
+            second = ctx.rest_client()
+
+        # Same Authorization header -> same client object (connection pool reused).
+        self.assertIs(first, second)
+
+    def test_client_cache_is_bounded(self):
+        """The per-principal client cache evicts the oldest entries past its cap."""
+        ctx = self._make_context()
+        cap = context_module._MAX_CACHED_CLIENTS
+
+        for i in range(cap + 5):
+            mock_request = MagicMock()
+            mock_request.headers.get.return_value = f"Bearer token-{i}"
+            with patch(
+                "fastmcp.server.dependencies.get_http_request",
+                return_value=mock_request,
+            ):
+                ctx.rest_client()
+
+        self.assertLessEqual(len(ctx._clients_by_auth), cap)

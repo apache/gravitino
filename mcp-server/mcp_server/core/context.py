@@ -15,8 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from collections import OrderedDict
+
 from mcp_server.client.factory import RESTClientFactory
 from mcp_server.core.setting import Setting
+
+# Upper bound on the number of per-principal REST clients kept alive at once.
+# Each client owns an httpx connection pool; caching by Authorization header lets
+# repeated calls from the same principal reuse a pool instead of opening a new one
+# per tool call, while the LRU bound keeps memory/sockets in check as principals
+# (e.g. rotating tokens) come and go.
+_MAX_CACHED_CLIENTS = 128
 
 
 def _get_request_authorization() -> str:
@@ -33,8 +42,9 @@ def _get_request_authorization() -> str:
         from fastmcp.server.dependencies import get_http_request
 
         return get_http_request().headers.get("authorization", "")
-    except Exception:  # pylint: disable=broad-exception-caught
-        # stdio mode or missing request context.
+    except (LookupError, RuntimeError):
+        # No active HTTP request: stdio mode (get_http_request raises
+        # RuntimeError) or missing request context (LookupError).
         return ""
 
 
@@ -50,6 +60,10 @@ class GravitinoContext:
         self._default_client = RESTClientFactory.create_rest_client(
             setting.metalake, setting.gravitino_uri, default_authorization
         )
+        # LRU cache of per-principal clients keyed by the raw Authorization header.
+        # Safe without locking: rest_client() runs on the single asyncio event
+        # loop and never awaits between lookup and insert.
+        self._clients_by_auth: "OrderedDict[str, object]" = OrderedDict()
 
     def rest_client(self):
         """Return a REST client carrying the correct identity for this request.
@@ -62,12 +76,25 @@ class GravitinoContext:
         Falls back to the shared default client (static startup token) when:
         - running in stdio mode (no HTTP request context), or
         - the incoming request carries no Authorization header.
+
+        Per-principal clients are cached (and their connection pools reused) so a
+        new pool is not opened on every tool call.
         """
         authorization = _get_request_authorization()
-        if authorization:
-            return RESTClientFactory.create_rest_client(
-                self._setting.metalake,
-                self._setting.gravitino_uri,
-                authorization,
-            )
-        return self._default_client
+        if not authorization:
+            return self._default_client
+
+        cached = self._clients_by_auth.get(authorization)
+        if cached is not None:
+            self._clients_by_auth.move_to_end(authorization)
+            return cached
+
+        client = RESTClientFactory.create_rest_client(
+            self._setting.metalake,
+            self._setting.gravitino_uri,
+            authorization,
+        )
+        self._clients_by_auth[authorization] = client
+        if len(self._clients_by_auth) > _MAX_CACHED_CLIENTS:
+            self._clients_by_auth.popitem(last=False)
+        return client
