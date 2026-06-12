@@ -50,19 +50,16 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   public static final Map<String, String> KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND =
-      ImmutableMap.of(
-          KerberosConfig.PRINCIPAL_KEY,
-          KerberosConfig.PRINCIPAL_KEY,
-          KerberosConfig.KET_TAB_URI_KEY,
-          KerberosConfig.KET_TAB_URI_KEY,
-          KerberosConfig.CHECK_INTERVAL_SEC_KEY,
-          KerberosConfig.CHECK_INTERVAL_SEC_KEY,
-          KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
-          KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
-          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
-          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
-          AuthenticationConfig.AUTH_TYPE_KEY,
-          AuthenticationConfig.AUTH_TYPE_KEY);
+      ImmutableMap.<String, String>builder()
+          .put(KerberosConfig.PRINCIPAL_KEY, KerberosConfig.PRINCIPAL_KEY)
+          .put(KerberosConfig.KET_TAB_URI_KEY, KerberosConfig.KET_TAB_URI_KEY)
+          .put(KerberosConfig.CHECK_INTERVAL_SEC_KEY, KerberosConfig.CHECK_INTERVAL_SEC_KEY)
+          .put(KerberosConfig.FETCH_TIMEOUT_SEC_KEY, KerberosConfig.FETCH_TIMEOUT_SEC_KEY)
+          .put(
+              AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
+              AuthenticationConfig.IMPERSONATION_ENABLE_KEY)
+          .put(AuthenticationConfig.AUTH_TYPE_KEY, AuthenticationConfig.AUTH_TYPE_KEY)
+          .build();
 
   static {
     List<PropertyEntry<?>> propertyEntries =
