@@ -232,6 +232,7 @@ def load_model_tools(mcp: FastMCP):
         )
 
     @mcp.tool(tags={"model"})
+    # pylint: disable=too-many-positional-arguments
     async def register_model(
         ctx: Context,
         catalog_name: str,

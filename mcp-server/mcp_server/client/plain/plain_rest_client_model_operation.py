@@ -85,6 +85,7 @@ class PlainRESTClientModelOperation(ModelOperation):
         )
         return response.json().get("modelVersion", {})
 
+    # pylint: disable=too-many-positional-arguments
     async def register_model(
         self,
         catalog_name: str,
@@ -112,6 +113,7 @@ class PlainRESTClientModelOperation(ModelOperation):
         )
         return extract_content_from_response(response, "deleted", False)
 
+    # pylint: disable=too-many-positional-arguments
     async def link_model_version(
         self,
         catalog_name: str,

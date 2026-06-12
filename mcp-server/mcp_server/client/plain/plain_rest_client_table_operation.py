@@ -51,6 +51,7 @@ class PlainRESTClientTableOperation(TableOperation):
         )
         return extract_content_from_response(response, "table", {})
 
+    # pylint: disable=too-many-positional-arguments
     async def create_table(
         self,
         catalog_name: str,

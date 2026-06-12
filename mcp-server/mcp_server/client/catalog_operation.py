@@ -34,6 +34,7 @@ class CatalogOperation(ABC):
         pass
 
     @abstractmethod
+    # pylint: disable=too-many-positional-arguments
     async def create_catalog(
         self,
         name: str,

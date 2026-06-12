@@ -108,6 +108,7 @@ class ModelOperation(ABC):
         pass
 
     @abstractmethod
+    # pylint: disable=too-many-positional-arguments
     async def register_model(
         self,
         catalog_name: str,
@@ -125,6 +126,7 @@ class ModelOperation(ABC):
         pass
 
     @abstractmethod
+    # pylint: disable=too-many-positional-arguments
     async def link_model_version(
         self,
         catalog_name: str,

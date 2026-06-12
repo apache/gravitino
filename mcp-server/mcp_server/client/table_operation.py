@@ -57,6 +57,7 @@ class TableOperation(ABC):
         pass
 
     @abstractmethod
+    # pylint: disable=too-many-positional-arguments
     async def create_table(
         self,
         catalog_name: str,

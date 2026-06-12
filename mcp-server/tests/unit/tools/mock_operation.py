@@ -69,6 +69,7 @@ class MockCatalogOperation(CatalogOperation):
     async def get_list_of_catalogs(self) -> str:
         return "mock_catalogs"
 
+    # pylint: disable=too-many-positional-arguments
     async def create_catalog(
         self, name, catalog_type, provider, comment, properties
     ) -> str:
@@ -237,6 +238,7 @@ class MockModelOperation(ModelOperation):
     ) -> str:
         return "mock_model_version_by_alias"
 
+    # pylint: disable=too-many-positional-arguments
     async def register_model(
         self, catalog_name, schema_name, name, comment, properties
     ) -> str:
@@ -279,6 +281,7 @@ class MockTopicOperation(TopicOperation):
     ) -> str:
         return "mock_topic"
 
+    # pylint: disable=too-many-positional-arguments
     async def create_topic(
         self, catalog_name, schema_name, name, comment, properties
     ) -> str:

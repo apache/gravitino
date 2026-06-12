@@ -55,6 +55,7 @@ class TopicOperation(ABC):
         pass
 
     @abstractmethod
+    # pylint: disable=too-many-positional-arguments
     async def create_topic(
         self,
         catalog_name: str,

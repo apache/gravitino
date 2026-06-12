@@ -259,6 +259,7 @@ def load_table_tools(mcp: FastMCP):
         )
 
     @mcp.tool(tags={"table"})
+    # pylint: disable=too-many-positional-arguments
     async def create_table(
         ctx: Context,
         catalog_name: str,

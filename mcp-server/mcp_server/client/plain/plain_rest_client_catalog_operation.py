@@ -35,6 +35,7 @@ class PlainRESTClientCatalogOperation(CatalogOperation):
         )
         return extract_content_from_response(response, "catalogs", [])
 
+    # pylint: disable=too-many-positional-arguments
     async def create_catalog(
         self,
         name: str,

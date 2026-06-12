@@ -50,6 +50,7 @@ class PlainRESTClientTopicOperation(TopicOperation):
         )
         return response.json().get("topic", {})
 
+    # pylint: disable=too-many-positional-arguments
     async def create_topic(
         self,
         catalog_name: str,

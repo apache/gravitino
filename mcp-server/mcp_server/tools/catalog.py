@@ -110,6 +110,7 @@ def load_catalog_tools(mcp: FastMCP):
         return await client.as_catalog_operation().get_list_of_catalogs()
 
     @mcp.tool(tags={"catalog"})
+    # pylint: disable=too-many-positional-arguments
     async def create_catalog(
         ctx: Context,
         name: str,

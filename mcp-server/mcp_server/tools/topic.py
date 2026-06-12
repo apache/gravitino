@@ -134,6 +134,7 @@ def load_topic_tools(mcp: FastMCP):
         )
 
     @mcp.tool(tags={"topic"})
+    # pylint: disable=too-many-positional-arguments
     async def create_topic(
         ctx: Context,
         catalog_name: str,
