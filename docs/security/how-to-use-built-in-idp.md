@@ -21,10 +21,10 @@ request and response schemas, see the [Built-in IDP OpenAPI](../open-api/idp/ope
 
 ## Web UI
 
-Built-in IdP is **incompatible** with the `simple` authenticator (the default). The Web UI does not
+Built-in IDP is **incompatible** with the `simple` authenticator (the default). The Web UI does not
 support signing in with built-in IDP Basic credentials. Login pages only handle `simple`
 (username-only when authorization is enabled) and `oauth` (OIDC/OAuth) flows. If you need the Web UI
-while built-in IdP is enabled, prefer [OAuth mode](how-to-authenticate.md#oauth-mode). For Basic
+while built-in IDP is enabled, prefer [OAuth mode](how-to-authenticate.md#oauth-mode). For Basic
 authentication, use the REST API, [Java/Python clients](how-to-authenticate.md#basic-mode), or
 engine connectors instead.
 

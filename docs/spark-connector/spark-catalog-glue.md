@@ -11,7 +11,7 @@ With the Apache Gravitino Spark connector, accessing data or managing metadata i
 
 ## Capabilities
 
-Supports most DDL and DML operations in SparkSQL, except such operations:
+Supports most DDL and DML operations in SparkSQL, except these operations:
 
 - Function operations (Gravitino UDFs are supported, see [Spark connector - User-defined functions](spark-connector-udf.md))
 - Partition operations
@@ -42,12 +42,12 @@ Table routing is based on the `table-format` property in Glue table parameters. 
 
 Spark's bundled Hive 2.3.9 does not include the `HiveMetaStoreClientFactory` interface
 (added by [HIVE-12679](https://issues.apache.org/jira/browse/HIVE-12679)) that the AWS Glue client
-requires. You must replace the bundled Hive JARs with patched versions bundled together with the
+requires. Replace the bundled Hive JARs with patched versions bundled together with the
 Glue client.
 
 :::note
 On AWS managed Spark environments such as Amazon EMR, the Hive libraries are already patched and
-the AWS Glue Data Catalog client is pre-installed. You can skip Steps 1 and 2 below.
+the AWS Glue Data Catalog client is pre-installed. Skip Steps 1 and 2 below.
 For a complete walkthrough on Amazon EMR, see [Deploy on Amazon EMR](#deploy-on-amazon-emr).
 :::
 

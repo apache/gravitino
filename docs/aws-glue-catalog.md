@@ -12,7 +12,7 @@ license: "This software is licensed under the Apache License version 2."
 
 Apache Gravitino uses [AWS Glue Data Catalog](https://aws.amazon.com/glue/) as a metadata catalog.
 
-### Requirements and Limitations
+### Requirements
 
 * The Glue catalog requires network access to the AWS Glue API.
 * Gravitino uses the AWS SDK v2 to communicate with Glue.
@@ -67,7 +67,7 @@ The Glue catalog supports creating, updating, and deleting databases in the AWS 
 
 ### Schema Properties
 
-The Glue catalog does not define predefined schema properties beyond `comment`. You can define your own key-value pair properties and transmit them to the underlying Glue database.
+The Glue catalog defines no predefined schema properties beyond `comment`. Additional key-value properties pass through to the underlying Glue database.
 
 ### Schema Operations
 
@@ -99,7 +99,7 @@ The `fieldName` specified in the partitioning attribute must be the name of a co
 ### Table Sort Orders and Distributions
 
 The Glue catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Create bucketed sorted tables by setting the `distribution` and `sortOrders` attributes.
-Although Gravitino supports several distribution strategies, AWS Glue inherently only supports a single distribution strategy (clustered by column). Therefore the Glue catalog only supports `Hash` distribution.
+Although Gravitino supports several distribution strategies, AWS Glue inherently only supports a single distribution strategy (clustered by column). Therefore, the Glue catalog only supports `Hash` distribution.
 
 :::caution
 The `fieldName` specified in the `distribution` and `sortOrders` attribute must be the name of a column defined in the table.
@@ -134,13 +134,12 @@ The following table lists the data types mapped from the Glue catalog to Graviti
 | `uniontype`               | `union`             | 1.3.0         |
 
 :::info
-The data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Glue catalog.
+Data types not listed above map to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)**, which represents an unresolvable data type from the Glue catalog.
 :::
 
 ### Table Properties
 
-Table properties supply or set metadata for the underlying Glue tables.
-The following table lists predefined table properties for a Glue table. Additional key-value properties pass through to the underlying Glue database.
+The following table lists predefined properties for Glue tables. Additional key-value properties pass through to the underlying Glue database.
 
 :::note
 **Reserved**: Fields that cannot be passed to the Gravitino server.
@@ -171,7 +170,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 #### Alter Operations
 
-Gravitino has already defined a unified set of [metadata operation interfaces](./manage-relational-metadata-using-gravitino.md#alter-a-table), and the following table lists the mapping relationship between Glue alter operations and Gravitino table update requests.
+Gravitino defines a unified set of [metadata operation interfaces](./manage-relational-metadata-using-gravitino.md#alter-a-table). The following table maps Glue alter operations to Gravitino table update requests.
 
 ##### Alter table
 
