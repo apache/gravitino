@@ -548,7 +548,7 @@ public class LanceSparkRESTServiceIT extends BaseIT {
       }
 
       if (expectedSchema.equals(actualSchema.toLowerCase(Locale.ROOT))
-          && expectedTable.equals(extractLeafTableName(rawTableName).toLowerCase(Locale.ROOT))) {
+          && expectedTable.equals(rawTableName.toLowerCase(Locale.ROOT))) {
         return true;
       }
     }
@@ -580,15 +580,6 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     }
 
     return null;
-  }
-
-  private String extractLeafTableName(String rawTableName) {
-    int delimiterIndex = Math.max(rawTableName.lastIndexOf('$'), rawTableName.lastIndexOf('.'));
-    if (delimiterIndex < 0) {
-      return rawTableName;
-    }
-
-    return rawTableName.substring(delimiterIndex + 1);
   }
 
   private void assertSparkAnalysisFailure(Throwable throwable, String... expectedMessageParts) {
