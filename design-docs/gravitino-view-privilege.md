@@ -94,6 +94,8 @@ The result is a privilege model where granting `SELECT_VIEW` to a user has visib
 
 4. **Materialized Views and Temporary Views**: Out of scope per the parent design (only logical views are in scope).
 
+5. **Alter View Not Supported for Rename**: Some data engines, such as MySQL and Iceberg, have different mechanisms for supporting rename functionality, including renaming within or across namespaces. Therefore, we are keeping this feature out of scope in the current version.
+
 5. **Identity Mapping between Gravitino and Databases**: This implementation will not manage the identity alignment between Gravitino's user principal and the database's user principal.
 
 ---
@@ -108,13 +110,13 @@ Three privilege types are defined for views, matching the existing `*_TABLE` and
 |----------------|-----------------------------------------|------------------------------------------------------------------------------------------|----------|
 | `CREATE_VIEW`  | Metalake, Catalog, Schema               | Permission to create new views in a schema.                                              | Existing |
 | `SELECT_VIEW`  | Metalake, Catalog, Schema, View         | Permission to read view metadata and resolve the view's SQL during query planning.       | Existing |
-| `ALTER_VIEW`  | Metalake, Catalog, Schema, View         | Permission to alter a view's metadata (comment, properties, representations, rename).    | **New**  |
+| `ALTER_VIEW`  | Metalake, Catalog, Schema, View         | Permission to alter a view's metadata (comment, properties, representations).    | **New**  |
 
 **Naming rationale:**
 
 - `CREATE_VIEW` — Consistent with `CREATE_TABLE`, `CREATE_FILESET`. Used for delegated objects whose primary store is the underlying catalog. No change.
 - `SELECT_VIEW` — Consistent with `SELECT_TABLE`. Reading view metadata is the analog of selecting from a table at the metadata layer; the actual SELECT against underlying data remains the engine's responsibility. No change.
-- `ALTER_VIEW` — Matches the parent View Management design doc and standard SQL `ALTER VIEW` syntax. Covers all alter operations supported by the parent design (rename, updateComment, setProperty, removeProperty, addRepresentation, updateRepresentation, removeRepresentation). Diverges from Gravitino's existing `MODIFY_TABLE` / `MODIFY_FUNCTION` convention but aligns with the parent doc and with the `alterView` REST/API/Java method names.
+- `ALTER_VIEW` — Matches the parent View Management design doc and standard SQL `ALTER VIEW` syntax. Covers all alter operations supported by the parent design ( updateComment, setProperty, removeProperty, addRepresentation, updateRepresentation, removeRepresentation). Diverges from Gravitino's existing `MODIFY_TABLE` / `MODIFY_FUNCTION` convention but aligns with the parent doc and with the `alterView` REST/API/Java method names.
 
 **Privilege inheritance:** Privileges granted at metalake, catalog, or schema level cascade to all views within that scope. Same as `*_TABLE` and `*_FUNCTION`.
 
