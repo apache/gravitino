@@ -1,0 +1,50 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# Vendored copy of dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 (MIT License).
+# The original action is not on Apache's allowlist, so we vendor the compiled dist here
+# and reference it as a local action to keep identical behavior.
+name: 'Paths Changes Filter'
+description: 'Execute your workflow steps only if relevant files are modified.'
+inputs:
+  token:
+    description: 'GitHub Access Token'
+    required: false
+    default: ${{ github.token }}
+  working-directory:
+    description: 'Relative path under $GITHUB_WORKSPACE where the repository was checked out.'
+    required: false
+  ref:
+    description: 'Git reference from which the changes will be detected.'
+    required: false
+  base:
+    description: 'Git reference against which the changes will be detected.'
+    required: false
+  filters:
+    description: 'Path to the configuration file or YAML string with filters definition'
+    required: true
+  list-files:
+    description: "Enables listing of files matching the filter: 'none' | 'csv' | 'json' | 'shell' | 'escape'"
+    required: false
+    default: none
+  initial-fetch-depth:
+    description: 'How many commits are initially fetched from base branch.'
+    required: false
+    default: '10'
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
