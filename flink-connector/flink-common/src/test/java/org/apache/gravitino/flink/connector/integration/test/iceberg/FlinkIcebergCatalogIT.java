@@ -58,7 +58,7 @@ import org.junit.jupiter.api.Test;
 
 public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
 
-  private static final String DEFAULT_ICEBERG_CATALOG = "flink_iceberg_catalog";
+  protected static final String DEFAULT_ICEBERG_CATALOG = "flink_iceberg_catalog";
 
   private static org.apache.gravitino.Catalog icebergCatalog;
 
