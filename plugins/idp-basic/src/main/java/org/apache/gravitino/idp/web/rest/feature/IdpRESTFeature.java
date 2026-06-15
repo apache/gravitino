@@ -45,6 +45,9 @@ import org.slf4j.LoggerFactory;
  * org.apache.gravitino.idp.web.rest.feature} so Jersey auto-discovers this feature. IdP REST
  * resource classes remain in {@code org.apache.gravitino.idp.web.rest} and are registered here.
  * Also initializes configured service admins in the built-in IdP when they do not yet exist.
+ *
+ * <p>When {@code simple} is listed in {@link Configs#AUTHENTICATORS}, built-in IdP is not
+ * initialized because it is incompatible with Simple authentication.
  */
 @Provider
 public class IdpRESTFeature implements Feature {
@@ -60,7 +63,15 @@ public class IdpRESTFeature implements Feature {
   public boolean configure(FeatureContext context) {
     GravitinoEnv env = GravitinoEnv.getInstance();
     Config config = env.config();
-    validateConfiguration(config);
+    if (config.get(Configs.AUTHENTICATORS).stream()
+        .anyMatch(name -> AuthenticatorType.SIMPLE.name().equalsIgnoreCase(name.trim()))) {
+      LOG.warn(
+          "Built-in IdP is incompatible with Simple authentication: both handle Authorization: "
+              + "Basic headers. Because 'simple' is configured in gravitino.authenticators, the "
+              + "idp-basic plugin is disabled and requests will use 'simple'.");
+      return true;
+    }
+
     registerBasicAuthenticator(config);
 
     try {
@@ -76,23 +87,6 @@ public class IdpRESTFeature implements Feature {
     context.register(IdpGroupOperations.class);
     context.register(IdpAuthorizationFilter.class);
     return true;
-  }
-
-  /**
-   * Validates that the server configuration is compatible with the built-in IdP plugin.
-   *
-   * @param config The server configuration.
-   */
-  static void validateConfiguration(Config config) {
-    boolean usesSimple =
-        config.get(Configs.AUTHENTICATORS).stream()
-            .anyMatch(name -> AuthenticatorType.SIMPLE.name().equalsIgnoreCase(name.trim()));
-    if (usesSimple) {
-      LOG.error(
-          "Built-in IdP is incompatible with Simple authentication. "
-              + "Remove 'simple' from gravitino.authenticators (default is simple).");
-      System.exit(1);
-    }
   }
 
   private static void registerBasicAuthenticator(Config config) {

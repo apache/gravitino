@@ -319,8 +319,9 @@ fresh Gravitino deployment.
    gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
-   Built-in IdP is incompatible with the `simple` authenticator. When the `idp-basic` plugin is
-   enabled, `gravitino.authenticators` must not include `simple`.
+   Built-in IdP is incompatible with the `simple` authenticator. If `simple` is listed in
+   `gravitino.authenticators`, the `idp-basic` plugin is disabled at startup. Configure
+   `gravitino.authenticators` without `simple` to enable the plugin.
 
 2. Export the initial service admin password before starting Gravitino:
 
@@ -402,9 +403,9 @@ credentials are otherwise exposed on the wire.
 | `gravitino.server.rest.extensionPackages`   | `org.apache.gravitino.idp.web.rest.feature`     | Yes                              |
 | `gravitino.authorization.serviceAdmins`     | Comma-separated service admin                   | Yes                              |
 
-List `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages` so
-Jersey registers `/api/idp/*` management APIs. Callers must use Basic authentication with a username
-in `gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`.
+List `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages` and
+configure `gravitino.authenticators` without `simple`. Callers must use Basic authentication with
+a username in `gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`.
 
 ### 8.2 Password Algorithm
 
@@ -416,7 +417,8 @@ The initial implementation uses Argon2id as the fixed password hashing algorithm
 
 Service admins manage local users and groups under `/api/idp` (global paths, no `{metalake}`).
 Operations are available when `org.apache.gravitino.idp.web.rest.feature` is listed in
-`gravitino.server.rest.extensionPackages`.
+`gravitino.server.rest.extensionPackages` and `gravitino.authenticators` is configured without
+`simple`.
 
 ### 9.1 HTTP Interface Design
 

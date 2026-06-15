@@ -40,9 +40,9 @@ Before you call `/api/idp/*`, ensure the following:
    gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
    ```
 
-2. **Server authenticator** — Built-in IdP is **incompatible** with the `simple` authenticator
-   (the default). When the `idp-basic` plugin is enabled, `gravitino.authenticators` must not
-   include `simple`.
+2. **Server authenticator** — Configure `gravitino.authenticators` without `simple`
+   (the default). If `simple` is listed in `gravitino.authenticators`, the `idp-basic` plugin is
+   disabled at startup and `/api/idp/*` is not registered.
 
 3. **Service admin passwords** — Built-in IDP requires every username in
    `gravitino.authorization.serviceAdmins` to have a password stored in `idp_user_meta` before you
@@ -327,9 +327,9 @@ Replace these with values that match your deployment.
    gravitino.authorization.serviceAdmins = admin
    ```
 
-   Built-in IdP is **incompatible** with the `simple` authenticator. Remove `simple` from
-   `gravitino.authenticators` (the default). For example, use `oauth` when the Web UI authenticates
-   through an external IdP; see [How to authenticate](how-to-authenticate.md).
+   Built-in IdP is **incompatible** with the `simple` authenticator. Configure
+   `gravitino.authenticators` without `simple` (the default); otherwise the plugin is disabled at
+   startup.
 
 2. Before the first start, set the initial service admin password (see
    [password rules](#password-and-username-rules)):
