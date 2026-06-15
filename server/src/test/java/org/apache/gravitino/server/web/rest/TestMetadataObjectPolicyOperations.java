@@ -312,6 +312,54 @@ public class TestMetadataObjectPolicyOperations extends JerseyTest {
   }
 
   @Test
+  public void testListPoliciesForObjectUnderHierarchicalSchema() {
+    // Hierarchical (multi-level) schema "a:b:c" using the default separator ":". Its ancestor
+    // schemas are "a" and "a:b". A table under it must inherit policies from the schema itself,
+    // all ancestor schemas, and the catalog.
+    MetadataObject catalog = MetadataObjects.parse("hcat", MetadataObject.Type.CATALOG);
+    MetadataObject schemaA = MetadataObjects.parse("hcat.a", MetadataObject.Type.SCHEMA);
+    MetadataObject schemaB = MetadataObjects.parse("hcat.a:b", MetadataObject.Type.SCHEMA);
+    MetadataObject schemaC = MetadataObjects.parse("hcat.a:b:c", MetadataObject.Type.SCHEMA);
+    MetadataObject table = MetadataObjects.parse("hcat.a:b:c.tbl", MetadataObject.Type.TABLE);
+
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, catalog))
+        .thenReturn(new PolicyEntity[] {createPolicy("catalogPolicy")});
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, schemaA))
+        .thenReturn(new PolicyEntity[] {createPolicy("schemaAPolicy")});
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, schemaB))
+        .thenReturn(new PolicyEntity[] {createPolicy("schemaBPolicy")});
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, schemaC))
+        .thenReturn(new PolicyEntity[] {createPolicy("schemaCPolicy")});
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, table))
+        .thenReturn(new PolicyEntity[] {createPolicy("tablePolicy")});
+
+    Response response =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("policies")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    PolicyListResponse policyListResponse = response.readEntity(PolicyListResponse.class);
+    Assertions.assertEquals(0, policyListResponse.getCode());
+    Assertions.assertEquals(5, policyListResponse.getPolicies().length);
+
+    Map<String, Policy> resultPolicies =
+        Arrays.stream(policyListResponse.getPolicies())
+            .collect(Collectors.toMap(Policy::name, Function.identity()));
+
+    Assertions.assertFalse(resultPolicies.get("tablePolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("schemaCPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("schemaBPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("schemaAPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("catalogPolicy").inherited().get());
+  }
+
+  @Test
   public void testGetPolicyForObject() {
     PolicyEntity policy1 = createPolicy("policy1");
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
