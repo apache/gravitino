@@ -32,13 +32,6 @@ _LOG = logging.getLogger(__name__)
 _MAX_CACHED_CLIENTS = 128
 
 
-def _log_close_failure(task: "asyncio.Task") -> None:
-    """Swallow and log errors from a background client-close task."""
-    exc = task.exception()
-    if exc is not None:
-        _LOG.warning("Failed to close evicted REST client: %s", exc)
-
-
 def _get_request_authorization() -> str:
     """Return the raw ``Authorization`` header of the current HTTP request.
 
@@ -75,6 +68,10 @@ class GravitinoContext:
         # Safe without locking: rest_client() runs on the single asyncio event
         # loop and never awaits between lookup and insert.
         self._clients_by_auth: "OrderedDict[str, object]" = OrderedDict()
+        # Strong references to in-flight background close tasks; the event loop
+        # only keeps weak references, so without this they could be GC'd before
+        # running. Entries are discarded when each task completes.
+        self._pending_closes: "set[asyncio.Task]" = set()
 
     def rest_client(self):
         """Return a REST client carrying the correct identity for this request.
@@ -111,8 +108,7 @@ class GravitinoContext:
             self._schedule_close(evicted)
         return client
 
-    @staticmethod
-    def _schedule_close(client) -> None:
+    def _schedule_close(self, client) -> None:
         """Best-effort close of an evicted client's connection pool.
 
         Closing is async; schedule it on the running event loop if there is one
@@ -127,4 +123,13 @@ class GravitinoContext:
         except RuntimeError:
             return
         task = loop.create_task(close())
-        task.add_done_callback(_log_close_failure)
+        # Hold a strong reference until the task finishes (see _pending_closes).
+        self._pending_closes.add(task)
+        task.add_done_callback(self._on_close_done)
+
+    def _on_close_done(self, task: "asyncio.Task") -> None:
+        """Drop the finished close task and log any failure."""
+        self._pending_closes.discard(task)
+        exc = task.exception()
+        if exc is not None:
+            _LOG.warning("Failed to close evicted REST client: %s", exc)

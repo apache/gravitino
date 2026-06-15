@@ -36,7 +36,10 @@ from fastmcp.server.middleware.timing import TimingMiddleware
 from fastmcp.tools.base import ToolResult
 
 from mcp_server.core import audit
-from mcp_server.core.context import GravitinoContext
+from mcp_server.core.context import (
+    GravitinoContext,
+    _get_request_authorization,
+)
 from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
 
@@ -46,18 +49,8 @@ def _get_principal_from_request() -> str:
 
     Returns "anonymous" in stdio mode or when no token is present.
     """
-    try:
-        # Imported lazily: only available within an HTTP request context.
-        # pylint: disable=import-outside-toplevel
-        from fastmcp.server.dependencies import get_http_request
-
-        authorization = get_http_request().headers.get("authorization", "")
-        # pylint: disable=protected-access
-        return audit._extract_principal(authorization)
-    except (LookupError, RuntimeError):
-        # No active HTTP request: stdio mode (get_http_request raises
-        # RuntimeError) or missing request context (LookupError).
-        return "anonymous"
+    # pylint: disable=protected-access
+    return audit._extract_principal(_get_request_authorization())
 
 
 class AuditMiddleware(Middleware):

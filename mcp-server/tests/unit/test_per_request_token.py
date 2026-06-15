@@ -22,6 +22,7 @@ Authorization header (any scheme) to Gravitino, not the shared startup token,
 so concurrent multi-principal sessions stay fully isolated in HTTP mode.
 """
 
+import asyncio
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -202,3 +203,40 @@ class TestGravitinoContextPerRequestAuthorization(unittest.TestCase):
                 ctx.rest_client()
 
         self.assertLessEqual(len(ctx._clients_by_auth), cap)
+
+    def test_evicted_client_is_closed(self):
+        """On eviction (with a running loop) the evicted client's pool is closed."""
+        closed = []
+
+        class _ClosableClient:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            async def close(self):
+                closed.append(self)
+
+        RESTClientFactory.set_rest_client(_ClosableClient)
+        try:
+            ctx = self._make_context()
+            cap = context_module._MAX_CACHED_CLIENTS
+
+            async def _drive():
+                for i in range(cap + 1):
+                    mock_request = MagicMock()
+                    mock_request.headers.get.return_value = f"Bearer t-{i}"
+                    with patch(
+                        "fastmcp.server.dependencies.get_http_request",
+                        return_value=mock_request,
+                    ):
+                        ctx.rest_client()
+                # Let the scheduled close task run to completion.
+                await asyncio.sleep(0)
+                await asyncio.gather(*ctx._pending_closes)
+
+            asyncio.run(_drive())
+
+            # Exactly one client (the oldest) was evicted and closed.
+            self.assertEqual(len(closed), 1)
+            self.assertEqual(len(ctx._pending_closes), 0)
+        finally:
+            RESTClientFactory.set_rest_client(PlainRESTClientOperation)
