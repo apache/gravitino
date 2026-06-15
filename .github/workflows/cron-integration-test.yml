@@ -81,7 +81,10 @@ jobs:
       - name: Integration Test
         id: integrationTest
         run: |
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PskipDockerTests=false -PskipWeb=true
+          # iceberg-rest-trino-it runs in its own dedicated workflow (Java 24 / Trino, deploy
+          # only); exclude it here so it is not run redundantly.
+          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PskipDockerTests=false -PskipWeb=true \
+            -x :iceberg:iceberg-rest-trino-it:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7
