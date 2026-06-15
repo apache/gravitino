@@ -93,9 +93,9 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
     Servlet container = new ServletContainer(resourceConfig);
     server.addServlet(container, LANCE_SPEC);
-    server.addCustomFilters(LANCE_SPEC);
     server.addFilter(
         new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), LANCE_SPEC);
+    server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
 
     LOG.info(

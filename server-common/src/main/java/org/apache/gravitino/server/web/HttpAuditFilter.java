@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.security.Principal;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -47,11 +48,18 @@ import org.slf4j.LoggerFactory;
  * already dispatched on the same request thread.
  *
  * <p><strong>Filter chain position:</strong> this filter must be registered <em>after</em> {@link
- * RequestContextFilter} (so the remote address is already populated) but <em>before</em> {@link
- * org.apache.gravitino.server.authentication.AuthenticationFilter} (so it observes 401
- * authentication failures as well as downstream 403 authorization denials). It is safe to install
- * on servers that do not use {@code RequestContextFilter} (Iceberg REST, Lance REST) because it
- * resolves the client address independently.
+ * RequestContextFilter} (so the remote address is already populated) but <em>before</em> both
+ * custom filters and {@link org.apache.gravitino.server.authentication.AuthenticationFilter} (so it
+ * wraps every downstream filter and observes 401 authentication failures, custom-filter 403s, and
+ * other downstream 4xx/5xx responses). It is safe to install on servers that do not use {@code
+ * RequestContextFilter} (Iceberg REST, Lance REST) because it resolves the client address
+ * independently.
+ *
+ * <p><strong>DispatcherType.ERROR skip:</strong> when an uncaught exception escapes the filter
+ * chain, this filter fires an {@link HttpRequestFailureEvent} (status 500) in its {@code finally}
+ * block, then re-throws. The servlet container (Jetty) may subsequently re-invoke the filter chain
+ * with {@link DispatcherType#ERROR} to render an error page. This filter detects that case and
+ * passes the request straight through without emitting a second event, preventing double-logging.
  *
  * <p><strong>Double-logging prevention:</strong> when an operation-layer failure event (e.g. {@code
  * LoadTableFailureEvent}, {@code AuthorizationDenialFailureEvent}) has already been dispatched via
@@ -129,6 +137,13 @@ public class HttpAuditFilter implements Filter {
     }
 
     HttpServletRequest httpRequest = (HttpServletRequest) request;
+    // Skip ERROR dispatches: after an uncaught exception, Jetty may re-invoke the filter chain
+    // with DispatcherType.ERROR to render an error page. The original REQUEST dispatch already
+    // fired an audit event (promoted to 500), so passing through here prevents double-logging.
+    if (httpRequest.getDispatcherType() == DispatcherType.ERROR) {
+      chain.doFilter(request, response);
+      return;
+    }
     // Defensive cleanup at request entry in case a pooled thread leaked stale state.
     RequestContext.resetOperationFailureFired();
     if (healthCheckMatcher.isHealthCheckPath(httpRequest.getRequestURI())) {

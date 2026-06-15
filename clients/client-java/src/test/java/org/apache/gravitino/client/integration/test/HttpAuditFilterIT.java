@@ -218,6 +218,41 @@ public class HttpAuditFilterIT extends BaseIT {
         hasHttpFailureEvent, "Health check must not produce an HttpRequestFailureEvent");
   }
 
+  // ─── No duplicate events per request ────────────────────────────────────────
+
+  /**
+   * Verifies that exactly one {@link HttpRequestFailureEvent} is emitted per failed HTTP request.
+   *
+   * <p>In particular, guards against the double-logging scenario where {@code HttpAuditFilter}
+   * could fire a second event if the servlet container re-invokes the filter chain with {@link
+   * javax.servlet.DispatcherType#ERROR} after an uncaught exception. The filter short-circuits
+   * {@code ERROR} dispatches, so only the original {@code REQUEST} dispatch produces an event.
+   */
+  @Test
+  public void testExactlyOneEventEmittedPerFailedRequest() throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(
+                new URI(
+                    "http://localhost:" + getGravitinoServerPort() + "/api/v99/no-such-endpoint"))
+            .GET()
+            .build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    Assertions.assertEquals(404, response.statusCode());
+    awaitAtLeastOneEvent();
+
+    long httpFailureEventCount =
+        CapturedEventListener.getEvents().stream()
+            .filter(e -> e instanceof HttpRequestFailureEvent)
+            .count();
+    Assertions.assertEquals(
+        1,
+        httpFailureEventCount,
+        "Expected exactly one HttpRequestFailureEvent per failed request, got: "
+            + httpFailureEventCount);
+  }
+
   // ─── Helper ──────────────────────────────────────────────────────────────────
 
   private void awaitAtLeastOneEvent() {

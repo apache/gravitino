@@ -204,13 +204,13 @@ public class RESTService implements GravitinoAuxiliaryService {
 
     Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, ICEBERG_SPEC);
-    server.addCustomFilters(ICEBERG_SPEC);
     server.addFilter(
         new HttpAuditFilter(
             eventBus,
             EventSource.GRAVITINO_ICEBERG_REST_SERVER,
             new IcebergHealthCheckPathMatcher()),
         ICEBERG_SPEC);
+    server.addCustomFilters(ICEBERG_SPEC);
     server.addSystemFilters(ICEBERG_SPEC);
 
     // Root-level aliases for health checks to improve compatibility with various monitoring

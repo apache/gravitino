@@ -188,10 +188,10 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(new HealthAliasServlet(), "/health/*");
     server.addServlet(new HealthAliasServlet(), "/health.html");
 
-    server.addCustomFilters(API_ANY_PATH);
     server.addFilter(new RequestContextFilter(), API_ANY_PATH);
     server.addFilter(
         new HttpAuditFilter(gravitinoEnv.eventBus(), EventSource.GRAVITINO_SERVER), API_ANY_PATH);
+    server.addCustomFilters(API_ANY_PATH);
     server.addFilter(new VersioningFilter(), API_ANY_PATH);
     server.addSystemFilters(API_ANY_PATH);
     if (server.isWebUiEnabled()) {

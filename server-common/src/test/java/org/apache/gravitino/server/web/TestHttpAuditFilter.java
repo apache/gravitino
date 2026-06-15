@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.security.Principal;
+import javax.servlet.DispatcherType;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
@@ -63,6 +64,27 @@ public class TestHttpAuditFilter {
 
     filter.doFilter(req, resp, chain);
 
+    verify(chain).doFilter(req, resp);
+  }
+
+  // ─── DispatcherType.ERROR pass-through ──────────────────────────────────────
+
+  @Test
+  public void testErrorDispatchTypePassesThrough() throws Exception {
+    // After an uncaught exception escapes the chain, Jetty may re-invoke the filter chain with
+    // DispatcherType.ERROR to render an error page. The original REQUEST dispatch already fired an
+    // audit event (promoted to 500). The filter must pass through silently here to avoid a second
+    // event for the same logical failure.
+    EventBus eventBus = mock(EventBus.class);
+    HttpAuditFilter filter = new HttpAuditFilter(eventBus, EventSource.GRAVITINO_SERVER);
+    HttpServletRequest req = mockRequest("GET", "/api/metalakes", null, "1.2.3.4");
+    when(req.getDispatcherType()).thenReturn(DispatcherType.ERROR);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    FilterChain chain = mock(FilterChain.class);
+
+    filter.doFilter(req, resp, chain);
+
+    verify(eventBus, never()).dispatchEvent(any());
     verify(chain).doFilter(req, resp);
   }
 
