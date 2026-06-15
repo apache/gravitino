@@ -136,4 +136,7 @@ public enum TestDatabaseName {
     }
   },
   FLINK_HIVE_CATALOG_IT,
+
+  /** Represents the MySQL database for the Flink Iceberg JDBC-backend catalog integration test. */
+  FLINK_ICEBERG_JDBC_CATALOG_IT,
 }
