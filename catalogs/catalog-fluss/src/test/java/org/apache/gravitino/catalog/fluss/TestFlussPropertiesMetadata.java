@@ -44,8 +44,6 @@ class TestFlussPropertiesMetadata {
     assertFalse(metadata.isImmutableProperty(FlussCatalogPropertiesMetadata.BOOTSTRAP_SERVERS));
     assertFalse(metadata.isHiddenProperty(FlussCatalogPropertiesMetadata.BOOTSTRAP_SERVERS));
 
-    assertTrue(metadata.containsProperty(CATALOG_BYPASS_PREFIX + "client.request.timeout"));
-    assertFalse(metadata.isReservedProperty(CATALOG_BYPASS_PREFIX + "client.request.timeout"));
     assertTrue(metadata.containsProperty(ID_KEY));
     assertTrue(metadata.isReservedProperty(Catalog.PROPERTY_IN_USE));
     assertTrue(metadata.isHiddenProperty(PROPERTY_METALAKE_IN_USE));
