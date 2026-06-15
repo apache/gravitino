@@ -120,16 +120,20 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
     Map<String, String> icebergCatalogOptions = Maps.newHashMap(catalogOptions);
     String catalogBackend =
         catalogOptions.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND);
+    // Only infer `catalog-type` from the backend when neither `catalog-type` nor `catalog-impl` is
+    // already set, otherwise an explicitly provided `catalog-impl` would conflict with it.
     if (catalogBackend != null
-        && !icebergCatalogOptions.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE)) {
+        && !icebergCatalogOptions.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE)
+        && !icebergCatalogOptions.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL)) {
       icebergCatalogOptions.put(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);
     }
     // Iceberg's FlinkCatalogFactory only accepts hive/hadoop/rest as `catalog-type`; a JDBC backend
-    // must be loaded through `catalog-impl` instead. The two keys are mutually exclusive.
+    // must be loaded through `catalog-impl` instead. The two keys are mutually exclusive, so drop
+    // `catalog-type` and use `putIfAbsent` to respect an explicitly provided `catalog-impl`.
     String catalogType = icebergCatalogOptions.get(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE);
     if (IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_JDBC.equalsIgnoreCase(catalogType)) {
       icebergCatalogOptions.remove(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE);
-      icebergCatalogOptions.put(
+      icebergCatalogOptions.putIfAbsent(
           IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL,
           IcebergPropertiesConstants.ICEBERG_JDBC_CATALOG_IMPL);
     }

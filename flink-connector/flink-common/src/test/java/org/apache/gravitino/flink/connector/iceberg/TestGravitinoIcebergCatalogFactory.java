@@ -63,6 +63,24 @@ class TestGravitinoIcebergCatalogFactory {
   }
 
   @Test
+  void testExplicitCatalogImplIsRespected() {
+    Map<String, String> options =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_JDBC,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL,
+            "com.example.CustomJdbcCatalog");
+
+    Map<String, String> result = factory.toIcebergCatalogOptions(options);
+
+    // An explicitly provided catalog-impl must not be overwritten, and catalog-type is dropped.
+    Assertions.assertEquals(
+        "com.example.CustomJdbcCatalog",
+        result.get(IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL));
+    Assertions.assertFalse(result.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE));
+  }
+
+  @Test
   void testHiveBackendKeepsCatalogType() {
     Map<String, String> options =
         ImmutableMap.of(

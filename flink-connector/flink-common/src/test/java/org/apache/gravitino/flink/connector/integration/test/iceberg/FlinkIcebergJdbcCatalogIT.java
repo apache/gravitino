@@ -21,6 +21,7 @@ package org.apache.gravitino.flink.connector.integration.test.iceberg;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -179,7 +180,7 @@ public abstract class FlinkIcebergJdbcCatalogIT extends FlinkIcebergCatalogIT {
   private String getDriverClassName() {
     try {
       return mySQLContainer.getDriverClassName(TEST_DB_NAME);
-    } catch (Exception e) {
+    } catch (SQLException e) {
       throw new RuntimeException("Failed to get MySQL driver class name", e);
     }
   }
