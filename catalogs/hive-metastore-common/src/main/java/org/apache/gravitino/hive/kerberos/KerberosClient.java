@@ -36,6 +36,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.hive.client.HiveClient;
+import org.apache.gravitino.utils.FileFetcher;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
@@ -173,7 +174,8 @@ public class KerberosClient implements java.io.Closeable {
     }
     File keytabFile = new File(path);
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
-    FetchFileUtils.fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
+    FileFetcher.get()
+        .fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf);
     return keytabFile;
   }
 
@@ -189,7 +191,6 @@ public class KerberosClient implements java.io.Closeable {
       }
 
       Files.deleteIfExists(Paths.get(keytabFilePath));
-      FetchFileUtils.removeLock(new File(keytabFilePath));
     } catch (IOException e) {
       LOG.warn("Failed to delete keytab file: {}", keytabFilePath, e);
     }
