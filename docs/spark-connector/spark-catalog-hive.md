@@ -18,7 +18,7 @@ Supports most DDL and DML operations in SparkSQL, except such operations:
 - View DDL operations (`CREATE VIEW`, `DROP VIEW`, `ALTER VIEW`)
 - `LOAD` clause
 - `CREATE TABLE LIKE` clause
-- `TRUCATE TABLE` clause
+- `TRUNCATE TABLE` clause
 
 
 :::info
@@ -61,6 +61,10 @@ SELECT * FROM employees WHERE department = 'Engineering';
 ## View
 
 Spark DDL view operations (`CREATE VIEW`, `DROP VIEW`, `ALTER VIEW`) are not supported. However, existing views stored in the Hive Metastore can be read with `SELECT`. When `SELECT` references a view name, the connector loads the view's SQL definition from Gravitino, resolves the query, and executes it.
+
+:::caution
+The current implementation materializes all view results on the Spark driver using `LocalScan`. This is suitable only for small or bounded views. Querying a large or unbounded view may exhaust driver memory and cause an OOM error.
+:::
 
 ```sql
 -- Assumes a view was created via Gravitino API, Flink, or Hive directly
