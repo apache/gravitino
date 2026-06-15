@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -569,7 +568,8 @@ public class LanceRESTServiceIT extends BaseIT {
     var listResponse = ns.listTables(listRequest);
     Set<String> stringSet = listResponse.getTables();
     Assertions.assertEquals(1, stringSet.size());
-    Assertions.assertTrue(stringSet.contains(Joiner.on(".").join(ids)));
+    Assertions.assertTrue(stringSet.contains("table"));
+    Assertions.assertFalse(stringSet.contains(String.join(DELIMITER, ids)));
 
     // Now try to drop columns in the table
     AlterTableDropColumnsRequest dropColumnsRequest = new AlterTableDropColumnsRequest();
