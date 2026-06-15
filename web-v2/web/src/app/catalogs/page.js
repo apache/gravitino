@@ -167,6 +167,7 @@ const CatalogsListPage = () => {
             await dispatch(fetchCatalogs({ metalake }))
             await dispatch(fetchSchemas({ metalake, catalog, catalogType }))
           }
+          dispatch(fetchSchemas({ metalake, catalog, catalogType, parentSchema: schema }))
           dispatch(fetchFunctions({ init: true, metalake, catalog, schema }))
           switch (catalogType) {
             case 'relational':
