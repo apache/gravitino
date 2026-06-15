@@ -41,15 +41,7 @@ public class FlussCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadat
                 BOOTSTRAP_SERVERS,
                 "The bootstrap servers used by the Fluss Java client",
                 false /* immutable */,
-                false /* hidden */),
-            PropertyEntry.stringPropertyPrefixEntry(
-                CATALOG_BYPASS_PREFIX,
-                "Properties with this prefix are passed to the Fluss Java client without the prefix",
-                false /* required */,
-                false /* immutable */,
-                null /* default value */,
-                false /* hidden */,
-                false /* reserved */));
+                false /* hidden */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }

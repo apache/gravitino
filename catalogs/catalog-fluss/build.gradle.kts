@@ -39,14 +39,24 @@ dependencies {
   annotationProcessor(libs.lombok)
 
   testImplementation(project(":api"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
 
+  testImplementation(libs.awaitility)
+  testImplementation(libs.commons.io)
+  testImplementation(libs.commons.lang3)
   testImplementation(libs.fluss.client)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

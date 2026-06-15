@@ -101,8 +101,14 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     Configuration flussConfig = toFlussConfiguration(config, info);
-    this.connection = connectionFactory.apply(flussConfig);
-    this.ops = new FlussAdminOps(connection.getAdmin());
+    try {
+      this.connection = connectionFactory.apply(flussConfig);
+      this.ops = new FlussAdminOps(connection.getAdmin());
+    } catch (ConnectionFailedException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw new ConnectionFailedException(e, "Failed to connect to Fluss cluster");
+    }
   }
 
   @Override

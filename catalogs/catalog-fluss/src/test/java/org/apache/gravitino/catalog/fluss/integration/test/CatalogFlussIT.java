@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.catalog.fluss.integration.test;
 
-import static org.apache.gravitino.catalog.fluss.integration.test.FlussCluster.BOOTSTRAP_SERVERS;
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,19 +29,27 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.fluss.config.ConfigOptions;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
-import org.apache.gravitino.catalog.fluss.FlussCatalogOperations;
-import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.SupportsSchemas;
+import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.integration.test.container.FlussContainer;
+import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -56,6 +64,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rest.RESTUtils;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,32 +72,37 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
-/** Integration tests for Fluss catalog operations against a minimal Fluss Docker cluster. */
+/** Integration tests for Fluss catalog operations through Gravitino server APIs. */
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogFlussIT {
+public class CatalogFlussIT extends BaseIT {
 
-  private static final Namespace CATALOG_NAMESPACE = Namespace.of("metalake", "catalog");
+  private static final String PROVIDER = "fluss";
+  private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("fluss_it_metalake");
+  private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("fluss_it_catalog");
 
-  private FlussCluster cluster;
-  private FlussCatalogOperations ops;
+  private GravitinoMetalake metalake;
+  private Catalog catalog;
   private String currentSchema;
 
   @BeforeAll
-  void startCluster() throws Exception {
-    cluster = FlussCluster.start();
-    ops = new FlussCatalogOperations();
-    ops.initialize(catalogConfig(), null, null);
+  void startUp() {
+    containerSuite.startFlussContainer();
+    createMetalake();
+
+    Map<String, String> properties = catalogProperties(containerSuite.getFlussContainer());
+    waitUntilConnectionSucceeds(CATALOG_NAME, properties);
+    catalog = createCatalog(CATALOG_NAME, "Fluss catalog for IT", properties);
   }
 
   @AfterEach
   void cleanupSchema() {
-    if (currentSchema == null) {
+    if (currentSchema == null || catalog == null) {
       return;
     }
 
     try {
-      ops.dropSchema(schemaIdent(currentSchema), true);
+      catalog.asSchemas().dropSchema(currentSchema, true);
     } catch (Exception ignored) {
     } finally {
       currentSchema = null;
@@ -96,12 +110,18 @@ public class CatalogFlussIT {
   }
 
   @AfterAll
-  void stopCluster() throws Exception {
-    if (ops != null) {
-      ops.close();
+  void stop() {
+    if (metalake != null) {
+      try {
+        metalake.dropCatalog(CATALOG_NAME, true);
+      } catch (Exception ignored) {
+      }
     }
-    if (cluster != null) {
-      cluster.close();
+    if (client != null) {
+      try {
+        client.dropMetalake(METALAKE_NAME, true);
+      } catch (Exception ignored) {
+      }
     }
   }
 
@@ -109,60 +129,56 @@ public class CatalogFlussIT {
   void testConnection() throws Exception {
     assertDoesNotThrow(
         () ->
-            ops.testConnection(
-                NameIdentifier.of("metalake", "catalog"),
+            metalake.testConnection(
+                GravitinoITUtils.genRandomName("test_fluss_catalog"),
                 Catalog.Type.RELATIONAL,
-                "fluss",
-                null,
-                catalogConfig()));
+                PROVIDER,
+                "Fluss catalog for IT",
+                catalogProperties(containerSuite.getFlussContainer())));
 
     String unusedPort = String.valueOf(RESTUtils.findAvailablePort(0, 0));
-    try (FlussCatalogOperations invalidOps = new FlussCatalogOperations()) {
-      assertThrows(
-          RuntimeException.class,
-          () ->
-              invalidOps.initialize(
-                  Map.of(
-                      BOOTSTRAP_SERVERS,
-                      "localhost:" + unusedPort,
-                      BaseCatalog.CATALOG_BYPASS_PREFIX
-                          + ConfigOptions.CLIENT_REQUEST_TIMEOUT.key(),
-                      "2 s"),
-                  null,
-                  null));
-    }
+    assertThrows(
+        ConnectionFailedException.class,
+        () ->
+            metalake.testConnection(
+                GravitinoITUtils.genRandomName("invalid_fluss_catalog"),
+                Catalog.Type.RELATIONAL,
+                PROVIDER,
+                "Invalid Fluss catalog",
+                invalidCatalogProperties(unusedPort)));
   }
 
   @Test
   void testSchemaCrud() {
+    SupportsSchemas schemas = catalog.asSchemas();
     String schema = newSchema();
 
-    assertFalse(ops.schemaExists(schemaIdent(schema)));
-    Schema created = ops.createSchema(schemaIdent(schema), "schema comment", Map.of("k1", "v1"));
+    assertFalse(schemas.schemaExists(schema));
+    Schema created = schemas.createSchema(schema, "schema comment", Map.of("k1", "v1"));
 
     assertEquals(schema, created.name());
     assertEquals("schema comment", created.comment());
     assertEquals("v1", created.properties().get("k1"));
-    assertTrue(ops.schemaExists(schemaIdent(schema)));
-    assertTrue(
-        Arrays.stream(ops.listSchemas(CATALOG_NAMESPACE))
-            .map(NameIdentifier::name)
-            .anyMatch(schema::equals));
+    assertTrue(schemas.schemaExists(schema));
+    assertTrue(Arrays.asList(schemas.listSchemas()).contains(schema));
 
-    Schema loaded = ops.loadSchema(schemaIdent(schema));
+    Schema loaded = schemas.loadSchema(schema);
     assertEquals(created.name(), loaded.name());
     assertEquals(created.comment(), loaded.comment());
 
-    assertTrue(ops.dropSchema(schemaIdent(schema), false));
+    assertTrue(schemas.dropSchema(schema, false));
     currentSchema = null;
-    assertFalse(ops.schemaExists(schemaIdent(schema)));
+    assertFalse(schemas.schemaExists(schema));
+    assertThrows(NoSuchSchemaException.class, () -> schemas.loadSchema(schema));
   }
 
   @Test
   void testDropNonEmptySchema() {
+    SupportsSchemas schemas = catalog.asSchemas();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
     String schema = newSchema();
-    ops.createSchema(schemaIdent(schema), null, Map.of());
-    ops.createTable(
+    schemas.createSchema(schema, null, Map.of());
+    tableCatalog.createTable(
         tableIdent(schema, "orders"),
         basicColumns(),
         null,
@@ -172,19 +188,21 @@ public class CatalogFlussIT {
         SortOrders.NONE,
         Indexes.EMPTY_INDEXES);
 
-    assertThrows(NonEmptySchemaException.class, () -> ops.dropSchema(schemaIdent(schema), false));
-    assertTrue(ops.dropSchema(schemaIdent(schema), true));
+    assertThrows(NonEmptySchemaException.class, () -> schemas.dropSchema(schema, false));
+    assertTrue(schemas.dropSchema(schema, true));
     currentSchema = null;
   }
 
   @Test
   void testTableCrud() {
+    SupportsSchemas schemas = catalog.asSchemas();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
     String schema = newSchema();
     NameIdentifier tableIdent = tableIdent(schema, "orders");
-    ops.createSchema(schemaIdent(schema), null, Map.of());
+    schemas.createSchema(schema, null, Map.of());
 
     Table created =
-        ops.createTable(
+        tableCatalog.createTable(
             tableIdent,
             basicColumns(),
             "orders comment",
@@ -201,21 +219,23 @@ public class CatalogFlussIT {
     assertEquals(3, created.columns().length);
 
     assertTrue(
-        Arrays.stream(ops.listTables(Namespace.of("metalake", "catalog", schema)))
+        Arrays.stream(tableCatalog.listTables(Namespace.of(schema)))
             .map(NameIdentifier::name)
             .anyMatch("orders"::equals));
-    assertEquals("orders", ops.loadTable(tableIdent).name());
-    assertTrue(ops.dropTable(tableIdent));
-    assertThrows(NoSuchTableException.class, () -> ops.loadTable(tableIdent));
-    assertFalse(ops.dropTable(tableIdent));
+    assertEquals("orders", tableCatalog.loadTable(tableIdent).name());
+    assertTrue(tableCatalog.dropTable(tableIdent));
+    assertThrows(NoSuchTableException.class, () -> tableCatalog.loadTable(tableIdent));
+    assertFalse(tableCatalog.dropTable(tableIdent));
   }
 
   @Test
   void testAlterTable() {
+    SupportsSchemas schemas = catalog.asSchemas();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
     String schema = newSchema();
     NameIdentifier tableIdent = tableIdent(schema, "orders");
-    ops.createSchema(schemaIdent(schema), null, Map.of());
-    ops.createTable(
+    schemas.createSchema(schema, null, Map.of());
+    tableCatalog.createTable(
         tableIdent,
         basicColumns(),
         null,
@@ -226,7 +246,7 @@ public class CatalogFlussIT {
         Indexes.EMPTY_INDEXES);
 
     Table withColumn =
-        ops.alterTable(
+        tableCatalog.alterTable(
             tableIdent, TableChange.addColumn(new String[] {"country"}, Types.StringType.get()));
     assertTrue(
         Arrays.stream(withColumn.columns()).anyMatch(column -> column.name().equals("country")));
@@ -234,10 +254,12 @@ public class CatalogFlussIT {
 
   @Test
   void testPartitionCrud() {
+    SupportsSchemas schemas = catalog.asSchemas();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
     String schema = newSchema();
     NameIdentifier tableIdent = tableIdent(schema, "partitioned_orders");
-    ops.createSchema(schemaIdent(schema), null, Map.of());
-    ops.createTable(
+    schemas.createSchema(schema, null, Map.of());
+    tableCatalog.createTable(
         tableIdent,
         partitionedColumns(),
         null,
@@ -247,7 +269,7 @@ public class CatalogFlussIT {
         SortOrders.NONE,
         Indexes.EMPTY_INDEXES);
 
-    SupportsPartitions partitions = ops.loadTable(tableIdent).supportPartitions();
+    SupportsPartitions partitions = tableCatalog.loadTable(tableIdent).supportPartitions();
     IdentityPartition partition = identityPartition("2026-05-26");
 
     Partition added = partitions.addPartition(partition);
@@ -259,21 +281,120 @@ public class CatalogFlussIT {
     assertFalse(partitions.dropPartition(partition.name()));
   }
 
-  private Map<String, String> catalogConfig() {
-    return Map.of(BOOTSTRAP_SERVERS, cluster.bootstrapServers());
+  @Test
+  void testAuthenticatedCatalog() {
+    containerSuite.startAuthenticatedFlussContainer();
+    FlussContainer authenticatedFlussContainer = containerSuite.getAuthenticatedFlussContainer();
+    String catalogName = GravitinoITUtils.genRandomName("fluss_auth_catalog");
+    String schema = GravitinoITUtils.genRandomName("fluss_auth_schema");
+    Catalog authenticatedCatalog = null;
+
+    Map<String, String> properties =
+        authenticatedCatalogProperties(
+            authenticatedFlussContainer,
+            FlussContainer.FLUSS_AUTH_USERNAME,
+            FlussContainer.FLUSS_AUTH_PASSWORD);
+    waitUntilConnectionSucceeds(catalogName, properties);
+
+    try {
+      authenticatedCatalog = createCatalog(catalogName, "Authenticated Fluss catalog", properties);
+      Schema created =
+          authenticatedCatalog
+              .asSchemas()
+              .createSchema(schema, "authenticated schema", Map.of("auth", "true"));
+      assertEquals(schema, created.name());
+      assertTrue(authenticatedCatalog.asSchemas().schemaExists(schema));
+      assertTrue(authenticatedCatalog.asSchemas().dropSchema(schema, false));
+
+      Map<String, String> wrongPasswordProperties =
+          authenticatedCatalogProperties(
+              authenticatedFlussContainer,
+              FlussContainer.FLUSS_AUTH_USERNAME,
+              FlussContainer.FLUSS_AUTH_PASSWORD + "-wrong");
+      wrongPasswordProperties.put(
+          CATALOG_BYPASS_PREFIX + ConfigOptions.CLIENT_REQUEST_TIMEOUT.key(), "2 s");
+      assertThrows(
+          ConnectionFailedException.class,
+          () ->
+              metalake.testConnection(
+                  GravitinoITUtils.genRandomName("invalid_fluss_auth_catalog"),
+                  Catalog.Type.RELATIONAL,
+                  PROVIDER,
+                  "Invalid authenticated Fluss catalog",
+                  wrongPasswordProperties));
+    } finally {
+      if (authenticatedCatalog != null) {
+        try {
+          authenticatedCatalog.asSchemas().dropSchema(schema, true);
+        } catch (Exception ignored) {
+        }
+      }
+      try {
+        metalake.dropCatalog(catalogName, true);
+      } catch (Exception ignored) {
+      }
+    }
+  }
+
+  private void createMetalake() {
+    client.createMetalake(METALAKE_NAME, "comment", Map.of());
+    metalake = client.loadMetalake(METALAKE_NAME);
+    assertEquals(METALAKE_NAME, metalake.name());
+  }
+
+  private Catalog createCatalog(
+      String catalogName, String comment, Map<String, String> properties) {
+    Catalog createdCatalog =
+        metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, PROVIDER, comment, properties);
+    Catalog loadedCatalog = metalake.loadCatalog(catalogName);
+    assertEquals(createdCatalog, loadedCatalog);
+    return loadedCatalog;
+  }
+
+  private void waitUntilConnectionSucceeds(String catalogName, Map<String, String> properties) {
+    Awaitility.await()
+        .atMost(2, TimeUnit.MINUTES)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertDoesNotThrow(
+                    () ->
+                        metalake.testConnection(
+                            catalogName,
+                            Catalog.Type.RELATIONAL,
+                            PROVIDER,
+                            "Fluss catalog for IT",
+                            properties)));
+  }
+
+  private Map<String, String> catalogProperties(FlussContainer flussContainer) {
+    return Map.of(ConfigOptions.BOOTSTRAP_SERVERS.key(), flussContainer.bootstrapServers());
+  }
+
+  private Map<String, String> invalidCatalogProperties(String unusedPort) {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(ConfigOptions.BOOTSTRAP_SERVERS.key(), "localhost:" + unusedPort);
+    properties.put(CATALOG_BYPASS_PREFIX + ConfigOptions.CLIENT_REQUEST_TIMEOUT.key(), "2 s");
+    return properties;
+  }
+
+  private Map<String, String> authenticatedCatalogProperties(
+      FlussContainer flussContainer, String username, String password) {
+    Map<String, String> properties = new HashMap<>(catalogProperties(flussContainer));
+    properties.put(CATALOG_BYPASS_PREFIX + ConfigOptions.CLIENT_SECURITY_PROTOCOL.key(), "sasl");
+    properties.put(CATALOG_BYPASS_PREFIX + ConfigOptions.CLIENT_SASL_MECHANISM.key(), "PLAIN");
+    properties.put(CATALOG_BYPASS_PREFIX + ConfigOptions.CLIENT_SASL_JAAS_USERNAME.key(), username);
+    properties.put(CATALOG_BYPASS_PREFIX + ConfigOptions.CLIENT_SASL_JAAS_PASSWORD.key(), password);
+    return properties;
   }
 
   private String newSchema() {
-    currentSchema = "fluss_it_" + System.nanoTime();
+    currentSchema = GravitinoITUtils.genRandomName("fluss_it_schema");
     return currentSchema;
   }
 
-  private NameIdentifier schemaIdent(String schema) {
-    return NameIdentifier.of("metalake", "catalog", schema);
-  }
-
   private NameIdentifier tableIdent(String schema, String table) {
-    return NameIdentifier.of("metalake", "catalog", schema, table);
+    return NameIdentifier.of(schema, table);
   }
 
   private Column[] basicColumns() {

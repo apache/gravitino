@@ -143,6 +143,26 @@ class TestFlussCatalogOperations {
   }
 
   @Test
+  void testInitializeMapsConnectionFailures() {
+    FlussCatalogOperations operations =
+        new FlussCatalogOperations(
+            config -> {
+              throw new IllegalStateException("auth failed");
+            });
+
+    ConnectionFailedException exception =
+        assertThrows(
+            ConnectionFailedException.class,
+            () ->
+                operations.initialize(
+                    Map.of(FlussCatalogPropertiesMetadata.BOOTSTRAP_SERVERS, "localhost:9123"),
+                    catalogInfo(),
+                    null));
+
+    assertTrue(exception.getMessage().contains("Failed to connect to Fluss cluster"));
+  }
+
+  @Test
   void testTestConnectionUsesInitializedOps() throws Exception {
     Admin admin = mock(Admin.class);
     Connection connection = mock(Connection.class);
