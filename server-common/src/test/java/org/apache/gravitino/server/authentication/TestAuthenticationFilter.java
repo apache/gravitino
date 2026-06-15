@@ -27,8 +27,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Collections;
 import java.util.Vector;
 import javax.servlet.FilterChain;
@@ -37,7 +40,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthenticationFilter {
@@ -66,6 +73,9 @@ public class TestAuthenticationFilter {
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(mockResponse.getWriter()).thenReturn(printWriter);
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
     when(authenticator.supportsToken(any())).thenReturn(true);
@@ -73,7 +83,17 @@ public class TestAuthenticationFilter {
     when(authenticator.authenticateToken(any()))
         .thenThrow(new UnauthorizedException("UNAUTHORIZED"));
     filter.doFilter(mockRequest, mockResponse, mockChain);
-    verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
+    verify(mockResponse).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    verify(mockResponse).setContentType("application/json");
+    verify(mockResponse).setCharacterEncoding("UTF-8");
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ObjectMapper mapper = ObjectMapperProvider.objectMapper();
+    ErrorResponse errorResponse = mapper.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(1011, errorResponse.getCode());
+    Assertions.assertEquals("UnauthorizedException", errorResponse.getType());
+    Assertions.assertEquals("UNAUTHORIZED", errorResponse.getMessage());
   }
 
   @Test
@@ -109,6 +129,9 @@ public class TestAuthenticationFilter {
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(mockResponse.getWriter()).thenReturn(printWriter);
     when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
         .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
     when(authenticator1.supportsToken(any())).thenReturn(false);
@@ -120,7 +143,16 @@ public class TestAuthenticationFilter {
         .thenThrow(new UnauthorizedException("UNAUTHORIZED"));
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
-    verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
+    verify(mockResponse).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    verify(mockResponse).setContentType("application/json");
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ObjectMapper mapper = ObjectMapperProvider.objectMapper();
+    ErrorResponse errorResponse = mapper.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(1011, errorResponse.getCode());
+    Assertions.assertEquals("UnauthorizedException", errorResponse.getType());
+    Assertions.assertEquals("UNAUTHORIZED", errorResponse.getMessage());
   }
 
   @Test
@@ -169,6 +201,9 @@ public class TestAuthenticationFilter {
       FilterChain mockChain = mock(FilterChain.class);
       HttpServletRequest mockRequest = mock(HttpServletRequest.class);
       HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+      StringWriter stringWriter = new StringWriter();
+      PrintWriter printWriter = new PrintWriter(stringWriter);
+      when(mockResponse.getWriter()).thenReturn(printWriter);
       when(mockRequest.getRequestURI()).thenReturn(path);
       when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
           .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
@@ -180,7 +215,81 @@ public class TestAuthenticationFilter {
       filter.doFilter(mockRequest, mockResponse, mockChain);
 
       // Auth flow ran and rejected — proves these paths are not exempted.
-      verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
+      verify(mockResponse).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+      verify(mockResponse).setContentType("application/json");
     }
+  }
+
+  @Test
+  public void testUnauthorizedErrorReturnsJsonBody() throws Exception {
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList());
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new UnauthorizedException("The provided credentials did not support"));
+
+    verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    verify(response).setContentType("application/json");
+    verify(response).setCharacterEncoding("UTF-8");
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ObjectMapper mapper = ObjectMapperProvider.objectMapper();
+    ErrorResponse errorResponse = mapper.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(1011, errorResponse.getCode());
+    Assertions.assertEquals("UnauthorizedException", errorResponse.getType());
+    Assertions.assertEquals("The provided credentials did not support", errorResponse.getMessage());
+  }
+
+  @Test
+  public void testForbiddenErrorReturnsJsonBody() throws Exception {
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList());
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(response, new ForbiddenException("Access denied"));
+
+    verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+    verify(response).setContentType("application/json");
+    verify(response).setCharacterEncoding("UTF-8");
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ObjectMapper mapper = ObjectMapperProvider.objectMapper();
+    ErrorResponse errorResponse = mapper.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(1008, errorResponse.getCode());
+    Assertions.assertEquals("ForbiddenException", errorResponse.getType());
+    Assertions.assertEquals("Access denied", errorResponse.getMessage());
+  }
+
+  @Test
+  public void testInternalServerErrorReturnsJsonBody() throws Exception {
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList());
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(response, new RuntimeException("Something went wrong"));
+
+    verify(response).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    verify(response).setContentType("application/json");
+    verify(response).setCharacterEncoding("UTF-8");
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ObjectMapper mapper = ObjectMapperProvider.objectMapper();
+    ErrorResponse errorResponse = mapper.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(1002, errorResponse.getCode());
+    Assertions.assertEquals("RuntimeException", errorResponse.getType());
+    Assertions.assertEquals("Something went wrong", errorResponse.getMessage());
   }
 }

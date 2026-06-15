@@ -37,10 +37,12 @@ import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
+import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +71,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoGlueCatalog.class);
 
   // Lazily initialized Iceberg GlueCatalog for Iceberg tables
-  private volatile SparkCatalog icebergGlueCatalog;
+  volatile SparkCatalog icebergGlueCatalog;
 
   // Store original config for Iceberg catalog initialization
   private String catalogName;
@@ -220,6 +222,41 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkHiveTypeConverter();
+  }
+
+  /**
+   * Delegates function lookup to the Iceberg {@link SparkCatalog}, which registers Iceberg built-in
+   * partition functions ({@code days}, {@code hours}, {@code months}, {@code years}, etc.). Falls
+   * back to the Gravitino function registry for non-Iceberg functions.
+   *
+   * <p>Without this override, {@link org.apache.gravitino.spark.connector.catalog.BaseCatalog}
+   * would only query the Gravitino server's function registry, which does not include Iceberg
+   * built-ins. This causes {@code INSERT} into Iceberg tables partitioned by time-based transforms
+   * to fail with {@code AnalysisException: days(col) is not currently supported}.
+   */
+  @Override
+  public UnboundFunction loadFunction(Identifier ident) throws NoSuchFunctionException {
+    try {
+      return getOrCreateIcebergGlueCatalog().loadFunction(ident);
+    } catch (NoSuchFunctionException e) {
+      return super.loadFunction(ident);
+    }
+  }
+
+  /**
+   * Invalidates both the Hive backend and the Iceberg backend caches for the given table.
+   *
+   * <p>{@link BaseCatalog} only calls {@code sparkCatalog.invalidateTable}, which clears the {@link
+   * HiveTableCatalog} cache. The Iceberg {@link SparkCatalog} maintains its own {@code
+   * CachingCatalog} that must be invalidated separately after any table mutation (ALTER, DROP,
+   * PURGE, RENAME) to avoid stale schema errors on subsequent reads.
+   */
+  @Override
+  public void invalidateTable(Identifier ident) {
+    super.invalidateTable(ident);
+    if (icebergGlueCatalog != null) {
+      icebergGlueCatalog.invalidateTable(ident);
+    }
   }
 
   /**

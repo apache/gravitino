@@ -151,24 +151,31 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(2)
   public void testListTopic() {
     TopicCatalog topicCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTopicCatalog();
-    NameIdentifier[] topicsList = topicCatalog.listTopics(Namespace.of(SCHEMA));
-    assertArrayEquals(
-        new NameIdentifier[] {
-          NameIdentifier.of(SCHEMA, "topic1"),
-          NameIdentifier.of(SCHEMA, "topic2"),
-          NameIdentifier.of(SCHEMA, "topic3")
-        },
-        topicsList);
     // normal user can only see topics they have privilege for
     TopicCatalog topicCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTopicCatalog();
 
-    NameIdentifier[] topicsListNormalUser = topicCatalogNormalUser.listTopics(Namespace.of(SCHEMA));
-    assertArrayEquals(
-        new NameIdentifier[] {
-          NameIdentifier.of(SCHEMA, "topic2"), NameIdentifier.of(SCHEMA, "topic3")
-        },
-        topicsListNormalUser);
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              NameIdentifier[] topicsList = topicCatalog.listTopics(Namespace.of(SCHEMA));
+              assertArrayEquals(
+                  new NameIdentifier[] {
+                    NameIdentifier.of(SCHEMA, "topic1"),
+                    NameIdentifier.of(SCHEMA, "topic2"),
+                    NameIdentifier.of(SCHEMA, "topic3")
+                  },
+                  topicsList);
+
+              NameIdentifier[] topicsListNormalUser =
+                  topicCatalogNormalUser.listTopics(Namespace.of(SCHEMA));
+              assertArrayEquals(
+                  new NameIdentifier[] {
+                    NameIdentifier.of(SCHEMA, "topic2"), NameIdentifier.of(SCHEMA, "topic3")
+                  },
+                  topicsListNormalUser);
+            });
   }
 
   @Test

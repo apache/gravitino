@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -460,6 +459,13 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(location, loadTable.getLocation());
     Assertions.assertNotNull(loadTable.getVersion());
 
+    describeTableRequest.setVersion(loadTable.getVersion());
+    DescribeTableResponse versionedLoadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(versionedLoadTable);
+    Assertions.assertEquals(location, versionedLoadTable.getLocation());
+    Assertions.assertEquals(loadTable.getVersion(), versionedLoadTable.getVersion());
+    Assertions.assertEquals(loadTable.getStorageOptions(), versionedLoadTable.getStorageOptions());
+
     List<JsonArrowField> jsonArrowFields = loadTable.getSchema().getFields();
     for (int i = 0; i < jsonArrowFields.size(); i++) {
       JsonArrowField jsonArrowField = jsonArrowFields.get(i);
@@ -562,7 +568,8 @@ public class LanceRESTServiceIT extends BaseIT {
     var listResponse = ns.listTables(listRequest);
     Set<String> stringSet = listResponse.getTables();
     Assertions.assertEquals(1, stringSet.size());
-    Assertions.assertTrue(stringSet.contains(Joiner.on(".").join(ids)));
+    Assertions.assertTrue(stringSet.contains("table"));
+    Assertions.assertFalse(stringSet.contains(String.join(DELIMITER, ids)));
 
     // Now try to drop columns in the table
     AlterTableDropColumnsRequest dropColumnsRequest = new AlterTableDropColumnsRequest();
@@ -824,15 +831,6 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.describeTable(describeTableRequest));
     assertLanceErrorCode(describeException, ErrorCode.TABLE_NOT_FOUND);
-
-    describeTableRequest.setVersion(1L);
-    RuntimeException versionException =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> ns.describeTable(describeTableRequest));
-    Assertions.assertTrue(
-        versionException
-            .getMessage()
-            .contains("Describing specific table version is not supported"));
   }
 
   @Test

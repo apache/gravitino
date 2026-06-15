@@ -279,7 +279,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
             .map(sparkTableChangeConverter::toGravitinoTableChange)
             .toArray(org.apache.gravitino.rel.TableChange[]::new);
     try {
-      sparkCatalog.invalidateTable(ident);
+      invalidateTable(ident);
       org.apache.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
               .asTableCatalog()
@@ -301,7 +301,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public boolean dropTable(Identifier ident) {
-    sparkCatalog.invalidateTable(ident);
+    invalidateTable(ident);
     return gravitinoCatalogClient
         .asTableCatalog()
         .dropTable(NameIdentifier.of(getDatabase(ident), ident.name()));
@@ -309,7 +309,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public boolean purgeTable(Identifier ident) {
-    sparkCatalog.invalidateTable(ident);
+    invalidateTable(ident);
     return gravitinoCatalogClient
         .asTableCatalog()
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
@@ -354,7 +354,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     org.apache.gravitino.rel.TableChange rename =
         org.apache.gravitino.rel.TableChange.rename(newIdent.name());
     try {
-      sparkCatalog.invalidateTable(oldIdent);
+      invalidateTable(oldIdent);
       gravitinoCatalogClient
           .asTableCatalog()
           .alterTable(NameIdentifier.of(getDatabase(oldIdent), oldIdent.name()), rename);
