@@ -102,7 +102,7 @@ SELECT * FROM employees WHERE dt = 20240101;
 
 ### View Capabilities
 
-- Supports `CREATE VIEW`, `DROP VIEW`, list, load, and rename views stored in the Hive Metastore Service.
+- Supports `CREATE VIEW`, `DROP VIEW`, `ALTER VIEW` (rename and replace view definition), list, load, and rename views stored in the Hive Metastore Service.
 - When creating a view, the connector stores the SQL with the `flink` dialect and automatically records the `flink.schema.num-columns` property, which acts as the dialect marker required by the Hive catalog.
 - When loading a view, the connector tries the `flink` dialect first, then falls back to the `hive` dialect.
 - Views created by other engines (e.g. Spark) with a different dialect marker are visible in `SHOW VIEWS` but cannot be loaded by the Flink connector.
