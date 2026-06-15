@@ -26,8 +26,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.idp.exception.AlreadyExistsException;
-import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,11 +69,10 @@ public final class IdpRESTUtils {
 
   public static Response handleException(
       String resourceType, IdpOperationType op, String name, Exception e) {
-    String formatted = StringUtils.isBlank(name) ? "" : " [" + name + "]";
     String errorMsg =
         String.format(
-            "Failed to operate built-in IdP %s %s operation [%s], reason [%s]",
-            resourceType, formatted, op.name(), e.getMessage());
+            "Failed to operate built-in IdP %s [%s] operation [%s], reason [%s]",
+            resourceType, StringUtils.defaultString(name), op.name(), e.getMessage());
     LOG.warn(errorMsg, e);
     return toErrorResponse(errorMsg, e);
   }

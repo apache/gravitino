@@ -1,0 +1,639 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /idp/users:
+    post:
+      tags:
+        - IDP
+      summary: Add built-in IDP user
+      description: >
+        Creates a built-in IDP user with the given username and password.
+        Requires the `idp-basic` plugin and built-in IdP Basic authentication.
+        `gravitino.authenticators` must not include `simple`.
+      operationId: addIdpUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddUserRequest"
+            examples:
+              AddUserRequest:
+                $ref: "#/components/examples/AddUserRequest"
+      responses:
+        "200":
+          description: Returns the added built-in IDP user
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpUserResponse"
+              examples:
+                IdpUserAddResponse:
+                  $ref: "#/components/examples/IdpUserAddResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpAddUserIllegalArgumentException"
+        "409":
+          description: Conflict - The built-in IDP user already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                AlreadyExistsException:
+                  $ref: "#/components/examples/IdpAlreadyExistsException"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/users/{user}:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/user"
+
+    get:
+      tags:
+        - IDP
+      summary: Get built-in IDP user
+      description: Returns the specified built-in IDP user, including group membership (empty if none; the example shows a user who already belongs to groups).
+      operationId: getIdpUser
+      responses:
+        "200":
+          description: Returns the built-in IDP user object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpUserResponse"
+              examples:
+                IdpUserGetResponse:
+                  $ref: "#/components/examples/IdpUserGetResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "404":
+          description: Not Found - The specified built-in IDP user does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NotFoundException:
+                  $ref: "#/components/examples/IdpNotFoundException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - IDP
+      summary: Change built-in IDP user password
+      description: Updates the password of the specified built-in IDP user and returns the user object with unchanged group membership.
+      operationId: changeIdpUserPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+            examples:
+              ChangePasswordRequest:
+                $ref: "#/components/examples/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Returns the built-in IDP user after the password change
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpUserResponse"
+              examples:
+                IdpUserUpdateResponse:
+                  $ref: "#/components/examples/IdpUserUpdateResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpChangePasswordIllegalArgumentException"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "404":
+          description: Not Found - The specified built-in IDP user does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NotFoundException:
+                  $ref: "#/components/examples/IdpUserUpdateNotFoundException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - IDP
+      summary: Remove built-in IDP user
+      description: Removes the specified built-in IDP user.
+      operationId: removeIdpUser
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/groups:
+    post:
+      tags:
+        - IDP
+      summary: Add built-in IDP group
+      description: Creates a built-in IDP group with the given name.
+      operationId: addIdpGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddGroupRequest"
+            examples:
+              AddGroupRequest:
+                $ref: "#/components/examples/AddGroupRequest"
+      responses:
+        "200":
+          description: Returns the added built-in IDP group
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpGroupResponse"
+              examples:
+                IdpGroupAddResponse:
+                  $ref: "#/components/examples/IdpGroupAddResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpAddGroupIllegalArgumentException"
+        "409":
+          description: Conflict - The built-in IDP group already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                AlreadyExistsException:
+                  $ref: "#/components/examples/IdpGroupAlreadyExistsException"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/groups/{group}:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/group"
+
+    get:
+      tags:
+        - IDP
+      summary: Get built-in IDP group
+      description: Returns the specified built-in IDP group, including member usernames (empty if none; the example shows a group that already has members).
+      operationId: getIdpGroup
+      responses:
+        "200":
+          description: Returns the built-in IDP group object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpGroupResponse"
+              examples:
+                IdpGroupGetResponse:
+                  $ref: "#/components/examples/IdpGroupGetResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "404":
+          description: Not Found - The specified built-in IDP group does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NotFoundException:
+                  $ref: "#/components/examples/IdpGroupNotFoundException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - IDP
+      summary: Remove built-in IDP group
+      description: Removes the specified built-in IDP group.
+      operationId: removeIdpGroup
+      parameters:
+        - $ref: "../openapi.yaml#/components/parameters/force"
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "405":
+          description: Method Not Allowed - The group is not empty and force is false
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                GroupNotEmptyException:
+                  $ref: "#/components/examples/IdpGroupNotEmptyException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /idp/groups/{group}/users:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/group"
+
+    put:
+      tags:
+        - IDP
+      summary: Change built-in IDP group membership
+      description: Adds and/or removes users from the specified built-in IDP group.
+      operationId: changeIdpGroupMembership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupMembershipChangeRequest"
+            examples:
+              GroupMembershipChangeRequest:
+                $ref: "#/components/examples/GroupMembershipChangeRequest"
+      responses:
+        "200":
+          description: Returns the built-in IDP group after membership changes
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/IdpGroupResponse"
+              examples:
+                IdpGroupMembershipResponse:
+                  $ref: "#/components/examples/IdpGroupMembershipResponse"
+        "400":
+          description: Bad Request - The request body is invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                IllegalArgumentException:
+                  $ref: "#/components/examples/IdpGroupMembershipIllegalArgumentException"
+        "403":
+          $ref: "#/components/responses/IdpForbiddenErrorResponse"
+        "404":
+          description: Not Found - The specified built-in IDP group or user does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                GroupNotFoundException:
+                  $ref: "#/components/examples/IdpGroupUpdateNotFoundException"
+                UserNotFoundException:
+                  $ref: "#/components/examples/IdpMembershipUserNotFoundException"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+  schemas:
+    IdpUser:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          description: The username of the built-in IDP user
+        groups:
+          type: array
+          items:
+            type: string
+            maxLength: 128
+          description: The built-in IDP groups the user belongs to
+
+    IdpGroup:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          description: The name of the built-in IDP group
+        users:
+          type: array
+          items:
+            type: string
+            maxLength: 128
+          description: The usernames of members in the built-in IDP group
+
+    AddUserRequest:
+      type: object
+      required:
+        - user
+        - password
+      properties:
+        user:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: "^[^:]*$"
+          description: The username to add.
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 64
+          description: The password of the built-in IDP user to add.
+          writeOnly: true
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - password
+      properties:
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 64
+          description: The new password of the built-in IDP user.
+          writeOnly: true
+
+    AddGroupRequest:
+      type: object
+      required:
+        - group
+      properties:
+        group:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: The group name to add.
+
+    GroupMembershipChangeRequest:
+      type: object
+      anyOf:
+        - required:
+            - usersToAdd
+        - required:
+            - usersToRemove
+      properties:
+        usersToAdd:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+          minItems: 1
+          description: The usernames to add to the built-in IDP group
+        usersToRemove:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+          minItems: 1
+          description: The usernames to remove from the built-in IDP group
+
+    IdpUserResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        user:
+          $ref: "#/components/schemas/IdpUser"
+
+    IdpGroupResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        group:
+          $ref: "#/components/schemas/IdpGroup"
+
+  responses:
+    IdpForbiddenErrorResponse:
+      description:
+        Forbidden - Only callers listed in `gravitino.authorization.serviceAdmins` may
+        manage built-in IDP users and groups. Unauthenticated requests and authenticated
+        non-service-admin users receive this response.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            ForbiddenException:
+              $ref: "#/components/examples/IdpForbiddenException"
+
+  examples:
+    AddUserRequest:
+      value: {
+        "user": "alice",
+        "password": "Passw0rd-1234"
+      }
+
+    ChangePasswordRequest:
+      value: {
+        "password": "Passw0rd-5678"
+      }
+
+    AddGroupRequest:
+      value: {
+        "group": "engineers"
+      }
+
+    GroupMembershipChangeRequest:
+      value: {
+        "usersToAdd": ["alice", "bob"],
+        "usersToRemove": ["carol"]
+      }
+
+    IdpUserAddResponse:
+      value: {
+        "code": 0,
+        "user": {
+          "name": "alice",
+          "groups": []
+        }
+      }
+
+    IdpUserGetResponse:
+      value: {
+        "code": 0,
+        "user": {
+          "name": "alice",
+          "groups": ["engineers"]
+        }
+      }
+
+    IdpUserUpdateResponse:
+      value: {
+        "code": 0,
+        "user": {
+          "name": "alice",
+          "groups": ["engineers"]
+        }
+      }
+
+    IdpGroupAddResponse:
+      value: {
+        "code": 0,
+        "group": {
+          "name": "engineers",
+          "users": []
+        }
+      }
+
+    IdpGroupGetResponse:
+      value: {
+        "code": 0,
+        "group": {
+          "name": "engineers",
+          "users": ["alice", "bob"]
+        }
+      }
+
+    IdpGroupMembershipResponse:
+      value: {
+        "code": 0,
+        "group": {
+          "name": "engineers",
+          "users": ["alice", "bob"]
+        }
+      }
+
+    IdpAddUserIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate built-in IdP user [] operation [ADD], reason [\"user\" field is required and cannot be empty]"
+      }
+
+    IdpChangePasswordIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate built-in IdP user [alice] operation [UPDATE], reason [\"password\" field is required and cannot be empty]"
+      }
+
+    IdpAddGroupIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate built-in IdP group [] operation [ADD], reason [\"group\" field is required and cannot be empty]"
+      }
+
+    IdpGroupMembershipIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Failed to operate built-in IdP group [engineers] operation [UPDATE], reason [usersToAdd and usersToRemove cannot both be null]"
+      }
+
+    IdpNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate built-in IdP user [missing-user] operation [GET], reason [IdP user not found: missing-user]"
+      }
+
+    IdpAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "AlreadyExistsException",
+        "message": "Failed to operate built-in IdP user [alice] operation [ADD], reason [IdP user alice already exists]"
+      }
+
+    IdpUserUpdateNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate built-in IdP user [missing-user] operation [UPDATE], reason [IdP user not found: missing-user]"
+      }
+
+    IdpGroupNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate built-in IdP group [missing-group] operation [GET], reason [IdP group not found: missing-group]"
+      }
+
+    IdpGroupUpdateNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate built-in IdP group [missing-group] operation [UPDATE], reason [IdP group not found: missing-group]"
+      }
+
+    IdpMembershipUserNotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Failed to operate built-in IdP group [engineers] operation [UPDATE], reason [IdP user not found: missing-user]"
+      }
+
+    IdpGroupAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "AlreadyExistsException",
+        "message": "Failed to operate built-in IdP group [engineers] operation [ADD], reason [IdP group engineers already exists]"
+      }
+
+    IdpGroupNotEmptyException:
+      value: {
+        "code": 1006,
+        "type": "IllegalStateException",
+        "message": "Failed to operate built-in IdP group [engineers] operation [REMOVE], reason [IdP group engineers is not empty, use force=true to delete it]"
+      }
+
+    IdpForbiddenException:
+      value: {
+        "code": 1008,
+        "type": "ForbiddenException",
+        "message": "Only service admins can manage built-in IdP users and groups."
+      }

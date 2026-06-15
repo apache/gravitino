@@ -123,9 +123,12 @@ public class IcebergTableOperations {
   public Response listTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace) {
+          String namespace,
+      @QueryParam("pageToken") String pageToken,
+      @QueryParam("pageSize") Integer pageSize) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -142,6 +145,11 @@ public class IcebergTableOperations {
                   filterListTablesResponse(
                       listTablesResponse, authContext.metalakeName(), catalogName);
             }
+            listTablesResponse =
+                IcebergPaginationHelper.paginateTables(
+                    listTablesResponse,
+                    Optional.ofNullable(pageToken),
+                    Optional.ofNullable(pageSize));
             return IcebergRESTUtils.ok(listTablesResponse);
           });
     } catch (Exception e) {
@@ -167,7 +175,8 @@ public class IcebergTableOperations {
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
             + "accessDelegation: {}, isCredentialVending: {}",
@@ -200,7 +209,7 @@ public class IcebergTableOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response updateTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -210,7 +219,8 @@ public class IcebergTableOperations {
           String table,
       UpdateTableRequest updateTableRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     if (LOG.isInfoEnabled()) {
       LOG.info(
@@ -245,7 +255,7 @@ public class IcebergTableOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER ",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -255,7 +265,8 @@ public class IcebergTableOperations {
           String table,
       @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Drop Iceberg table, catalog: {}, namespace: {}, table: {}, purgeRequested: {}",
@@ -283,10 +294,11 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
-  // SCHEMA-level authorization; TABLE-specific authorization is handled in LoadTableAuthzHandler
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+      allowCheckExistence =
+          AuthorizationExpressionConstants.ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
@@ -297,7 +309,8 @@ public class IcebergTableOperations {
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
       @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     LOG.info(
@@ -351,10 +364,7 @@ public class IcebergTableOperations {
   @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "table-exists", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)",
+      expression = AuthorizationExpressionConstants.ICEBERG_TABLE_EXISTS_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response tableExists(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -363,7 +373,8 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Check Iceberg table exists, catalog: {}, namespace: {}, table: {}",
@@ -400,7 +411,8 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("table") String table,
       ReportMetricsRequest request) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Report Iceberg table metrics, catalog: {}, namespace: {}, table: {}",
@@ -450,7 +462,7 @@ public class IcebergTableOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response getTableCredentials(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -458,7 +470,8 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Get Iceberg table credentials, catalog: {}, namespace: {}, table: {}",
@@ -504,7 +517,7 @@ public class IcebergTableOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response planTableScan(
       @PathParam("prefix") @AuthorizationMetadata(type = EntityType.CATALOG) String prefix,
@@ -513,7 +526,8 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
       PlanTableScanRequest scanRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Plan table scan, catalog: {}, namespace: {}, table: {}",

@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -36,6 +37,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -54,6 +56,8 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -95,9 +99,12 @@ public class IcebergViewOperations {
   public Response listView(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace) {
+          String namespace,
+      @QueryParam("pageToken") String pageToken,
+      @QueryParam("pageSize") Integer pageSize) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("List Iceberg views, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -114,6 +121,11 @@ public class IcebergViewOperations {
                   filterListViewsResponse(
                       listTablesResponse, authContext.metalakeName(), catalogName);
             }
+            listTablesResponse =
+                IcebergPaginationHelper.paginateTables(
+                    listTablesResponse,
+                    Optional.ofNullable(pageToken),
+                    Optional.ofNullable(pageSize));
             return IcebergRESTUtils.ok(listTablesResponse);
           });
     } catch (Exception e) {
@@ -126,10 +138,7 @@ public class IcebergViewOperations {
   @Timed(name = "create-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-view", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_VIEW",
+      expression = AuthorizationExpressionConstants.ICEBERG_CREATE_VIEW_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createView(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -137,7 +146,8 @@ public class IcebergViewOperations {
           String namespace,
       CreateViewRequest createViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Create Iceberg view, catalog: {}, namespace: {}, createViewRequest: {}",
         catalogName,
@@ -165,14 +175,22 @@ public class IcebergViewOperations {
   @ResponseMetered(name = "load-view", absolute = true)
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION,
+      allowCheckExistence =
+          AuthorizationExpressionConstants
+              .ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response loadView(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
+      @IcebergAuthorizationMetadata(type = RequestType.LOAD_VIEW)
+          @AuthorizationMetadata(type = EntityType.VIEW)
+          @Encoded()
+          @PathParam("view")
+          String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Load Iceberg view, catalog: {}, namespace: {}, view: {}",
@@ -201,10 +219,7 @@ public class IcebergViewOperations {
   @Timed(name = "replace-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "replace-view", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && VIEW::OWNER",
+      expression = AuthorizationExpressionConstants.ICEBERG_VIEW_OWNER_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response replaceView(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -213,7 +228,8 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view,
       UpdateTableRequest replaceViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Replace Iceberg view, catalog: {}, namespace: {}, view: {}, replaceViewRequest: {}",
@@ -243,10 +259,7 @@ public class IcebergViewOperations {
   @Timed(name = "drop-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-view", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && VIEW::OWNER",
+      expression = AuthorizationExpressionConstants.ICEBERG_VIEW_OWNER_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response dropView(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -254,7 +267,8 @@ public class IcebergViewOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Drop Iceberg view, catalog: {}, namespace: {}, view: {}",
@@ -282,7 +296,7 @@ public class IcebergViewOperations {
   @Timed(name = "view-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "view-exists", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION,
+      expression = AuthorizationExpressionConstants.ICEBERG_VIEW_EXISTS_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response viewExists(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -290,7 +304,8 @@ public class IcebergViewOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Check Iceberg view exists, catalog: {}, namespace: {}, view: {}",

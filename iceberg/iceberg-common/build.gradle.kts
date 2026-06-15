@@ -25,6 +25,11 @@ plugins {
 }
 
 dependencies {
+  // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
+  constraints {
+    implementation(libs.thrift)
+  }
+
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":catalogs:hadoop-common")) {

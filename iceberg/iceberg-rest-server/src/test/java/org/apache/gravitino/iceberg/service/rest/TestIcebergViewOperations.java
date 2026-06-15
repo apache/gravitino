@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.rest;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Optional;
@@ -29,6 +30,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewFailureEvent;
@@ -48,6 +50,7 @@ import org.apache.gravitino.listener.api.event.IcebergRenameViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergReplaceViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergReplaceViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergReplaceViewPreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergViewExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergViewExistsPreEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
@@ -70,6 +73,7 @@ import org.apache.iceberg.view.ViewMetadata;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
@@ -126,7 +130,52 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     dummyEventListener.clearEvent();
     verifyLisViewSucc(namespace, ImmutableSet.of("list_foo1", "list_foo2"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListViewPreEvent);
-    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergListViewEvent);
+    Event listViewPostEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(listViewPostEvent instanceof IcebergListViewEvent);
+    Assertions.assertEquals(2, ((IcebergListViewEvent) listViewPostEvent).resultCount());
+  }
+
+  @ParameterizedTest
+  @MethodSource(
+      "org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testPrefixesAndNamespaces")
+  void testListViewsWithPagination(String prefix, Namespace namespace) {
+    setUrlPathWithPrefix(prefix);
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "page_v1");
+    verifyCreateViewSucc(namespace, "page_v2");
+    verifyCreateViewSucc(namespace, "page_v3");
+
+    dummyEventListener.clearEvent();
+
+    // First page: pageSize=2
+    String viewPath =
+        IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(namespace) + "/views";
+    Response firstPageResponse =
+        getIcebergClientBuilder(viewPath, Optional.of(ImmutableMap.of("pageSize", "2"))).get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), firstPageResponse.getStatus());
+    ListTablesResponse firstPage = firstPageResponse.readEntity(ListTablesResponse.class);
+    Assertions.assertEquals(2, firstPage.identifiers().size());
+    Assertions.assertNotNull(firstPage.nextPageToken());
+
+    // Second page using nextPageToken
+    Response secondPageResponse =
+        getIcebergClientBuilder(
+                viewPath,
+                Optional.of(
+                    ImmutableMap.of("pageToken", firstPage.nextPageToken(), "pageSize", "2")))
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), secondPageResponse.getStatus());
+    ListTablesResponse secondPage = secondPageResponse.readEntity(ListTablesResponse.class);
+    Assertions.assertEquals(1, secondPage.identifiers().size());
+    Assertions.assertNull(secondPage.nextPageToken());
+
+    // Verify combined results
+    Set<String> paginatedNames =
+        java.util.stream.Stream.concat(
+                firstPage.identifiers().stream(), secondPage.identifiers().stream())
+            .map(id -> id.name())
+            .collect(Collectors.toSet());
+    Assertions.assertEquals(ImmutableSet.of("page_v1", "page_v2", "page_v3"), paginatedNames);
   }
 
   @ParameterizedTest
@@ -451,5 +500,15 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
   private void verifyRenameViewSucc(Namespace ns, String source, String dest) {
     Response response = doRenameView(ns, source, dest);
     Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testIcebergListViewEventDeprecatedConstructorReturnsNegativeCount() {
+    IcebergListViewEvent event =
+        new IcebergListViewEvent(
+            Mockito.mock(IcebergRequestContext.class),
+            NameIdentifier.of("metalake", "catalog", "schema"));
+    Assertions.assertEquals(-1, event.resultCount());
   }
 }

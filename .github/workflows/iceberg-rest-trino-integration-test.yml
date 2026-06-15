@@ -1,0 +1,98 @@
+name: Iceberg REST Trino Integration Test
+
+# Verifies Gravitino authorization is enforced when an Iceberg REST Catalog served
+# in auxiliary mode is accessed through Trino's native iceberg REST connector.
+# The module uses a Java 24 toolchain (Trino 478) and runs in deploy mode against
+# the built distribution, so it needs its own job rather than the catch-all backend IT.
+on:
+  push:
+    branches: [ "main", "branch-*" ]
+  pull_request:
+    branches: [ "main", "branch-*" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+        id: filter
+        with:
+          filters: |
+            source_changes:
+              - .github/**
+              - api/**
+              - catalogs/catalog-common/**
+              - clients/client-java/**
+              - common/**
+              - core/**
+              - server-common/**
+              - iceberg/**
+              - integration-test-common/**
+              - gradle/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - settings.gradle.kts
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+
+  IcebergRestTrinoIT:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      matrix:
+        architecture: [linux/amd64]
+        java-version: [ 17 ]
+    env:
+      PLATFORM: ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installs the primary JDK plus JDK 24 and registers JDK 24 with the Gradle
+      # toolchain, which the trino-iceberg-rest module requires.
+      - uses: ./.github/actions/setup-java-toolchains
+        with:
+          java-version: ${{ matrix.java-version }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
+      - name: Package Gravitino
+        run: |
+          ./gradlew compileDistribution -PskipWeb=true -x test
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Install dependencies
+        run: |
+          wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+          sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+
+      - name: Iceberg REST Trino Integration Test
+        id: integrationTest
+        run: |
+          ./gradlew :iceberg:iceberg-rest-trino-it:test -PtestMode=deploy -PskipDockerTests=false -PskipWeb=true
+
+      - name: Upload integrate tests reports
+        uses: actions/upload-artifact@v7
+        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        with:
+          name: iceberg-rest-trino-it-reports-${{ matrix.java-version }}
+          path: |
+            build/reports
+            iceberg/iceberg-rest-trino-it/build/reports
+            distribution/package/logs/*.out
+            distribution/package/logs/*.log

@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
-import org.apache.gravitino.idp.exception.AlreadyExistsException;
-import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -45,6 +45,8 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> userMetaService.getIdpUserByUsername("missing"));
     assertEquals("user1", userMetaService.getIdpUserByUsername("user1").getUsername());
+    assertEquals("user1", userMetaService.getIdpUser("user1").name());
+    assertThrows(NotFoundException.class, () -> userMetaService.getIdpUser("missing"));
   }
 
   @ParameterizedTest

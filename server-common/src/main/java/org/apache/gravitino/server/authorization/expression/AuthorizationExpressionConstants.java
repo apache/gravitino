@@ -48,6 +48,26 @@ public class AuthorizationExpressionConstants {
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
                   """;
 
+  /**
+   * Existence-check expression for Iceberg REST {@code loadTable}: used when the primary load-table
+   * expression is forbidden, to allow schema-level principals who can create/select views to
+   * resolve a table identifier (e.g. view backing table) without full table privileges.
+   */
+  public static final String ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (ANY_CREATE_TABLE || ANY_SELECT_VIEW || ANY_CREATE_VIEW || VIEW::OWNER)
+                  """;
+
+  /** Iceberg REST {@code HEAD .../tables/{table}} (table exists). */
+  public static final String ICEBERG_TABLE_EXISTS_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || VIEW::OWNER ||
+                  ANY_CREATE_VIEW || ANY_SELECT_VIEW || ANY_SELECT_TABLE ||
+                  ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  """;
+
   public static final String MODIFY_TABLE_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
@@ -97,16 +117,46 @@ public class AuthorizationExpressionConstants {
                   ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW)
                   """;
 
-  //  Adding ANY_SELECT_TABLE / ANY_MODIFY_TABLE / ANY_CREATE_TABLE here because Spark probes
-  //  viewExists(tableName) when resolving any relation. Without table privileges in the
-  //  expression, users who only hold table grants get a spurious 403 on the HEAD /views/{name}
-  //  probe, blocking legitimate table reads.
   public static final String ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW
-                      || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW)
+                  """;
+
+  /**
+   * Existence-check expression for Iceberg REST {@code loadView}: when the primary load-view
+   * expression is forbidden, allows schema-level principals with view or referenced-table paths
+   * (similar shape to {@link #ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION}, tuned for
+   * view metadata and backing relation resolution).
+   */
+  public static final String ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  &&
+                  (ANY_CREATE_VIEW || TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  """;
+
+  public static final String ICEBERG_CREATE_VIEW_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && ANY_CREATE_VIEW
+                  """;
+
+  /** Iceberg REST replace view, drop view, and rename view (VIEW::OWNER path). */
+  public static final String ICEBERG_VIEW_OWNER_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && VIEW::OWNER
+                  """;
+
+  /** Iceberg REST {@code HEAD .../views/{view}} (view exists). */
+  public static final String ICEBERG_VIEW_EXISTS_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW)
                   """;
 
   public static final String FILTER_TABLE_AUTHORIZATION_EXPRESSION =
@@ -186,7 +236,4 @@ public class AuthorizationExpressionConstants {
 
   public static final String LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || JOB_TEMPLATE::OWNER || ANY_USE_JOB_TEMPLATE";
-
-  public static final String REQUEST_REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE =
-      "REQUEST::REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE";
 }

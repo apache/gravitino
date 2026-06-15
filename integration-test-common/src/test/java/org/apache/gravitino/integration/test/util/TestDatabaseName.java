@@ -119,6 +119,8 @@ public enum TestDatabaseName {
   },
   PG_ICEBERG_AUTHZ_IT,
 
+  PG_ICEBERG_ASYNC_CLEANUP_IT,
+
   CLICKHOUSE_CLICKHOUSE_ABSTRACT_IT,
   CLICKHOUSE_CATALOG_CLICKHOUSE_IT,
   CLICKHOUSE_AUDIT_CATALOG_CLICKHOUSE_IT,
@@ -134,4 +136,7 @@ public enum TestDatabaseName {
     }
   },
   FLINK_HIVE_CATALOG_IT,
+
+  /** Represents the MySQL database for the Flink Iceberg JDBC-backend catalog integration test. */
+  FLINK_ICEBERG_JDBC_CATALOG_IT,
 }

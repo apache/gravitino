@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -44,9 +43,8 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.SchemaEntityCleaner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -192,13 +190,27 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
 
     if (!schema.imported()) {
-      TreeLockUtils.doWithTreeLock(
-          NameIdentifier.of(ident.namespace().levels()),
-          LockType.WRITE,
-          () -> {
-            importSchema(ident);
-            return null;
-          });
+      try {
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(ident.namespace().levels()),
+            LockType.WRITE,
+            () -> {
+              importSchema(ident);
+              return null;
+            });
+      } catch (EntityAlreadyExistsException e) {
+        // HA race: another Gravitino node concurrently imported this schema. Reload from the
+        // entity store to verify the entity stored by the winning node is consistent.
+        LOG.info(
+            "Schema {} was concurrently imported by another node; reloading from store.", ident);
+        EntityCombinedSchema reloaded =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
+        if (!reloaded.imported()) {
+          throw new UnsupportedOperationException(
+              "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
+                  + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
+        }
+      }
     }
 
     return schema;
@@ -343,55 +355,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             throw new RuntimeException(e);
           }
 
-          cleanupOrphanedAncestors(catalogIdent, ident);
+          SchemaEntityCleaner.deleteOrphanedSchemaEntities(
+              store,
+              ident,
+              false,
+              schemaIdent ->
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
+                      RuntimeException.class));
           return droppedFromCatalog;
         });
-  }
-
-  /**
-   * Reconciles auto-created ancestor entities after a hierarchical schema leaf is dropped. This
-   * mirrors {@code IcebergNamespaceHookDispatcher.dropNamespace}: walk the ancestors
-   * innermost-to-outermost to find the outermost ancestor that no longer exists in the catalog,
-   * stopping at the first ancestor that still exists (its existence implies all of its outer
-   * ancestors exist). A single cascade delete of that outermost orphaned ancestor removes it and
-   * all descendant schema entities (the intermediate ancestors) in one batched operation, rather
-   * than issuing one delete per ancestor. For a flat schema name this is a no-op.
-   *
-   * @param catalogIdent the identifier of the catalog the schema belongs to
-   * @param ident the identifier of the dropped (leaf) schema
-   */
-  private void cleanupOrphanedAncestors(NameIdentifier catalogIdent, NameIdentifier ident) {
-    String separator = HierarchicalSchemaUtil.schemaSeparator();
-    List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
-    String metalake = ident.namespace().level(0);
-    String catalog = ident.namespace().level(1);
-    NameIdentifier outermostOrphan = null;
-    for (int i = ancestorNames.size() - 1; i >= 0; i--) {
-      NameIdentifier ancestorIdent =
-          NameIdentifierUtil.ofSchema(metalake, catalog, ancestorNames.get(i));
-      boolean ancestorExistsInCatalog =
-          doWithCatalog(
-              catalogIdent,
-              c -> c.doWithSchemaOps(s -> s.schemaExists(ancestorIdent)),
-              RuntimeException.class);
-      if (ancestorExistsInCatalog) {
-        break;
-      }
-      outermostOrphan = ancestorIdent;
-    }
-    if (outermostOrphan == null) {
-      return;
-    }
-    // The leaf was already deleted by the caller; cascade-deleting the outermost orphaned ancestor
-    // cleans up it and every intermediate ancestor (the relational store matches descendant schemas
-    // by name prefix) in a single batched delete.
-    try {
-      store.delete(outermostOrphan, SCHEMA, true);
-    } catch (NoSuchEntityException e) {
-      LOG.warn("The orphaned ancestor schema does not exist in the store: {}", outermostOrphan, e);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
   }
 
   private void importSchema(NameIdentifier identifier) {
@@ -438,10 +412,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     try {
       store.put(schemaEntity, true);
     } catch (EntityAlreadyExistsException e) {
-      LOG.error("Failed to import schema {} with id {} to the store.", identifier, uid, e);
-      throw new UnsupportedOperationException(
-          "Schema managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-              + "To resolve: Remove all catalogs managing this schema, then recreate one catalog to ensure single-catalog management.");
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import schema entity to the store.", e);

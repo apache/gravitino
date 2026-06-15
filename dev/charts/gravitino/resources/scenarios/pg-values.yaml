@@ -22,4 +22,4 @@ postgresql:
 initScript: |
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/start-gravitino.sh
+  /bin/bash ${GRAVITINO_HOME}/docker/docker-entrypoint.sh

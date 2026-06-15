@@ -1,12 +1,12 @@
 ---
 title: "Install Lance REST Server on Kubernetes"
-slug: /lance-rest-server-chart
-keyword: 
+slug: "/lance-rest-server-chart"
+keyword:
   - Lance REST Server Helm Chart
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Install Lance REST Server on Kubernetes
+## Introduction
 
 This Helm chart deploys Apache Gravitino Lance REST Server on Kubernetes with customizable configurations.
 
@@ -31,7 +31,7 @@ Or install directly:
 helm upgrade --install gravitino-lance oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version <VERSION> -n gravitino --create-namespace
 ```
 
-### Install from Local Repository (For Development or Unreleased Versions)
+### Install from Local Repository (for Development or Unreleased Versions)
 
 Clone the repository and navigate to the chart directory:
 
@@ -54,7 +54,7 @@ helm upgrade --install gravitino-lance ./gravitino-lance-rest-server -n gravitin
 
 ## View Chart Values
 
-You can customize values.yaml parameters to override chart default settings. Additionally, Gravitino Lance REST Server configurations in [gravitino-lance-rest-server.conf](../dev/charts/gravitino-lance-rest-server/resources/gravitino-lance-rest-server.conf) can be modified through Helm values.yaml.
+Customize values.yaml parameters to override chart default settings. Additionally, Gravitino Lance REST Server configurations in [gravitino-lance-rest-server.conf](../dev/charts/gravitino-lance-rest-server/resources/gravitino-lance-rest-server.conf) can be modified through Helm values.yaml.
 
 To display the default values of the chart, run:
 

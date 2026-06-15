@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
-import com.google.common.collect.Maps;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -93,36 +91,25 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   @Override
   @Evolving
   public Map<String, String> propertiesWithCredentialProviders() {
-    Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
-    return applyDefaultCredentialProviders(properties);
+    Map<String, String> props = super.propertiesWithCredentialProviders();
+    // Iceberg is security-first: disable s3:ListBucket on bare location prefix so a vended
+    // credential cannot enumerate sibling keys. This is catalog-type policy, not user-configurable.
+    props.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "false");
+    return props;
   }
 
-  private Map<String, String> applyDefaultCredentialProviders(Map<String, String> properties) {
-    // If credential providers already set, return as is
-    if (StringUtils.isNotBlank(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
-      return properties;
-    }
-
-    List<String> credentialProviders = new ArrayList<>();
-
-    // Add JDBC credential provider if backend is JDBC and jdbc-user/jdbc-password are set
+  @Override
+  protected void addCatalogSpecificCredentialProviders(
+      Map<String, String> properties, List<String> credentialProviders) {
     String catalogBackend = properties.get(IcebergConstants.CATALOG_BACKEND);
     if (catalogBackend != null
         && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
       String jdbcUser = properties.get(IcebergConstants.GRAVITINO_JDBC_USER);
       String jdbcPassword = properties.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
-      if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
+      if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
         credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
       }
     }
-
     addStorageCredentialProviders(properties, credentialProviders);
-
-    if (!credentialProviders.isEmpty()) {
-      properties.put(
-          CredentialConstants.CREDENTIAL_PROVIDERS, String.join(",", credentialProviders));
-    }
-
-    return properties;
   }
 }

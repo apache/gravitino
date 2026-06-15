@@ -84,6 +84,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     return true;
   }
 
+  /** Returns the Gravitino {@link Catalog} for the catalog under test. */
+  protected Catalog getGravitinoCatalog() {
+    return client.loadMetalake(metalakeName).loadCatalog(getCatalogName());
+  }
+
   @Override
   protected SparkSession getSparkSession() {
     Assertions.assertNotNull(sparkSession);
@@ -91,7 +96,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   }
 
   @BeforeAll
-  void startUp() throws Exception {
+  protected void startUp() throws Exception {
     initHiveEnv();
     // initialize the hiveMetastoreUri and warehouse at first to inject properties to
     // IcebergRestService
@@ -115,7 +120,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   }
 
   @AfterAll
-  void stop() throws IOException, InterruptedException {
+  protected void stop() throws IOException, InterruptedException {
     if (hdfs != null) {
       try {
         hdfs.close();

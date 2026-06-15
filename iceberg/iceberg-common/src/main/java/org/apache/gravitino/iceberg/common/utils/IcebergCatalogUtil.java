@@ -115,6 +115,12 @@ public class IcebergCatalogUtil {
     // Default to V1 schema to support view operations; can be overridden by explicit config.
     properties.putIfAbsent(IcebergConstants.ICEBERG_JDBC_SCHEMA_VERSION, "V1");
 
+    // Default to strict mode so that creating a table or view in a non-existent namespace fails
+    // with NoSuchNamespaceException (HTTP 404) instead of implicitly creating the namespace,
+    // matching the Iceberg REST spec and the memory backend behavior. Can be overridden by
+    // explicit config.
+    properties.putIfAbsent(IcebergConstants.ICEBERG_JDBC_STRICT_MODE, "true");
+
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     jdbcCatalog.setConf(hdfsConfiguration);
@@ -139,6 +145,7 @@ public class IcebergCatalogUtil {
 
     // REST catalog must use forward access token from the user request
     properties.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
+    applyRestCatalogHttpTimeoutProperties(icebergConfig, properties);
 
     properties.forEach(hdfsConfiguration::set);
     restCatalog.setConf(hdfsConfiguration);
@@ -158,6 +165,19 @@ public class IcebergCatalogUtil {
   @VisibleForTesting
   public static void applyDefaultResolvingFileIO(Map<String, String> properties) {
     properties.putIfAbsent(IcebergConstants.IO_IMPL, ResolvingFileIO.class.getName());
+  }
+
+  @VisibleForTesting
+  static void applyRestCatalogHttpTimeoutProperties(
+      IcebergConfig icebergConfig, Map<String, String> properties) {
+    properties.put(
+        IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS,
+        String.valueOf(
+            icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS)));
+    properties.put(
+        IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS,
+        String.valueOf(
+            icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS)));
   }
 
   @VisibleForTesting

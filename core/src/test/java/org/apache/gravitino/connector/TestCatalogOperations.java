@@ -306,6 +306,11 @@ public class TestCatalogOperations
   }
 
   @Override
+  public boolean purgeTable(NameIdentifier ident) {
+    return dropTable(ident);
+  }
+
+  @Override
   public View createView(
       NameIdentifier ident,
       String comment,

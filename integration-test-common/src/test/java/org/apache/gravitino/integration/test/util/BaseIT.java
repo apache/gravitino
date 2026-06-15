@@ -332,8 +332,13 @@ public class BaseIT {
     }
   }
 
-  @BeforeAll
-  public void startIntegrationTest() throws Exception {
+  /**
+   * Starts the Gravitino server (embedded or external) and initialises the admin client. Extracted
+   * from {@link #startIntegrationTest()} so that subclasses can call it directly without triggering
+   * virtual-dispatch through overriding {@code @BeforeAll} overrides (e.g. {@code
+   * SparkEnvIT.startIntegrationTest()} which is intentionally empty).
+   */
+  protected void startServer() throws Exception {
     testMode =
         System.getProperty(ITUtils.TEST_MODE) == null
             ? ITUtils.EMBEDDED_TEST_MODE
@@ -462,6 +467,11 @@ public class BaseIT {
     } else {
       client = GravitinoAdminClient.builder(serverUri).build();
     }
+  }
+
+  @BeforeAll
+  public void startIntegrationTest() throws Exception {
+    startServer();
   }
 
   @AfterAll

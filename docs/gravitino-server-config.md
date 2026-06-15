@@ -1,6 +1,6 @@
 ---
-title: Apache Gravitino configuration
-slug: /gravitino-server-config
+title: "Gravitino Server Configuration"
+slug: "/gravitino-server-config"
 keywords:
   - configuration
 license: "This software is licensed under the Apache License version 2."
@@ -14,14 +14,14 @@ Apache Gravitino supports several configurations:
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
 3. **Some other configurations**: Includes HDFS and other configurations.
 
-## Apache Gravitino server configurations
+## Gravitino Server Configurations
 
-You can customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
+Customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
 We strongly recommend that you read the following sections to understand the configuration file, so you can change the default values to suit your specific situation and usage scenario.
 
 The `gravitino.conf` file lists the configuration items in the following table. It groups those items into the following categories:
 
-### Apache Gravitino HTTP Server configuration
+### HTTP Server Configuration
 
 | Configuration item                                   | Description                                                                                                                                                                           | Default value                                                                | Required | Since version    |
 |------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|------------------|
@@ -30,7 +30,7 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 | `gravitino.server.webserver.minThreads`              | The minimum number of threads in the thread pool used by the Jetty webserver. `minThreads` is 8 if the value is less than 8.                                                          | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)` | No       | 0.2.0            |
 | `gravitino.server.webserver.maxThreads`              | The maximum number of threads in the thread pool used by the Jetty webserver. `maxThreads` is 8 if the value is less than 8, and `maxThreads` must be great or equal to `minThreads`. | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`              | No       | 0.1.0            |
 | `gravitino.server.webserver.threadPoolWorkQueueSize` | The size of the queue in the thread pool used by the Jetty webserver.                                                                                                                 | `100`                                                                        | No       | 0.1.0            |
-| `gravitino.server.webserver.stopTimeout`             | Time in milliseconds to gracefully shut down the Jetty webserver, for more, please see `org.eclipse.jetty.server.Server#setStopTimeout`.                                              | `30000`                                                                      | No       | 0.2.0            |
+| `gravitino.server.webserver.stopTimeout`             | Time in milliseconds to gracefully shut down the Jetty webserver, for more, see `org.eclipse.jetty.server.Server#setStopTimeout`.                                                     | `30000`                                                                      | No       | 0.2.0            |
 | `gravitino.server.webserver.idleTimeout`             | The timeout in milliseconds of idle connections.                                                                                                                                      | `30000`                                                                      | No       | 0.2.0            |
 | `gravitino.server.webserver.requestHeaderSize`       | Maximum size of HTTP requests.                                                                                                                                                        | `131072`                                                                     | No       | 0.1.0            |
 | `gravitino.server.webserver.responseHeaderSize`      | Maximum size of HTTP responses.                                                                                                                                                       | `131072`                                                                     | No       | 0.1.0            |
@@ -40,44 +40,47 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 | `gravitino.server.visibleConfigs`                    | List of configs that are visible in the config servlet                                                                                                                                | (none)                                                                       | No       | 0.9.0-incubating |
 
 The filter in the customFilters should be a standard javax servlet filter.
-You can also specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
+Specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
 
-### Storage configuration
+### Storage Configuration
 
-#### Storage backend configuration
+#### Storage Backend Configuration
 
-Currently, Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
+Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
 If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. It's highly recommended using MySQL as the backend database.  
 
 The following table lists the storage configuration items:
 
-| Configuration item                                | Description                                                                                                                                                                                                                                             | Default value                     | Required                                        | Since version    |
-|---------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|-------------------------------------------------|------------------|
-| `gravitino.entity.store`                          | Which entity storage implementation to use. Only`relational` storage is currently supported.                                                                                                                                                            | `relational`                      | No                                              | 0.1.0            |
-| `gravitino.entity.store.maxTransactionSkewTimeMs` | The maximum skew time of transactions in milliseconds.                                                                                                                                                                                                  | `2000`                            | No                                              | 0.3.0            |
-| `gravitino.entity.store.deleteAfterTimeMs`        | The maximum time in milliseconds that deleted and old-version data is kept. Set to at least 10 minutes and no longer than 30 days.                                                                                                                      | `604800000`(7 days)               | No                                              | 0.5.0            |
-| `gravitino.entity.store.versionRetentionCount`    | The Count of versions allowed to be retained, including the current version, used to delete old versions data. Set to at least 1 and no greater than 10.                                                                                                | `1`                               | No                                              | 0.5.0            |
-| `gravitino.entity.store.relational`               | Detailed implementation of Relational storage. `H2`, `MySQL` and `PostgreSQL` is currently supported, and the implementation is `JDBCBackend`.                                                                                                          | `JDBCBackend`                     | No                                              | 0.5.0            |
-| `gravitino.entity.store.relational.jdbcUrl`       | The database url that the `JDBCBackend` needs to connect to. If you use `MySQL` or `PostgreSQL`, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/{DATABASE_TYPE}/` directory. | `jdbc:h2`                         | No                                              | 0.5.0            |
-| `gravitino.entity.store.relational.jdbcDriver`    | The jdbc driver name that the `JDBCBackend` needs to use. You should place the driver Jar package in the `${GRAVITINO_HOME}/libs/` directory.                                                                                                           | `org.h2.Driver`                   | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
-| `gravitino.entity.store.relational.jdbcUser`      | The username that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                              | `gravitino`                       | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
-| `gravitino.entity.store.relational.jdbcPassword`  | The password that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                              | `gravitino`                       | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
-| `gravitino.entity.store.relational.storagePath`   | The storage path for embedded JDBC storage implementation. It supports both absolute and relative path, if the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is `${GRAVITINO_HOME}/data/jdbc`     | `${GRAVITINO_HOME}/data/jdbc`     | No                                              | 0.6.0-incubating |
-| `gravitino.entity.store.relational.maxConnections`| The maximum number of connections for the JDBC Backend connection pool                                                                                                                                                                                  | `100`                             | No                                              | 0.9.0-incubating |
-| `gravitino.entity.store.relational.maxWaitMillis` | The maximum wait time in milliseconds for a connection from the JDBC Backend connection pool                                                                                                                                                            | `1000`                            | No                                              | 0.9.0-incubating |
+| Configuration item                                 | Description                                                                                                                                                                                                                                             | Default value                     | Required                                        | Since version    |
+|----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|-------------------------------------------------|------------------|
+| `gravitino.entity.store`                           | Which entity storage implementation to use. Only`relational` storage is supported.                                                                                                                                                                      | `relational`                      | No                                              | 0.1.0            |
+| `gravitino.entity.store.maxTransactionSkewTimeMs`  | The maximum skew time of transactions in milliseconds.                                                                                                                                                                                                  | `2000`                            | No                                              | 0.3.0            |
+| `gravitino.entity.store.deleteAfterTimeMs`         | The maximum time in milliseconds that deleted and old-version data is kept. Set to at least 10 minutes and no longer than 30 days.                                                                                                                      | `604800000`(7 days)               | No                                              | 0.5.0            |
+| `gravitino.entity.store.versionRetentionCount`     | The Count of versions allowed to be retained, including the current version, used to delete old versions data. Set to at least 1 and no greater than 10.                                                                                                | `1`                               | No                                              | 0.5.0            |
+| `gravitino.entityChangeLog.pollIntervalSecs`       | The interval in seconds for polling the entity change log. The poller invalidates stale local caches (e.g. the catalog cache) across HA nodes by consuming change log records. Must be positive.                                                        | `3`                               | No                                              | 1.3.0            |
+| `gravitino.entityChangeLog.retentionSecs`          | The retention time in seconds for entity change log rows. Expired rows are pruned periodically. Set to `0` to disable automatic cleanup. Must be non-negative.                                                                                          | `86400`(1 day)                    | No                                              | 1.3.0            |
+| `gravitino.entityChangeLog.cleanupIntervalSecs`    | The interval in seconds for pruning expired entity change log rows. Must be positive.                                                                                                                                                                   | `3600`(1 hour)                    | No                                              | 1.3.0            |
+| `gravitino.entity.store.relational`                | Detailed implementation of Relational storage. `H2`, `MySQL` and `PostgreSQL` is supported, and the implementation is `JDBCBackend`.                                                                                                                    | `JDBCBackend`                     | No                                              | 0.5.0            |
+| `gravitino.entity.store.relational.jdbcUrl`        | The database url that the `JDBCBackend` needs to connect to. If you use `MySQL` or `PostgreSQL`, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/{DATABASE_TYPE}/` directory. | `jdbc:h2`                         | No                                              | 0.5.0            |
+| `gravitino.entity.store.relational.jdbcDriver`     | The jdbc driver name that the `JDBCBackend` needs to use. You should place the driver Jar package in the `${GRAVITINO_HOME}/libs/` directory.                                                                                                           | `org.h2.Driver`                   | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
+| `gravitino.entity.store.relational.jdbcUser`       | The username that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                              | `gravitino`                       | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
+| `gravitino.entity.store.relational.jdbcPassword`   | The password that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                              | `gravitino`                       | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
+| `gravitino.entity.store.relational.storagePath`    | The storage path for embedded JDBC storage implementation. It supports both absolute and relative path, if the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is `${GRAVITINO_HOME}/data/jdbc`     | `${GRAVITINO_HOME}/data/jdbc`     | No                                              | 0.6.0-incubating |
+| `gravitino.entity.store.relational.maxConnections` | The maximum number of connections for the JDBC Backend connection pool                                                                                                                                                                                  | `100`                             | No                                              | 0.9.0-incubating |
+| `gravitino.entity.store.relational.maxWaitMillis`  | The maximum wait time in milliseconds for a connection from the JDBC Backend connection pool                                                                                                                                                            | `1000`                            | No                                              | 0.9.0-incubating |
 
 
 :::caution
 We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`, as it's under the deployment directory and future version upgrades may remove it.
 :::
 
-#### Create JDBC backend schema and table 
+#### Create JDBC Backend Schema and Table
 
 For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
-### Storage cache configuration
+### Storage Cache Configuration
 
-To enable storage caching, please modify the following settings in the `${GRAVITINO_HOME}/conf/gravitino.conf` file:
+To enable storage caching, modify the following settings in the `${GRAVITINO_HOME}/conf/gravitino.conf` file:
 
 ```
 # Whether to enable the cache
@@ -104,7 +107,7 @@ gravitino.cache.lockSegments=16
 - `gravitino.cache.expireTimeInMs`: Controls the cache TTL in milliseconds.
 - If `gravitino.cache.enableStats` is enabled, Gravitino will log cache statistics (hit count, miss count, load failures, etc.) every 5 minutes at the Info level.
 
-#### Eviction strategies
+#### Eviction Strategies
 
 Gravitino supports multiple eviction strategies including capacity-based, weight-based, and time-based (TTL) eviction. The following describes how they work with Caffeine:
 
@@ -129,9 +132,20 @@ All cache entries are subject to a TTL (Time-To-Live) expiration policy. By defa
 - TTL can work in conjunction with both capacity and weight-based eviction;
 - Expired entries will also trigger asynchronous cleanup mechanisms for resource release and logging.
 
-### Tree lock configuration
+### Job Configuration
 
-Gravitino server uses tree lock to ensure the consistency of the data. The tree lock is a memory lock (Currently, Gravitino only supports in memory lock) that can be used to ensure the consistency of the data in Gravitino server. The configuration items are as follows:
+The following table lists the job configuration items:
+
+| Configuration Item                     | Description                                                                                                                                                               | Default Value                 | Required | Since Version |
+|----------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|----------|---------------|
+| `gravitino.job.stagingDir`             | Directory for managing staging files when running jobs.                                                                                                                   | `/tmp/gravitino/jobs/staging` | No       | 1.0.0         |
+| `gravitino.job.executor`               | The executor to run jobs. By default it is `local`; users can implement their own executor and set it here.                                                               | `local`                       | No       | 1.0.0         |
+| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging files of the finished job in the job staging directory. The minimum recommended value is 10 minutes if you are not testing.  | `604800000` (7 days)          | No       | 1.0.0         |
+| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor. The minimum recommended value is 1 minute if you are not testing.                              | `300000` (5 minutes)          | No       | 1.0.0         |
+
+### Tree Lock Configuration
+
+The Gravitino server uses a tree lock to ensure data consistency. The tree lock is an in-memory lock; Gravitino currently supports only in-memory locks. The configuration items are as follows:
 
 | Configuration item                   | Description                                                   | Default value | Required | Since Version |
 |--------------------------------------|---------------------------------------------------------------|---------------|----------|---------------|
@@ -139,7 +153,7 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 | `gravitino.lock.minNodes`            | The minimum number of tree lock nodes to keep in memory       | 1000          | No       | 0.5.0         |
 | `gravitino.lock.cleanIntervalInSecs` | The interval in seconds to clean up the stale tree lock nodes | 60            | No       | 0.5.0         |
 
-### Catalog configuration
+### Catalog Configuration
 
 | Configuration item                           | Description                                                                                                                                                                                         | Default value | Required | Since version |
 |----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -153,7 +167,7 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 |-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.schema.separator` | The separator used to represent a hierarchical (multi-level) schema in schema names at the API boundary, e.g. `:` for `A:B:C`. It only takes effect for catalogs that support hierarchical schemas (currently the Iceberg catalog). The value must not be blank and must not contain `.` or the internal physical separator (ASCII-1, `\u0001`). See [Hierarchical schema](./lakehouse-iceberg-catalog.md#hierarchical-schema). | `:`           | No       | 1.3.0         |
 
-### Auxiliary service configuration
+### Auxiliary Service Configuration
 
 | Configuration item            | Description                                                                                                                    | Default value | Since Version |
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
@@ -161,7 +175,7 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 
 Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configuration details.
 
-### Event listener configuration
+### Event Listener Configuration
 
 Gravitino provides event listener mechanism to allow users to capture the events which are provided by Gravitino server to integrate some custom operations.
 
@@ -228,7 +242,7 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 | policy operation                        | `CreatePolicyPreEvent`, `AlterPolicyPreEvent`, `DeletePolicyPreEvent`, `GetPolicyPreEvent`, `ListPoliciesPreEvent`, `ListPolicyInfosPreEvent`, `EnablePolicyPreEvent`, `DisablePolicyPreEvent`, `GetPolicyForMetadataObjectPreEvent`, `AssociatePoliciesForMetadataObjectPreEvent`, `ListPolicyInfosForMetadataObjectPreEvent`, `ListMetadataObjectsForPolicyPreEvent` | 1.1.0 |
 | function operation                      | `RegisterFunctionPreEvent`, `GetFunctionPreEvent`, `AlterFunctionPreEvent`, `DropFunctionPreEvent`, `ListFunctionPreEvent`                                                                                                                                                                                                        | 1.3.0 |
 
-#### Event listener plugin
+#### Event Listener Plugin
 
 The `EventListenerPlugin` defines an interface for event listeners that manage the lifecycle and state of a plugin. This includes handling its initialization, startup, and shutdown processes, as well as handing events triggered by various operations.
 
@@ -240,25 +254,25 @@ The plugin provides several operational modes for how to process event, supporti
  
 - **ASYNC_ISOLATED**: Events are processed asynchronously, with each listener having its own dedicated queue and dispatcher thread. This approach offers better isolation but at the expense of multiple queues and dispatchers.
 
-When processing pre-event, you could throw a `ForbiddenException` to skip the following executions. For more details, please refer to the definition of the plugin.
+When processing pre-event, you could throw a `ForbiddenException` to skip the following executions. For more details, refer to the definition of the plugin.
 
-### Audit log configuration
+### Audit Log Configuration
 
 The audit log framework defines how audit logs are formatted and written to various storages. The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`. The writer defines an interface to writing AuditLog to different storages.
 
 Gravitino provides a default implementation to log basic audit information to a file. You can extend the audit system by implementing the corresponding interfaces.
 
-| Property name                         | Description                            | Default value                                  | Required | Since Version    |
-|---------------------------------------|----------------------------------------|------------------------------------------------|----------|------------------|
-| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                          | NO       | 0.7.0-incubating |
-| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter     | NO       | 0.7.0-incubating |
-| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.v2.SimpleFormatterV2 | NO      | 0.7.0-incubating |
+| Property name                         | Description                            | Default value                                   | Required | Since Version     |
+|---------------------------------------|----------------------------------------|-------------------------------------------------|----------|-------------------|
+| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                           | NO       | 0.7.0-incubating  |
+| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter      | NO       | 0.7.0-incubating  |
+| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.v2.SimpleFormatterV2 | NO       | 0.7.0-incubating  |
 
-#### Audit log formatter
+#### Audit Log Formatter
 
-The `Formatter` interface transforms an `Event` into an `AuditLog`. `SimpleFormatterV2` is the default implementation and requires no extra configuration. It produces a tab-separated line with the following fields: timestamp, user, operation type, identifier, operation status, event source, remote address, and custom info.
+The `Formatter` interface transforms an `Event` into an `AuditLog`. `SimpleFormatterV2` is the default implementation. `JsonAuditFormatter` is also available when structured JSON output is required. It emits one JSON object per line, serializes `customInfo`, and formats `timestamp` as ISO 8601 with millisecond precision and zone offset. Both simple and JSON formatters mask sensitive values such as `Authorization`, `Cookie`, `X-Amz-Security-Token`, `s3.access-key-id`, and `jdbc-password`.
 
-#### Audit log writer
+#### Audit Log Writer
 
 The `AuditLogWriter` interface enables writing audit logs to different storage mediums (files, databases, etc.).
 
@@ -269,10 +283,10 @@ The `AuditLogWriter` interface enables writing audit logs to different storage m
 The following `gravitino.audit.writer.file.*` properties were accepted in earlier versions but are now **deprecated** and have no effect. `FileAuditWriter` emits a `WARN` log at startup if any of them are present. Configure the equivalent behavior directly in `conf/log4j2.properties` instead.
 
 | Deprecated property                             | Migration: configure in `conf/log4j2.properties`                  |
-|-------------------------------------------------|--------------------------------------------------------------------|
-| `gravitino.audit.writer.file.fileName`          | `appender.audit_file.fileName`                                     |
-| `gravitino.audit.writer.file.append`            | `appender.audit_file.append`                                       |
-| `gravitino.audit.writer.file.flushIntervalSecs` | Use `immediateFlush` on the appender or an async appender wrapper  |
+|-------------------------------------------------|-------------------------------------------------------------------|
+| `gravitino.audit.writer.file.fileName`          | `appender.audit_file.fileName`                                    |
+| `gravitino.audit.writer.file.append`            | `appender.audit_file.append`                                      |
+| `gravitino.audit.writer.file.flushIntervalSecs` | Use `immediateFlush` on the appender or an async appender wrapper |
 
 Example — change the audit log path:
 
@@ -288,17 +302,78 @@ Example — adjust retention to 90 days:
 appender.audit_file.strategy.delete.ifLastModified.age = 90d
 ```
 
-### Security configuration
+### Security Configuration
 
 Refer to [security](security/security.md) for HTTPS and authentication configurations.
 
-### Metrics configuration
+| Configuration Item                         | Description                                                                                                                                                                                                                                          | Default Value | Required | Since Version |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.fetchFile.blockUnsafeRemoteUri` | Whether to block remote file URIs from resolving to unsafe addresses from the Gravitino server side. This applies to job files and catalog files such as Kerberos keytabs. Disable this only for trusted URIs that require access to such addresses. | `true`        | No       | 1.3.0         |
+
+### Metrics Configuration
 
 | Property name                             | Description                                          | Default value | Required | Since Version |
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
 
-### Memory settings
+### Health Check Endpoints
+
+Gravitino exposes three health check endpoints following [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics. All endpoints are exempt from authentication so that Kubernetes probes, load balancers, and global traffic managers can reach them without credentials.
+
+| Endpoint                | Description                                                                                                                                                                           | HTTP status |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /api/health/live`  | Liveness probe. Returns 200 as long as the HTTP server thread can respond. Use this to determine whether to restart a pod.                                                            | 200         |
+| `GET /api/health/ready` | Readiness probe. Returns 200 when the entity store is reachable within the configured timeout; 503 when the entity store is unavailable or slow. Use this to control traffic routing. | 200 / 503   |
+| `GET /api/health`       | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                                                                                         | 200 / 503   |
+
+Root-level aliases are also available for global traffic managers that require probes at well-known root paths:
+
+| Alias               | Forwards to             |
+|---------------------|-------------------------|
+| `GET /health`       | `GET /api/health`       |
+| `GET /health/live`  | `GET /api/health/live`  |
+| `GET /health/ready` | `GET /api/health/ready` |
+| `GET /health.html`  | `GET /api/health`       |
+
+**Configuration:**
+
+| Property name                                        | Description                                                                               | Default value | Required | Since version |
+|------------------------------------------------------|-------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.server.health.entityStore.probeTimeoutMs` | Timeout in milliseconds for the entity-store readiness probe used by `/api/health/ready`. | `2000`        | No       | 1.3.0         |
+
+**Response format:**
+
+All endpoints return a JSON body with the same shape. The `code` field is always `0`. `status` is `UP` or `DOWN`. `checks` lists per-component results; liveness reports `httpServer` and readiness reports `entityStore`.
+
+Healthy response (HTTP 200):
+
+```json
+{
+  "code": 0,
+  "status": "UP",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "entityStore", "status": "UP", "details": {} }
+  ]
+}
+```
+
+Unhealthy response (HTTP 503):
+
+```json
+{
+  "code": 0,
+  "status": "DOWN",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "entityStore", "status": "DOWN", "details": { "reason": "timeout" } }
+  ]
+}
+```
+
+Possible `reason` values in the `entityStore` DOWN check: `timeout`, `interrupted`, `probe-rejected`, or the class name of an unexpected exception.
+
+### Memory Settings
 
 `GRAVITINO_MEM` sets JVM heap/metaspace flags for the Gravitino server and is also read by the Iceberg REST server and Lance REST server launchers.
 
@@ -309,7 +384,7 @@ Typical values:
 - Moderate production: `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`
 - Larger deployments: `-Xms8g -Xmx8g -XX:MaxMetaspaceSize=1g` or higher depending on catalog count, plugins, and query concurrency
 
-## Apache Gravitino catalog properties configuration
+## Catalog Properties Configuration
 
 There are three types of catalog properties:
 
@@ -359,13 +434,13 @@ The following table lists the catalog specific properties and their default path
 The Gravitino server automatically adds the catalog properties configuration directory to classpath.
 :::
 
-## Some other configurations
+## Some Other Configurations
 
 You could put HDFS configuration file to the catalog properties configuration dir, like `catalogs/lakehouse-iceberg/conf/`.
 
-## Docker instructions
+## Docker Instructions
 
-You could run Gravitino server though docker container:
+Run the Gravitino server in a Docker container:
 
 ```shell
 docker run -d -p 8090:8090 apache/gravitino:latest
@@ -403,14 +478,46 @@ These variables override the corresponding entries in `gravitino.conf` at startu
 | `GRAVITINO_ICEBERG_REST_CLASSPATH`                       | `gravitino.iceberg-rest.classpath`                   | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.0.0         |
 | `GRAVITINO_ICEBERG_REST_HOST`                            | `gravitino.iceberg-rest.host`                        | `0.0.0.0`                                            | 1.0.0         |
 | `GRAVITINO_ICEBERG_REST_HTTP_PORT`                       | `gravitino.iceberg-rest.httpPort`                    | `9001`                                               | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_URI`                             | `gravitino.iceberg-rest.uri`                         | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_IO_IMPL`                         | `gravitino.iceberg-rest.io-impl`                     | (none)                                               | 1.3.0         |
 | `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                 | `gravitino.iceberg-rest.catalog-backend`             | `memory`                                             | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_JDBC_DRIVER`                     | `gravitino.iceberg-rest.jdbc-driver`                 | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_JDBC_USER`                       | `gravitino.iceberg-rest.jdbc-user`                   | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_JDBC_PASSWORD`                   | `gravitino.iceberg-rest.jdbc-password`               | (none)                                               | 1.3.0         |
 | `GRAVITINO_ICEBERG_REST_WAREHOUSE`                       | `gravitino.iceberg-rest.warehouse`                   | `/tmp/`                                              | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`            | `gravitino.iceberg-rest.credential-providers`        | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE`        | `gravitino.iceberg-rest.gcs-service-account-file`    | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_ACCESS_KEY`                   | `gravitino.iceberg-rest.s3-access-key-id`            | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_SECRET_KEY`                   | `gravitino.iceberg-rest.s3-secret-access-key`        | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_ENDPOINT`                     | `gravitino.iceberg-rest.s3-endpoint`                 | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_REGION`                       | `gravitino.iceberg-rest.s3-region`                   | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_PATH_STYLE_ACCESS`            | `gravitino.iceberg-rest.s3-path-style-access`        | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_ROLE_ARN`                     | `gravitino.iceberg-rest.s3-role-arn`                 | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_EXTERNAL_ID`                  | `gravitino.iceberg-rest.s3-external-id`              | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_S3_TOKEN_SERVICE_ENDPOINT`       | `gravitino.iceberg-rest.s3-token-service-endpoint`   | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_NAME`      | `gravitino.iceberg-rest.azure-storage-account-name`  | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_KEY`       | `gravitino.iceberg-rest.azure-storage-account-key`   | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_TENANT_ID`                 | `gravitino.iceberg-rest.azure-tenant-id`             | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_ID`                 | `gravitino.iceberg-rest.azure-client-id`             | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_SECRET`             | `gravitino.iceberg-rest.azure-client-secret`         | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_ACCESS_KEY`                  | `gravitino.iceberg-rest.oss-access-key-id`           | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_SECRET_KEY`                  | `gravitino.iceberg-rest.oss-secret-access-key`       | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_ENDPOINT`                    | `gravitino.iceberg-rest.oss-endpoint`                | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_REGION`                      | `gravitino.iceberg-rest.oss-region`                  | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_ROLE_ARN`                    | `gravitino.iceberg-rest.oss-role-arn`                | (none)                                               | 1.3.0         |
+| `GRAVITINO_ICEBERG_REST_OSS_EXTERNAL_ID`                 | `gravitino.iceberg-rest.oss-external-id`             | (none)                                               | 1.3.0         |
 
 :::note
-This feature is supported in the Gravitino Docker image starting from version `1.0.0`.
+The Gravitino server Docker image bundles MySQL and PostgreSQL JDBC drivers under
+`jdbc-drivers/`. The container startup script links them into `libs/` and
+`iceberg-rest-server/libs/` for the auxiliary Iceberg REST service.
+
+For cloud storage backends such as S3, OSS, Azure, or GCS, place the corresponding Iceberg
+bundle jars under `iceberg-bundles/`. The startup script links them into
+`iceberg-rest-server/libs/` at container startup.
 :::
 
-Usage Example:
+### Usage examples
 
 To start a container and override the default HTTP port:
 
@@ -421,7 +528,7 @@ docker run --rm -d \
   apache/gravitino:<tag>
 ```
 
-To configure JDBC backend with PostgreSQL:
+To configure the relational entity store with PostgreSQL:
 
 ```shell
 docker run --rm -d \
@@ -431,10 +538,27 @@ docker run --rm -d \
   apache/gravitino:<tag>
 ```
 
-You can verify that the configuration was applied correctly by inspecting the container's `gravitino.conf`:
+To configure the auxiliary Iceberg REST service with local storage:
 
 ```shell
-docker exec -it <container_id> cat /root/gravitino/conf/gravitino.conf
+docker run --rm -d \
+  -p 8090:8090 \
+  -p 9001:9001 \
+  -e GRAVITINO_ICEBERG_REST_WAREHOUSE=/tmp/warehouse/ \
+  -e GRAVITINO_ICEBERG_REST_HTTP_PORT=9001 \
+  apache/gravitino:<tag>
+```
+
+Verify that the configuration was applied correctly by inspecting the container's `gravitino.conf`:
+
+```shell
+docker exec -it <container_id> cat /opt/gravitino/conf/gravitino.conf
+```
+
+To verify that the auxiliary Iceberg REST service is running:
+
+```shell
+curl http://127.0.0.1:9001/iceberg/v1/config
 ```
 
 :::note
@@ -442,16 +566,16 @@ If both `gravitino.conf` and environment variable exist, the container’s start
 :::
 
 
-## How to set up runtime environment variables
+## Set Up Runtime Environment Variables
 
 The Gravitino server supports configuring runtime environment variables in two ways:
 
 1. **Local deployment:** Modify `gravitino-env.sh` located in the `conf` directory.
 2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 1.0.0)*
 
-### How to access Apache Hadoop
+### Access Apache Hadoop
 
-Currently, due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
+Due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
 Apache Hadoop access. Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
 permissions; otherwise, you may encounter a `Permission denied` error. There are two ways to resolve this error:
 

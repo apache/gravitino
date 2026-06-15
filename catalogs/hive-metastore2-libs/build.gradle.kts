@@ -34,6 +34,7 @@ dependencies {
     implementation(libs.thrift)
     implementation(libs.snappy.java)
     implementation(libs.commons.beanutils)
+    implementation(libs.woodstox.core)
   }
 
   implementation(libs.hadoop3.common) {
@@ -61,6 +62,7 @@ dependencies {
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
     exclude(group = "com.sun.jersey")
+    exclude(group = "io.netty", module = "netty")
     exclude(group = "log4j")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")

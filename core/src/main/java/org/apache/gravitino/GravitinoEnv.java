@@ -103,6 +103,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.utils.FileFetcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,14 +121,17 @@ public class GravitinoEnv {
   private EntityStore entityStore;
 
   private CatalogDispatcher catalogDispatcher;
+  private CatalogDispatcher internalCatalogDispatcher;
 
   private CatalogManager catalogManager;
 
   private MetalakeManager metalakeManager;
 
   private SchemaDispatcher schemaDispatcher;
+  private SchemaDispatcher internalSchemaDispatcher;
 
   private TableDispatcher tableDispatcher;
+  private TableDispatcher internalTableDispatcher;
 
   private PartitionDispatcher partitionDispatcher;
 
@@ -140,6 +144,7 @@ public class GravitinoEnv {
   private FunctionDispatcher functionDispatcher;
 
   private ViewDispatcher viewDispatcher;
+  private ViewDispatcher internalViewDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
 
@@ -150,6 +155,7 @@ public class GravitinoEnv {
   private PolicyDispatcher policyDispatcher;
 
   private AccessControlDispatcher accessControlDispatcher;
+  private AccessControlDispatcher internalAccessControlDispatcher;
 
   private IdGenerator idGenerator;
 
@@ -167,6 +173,7 @@ public class GravitinoEnv {
 
   private EventBus eventBus;
   private OwnerDispatcher ownerDispatcher;
+  private OwnerDispatcher internalOwnerDispatcher;
   private FutureGrantManager futureGrantManager;
   private GravitinoAuthorizer gravitinoAuthorizer;
   private StatisticDispatcher statisticDispatcher;
@@ -194,6 +201,7 @@ public class GravitinoEnv {
   public void initializeBaseComponents(Config config) {
     LOG.info("Initializing Gravitino base environment...");
     this.config = config;
+    FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
     this.manageFullComponents = false;
     initBaseComponents();
     LOG.info("Gravitino base environment is initialized.");
@@ -207,6 +215,7 @@ public class GravitinoEnv {
   public void initializeFullComponents(Config config) {
     LOG.info("Initializing Gravitino full environment...");
     this.config = config;
+    FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
     this.manageFullComponents = true;
     initBaseComponents();
     initGravitinoServerComponents();
@@ -242,6 +251,19 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the internal CatalogDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher preserves normalization but skips hooks and event emission. It is
+   * intended for infrastructure catalog lookups that should not be recorded as user API audit
+   * events.
+   *
+   * @return The internal CatalogDispatcher instance.
+   */
+  public CatalogDispatcher internalCatalogDispatcher() {
+    return internalCatalogDispatcher;
+  }
+
+  /**
    * Get the SchemaDispatcher associated with the Gravitino environment.
    *
    * @return The SchemaDispatcher instance.
@@ -251,12 +273,38 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the internal SchemaDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher preserves normalization but skips hooks and event emission. It is
+   * intended for infrastructure code that synchronizes metadata as part of another user-visible
+   * operation.
+   *
+   * @return The internal SchemaDispatcher instance.
+   */
+  public SchemaDispatcher internalSchemaDispatcher() {
+    return internalSchemaDispatcher;
+  }
+
+  /**
    * Get the TableDispatcher associated with the Gravitino environment.
    *
    * @return The TableDispatcher instance.
    */
   public TableDispatcher tableDispatcher() {
     return tableDispatcher;
+  }
+
+  /**
+   * Get the internal TableDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher preserves normalization but skips hooks and event emission. It is
+   * intended for infrastructure code that synchronizes metadata as part of another user-visible
+   * operation.
+   *
+   * @return The internal TableDispatcher instance.
+   */
+  public TableDispatcher internalTableDispatcher() {
+    return internalTableDispatcher;
   }
 
   /**
@@ -284,6 +332,19 @@ public class GravitinoEnv {
    */
   public ViewDispatcher viewDispatcher() {
     return viewDispatcher;
+  }
+
+  /**
+   * Get the internal ViewDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher preserves normalization but skips hook/event side effects from
+   * dependent schema lookups. It is intended for infrastructure code that synchronizes metadata as
+   * part of another user-visible operation.
+   *
+   * @return The internal ViewDispatcher instance.
+   */
+  public ViewDispatcher internalViewDispatcher() {
+    return internalViewDispatcher;
   }
 
   /**
@@ -383,6 +444,18 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the internal AccessControlDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher skips hooks and event emission. It is intended for authorization
+   * infrastructure lookups that should not be recorded as user API audit events.
+   *
+   * @return The internal AccessControlDispatcher instance.
+   */
+  public AccessControlDispatcher internalAccessControlDispatcher() {
+    return internalAccessControlDispatcher;
+  }
+
+  /**
    * Get the tagDispatcher associated with the Gravitino environment.
    *
    * @return The tagDispatcher instance.
@@ -407,6 +480,18 @@ public class GravitinoEnv {
    */
   public OwnerDispatcher ownerDispatcher() {
     return ownerDispatcher;
+  }
+
+  /**
+   * Get the internal OwnerDispatcher associated with the Gravitino environment.
+   *
+   * <p>The internal dispatcher skips event emission. It is intended for infrastructure ownership
+   * synchronization that happens as part of another user-visible operation.
+   *
+   * @return The internal OwnerDispatcher instance.
+   */
+  public OwnerDispatcher internalOwnerDispatcher() {
+    return internalOwnerDispatcher;
   }
 
   /**
@@ -564,9 +649,12 @@ public class GravitinoEnv {
     // Create and initialize Catalog related modules, the operation chain is:
     // CatalogHookDispatcher -> CatalogEventDispatcher -> CatalogNormalizeDispatcher ->
     // CatalogManager
+    // CatalogManager registers its own change-log listener with the entity store (when the store
+    // supports it), so no poller wiring is needed here.
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);
+    this.internalCatalogDispatcher = catalogNormalizeDispatcher;
     CatalogEventDispatcher catalogEventDispatcher =
         new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
     this.catalogDispatcher = new CatalogHookDispatcher(catalogEventDispatcher);
@@ -578,6 +666,7 @@ public class GravitinoEnv {
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
+    this.internalSchemaDispatcher = schemaNormalizeDispatcher;
     SchemaEventDispatcher schemaEventDispatcher =
         new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
     this.schemaDispatcher = new SchemaHookDispatcher(schemaEventDispatcher);
@@ -586,6 +675,11 @@ public class GravitinoEnv {
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
     TableNormalizeDispatcher tableNormalizeDispatcher =
         new TableNormalizeDispatcher(tableOperationDispatcher, catalogManager);
+    TableOperationDispatcher internalTableOperationDispatcher =
+        new TableOperationDispatcher(
+            catalogManager, entityStore, idGenerator, () -> internalSchemaDispatcher);
+    this.internalTableDispatcher =
+        new TableNormalizeDispatcher(internalTableOperationDispatcher, catalogManager);
     TableEventDispatcher tableEventDispatcher =
         new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
     this.tableDispatcher = new TableHookDispatcher(tableEventDispatcher);
@@ -642,6 +736,11 @@ public class GravitinoEnv {
         new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
     ViewNormalizeDispatcher viewNormalizeDispatcher =
         new ViewNormalizeDispatcher(viewOperationDispatcher, catalogManager);
+    ViewOperationDispatcher internalViewOperationDispatcher =
+        new ViewOperationDispatcher(
+            catalogManager, entityStore, idGenerator, () -> internalSchemaDispatcher);
+    this.internalViewDispatcher =
+        new ViewNormalizeDispatcher(internalViewOperationDispatcher, catalogManager);
     ViewEventDispatcher viewEventDispatcher =
         new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
     this.viewDispatcher = viewEventDispatcher;
@@ -655,15 +754,19 @@ public class GravitinoEnv {
     if (enableAuthorization) {
       AccessControlManager accessControlManager =
           new AccessControlManager(entityStore, idGenerator, config);
+      this.internalAccessControlDispatcher = accessControlManager;
       AccessControlEventDispatcher accessControlEventDispatcher =
           new AccessControlEventDispatcher(eventBus, accessControlManager);
       this.accessControlDispatcher = new AccessControlHookDispatcher(accessControlEventDispatcher);
       OwnerDispatcher ownerManager = new OwnerManager(entityStore);
+      this.internalOwnerDispatcher = ownerManager;
       this.ownerDispatcher = new OwnerEventManager(eventBus, ownerManager);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
       this.accessControlDispatcher = null;
+      this.internalAccessControlDispatcher = null;
       this.ownerDispatcher = null;
+      this.internalOwnerDispatcher = null;
       this.futureGrantManager = null;
     }
 

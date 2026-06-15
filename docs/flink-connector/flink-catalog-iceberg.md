@@ -1,16 +1,18 @@
 ---
-title: "Flink connector Iceberg catalog"
-slug: /flink-connector/flink-catalog-iceberg
-keyword: flink connector iceberg catalog
+title: "Flink Connector: Iceberg Catalog"
+slug: "/flink-connector/flink-catalog-iceberg"
+keyword: "flink connector iceberg catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 The Apache Gravitino Flink connector can be used to read and write Iceberg tables, with the metadata managed by the Gravitino server.
 To enable the Flink connector, you must download the Iceberg Flink runtime JAR and place it in the Flink classpath.
 
 ## Capabilities
 
-#### Supported DML and DDL operations:
+### DML and DDL Operations
 
 - `CREATE CATALOG`
 - `CREATE DATABASE`
@@ -20,7 +22,7 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 - `INSERT INTO & OVERWRITE`
 - `SELECT`
 
-#### Operations not supported:
+### Unsupported Operations
 
 - Partition operations
 - View operations
@@ -31,7 +33,27 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 - `DELETE` clause
 - `CREATE TABLE LIKE` clause
 
-## SQL example
+## Getting Started
+
+### Prerequisites
+
+Place the Iceberg Flink runtime JAR and the Gravitino Flink connector runtime JAR in the `lib` directory of your Flink installation.
+
+Flink clients use a different Iceberg version than the Gravitino server (1.11.0). Use the table below to choose the correct JARs for your Flink version.
+
+| Flink version | Scala | Iceberg version | Iceberg client runtime artifact        | Gravitino connector runtime artifact                                   |
+|---------------|-------|-----------------|----------------------------------------|------------------------------------------------------------------------|
+| 1.18          | 2.12  | 1.9.2           | `iceberg-flink-runtime-1.18-1.9.2.jar` | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| 1.19          | 2.12  | 1.10.2          | `iceberg-flink-runtime-1.19-1.10.2.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
+| 1.20          | 2.12  | 1.11.0          | `iceberg-flink-runtime-1.20-1.11.0.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+
+Replace `${gravitino-version}` with your Gravitino release version.
+
+:::caution
+Use only the JARs from the matching table row. Mixing Iceberg JARs from different versions on the client classpath is not compatible and may cause runtime errors.
+:::
+
+## SQL Example
 
 ```sql
 
@@ -55,14 +77,14 @@ SELECT * FROM sample WHERE data = 'B';
 
 ```
 
-## Catalog properties
+## Catalog Properties
 
 The Gravitino Flink connector transforms the following properties in a catalog to Flink connector configuration.
 
 
 | Gravitino catalog property name | Flink Iceberg connector configuration | Description                                                                                                   | Since Version    |
 |---------------------------------|---------------------------------------|---------------------------------------------------------------------------------------------------------------|------------------|
-| `catalog-backend`               | `catalog-type`                        | Catalog backend type, currently, only `Hive` Catalog is supported, `JDBC` and `Rest` in Continuous Validation | 0.8.0-incubating |
+| `catalog-backend`               | `catalog-type`                        | Catalog backend type, currently, `Hive` and `REST` catalogs are supported, and `JDBC` is in continuous validation | 0.8.0-incubating |
 | `uri`                           | `uri`                                 | Catalog backend URI                                                                                           | 0.8.0-incubating |
 | `warehouse`                     | `warehouse`                           | Catalog backend warehouse                                                                                     | 0.8.0-incubating |
 | `io-impl`                       | `io-impl`                             | The IO implementation for `FileIO` in Iceberg.                                                                | 0.8.0-incubating |

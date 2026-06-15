@@ -33,7 +33,10 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class AuthenticationFilter implements Filter {
@@ -114,22 +117,35 @@ public class AuthenticationFilter implements Filter {
   }
 
   /**
-   * Sends an error response when authentication fails. Subclasses can override this to customize
-   * the error response format (e.g., Iceberg REST server returns JSON error bodies).
-   *
-   * <p>TODO: Gravitino server should override this method to return a correct JSON response
-   * following the Gravitino error response spec.
+   * Sends a JSON error response when authentication fails. Subclasses can override this to
+   * customize the error response format (e.g., Iceberg REST server returns Iceberg-specific JSON
+   * error bodies).
    *
    * @param response the HTTP servlet response
    * @param exception the authentication exception
    */
   protected void sendAuthErrorResponse(HttpServletResponse response, Exception exception)
       throws IOException {
-    int status =
-        exception instanceof UnauthorizedException
-            ? HttpServletResponse.SC_UNAUTHORIZED
-            : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-    response.sendError(status, exception.getMessage());
+    int httpStatus;
+    ErrorResponse errorResponse;
+
+    if (exception instanceof UnauthorizedException) {
+      httpStatus = HttpServletResponse.SC_UNAUTHORIZED;
+      errorResponse =
+          ErrorResponse.unauthorized(
+              exception.getClass().getSimpleName(), exception.getMessage(), exception);
+    } else if (exception instanceof ForbiddenException) {
+      httpStatus = HttpServletResponse.SC_FORBIDDEN;
+      errorResponse = ErrorResponse.forbidden(exception.getMessage(), exception);
+    } else {
+      httpStatus = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+      errorResponse = ErrorResponse.internalError(exception.getMessage(), exception);
+    }
+
+    response.setStatus(httpStatus);
+    response.setContentType("application/json");
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    ObjectMapperProvider.objectMapper().writeValue(response.getWriter(), errorResponse);
   }
 
   /**

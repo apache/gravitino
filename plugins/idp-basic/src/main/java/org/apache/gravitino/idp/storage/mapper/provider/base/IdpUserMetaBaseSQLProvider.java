@@ -20,6 +20,8 @@
 package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.List;
+import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.ibatis.annotations.Param;
@@ -32,6 +34,21 @@ public class IdpUserMetaBaseSQLProvider {
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE user_name = #{username} AND deleted_at = 0";
+  }
+
+  public String selectIdpUserWithGroups(@Param("username") String username) {
+    return "SELECT u.user_name as name, u.password_hash as passwordHash,"
+        + " COALESCE(JSON_ARRAYAGG(g.group_name), JSON_ARRAY()) as groupNames"
+        + " FROM "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u LEFT JOIN "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r ON r.user_id = u.user_id AND r.deleted_at = 0"
+        + " LEFT JOIN "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
+        + " WHERE u.user_name = #{username} AND u.deleted_at = 0"
+        + " GROUP BY u.user_id, u.user_name, u.password_hash";
   }
 
   public String selectIdpUsersByUsernames(@Param("usernames") List<String> usernames) {

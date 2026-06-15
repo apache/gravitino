@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
         id: filter
         with:
           filters: |
@@ -57,6 +57,22 @@ jobs:
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
           ct lint --chart-dirs=dev/charts --chart-yaml-schema=dev/ci/chart_schema.yaml --lint-conf=dev/ci/lintconf.yaml --target-branch ${{ github.event.pull_request.base.ref }} --check-version-increment=false
+
+      - name: Set up helm-unittest
+        if: steps.list-changed.outputs.changed == 'true'
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v1.1.0 --verify=false
+
+      - name: Unit test Gravitino chart
+        if: steps.list-changed.outputs.changed == 'true'
+        run: helm unittest --with-subchart=false dev/charts/gravitino
+
+      - name: Unit test Gravitino Iceberg REST Server chart
+        if: steps.list-changed.outputs.changed == 'true'
+        run: helm unittest --with-subchart=false dev/charts/gravitino-iceberg-rest-server
+
+      - name: Unit test Gravitino Lance REST Server chart
+        if: steps.list-changed.outputs.changed == 'true'
+        run: helm unittest --with-subchart=false dev/charts/gravitino-lance-rest-server
 
       - name: Set up kind cluster
         if: steps.list-changed.outputs.changed == 'true'

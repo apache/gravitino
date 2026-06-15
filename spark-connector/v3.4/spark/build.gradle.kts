@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+evaluationDependsOn(":spark-connector:spark-common")
+
 plugins {
   `maven-publish`
   id("java")
@@ -30,7 +32,7 @@ repositories {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark34.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4connector.get()
+val icebergVersion: String = libs.versions.iceberg4spark34.get()
 val paimonVersion: String = libs.versions.paimon.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
@@ -96,6 +98,16 @@ dependencies {
   }
 
   testImplementation(libs.awaitility)
+  // Iceberg's GlueCatalog references several AWS SDK modules at runtime; must be on test classpath
+  testImplementation(libs.aws.dynamodb)
+  testImplementation(libs.aws.glue)
+  testImplementation(libs.aws.kms)
+  testImplementation(libs.aws.s3)
+  testImplementation(libs.aws.sts)
+  testImplementation(libs.hadoop3.aws)
+  // hadoop-aws declares hadoop-client-api as provided; add it explicitly so S3AFileSystem can load
+  // org.apache.hadoop.fs.impl.prefetch.PrefetchingStatistics (added in 3.3.5) at runtime.
+  testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hive2.common) {
     exclude("com.sun.jersey")
     exclude("org.apache.curator")
@@ -163,6 +175,9 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+val glueHiveJarsDir: String? =
+  project(":spark-connector:spark-common").extra["glueHiveJarsDir"] as String?
+
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
@@ -173,6 +188,10 @@ tasks.test {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
+    if (glueHiveJarsDir != null) {
+      dependsOn(":spark-connector:spark-common:downloadGlueHiveJars")
+      jvmArgs("-Dglue.hive-jars-dir=$glueHiveJarsDir")
+    }
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")

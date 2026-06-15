@@ -22,7 +22,6 @@ import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -81,8 +80,6 @@ class RelationalTable
         SupportsStatistics,
         SupportsPartitionStatistics {
 
-  private static final Joiner DOT_JOINER = Joiner.on(".");
-
   private final Table table;
 
   private final RESTClient restClient;
@@ -119,7 +116,9 @@ class RelationalTable
     this.restClient = restClient;
     this.table = fromDTO(tableDTO);
     MetadataObject tableObject =
-        MetadataObjects.parse(tableFullName(namespace, tableDTO.name()), MetadataObject.Type.TABLE);
+        MetadataObjects.of(
+            Arrays.asList(namespace.level(1), namespace.level(2), tableDTO.name()),
+            MetadataObject.Type.TABLE);
     this.objectTagOperations =
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
     this.objectRoleOperations =
@@ -371,10 +370,6 @@ class RelationalTable
   @Override
   public SupportsPartitionStatistics supportsPartitionStatistics() {
     return this;
-  }
-
-  private static String tableFullName(Namespace tableNS, String tableName) {
-    return DOT_JOINER.join(tableNS.level(1), tableNS.level(2), tableName);
   }
 
   @Override

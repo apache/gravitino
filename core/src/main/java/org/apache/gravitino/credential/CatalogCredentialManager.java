@@ -49,6 +49,15 @@ public class CatalogCredentialManager implements Closeable {
     credentialCache.initialize(catalogProperties);
   }
 
+  /**
+   * Returns the catalog name this manager was created for.
+   *
+   * @return catalog name
+   */
+  public String catalogName() {
+    return catalogName;
+  }
+
   public Optional<Credential> getCredential(String credentialType, CredentialContext context) {
     CredentialCacheKey credentialCacheKey = new CredentialCacheKey(credentialType, context);
     return credentialCache.getCredential(credentialCacheKey, cacheKey -> doGetCredential(cacheKey));

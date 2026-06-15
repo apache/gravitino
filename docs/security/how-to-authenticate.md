@@ -1,16 +1,16 @@
 ---
-title: "How to authenticate"
-slug: /security/how-to-authenticate
-keyword: security authentication oauth kerberos
+title: "Authentication"
+slug: "/security/how-to-authenticate"
+keyword: "security authentication oauth kerberos"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Authentication
+## Introduction
 
-Apache Gravitino supports three kinds of authentication mechanisms: simple, OAuth and Kerberos.
+Apache Gravitino supports four kinds of authentication mechanisms: simple, Basic, OAuth and Kerberos.
 If you don't enable authentication for your client and server explicitly, the user `anonymous` will be used to access the server.
 
-### Simple mode
+### Simple Mode
 
 In simple mode, the client uses the value of the `GRAVITINO_USER` environment variable as the username.
 If the environment variable `GRAVITINO_USER` in the client isn't set, the client defaults to the username of the user logged into the machine sending the requests.
@@ -43,7 +43,58 @@ curl -v -X GET \
   http://localhost:8090/api/version
 ```
 
-### OAuth mode
+### Basic Mode
+
+In Basic mode, Gravitino verifies HTTP Basic credentials against built-in IDP user metadata stored
+in the relational entity store.
+
+To enable Basic mode:
+
+- Set `gravitino.server.rest.extensionPackages` to `org.apache.gravitino.idp.web.rest.feature`.
+- Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
+  the built-in IDP.
+- On the first startup, if any configured service admin does not yet have a password, set the
+  `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable to the initial password (12 to 64
+  characters) before starting Gravitino. The same password is applied to every configured service
+  admin that does not yet exist in the built-in IDP.
+
+For the client side, enable Basic mode with the following code:
+
+```java
+GravitinoClient client = GravitinoClient.builder(uri)
+    .withMetalake("metalake")
+    .withBasicAuth("admin", "YourSecureGravitinoPassword")
+    .build();
+```
+
+```python
+from gravitino.auth.basic_auth_provider import BasicAuthProvider
+from gravitino.client.gravitino_client import GravitinoClient
+
+client = GravitinoClient(
+    uri="http://localhost:8090",
+    metalake_name="metalake",
+    auth_data_provider=BasicAuthProvider("admin", "YourSecureGravitinoPassword"),
+)
+```
+
+```shell
+curl -v -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:YourSecureGravitinoPassword' | base64)" \
+  http://localhost:8090/api/version
+```
+
+:::note
+The Web UI does not provide a username/password login form for built-in IDP Basic authentication.
+Use REST clients, the Java/Python client, or engine connectors instead. See
+[built-in IDP Web UI](how-to-use-built-in-idp.md#web-ui), the
+[Web UI initial page](../webui.md#initial-page), and the
+[Web V2 initial page](../webui-v2.md#initial-page).
+:::
+
+### OAuth Mode
 
 Gravitino supports external OAuth 2.0 servers with two token validation methods:
 
@@ -72,7 +123,7 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
-### Kerberos mode
+### Kerberos Mode
 
 To enable Kerberos mode, users must ensure that the server and client have the correct Kerberos configuration. On the server side, users should set `gravitino.authenticators` as `kerberos` and give
 `gravitino.authenticator.kerberos.principal` and `gravitino.authenticator.kerberos.keytab` a proper value. For the client side, users can enable `kerberos` mode by the following code:
@@ -96,11 +147,11 @@ GravitinoClient client = GravitinoClient.builder(uri)
 ```
 
 :::info
-Currently, the Iceberg REST service does not support Kerberos authentication.
+The Iceberg REST service does not support Kerberos authentication.
 The URI must be the server's hostname instead of its IP address.
 :::
 
-### Custom mode
+### Custom Mode
 
 Gravitino also supports custom authentication implementations.
 For server side, you can implement the interface `Authenticator` and specify `gravitino.authenciators`.
@@ -113,17 +164,17 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
-### Principal mapping
+### Principal Mapping
 
 Gravitino supports principal mapping to transform authenticated principals (from OAuth or Kerberos) into user identities for authorization. By default, Gravitino uses regex-based mapping.
 
-### Group mapping
+### Group Mapping
 
 Gravitino supports group mapping to transform authenticated groups (from OAuth) into Gravitino groups for authorization. By default, Gravitino uses regex-based mapping.
 
-#### OAuth group mapping
+#### OAuth Group Mapping
 
-For OAuth authentication, groups are extracted from JWT claims (configured via `gravitino.authenticator.oauth.groupsFields`). You can customize how these groups are mapped:
+For OAuth authentication, groups are extracted from JWT claims (configured via `gravitino.authenticator.oauth.groupsFields`). Customize how these groups are mapped:
 
 ```text
 # Use default regex mapper that extracts everything (passes through unchanged)
@@ -139,7 +190,7 @@ gravitino.authenticator.oauth.groupMapper.regex.pattern = ^/(.*)
 gravitino.authenticator.oauth.groupMapper = com.example.MyCustomGroupMapper
 ```
 
-#### Custom group mapper
+#### Custom Group Mapper
 
 For advanced use cases, implement the `GroupMapper` interface:
 
@@ -172,9 +223,9 @@ Configure Gravitino to use your custom mapper:
 gravitino.authenticator.oauth.groupMapper = com.example.MyCustomGroupMapper
 ```
 
-#### OAuth principal mapping
+#### OAuth Principal Mapping
 
-For OAuth authentication, principals are extracted from JWT claims (configured via `gravitino.authenticator.oauth.principalFields`). You can customize how these principals are mapped:
+For OAuth authentication, principals are extracted from JWT claims (configured via `gravitino.authenticator.oauth.principalFields`). Customize how these principals are mapped:
 
 ```text
 # Use default regex mapper that extracts everything (passes through unchanged)
@@ -189,7 +240,7 @@ gravitino.authenticator.oauth.principalMapper.regex.pattern = ([^@]+)@.*
 gravitino.authenticator.oauth.principalMapper = com.example.MyCustomPrincipalMapper
 ```
 
-#### Custom principal mapper
+#### Custom Principal Mapper
 
 For advanced use cases, implement the `PrincipalMapper` interface:
 
@@ -213,7 +264,7 @@ Configure Gravitino to use your custom mapper:
 gravitino.authenticator.oauth.principalMapper = com.example.MyCustomPrincipalMapper
 ```
 
-#### Kerberos principal mapping
+#### Kerberos Principal Mapping
 
 For Kerberos authentication, principals follow the format `primary[/instance][@REALM]`. The default mapper extracts the primary component (username before `@`):
 
@@ -227,7 +278,7 @@ gravitino.authenticator.kerberos.principalMapper = regex
 gravitino.authenticator.kerberos.principalMapper.regex.pattern = ([^/@]+).*
 ```
 
-#### Custom Kerberos principal mapper
+#### Custom Kerberos Principal Mapper
 
 For advanced use cases, implement the `PrincipalMapper` interface:
 
@@ -267,7 +318,7 @@ Configure Gravitino to use your custom mapper:
 gravitino.authenticator.kerberos.principalMapper = com.example.RealmBasedMapper
 ```
 
-### Server configuration
+### Server Configuration
 
 Gravitino server and Gravitino Iceberg REST server share the same configuration items, you doesn't need to add `gravitino.iceberg-rest` prefix for Gravitino Iceberg REST server.
 
@@ -314,6 +365,48 @@ The signature algorithms that Gravitino supports follows:
 | PS256 | RSASSA-PSS using SHA-256 and MGF1 with SHA-256 |
 | PS384 | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
 | PS512 | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
+
+### Example: Basic authentication
+
+This example shows how to enable built-in Basic authentication.
+
+**Prerequisites:**
+
+- Gravitino distribution package (includes the idp-basic plugin on the server classpath)
+
+Built-in IdP is **incompatible** with the `simple` authenticator (the default). When the
+`idp-basic` plugin is enabled, `gravitino.authenticators` must not include `simple`.
+
+**Configuration:**
+
+Append the following to `conf/gravitino.conf`:
+
+```text
+gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
+gravitino.authorization.serviceAdmins = admin
+```
+
+On the first startup, if the `admin` service admin does not yet have a password in the store,
+set initial passwords before starting the server:
+
+```bash
+export GRAVITINO_INITIAL_ADMIN_PASSWORD='YourSecureGravitinoPassword'
+./bin/start-gravitino.sh
+```
+
+**Usage:**
+
+```shell
+curl -v -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:YourSecureGravitinoPassword' | base64)" \
+  http://localhost:8090/api/version
+```
+
+If the service admin already has a password, you do not need to set
+`GRAVITINO_INITIAL_ADMIN_PASSWORD` on restart. Gravitino does not change existing passwords
+when the server starts again.
 
 ### Example: Azure AD as OIDC Provider with JWKS Validation
 
@@ -400,9 +493,9 @@ gravitino.authenticator.oauth.tokenValidatorClass = org.apache.gravitino.server.
 gravitino.authenticator.oauth.jwksUri = https://your-oauth-provider/.well-known/jwks.json
 ```
 
-### Example 
+### Example
 
-You can follow the steps to set up an OAuth mode Gravitino server.
+Follow these steps to set up an OAuth mode Gravitino server:
 
 1. Prerequisite
 
@@ -441,7 +534,7 @@ gravitino.authenticator.oauth.serverUri = http://localhost:8177
 
    ![oauth_login_image](../assets/oauth.png)
 
-8. You can also use the curl command to access Gravitino.
+8. Use the curl command to access Gravitino.
 
 Get access token
 
@@ -455,7 +548,7 @@ Use the access token to request the Gravitino
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
 ```
 
-### Example: Keycloak as OAuth providers
+### Configure Keycloak as an OAuth Provider
 
 1. Set up an external Keycloak server, you can refer to [Keycloak document](https://www.keycloak.org/getting-started/getting-started-docker)
 
@@ -505,7 +598,7 @@ docker run -dti -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRA
 
    ![create-client.png](../assets/security/create-client.png)
 
-7. You can refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
+7. Refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
 gravitino.authenticators = oauth

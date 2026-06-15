@@ -1,12 +1,12 @@
 ---
-title: How to build Apache Gravitino
-slug: /how-to-build
+title: "Build Gravitino"
+slug: "/how-to-build"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-- [Prerequisites](#prerequisites)
-- [Quick start](#quick-start)
-- [How to Build Apache Gravitino on Windows (Using WSL)](#how-to-build-apache-gravitino-on-windows-using-wsl)
+## Introduction
+
+Gravitino builds from source on Linux and macOS natively, and on Windows through WSL. The sections below cover prerequisites, the quick-start build sequence for the server and connectors, and the Windows-specific setup steps.
 
 ## Prerequisites
 
@@ -28,11 +28,11 @@ license: "This software is licensed under the Apache License version 2."
 + Depending on how you deploy Gravitino, other software used in conjunction with Gravitino may contain known security vulnerabilities.
 :::
 
-## Quick start
+## Quick Start
 
 1. Clone the Gravitino project.
 
-   If you want to contribute to this open-source project, please fork the project on GitHub first. After forking, clone the forked project to your local environment, make your changes, and submit a pull request (PR).
+   If you want to contribute to this open-source project, fork the project on GitHub first. After forking, clone the forked project to your local environment, make your changes, and submit a pull request (PR).
 
    ```shell
    git clone git@github.com:apache/gravitino.git
@@ -47,7 +47,7 @@ license: "This software is licensed under the Apache License version 2."
 
   The `./gradlew build` command builds all the Gravitino components, including the Gravitino server, Java and Python clients, Trino and Spark connectors, and more.
 
-  For the Python client, the `./gradlew build` command builds the Python client with Python 3.12 by default. If you want to use Python 3.10 or 3.11 to build, please modify the property `pythonVersion` to 3.10 or 3.11 in the `gradle.properties` file, or specify the version with `-P` like:
+  For the Python client, the `./gradlew build` command builds the Python client with Python 3.12 by default. If you want to use Python 3.10 or 3.11 to build, modify the property `pythonVersion` to 3.10 or 3.11 in the `gradle.properties` file, or specify the version with `-P` like:
 
    ```shell
    ./gradlew build -PpythonVersion=3.10
@@ -88,9 +88,9 @@ license: "This software is licensed under the Apache License version 2."
  
   You can add `-x test` to skip the tests using `./gradlew build -x test`.
 
-  The built Gravitino libraries are Java 17 compatible and verified under 17 environments. You can use Java 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
+  The built Gravitino libraries are Java 17 compatible and verified under 17 environments. Use Java 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
 
-  The built jars are under the modules `build/libs` directory. You can publish them in your Maven repository for use in your project.
+  The built jars are under the modules `build/libs` directory. Publish them in your Maven repository for use in your project.
   :::
 
 3. Get the Gravitino server binary package.
@@ -120,9 +120,9 @@ license: "This software is licensed under the Apache License version 2."
 
   The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz`, `gravitino-{version}-bin.tar.gz.sha256`, `gravitino-{version}-bin-all.tar.gz`, `gravitino-{version}-bin-all.tar.gz.sha256` under the `distribution` directory.
   
-  About the difference between `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin-all.tar.gz`, please refer to the explanation of the difference between `package` and `package-all` in the previous step.  
+  `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin-all.tar.gz` follow the same distinction as `package` and `package-all` from the previous step.  
 
-  You can deploy these to your production environment.
+  Deploy these to your production environment.
 
   :::note
   The `gravitino-{version}-bin.tar.gz` file is the Gravitino **server** distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino server distribution package.
@@ -151,7 +151,7 @@ license: "This software is licensed under the Apache License version 2."
 
   This creates `gravitino-iceberg-rest-server-{version}.tar.gz` and `gravitino-iceberg-rest-server-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to use the Gravitino Iceberg REST server.
 
-## How to build Apache Gravitino on Windows (Using WSL)
+## Build on Windows (Using WSL)
 
 ### Download WSL (Ubuntu)
 
@@ -163,7 +163,7 @@ Refer to this guide for installation: [WSL Installation Guide](https://learn.mic
 
 This step involves setting up your Windows machine's Windows Subsystem for Linux (WSL). WSL allows you to run a Linux distribution alongside Windows, providing a Linux-like environment for development.
 
-### Update package list and install necessary packages
+### Update Package List and Install Necessary Packages
 
 **On Ubuntu (WSL):**
 
@@ -174,7 +174,7 @@ sudo apt install apt-transport-https ca-certificates curl software-properties-co
 
 Updating the package list ensures you have the latest information on the newest versions of packages and dependencies. Installing the necessary packages lets your system download and manage additional software securely.
 
-### Download and setup Java SDK 17
+### Download and Set Up Java SDK 17
 
 **On Ubuntu (WSL):**
 
@@ -229,7 +229,7 @@ python3.11 --version
 
 These commands add a repository that provides the latest Python versions and installs Python 3.11.
 
-### Download Apache Gravitino project to WSL
+### Download Apache Gravitino Project to WSL
 
 **On Ubuntu (WSL):**
 
@@ -245,6 +245,6 @@ Access [http://localhost:8090](http://localhost:8090)
 
 Building the Gravitino project compiles the necessary components, and starting the server allows you to access the application in your browser.
 
-Please refer to [CONTRIBUTING.md](https://github.com/apache/gravitino/blob/main/CONTRIBUTING.md) for instructions on running the project using VSCode or IntelliJ on Windows.
+Refer to [CONTRIBUTING.md](https://github.com/apache/gravitino/blob/main/CONTRIBUTING.md) for instructions on running the project using VSCode or IntelliJ on Windows.
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToBuild" alt="" />

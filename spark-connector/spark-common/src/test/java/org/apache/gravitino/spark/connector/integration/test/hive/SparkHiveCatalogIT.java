@@ -22,8 +22,15 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.hive.HivePropertiesConstants;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
@@ -31,6 +38,7 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo.SparkColumnInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
@@ -165,6 +173,17 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     // test exactly match
     partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=2)");
     Assertions.assertEquals(0, partitionInfo.size());
+
+    String nullPartitionTableName = "hive_null_partition_ops_table";
+    dropTableIfExists(nullPartitionTableName);
+    sql(
+        "CREATE TABLE "
+            + nullPartitionTableName
+            + " (id INT, name STRING) PARTITIONED BY (dt INT) STORED AS PARQUET");
+    sql("INSERT INTO " + nullPartitionTableName + " (id, name, dt) SELECT 1, 'test', null");
+    List<Object[]> nullPartitionInfo = getTablePartitions(nullPartitionTableName);
+    Assertions.assertEquals(1, nullPartitionInfo.size());
+    Assertions.assertTrue(String.valueOf(nullPartitionInfo.get(0)[0]).startsWith("dt="));
 
     Exception exception =
         Assertions.assertThrows(
@@ -516,5 +535,162 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
             SparkColumnInfo.of("id", DataTypes.IntegerType),
             SparkColumnInfo.of("ts", DataTypes.TimestampType));
     checkTableColumns(tableName, expectedSparkInfo, tableInfo);
+  }
+
+  @Test
+  void testCreateViewViaSql() {
+    String tableName = "cv_base_table";
+    String viewName = "cv_test_view";
+    String schemaName = getDefaultDatabase();
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    try {
+      // CREATE VIEW via SQL is not supported for V2 named catalogs. Spark's
+      // ResolveSessionCatalog unconditionally throws for any non-session catalog
+      // (see the "case CreateView(ResolvedIdentifier(catalog, _), ...)" branch), regardless of
+      // whether the catalog implements ViewCatalog. Views must be created through the
+      // Gravitino API (ViewCatalog.createView) and are readable via SELECT.
+      AnalysisException ex =
+          Assertions.assertThrows(
+              AnalysisException.class,
+              () ->
+                  sql(
+                      String.format(
+                          "CREATE VIEW %s.%s.%s AS SELECT * FROM %s.%s.%s",
+                          getCatalogName(),
+                          schemaName,
+                          viewName,
+                          getCatalogName(),
+                          schemaName,
+                          tableName)));
+      Assertions.assertTrue(
+          ex.getMessage().contains("does not support views"),
+          "Expected error about view support, got: " + ex.getMessage());
+    } finally {
+      dropTableIfExists(tableName);
+    }
+  }
+
+  @Test
+  void testSelectHiveView() {
+    String tableName = "view_base_table";
+    String viewName = "test_hive_view";
+    String schemaName = getDefaultDatabase();
+
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    sql(String.format("INSERT INTO %s VALUES (1, '1', 1),(2, '2', 2),(3, '3', 3)", tableName));
+
+    ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
+    NameIdentifier viewIdent = NameIdentifier.of(schemaName, viewName);
+    if (viewCatalog.viewExists(viewIdent)) {
+      viewCatalog.dropView(viewIdent);
+    }
+
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder()
+            .withDialect("spark")
+            .withSql(
+                String.format("SELECT * FROM %s.%s.%s", getCatalogName(), schemaName, tableName))
+            .build();
+    viewCatalog.createView(
+        viewIdent,
+        "test view",
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), null),
+          Column.of("name", Types.StringType.get(), null),
+          Column.of("age", Types.IntegerType.get(), null)
+        },
+        new SQLRepresentation[] {sparkRep},
+        getCatalogName(),
+        schemaName,
+        ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
+
+    try {
+      List<String> data =
+          getQueryData(
+              String.format("SELECT * FROM %s.%s.%s", getCatalogName(), schemaName, viewName));
+      data.sort(Comparator.naturalOrder());
+      Assertions.assertEquals(3, data.size());
+      Assertions.assertEquals("1,1,1", data.get(0));
+      Assertions.assertEquals("2,2,2", data.get(1));
+      Assertions.assertEquals("3,3,3", data.get(2));
+    } finally {
+      viewCatalog.dropView(viewIdent);
+      dropTableIfExists(tableName);
+    }
+  }
+
+  @Test
+  void testTableExistsForView() {
+    String viewName = "test_view_exists";
+    String schemaName = getDefaultDatabase();
+
+    ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
+    NameIdentifier viewIdent = NameIdentifier.of(schemaName, viewName);
+    if (viewCatalog.viewExists(viewIdent)) {
+      viewCatalog.dropView(viewIdent);
+    }
+
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1 AS id").build();
+    viewCatalog.createView(
+        viewIdent,
+        null,
+        new Column[] {Column.of("id", Types.IntegerType.get(), null)},
+        new SQLRepresentation[] {sparkRep},
+        null,
+        null,
+        ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
+
+    try {
+      Assertions.assertDoesNotThrow(
+          () ->
+              sql(
+                  String.format(
+                      "DESCRIBE TABLE %s.%s.%s", getCatalogName(), schemaName, viewName)));
+    } finally {
+      viewCatalog.dropView(viewIdent);
+    }
+  }
+
+  @Test
+  void testShowTablesExcludesViews() {
+    String tableName = "show_tables_base_table";
+    String viewName = "show_tables_view";
+    String schemaName = getDefaultDatabase();
+
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+
+    ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
+    NameIdentifier viewIdent = NameIdentifier.of(schemaName, viewName);
+    if (viewCatalog.viewExists(viewIdent)) {
+      viewCatalog.dropView(viewIdent);
+    }
+
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder()
+            .withDialect("spark")
+            .withSql(
+                String.format("SELECT * FROM %s.%s.%s", getCatalogName(), schemaName, tableName))
+            .build();
+    viewCatalog.createView(
+        viewIdent,
+        null,
+        new Column[0],
+        new SQLRepresentation[] {sparkRep},
+        getCatalogName(),
+        schemaName,
+        ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
+
+    try {
+      Set<String> tableNames = listTableNames(schemaName);
+      Assertions.assertTrue(tableNames.contains(tableName));
+      Assertions.assertFalse(tableNames.contains(viewName));
+    } finally {
+      viewCatalog.dropView(viewIdent);
+      dropTableIfExists(tableName);
+    }
   }
 }

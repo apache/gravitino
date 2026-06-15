@@ -1,0 +1,267 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino deployment
+templates:
+  - deployment.yaml
+  - configmap.yaml
+tests:
+  - it: renders the default deployment
+    template: deployment.yaml
+    release:
+      name: gravitino
+      namespace: gravitino-system
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.namespace
+          value: gravitino-system
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.selector.matchLabels.release
+          value: gravitino
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: default
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: sqlfile
+          any: true
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "^docker\\.io/apache/gravitino:.+"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GRAVITINO_HOME
+            value: /opt/gravitino
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: http
+            containerPort: 8090
+            protocol: TCP
+          any: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: storage
+            emptyDir: {}
+          any: true
+
+  - it: renders pod customization, templated env, and an existing storage claim
+    release:
+      name: gravitino-custom
+    template: deployment.yaml
+    set:
+      replicas: 2
+      serviceAccountName: gravitino-sa
+      global:
+        imagePullSecrets:
+          - name: registry-secret
+      podLabels:
+        app.kubernetes.io/part-of: gravitino
+      podAnnotations:
+        prometheus.io/scrape: "true"
+      envWithTpl:
+        - name: RELEASE_NAME
+          value: "{{ .Release.Name }}"
+      envFrom:
+        - configMapRef:
+            name: gravitino-env
+      persistence:
+        enabled: true
+        existingClaim: gravitino-data
+      extraVolumes:
+        - name: audit-config
+          configMap:
+            name: audit-config
+      extraVolumeMounts:
+        - name: audit-config
+          mountPath: /opt/gravitino/audit
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: gravitino-sa
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: registry-secret
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/part-of"]
+          value: gravitino
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: RELEASE_NAME
+            value: gravitino-custom
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: gravitino-env
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: storage
+            persistentVolumeClaim:
+              claimName: gravitino-data
+          any: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: audit-config
+            configMap:
+              name: audit-config
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: audit-config
+            mountPath: /opt/gravitino/audit
+
+  - it: renders security contexts, resources, and custom probes
+    template: deployment.yaml
+    set:
+      podSecurityContext:
+        fsGroup: 1000
+      initContainerSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+      containerSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 2Gi
+      initResources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 100m
+          memory: 256Mi
+      livenessProbe:
+        httpGet:
+          path: /api/version
+          port: http
+        initialDelaySeconds: 30
+        timeoutSeconds: 3
+      readinessProbe:
+        httpGet:
+          path: /api/health
+          port: http
+        initialDelaySeconds: 10
+        timeoutSeconds: 2
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 1000
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.runAsUser
+          value: 2000
+      - equal:
+          path: spec.template.spec.initContainers[0].resources.requests.cpu
+          value: 50m
+      - equal:
+          path: spec.template.spec.initContainers[0].resources.limits.memory
+          value: 256Mi
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsUser
+          value: 1000
+      - contains:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          content: ALL
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: 1Gi
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: "2"
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /api/version
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /api/health
+
+  - it: renders MySQL initialization when MySQL is enabled
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      mysql:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: init-mysql
+          any: true
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-mysql")].command[2]
+          pattern: "Waiting for MySQL to be ready"
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-mysql")].env
+          content:
+            name: GRAVITINO_DB
+            value: gravitino
+          any: true
+
+  - it: renders PostgreSQL initialization when PostgreSQL is enabled
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: init-postgresql
+          any: true
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: "Waiting for PostgreSQL to be ready"
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: GRAVITINO_DB
+            value: gravitino
+          any: true

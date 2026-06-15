@@ -18,8 +18,12 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -27,6 +31,7 @@ import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
@@ -37,6 +42,9 @@ import org.apache.gravitino.listener.api.event.IcebergCreateNamespacePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropNamespacePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergListNamespacesEvent;
+import org.apache.gravitino.listener.api.event.IcebergListNamespacesFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergListNamespacesPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadNamespacePreEvent;
@@ -45,6 +53,7 @@ import org.apache.gravitino.listener.api.event.IcebergNamespaceExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
@@ -53,6 +62,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
@@ -159,11 +169,14 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2", "a"));
     verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "b"));
 
-    verifyDropNamespaceSucc(Namespace.of("exists_foo2"));
-    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2"));
+    // Iceberg 1.11: dropping a namespace that still has child namespaces returns 409 Conflict.
+    verifyDropNamespaceFail(409, Namespace.of("exists_foo2"));
+    verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2"));
     verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2", "a"));
 
     verifyDropNamespaceSucc(Namespace.of("exists_foo2", "a"));
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "a"));
+    verifyDropNamespaceSucc(Namespace.of("exists_foo2"));
     verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2"));
     verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "a"));
   }
@@ -258,7 +271,14 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
   void testListNamespace(String prefix) {
     setUrlPathWithPrefix(prefix);
     dropAllExistingNamespace();
+
+    dummyEventListener.clearEvent();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList());
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergListNamespacesPreEvent);
+    Event emptyListEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(emptyListEvent instanceof IcebergListNamespacesEvent);
+    Assertions.assertEquals(0, ((IcebergListNamespacesEvent) emptyListEvent).resultCount());
 
     doCreateNamespace(Namespace.of("list_foo1"));
     doCreateNamespace(Namespace.of("list_foo2"));
@@ -267,16 +287,80 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     doCreateNamespace(Namespace.of("list_foo3", "a", "z"));
     doCreateNamespace(Namespace.of("list_foo3", "a", "y"));
 
+    dummyEventListener.clearEvent();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList("list_foo1", "list_foo2", "list_foo3"));
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergListNamespacesPreEvent);
+    Event listEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(listEvent instanceof IcebergListNamespacesEvent);
+    Assertions.assertEquals(3, ((IcebergListNamespacesEvent) listEvent).resultCount());
+
     verifyListNamespaceSucc(
         Optional.of(Namespace.of("list_foo3")), Arrays.asList("list_foo3.a", "list_foo3.b"));
     verifyListNamespaceSucc(
         Optional.of(Namespace.of("list_foo3", "a")),
         Arrays.asList("list_foo3.a.y", "list_foo3.a.z"));
 
+    dummyEventListener.clearEvent();
     verifyListNamespaceFail(Optional.of(Namespace.of("list_fooxx")), 404);
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergListNamespacesPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergListNamespacesFailureEvent);
+
     verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "c")), 404);
     verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "a", "x")), 404);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  void testListNamespaceWithPagination(String prefix) {
+    setUrlPathWithPrefix(prefix);
+    dropAllExistingNamespace();
+
+    doCreateNamespace(Namespace.of("page_ns1"));
+    doCreateNamespace(Namespace.of("page_ns2"));
+    doCreateNamespace(Namespace.of("page_ns3"));
+
+    // First page: pageSize=2, no pageToken
+    Response firstPageResponse =
+        getNamespaceClientBuilder(
+                Optional.empty(), Optional.empty(), Optional.of(ImmutableMap.of("pageSize", "2")))
+            .get();
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstPageResponse.getStatus());
+    ListNamespacesResponse firstPage = firstPageResponse.readEntity(ListNamespacesResponse.class);
+    Assertions.assertEquals(2, firstPage.namespaces().size());
+    Assertions.assertNotNull(firstPage.nextPageToken());
+
+    // Second page using the nextPageToken
+    Response secondPageResponse =
+        getNamespaceClientBuilder(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(
+                    ImmutableMap.of("pageToken", firstPage.nextPageToken(), "pageSize", "2")))
+            .get();
+    Assertions.assertEquals(Status.OK.getStatusCode(), secondPageResponse.getStatus());
+    ListNamespacesResponse secondPage = secondPageResponse.readEntity(ListNamespacesResponse.class);
+    Assertions.assertEquals(1, secondPage.namespaces().size());
+    Assertions.assertNull(secondPage.nextPageToken());
+
+    // Verify combined results
+    Set<String> paginatedNames =
+        java.util.stream.Stream.concat(
+                firstPage.namespaces().stream(), secondPage.namespaces().stream())
+            .map(Namespace::toString)
+            .collect(Collectors.toSet());
+    Assertions.assertEquals(ImmutableSet.of("page_ns1", "page_ns2", "page_ns3"), paginatedNames);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testIcebergListNamespacesEventDeprecatedConstructorReturnsNegativeCount() {
+    IcebergListNamespacesEvent event =
+        new IcebergListNamespacesEvent(
+            Mockito.mock(IcebergRequestContext.class), NameIdentifier.of("metalake", "catalog"));
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test
