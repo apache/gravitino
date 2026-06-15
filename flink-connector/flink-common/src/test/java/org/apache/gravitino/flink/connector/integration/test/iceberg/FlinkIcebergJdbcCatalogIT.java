@@ -19,26 +19,18 @@
 
 package org.apache.gravitino.flink.connector.integration.test.iceberg;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.Map;
-import java.util.Optional;
-import org.apache.flink.table.api.TableResult;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
-import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalog;
 import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
 
 /** Iceberg catalog with a JDBC (MySQL) metadata backend. */
 @Tag("gravitino-docker-test")
@@ -95,76 +87,37 @@ public abstract class FlinkIcebergJdbcCatalogIT extends FlinkIcebergCatalogIT {
   }
 
   /**
-   * The base test creates the catalog via SQL with only backend/uri/warehouse, but a JDBC backend
-   * also requires the jdbc credentials and credential vending, so the WITH clause is extended here.
+   * The base WITH clause only carries backend/uri/warehouse, but a JDBC backend also needs the jdbc
+   * driver, credential vending, and native jdbc credentials (the latter for the create-time eager
+   * connect, since vending is not available until the catalog is persisted in Gravitino).
    */
   @Override
-  @Test
-  public void testCreateGravitinoIcebergUsingSQL() {
-    tableEnv.useCatalog(DEFAULT_CATALOG);
-    int numCatalogs = tableEnv.listCatalogs().length;
-
-    String catalogName = "gravitino_iceberg_using_sql";
-    tableEnv.executeSql(
-        String.format(
-            "create catalog %s with ("
-                + "'type'='%s', "
-                + "'catalog-backend'='%s',"
-                + "'uri'='%s',"
-                + "'warehouse'='%s',"
-                + "'jdbc-user'='%s',"
-                + "'jdbc-password'='%s',"
-                + "'jdbc-driver'='%s',"
-                + "'%s'='%s',"
-                // Native jdbc credentials are needed for the create-time eager connect (vending is
-                // not available until the catalog is persisted in Gravitino).
-                + "'jdbc.user'='%s',"
-                + "'jdbc.password'='%s'"
-                + ")",
-            catalogName,
-            GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
-            getCatalogBackend(),
-            getUri(),
-            warehouse,
-            mySQLContainer.getUsername(),
-            mySQLContainer.getPassword(),
-            getDriverClassName(),
-            CredentialConstants.CREDENTIAL_PROVIDERS,
-            JdbcCredential.JDBC_CREDENTIAL_TYPE,
-            mySQLContainer.getUsername(),
-            mySQLContainer.getPassword()));
-    Assertions.assertTrue(metalake.catalogExists(catalogName));
-
-    Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
-    Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals(getUri(), properties.get(IcebergConstants.URI));
-
-    Optional<org.apache.flink.table.catalog.Catalog> catalog = tableEnv.getCatalog(catalogName);
-    Assertions.assertTrue(catalog.isPresent());
-    Assertions.assertInstanceOf(GravitinoIcebergCatalog.class, catalog.get());
-
-    String[] catalogs = tableEnv.listCatalogs();
-    Assertions.assertEquals(numCatalogs + 1, catalogs.length, "Should create a new catalog");
-    Assertions.assertTrue(
-        Arrays.asList(catalogs).contains(catalogName), "Should create the correct catalog.");
-
-    TableResult result = tableEnv.executeSql("show catalogs");
-    Assertions.assertEquals(
-        numCatalogs + 1, Lists.newArrayList(result.collect()).size(), "Should have 2 catalogs");
-
-    tableEnv.useCatalog(catalogName);
-    Assertions.assertEquals(
+  protected String buildCreateCatalogSql(String catalogName) {
+    return String.format(
+        "create catalog %s with ("
+            + "'type'='%s', "
+            + "'catalog-backend'='%s',"
+            + "'uri'='%s',"
+            + "'warehouse'='%s',"
+            + "'jdbc-user'='%s',"
+            + "'jdbc-password'='%s',"
+            + "'jdbc-driver'='%s',"
+            + "'%s'='%s',"
+            + "'jdbc.user'='%s',"
+            + "'jdbc.password'='%s'"
+            + ")",
         catalogName,
-        tableEnv.getCurrentCatalog(),
-        "Current catalog should be the one that is created just now.");
-
-    tableEnv.useCatalog(DEFAULT_CATALOG);
-    tableEnv.executeSql("drop catalog " + catalogName);
-    Assertions.assertFalse(metalake.catalogExists(catalogName));
-
-    Optional<org.apache.flink.table.catalog.Catalog> droppedCatalog =
-        tableEnv.getCatalog(catalogName);
-    Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
+        GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
+        getCatalogBackend(),
+        getUri(),
+        warehouse,
+        mySQLContainer.getUsername(),
+        mySQLContainer.getPassword(),
+        getDriverClassName(),
+        CredentialConstants.CREDENTIAL_PROVIDERS,
+        JdbcCredential.JDBC_CREDENTIAL_TYPE,
+        mySQLContainer.getUsername(),
+        mySQLContainer.getPassword());
   }
 
   @Override

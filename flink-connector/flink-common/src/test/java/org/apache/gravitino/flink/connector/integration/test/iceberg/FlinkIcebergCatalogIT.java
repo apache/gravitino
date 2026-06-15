@@ -146,19 +146,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
 
     // Create a new catalog.
     String catalogName = "gravitino_iceberg_using_sql";
-    tableEnv.executeSql(
-        String.format(
-            "create catalog %s with ("
-                + "'type'='%s', "
-                + "'catalog-backend'='%s',"
-                + "'uri'='%s',"
-                + "'warehouse'='%s'"
-                + ")",
-            catalogName,
-            GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
-            getCatalogBackend(),
-            getUri(),
-            warehouse));
+    tableEnv.executeSql(buildCreateCatalogSql(catalogName));
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the properties of the created catalog.
@@ -505,4 +493,26 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
   protected abstract String getCatalogBackend();
 
   protected abstract String getUri();
+
+  /**
+   * Builds the {@code CREATE CATALOG} SQL used by {@link #testCreateGravitinoIcebergUsingSQL()}.
+   * Subclasses override this to add backend-specific options (e.g. JDBC credentials).
+   *
+   * @param catalogName the catalog name to create.
+   * @return the {@code CREATE CATALOG} SQL statement.
+   */
+  protected String buildCreateCatalogSql(String catalogName) {
+    return String.format(
+        "create catalog %s with ("
+            + "'type'='%s', "
+            + "'catalog-backend'='%s',"
+            + "'uri'='%s',"
+            + "'warehouse'='%s'"
+            + ")",
+        catalogName,
+        GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
+        getCatalogBackend(),
+        getUri(),
+        warehouse);
+  }
 }
