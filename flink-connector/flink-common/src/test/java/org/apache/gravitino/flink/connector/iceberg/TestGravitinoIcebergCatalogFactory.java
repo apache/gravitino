@@ -130,65 +130,47 @@ class TestGravitinoIcebergCatalogFactory {
   }
 
   @Test
-  void testInjectRestAuthInjectsForRestBackend() {
-    Map<String, String> icebergCatalogOptions = new HashMap<>();
-    Map<String, String> clientConfig =
-        ImmutableMap.of(
-            GravitinoCatalogStoreFactoryOptions.AUTH_TYPE,
-                GravitinoCatalogStoreFactoryOptions.BASIC,
-            GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME, "user",
-            GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD, "password");
+  void testRestAuthPropertiesForRestBackend() {
+    Map<String, String> authProperties =
+        GravitinoIcebergCatalogFactory.restAuthProperties(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
+            new HashMap<>(),
+            basicConfig());
 
-    GravitinoIcebergCatalogFactory.injectRestAuth(
-        icebergCatalogOptions,
-        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
-        clientConfig);
-
-    assertEquals(
-        AuthProperties.AUTH_TYPE_BASIC, icebergCatalogOptions.get(AuthProperties.AUTH_TYPE));
-    assertEquals("user", icebergCatalogOptions.get(AuthProperties.BASIC_USERNAME));
+    assertEquals(AuthProperties.AUTH_TYPE_BASIC, authProperties.get(AuthProperties.AUTH_TYPE));
+    assertEquals("user", authProperties.get(AuthProperties.BASIC_USERNAME));
   }
 
   @Test
-  void testInjectRestAuthSkipsNonRestBackend() {
-    Map<String, String> icebergCatalogOptions = new HashMap<>();
-    Map<String, String> clientConfig =
-        ImmutableMap.of(
-            GravitinoCatalogStoreFactoryOptions.AUTH_TYPE,
-                GravitinoCatalogStoreFactoryOptions.BASIC,
-            GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME, "user",
-            GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD, "password");
-
-    GravitinoIcebergCatalogFactory.injectRestAuth(
-        icebergCatalogOptions,
-        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE,
-        clientConfig);
+  void testRestAuthPropertiesSkipsNonRestBackend() {
+    Map<String, String> authProperties =
+        GravitinoIcebergCatalogFactory.restAuthProperties(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE,
+            new HashMap<>(),
+            basicConfig());
 
     assertTrue(
-        icebergCatalogOptions.isEmpty(),
-        "Auth must not leak into a non-REST backend's catalog options");
+        authProperties.isEmpty(), "Auth must not leak into a non-REST backend's catalog options");
   }
 
   @Test
-  void testInjectRestAuthDoesNotOverrideExplicitAuth() {
+  void testRestAuthPropertiesDoesNotOverrideExplicitAuthType() {
     Map<String, String> icebergCatalogOptions = new HashMap<>();
     icebergCatalogOptions.put(AuthProperties.AUTH_TYPE, AuthProperties.AUTH_TYPE_OAUTH2);
-    Map<String, String> clientConfig =
-        ImmutableMap.of(
-            GravitinoCatalogStoreFactoryOptions.AUTH_TYPE,
-                GravitinoCatalogStoreFactoryOptions.BASIC,
-            GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME, "user",
-            GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD, "password");
 
-    GravitinoIcebergCatalogFactory.injectRestAuth(
-        icebergCatalogOptions,
-        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
-        clientConfig);
+    Map<String, String> authProperties =
+        GravitinoIcebergCatalogFactory.restAuthProperties(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
+            icebergCatalogOptions,
+            basicConfig());
 
-    assertEquals(
-        AuthProperties.AUTH_TYPE_OAUTH2,
-        icebergCatalogOptions.get(AuthProperties.AUTH_TYPE),
-        "User-configured REST auth must be preserved");
-    assertFalse(icebergCatalogOptions.containsKey(AuthProperties.BASIC_USERNAME));
+    assertTrue(authProperties.isEmpty(), "User-configured REST auth must be preserved");
+  }
+
+  private static Map<String, String> basicConfig() {
+    return ImmutableMap.of(
+        GravitinoCatalogStoreFactoryOptions.AUTH_TYPE, GravitinoCatalogStoreFactoryOptions.BASIC,
+        GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME, "user",
+        GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD, "password");
   }
 }

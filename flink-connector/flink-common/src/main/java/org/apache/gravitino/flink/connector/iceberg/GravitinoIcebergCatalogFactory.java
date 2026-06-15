@@ -139,10 +139,11 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
         && !icebergCatalogOptions.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE)) {
       icebergCatalogOptions.put(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);
     }
-    injectRestAuth(
-        icebergCatalogOptions,
-        catalogBackend,
-        GravitinoCatalogManager.get().getGravitinoClientConfig());
+    icebergCatalogOptions.putAll(
+        restAuthProperties(
+            catalogBackend,
+            icebergCatalogOptions,
+            GravitinoCatalogManager.get().getGravitinoClientConfig()));
     // The outer Flink factory is `gravitino-iceberg`, but the nested Iceberg factory still expects
     // `catalog-type=iceberg` when building the native Iceberg catalog instance.
     icebergCatalogOptions.put(CommonCatalogOptions.CATALOG_TYPE.key(), "iceberg");
@@ -150,24 +151,26 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
   }
 
   /**
-   * Propagates the Gravitino client's authentication to the Iceberg REST catalog options. A REST
+   * Resolves the Iceberg REST auth properties to propagate from the Gravitino client. A REST
    * backend connects directly to the Iceberg REST service, bypassing the Gravitino server's auth
-   * proxy, so the REST client needs its own credentials. Does nothing for non-REST backends, or
-   * when the user has already configured REST auth explicitly.
+   * proxy, so the REST client needs its own credentials. Returns an empty map for non-REST
+   * backends, or when the user has already configured REST auth explicitly.
    *
-   * @param icebergCatalogOptions the Iceberg catalog options to inject auth into
    * @param catalogBackend the Gravitino Iceberg catalog backend (e.g. {@code rest}, {@code hive})
+   * @param icebergCatalogOptions the current Iceberg catalog options, inspected for user-set auth
    * @param gravitinoClientConfig the Gravitino client config carrying the authentication entries
+   * @return Iceberg REST auth properties to add, empty when none should be injected
    */
   @VisibleForTesting
-  static void injectRestAuth(
-      Map<String, String> icebergCatalogOptions,
+  static Map<String, String> restAuthProperties(
       String catalogBackend,
+      Map<String, String> icebergCatalogOptions,
       Map<String, String> gravitinoClientConfig) {
-    if (IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST.equalsIgnoreCase(catalogBackend)
-        && !icebergCatalogOptions.containsKey(AuthProperties.AUTH_TYPE)) {
-      icebergCatalogOptions.putAll(toRestAuthProperties(gravitinoClientConfig));
+    if (!IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST.equalsIgnoreCase(catalogBackend)
+        || icebergCatalogOptions.containsKey(AuthProperties.AUTH_TYPE)) {
+      return Collections.emptyMap();
     }
+    return toRestAuthProperties(gravitinoClientConfig);
   }
 
   /**
