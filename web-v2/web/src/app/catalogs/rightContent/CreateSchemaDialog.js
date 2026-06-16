@@ -205,7 +205,11 @@ export default function CreateSchemaDialog({ ...props }) {
         } else {
           await dispatch(createSchema({ data: submitData, metalake, catalog, catalogType }))
         }
-        !editSchema && treeRef.current.onLoadData({ key: catalog, nodeType: 'catalog', inUse: 'true' }, true)
+        !editSchema &&
+          treeRef.current.onLoadData(
+            { key: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`, nodeType: 'catalog', inUse: 'true' },
+            true
+          )
         setConfirmLoading(false)
         setOpen(false)
       })
