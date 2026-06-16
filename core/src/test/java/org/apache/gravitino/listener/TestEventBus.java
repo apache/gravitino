@@ -25,9 +25,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
+import org.apache.gravitino.utils.RequestContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -92,6 +96,48 @@ public class TestEventBus {
 
     // RuntimeException should be propagated for regular events
     Assertions.assertThrows(RuntimeException.class, () -> eventBus.dispatchEvent(postEvent));
+  }
+
+  @AfterEach
+  void clearRequestContext() {
+    RequestContext.resetOperationFailureFired();
+    RequestContext.clear();
+  }
+
+  // ─── operationFailureFired flag marking ──────────────────────────────────────
+
+  @Test
+  void testOperationLayerFailureEventSetsOperationFailureFiredFlag() {
+    EventBus eventBus = new EventBus(Collections.emptyList());
+    // Any FailureEvent that is not an HttpRequestFailureEvent should set the flag
+    Event failureEvent =
+        new FailureEvent("user", NameIdentifier.of("test"), new Exception("op error")) {
+          @Override
+          public OperationStatus operationStatus() {
+            return OperationStatus.FAILURE;
+          }
+        };
+
+    Assertions.assertFalse(RequestContext.isOperationFailureFired(), "Flag must start as false");
+    eventBus.dispatchEvent(failureEvent);
+    Assertions.assertTrue(
+        RequestContext.isOperationFailureFired(),
+        "Flag must be set after dispatching an operation-layer failure event");
+  }
+
+  @Test
+  void testHttpRequestFailureEventDoesNotSetOperationFailureFiredFlag() {
+    EventBus eventBus = new EventBus(Collections.emptyList());
+    HttpRequestFailureEvent httpEvent =
+        new HttpRequestFailureEvent(
+            "alice", "1.2.3.4", "GET", "/api/metalakes", 401, EventSource.GRAVITINO_SERVER);
+
+    eventBus.dispatchEvent(httpEvent);
+
+    Assertions.assertFalse(
+        RequestContext.isOperationFailureFired(),
+        "Flag must NOT be set when dispatching HttpRequestFailureEvent — "
+            + "it is the HTTP-layer event and must not suppress itself");
   }
 
   static class ThrowingEventListener implements EventListenerPlugin {
