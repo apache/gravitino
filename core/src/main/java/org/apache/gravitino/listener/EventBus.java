@@ -31,6 +31,8 @@ import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 import org.apache.gravitino.listener.api.event.PreEvent;
 import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
+import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
+import org.apache.gravitino.utils.RequestContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,17 +131,27 @@ public class EventBus {
   }
 
   /**
-   * Dispatches a failure failureEvent to listeners, swallowing all exceptions to preserve the
-   * original error.
+   * Dispatches a failure event to listeners, swallowing all exceptions to preserve the original
+   * error.
    *
    * <p>When the primary operation fails, we want to notify listeners, but listener exceptions must
-   * NOT propagate and mask the original failure. This method catches and logs all exceptions
-   * (including {@link RuntimeException}, {@link Error}, etc.) to ensure the original exception can
-   * be properly thrown to the caller.
+   * NOT propagate and mask the original failure. This method catches and logs all {@link
+   * Exception}s to ensure the original exception can be properly thrown to the caller.
+   *
+   * <p>For every failure event that is <em>not</em> an {@link HttpRequestFailureEvent}, this method
+   * also sets {@link RequestContext#markOperationFailureFired()} on the current thread. This lets
+   * {@code HttpAuditFilter} detect that an operation-layer failure event has already been
+   * dispatched and skip emitting a redundant HTTP-level event for the same request.
    *
    * @param failureEvent the failure event to dispatch
    */
   private void dispatchFailureEvent(Event failureEvent) {
+    // Mark the request thread so HttpAuditFilter skips emitting its own event.
+    // HttpRequestFailureEvent is exempt — it IS the HTTP-layer event and must not set the flag,
+    // otherwise it would suppress itself on the next pass through the finally block.
+    if (!(failureEvent instanceof HttpRequestFailureEvent)) {
+      RequestContext.markOperationFailureFired();
+    }
     try {
       eventListeners.forEach(eventListener -> eventListener.onPostEvent(failureEvent));
     } catch (Exception e) {
