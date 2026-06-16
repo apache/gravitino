@@ -148,6 +148,21 @@ tests:
             name: audit-config
             mountPath: /opt/gravitino/audit
 
+  - it: renders priorityClassName when set
+    template: deployment.yaml
+    set:
+      priorityClassName: high-priority
+    asserts:
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: high-priority
+
+  - it: omits priorityClassName when not set
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.priorityClassName
+
   - it: renders security contexts, resources, and custom probes
     template: deployment.yaml
     set:
