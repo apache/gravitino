@@ -17,7 +17,7 @@
 
 """End-to-end authorization integration test through the live MCP HTTP server.
 
-Validates the three demo acceptance moments against a real Gravitino with
+Validates the three acceptance scenarios against a real Gravitino with
 authorization enabled:
 
   1. Two principals run the same discovery call and get correctly different,
@@ -64,10 +64,8 @@ async def _list_catalog_names(principal: str, mcp_url: str) -> set:
     return {entry["name"] for entry in payload}
 
 
-def test_moment1_authorization_scoped_discovery(
-    gravitino_fixture, integration_env
-):
-    """Moment 1: admin and bob get different, correctly scoped catalog lists."""
+def test_authorization_scoped_discovery(gravitino_fixture, integration_env):
+    """Admin and bob get different, correctly scoped catalog lists."""
     mcp_url = integration_env["mcp_url"]
 
     admin_catalogs = asyncio.run(_list_catalog_names(ADMIN, mcp_url))
@@ -85,10 +83,10 @@ def test_moment1_authorization_scoped_discovery(
     assert admin_catalogs != bob_catalogs
 
 
-def test_moment2_write_denied_for_readonly_principal(
+def test_write_denied_for_readonly_principal(
     gravitino_fixture, integration_env
 ):
-    """Moment 2: bob (no write grant) is denied when creating a tag through MCP."""
+    """Bob (no write grant) is denied when creating a tag through MCP."""
     mcp_url = integration_env["mcp_url"]
 
     async def _attempt_write():
@@ -122,8 +120,8 @@ def test_moment2_write_denied_for_readonly_principal(
     ), f"expected an authorization denial, got: {exc_info.value!r}"
 
 
-def test_moment3_audit_trail_attribution(gravitino_fixture, integration_env):
-    """Moment 3: audit log records reads/writes attributed to the right principal."""
+def test_audit_trail_attribution(gravitino_fixture, integration_env):
+    """Audit log records reads/writes attributed to the right principal."""
     audit_log = os.environ.get("MCP_AUDIT_LOG")
     if not audit_log or not os.path.exists(audit_log):
         pytest.skip("MCP_AUDIT_LOG not set or file missing")
