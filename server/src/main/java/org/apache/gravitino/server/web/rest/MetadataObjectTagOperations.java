@@ -62,6 +62,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,11 +115,13 @@ public class MetadataObjectTagOperations {
             Optional<Tag> tag = getTagForObject(metalake, object, tagName);
             Optional<TagDTO> tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(false)));
 
-            MetadataObject parentObject = MetadataObjects.parent(object);
-            while (!tag.isPresent() && parentObject != null) {
+            for (MetadataObject parentObject :
+                MetadataObjectUtil.getParentMetadataObjects(object)) {
+              if (tag.isPresent()) {
+                break;
+              }
               tag = getTagForObject(metalake, parentObject, tagName);
               tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(true)));
-              parentObject = MetadataObjects.parent(parentObject);
             }
 
             if (!tagDTO.isPresent()) {
@@ -190,8 +193,8 @@ public class MetadataObjectTagOperations {
                       .toArray(TagDTO[]::new));
             }
 
-            MetadataObject parentObject = MetadataObjects.parent(object);
-            while (parentObject != null) {
+            for (MetadataObject parentObject :
+                MetadataObjectUtil.getParentMetadataObjects(object)) {
               Tag[] inheritedTags =
                   tagDispatcher.listTagsInfoForMetadataObject(metalake, parentObject);
               if (ArrayUtils.isNotEmpty(inheritedTags)) {
@@ -201,7 +204,6 @@ public class MetadataObjectTagOperations {
                         .map(t -> DTOConverters.toDTO(t, Optional.of(true)))
                         .toArray(TagDTO[]::new));
               }
-              parentObject = MetadataObjects.parent(parentObject);
             }
 
             if (verbose) {

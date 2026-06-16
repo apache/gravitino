@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.utils;
 
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -145,5 +147,54 @@ public class TestMetadataObjectUtil {
         NameIdentifier.of("metalake", "catalog", "schema", "view"),
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
+  }
+
+  @Test
+  public void testGetParentMetadataObjectsForFlatSchema() {
+    // A table under a flat (single-level) schema inherits from [schema, catalog].
+    MetadataObject table = MetadataObjects.of("catalog.schema", "table", MetadataObject.Type.TABLE);
+    Assertions.assertEquals(
+        List.of("SCHEMA:catalog.schema", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(table, ":")));
+
+    // A flat schema inherits only from its catalog.
+    MetadataObject schema = MetadataObjects.of("catalog", "schema", MetadataObject.Type.SCHEMA);
+    Assertions.assertEquals(
+        List.of("CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(schema, ":")));
+
+    // A catalog has no ancestors.
+    MetadataObject catalog = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
+    Assertions.assertTrue(MetadataObjectUtil.getParentMetadataObjects(catalog, ":").isEmpty());
+  }
+
+  @Test
+  public void testGetParentMetadataObjectsForHierarchicalSchema() {
+    // A table under hierarchical schema a:b:c inherits from the schema and all its ancestor
+    // schemas (nearest first), then the catalog.
+    MetadataObject table = MetadataObjects.of("catalog.a:b:c", "table", MetadataObject.Type.TABLE);
+    Assertions.assertEquals(
+        List.of(
+            "SCHEMA:catalog.a:b:c", "SCHEMA:catalog.a:b", "SCHEMA:catalog.a", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(table, ":")));
+
+    // The hierarchical schema itself inherits from its ancestor schemas and the catalog, but not
+    // from itself.
+    MetadataObject schema = MetadataObjects.of("catalog", "a:b:c", MetadataObject.Type.SCHEMA);
+    Assertions.assertEquals(
+        List.of("SCHEMA:catalog.a:b", "SCHEMA:catalog.a", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(schema, ":")));
+
+    // A column under a hierarchical schema walks table -> schema -> ancestor schemas -> catalog.
+    MetadataObject column =
+        MetadataObjects.of("catalog.a:b.table", "col", MetadataObject.Type.COLUMN);
+    Assertions.assertEquals(
+        List.of(
+            "TABLE:catalog.a:b.table", "SCHEMA:catalog.a:b", "SCHEMA:catalog.a", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(column, ":")));
+  }
+
+  private static List<String> describe(List<MetadataObject> objects) {
+    return objects.stream().map(o -> o.type() + ":" + o.fullName()).collect(Collectors.toList());
   }
 }
