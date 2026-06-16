@@ -105,7 +105,11 @@ class TestGravitinoIcebergCatalogFactory {
             IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
             IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
             IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
-            "http://localhost:9001/iceberg/");
+            "http://localhost:9001/iceberg/",
+            // Pre-set so the REST auth-propagation branch (which needs a live
+            // GravitinoCatalogManager) is skipped; that branch is covered separately below.
+            org.apache.iceberg.rest.auth.AuthProperties.AUTH_TYPE,
+            "none");
 
     Map<String, String> result = factory.toIcebergCatalogOptions(options);
 
@@ -114,5 +118,27 @@ class TestGravitinoIcebergCatalogFactory {
         result.get(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE));
     Assertions.assertFalse(result.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL));
     Assertions.assertEquals("iceberg", result.get(CommonCatalogOptions.CATALOG_TYPE.key()));
+  }
+
+  @Test
+  void testRestAuthPropagatedWhenLoadedFromCatalogStore() {
+    // Simulates the catalog-store load path (`USE CATALOG ...`): by the time options reach this
+    // factory, GravitinoCatalogStore.getCatalog has already renamed `catalog-backend` ->
+    // `catalog-type`, so only `catalog-type=rest` is present, no `catalog-backend` key.
+    Map<String, String> options =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
+            "http://localhost:9001/iceberg/");
+
+    // Regression check for #11601: the REST auth-propagation branch must be gated on the
+    // normalized `catalog-type`, not the renamed-away `catalog-backend` key, otherwise it would
+    // silently skip auth propagation on this path. GravitinoCatalogManager isn't initialized in
+    // this unit test, so reaching it (and failing there) proves the gate now fires correctly.
+    IllegalStateException exception =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> factory.toIcebergCatalogOptions(options));
+    Assertions.assertTrue(exception.getMessage().contains("GravitinoCatalogManager"));
   }
 }
