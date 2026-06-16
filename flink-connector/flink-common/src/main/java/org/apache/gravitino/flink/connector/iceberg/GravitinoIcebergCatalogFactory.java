@@ -32,7 +32,9 @@ import org.apache.gravitino.flink.connector.DefaultPartitionConverter;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
+import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.flink.connector.utils.FactoryUtils;
+import org.apache.iceberg.rest.auth.AuthProperties;
 
 public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
 
@@ -126,6 +128,15 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
         && !icebergCatalogOptions.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE)
         && !icebergCatalogOptions.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL)) {
       icebergCatalogOptions.put(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);
+    }
+    // A REST backend connects directly to the Iceberg REST service, bypassing the Gravitino
+    // server's auth proxy, so propagate the Gravitino client's authentication to the REST client,
+    // unless the user has already configured REST auth explicitly.
+    if (IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST.equalsIgnoreCase(catalogBackend)
+        && !icebergCatalogOptions.containsKey(AuthProperties.AUTH_TYPE)) {
+      icebergCatalogOptions.putAll(
+          IcebergPropertiesConverter.INSTANCE.toRestAuthProperties(
+              GravitinoCatalogManager.get().getGravitinoClientConfig()));
     }
     // Iceberg's FlinkCatalogFactory only accepts hive/hadoop/rest as `catalog-type`; a JDBC backend
     // must be loaded through `catalog-impl` instead. The two keys are mutually exclusive, so drop

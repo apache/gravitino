@@ -20,6 +20,7 @@ package org.apache.gravitino.flink.connector.catalog;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
@@ -153,6 +154,17 @@ public class GravitinoCatalogManager {
   }
 
   /**
+   * Get the Gravitino client config, including the authentication entries. This is used to
+   * propagate authentication to the Iceberg REST catalog backend, which connects directly to the
+   * Iceberg REST service and therefore needs its own credentials.
+   *
+   * @return The Gravitino client config
+   */
+  public Map<String, String> getGravitinoClientConfig() {
+    return gravitinoClientConfig;
+  }
+
+  /**
    * Get GravitinoCatalog by name.
    *
    * @param name Catalog name
@@ -261,17 +273,20 @@ public class GravitinoCatalogManager {
         "Basic password is required. Please set %s",
         GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD);
 
+    // Strip auth keys from a copy so the original config (kept in gravitinoClientConfig) stays
+    // intact for propagating authentication to the Iceberg REST catalog backend.
+    Map<String, String> clientConfig = Maps.newHashMap(config);
     Set<String> basicConfigKeys =
         Sets.newHashSet(
             GravitinoCatalogStoreFactoryOptions.AUTH_TYPE,
             GravitinoCatalogStoreFactoryOptions.BASIC_USERNAME,
             GravitinoCatalogStoreFactoryOptions.BASIC_PASSWORD);
     for (String key : basicConfigKeys) {
-      config.remove(key);
+      clientConfig.remove(key);
     }
     return GravitinoAdminClient.builder(gravitinoUri)
         .withBasicAuth(username, password)
-        .withClientConfig(config)
+        .withClientConfig(clientConfig)
         .build();
   }
 
@@ -282,10 +297,12 @@ public class GravitinoCatalogManager {
     String path = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_TOKEN_PATH);
     String scope = config.get(GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE);
 
-    // Remove OAuth-specific config entries from the client config map. These keys are only
-    // used to construct the OAuth2 token provider and are not valid GravitinoAdminClient
+    // Remove OAuth-specific config entries from a copy of the client config map. These keys are
+    // only used to construct the OAuth2 token provider and are not valid GravitinoAdminClient
     // client configuration options; passing them to withClientConfig() could cause validation
-    // errors or other unexpected behavior.
+    // errors or other unexpected behavior. The original config (kept in gravitinoClientConfig)
+    // stays intact for propagating authentication to the Iceberg REST catalog backend.
+    Map<String, String> clientConfig = Maps.newHashMap(config);
     Set<String> oauthConfigKeys =
         Sets.newHashSet(
             GravitinoCatalogStoreFactoryOptions.AUTH_TYPE,
@@ -294,7 +311,7 @@ public class GravitinoCatalogManager {
             GravitinoCatalogStoreFactoryOptions.OAUTH2_TOKEN_PATH,
             GravitinoCatalogStoreFactoryOptions.OAUTH2_SCOPE);
     for (String key : oauthConfigKeys) {
-      config.remove(key);
+      clientConfig.remove(key);
     }
 
     DefaultOAuth2TokenProvider provider =
@@ -307,7 +324,7 @@ public class GravitinoCatalogManager {
 
     return GravitinoAdminClient.builder(gravitinoUri)
         .withOAuth(provider)
-        .withClientConfig(config)
+        .withClientConfig(clientConfig)
         .build();
   }
 
