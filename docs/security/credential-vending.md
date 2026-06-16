@@ -193,7 +193,7 @@ The classpath of the server:
 - Iceberg REST server: the classpath differs by deployment mode; see the [Deployment](../iceberg-rest-service.md#deployment) section.
 - Fileset catalog: `catalogs/fileset/libs/`
 
-## Credential Vending for Relational Catalogs
+## Credential Vending for Catalogs
 
 Hive, Iceberg, Glue, JDBC, and Paimon catalogs support server-side credential vending since Gravitino 1.4.0. This section explains how credential vending works for these catalog types and how it differs from the Hadoop Fileset and Iceberg REST server cases.
 
