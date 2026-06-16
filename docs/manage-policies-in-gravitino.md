@@ -29,7 +29,10 @@ Javadoc and REST API documentation.
    associated with policies. 
 3. Policies in Gravitino are inheritable, so listing policies of a metadata object will also list the
    policies of its parent metadata objects. For example, listing policies of a `Table` will also list
-   the policies of its parent `Schema` and `Catalog`.
+   the policies of its parent `Schema` and `Catalog`. For catalogs that support multi-level
+   (hierarchical) schemas, such as a schema named `a:b:c` (using the configured schema separator),
+   the intermediate parent schemas `a:b` and `a` are also part of the hierarchy, so their policies
+   are inherited as well.
 4. The same policy can be associated with both parent and child metadata objects. But when you list the
    associated policies of a child metadata object, this policy will be included only once in the result
    list with `inherited` value `false`.
@@ -381,7 +384,8 @@ schema.supportsPolicies().associatePolicies(new String[] {"policy1"}, null);
 ### List Associated Policies for a Metadata Object
 
 List all the policies associated with a metadata object. If a policy is inheritable, 
-listing policies of a metadata object will also list the policies of its parent metadata objects.
+listing policies of a metadata object will also list the policies of its parent metadata objects,
+including the intermediate parent schemas of a multi-level (hierarchical) schema.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies`.
 

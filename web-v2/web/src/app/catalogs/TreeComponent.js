@@ -484,20 +484,20 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
     setIsHover(null)
   }
 
-  const onLoadData = node => {
+  const onLoadData = (node, reload = false) => {
     if (node.inUse === 'false') return new Promise(resolve => resolve())
     const { key, children } = node
 
     dispatch(setLoadedNodes([...store.loadedNodes, key]))
 
     return new Promise(resolve => {
-      if (children && children.length !== 0) {
+      if (!reload && children && children.length !== 0) {
         resolve()
 
         return
       }
 
-      dispatch(setIntoTreeNodeWithFetch({ key }))
+      dispatch(setIntoTreeNodeWithFetch({ key, reload }))
 
       resolve()
     })
