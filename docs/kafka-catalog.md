@@ -22,6 +22,10 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `bootstrap.servers` | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      | 0.5.0         |
 | `gravitino.bypass.` | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for more details) | (none)        | No       | 0.5.0         |
 
+:::caution
+`gravitino.bypass.*` properties are **not hidden** and will be returned in plaintext by the Gravitino REST API. Avoid using `gravitino.bypass.*` to pass sensitive credentials such as access keys or passwords. Use the dedicated catalog properties instead, which are hidden and excluded from API responses.
+:::
+
 ### Catalog Operations
 
 Refer to [Catalog operations](./manage-messaging-metadata-using-gravitino.md#catalog-operations) for more details.

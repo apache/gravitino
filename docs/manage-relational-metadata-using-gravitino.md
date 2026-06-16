@@ -140,6 +140,14 @@ Gravitino supports the following catalog providers:
 | `jdbc-hologres`     | [Hologres catalog property](./jdbc-hologres-catalog.md#catalog-properties)              |
 | `lakehouse-generic` | [Lakehouse generic catalog property](./lakehouse-generic-catalog.md#catalog-properties) |
 
+:::caution
+Properties passed via the `gravitino.bypass.` prefix are **not hidden** and will be returned in
+plaintext by the Gravitino REST API (e.g. `GET /api/metalakes/{metalake}/catalogs/{catalog}`).
+Avoid using `gravitino.bypass.*` to pass sensitive credentials such as access keys, secret keys,
+or passwords. Use the dedicated catalog properties instead (e.g. `s3-access-key-id`,
+`oss-access-key-id`, `jdbc-password`), which are hidden and excluded from API responses.
+:::
+
 ### Load a Catalog
 
 Load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client. The following is an example of loading a catalog:

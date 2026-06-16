@@ -43,6 +43,10 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `list-all-tables`                        | Whether to list all tables in a database, including non-Hive tables such as Iceberg, Paimon, and Hudi. When false, non-Hive tables are filtered out on a best-effort basis; see the note below for known limitations.                               | false          | No                           | 0.5.1         |
 | `default.catalog`                        | The default catalog name for the Hive3 metastore backend; this configuration is ignored when using a Hive2 metastore.                                                                                                                               | hive           | No                           | 1.1.0         |
 
+:::caution
+`gravitino.bypass.*` properties are **not hidden** and will be returned in plaintext by the Gravitino REST API. Avoid using `gravitino.bypass.*` to pass sensitive credentials such as access keys or passwords. Use the dedicated catalog properties instead, which are hidden and excluded from API responses.
+:::
+
 :::note
 When `list-all-tables=false`, the Hive catalog removes the following on a best-effort basis:
 - Iceberg tables (table property `table_type=ICEBERG`)
