@@ -80,10 +80,6 @@ connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
 
-:::caution
-`gravitino.bypass.*` properties are **not hidden** and will be returned in plaintext by the Gravitino REST API. Avoid using `gravitino.bypass.*` to pass sensitive credentials such as access keys or passwords. Use the dedicated catalog properties instead, which are hidden and excluded from API responses.
-:::
-
 #### JDBC Backend
 
 If you are using JDBC backend, you must specify the properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`.

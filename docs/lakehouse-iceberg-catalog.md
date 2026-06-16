@@ -44,10 +44,6 @@ Builds with Apache Iceberg `1.11.0`. The Apache Iceberg table format version is 
 
 Any property not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
-:::caution
-`gravitino.bypass.*` properties are **not hidden** and will be returned in plaintext by the Gravitino REST API. Avoid using `gravitino.bypass.*` to pass sensitive credentials such as access keys or passwords. Use the dedicated catalog properties instead, which are hidden and excluded from API responses.
-:::
-
 If you are using the Gravitino with Trino, you can pass the Trino Iceberg connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.iceberg.table-statistics-enabled` to pass the `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog in Trino runtime.
 
 If you are using the Gravitino with Spark, you can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
@@ -105,7 +101,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-To access a non-default catalog, set `warehouse` to the catalog name. This uses a REST path like `http://127.0.0.1:9001/iceberg/v1/catalog/namespaces/db/tables/table`. See [Multi-Catalog Configuration](./iceberg-rest-service.md#multi-catalog-configuration) for details.
+To access a non-default catalog, set `warehouse` to the catalog name. This uses a REST path like `http://127.0.0.1:9001/iceberg/v1/catalog/namespaces/db/tables/table`. See [Multi catalog](./iceberg-rest-service.md#multiple-catalog-backend-support) for details.
 
 #### S3
 

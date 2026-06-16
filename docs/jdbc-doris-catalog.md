@@ -35,10 +35,6 @@ Pass to a Doris data source any property that isn't defined by Gravitino by addi
 `gravitino.bypass.` prefix as a catalog property. For example, catalog property
 `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
-:::caution
-`gravitino.bypass.*` properties are **not hidden** and will be returned in plaintext by the Gravitino REST API. Avoid using `gravitino.bypass.*` to pass sensitive credentials such as access keys or passwords. Use the dedicated catalog properties instead, which are hidden and excluded from API responses.
-:::
-
 Check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
 more details.

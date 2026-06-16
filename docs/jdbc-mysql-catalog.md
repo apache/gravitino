@@ -34,10 +34,6 @@ Gravitino saves some system information in schema and table comment, like `(From
 
 Pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
-:::caution
-`gravitino.bypass.*` properties are **not hidden** and will be returned in plaintext by the Gravitino REST API. Avoid using `gravitino.bypass.*` to pass sensitive credentials such as access keys or passwords. Use the dedicated catalog properties instead, which are hidden and excluded from API responses.
-:::
-
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
 When using Gravitino with Trino, pass the Trino MySQL connector configuration using the `trino.bypass.` prefix. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino MySQL catalog in Trino runtime.
