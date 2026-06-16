@@ -36,12 +36,19 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.HealthCheckPathMatcher;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class AuthenticationFilter implements Filter {
 
   private final List<Authenticator> filterAuthenticators;
+
+  /**
+   * The matcher used to identify health check paths that bypass authentication. Subclasses may
+   * replace this with a server-specific matcher (e.g. {@code IcebergHealthCheckPathMatcher}).
+   */
+  protected HealthCheckPathMatcher healthCheckMatcher = new HealthCheckPathMatcher();
 
   public AuthenticationFilter() {
     filterAuthenticators = null;
@@ -150,7 +157,7 @@ public class AuthenticationFilter implements Filter {
 
   /**
    * Returns {@code true} if the request targets a health check endpoint that should bypass
-   * authentication. Subclasses may override this to add additional bypass paths.
+   * authentication, as determined by the configured {@link #healthCheckMatcher}.
    *
    * @param request the incoming servlet request
    * @return {@code true} if the request should skip authentication
@@ -159,17 +166,7 @@ public class AuthenticationFilter implements Filter {
     if (!(request instanceof HttpServletRequest)) {
       return false;
     }
-    String path = ((HttpServletRequest) request).getRequestURI();
-    if (path == null) {
-      return false;
-    }
-    // Also match /health, /health/*, and /health.html — root-level aliases that forward to
-    // /api/health/*. During a forward, getRequestURI() returns the original URI, not the target.
-    return path.equals("/health")
-        || path.startsWith("/health/")
-        || path.equals("/health.html")
-        || path.equals("/api/health")
-        || path.startsWith("/api/health/");
+    return healthCheckMatcher.isHealthCheckPath(((HttpServletRequest) request).getRequestURI());
   }
 
   @Override
