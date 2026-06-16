@@ -83,7 +83,7 @@
       "postcss": "^8.5.10",
       "picomatch": "^4.0.4",
       "yaml": "^2.4.2",
-      "esbuild": "0.25.0",
+      "esbuild": "0.28.1",
       "axios": "^1.16.0",
       "js-cookie": "^3.0.7"
     }
