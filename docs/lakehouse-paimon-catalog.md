@@ -242,15 +242,6 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - The `defaultCatalog` and `defaultSchema` fields are stored as Paimon view options and can be used to resolve unqualified identifiers in the SQL text.
 - View support depends on the selected Paimon backend and requires backend view API support.
 
-### Supported Alter Operations
-
-| Operation       | REST / JSON                                                                   | Java                                          |
-|-----------------|-------------------------------------------------------------------------------|-----------------------------------------------|
-| Rename view     | `{"@type":"rename","newName":"new_name"}`                                     | `ViewChange.rename("new_name")`               |
-| Set property    | `{"@type":"setProperty","property":"key","value":"value"}`                    | `ViewChange.setProperty("key", "value")`      |
-| Remove property | `{"@type":"removeProperty","property":"key"}`                                 | `ViewChange.removeProperty("key")`            |
-| Replace view    | Replace columns, representations, defaultCatalog, defaultSchema, comment      | `ViewChange.replaceView(...)`                 |
-
 :::note
 Rename cannot be combined with other changes in a single `alterView` call. Submit rename as a standalone request.
 :::

@@ -491,15 +491,6 @@ If you update a nullability column to non nullability, there may be compatibilit
 - `defaultCatalog` and `defaultSchema` are stored and returned as-is by the backend.
 - View support depends on the Iceberg catalog backend: REST and Hive backends generally support views; JDBC backend support is in continuous validation.
 
-### Supported Alter Operations
-
-| Operation       | REST / JSON                                                                   | Java                                          |
-|-----------------|-------------------------------------------------------------------------------|-----------------------------------------------|
-| Rename view     | `{"@type":"rename","newName":"new_name"}`                                     | `ViewChange.rename("new_name")`               |
-| Set property    | `{"@type":"setProperty","property":"key","value":"value"}`                    | `ViewChange.setProperty("key", "value")`      |
-| Remove property | `{"@type":"removeProperty","property":"key"}`                                 | `ViewChange.removeProperty("key")`            |
-| Replace view    | Replace columns, representations, defaultCatalog, defaultSchema, comment      | `ViewChange.replaceView(...)`                 |
-
 :::note
 Rename cannot be combined with other changes in a single `alterView` call. Submit rename as a standalone request.
 :::
