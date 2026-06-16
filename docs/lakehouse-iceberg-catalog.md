@@ -21,6 +21,15 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 Builds with Apache Iceberg `1.11.0`. The Apache Iceberg table format version is `2` by default.
 :::
 
+Flink and Spark clients may use a different Iceberg version than the server.
+
+- [Flink Iceberg catalog](flink-connector/flink-catalog-iceberg.md) — client JAR requirements
+- [Spark Iceberg catalog](spark-connector/spark-catalog-iceberg.md) — client JAR requirements
+
+:::caution
+Mixing Iceberg JARs from different versions on the client classpath is not compatible and may cause runtime errors.
+:::
+
 ## Catalog
 
 ### Catalog Capabilities
@@ -101,7 +110,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-To access a non-default catalog, set `warehouse` to the catalog name. This uses a REST path like `http://127.0.0.1:9001/iceberg/v1/catalog/namespaces/db/tables/table`. See [Multi catalog](./iceberg-rest-service.md#multiple-catalog-backend-support) for details.
+To access a non-default catalog, set `warehouse` to the catalog name. This uses a REST path like `http://127.0.0.1:9001/iceberg/v1/catalog/namespaces/db/tables/table`. See [Multi-Catalog Configuration](./iceberg-rest-service.md#multi-catalog-configuration) for details.
 
 #### S3
 
