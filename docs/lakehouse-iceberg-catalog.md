@@ -21,15 +21,6 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 Builds with Apache Iceberg `1.11.0`. The Apache Iceberg table format version is `2` by default.
 :::
 
-Flink and Spark clients may use a different Iceberg version than the server.
-
-- [Flink Iceberg catalog](flink-connector/flink-catalog-iceberg.md) — client JAR requirements
-- [Spark Iceberg catalog](spark-connector/spark-catalog-iceberg.md) — client JAR requirements
-
-:::caution
-Mixing Iceberg JARs from different versions on the client classpath is not compatible and may cause runtime errors.
-:::
-
 ## Catalog
 
 ### Catalog Capabilities
