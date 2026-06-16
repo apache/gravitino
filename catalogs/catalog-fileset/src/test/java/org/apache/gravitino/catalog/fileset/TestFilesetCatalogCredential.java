@@ -20,19 +20,24 @@ package org.apache.gravitino.catalog.fileset;
 
 import com.google.common.collect.Maps;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies that the fileset catalog enables the internal S3 location-prefix flag so a
- * directory-root {@code getFileStatus} HEAD returns 404 instead of 403, regardless of any
- * user-provided value.
+ * Verifies the fileset catalog credential behavior: the internal S3 location-prefix flag is
+ * enabled regardless of any user-provided value, static storage credentials are hidden from the
+ * outward-facing {@code properties()}, and they remain available for credential vending via {@code
+ * propertiesWithCredentialProviders()}.
  */
 public class TestFilesetCatalogCredential {
 
@@ -73,5 +78,40 @@ public class TestFilesetCatalogCredential {
         catalog
             .propertiesWithCredentialProviders()
             .get(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX));
+  }
+
+  @Test
+  void testStaticCredentialsHiddenFromCatalogProperties() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, "ak");
+    properties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "sk");
+    properties.put(S3Properties.GRAVITINO_S3_ENDPOINT, "https://s3.example.com");
+    FilesetCatalogImpl catalog = newCatalog(properties);
+
+    Map<String, String> exposed = catalog.properties();
+    // Sensitive credentials are filtered out from the outward-facing properties.
+    Assertions.assertFalse(exposed.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    Assertions.assertFalse(exposed.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    // Non-sensitive connection info remains visible.
+    Assertions.assertEquals(
+        "https://s3.example.com", exposed.get(S3Properties.GRAVITINO_S3_ENDPOINT));
+  }
+
+  @Test
+  void testStaticCredentialsStillAvailableForCredentialVending() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, "ak");
+    properties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "sk");
+    FilesetCatalogImpl catalog = newCatalog(properties);
+
+    // Hiding the credentials does not break credential vending: the raw credentials are still
+    // available to the server-side credential manager, and the matching credential provider is
+    // auto-injected so clients (e.g. GVFS) can obtain vended credentials.
+    Map<String, String> credProps = catalog.propertiesWithCredentialProviders();
+    Assertions.assertEquals("ak", credProps.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    Assertions.assertEquals("sk", credProps.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    List<String> providers =
+        Arrays.asList(credProps.get(CredentialConstants.CREDENTIAL_PROVIDERS).split(","));
+    Assertions.assertTrue(providers.contains(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE));
   }
 }
