@@ -77,10 +77,15 @@ spark35 = "3.5.3"
 kyuubi4spark = "1.11.0"
 kyuubi4authz = "1.10.2"
 trino = '435'
+# Trino version the iceberg-rest-trino-it module's in-process query runner is tested against.
+trino-iceberg-it = "478"
 scala-collection-compat = "2.7.0"
 scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
 testcontainers = "1.21.4"
+# docker-java version aligned with testcontainers 1.21.4; forced in iceberg-rest-trino-it to
+# override the newer versions Trino's test stack would otherwise pull in.
+docker-java = "3.4.2"
 jwt = "0.11.1"
 nimbus-jose-jwt = "10.9"
 jline = "3.21.0"
