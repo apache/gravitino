@@ -31,6 +31,12 @@ public class IcebergPropertiesConstants {
 
   public static final String ICEBERG_CATALOG_TYPE = FlinkCatalogFactory.ICEBERG_CATALOG_TYPE;
 
+  public static final String ICEBERG_CATALOG_IMPL = CatalogProperties.CATALOG_IMPL;
+
+  public static final String ICEBERG_CATALOG_BACKEND_JDBC = "jdbc";
+
+  public static final String ICEBERG_JDBC_CATALOG_IMPL = "org.apache.iceberg.jdbc.JdbcCatalog";
+
   public static final String GRAVITINO_ICEBERG_CATALOG_WAREHOUSE = IcebergConstants.WAREHOUSE;
 
   public static final String ICEBERG_CATALOG_WAREHOUSE = CatalogProperties.WAREHOUSE_LOCATION;
