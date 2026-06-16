@@ -348,6 +348,16 @@ authenticator:
     defaultSignKey: ""
     serverUri: ""
     tokenPath: /realms/myrealm/protocol/openid-connect/token
+    ## Principal mapper type for OAuth (default: regex)
+    principalMapper: "regex"
+    ## Regex pattern for OAuth principal mapping (default: ^(.*)$)
+    principalMapperRegexPattern: "^(.*)$"
+    ## JWT claim field(s) to use for group membership (default: groups)
+    groupsFields: "groups"
+    ## Group mapper type for OAuth (default: regex)
+    groupMapper: "regex"
+    ## Regex pattern for OAuth group mapping (default: ^(.*)$)
+    groupMapperRegexPattern: "^(.*)$"
 
 ## Audit log configuration
 ##
