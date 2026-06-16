@@ -39,19 +39,12 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.GCSTokenCredential;
-import org.apache.gravitino.credential.OSSSecretKeyCredential;
-import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.storage.AzureProperties;
-import org.apache.gravitino.storage.GCSProperties;
-import org.apache.gravitino.storage.OSSProperties;
-import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -517,28 +510,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   @Evolving
   protected void addStorageCredentialProviders(
       Map<String, String> properties, List<String> credentialProviders) {
-    String s3AccessKeyId = properties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID);
-    String s3SecretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
-    if (StringUtils.isNotBlank(s3AccessKeyId) && StringUtils.isNotBlank(s3SecretAccessKey)) {
-      credentialProviders.add(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
-    }
-
-    String ossAccessKeyId = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID);
-    String ossSecretAccessKey = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
-    if (StringUtils.isNotBlank(ossAccessKeyId) && StringUtils.isNotBlank(ossSecretAccessKey)) {
-      credentialProviders.add(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE);
-    }
-
-    String azureAccountName = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
-    String azureAccountKey = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
-    if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
-      credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
-    }
-
-    String gcsServiceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
-    if (StringUtils.isNotBlank(gcsServiceAccountFile)) {
-      credentialProviders.add(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
-    }
+    credentialProviders.addAll(CredentialUtils.getStorageCredentialProviders(properties));
   }
 
   @Override
