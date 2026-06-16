@@ -992,7 +992,7 @@ export const createSchema = createAsyncThunk(
       children: []
     }
 
-    dispatch(fetchSchemas({ metalake, catalog, catalogType, init: true }))
+    await dispatch(fetchSchemas({ metalake, catalog, catalogType, init: true }))
 
     return schemaData
   }
