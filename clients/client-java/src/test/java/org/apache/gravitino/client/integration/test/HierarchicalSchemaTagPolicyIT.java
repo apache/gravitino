@@ -44,7 +44,6 @@ import org.apache.gravitino.tag.SupportsTags;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -58,8 +57,11 @@ import org.junit.jupiter.api.Test;
  * catalog backed by an in-memory H2 database, because {@code ":"} hierarchical schema names are
  * only supported by Iceberg catalogs accessed through the Gravitino REST server with a configured
  * schema separator.
+ *
+ * <p>This test runs entirely against the embedded server and an in-memory H2 database, so it needs
+ * no Docker container and is intentionally not tagged {@code gravitino-docker-test}; tagging it as
+ * such would exclude it from the standard (non-Docker) integration-test runs.
  */
-@Tag("gravitino-docker-test")
 public class HierarchicalSchemaTagPolicyIT extends BaseIT {
 
   private static final String METALAKE =
@@ -90,13 +92,13 @@ public class HierarchicalSchemaTagPolicyIT extends BaseIT {
     metalake = client.createMetalake(METALAKE, "comment", new HashMap<>());
 
     // Create an Iceberg catalog backed by an in-memory H2 database; it is lightweight, needs no
-    // extra container, and supports ':' hierarchical schema names. H2 is NOT a supported
-    // production Iceberg backend.
+    // extra container, and supports ':' hierarchical schema names. H2 is NOT a supported production
+    // Iceberg backend. The warehouse path and the H2 database name are derived from the randomized
+    // metalake name so concurrent runs on the same host do not share state and interfere.
     Map<String, String> catalogProperties = new HashMap<>();
     catalogProperties.put("catalog-backend", "jdbc");
-    catalogProperties.put("warehouse", "/tmp/gravitino-it-hierarchical-tag-policy");
-    catalogProperties.put(
-        "uri", "jdbc:h2:mem:gravitino-it-hierarchical-tag-policy;DB_CLOSE_DELAY=-1;MODE=MYSQL");
+    catalogProperties.put("warehouse", "/tmp/" + METALAKE);
+    catalogProperties.put("uri", "jdbc:h2:mem:" + METALAKE + ";DB_CLOSE_DELAY=-1;MODE=MYSQL");
     catalogProperties.put("jdbc-driver", "org.h2.Driver");
     catalogProperties.put("jdbc-initialize", "true");
     catalog =
@@ -130,6 +132,10 @@ public class HierarchicalSchemaTagPolicyIT extends BaseIT {
       metalake.dropCatalog(CATALOG, true);
       client.dropMetalake(METALAKE, true);
     }
+    // Note: this intentionally does not call super.stopIntegrationTest(). JUnit 5 invokes @AfterAll
+    // methods of both this subclass and the parent BaseIT, so BaseIT.stopIntegrationTest() (which
+    // stops the embedded server and clears customConfigs) still runs. Closing the client and
+    // nulling it here prevents BaseIT from double-closing it afterwards.
     if (client != null) {
       client.close();
       client = null;

@@ -154,6 +154,14 @@ public class MetadataObjectUtil {
    * catalog and skip the intermediate parent schemas, so tags/policies assigned to a parent schema
    * would not be inherited by its child schemas and the objects within them.
    *
+   * <p>The hierarchical schema separator is resolved from {@link
+   * HierarchicalSchemaUtil#schemaSeparator()}, which reads the server config from {@link
+   * org.apache.gravitino.GravitinoEnv} and falls back to the default {@code ":"} ({@link
+   * org.apache.gravitino.Configs#SCHEMA_SEPARATOR}) when the config is not available (for example
+   * in unit tests that do not boot the server). Tests that need a deterministic separator without
+   * booting the server should call {@link #getParentMetadataObjects(MetadataObject, String)} with
+   * an explicit separator instead.
+   *
    * @param object The metadata object
    * @return The ancestor metadata objects, nearest first
    */
