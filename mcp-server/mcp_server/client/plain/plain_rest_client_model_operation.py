@@ -19,6 +19,7 @@ from mcp_server.client import ModelOperation
 from mcp_server.client.plain.utils import (
     encode_path_segment,
     extract_content_from_response,
+    extract_response,
 )
 
 
@@ -111,7 +112,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/schemas/{encode_path_segment(schema_name)}"
             f"/models/{encode_path_segment(model_name)}"
         )
-        return extract_content_from_response(response, "deleted", False)
+        return extract_content_from_response(response, "dropped", False)
 
     # pylint: disable=too-many-positional-arguments
     async def link_model_version(
@@ -136,7 +137,7 @@ class PlainRESTClientModelOperation(ModelOperation):
                 "properties": properties,
             },
         )
-        return extract_content_from_response(response, "modelVersion", {})
+        return extract_response(response)
 
     async def delete_model_version(
         self, catalog_name: str, schema_name: str, model_name: str, version: int
@@ -148,4 +149,4 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/models/{encode_path_segment(model_name)}"
             f"/versions/{encode_path_segment(version)}"
         )
-        return extract_content_from_response(response, "deleted", False)
+        return extract_content_from_response(response, "dropped", False)

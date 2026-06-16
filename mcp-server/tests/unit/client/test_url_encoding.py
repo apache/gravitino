@@ -165,6 +165,30 @@ class TestModelOperationUrlEncoding(unittest.TestCase):
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)
 
+    def test_delete_model_reads_dropped_response(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(op.delete_model("catalog", "schema", "model"))
+        self.assertEqual("true", result)
+
+    def test_link_model_version_returns_base_response(self):
+        client = _make_mock_client({"code": 0})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(
+            op.link_model_version(
+                "catalog", "schema", "model", "s3://bucket/model", [], "", {}
+            )
+        )
+        self.assertEqual('{"code": 0}', result)
+
+    def test_delete_model_version_reads_dropped_response(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(
+            op.delete_model_version("catalog", "schema", "model", 1)
+        )
+        self.assertEqual("true", result)
+
 
 class TestTopicOperationUrlEncoding(unittest.TestCase):
     def test_list_of_topics_encodes_path_traversal(self):

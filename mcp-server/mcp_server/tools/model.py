@@ -310,7 +310,7 @@ def load_model_tools(mcp: FastMCP):
             properties (dict): Model version configuration properties.
 
         Returns:
-            str: JSON-formatted string containing the linked model version.
+            str: JSON-formatted string containing the success response.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_model_operation().link_model_version(
