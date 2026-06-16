@@ -34,8 +34,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies the fileset catalog credential behavior: the internal S3 location-prefix flag is
- * enabled regardless of any user-provided value, static storage credentials are hidden from the
+ * Verifies the fileset catalog credential behavior: the internal S3 location-prefix flag is enabled
+ * regardless of any user-provided value, static storage credentials are hidden from the
  * outward-facing {@code properties()}, and they remain available for credential vending via {@code
  * propertiesWithCredentialProviders()}.
  */
