@@ -24,8 +24,9 @@ import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.FeatureContext;
 import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.auth.IdpBasicAuthConfigValidator;
+import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
@@ -40,11 +41,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Registers built-in IdP REST resources for the idp-basic plugin.
  *
- * <p>Configure {@link org.apache.gravitino.Configs#REST_API_EXTENSION_PACKAGES} to {@link
- * #IDP_REST_EXTENSION_PACKAGE} and list {@code basic} in {@link
- * org.apache.gravitino.Configs#AUTHENTICATORS} so Jersey auto-discovers this feature. IdP REST
- * resource classes remain in {@code org.apache.gravitino.idp.web.rest} and are registered here.
- * Also initializes configured service admins in the built-in IdP when they do not yet exist.
+ * <p>Configure {@link Configs#REST_API_EXTENSION_PACKAGES} to {@link #IDP_REST_EXTENSION_PACKAGE}
+ * and list {@code basic} in {@link Configs#AUTHENTICATORS} so Jersey auto-discovers this feature.
+ * IdP REST resource classes remain in {@code org.apache.gravitino.idp.web.rest} and are registered
+ * here. Also initializes configured service admins in the built-in IdP when they do not yet exist.
  */
 @Provider
 public class IdpRESTFeature implements Feature {
@@ -53,7 +53,7 @@ public class IdpRESTFeature implements Feature {
 
   /** Extension package name registered through {@code gravitino.server.rest.extensionPackages}. */
   public static final String IDP_REST_EXTENSION_PACKAGE =
-      IdpBasicAuthConfigValidator.IDP_REST_EXTENSION_PACKAGE;
+      "org.apache.gravitino.idp.web.rest.feature";
 
   /** Environment variable for the initial password of configured service admins. */
   public static final String INITIAL_ADMIN_PASSWORD_ENV = "GRAVITINO_INITIAL_ADMIN_PASSWORD";
@@ -83,10 +83,34 @@ public class IdpRESTFeature implements Feature {
   /**
    * Validates that the server configuration is compatible with the built-in IdP plugin.
    *
+   * <p>Called when the idp-basic extension package is enabled. Requires {@code basic} in {@link
+   * Configs#AUTHENTICATORS} and rejects {@code simple} together with {@code basic}.
+   *
    * @param config The server configuration.
    */
   static void validateConfiguration(Config config) {
-    IdpBasicAuthConfigValidator.validate(config);
+    List<String> authenticators = config.get(Configs.AUTHENTICATORS);
+    boolean usesBasic =
+        authenticators.stream()
+            .anyMatch(name -> AuthenticatorType.BASIC.name().equalsIgnoreCase(name.trim()));
+    boolean usesSimple =
+        authenticators.stream()
+            .anyMatch(name -> AuthenticatorType.SIMPLE.name().equalsIgnoreCase(name.trim()));
+
+    if (usesSimple && usesBasic) {
+      throw new IllegalArgumentException(
+          "Built-in IdP basic authentication is incompatible with simple authentication because "
+              + "both handle Authorization: Basic headers. Remove either 'simple' or 'basic' from "
+              + "gravitino.authenticators.");
+    }
+
+    if (!usesBasic) {
+      throw new IllegalArgumentException(
+          "gravitino.server.rest.extensionPackages includes the built-in IdP plugin ("
+              + IDP_REST_EXTENSION_PACKAGE
+              + ") but 'basic' is not listed in gravitino.authenticators. Add 'basic' to "
+              + "gravitino.authenticators or remove the extension package.");
+    }
   }
 
   private static void registerBasicAuthenticator(Config config) {

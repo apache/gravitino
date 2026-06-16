@@ -39,9 +39,6 @@ class TestIdpRESTFeature {
         Lists.newArrayList(
             AuthenticatorType.SIMPLE.name().toLowerCase(),
             AuthenticatorType.BASIC.name().toLowerCase()));
-    config.set(
-        Configs.REST_API_EXTENSION_PACKAGES,
-        Lists.newArrayList(IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE));
 
     IllegalArgumentException exception =
         assertThrows(
@@ -51,29 +48,24 @@ class TestIdpRESTFeature {
   }
 
   @Test
-  void testBasicWithoutExtensionFails() {
+  void testExtensionWithoutBasicFails() {
+    Config config = new Config(false) {};
+    config.set(
+        Configs.AUTHENTICATORS, Lists.newArrayList(AuthenticatorType.OAUTH.name().toLowerCase()));
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> IdpRESTFeature.validateConfiguration(config));
+
+    assertTrue(exception.getMessage().contains("gravitino.authenticators"));
+  }
+
+  @Test
+  void testBasicOk() {
     Config config = new Config(false) {};
     config.set(
         Configs.AUTHENTICATORS, Lists.newArrayList(AuthenticatorType.BASIC.name().toLowerCase()));
 
-    assertThrows(
-        IllegalArgumentException.class, () -> IdpRESTFeature.validateConfiguration(config));
-  }
-
-  @Test
-  void testBasicWithExtensionOk() {
-    Config config =
-        newConfig(
-            AuthenticatorType.BASIC.name().toLowerCase(),
-            IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE);
-
     assertDoesNotThrow(() -> IdpRESTFeature.validateConfiguration(config));
-  }
-
-  private static Config newConfig(String authenticator, String extensionPackage) {
-    Config config = new Config(false) {};
-    config.set(Configs.AUTHENTICATORS, Lists.newArrayList(authenticator));
-    config.set(Configs.REST_API_EXTENSION_PACKAGES, Lists.newArrayList(extensionPackage));
-    return config;
   }
 }

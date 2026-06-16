@@ -29,7 +29,8 @@ info:
     validated against built-in IdP user metadata. Enable built-in IdP by listing `basic` in
     `gravitino.authenticators` and registering
     `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages`.
-    Both settings are required. Do not list `simple` together with `basic`.
+    When the extension package is enabled, `basic` must be listed in `gravitino.authenticators`.
+    Do not list `simple` together with `basic`.
 
 servers:
   - url: "{scheme}://{host}:{port}/{basePath}"

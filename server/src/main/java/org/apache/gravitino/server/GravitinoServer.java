@@ -27,7 +27,6 @@ import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.auth.IdpBasicAuthConfigValidator;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
@@ -106,7 +105,6 @@ public class GravitinoServer extends ResourceConfig {
 
   public void initialize() {
     gravitinoEnv.initializeFullComponents(serverConfig);
-    IdpBasicAuthConfigValidator.validate(serverConfig);
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
