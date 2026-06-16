@@ -62,7 +62,6 @@ public class TestDynamicIcebergConfigProvider {
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     // Clean up GravitinoEnv and IcebergRESTServerContext state after each test
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", null, true);
     resetServerContext();
   }
@@ -371,7 +370,6 @@ public class TestDynamicIcebergConfigProvider {
     createMockServerContext(true);
 
     // Ensure internal CatalogDispatcher is null (simulating GravitinoEnv not initialized)
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", null, true);
 
     // Initialize provider with required properties
