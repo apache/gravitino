@@ -11,7 +11,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 ## Capabilities
 
-1. Supports [Hive catalog](spark-catalog-hive.md), [Iceberg catalog](spark-catalog-iceberg.md), [Paimon catalog](spark-catalog-paimon.md) and [Jdbc catalog](spark-catalog-jdbc.md).
+1. Supports [Hive catalog](spark-catalog-hive.md), [Iceberg catalog](spark-catalog-iceberg.md), [Paimon catalog](spark-catalog-paimon.md), [Jdbc catalog](spark-catalog-jdbc.md), and [AWS Glue catalog](spark-catalog-glue.md).
 2. Supports federation query.
 3. Supports most DDL and DML SQLs.
 
