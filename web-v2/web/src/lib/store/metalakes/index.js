@@ -335,7 +335,8 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
                 name: schemaName,
                 title: schemaName,
                 tables: [],
-                children: []
+                children: [],
+                isLeaf: reload ? false : undefined
               }
             })
           : []
@@ -451,6 +452,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
       }
 
       result.data = [...childSchemas, ...entities, ...functions, ...views]
+      result.entities = entities
     }
 
     return result
@@ -946,7 +948,7 @@ export const fetchSchemas = createAsyncThunk(
 
     dispatch(setExpandedNodes([`{{${metalake}}}`, `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`]))
 
-    return { schemas, page, init }
+    return { schemas, page, init, parentSchema }
   }
 )
 
@@ -990,7 +992,7 @@ export const createSchema = createAsyncThunk(
       children: []
     }
 
-    dispatch(fetchSchemas({ metalake, catalog, catalogType, init: true }))
+    await dispatch(fetchSchemas({ metalake, catalog, catalogType, init: true }))
 
     return schemaData
   }
@@ -2327,6 +2329,7 @@ export const appMetalakesSlice = createSlice({
     tableProps: [],
     catalogs: [],
     schemas: [],
+    subschemas: [],
     tables: [],
     functions: [],
     views: [],
@@ -2392,6 +2395,7 @@ export const appMetalakesSlice = createSlice({
       state.tableProps = []
       state.catalogs = []
       state.schemas = []
+      state.subschemas = []
       state.tables = []
       state.functions = []
       state.views = []
@@ -2400,6 +2404,9 @@ export const appMetalakesSlice = createSlice({
       state.topics = []
       state.models = []
       state.versions = []
+    },
+    setSubschemas(state, action) {
+      state.subschemas = action.payload
     },
     setTableLoading(state, action) {
       state.tableLoading = action.payload
@@ -2706,9 +2713,13 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(setIntoTreeNodeWithFetch.fulfilled, (state, action) => {
-      const { key, data } = action.payload
+      const { key, data, entities } = action.payload
 
       state.metalakeTree = updateTreeData(state.metalakeTree, key, data)
+
+      if (entities && state.selectedNodes.includes(key)) {
+        state.tableData = entities
+      }
     })
     builder.addCase(setIntoTreeNodeWithFetch.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
@@ -2816,7 +2827,11 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(fetchSchemas.fulfilled, (state, action) => {
-      state.schemas = action.payload.schemas
+      if (action.payload.parentSchema) {
+        state.subschemas = action.payload.schemas
+      } else {
+        state.schemas = action.payload.schemas
+      }
       if (action.payload.init) {
         state.tableData = action.payload.schemas
       }
