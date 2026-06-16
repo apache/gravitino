@@ -308,9 +308,11 @@ export function extractPlaceholder(str) {
 export const updateTreeData = (list = [], key, children = []) => {
   return list.map(node => {
     if (node.key === key) {
+      const isLeaf = children?.length === 0
+
       return {
         ...node,
-        isLeaf: children?.length === 0,
+        isLeaf,
         children
       }
     }
