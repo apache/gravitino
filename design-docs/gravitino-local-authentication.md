@@ -315,12 +315,13 @@ fresh Gravitino deployment.
 1. Deploy Gravitino with built-in IDP enabled:
 
    ```properties
+   gravitino.authenticators=basic
    gravitino.server.rest.extensionPackages=org.apache.gravitino.idp.web.rest.feature
    gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
-   Built-in IdP is incompatible with the `simple` authenticator. When the `idp-basic` plugin is
-   enabled, `gravitino.authenticators` must not include `simple`.
+   Built-in IdP requires both `basic` in `gravitino.authenticators` and the extension package above.
+   It is incompatible with the `simple` authenticator; do not list `simple` together with `basic`.
 
 2. Export the initial service admin password before starting Gravitino:
 
@@ -399,12 +400,15 @@ credentials are otherwise exposed on the wire.
 
 | Key                                         | Value                                           | Required when using built-in IDP |
 |---------------------------------------------|-------------------------------------------------|----------------------------------|
+| `gravitino.authenticators`                  | Must include `basic`                            | Yes                              |
 | `gravitino.server.rest.extensionPackages`   | `org.apache.gravitino.idp.web.rest.feature`     | Yes                              |
 | `gravitino.authorization.serviceAdmins`     | Comma-separated service admin                   | Yes                              |
 
-List `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages` so
-Jersey registers `/api/idp/*` management APIs. Callers must use Basic authentication with a username
-in `gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`.
+List `basic` in `gravitino.authenticators` and `org.apache.gravitino.idp.web.rest.feature` in
+`gravitino.server.rest.extensionPackages` so Jersey registers `/api/idp/*` management APIs and the
+Web UI can use the built-in IdP login form. Both settings are required. Callers must use Basic
+authentication with a username in `gravitino.authorization.serviceAdmins` and a password stored in
+`idp_user_meta`. Do not list `simple` together with `basic`.
 
 ### 8.2 Password Algorithm
 

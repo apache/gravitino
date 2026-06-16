@@ -49,6 +49,10 @@ public class AuthenticatorFactory {
 
     List<Authenticator> authenticators = Lists.newArrayList();
     for (String name : authenticatorNames) {
+      if (AuthenticatorType.BASIC.name().equalsIgnoreCase(name.trim())) {
+        // BasicAuthenticator is registered by the idp-basic plugin at Jersey startup.
+        continue;
+      }
       String className = AUTHENTICATORS.getOrDefault(name, name);
       try {
         Authenticator authenticator =
