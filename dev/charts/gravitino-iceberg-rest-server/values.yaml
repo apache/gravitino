@@ -347,6 +347,11 @@ tolerations: []
 
 affinity: {}
 
+## Priority class name for the Iceberg REST Server pod
+## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/
+##
+priorityClassName: ""
+
 ## PodDisruptionBudget configuration
 ## PodDisruptionBudgets limit the number of pods that can be down simultaneously during voluntary disruptions
 ## (such as node drains, cluster upgrades, or pod evictions), ensuring high availability and service continuity.

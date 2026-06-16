@@ -234,6 +234,9 @@ spec:
         {{- toYaml .Values.affinity | nindent 8 }}
       tolerations:
         {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       volumes:
         - name: gravitino-conf
           configMap:
