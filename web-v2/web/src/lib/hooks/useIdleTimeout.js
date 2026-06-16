@@ -45,6 +45,12 @@ const DEFAULT_IDLE_TIMEOUT_MS = (() => {
 })()
 
 /**
+ * Throttle interval for activity events in milliseconds.
+ * Prevents excessive React state updates from high-frequency events like mousemove/scroll.
+ */
+const ACTIVITY_THROTTLE_MS = 1000
+
+/**
  * Custom hook for idle timeout detection using DOM event listeners and
  * requestAnimationFrame polling. Provides full control over timer reset
  * for "Stay signed in" and cross-tab synchronization.
@@ -52,6 +58,7 @@ const DEFAULT_IDLE_TIMEOUT_MS = (() => {
  * Performance optimizations:
  * - Skips polling loop entirely when idleTimeoutMs is Number.MAX_SAFE_INTEGER (unauthenticated)
  * - Throttles state updates to once per second (only when remaining seconds change)
+ * - Throttles activity event handling to avoid excessive resets from high-frequency events
  *
  * @param {Object} options
  * @param {number} [options.idleTimeoutMs] - Idle timeout in milliseconds (default: 15 minutes).
@@ -66,6 +73,7 @@ export function useIdleTimeout({ idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS, paused
   const rafIdRef = useRef(null)
   const pausedRef = useRef(paused)
   const lastReportedSecondRef = useRef(null)
+  const lastResetTimeRef = useRef(0)
   const [isIdle, setIsIdle] = useState(false)
   const [idleTimeRemaining, setIdleTimeRemaining] = useState(idleTimeoutMs)
 
@@ -90,6 +98,7 @@ export function useIdleTimeout({ idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS, paused
     // Initialize the last activity timestamp on mount
     lastActivityRef.current = Date.now()
     lastReportedSecondRef.current = null
+    lastResetTimeRef.current = 0
 
     const handleActivityEvent = event => {
       // Ignore events fired while the tab is hidden (IST-REQ-001)
@@ -102,6 +111,14 @@ export function useIdleTimeout({ idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS, paused
       if (pausedRef.current) {
         return
       }
+
+      // Throttle activity resets to avoid excessive React state updates
+      // from high-frequency events like mousemove and scroll
+      const now = Date.now()
+      if (now - lastResetTimeRef.current < ACTIVITY_THROTTLE_MS) {
+        return
+      }
+      lastResetTimeRef.current = now
 
       resetActivity()
     }

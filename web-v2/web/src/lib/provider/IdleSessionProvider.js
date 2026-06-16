@@ -184,32 +184,31 @@ export default function IdleSessionProvider({
           setWarningCountdown(msToSeconds(warningLeadMs))
         }
       } else if (message.type === 'logout') {
-        // Another tab triggered logout — redirect without calling signOut again
+        // Another tab triggered logout — clear local auth state and redirect
         if (!loggedOutRef.current) {
           loggedOutRef.current = true
-          const loginUrl = message.reason ? `/login?reason=${message.reason}` : '/login'
-          router.push(loginUrl)
+          dispatch(logoutAction({ router, reason: message.reason }))
         }
       }
     })
-  }, [onMessage, resetIdleActivity, router, state, warningLeadMs])
+  }, [onMessage, resetIdleActivity, router, state, warningLeadMs, dispatch])
 
   // Broadcast activity to other tabs when this tab has activity (IST-REQ-005)
-  // The idle hook already resets on activity; we just need to broadcast
-  const lastBroadcastRef = useRef(0)
+  // Only broadcast when idleTimeRemaining jumps UP (indicating a timer reset),
+  // not on every tick down. This prevents continuously resetting other tabs' timers.
+  const prevIdleTimeRemainingRef = useRef(idleTimeRemaining)
   useEffect(() => {
     if (!isAuthenticated) {
       return
     }
 
-    // When idleTimeRemaining is reset (activity detected), broadcast to other tabs
-    // We use a throttled approach: check if enough time has passed since last broadcast
-    const now = Date.now()
-
-    if (now - lastBroadcastRef.current >= 2000) {
-      sendMessage({ type: 'activity', timestamp: now })
-      lastBroadcastRef.current = now
+    // Detect a jump UP in remaining time, which indicates the idle timer was reset
+    // due to user activity. A steady decrease (idle countdown) should not trigger a broadcast.
+    if (idleTimeRemaining > prevIdleTimeRemainingRef.current) {
+      sendMessage({ type: 'activity', timestamp: Date.now() })
     }
+
+    prevIdleTimeRemainingRef.current = idleTimeRemaining
   }, [idleTimeRemaining, isAuthenticated, sendMessage])
 
   // Auto-logout when state becomes expired (from isIdle)
@@ -222,12 +221,25 @@ export default function IdleSessionProvider({
   // Detect authenticated→unauthenticated transition (e.g., manual logout from user menu)
   // and broadcast logout to other tabs
   useEffect(() => {
-    if (wasAuthenticatedRef.current && !isAuthenticated && !loggedOutRef.current) {
+    const wasAuthenticated = wasAuthenticatedRef.current
+
+    // Reset guard and timer state on unauthenticated→authenticated transition
+    // This handles SPA flows where user logs out and logs back in without a full page reload
+    if (!wasAuthenticated && isAuthenticated) {
+      loggedOutRef.current = false
+      setState('active')
+      resetIdleActivity()
+      setWarningCountdown(msToSeconds(warningLeadMs))
+    }
+
+    // Broadcast authenticated→unauthenticated transition (e.g., manual logout from user menu)
+    if (wasAuthenticated && !isAuthenticated && !loggedOutRef.current) {
       loggedOutRef.current = true
       sendMessage({ type: 'logout', timestamp: Date.now() })
     }
+
     wasAuthenticatedRef.current = isAuthenticated
-  }, [isAuthenticated, sendMessage])
+  }, [isAuthenticated, resetIdleActivity, sendMessage, warningLeadMs])
 
   // Context value
   const contextValue = {

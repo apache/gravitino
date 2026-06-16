@@ -122,10 +122,17 @@ export const logoutAction = createAsyncThunk(
               dispatch(clearIntervalId())
               dispatch(setAuthToken(''))
 
-              // Redirect to IdP logout endpoint — browser navigates away, must be last
-              await userManager.signoutRedirect({ id_token_hint: user?.id_token })
+              // Only redirect to IdP logout endpoint if we have an id_token.
+              // After a completed signout redirect callback, getUser() returns null
+              // and calling signoutRedirect() without id_token_hint would cause a
+              // redirect loop (/oauth/logout -> signoutRedirect -> /oauth/logout ...).
+              if (user?.id_token) {
+                await userManager.signoutRedirect({ id_token_hint: user.id_token })
 
-              return { token: null } // unreachable — browser navigates away
+                return { token: null } // unreachable — browser navigates away
+              }
+
+              // No id_token available — fall through to local cleanup + navigation
             }
           }
 
@@ -143,6 +150,7 @@ export const logoutAction = createAsyncThunk(
 
       dispatch(clearIntervalId())
       dispatch(setAuthToken(''))
+      dispatch(setAuthUser(null))
     } else {
       dispatch(setAuthUser(null))
     }
