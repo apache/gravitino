@@ -15,7 +15,6 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 
 - Function operations
 - Partition operations
-- View operations
 - Querying UDF
 - `LOAD` clause
 - `UNLOAD` clause
@@ -97,6 +96,31 @@ DESC EXTENDED employees;
 
 INSERT INTO employees VALUES (1, 'John Doe', 20240101), (2, 'Jane Smith', 20240101);
 SELECT * FROM employees WHERE dt = 20240101;
+```
+
+## View
+
+### View Capabilities
+
+- Supports `CREATE VIEW`, `DROP VIEW`, `ALTER VIEW` (rename and replace view definition), list, load, and rename views stored in the Hive Metastore Service.
+- When creating a view, the connector stores the SQL with the `flink` dialect and automatically records the `flink.schema.num-columns` property, which acts as the dialect marker required by the Hive catalog.
+- When loading a view, the connector tries the `flink` dialect first, then falls back to the `hive` dialect.
+- Views created by other engines (e.g. Spark) with a different dialect marker are visible in `SHOW VIEWS` but cannot be loaded by the Flink connector.
+- `defaultCatalog` and `defaultSchema` are always stored as `null` for Flink-created views.
+
+### View SQL Example
+
+```sql
+USE CATALOG hive_a;
+USE mydatabase;
+
+CREATE VIEW employee_view AS SELECT id, name FROM employees WHERE dt = 20240101;
+
+SHOW VIEWS;
+
+SELECT * FROM employee_view;
+
+DROP VIEW employee_view;
 ```
 
 ## Catalog Properties

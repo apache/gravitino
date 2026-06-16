@@ -494,9 +494,15 @@ If you update a nullability column to non nullability, there may be compatibilit
 
 ### View Capabilities
 
-- Supports list, create, load, alter, and drop for views managed by the underlying Iceberg REST, JDBC, or Hive backend.
-- Supports dialects such as `trino`, `spark`, and `hive`.
-- Can preserve multiple SQL representations for the same logical view.
+- Supports list, create, load, alter, and drop for views managed by the underlying Iceberg backend.
+- Accepts any dialect name (e.g. `trino`, `spark`, `flink`, `hive`). No restriction on which dialects are used.
+- Can preserve multiple SQL representations for the same logical view; the full set of representations round-trips through Gravitino.
+- `defaultCatalog` and `defaultSchema` are stored and returned as-is by the backend.
+- View support depends on the Iceberg catalog backend: REST and Hive backends generally support views; JDBC backend support is in continuous validation.
+
+:::note
+Rename cannot be combined with other changes in a single `alterView` call. Submit rename as a standalone request.
+:::
 
 ### View Operations
 
