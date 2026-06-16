@@ -37,7 +37,7 @@ class PlainRESTClientTopicOperation(TopicOperation):
             f"/catalogs/{encode_path_segment(catalog_name)}"
             f"/schemas/{encode_path_segment(schema_name)}/topics"
         )
-        return response.json().get("identifiers", [])
+        return extract_content_from_response(response, "identifiers", [])
 
     async def load_topic(
         self, catalog_name: str, schema_name: str, topic_name: str
@@ -48,7 +48,7 @@ class PlainRESTClientTopicOperation(TopicOperation):
             f"/schemas/{encode_path_segment(schema_name)}"
             f"/topics/{encode_path_segment(topic_name)}"
         )
-        return response.json().get("topic", {})
+        return extract_content_from_response(response, "topic", {})
 
     # pylint: disable=too-many-positional-arguments
     async def create_topic(

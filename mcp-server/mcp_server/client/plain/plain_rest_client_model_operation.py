@@ -37,7 +37,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/catalogs/{encode_path_segment(catalog_name)}"
             f"/schemas/{encode_path_segment(schema_name)}/models"
         )
-        return response.json().get("identifiers", [])
+        return extract_content_from_response(response, "identifiers", [])
 
     async def load_model(
         self, catalog_name: str, schema_name: str, model_name: str
@@ -48,7 +48,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/schemas/{encode_path_segment(schema_name)}"
             f"/models/{encode_path_segment(model_name)}"
         )
-        return response.json().get("model", {})
+        return extract_content_from_response(response, "model", {})
 
     async def list_model_versions(
         self, catalog_name: str, schema_name: str, model_name: str
@@ -59,7 +59,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/schemas/{encode_path_segment(schema_name)}"
             f"/models/{encode_path_segment(model_name)}/versions?details=true"
         )
-        return response.json().get("infos", [])
+        return extract_content_from_response(response, "infos", [])
 
     async def load_model_version(
         self, catalog_name: str, schema_name: str, model_name: str, version: int
@@ -71,7 +71,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/models/{encode_path_segment(model_name)}"
             f"/versions/{encode_path_segment(version)}"
         )
-        return response.json().get("modelVersion", {})
+        return extract_content_from_response(response, "modelVersion", {})
 
     async def load_model_version_by_alias(
         self, catalog_name: str, schema_name: str, model_name: str, alias: str
@@ -83,7 +83,7 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/models/{encode_path_segment(model_name)}"
             f"/aliases/{encode_path_segment(alias)}"
         )
-        return response.json().get("modelVersion", {})
+        return extract_content_from_response(response, "modelVersion", {})
 
     # pylint: disable=too-many-positional-arguments
     async def register_model(
