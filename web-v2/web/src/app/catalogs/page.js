@@ -163,11 +163,20 @@ const CatalogsListPage = () => {
         }
 
         if (paramsSize === 4 && catalog && catalogType && schema) {
-          if (!store.catalogs.length) {
-            await dispatch(fetchCatalogs({ metalake }))
-            await dispatch(fetchSchemas({ metalake, catalog, catalogType }))
+          let catalogsList = store.catalogs
+          if (!catalogsList.length) {
+            const { payload } = await dispatch(fetchCatalogs({ init: true, metalake }))
+            catalogsList = payload?.catalogs || []
+            await dispatch(fetchSchemas({ init: true, metalake, catalog, catalogType }))
           }
-          dispatch(fetchSchemas({ metalake, catalog, catalogType, parentSchema: schema }))
+          const currentCatalog = catalogsList.find(c => c.name === catalog)
+
+          const isIcebergJdbcCatalog =
+            currentCatalog?.provider === 'lakehouse-iceberg' &&
+            currentCatalog?.properties?.['catalog-backend'] === 'jdbc'
+          if (isIcebergJdbcCatalog) {
+            dispatch(fetchSchemas({ metalake, catalog, catalogType, parentSchema: schema }))
+          }
           dispatch(fetchFunctions({ init: true, metalake, catalog, schema }))
           switch (catalogType) {
             case 'relational':

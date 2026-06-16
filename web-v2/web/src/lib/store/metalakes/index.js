@@ -2717,7 +2717,7 @@ export const appMetalakesSlice = createSlice({
 
       state.metalakeTree = updateTreeData(state.metalakeTree, key, data)
 
-      if (entities) {
+      if (entities && state.selectedNodes.includes(key)) {
         state.tableData = entities
       }
     })

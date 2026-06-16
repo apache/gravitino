@@ -298,12 +298,7 @@ export default function SchemaDetailsPage() {
   }
 
   const showDeleteSchemaConfirm = name => {
-    let confirmInput = ''
     let validateFn = null
-
-    const setConfirmInput = value => {
-      confirmInput = value
-    }
 
     const registerValidate = fn => {
       validateFn = fn
@@ -312,27 +307,22 @@ export default function SchemaDetailsPage() {
     modal.confirm({
       title: `Are you sure to delete the schema ${name}?`,
       icon: <ExclamationCircleFilled />,
-      content: <ConfirmInput name={name} setConfirmInput={setConfirmInput} registerValidate={registerValidate} />,
+      content: <ConfirmInput name={name} registerValidate={registerValidate} />,
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
-      onOk(close) {
+      async onOk() {
         if (validateFn && !validateFn()) return
 
-        const confirmFn = async () => {
-          await dispatch(deleteSchema({ metalake: currentMetalake, catalog, catalogType, schema: name }))
-          console.log(`reloading schema ${schema}, reloading subschemas...`)
+        await dispatch(deleteSchema({ metalake: currentMetalake, catalog, catalogType, schema: name }))
 
-          // Fetch subschemas again to update store.subschemas
-          await dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
+        // Fetch subschemas again to update store.subschemas
+        await dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
 
-          treeRef.current.onLoadData(
-            { key: `{{${currentMetalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`, nodeType: 'schema' },
-            true
-          )
-          close()
-        }
-        confirmFn()
+        treeRef.current.onLoadData(
+          { key: `{{${currentMetalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`, nodeType: 'schema' },
+          true
+        )
       }
     })
   }
@@ -492,12 +482,7 @@ export default function SchemaDetailsPage() {
       location = catalogData?.provider === 'hive' ? table.properties?.['location'] : ''
     }
 
-    let confirmInput = ''
     let validateFn = null
-
-    const setConfirmInput = value => {
-      confirmInput = value
-    }
 
     const registerValidate = fn => {
       validateFn = fn
@@ -507,13 +492,7 @@ export default function SchemaDetailsPage() {
       title: `Are you sure to delete the ${type} ${entity}?`,
       icon: <ExclamationCircleFilled />,
       content: (
-        <ConfirmInput
-          name={entity}
-          setConfirmInput={setConfirmInput}
-          isManaged={isManaged}
-          location={location}
-          registerValidate={registerValidate}
-        />
+        <ConfirmInput name={entity} isManaged={isManaged} location={location} registerValidate={registerValidate} />
       ),
       okText: 'Delete',
       okType: 'danger',
