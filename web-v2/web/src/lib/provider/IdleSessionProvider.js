@@ -90,6 +90,7 @@ export default function IdleSessionProvider({
   const [state, setState] = useState('active')
   const [warningCountdown, setWarningCountdown] = useState(msToSeconds(warningLeadMs))
   const loggedOutRef = useRef(false)
+  const wasAuthenticatedRef = useRef(isAuthenticated)
 
   const {
     isIdle,
@@ -103,7 +104,7 @@ export default function IdleSessionProvider({
     paused: state === 'warning'
   })
 
-  const { sendMessage, onMessage, tabId } = useBroadcastChannel()
+  const { sendMessage, onMessage } = useBroadcastChannel()
 
   // Track warning threshold: when idleTimeRemaining drops below warningLeadMs, show warning
   const warningThreshold = warningLeadMs
@@ -147,8 +148,8 @@ export default function IdleSessionProvider({
     loggedOutRef.current = true
     setState('expired')
 
-    // Broadcast logout to other tabs
-    sendMessage({ type: 'logout', timestamp: Date.now() })
+    // Broadcast logout with reason to other tabs
+    sendMessage({ type: 'logout', reason: 'inactive', timestamp: Date.now() })
 
     // Dispatch logout action (handles both OAuth and simple auth)
     // Pass reason to show inactivity message on login page
@@ -186,7 +187,8 @@ export default function IdleSessionProvider({
         // Another tab triggered logout — redirect without calling signOut again
         if (!loggedOutRef.current) {
           loggedOutRef.current = true
-          router.push('/login?reason=inactive')
+          const loginUrl = message.reason ? `/login?reason=${message.reason}` : '/login'
+          router.push(loginUrl)
         }
       }
     })
@@ -216,6 +218,16 @@ export default function IdleSessionProvider({
       handleLogout()
     }
   }, [state, handleLogout])
+
+  // Detect authenticated→unauthenticated transition (e.g., manual logout from user menu)
+  // and broadcast logout to other tabs
+  useEffect(() => {
+    if (wasAuthenticatedRef.current && !isAuthenticated && !loggedOutRef.current) {
+      loggedOutRef.current = true
+      sendMessage({ type: 'logout', timestamp: Date.now() })
+    }
+    wasAuthenticatedRef.current = isAuthenticated
+  }, [isAuthenticated, sendMessage])
 
   // Context value
   const contextValue = {

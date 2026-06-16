@@ -151,7 +151,7 @@ export const logoutAction = createAsyncThunk(
     oauthProviderFactory.reset()
 
     // Build login URL with optional reason parameter
-    const loginUrl = reason ? `/login?reason=${reason}` : '/login'
+    const loginUrl = reason ? `/login?reason=${encodeURIComponent(reason)}` : '/login'
     await router.push(loginUrl)
 
     return { token: null }

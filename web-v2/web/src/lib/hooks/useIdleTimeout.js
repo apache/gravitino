@@ -28,6 +28,12 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'visibilitychange']
 
 /**
+ * Sentinel value indicating the hook should be effectively disabled.
+ * When idleTimeoutMs is this value, no polling loop or event listeners are attached.
+ */
+const DISABLED_SENTINEL = Number.MAX_SAFE_INTEGER
+
+/**
  * Default idle timeout: 15 minutes in milliseconds.
  * Overridable via NEXT_PUBLIC_IDLE_TIMEOUT_MS environment variable.
  */
@@ -43,8 +49,13 @@ const DEFAULT_IDLE_TIMEOUT_MS = (() => {
  * requestAnimationFrame polling. Provides full control over timer reset
  * for "Stay signed in" and cross-tab synchronization.
  *
+ * Performance optimizations:
+ * - Skips polling loop entirely when idleTimeoutMs is Number.MAX_SAFE_INTEGER (unauthenticated)
+ * - Throttles state updates to once per second (only when remaining seconds change)
+ *
  * @param {Object} options
- * @param {number} [options.idleTimeoutMs] - Idle timeout in milliseconds (default: 15 minutes)
+ * @param {number} [options.idleTimeoutMs] - Idle timeout in milliseconds (default: 15 minutes).
+ *   Pass Number.MAX_SAFE_INTEGER to disable the hook entirely.
  * @param {boolean} [options.paused] - When true, DOM activity events are ignored (timer keeps running).
  *   Used to keep the warning modal visible until the user explicitly acts.
  *   Programmatic calls to resetActivity() still work when paused.
@@ -54,6 +65,7 @@ export function useIdleTimeout({ idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS, paused
   const lastActivityRef = useRef(null)
   const rafIdRef = useRef(null)
   const pausedRef = useRef(paused)
+  const lastReportedSecondRef = useRef(null)
   const [isIdle, setIsIdle] = useState(false)
   const [idleTimeRemaining, setIdleTimeRemaining] = useState(idleTimeoutMs)
 
@@ -66,11 +78,18 @@ export function useIdleTimeout({ idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS, paused
     lastActivityRef.current = Date.now()
     setIsIdle(false)
     setIdleTimeRemaining(idleTimeoutMs)
+    lastReportedSecondRef.current = null
   }, [idleTimeoutMs])
 
   useEffect(() => {
+    // Skip entirely when disabled (unauthenticated sentinel)
+    if (idleTimeoutMs === DISABLED_SENTINEL) {
+      return
+    }
+
     // Initialize the last activity timestamp on mount
     lastActivityRef.current = Date.now()
+    lastReportedSecondRef.current = null
 
     const handleActivityEvent = event => {
       // Ignore events fired while the tab is hidden (IST-REQ-001)
@@ -97,18 +116,24 @@ export function useIdleTimeout({ idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS, paused
     })
 
     // requestAnimationFrame polling loop to check idle state
+    // Throttled to update state only when the remaining seconds change
     const checkIdle = () => {
       const now = Date.now()
       const elapsed = now - lastActivityRef.current
-      const remaining = Math.max(0, idleTimeoutMs - elapsed)
+      const remainingMs = Math.max(0, idleTimeoutMs - elapsed)
+      const remainingSeconds = Math.ceil(remainingMs / 1000)
 
-      setIdleTimeRemaining(remaining)
+      // Only trigger re-render when the displayed second changes
+      if (remainingSeconds !== lastReportedSecondRef.current) {
+        lastReportedSecondRef.current = remainingSeconds
+        setIdleTimeRemaining(remainingMs)
+      }
 
       if (elapsed >= idleTimeoutMs) {
         setIsIdle(true)
+      } else {
+        rafIdRef.current = requestAnimationFrame(checkIdle)
       }
-
-      rafIdRef.current = requestAnimationFrame(checkIdle)
     }
 
     rafIdRef.current = requestAnimationFrame(checkIdle)

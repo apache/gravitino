@@ -19,8 +19,8 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Modal, Typography, Button, Space, Flex } from 'antd'
+import { useState, useEffect, useRef } from 'react'
+import { Modal, Typography, Button, Flex } from 'antd'
 import { ClockCircleOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
@@ -40,6 +40,12 @@ const { Text } = Typography
  */
 export default function IdleWarningModal({ open, countdownSeconds, onStaySignedIn, onSignOut }) {
   const [remaining, setRemaining] = useState(countdownSeconds)
+  const onSignOutRef = useRef(onSignOut)
+
+  // Keep ref in sync with latest callback
+  useEffect(() => {
+    onSignOutRef.current = onSignOut
+  }, [onSignOut])
 
   // Reset countdown when the modal opens or countdownSeconds changes
   useEffect(() => {
@@ -48,9 +54,10 @@ export default function IdleWarningModal({ open, countdownSeconds, onStaySignedI
     }
   }, [open, countdownSeconds])
 
-  // Countdown timer
+  // Countdown timer - only depends on open, not remaining
+  // Uses functional setRemaining to avoid recreating interval every second
   useEffect(() => {
-    if (!open || remaining <= 0) {
+    if (!open) {
       return
     }
 
@@ -60,7 +67,7 @@ export default function IdleWarningModal({ open, countdownSeconds, onStaySignedI
           clearInterval(timer)
 
           // Auto-logout when countdown reaches zero
-          onSignOut()
+          onSignOutRef.current()
 
           return 0
         }
@@ -70,7 +77,7 @@ export default function IdleWarningModal({ open, countdownSeconds, onStaySignedI
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [open, remaining, onSignOut])
+  }, [open])
 
   return (
     <Modal
