@@ -238,7 +238,7 @@ Support for altering partitions is under development.
 - Supports list, create, load, alter, and drop for views stored in the Hive Metastore Service as `VIRTUAL_VIEW`.
 - Each view must contain exactly one SQL representation.
 - Supports creating views with the `hive`, `flink`, or `spark` dialect.
-- When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `flink`, `spark`, or `trino` dialect. A `trino` view (created outside Gravitino as a Presto/Trino view) can be loaded but not created, since Gravitino doesn't support creating views with the `trino` dialect yet.
+- When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `flink`, `spark`, or `trino` dialect.
 - For the `hive` and `flink` dialects, `defaultCatalog` and `defaultSchema` must be `null`.
 - The `flink` dialect requires at least one view property with the prefix `flink.` to be set. The Flink connector automatically sets `flink.schema.num-columns`; when using the REST API directly, set at least one `flink.*` property explicitly.
 - The `spark` dialect requires the view property `spark.sql.create.version` to be set; without it the view round-trips as the `hive` dialect on reload.
