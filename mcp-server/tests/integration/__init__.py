@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#  http://www.apache.org/licenses/LICENSE-2.0
+#   http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -14,45 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-
-**/.pytest_cache/**
-**/__pycache__/**
-mcp_server.egg-info
-vevn
-venv
-.vevn
-.venv
-.idea
-.uv
-dist
-build
-gravitino_mcp_server.egg-info
-
-logs/
-*.log
-*.err
-gravitino_mcp_server.egg-info
-
-# Local run artifacts from dev/start_inspector_demo.sh (.out logs and .pid files)
-.inspector-demo-*
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Documentation Related
-docs/build
-docs/source/generated
-
