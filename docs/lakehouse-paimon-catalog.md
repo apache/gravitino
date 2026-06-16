@@ -58,7 +58,7 @@ Builds with Apache Paimon `1.2`.
 :::note
 - If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/maintenance/filesystems/#s3).
 - If you use an S3 warehouse, also download [`gravitino-aws-<version>.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) and place it in the `catalogs/lakehouse-paimon/libs` directory to enable credential vending. For OSS, use [`gravitino-aliyun-<version>.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) instead.
-- Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are hidden from `GET /catalogs/{catalog}` REST API responses since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to obtain credentials at runtime.
+- Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are hidden from `GET /catalogs/{catalog}` REST API responses since Gravitino 1.4.0. Use the [credential vending API](security/credential-vending.md) to obtain credentials at runtime.
 - If you want to use REST backend, Gravitino Paimon catalog supports Aliyun DLF (Data Lake Formation) as the REST catalog service. You need to configure the DLF-related properties eg:
 ```
 {
