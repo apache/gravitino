@@ -70,8 +70,8 @@ class PlainRESTClientOperation(GravitinoOperation):
             uri: Gravitino server URI.
             authorization: Full ``Authorization`` header value forwarded verbatim
                 on every request (for example ``"Bearer <token>"`` for OAuth2 or
-                ``"Basic <base64(user:dummy)>"`` for simple auth). Empty string
-                means anonymous (no header sent).
+                ``"Basic <base64(user:secret)>"`` for simple or Basic auth).
+                Empty string means anonymous (no header sent).
         """
         headers = {}
         if authorization:

@@ -168,6 +168,22 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
         self.assertEqual(record["outcome"], "allow")
         self.assertEqual(record["principal"], "anonymous")
 
+    def test_principal_falls_back_to_startup_token(self):
+        """With no request header, the audit principal uses the startup --token."""
+        RESTClientFactory.set_rest_client(MockOperation)
+        server = GravitinoMCPServer(
+            Setting("mock_metalake", token="abcdef123456")
+        )
+
+        async def _run():
+            async with Client(server.mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+
+        asyncio.run(_run())
+
+        record = json.loads(self.log_records[0])
+        self.assertEqual(record["principal"], "bearer:abcdef12")
+
     def test_failed_tool_call_emits_deny_record(self):
         """A tool call that raises an exception produces an audit record with outcome=deny."""
 

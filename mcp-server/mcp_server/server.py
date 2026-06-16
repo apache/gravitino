@@ -39,22 +39,31 @@ from mcp_server.core import audit
 from mcp_server.core.context import (
     GravitinoContext,
     _get_request_authorization,
+    startup_authorization,
 )
 from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
 
 
-def _get_principal_from_request() -> str:
-    """Derive a display principal from the current HTTP request's Authorization header.
+def _get_principal_from_request(fallback_authorization: str = "") -> str:
+    """Derive a display principal for audit attribution.
 
-    Returns "anonymous" in stdio mode or when no token is present.
+    Uses the incoming HTTP request's Authorization header when present;
+    otherwise falls back to the static startup identity (``--token``), which is
+    what actually authenticates the call in stdio mode or in HTTP requests that
+    carry no Authorization header. Returns "anonymous" when neither is set.
     """
+    authorization = _get_request_authorization() or fallback_authorization
     # pylint: disable=protected-access
-    return audit._extract_principal(_get_request_authorization())
+    return audit._extract_principal(authorization)
 
 
 class AuditMiddleware(Middleware):
     """Emit a structured audit record for every tool invocation."""
+
+    def __init__(self, fallback_authorization: str = ""):
+        super().__init__()
+        self._fallback_authorization = fallback_authorization
 
     async def on_call_tool(
         self,
@@ -62,7 +71,7 @@ class AuditMiddleware(Middleware):
         call_next: CallNext[mt.CallToolRequestParams, ToolResult],
     ) -> ToolResult:
         tool_name = context.message.name if context.message else "unknown"
-        principal = _get_principal_from_request()
+        principal = _get_principal_from_request(self._fallback_authorization)
         try:
             result = await call_next(context)
             audit.emit(principal=principal, tool=tool_name, outcome="allow")
@@ -100,7 +109,7 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
             lifespan=_create_lifespan_manager(GravitinoContext(setting)),
         )
 
-    mcp.add_middleware(AuditMiddleware())
+    mcp.add_middleware(AuditMiddleware(startup_authorization(setting)))
     mcp.add_middleware(
         LoggingMiddleware(include_payloads=True, max_payload_length=1000)
     )

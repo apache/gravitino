@@ -36,9 +36,9 @@ def _get_request_authorization() -> str:
     """Return the raw ``Authorization`` header of the current HTTP request.
 
     The header is forwarded to Gravitino verbatim so the auth scheme chosen by
-    the agent (``Basic`` for simple auth, ``Bearer`` for OAuth2, ``Negotiate``
-    for Kerberos) is preserved. Returns an empty string in stdio mode or when
-    the header is absent.
+    the agent (``Basic`` for simple or Basic auth, ``Bearer`` for OAuth2,
+    ``Negotiate`` for Kerberos) is preserved. Returns an empty string in stdio
+    mode or when the header is absent.
     """
     try:
         # Imported lazily: only available within an HTTP request context.
@@ -52,17 +52,23 @@ def _get_request_authorization() -> str:
         return ""
 
 
+def startup_authorization(setting: Setting) -> str:
+    """The static --token rendered as an ``Authorization`` header value.
+
+    The CLI token is treated as an OAuth2 Bearer token. Empty string when no
+    token is configured (anonymous). This is the identity used in stdio mode and
+    the fallback for HTTP requests that carry no ``Authorization`` header.
+    """
+    return f"Bearer {setting.token}" if setting.token else ""
+
+
 class GravitinoContext:
     def __init__(self, setting: Setting):
         self._setting = setting
-        # Static startup identity: the --token CLI value is treated as a Bearer
-        # token (OAuth2). Used in stdio mode or as the fallback when an HTTP
-        # request carries no Authorization header.
-        default_authorization = (
-            f"Bearer {setting.token}" if setting.token else ""
-        )
         self._default_client = RESTClientFactory.create_rest_client(
-            setting.metalake, setting.gravitino_uri, default_authorization
+            setting.metalake,
+            setting.gravitino_uri,
+            startup_authorization(setting),
         )
         # LRU cache of per-principal clients keyed by the raw Authorization header.
         # Safe without locking: rest_client() runs on the single asyncio event

@@ -74,7 +74,12 @@ class GravitinoFixture:  # pylint: disable=too-many-instance-attributes
         return response
 
     def provision(self) -> None:
-        """Create all metadata and authorization fixtures (idempotent-ish)."""
+        """Create all metadata and authorization fixtures.
+
+        Not idempotent: every step raises on a non-2xx response, so re-running
+        against an already-provisioned metalake fails (e.g. HTTP 409). Expects a
+        clean Gravitino instance.
+        """
         self._create_metalake()
         self._create_model_catalog(self.catalog_allowed)
         self._create_model_catalog(self.catalog_denied)
