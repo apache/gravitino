@@ -57,6 +57,7 @@ Builds with Apache Paimon `1.2`.
 
 :::note
 - If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/maintenance/filesystems/#s3).
+- To enable credential vending for S3, place `gravitino-aws-<version>.jar` in the `catalogs/lakehouse-paimon/libs` directory. For OSS, place `gravitino-aliyun-<version>.jar` instead. These jars are available in the `catalogs/glue/libs` directory of the Gravitino distribution.
 - If you want to use REST backend, Gravitino Paimon catalog supports Aliyun DLF (Data Lake Formation) as the REST catalog service. You need to configure the DLF-related properties eg:
 ```
 {
