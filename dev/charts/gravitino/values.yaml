@@ -114,6 +114,13 @@ postgresql:
     ## The value is evaluated as a template.
     ##
     existingSecret: ""
+    ## @param auth.existingSecretName Name of existing secret to use in the init container's secretKeyRef
+    ## When set, this overrides the default `{{ .Release.Name }}-postgresql` secret name used by
+    ## the init-postgresql init container to retrieve the PostgreSQL password.
+    ## Useful when using an external PostgreSQL provider (e.g., CloudNativePG, AWS RDS) where the
+    ## secret name does not follow the Bitnami convention.
+    ##
+    existingSecretName: ""
 
 ## THE CONFIGURATION FOR Gravitino ENTITY STORE
 ##

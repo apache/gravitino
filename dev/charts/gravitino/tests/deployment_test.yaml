@@ -265,3 +265,36 @@ tests:
             name: GRAVITINO_DB
             value: gravitino
           any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-postgresql
+                key: password
+          any: true
+
+  - it: renders custom PostgreSQL secret name when existingSecretName is set
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: true
+        existingSecretName: gravitino-cnpg-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: init-postgresql
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-cnpg-secret
+                key: password
+          any: true
