@@ -87,6 +87,13 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
     return SCHEMA_PROPERTIES_META;
   }
 
+  /**
+   * Adds a JDBC credential provider when the backend is JDBC and credentials are configured, then
+   * delegates to the parent for storage (S3/OSS/Azure/GCS) credential provider detection.
+   *
+   * @param properties the raw catalog properties
+   * @param credentialProviders the list to append detected provider names to
+   */
   @Override
   protected void addCatalogSpecificCredentialProviders(
       Map<String, String> properties, List<String> credentialProviders) {
