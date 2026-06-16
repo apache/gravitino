@@ -25,7 +25,6 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 ### Unsupported Operations
 
 - Partition operations
-- View operations
 - Metadata tables, like:
   - `{iceberg_catalog}.{iceberg_database}.{iceberg_table}&snapshots`
 - Query UDF
@@ -75,6 +74,30 @@ VALUES (1, 'A'), (2, 'B');
 
 SELECT * FROM sample WHERE data = 'B';
 
+```
+
+## View
+
+### View Capabilities
+
+- Supports `CREATE VIEW`, `DROP VIEW`, `ALTER VIEW` (rename and replace view definition), list, load, and rename views managed by the underlying Iceberg backend.
+- When creating a view, the connector stores the SQL with the `flink` dialect.
+- When loading a view, the connector tries the `flink` dialect first, then falls back to the `hive` dialect.
+- Multiple SQL representations per view (e.g. also a `spark` dialect) can coexist and are preserved through Gravitino.
+
+### View SQL Example
+
+```sql
+USE CATALOG iceberg_a;
+USE mydb;
+
+CREATE VIEW order_view AS SELECT id, amount FROM orders WHERE status = 'completed';
+
+SHOW VIEWS;
+
+SELECT * FROM order_view;
+
+DROP VIEW order_view;
 ```
 
 ## Catalog Properties

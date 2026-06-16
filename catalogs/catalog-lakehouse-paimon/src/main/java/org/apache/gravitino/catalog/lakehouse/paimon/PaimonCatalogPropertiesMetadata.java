@@ -31,9 +31,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
-import org.apache.gravitino.catalog.lakehouse.paimon.storage.PaimonOSSFileSystemConfig;
-import org.apache.gravitino.catalog.lakehouse.paimon.storage.PaimonS3FileSystemConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
+import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
@@ -62,6 +62,11 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String S3_ACCESS_KEY = PaimonConstants.S3_ACCESS_KEY;
   public static final String S3_SECRET_KEY = PaimonConstants.S3_SECRET_KEY;
 
+  // OSS properties needed by Paimon
+  public static final String OSS_ENDPOINT = PaimonConstants.OSS_ENDPOINT;
+  public static final String OSS_ACCESS_KEY = PaimonConstants.OSS_ACCESS_KEY;
+  public static final String OSS_SECRET_KEY = PaimonConstants.OSS_SECRET_KEY;
+
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
       ImmutableMap.<String, String>builder()
           .put(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE)
@@ -85,13 +90,12 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           .build();
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
   public static final Map<String, String> KERBEROS_CONFIGURATION =
-      ImmutableMap.<String, String>builder()
-          .put(KerberosConfig.PRINCIPAL_KEY, KerberosConfig.PRINCIPAL_KEY)
-          .put(KerberosConfig.KEY_TAB_URI_KEY, KerberosConfig.KEY_TAB_URI_KEY)
-          .put(KerberosConfig.CHECK_INTERVAL_SEC_KEY, KerberosConfig.CHECK_INTERVAL_SEC_KEY)
-          .put(KerberosConfig.FETCH_TIMEOUT_SEC_KEY, KerberosConfig.FETCH_TIMEOUT_SEC_KEY)
-          .put(AuthenticationConfig.AUTH_TYPE_KEY, AuthenticationConfig.AUTH_TYPE_KEY)
-          .build();
+      ImmutableMap.of(
+          KerberosConfig.PRINCIPAL_KEY, KerberosConfig.PRINCIPAL_KEY,
+          KerberosConfig.KEY_TAB_URI_KEY, KerberosConfig.KEY_TAB_URI_KEY,
+          KerberosConfig.CHECK_INTERVAL_SEC_KEY, KerberosConfig.CHECK_INTERVAL_SEC_KEY,
+          KerberosConfig.FETCH_TIMEOUT_SEC_KEY, KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
+          AuthenticationConfig.AUTH_TYPE_KEY, AuthenticationConfig.AUTH_TYPE_KEY);
 
   public static final Map<String, String> S3_CONFIGURATION =
       ImmutableMap.of(
@@ -101,9 +105,9 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
 
   public static final Map<String, String> OSS_CONFIGURATION =
       ImmutableMap.of(
-          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, PaimonOSSFileSystemConfig.OSS_ACCESS_KEY,
-          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, PaimonOSSFileSystemConfig.OSS_SECRET_KEY,
-          OSSProperties.GRAVITINO_OSS_ENDPOINT, PaimonOSSFileSystemConfig.OSS_ENDPOINT);
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY,
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY,
+          OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
 
   public static final Map<String, PropertyEntry<?>> REST_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
@@ -119,10 +123,10 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
               PaimonConstants.TOKEN,
               stringOptionalPropertyEntry(
                   PaimonConstants.TOKEN,
-                  "The bear token for REST catalog authentication",
+                  "The bearer token for REST catalog authentication",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
               stringOptionalPropertyEntry(
@@ -130,7 +134,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "The access key ID for Aliyun DLF",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
               stringOptionalPropertyEntry(
@@ -138,7 +142,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "The access key secret for Aliyun DLF",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
               stringOptionalPropertyEntry(
@@ -146,7 +150,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "The security token for Aliyun DLF",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_TOKEN_PATH,
               stringOptionalPropertyEntry(
@@ -193,13 +197,13 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 "Gravitino Paimon catalog jdbc user",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 GRAVITINO_JDBC_PASSWORD,
                 "Gravitino Paimon catalog jdbc password",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 GRAVITINO_JDBC_DRIVER,
                 "The driver of the Jdbc connection",
@@ -210,8 +214,8 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
-    result.putAll(PaimonS3FileSystemConfig.S3_FILESYSTEM_PROPERTY_ENTRIES);
-    result.putAll(PaimonOSSFileSystemConfig.OSS_FILESYSTEM_PROPERTY_ENTRIES);
+    result.putAll(S3PropertiesMetadata.PROPERTY_ENTRIES);
+    result.putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES);
     result.putAll(REST_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);
   }

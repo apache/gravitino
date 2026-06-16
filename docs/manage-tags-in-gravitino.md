@@ -31,7 +31,10 @@ the future versions.
 2`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` objects can be tagged.
 3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
    tags of its parent metadata objects. For example, listing tags of a `Table` will also list
-   the tags of its parent `Schema` and `Catalog`.
+   the tags of its parent `Schema` and `Catalog`. For catalogs that support multi-level
+   (hierarchical) schemas, such as a schema named `a:b:c` (using the configured schema
+   separator), the intermediate parent schemas `a:b` and `a` are also part of the hierarchy, so
+   their tags are inherited as well.
 4. The same tag can be associated with both parent and child metadata objects. But when you list the
    associated tags of a child metadata object, this tag will be included only once in the result
    list with `inherited` value `false`.
@@ -249,7 +252,7 @@ schema1.supportsTags().associateTags(new String[] {"tag1"}， null);
 
 List all the tags associated with a metadata object. The tags in Gravitino are
 inheritable, so listing tags of a metadata object will also list the tags of its parent metadata
-objects.
+objects, including the intermediate parent schemas of a multi-level (hierarchical) schema.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/tags`.
 

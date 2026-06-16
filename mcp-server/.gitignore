@@ -34,6 +34,9 @@ logs/
 *.err
 gravitino_mcp_server.egg-info
 
+# Local run artifacts from dev/start_inspector_demo.sh (.out logs and .pid files)
+.inspector-demo-*
+
 # Unit test / coverage reports
 htmlcov/
 .tox/

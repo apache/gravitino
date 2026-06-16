@@ -28,7 +28,6 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 
 - Function operations
 - Partition operations
-- View operations
 - Querying UDF
 - `LOAD` clause
 - `UNLOAD` clause
@@ -124,6 +123,30 @@ CREATE TABLE paimon_bucketed_table (
     'bucket-key' = 'id',
     'bucket' = '4'
 );
+```
+
+## View
+
+### View Capabilities
+
+- Supports `CREATE VIEW`, `DROP VIEW`, `ALTER VIEW` (rename and replace view definition), list, load, and rename views stored in the Paimon catalog.
+- When creating a view, the connector stores two SQL representations: one with the `flink` dialect and one with the `query` dialect (Paimon's canonical dialect), both using the same expanded SQL text.
+- When loading a view, the connector tries dialects in order: `flink` → `hive` → `query`. The first available representation wins.
+- View support depends on the selected Paimon backend; not all backends implement the Paimon view API.
+
+### View SQL Example
+
+```sql
+USE CATALOG paimon_a;
+USE mydb;
+
+CREATE VIEW summary_view AS SELECT category, SUM(amount) AS total FROM orders GROUP BY category;
+
+SHOW VIEWS;
+
+SELECT * FROM summary_view;
+
+DROP VIEW summary_view;
 ```
 
 ## Catalog Properties

@@ -312,6 +312,104 @@ public class TestMetadataObjectPolicyOperations extends JerseyTest {
   }
 
   @Test
+  public void testListPoliciesForObjectUnderHierarchicalSchema() {
+    // Hierarchical (multi-level) schema "a:b:c" using the default separator ":". Its ancestor
+    // schemas are "a" and "a:b". A table under it must inherit policies from the schema itself,
+    // all ancestor schemas, and the catalog. The REST operation resolves the separator via
+    // MetadataObjectUtil.getParentMetadataObjects(MetadataObject), which falls back to the default
+    // ":" here because GravitinoEnv config is not booted in this unit test.
+    MetadataObject catalog = MetadataObjects.parse("hcat", MetadataObject.Type.CATALOG);
+    MetadataObject schemaA = MetadataObjects.parse("hcat.a", MetadataObject.Type.SCHEMA);
+    MetadataObject schemaB = MetadataObjects.parse("hcat.a:b", MetadataObject.Type.SCHEMA);
+    MetadataObject schemaC = MetadataObjects.parse("hcat.a:b:c", MetadataObject.Type.SCHEMA);
+    MetadataObject table = MetadataObjects.parse("hcat.a:b:c.tbl", MetadataObject.Type.TABLE);
+
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, catalog))
+        .thenReturn(new PolicyEntity[] {createPolicy("catalogPolicy")});
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, schemaA))
+        .thenReturn(new PolicyEntity[] {createPolicy("schemaAPolicy")});
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, schemaB))
+        .thenReturn(new PolicyEntity[] {createPolicy("schemaBPolicy")});
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, schemaC))
+        .thenReturn(new PolicyEntity[] {createPolicy("schemaCPolicy")});
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, table))
+        .thenReturn(new PolicyEntity[] {createPolicy("tablePolicy")});
+
+    Response response =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("policies")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    PolicyListResponse policyListResponse = response.readEntity(PolicyListResponse.class);
+    Assertions.assertEquals(0, policyListResponse.getCode());
+    Assertions.assertEquals(5, policyListResponse.getPolicies().length);
+
+    Map<String, Policy> resultPolicies =
+        Arrays.stream(policyListResponse.getPolicies())
+            .collect(Collectors.toMap(Policy::name, Function.identity()));
+
+    Assertions.assertFalse(resultPolicies.get("tablePolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("schemaCPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("schemaBPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("schemaAPolicy").inherited().get());
+    Assertions.assertTrue(resultPolicies.get("catalogPolicy").inherited().get());
+  }
+
+  @Test
+  public void testGetPolicyForObjectUnderHierarchicalSchema() {
+    // Hierarchical (multi-level) schema "a:b:c" using the default separator ":". The REST operation
+    // resolves the separator via MetadataObjectUtil.getParentMetadataObjects(MetadataObject), which
+    // falls back to the default ":" here because GravitinoEnv config is not booted in this unit
+    // test.
+    MetadataObject schemaA = MetadataObjects.parse("hcat.a", MetadataObject.Type.SCHEMA);
+    MetadataObject schemaB = MetadataObjects.parse("hcat.a:b", MetadataObject.Type.SCHEMA);
+    MetadataObject table = MetadataObjects.parse("hcat.a:b:c.tbl", MetadataObject.Type.TABLE);
+
+    PolicyEntity schemaAPolicy = createPolicy("schemaAPolicy");
+    PolicyEntity schemaBPolicy = createPolicy("schemaBPolicy");
+    when(policyManager.getPolicyForMetadataObject(metalake, schemaA, "schemaAPolicy"))
+        .thenReturn(schemaAPolicy);
+    when(policyManager.getPolicyForMetadataObject(metalake, schemaB, "schemaBPolicy"))
+        .thenReturn(schemaBPolicy);
+
+    // A policy on the intermediate schema "a:b" is inherited by a table under "a:b:c".
+    Response responseB =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("policies")
+            .path("schemaBPolicy")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), responseB.getStatus());
+    Policy respPolicyB = responseB.readEntity(PolicyResponse.class).getPolicy();
+    Assertions.assertEquals("schemaBPolicy", respPolicyB.name());
+    Assertions.assertTrue(respPolicyB.inherited().get());
+
+    // A policy on the ancestor schema "a" is also inherited by a table under "a:b:c".
+    Response responseA =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("policies")
+            .path("schemaAPolicy")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), responseA.getStatus());
+    Policy respPolicyA = responseA.readEntity(PolicyResponse.class).getPolicy();
+    Assertions.assertEquals("schemaAPolicy", respPolicyA.name());
+    Assertions.assertTrue(respPolicyA.inherited().get());
+  }
+
+  @Test
   public void testGetPolicyForObject() {
     PolicyEntity policy1 = createPolicy("policy1");
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
