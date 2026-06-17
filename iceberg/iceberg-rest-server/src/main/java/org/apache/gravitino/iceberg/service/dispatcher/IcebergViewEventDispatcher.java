@@ -37,6 +37,9 @@ import org.apache.gravitino.listener.api.event.IcebergListViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadViewPreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameViewPreEvent;
@@ -50,6 +53,7 @@ import org.apache.gravitino.listener.api.event.IcebergViewExistsPreEvent;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
@@ -101,6 +105,33 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
     eventBus.dispatchEvent(
         new IcebergCreateViewEvent(
             context, nameIdentifier, transformedCreateEvent.createViewRequest(), loadViewResponse));
+    return loadViewResponse;
+  }
+
+  @Override
+  public LoadViewResponse registerView(
+      IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
+    TableIdentifier viewIdentifier = TableIdentifier.of(namespace, registerViewRequest.name());
+    NameIdentifier nameIdentifier =
+        IcebergRESTUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), viewIdentifier);
+
+    eventBus.dispatchEvent(
+        new IcebergRegisterViewPreEvent(context, nameIdentifier, registerViewRequest));
+
+    LoadViewResponse loadViewResponse;
+    try {
+      loadViewResponse =
+          icebergViewOperationDispatcher.registerView(context, namespace, registerViewRequest);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergRegisterViewFailureEvent(context, nameIdentifier, registerViewRequest, e));
+      throw e;
+    }
+
+    eventBus.dispatchEvent(
+        new IcebergRegisterViewEvent(
+            context, nameIdentifier, registerViewRequest, loadViewResponse));
     return loadViewResponse;
   }
 

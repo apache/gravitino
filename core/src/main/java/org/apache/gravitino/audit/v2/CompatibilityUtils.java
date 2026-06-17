@@ -95,6 +95,7 @@ public class CompatibilityUtils {
           .put(OperationType.LIST_TOPIC, Operation.LIST_TOPIC)
           .put(OperationType.LOAD_TOPIC, Operation.LOAD_TOPIC)
           .put(OperationType.CREATE_VIEW, Operation.CREATE_VIEW)
+          .put(OperationType.REGISTER_VIEW, Operation.REGISTER_VIEW)
           .put(OperationType.ALTER_VIEW, Operation.ALTER_VIEW)
           .put(OperationType.REPLACE_VIEW, Operation.REPLACE_VIEW)
           .put(OperationType.DROP_VIEW, Operation.DROP_VIEW)

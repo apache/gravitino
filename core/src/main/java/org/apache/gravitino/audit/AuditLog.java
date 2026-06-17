@@ -332,6 +332,8 @@ public interface AuditLog {
 
     CREATE_VIEW,
 
+    REGISTER_VIEW,
+
     ALTER_VIEW,
 
     REPLACE_VIEW,

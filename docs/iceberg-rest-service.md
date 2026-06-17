@@ -36,7 +36,6 @@ The Iceberg REST server provides:
 The following Iceberg REST API features are not implemented:
 
 - Multi-table transactions.
-- View registration.
 
 ## Deployment
 

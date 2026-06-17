@@ -32,6 +32,7 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
@@ -80,6 +81,27 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
         context.catalogName(),
         namespace,
         createViewRequest.name(),
+        context.userName(),
+        GravitinoEnv.getInstance().internalOwnerDispatcher());
+
+    return response;
+  }
+
+  @Override
+  public LoadViewResponse registerView(
+      IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
+    LoadViewResponse response = dispatcher.registerView(context, namespace, registerViewRequest);
+
+    // Import is intentionally NOT wrapped in try-catch: if it fails the view exists in Iceberg
+    // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
+    // entity is registered. Surface the failure so the caller can react.
+    strictImportView(context.catalogName(), namespace, registerViewRequest.name());
+
+    IcebergOwnershipUtils.setViewOwner(
+        metalake,
+        context.catalogName(),
+        namespace,
+        registerViewRequest.name(),
         context.userName(),
         GravitinoEnv.getInstance().internalOwnerDispatcher());
 
@@ -213,6 +235,18 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
             viewName,
             e.getMessage());
       }
+    }
+  }
+
+  private void strictImportView(String catalogName, Namespace namespace, String viewName) {
+    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
+    if (viewDispatcher != null) {
+      viewDispatcher.loadView(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake,
+              catalogName,
+              TableIdentifier.of(namespace, viewName),
+              HierarchicalSchemaUtil.schemaSeparator()));
     }
   }
 

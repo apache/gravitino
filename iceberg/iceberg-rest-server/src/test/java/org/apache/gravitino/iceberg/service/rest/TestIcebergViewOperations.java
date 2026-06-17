@@ -44,6 +44,9 @@ import org.apache.gravitino.listener.api.event.IcebergListViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadViewPreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameViewPreEvent;
@@ -194,6 +197,21 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
 
     verifyCreateViewFail(namespace, "create_foo1", 409);
     verifyCreateViewFail(namespace, "", 400);
+  }
+
+  @Test
+  void testRegisterView() {
+    Namespace namespace = Namespace.of("register_view_ns");
+    verifyRegisterViewSucc("register_view_foo1", namespace);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRegisterViewPreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergRegisterViewEvent);
+
+    verifyRegisterViewFail(409, "fail_register_view_foo1", namespace);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRegisterViewPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergRegisterViewFailureEvent);
+
+    verifyRegisterViewSucc("register_view_foo2", Namespace.of("register_view_ns_2", "a"));
   }
 
   @ParameterizedTest

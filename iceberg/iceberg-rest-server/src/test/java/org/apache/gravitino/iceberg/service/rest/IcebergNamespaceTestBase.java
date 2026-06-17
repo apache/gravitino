@@ -33,7 +33,9 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterViewRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
@@ -58,6 +60,24 @@ public class IcebergNamespaceTestBase extends IcebergTestBase {
         ImmutableRegisterTableRequest.builder().name(tableName).metadataLocation("mock").build();
     return getNamespaceClientBuilder(Optional.of(ns), Optional.of("register"), Optional.empty())
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  protected Response doRegisterView(String viewName, Namespace ns) {
+    RegisterViewRequest request =
+        ImmutableRegisterViewRequest.builder().name(viewName).metadataLocation("mock").build();
+    return getNamespaceClientBuilder(
+            Optional.of(ns), Optional.of("register-view"), Optional.empty())
+        .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  protected void verifyRegisterViewSucc(String viewName, Namespace ns) {
+    Response response = doRegisterView(viewName, ns);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  protected void verifyRegisterViewFail(int status, String viewName, Namespace ns) {
+    Response response = doRegisterView(viewName, ns);
+    Assertions.assertEquals(status, response.getStatus());
   }
 
   protected Response doRegisterTableWithCredentialVending(

@@ -48,6 +48,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
 import org.apache.iceberg.rest.requests.ImmutableCreateViewRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
@@ -263,6 +264,52 @@ public class TestIcebergViewHookDispatcher {
     verify(mockExecutor, times(1)).createView(mockContext, namespace, createRequest);
     verify(mockInternalViewDispatcher, times(1)).loadView(any(NameIdentifier.class));
     verify(mockViewDispatcher, never()).loadView(any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRegisterViewThrowsWhenSetOwnerFails() {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    RegisterViewRequest mockRequest = mock(RegisterViewRequest.class);
+    when(mockRequest.name()).thenReturn(VIEW_NAME);
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockExecutor.registerView(mockContext, namespace, mockRequest)).thenReturn(mockResponse);
+
+    doThrow(new RuntimeException("Set owner failed"))
+        .when(mockInternalOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+
+    RuntimeException thrown =
+        assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerView(mockContext, namespace, mockRequest));
+    assertEquals("Set owner failed", thrown.getMessage());
+    verify(mockExecutor, times(1)).registerView(mockContext, namespace, mockRequest);
+    verify(mockInternalViewDispatcher, times(1)).loadView(any(NameIdentifier.class));
+    verify(mockViewDispatcher, never()).loadView(any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRegisterViewPropagatesImportFailure() {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    RegisterViewRequest mockRequest = mock(RegisterViewRequest.class);
+    when(mockRequest.name()).thenReturn(VIEW_NAME);
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockExecutor.registerView(mockContext, namespace, mockRequest)).thenReturn(mockResponse);
+
+    doThrow(new RuntimeException("Import failed"))
+        .when(mockInternalViewDispatcher)
+        .loadView(any(NameIdentifier.class));
+
+    RuntimeException thrown =
+        assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerView(mockContext, namespace, mockRequest));
+    assertEquals("Import failed", thrown.getMessage());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 

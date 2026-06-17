@@ -38,9 +38,15 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
+import org.apache.iceberg.rest.responses.ImmutableLoadViewResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
+import org.apache.iceberg.view.ImmutableSQLViewRepresentation;
+import org.apache.iceberg.view.ImmutableViewVersion;
+import org.apache.iceberg.view.ViewMetadata;
 
 // Test wrapper that mocks operations the in-memory catalog cannot perform natively
 // (e.g. registerTable, which requires a real metadata.json file at the given location),
@@ -103,6 +109,36 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
           CredentialPrivilege.WRITE);
     }
     return loadTableResponse;
+  }
+
+  @Override
+  public LoadViewResponse registerView(Namespace namespace, RegisterViewRequest request) {
+    if (request.name().contains("fail")) {
+      throw new AlreadyExistsException("Already exits exception for test");
+    }
+
+    String location =
+        request.metadataLocation().contains("://") ? request.metadataLocation() : "/mock";
+    Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
+    ImmutableViewVersion viewVersion =
+        ImmutableViewVersion.builder()
+            .versionId(1)
+            .timestampMillis(System.currentTimeMillis())
+            .schemaId(mockSchema.schemaId())
+            .defaultNamespace(namespace)
+            .addRepresentations(
+                ImmutableSQLViewRepresentation.builder().sql("select 1").dialect("spark").build())
+            .build();
+    ViewMetadata viewMetadata =
+        ViewMetadata.builder()
+            .setLocation(location)
+            .setProperties(ImmutableMap.of())
+            .setCurrentVersion(viewVersion, mockSchema)
+            .build();
+    return ImmutableLoadViewResponse.builder()
+        .metadataLocation(location + "/metadata/version-hint.text")
+        .metadata(viewMetadata)
+        .build();
   }
 
   private boolean shouldGeneratePlanTasksData(CreateTableRequest request) {
