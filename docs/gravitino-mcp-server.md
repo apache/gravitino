@@ -108,7 +108,7 @@ You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows
 | `--metalake`      | The Gravitino metalake name.                                                     | none                        | Yes      | 1.0.0         |
 | `--gravitino-uri` | The URI of Gravitino server.                                                     | `http://127.0.0.1:8090`     | No       | 1.0.0         |
 | `--transport`     | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).     | `stdio`                     | No       | 1.0.0         |
-| `--mcp-url`       | The url of MCP server if using http transport.                                   | `http://127.0.0.1:8000/mcp` | No       | 1.0.0         |
+| `--mcp-url`       | The URL of MCP server if using HTTP transport.                                   | `http://127.0.0.1:8000/mcp` | No       | 1.0.0         |
 | `--token`         | OAuth2 Bearer token for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. | none (anonymous)            | No       | 1.3.0         |
 | `--tls-cert`      | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.          | none                        | No       | 1.3.0         |
 | `--tls-key`       | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.         | none                        | No       | 1.3.0         |
@@ -138,7 +138,7 @@ Authorization itself is always enforced by Gravitino: the MCP server forwards th
 
 ### Serving over HTTPS (TLS)
 
-To serve the HTTP endpoint over TLS, provide both `--tls-cert` and `--tls-key` and use an `https://` `--mcp-url`. The certificate and key must be provided together, and the URL scheme must match the TLS setting (an `https://` URL without a cert/key, or a cert/key behind an `http://` URL, is rejected at startup).
+To serve the MCP HTTP endpoint (the `--mcp-url`, not the `--gravitino-uri`) over TLS, provide both `--tls-cert` and `--tls-key` and use an `https://` `--mcp-url`. The certificate and key must be provided together, and the URL scheme must match the TLS setting (an `https://` URL without a cert/key, or a cert/key behind an `http://` URL, is rejected at startup).
 
 ```shell
 uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
