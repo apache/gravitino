@@ -321,7 +321,7 @@ fresh Gravitino deployment.
    ```
 
    When IdP is enabled, `gravitino.authenticators` must include `basic` and must not include
-   `simple`.
+   `simple`. Built-in IdP is incompatible with the `simple` authenticator (the default).
 
 2. Export the initial service admin password before starting Gravitino:
 
@@ -407,7 +407,8 @@ credentials are otherwise exposed on the wire.
 List `basic` in `gravitino.authenticators` and `org.apache.gravitino.idp.web.rest.feature` in
 `gravitino.server.rest.extensionPackages` so Jersey registers `/api/idp/*` management APIs and the
 Web UI can use the built-in IdP login form. When IdP is enabled, `gravitino.authenticators` must
-include `basic` and must not include `simple`. Callers must use Basic authentication with a username
+include `basic` and must not include `simple`. Built-in IdP is incompatible with the `simple`
+authenticator (the default). Callers must use Basic authentication with a username
 in `gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`.
 
 ### 8.2 Password Algorithm
