@@ -105,6 +105,7 @@ import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
 import org.apache.gravitino.listener.api.event.view.CreateViewEvent;
@@ -483,6 +484,8 @@ public interface AuditLog {
 
     LIST_FUNCTION_INFOS,
 
+    AUTHORIZATION_DENIAL,
+
     UNKNOWN_OPERATION;
 
     public static Operation fromEvent(Event event) {
@@ -587,6 +590,8 @@ public interface AuditLog {
         return LOAD_FILESET;
       } else if (event instanceof ListFilesetEvent || event instanceof ListFilesetFailureEvent) {
         return LIST_FILESET;
+      } else if (event instanceof AuthorizationDenialFailureEvent) {
+        return AUTHORIZATION_DENIAL;
       } else {
         return UNKNOWN_OPERATION;
       }

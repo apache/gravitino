@@ -64,7 +64,6 @@ import {
 } from '@/lib/store/metalakes'
 import Link from 'next/link'
 import { cn } from '@/lib/utils/tailwind'
-import { to } from '@/lib/utils'
 import Loading from '@/components/Loading'
 import CreateSchemaDialog from '../CreateSchemaDialog'
 import CreateFilesetDialog from '../CreateFilesetDialog'
@@ -149,6 +148,11 @@ export default function SchemaDetailsPage() {
       return
     }
 
+    // Wait for catalogData to be loaded before checking catalog type
+    if (!catalogData) {
+      return
+    }
+
     const provider = catalogData?.provider
     const catalogBackend = catalogData?.properties?.['catalog-backend']
     const isIcebergJdbcCatalog = provider === 'lakehouse-iceberg' && catalogBackend === 'jdbc'
@@ -160,32 +164,18 @@ export default function SchemaDetailsPage() {
       return
     }
 
-    const loadSubSchemas = async () => {
-      const [err, res] = await to(
-        dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
-      )
-      if (err || !res) {
-        setSubSchemas([])
-
-        return
+    // Use subschemas from store
+    const nextSubSchemas = (store.subschemas || []).map(item => {
+      return {
+        ...item,
+        name: item.name,
+        key: item.name,
+        title: item.name
       }
+    })
 
-      const { schemas = [] } = res?.payload || {}
-
-      const nextSubSchemas = schemas.map(item => {
-        return {
-          ...item,
-          name: item.name,
-          key: item.name,
-          title: item.name
-        }
-      })
-
-      setSubSchemas(nextSubSchemas)
-    }
-
-    loadSubSchemas()
-  }, [currentMetalake, catalog, schema, catalogData?.provider, catalogData?.properties?.['catalog-backend']])
+    setSubSchemas(nextSubSchemas)
+  }, [currentMetalake, catalog, schema, catalogData, store.subschemas])
 
   useEffect(() => {
     const hasSubSchemas = subSchemas.length > 0
@@ -308,24 +298,31 @@ export default function SchemaDetailsPage() {
   }
 
   const showDeleteSchemaConfirm = name => {
+    let validateFn = null
+
+    const registerValidate = fn => {
+      validateFn = fn
+    }
+
     modal.confirm({
       title: `Are you sure to delete the schema ${name}?`,
       icon: <ExclamationCircleFilled />,
+      content: <ConfirmInput name={name} registerValidate={registerValidate} />,
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
-      onOk: async () => {
+      async onOk() {
+        if (validateFn && !validateFn()) return
+
         await dispatch(deleteSchema({ metalake: currentMetalake, catalog, catalogType, schema: name }))
 
-        const [err, res] = await to(
-          dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
+        // Fetch subschemas again to update store.subschemas
+        await dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
+
+        treeRef.current.onLoadData(
+          { key: `{{${currentMetalake}}}{{${catalog}}}{{${catalogType}}}{{${schema}}}`, nodeType: 'schema' },
+          true
         )
-        if (!err && res) {
-          const { schemas = [] } = res.payload || {}
-          const nextSubSchemas = schemas.map(item => ({ ...item, name: item.name, key: item.name, title: item.name }))
-          setSubSchemas(nextSubSchemas)
-        }
-        treeRef.current.onLoadData({ key: catalog, nodeType: 'catalog', inUse: 'true' }, true)
       }
     })
   }
@@ -485,12 +482,7 @@ export default function SchemaDetailsPage() {
       location = catalogData?.provider === 'hive' ? table.properties?.['location'] : ''
     }
 
-    let confirmInput = ''
     let validateFn = null
-
-    const setConfirmInput = value => {
-      confirmInput = value
-    }
 
     const registerValidate = fn => {
       validateFn = fn
@@ -500,13 +492,7 @@ export default function SchemaDetailsPage() {
       title: `Are you sure to delete the ${type} ${entity}?`,
       icon: <ExclamationCircleFilled />,
       content: (
-        <ConfirmInput
-          name={entity}
-          setConfirmInput={setConfirmInput}
-          isManaged={isManaged}
-          location={location}
-          registerValidate={registerValidate}
-        />
+        <ConfirmInput name={entity} isManaged={isManaged} location={location} registerValidate={registerValidate} />
       ),
       okText: 'Delete',
       okType: 'danger',
@@ -660,7 +646,7 @@ export default function SchemaDetailsPage() {
       showDeleteConfirm: name => showDeleteSchemaConfirm(name),
       handleSetOwner
     })
-  }, [currentMetalake, catalog, catalogType, anthEnable, catalogData?.provider])
+  }, [currentMetalake, catalog, catalogType, schema, anthEnable, catalogData?.provider])
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
     return { columns, minWidth: 100 }

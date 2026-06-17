@@ -34,6 +34,13 @@ dependencies = [
     "pylint>=2.20.0",
 ]
 
+# Restrict packaging to the importable library. Without this, setuptools'
+# flat-layout auto-discovery also picks up sibling dirs like `dev/` (it only
+# excludes `tests*` by default), failing the build with
+# "Multiple top-level packages discovered in a flat-layout".
+[tool.setuptools.packages.find]
+include = ["mcp_server", "mcp_server.*"]
+
 [tool.isort]
 profile = "black"
 line_length = 80

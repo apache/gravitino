@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.idp.auth;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -26,18 +27,40 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Lists;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.model.IdpUser;
+import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.junit.jupiter.api.Test;
 
 class TestBasicAuthenticator {
+
+  @Test
+  void testValidateExtensionPackageOk() {
+    Config config = new Config(false) {};
+    config.set(
+        Configs.REST_API_EXTENSION_PACKAGES,
+        Lists.newArrayList(IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE));
+
+    assertDoesNotThrow(() -> BasicAuthenticator.validateExtensionPackage(config));
+  }
+
+  @Test
+  void testValidateExtensionPackageMissingFails() {
+    Config config = new Config(false) {};
+
+    assertThrows(
+        IllegalStateException.class, () -> BasicAuthenticator.validateExtensionPackage(config));
+  }
 
   @Test
   void testNotInitialized() {

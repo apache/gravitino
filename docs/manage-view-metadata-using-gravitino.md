@@ -133,8 +133,8 @@ Use the following fields when creating a view:
   `Representation` model, but only the `sql` type is supported, which maps to
   `SQLRepresentation` in Java.
 - `defaultCatalog` and `defaultSchema`: Optionally define how unqualified identifiers in the SQL
-  text are resolved for dialects that use them. For the `hive` dialect in Hive catalogs, both
-  fields must be `null`.
+  text are resolved for dialects that use them. For the `hive` and `flink` dialects in Hive
+  catalogs, both fields must be `null`.
 - `properties`: Carries provider-specific metadata.
 
 Column types use the same Gravitino type system as table columns. For the full type list and the

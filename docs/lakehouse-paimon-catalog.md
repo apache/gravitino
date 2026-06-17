@@ -47,8 +47,8 @@ Builds with Apache Paimon `1.2`.
 | `s3-endpoint`                                      | The endpoint of the AWS S3.                                                                                                                                                                                 | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
 | `s3-access-key-id`                                 | The access key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
 | `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
-| `token-provider`                                   | The token provider type for Paimon catalog backend.                                                                                                                                                         | Token provider could be `bear` or `dlf`.                                       | required if the value of `catalog-backend` is `rest`.                                                                                                                | 1.2.0            |
-| `token`                                            | The bear token for Paimon REST catalog authentication.                                                                                                                                                      | (none)                                                                         | required if the value of `token-provider` is `bear`.                                                                                                                 | 1.2.0            |
+| `token-provider`                                   | The token provider type for Paimon catalog backend.                                                                                                                                                         | Token provider could be `bearer` or `dlf`.                                     | required if the value of `catalog-backend` is `rest`.                                                                                                                | 1.2.0            |
+| `token`                                            | The bearer token for Paimon REST catalog authentication.                                                                                                                                                    | (none)                                                                         | required if the value of `token-provider` is `bearer`.                                                                                                               | 1.2.0            |
 | `dlf-access-key-id`                                | The access key ID for Aliyun DLF (Data Lake Formation).                                                                                                                                                     | (none)                                                                         | required if the value of `catalog-backend` is `rest` and accessing Aliyun DLF Paimon REST server.                                                                    | 1.2.0            |
 | `dlf-access-key-secret`                            | The access key secret for Aliyun DLF.                                                                                                                                                                       | (none)                                                                         | required if the value of `catalog-backend` is `rest` and accessing Aliyun DLF Paimon REST server.                                                                    | 1.2.0            |
 | `dlf-security-token`                               | The security token for Aliyun DLF.                                                                                                                                                                          | (none)                                                                         | No                                                                                                                                                                   | 1.2.0            |
@@ -57,6 +57,7 @@ Builds with Apache Paimon `1.2`.
 
 :::note
 - If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/1.2/maintenance/filesystems/#s3).
+- If you use an S3 warehouse, also download [`gravitino-aws-<version>.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) and place it in the `catalogs/lakehouse-paimon/libs` directory to enable credential vending. For OSS, use [`gravitino-aliyun-<version>.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) instead.
 - If you want to use REST backend, Gravitino Paimon catalog supports Aliyun DLF (Data Lake Formation) as the REST catalog service. You need to configure the DLF-related properties eg:
 ```
 {
@@ -96,6 +97,10 @@ Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-p
 ### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+
+:::note
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+:::
 
 ## Schema
 
@@ -237,10 +242,14 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 ### View Capabilities
 
 - Supports list, create, load, alter, and drop for views stored in the Paimon catalog.
-- Each view must include exactly one SQL representation with dialect `query`, which serves as the canonical view definition.
-- Additional dialect-specific SQL representations (for example, `spark` or `trino`) can be provided alongside the required `query` representation.
+- Each view must include exactly one SQL representation with dialect `query`, which serves as the canonical view definition. At most one representation per dialect is allowed.
+- Additional dialect-specific SQL representations (for example, `flink`, `spark`) can be provided alongside the required `query` representation.
 - The `defaultCatalog` and `defaultSchema` fields are stored as Paimon view options and can be used to resolve unqualified identifiers in the SQL text.
 - View support depends on the selected Paimon backend and requires backend view API support.
+
+:::note
+Rename cannot be combined with other changes in a single `alterView` call. Submit rename as a standalone request.
+:::
 
 ### View Operations
 

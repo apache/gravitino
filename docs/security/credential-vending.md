@@ -12,13 +12,22 @@ Gravitino credential vending is used to generate temporary or static credentials
 ### Capabilities
 
 - Supports Gravitino Iceberg REST server.
-- Supports Gravitino server, only support Hadoop catalog.
+- Supports Gravitino server with the following catalog types:
+
+  | Catalog type    | Supported credential types                                      | Since version    |
+  |-----------------|-----------------------------------------------------------------|------------------|
+  | Hadoop (Fileset)| S3, OSS, GCS, ADLS                                             | 0.7.0-incubating |
+  | Hive            | S3, OSS, GCS, ADLS                                             | 1.3.0            |
+  | Iceberg         | S3, OSS, GCS, ADLS                                             | 1.3.0            |
+  | Glue            | S3                                                              | 1.3.0            |
+  | JDBC            | JDBC user/password (`jdbc-user-password`)                       | 1.3.0            |
+  | Paimon          | S3, OSS, JDBC user/password (`jdbc-user-password`)             | 1.3.0            |
 - Supports pluggable credentials with build-in credentials:
   - S3: `S3TokenCredential`, `S3SecretKeyCredential`, `AwsIrsaCredential`
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
-- No support for Spark/Trino/Flink connector yet.
+- Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs since 1.3.0.
 
 ## General Configurations
 
@@ -184,6 +193,54 @@ The classpath of the server:
 - Iceberg REST server: the classpath differs by deployment mode; see the [Deployment](../iceberg-rest-service.md#deployment) section.
 - Fileset catalog: `catalogs/fileset/libs/`
 
+## Credential Vending for Catalogs
+
+Hive, Iceberg, Glue, JDBC, and Paimon catalogs support server-side credential vending since Gravitino 1.4.0. This section explains how credential vending works for these catalog types and how it differs from the Hadoop Fileset and Iceberg REST server cases.
+
+### Auto-Detection of Credential Providers
+
+Relational catalogs **do not** require an explicit `credential-providers` property in the catalog configuration. Instead, Gravitino automatically detects which credential providers to enable based on the catalog properties you supply:
+
+- If `s3-access-key-id` / `s3-secret-access-key` are present, the S3 secret-key credential provider is enabled.
+- If `s3-role-arn` is also present, the S3 token (STS) credential provider is enabled instead.
+- If `oss-access-key-id` / `oss-secret-access-key` are present, the OSS secret-key or token credential provider is enabled.
+- For JDBC catalogs (and Paimon with `catalog-backend=jdbc`), if `jdbc-user` / `jdbc-password` are set, the JDBC credential provider is enabled.
+- Paimon additionally supports OSS and S3 credential vending when the corresponding cloud properties are set.
+
+No extra configuration is required beyond the catalog's normal properties.
+
+### Security: Sensitive Properties Hidden from REST API
+
+To protect credentials, all sensitive catalog properties (such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, `jdbc-password`, etc.) are excluded from the `GET /api/metalakes/{metalake}/catalogs/{catalog}` response. Clients retrieve credentials through the dedicated credential vending endpoint instead.
+
+### Credential Vending REST API
+
+Clients retrieve vended credentials from:
+
+```
+GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
+```
+
+The server returns short-lived or static credentials that the client can use to access the underlying storage directly.
+
+### Spark and Flink Connector Integration
+
+The Gravitino Spark and Flink connectors automatically call the credential vending API and inject the returned credentials into the connector's configuration, so no connector-side credential configuration is needed. For example, `GravitinoHiveCatalog`, `GravitinoGlueCatalog`, `GravitinoJdbcCatalog`, and `GravitinoIcebergCatalog` all consume the vended credentials transparently.
+
+### Backward Compatibility: `gravitino.catalog.credential.backfillToProperties`
+
+During a rolling upgrade from Gravitino < 1.4.0 to 1.4.0, older clients that read catalog properties directly (rather than calling `/credentials`) would lose access to credentials because the properties are now hidden. To allow a zero-downtime migration, set the following property in `gravitino.conf`:
+
+```properties
+gravitino.catalog.credential.backfillToProperties = true
+```
+
+When enabled, the server re-includes hidden credential properties in `GET /catalogs/{catalog}` responses for backward compatibility.
+
+:::caution
+`gravitino.catalog.credential.backfillToProperties = true` exposes credentials in plaintext in catalog GET responses. Disable it once all clients have been upgraded to use the credential vending API.
+:::
+
 ## Example
 
 ### Credential Vending for Iceberg REST Server
@@ -204,7 +261,7 @@ gravitino.iceberg-rest.s3-region = {region_name}
 gravitino.iceberg-rest.s3-role-arn = {role_arn}
 ```
 
-3. Exploring the Iceberg table with a Spark client with credential vending enabled.
+3. Explore the Iceberg table with a Spark client with credential vending enabled.
 
 ```shell
 ./bin/spark-sql -v \

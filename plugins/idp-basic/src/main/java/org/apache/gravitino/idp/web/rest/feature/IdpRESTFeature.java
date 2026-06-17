@@ -41,16 +41,17 @@ import org.slf4j.LoggerFactory;
 /**
  * Registers built-in IdP REST resources for the idp-basic plugin.
  *
- * <p>Configure {@link Configs#REST_API_EXTENSION_PACKAGES} to {@code
- * org.apache.gravitino.idp.web.rest.feature} so Jersey auto-discovers this feature. IdP REST
- * resource classes remain in {@code org.apache.gravitino.idp.web.rest} and are registered here.
- * Also initializes configured service admins in the built-in IdP when they do not yet exist.
+ * <p>Configure {@link Configs#REST_API_EXTENSION_PACKAGES} to {@link #IDP_REST_EXTENSION_PACKAGE}
+ * and list {@code basic} in {@link Configs#AUTHENTICATORS} so Jersey auto-discovers this feature.
+ * IdP REST resource classes remain in {@code org.apache.gravitino.idp.web.rest} and are registered
+ * here. Also initializes configured service admins in the built-in IdP when they do not yet exist.
  */
 @Provider
 public class IdpRESTFeature implements Feature {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpRESTFeature.class);
 
+  /** Extension package name registered through {@code gravitino.server.rest.extensionPackages}. */
   public static final String IDP_REST_EXTENSION_PACKAGE = IdpRESTFeature.class.getPackageName();
 
   /** Environment variable for the initial password of configured service admins. */
@@ -81,16 +82,34 @@ public class IdpRESTFeature implements Feature {
   /**
    * Validates that the server configuration is compatible with the built-in IdP plugin.
    *
+   * <p>Called when the idp-basic extension package is enabled. Requires {@code basic} in {@link
+   * Configs#AUTHENTICATORS} and rejects {@code simple}.
+   *
    * @param config The server configuration.
    */
   static void validateConfiguration(Config config) {
+    List<String> authenticators = config.get(Configs.AUTHENTICATORS);
+    boolean usesBasic =
+        authenticators.stream()
+            .anyMatch(name -> AuthenticatorType.BASIC.name().equalsIgnoreCase(name.trim()));
     boolean usesSimple =
-        config.get(Configs.AUTHENTICATORS).stream()
+        authenticators.stream()
             .anyMatch(name -> AuthenticatorType.SIMPLE.name().equalsIgnoreCase(name.trim()));
+
+    if (!usesBasic) {
+      LOG.error(
+          "gravitino.server.rest.extensionPackages includes the built-in IdP plugin ({}) but "
+              + "'basic' is not listed in gravitino.authenticators. Add 'basic' to "
+              + "gravitino.authenticators.",
+          IDP_REST_EXTENSION_PACKAGE);
+      System.exit(1);
+    }
+
     if (usesSimple) {
       LOG.error(
-          "Built-in IdP is incompatible with Simple authentication. "
-              + "Remove 'simple' from gravitino.authenticators (default is simple).");
+          "Built-in IdP basic authentication is incompatible with simple authentication because "
+              + "both handle Authorization: Basic headers. Remove 'simple' from "
+              + "gravitino.authenticators.");
       System.exit(1);
     }
   }
