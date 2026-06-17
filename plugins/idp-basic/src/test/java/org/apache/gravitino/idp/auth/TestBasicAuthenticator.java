@@ -38,6 +38,8 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
+import org.apache.gravitino.idp.SystemExitTestHelper;
+import org.apache.gravitino.idp.SystemExitTestHelper.SystemExitException;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.junit.jupiter.api.Test;
@@ -61,7 +63,9 @@ class TestBasicAuthenticator {
     SystemExitException exception =
         assertThrows(
             SystemExitException.class,
-            () -> validateWithExitGuard(() -> BasicAuthenticator.validateExtensionPackage(config)));
+            () ->
+                SystemExitTestHelper.runWithExitGuard(
+                    () -> BasicAuthenticator.validateExtensionPackage(config)));
 
     assertEquals(1, exception.status());
   }
@@ -272,40 +276,5 @@ class TestBasicAuthenticator {
     field.setAccessible(true);
     field.set(authenticator, userGroupManager);
     return authenticator;
-  }
-
-  @SuppressWarnings("removal")
-  private static void validateWithExitGuard(Runnable action) {
-    SecurityManager original = System.getSecurityManager();
-    System.setSecurityManager(
-        new SecurityManager() {
-          @Override
-          public void checkExit(int status) {
-            throw new SystemExitException(status);
-          }
-
-          @Override
-          public void checkPermission(java.security.Permission perm) {
-            // Allow test execution.
-          }
-        });
-    try {
-      action.run();
-    } finally {
-      System.setSecurityManager(original);
-    }
-  }
-
-  private static final class SystemExitException extends SecurityException {
-    private final int status;
-
-    private SystemExitException(int status) {
-      super("System.exit(" + status + ")");
-      this.status = status;
-    }
-
-    private int status() {
-      return status;
-    }
   }
 }
