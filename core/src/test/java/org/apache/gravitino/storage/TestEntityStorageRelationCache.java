@@ -58,6 +58,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -74,6 +75,7 @@ import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -1603,6 +1605,381 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
         Assertions.assertTrue(
             rolesAfterRevoke.isEmpty(),
             "listEntitiesByRelation must return empty after revoking the last privilege from role");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testGrantPrivilegeInvalidatesMetadataObjectRoleRelCache(String type, boolean enableCache)
+      throws Exception {
+    Assumptions.assumeTrue(enableCache);
+
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "test_schema",
+                auditInfo);
+        store.put(schema, false);
+
+        SecurableObject catalogObject = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+        SecurableObject schemaObject =
+            SecurableObjects.ofSchema(
+                catalogObject, "test_schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+
+        RoleEntity roleA =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(schemaObject))
+                .build();
+        store.put(roleA, false);
+
+        RoleEntity roleB =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleB")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList())
+                .build();
+        store.put(roleB, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        List<RoleEntity> rolesBeforeGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertEquals(1, rolesBeforeGrant.size());
+        Assertions.assertEquals("roleA", rolesBeforeGrant.get(0).name());
+
+        store.update(
+            roleB.nameIdentifier(),
+            RoleEntity.class,
+            Entity.EntityType.ROLE,
+            existing ->
+                RoleEntity.builder()
+                    .withId(existing.id())
+                    .withName(existing.name())
+                    .withNamespace(existing.namespace())
+                    .withProperties(existing.properties())
+                    .withAuditInfo(existing.auditInfo())
+                    .withSecurableObjects(Lists.newArrayList(schemaObject))
+                    .build());
+
+        List<RoleEntity> roleEntitiesAfterGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        List<String> rolesAfterGrant =
+            roleEntitiesAfterGrant.stream()
+                .map(RoleEntity::name)
+                .sorted()
+                .collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("roleA", "roleB"),
+            rolesAfterGrant,
+            "grant must be immediately visible via listEntitiesByRelation");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testCreateRoleInvalidatesMetadataObjectRoleRelCache(String type, boolean enableCache)
+      throws Exception {
+    Assumptions.assumeTrue(enableCache);
+
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "test_schema",
+                auditInfo);
+        store.put(schema, false);
+
+        SecurableObject catalogObject = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+        SecurableObject schemaObject =
+            SecurableObjects.ofSchema(
+                catalogObject, "test_schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+
+        RoleEntity roleA =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(schemaObject))
+                .build();
+        store.put(roleA, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        List<RoleEntity> rolesBeforeCreate =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertEquals(1, rolesBeforeCreate.size());
+        Assertions.assertEquals("roleA", rolesBeforeCreate.get(0).name());
+
+        RoleEntity roleB =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleB")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(schemaObject))
+                .build();
+        store.put(roleB, false);
+
+        List<RoleEntity> roleEntitiesAfterCreate =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        List<String> rolesAfterCreate =
+            roleEntitiesAfterCreate.stream()
+                .map(RoleEntity::name)
+                .sorted()
+                .collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("roleA", "roleB"),
+            rolesAfterCreate,
+            "new role must be immediately visible via listEntitiesByRelation");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testGrantRoleToUserInvalidatesRoleUserRelCache(String type, boolean enableCache)
+      throws Exception {
+    Assumptions.assumeTrue(enableCache);
+
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        RoleEntity role =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList())
+                .build();
+        store.put(role, false);
+
+        UserEntity user =
+            createUserEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                AuthorizationUtils.ofUserNamespace("metalake"),
+                "userA",
+                auditInfo);
+        store.put(user, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+        List<UserEntity> usersBeforeGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                role.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        Assertions.assertTrue(usersBeforeGrant.isEmpty());
+
+        store.update(
+            user.nameIdentifier(),
+            UserEntity.class,
+            Entity.EntityType.USER,
+            existing ->
+                UserEntity.builder()
+                    .withId(existing.id())
+                    .withNamespace(existing.namespace())
+                    .withName(existing.name())
+                    .withRoleNames(Lists.newArrayList(role.name()))
+                    .withRoleIds(Lists.newArrayList(role.id()))
+                    .withAuditInfo(existing.auditInfo())
+                    .build());
+
+        List<UserEntity> userEntitiesAfterGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                role.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        List<String> usersAfterGrant =
+            userEntitiesAfterGrant.stream().map(UserEntity::name).collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("userA"),
+            usersAfterGrant,
+            "granted user must be immediately visible via ROLE_USER_REL from role side");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testGrantRoleToGroupInvalidatesRoleGroupRelCache(String type, boolean enableCache)
+      throws Exception {
+    Assumptions.assumeTrue(enableCache);
+
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        RoleEntity role =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList())
+                .build();
+        store.put(role, false);
+
+        GroupEntity group =
+            GroupEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withNamespace(AuthorizationUtils.ofGroupNamespace("metalake"))
+                .withName("groupA")
+                .withRoleNames(Lists.newArrayList())
+                .withRoleIds(Lists.newArrayList())
+                .withAuditInfo(auditInfo)
+                .build();
+        store.put(group, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+        List<GroupEntity> groupsBeforeGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                role.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        Assertions.assertTrue(groupsBeforeGrant.isEmpty());
+
+        store.update(
+            group.nameIdentifier(),
+            GroupEntity.class,
+            Entity.EntityType.GROUP,
+            existing ->
+                GroupEntity.builder()
+                    .withId(existing.id())
+                    .withNamespace(existing.namespace())
+                    .withName(existing.name())
+                    .withRoleNames(Lists.newArrayList(role.name()))
+                    .withRoleIds(Lists.newArrayList(role.id()))
+                    .withAuditInfo(existing.auditInfo())
+                    .build());
+
+        List<GroupEntity> groupEntitiesAfterGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                role.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        List<String> groupsAfterGrant =
+            groupEntitiesAfterGrant.stream().map(GroupEntity::name).collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("groupA"),
+            groupsAfterGrant,
+            "granted group must be immediately visible via ROLE_GROUP_REL from role side");
 
       } finally {
         destroy(type);

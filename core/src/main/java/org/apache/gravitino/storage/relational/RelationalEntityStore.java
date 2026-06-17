@@ -41,6 +41,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.EntityCache;
@@ -48,8 +49,13 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
+import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,6 +149,7 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
+    invalidateDerivedRelationCaches(e);
     cache.put(e);
   }
 
@@ -152,6 +159,7 @@ public class RelationalEntityStore
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
     cache.invalidate(ident, entityType);
+    invalidateDerivedRelationCaches(updatedEntity);
     return updatedEntity;
   }
 
@@ -410,6 +418,58 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+  }
+
+  private void invalidateDerivedRelationCaches(Entity entity) {
+    if (entity instanceof RoleEntity) {
+      invalidateMetadataObjectRoleRelCache((RoleEntity) entity);
+    } else if (entity instanceof UserEntity) {
+      invalidateRoleUserRelCache((UserEntity) entity);
+    } else if (entity instanceof GroupEntity) {
+      invalidateRoleGroupRelCache((GroupEntity) entity);
+    }
+  }
+
+  private void invalidateMetadataObjectRoleRelCache(RoleEntity roleEntity) {
+    if (roleEntity.securableObjects() == null) {
+      return;
+    }
+
+    String metalakeName = roleEntity.namespace().level(0);
+    for (SecurableObject securableObject : roleEntity.securableObjects()) {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalakeName, securableObject);
+      Entity.EntityType entityType = MetadataObjectUtil.toEntityType(securableObject.type());
+      cache.invalidateRelationCache(
+          identifier, entityType, SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL);
+    }
+  }
+
+  private void invalidateRoleUserRelCache(UserEntity userEntity) {
+    if (userEntity.roleNames() == null) {
+      return;
+    }
+
+    String metalakeName = userEntity.namespace().level(0);
+    for (String roleName : userEntity.roleNames()) {
+      cache.invalidateRelationCache(
+          NameIdentifierUtil.ofRole(metalakeName, roleName),
+          Entity.EntityType.ROLE,
+          SupportsRelationOperations.Type.ROLE_USER_REL);
+    }
+  }
+
+  private void invalidateRoleGroupRelCache(GroupEntity groupEntity) {
+    if (groupEntity.roleNames() == null) {
+      return;
+    }
+
+    String metalakeName = groupEntity.namespace().level(0);
+    for (String roleName : groupEntity.roleNames()) {
+      cache.invalidateRelationCache(
+          NameIdentifierUtil.ofRole(metalakeName, roleName),
+          Entity.EntityType.ROLE,
+          SupportsRelationOperations.Type.ROLE_GROUP_REL);
+    }
   }
 
   private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>> getCachedRelations(

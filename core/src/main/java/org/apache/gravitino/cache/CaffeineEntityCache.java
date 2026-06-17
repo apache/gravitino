@@ -197,6 +197,23 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public boolean invalidateRelationCache(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
+    checkArguments(ident, type, relType);
+
+    EntityCacheRelationKey entityCacheKey = EntityCacheRelationKey.of(ident, type, relType);
+    return segmentedLock.withLock(
+        entityCacheKey,
+        () -> {
+          cacheData.invalidate(entityCacheKey);
+          cacheIndex.remove(entityCacheKey.toString());
+          reverseIndex.remove(entityCacheKey);
+          return true;
+        });
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
     return segmentedLock.withLock(

@@ -57,6 +57,17 @@ public interface SupportsRelationEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType);
 
   /**
+   * Invalidates only the exact cached relation for the given entity and relation type.
+   *
+   * @param ident the name identifier
+   * @param type the entity type
+   * @param relType the relation type
+   * @return true if the cache entry was removed
+   */
+  boolean invalidateRelationCache(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType);
+
+  /**
    * Checks whether an entity with the given name identifier, type, and relation type is present in
    * the cache.
    *
