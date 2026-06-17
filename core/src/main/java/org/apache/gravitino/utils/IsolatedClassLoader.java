@@ -247,16 +247,15 @@ public class IsolatedClassLoader implements Closeable {
     // from the server classloader which cannot find them, causing a permanent
     // NoClassDefFoundError that is cached by the JVM for the lifetime of the process.
     return name.startsWith("org.apache.gravitino.hive.")
-        || (name.startsWith("org.apache.gravitino.catalog")
-            && (name.startsWith("org.apache.gravitino.catalog.hive.")
-                || name.startsWith("org.apache.gravitino.catalog.lakehouse.")
-                || name.startsWith("org.apache.gravitino.catalog.jdbc.")
-                || name.startsWith("org.apache.gravitino.catalog.mysql.")
-                || name.startsWith("org.apache.gravitino.catalog.postgresql.")
-                || name.startsWith("org.apache.gravitino.catalog.doris.")
-                || name.startsWith("org.apache.gravitino.catalog.fileset.")
-                || name.startsWith("org.apache.gravitino.catalog.model.")
-                || name.startsWith("org.apache.gravitino.catalog.kafka.")));
+        || name.startsWith("org.apache.gravitino.catalog.hive.")
+        || name.startsWith("org.apache.gravitino.catalog.lakehouse.")
+        || name.startsWith("org.apache.gravitino.catalog.jdbc.")
+        || name.startsWith("org.apache.gravitino.catalog.mysql.")
+        || name.startsWith("org.apache.gravitino.catalog.postgresql.")
+        || name.startsWith("org.apache.gravitino.catalog.doris.")
+        || name.startsWith("org.apache.gravitino.catalog.fileset.")
+        || name.startsWith("org.apache.gravitino.catalog.model.")
+        || name.startsWith("org.apache.gravitino.catalog.kafka.");
   }
 
   /**
