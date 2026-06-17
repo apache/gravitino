@@ -33,9 +33,6 @@ The Web UI reads `gravitino.authenticators` from `/configs` and uses the first e
 authentication type. List `basic` first when you want the built-in IdP login form. `gravitino.authenticators`
 must not include `simple` when IdP is enabled.
 
-You can combine `basic` with `oauth` (for example `basic,oauth`) when clients need both login
-flows; put the type that should drive the Web UI first.
-
 ---
 
 ## Prerequisites
