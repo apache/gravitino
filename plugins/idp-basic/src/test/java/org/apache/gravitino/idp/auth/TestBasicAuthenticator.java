@@ -38,8 +38,6 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
-import org.apache.gravitino.idp.SystemExitTestHelper;
-import org.apache.gravitino.idp.SystemExitTestHelper.SystemExitException;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.junit.jupiter.api.Test;
@@ -60,14 +58,8 @@ class TestBasicAuthenticator {
   void testValidateExtensionPackageMissingFails() {
     Config config = new Config(false) {};
 
-    SystemExitException exception =
-        assertThrows(
-            SystemExitException.class,
-            () ->
-                SystemExitTestHelper.runWithExitGuard(
-                    () -> BasicAuthenticator.validateExtensionPackage(config)));
-
-    assertEquals(1, exception.status());
+    assertThrows(
+        IllegalStateException.class, () -> BasicAuthenticator.validateExtensionPackage(config));
   }
 
   @Test

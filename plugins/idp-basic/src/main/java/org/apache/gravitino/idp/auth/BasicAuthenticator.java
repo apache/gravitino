@@ -38,13 +38,9 @@ import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.apache.gravitino.server.authentication.Authenticator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Authenticates HTTP Basic credentials against built-in IdP user metadata. */
 public class BasicAuthenticator implements Authenticator {
-
-  private static final Logger LOG = LoggerFactory.getLogger(BasicAuthenticator.class);
 
   private static final String BASIC_CHALLENGE = AuthConstants.AUTHORIZATION_BASIC_HEADER.trim();
 
@@ -85,11 +81,11 @@ public class BasicAuthenticator implements Authenticator {
             .anyMatch(
                 pkg -> IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE.equalsIgnoreCase(pkg.trim()));
     if (!idpExtensionEnabled) {
-      LOG.error(
-          "'basic' in gravitino.authenticators requires gravitino.server.rest.extensionPackages "
-              + "to include {}.",
-          IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE);
-      System.exit(1);
+      throw new IllegalStateException(
+          String.format(
+              "'basic' in gravitino.authenticators requires gravitino.server.rest.extensionPackages "
+                  + "to include %s.",
+              IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE));
     }
   }
 
