@@ -12,9 +12,10 @@ Fileset catalog is a fileset catalog that using Hadoop Compatible File System (H
 the storage location of the fileset. It supports the local filesystem and HDFS. Since
 0.7.0-incubating, Gravitino supports [S3](fileset-catalog-with-s3.md), [GCS](fileset-catalog-with-gcs.md),
 [OSS](fileset-catalog-with-oss.md) and [Azure Blob Storage](fileset-catalog-with-adls.md) through Fileset catalog.
+Since 1.4.0, Gravitino also supports [Tencent Cloud COS](fileset-catalog-with-cos.md).
 
 The rest of this document will use HDFS or local file as an example to illustrate how to use the Fileset catalog.
-For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS,
+For S3, GCS, OSS, Azure Blob Storage and COS, the configuration is similar to HDFS,
 refer to the corresponding document for more details.
 
 Note that Gravitino uses Hadoop 3 dependencies to build Fileset catalog. Theoretically, it should be
@@ -43,7 +44,7 @@ the Fileset catalog has the following properties:
 | `fs.path.config.<name>`              | Defines a logical location entry. Set `fs.path.config.<name>` to the real base URI (for example, `hdfs://cluster1/`). Any key that starts with the same prefix (such as `fs.path.config.<name>.config.resource`) is treated as a location-scoped property and will be forwarded to the underlying filesystem client.            | (none)          | No       | 1.2.0            |
 
 :::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aws-bundle`, `gravitino-azure-bundle`, `gravitino-aliyun-bundle`, or `gravitino-gcp-bundle`).
+`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including the built-in filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aws-bundle`, `gravitino-azure-bundle`, `gravitino-aliyun-bundle`, `gravitino-gcp-bundle`, or `gravitino-tencent-bundle`).
 :::
 
 Refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
@@ -75,13 +76,14 @@ The Gravitino Fileset extends the following properties in the `xxx-site.xml`:
 ### Fileset Catalog with Cloud Storage
 
 In the current implementation, the fileset uses the HDFS protocol to access its location. If users use S3, GCS, OSS,
-or Azure Blob Storage, they can also configure the `config.resources` to specify custom configuration
+Azure Blob Storage or Tencent Cloud COS, they can also configure the `config.resources` to specify custom configuration
 files.
 
 - For S3, refer to [Fileset-catalog-with-s3](./fileset-catalog-with-s3.md) for more details.
 - For GCS, refer to [Fileset-catalog-with-gcs](./fileset-catalog-with-gcs.md) for more details.
 - For OSS, refer to [Fileset-catalog-with-oss](./fileset-catalog-with-oss.md) for more details.
 - For Azure Blob Storage, refer to [Fileset-catalog-with-adls](./fileset-catalog-with-adls.md) for more details.
+- For Tencent Cloud COS, refer to [Fileset-catalog-with-cos](./fileset-catalog-with-cos.md) for more details.
 
 ### Implement a Custom HCFS File System Fileset
 
@@ -96,11 +98,11 @@ the jar [gravitino-hadoop-common](https://repo1.maven.org/maven2/org/apache/grav
       throws IOException;
   
   // The schema name of the file system provider. 'file' for Local file system,
-  // 'hdfs' for HDFS, 's3a' for AWS S3, 'gs' for GCS, 'oss' for Aliyun OSS. 
+  // 'hdfs' for HDFS, 's3a' for AWS S3, 'gs' for GCS, 'oss' for Aliyun OSS, 'cosn' for Tencent Cloud COS.
   String scheme();
 
   // Name of the file system provider. 'builtin-local' for Local file system, 'builtin-hdfs' for HDFS, 
-  // 's3' for AWS S3, 'gcs' for GCS, 'oss' for Aliyun OSS.
+  // 's3' for AWS S3, 'gcs' for GCS, 'oss' for Aliyun OSS, 'cos' for Tencent Cloud COS.
   String name();
 ```
 
