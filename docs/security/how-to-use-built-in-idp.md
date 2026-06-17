@@ -47,9 +47,6 @@ Before you call `/api/idp/*`, ensure the following:
    gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
    ```
 
-   When IdP is enabled, `gravitino.authenticators` must include `basic`; Gravitino fails to start
-   otherwise.
-
 2. **Server authenticator** — Built-in IdP is **incompatible** with the `simple` authenticator
    (the default). Do not list `simple` together with `basic` in `gravitino.authenticators`.
 
