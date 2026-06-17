@@ -162,7 +162,7 @@ authorization resources.
 
 ### 4.2 Ownership
 
-Gravitino supports object ownership, where the owner of an object implicitly has administrative privileges such as ALTER, DROP, and GRANT.
+Gravitino supports object ownership, where the owner of an object implicitly has administrative privileges such as ALTER and DROP.
 
 Since StarRocks does not provide a native object ownership model, the plugin should map Gravitino ownership to StarRocks privileges by granting ALL privileges on the corresponding resource to the owner. 
 This approach preserves the ownership semantics in Gravitino and ensures that owners retain full administrative control over their objects in StarRocks
