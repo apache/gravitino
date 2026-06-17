@@ -42,8 +42,8 @@ Before you call `/api/idp/*`, ensure the following:
 1. **IDP REST API registration** — In `gravitino.conf`, set:
 
    ```properties
-   gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
    gravitino.authenticators = basic
+   gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
    ```
 
    When IdP is enabled, list `basic` in `gravitino.authenticators`. Gravitino fails to start
