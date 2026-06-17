@@ -339,8 +339,8 @@ Replace these with values that match your deployment.
    gravitino.authorization.serviceAdmins = admin
    ```
 
-   When IdP is enabled, `gravitino.authenticators` must include `basic` and must not include
-   `simple`. Built-in IdP is **incompatible** with the `simple` authenticator (the default).
+   Built-in IdP is **incompatible** with the `simple` authenticator (the default),
+   `gravitino.authenticators` must include `basic` and must not include `simple`.
 
 2. Before the first start, set the initial service admin password (see
    [password rules](#password-and-username-rules)):

@@ -28,8 +28,8 @@ info:
     by the `idp-basic` plugin. Clients authenticate with Basic credentials validated against
     built-in IdP user metadata. Enable built-in IdP by registering
     `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages`.
-    When IdP is enabled, `gravitino.authenticators` must include `basic` and must not include
-    `simple`.
+    Built-in IdP is incompatible with the `simple` authenticator (the default),
+    `gravitino.authenticators` must include `basic` and must not include `simple`.
 
 servers:
   - url: "{scheme}://{host}:{port}/{basePath}"
