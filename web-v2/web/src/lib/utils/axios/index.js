@@ -40,7 +40,6 @@ import { useAuth as Auth } from '../../provider/session'
 import { githubApis } from '@/lib/api/github'
 import { isProdEnv } from '@/lib/utils'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
-import { store } from '@/lib/store'
 
 /**
  * @description: Data processing to facilitate the distinction of multiple processing methods
@@ -181,8 +180,9 @@ const transform = {
       return config
     }
 
-    // Get authType from Redux store to determine which auth method to use
-    const authType = store.getState().auth.authType
+    // Get authType from localStorage (persisted by getAuthConfigs)
+    // to avoid circular dependency with Redux store
+    const authType = localStorage.getItem('authType')
 
     try {
       if (authType === 'oauth') {
@@ -202,7 +202,7 @@ const transform = {
           config.headers.Authorization = `Basic ${Buffer.from(user).toString('base64')}`
         }
       } else {
-        // authType is null during bootstrap (before /configs resolves).
+        // authType not yet persisted during bootstrap (before /configs resolves).
         // Fall back to persisted auth artifacts to avoid spurious 401s.
         // localStorage.accessToken indicates a prior OAuth session (simple auth doesn't persist tokens).
         const persistedToken = localStorage.getItem('accessToken')
