@@ -50,15 +50,13 @@ The Web V2 landing page depends on both the authentication mode and whether auth
 
   ![simple-with-login](./assets/webui-v2/simple-with-login.png)
 
+- When `gravitino.authenticators=basic` and the built-in IdP extension package is configured, the
+  Web UI shows a username and password login form backed by built-in IdP user metadata. See
+  [built-in IDP Web UI](security/how-to-use-built-in-idp.md#web-ui).
+
 - When `gravitino.authenticators=oauth`, OAuth configuration is required for login. OAuth mode requires `gravitino.authorization.enable=true`. See the details in [Security](security/security.md)
 
   ![oauth-login](./assets/webui-v2/oauth-login.png)
-
-:::note
-Built-in IDP Basic authentication is not supported in the Web UI. The UI does not collect
-username and password for this mode. Use the REST API, Java/Python clients, or engine connectors
-instead. See [built-in IDP Web UI](security/how-to-use-built-in-idp.md#web-ui).
-:::
 
 ### Metalakes
 
