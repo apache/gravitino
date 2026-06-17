@@ -161,7 +161,7 @@ Gravitino Iceberg REST service supports using static access-key-id and secret-ac
 | `oss-endpoint`          | The endpoint of Aliyun OSS service.                                                                                             | (none)                                  | No       | 0.7.0-incubating |
 
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
-Passing credentials or security tokens through `gravitino.bypass.` properties has a credential leakage risk. See
+Passing credentials or security tokens through `gravitino.bypass.` properties can expose sensitive values in plaintext. See
 [Catalog Properties Configuration](./gravitino-server-config.md#catalog-properties-configuration) for details.
 
 :::info
@@ -221,7 +221,7 @@ For other storages that are not managed by Gravitino directly, you can manage th
 | `io-impl`          | The IO implementation for `FileIO` in Iceberg. Use the fully qualified class name to override the default implementation. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
 
 To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
-Passing credentials or security tokens through `gravitino.bypass.` properties has a credential leakage risk. See
+Passing credentials or security tokens through `gravitino.bypass.` properties can expose sensitive values in plaintext. See
 [Catalog Properties Configuration](./gravitino-server-config.md#catalog-properties-configuration) for details.
 
 :::info
