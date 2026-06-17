@@ -20,8 +20,8 @@
 package org.apache.gravitino.idp.web.rest.feature;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Lists;
 import org.apache.gravitino.Config;
@@ -40,11 +40,10 @@ class TestIdpRESTFeature {
             AuthenticatorType.SIMPLE.name().toLowerCase(),
             AuthenticatorType.BASIC.name().toLowerCase()));
 
-    IllegalArgumentException exception =
-        assertThrows(
-            IllegalArgumentException.class, () -> IdpRESTFeature.validateConfiguration(config));
+    SystemExitException exception =
+        assertThrows(SystemExitException.class, () -> validateWithExitGuard(config));
 
-    assertTrue(exception.getMessage().contains("simple"));
+    assertEquals(1, exception.status());
   }
 
   @Test
@@ -53,11 +52,10 @@ class TestIdpRESTFeature {
     config.set(
         Configs.AUTHENTICATORS, Lists.newArrayList(AuthenticatorType.OAUTH.name().toLowerCase()));
 
-    IllegalArgumentException exception =
-        assertThrows(
-            IllegalArgumentException.class, () -> IdpRESTFeature.validateConfiguration(config));
+    SystemExitException exception =
+        assertThrows(SystemExitException.class, () -> validateWithExitGuard(config));
 
-    assertTrue(exception.getMessage().contains("gravitino.authenticators"));
+    assertEquals(1, exception.status());
   }
 
   @Test
@@ -67,5 +65,40 @@ class TestIdpRESTFeature {
         Configs.AUTHENTICATORS, Lists.newArrayList(AuthenticatorType.BASIC.name().toLowerCase()));
 
     assertDoesNotThrow(() -> IdpRESTFeature.validateConfiguration(config));
+  }
+
+  @SuppressWarnings("removal")
+  private static void validateWithExitGuard(Config config) {
+    SecurityManager original = System.getSecurityManager();
+    System.setSecurityManager(
+        new SecurityManager() {
+          @Override
+          public void checkExit(int status) {
+            throw new SystemExitException(status);
+          }
+
+          @Override
+          public void checkPermission(java.security.Permission perm) {
+            // Allow test execution.
+          }
+        });
+    try {
+      IdpRESTFeature.validateConfiguration(config);
+    } finally {
+      System.setSecurityManager(original);
+    }
+  }
+
+  private static final class SystemExitException extends SecurityException {
+    private final int status;
+
+    private SystemExitException(int status) {
+      super("System.exit(" + status + ")");
+      this.status = status;
+    }
+
+    private int status() {
+      return status;
+    }
   }
 }

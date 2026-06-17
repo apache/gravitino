@@ -96,19 +96,21 @@ public class IdpRESTFeature implements Feature {
         authenticators.stream()
             .anyMatch(name -> AuthenticatorType.SIMPLE.name().equalsIgnoreCase(name.trim()));
 
+    if (!usesBasic) {
+      LOG.error(
+          "gravitino.server.rest.extensionPackages includes the built-in IdP plugin ({}) but "
+              + "'basic' is not listed in gravitino.authenticators. Add 'basic' to "
+              + "gravitino.authenticators or remove the extension package.",
+          IDP_REST_EXTENSION_PACKAGE);
+      System.exit(1);
+    }
+
     if (usesSimple && usesBasic) {
-      throw new IllegalArgumentException(
+      LOG.error(
           "Built-in IdP basic authentication is incompatible with simple authentication because "
               + "both handle Authorization: Basic headers. Remove either 'simple' or 'basic' from "
               + "gravitino.authenticators.");
-    }
-
-    if (!usesBasic) {
-      throw new IllegalArgumentException(
-          "gravitino.server.rest.extensionPackages includes the built-in IdP plugin ("
-              + IDP_REST_EXTENSION_PACKAGE
-              + ") but 'basic' is not listed in gravitino.authenticators. Add 'basic' to "
-              + "gravitino.authenticators or remove the extension package.");
+      System.exit(1);
     }
   }
 
