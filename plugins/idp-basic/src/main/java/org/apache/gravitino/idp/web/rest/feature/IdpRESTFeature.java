@@ -52,8 +52,7 @@ public class IdpRESTFeature implements Feature {
   private static final Logger LOG = LoggerFactory.getLogger(IdpRESTFeature.class);
 
   /** Extension package name registered through {@code gravitino.server.rest.extensionPackages}. */
-  public static final String IDP_REST_EXTENSION_PACKAGE =
-      "org.apache.gravitino.idp.web.rest.feature";
+  public static final String IDP_REST_EXTENSION_PACKAGE = IdpRESTFeature.class.getPackageName();
 
   /** Environment variable for the initial password of configured service admins. */
   public static final String INITIAL_ADMIN_PASSWORD_ENV = "GRAVITINO_INITIAL_ADMIN_PASSWORD";
