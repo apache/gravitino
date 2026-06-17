@@ -268,6 +268,11 @@ class BaseGVFSOperations(ABC):
     def current_location_name(self):
         return self._current_location_name
 
+    @property
+    def enable_credential_vending(self):
+        """Whether credential vending is enabled for this filesystem."""
+        return self._enable_credential_vending
+
     @abstractmethod
     def ls(self, path, detail=True, **kwargs):
         """List the files and directories info of the path.
