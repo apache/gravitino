@@ -49,6 +49,9 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
 
   localStorage.setItem('oauthUrl', oauthUrl)
 
+  // Persist authType for axios interceptor to avoid circular dependency with Redux store
+  localStorage.setItem('authType', authType)
+
   return { oauthUrl, authType, anthEnable, serviceAdmins, systemConfig: res }
 })
 
@@ -150,10 +153,15 @@ export const logoutAction = createAsyncThunk(
 
       dispatch(clearIntervalId())
       dispatch(setAuthToken(''))
-      dispatch(setAuthUser(null))
-    } else {
-      dispatch(setAuthUser(null))
     }
+
+    // Always clear authUser in Redux and sessionStorage on logout
+    // This ensures consistent behavior for both OAuth and simple auth
+    dispatch(setAuthUser(null))
+    sessionStorage.removeItem('simpleAuthToken')
+
+    // Clear persisted authType to avoid stale auth mode on next visit
+    localStorage.removeItem('authType')
 
     // Reset provider factory to ensure clean state for next login
     oauthProviderFactory.reset()
