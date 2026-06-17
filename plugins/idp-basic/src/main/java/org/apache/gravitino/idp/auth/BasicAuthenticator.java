@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
@@ -35,10 +36,15 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.model.IdpUser;
+import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.apache.gravitino.server.authentication.Authenticator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Authenticates HTTP Basic credentials against built-in IdP user metadata. */
 public class BasicAuthenticator implements Authenticator {
+
+  private static final Logger LOG = LoggerFactory.getLogger(BasicAuthenticator.class);
 
   private static final String BASIC_CHALLENGE = AuthConstants.AUTHORIZATION_BASIC_HEADER.trim();
 
@@ -62,8 +68,29 @@ public class BasicAuthenticator implements Authenticator {
 
   @Override
   public void initialize(Config config) {
+    validateExtensionPackage(config);
     GravitinoEnv env = GravitinoEnv.getInstance();
     this.userGroupManager = IdpUserGroupManager.getInstance(config, env.idGenerator());
+  }
+
+  /**
+   * Validates that the built-in IdP REST extension package is enabled when Basic authentication is
+   * used.
+   *
+   * @param config The server configuration.
+   */
+  static void validateExtensionPackage(Config config) {
+    boolean idpExtensionEnabled =
+        config.get(Configs.REST_API_EXTENSION_PACKAGES).stream()
+            .anyMatch(
+                pkg -> IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE.equalsIgnoreCase(pkg.trim()));
+    if (!idpExtensionEnabled) {
+      LOG.error(
+          "'basic' in gravitino.authenticators requires gravitino.server.rest.extensionPackages "
+              + "to include {}.",
+          IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE);
+      System.exit(1);
+    }
   }
 
   @Override
