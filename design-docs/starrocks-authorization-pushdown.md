@@ -77,10 +77,10 @@ the common hook flow:
 StarRocks 3.0 and later provide a role-based authorization model. The objects relevant to
 this design are:
 
-| StarRocks object | Relevant privileges |
-|------------------|---------------------|
-| Catalog          | `USAGE`, `CREATE DATABASE` |
-| Database         | `CREATE TABLE`, `ALTER`, `DROP` |
+| StarRocks object | Relevant privileges                                     |
+|------------------|---------------------------------------------------------|
+| Catalog          | `USAGE`, `CREATE DATABASE`                              |
+| Database         | `CREATE TABLE`, `ALTER`, `DROP`                         |
 | Table            | `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `ALTER`, `DROP` |
 
 
@@ -89,13 +89,13 @@ this design are:
 The existing `jdbc-starrocks` catalog maps Gravitino metadata to StarRocks metadata as
 follows:
 
-| Gravitino object | StarRocks object |
-|------------------|------------------|
-| Metalake         | Not represented in StarRocks |
+| Gravitino object | StarRocks object                             |
+|------------------|----------------------------------------------|
+| Metalake         | Not represented in StarRocks                 |
 | Catalog          | StarRocks internal catalog `default_catalog` |
-| Schema           | Database under `default_catalog` |
-| Table            | Table under a database |
-| Column           | Column under a table |
+| Schema           | Database under `default_catalog`             |
+| Table            | Table under a database                       |
+| Column           | Column under a table                         |
 
 
 ## 3. Server-side Design
@@ -153,15 +153,27 @@ public class StarRocksAuthorization extends BaseAuthorization<StarRocksAuthoriza
 The StarRocks mapping provider translates Gravitino securable objects into StarRocks
 authorization resources.
 
-| Gravitino object | StarRocks resource |
-|------------------|--------------------|
-| Metalake         | `default_catalog`, all databases, all tables |
-| Catalog          | `default_catalog`, all databases, all tables |
+| Gravitino object | StarRocks resource                            |
+|------------------|-----------------------------------------------|
+| Metalake         | `default_catalog`, all databases, all tables  |
+| Catalog          | `default_catalog`, all databases, all tables  |
 | Schema           | Database `{schema}`, all tables in `{schema}` |
-| Table            | Table `{schema}.{table}` |
+| Table            | Table `{schema}.{table}`                      |
 
+### 4.2 Ownership
 
-### 4.2 Supported Privileges
+Gravitino supports object ownership, where the owner of an object implicitly has administrative privileges such as ALTER, DROP, and GRANT.
+
+Since StarRocks does not provide a native object ownership model, the plugin should map Gravitino ownership to StarRocks privileges by granting ALL privileges on the corresponding resource to the owner. 
+This approach preserves the ownership semantics in Gravitino and ensures that owners retain full administrative control over their objects in StarRocks
+
+| Gravitino object | StarRocks privilege | StarRocks resource                 |
+|------------------|---------------------|------------------------------------|
+| Catalog          | `ALL`               | `default_catalog`                  |
+| Schema           | `ALL`               | `default_catalog.{schema}.*`       |
+| Table            | `ALL`               | `default_catalog.{schema}.{table}` |
+
+### 4.3 Supported Privileges
 
 | Gravitino object | Gravitino privilege | StarRocks privilege                             | StarRocks resource                 |
 |------------------|---------------------|-------------------------------------------------|------------------------------------|
@@ -179,12 +191,12 @@ authorization resources.
 | Table            | `MODIFY_TABLE`      | `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `ALTER` | `default_catalog.{schema}.{table}` |
 
 
-### 4.3 Deny Privileges
+### 4.4 Deny Privileges
 
 The StarRocks pushdown plugin should only push down `Privilege.Condition.ALLOW`.
 Privileges with `Privilege.Condition.DENY` should be filtered out.
 
-### 4.4 Unsupported Privileges
+### 4.5 Unsupported Privileges
 
 The plugin should ignore or reject privileges outside the supported StarRocks table
 management scope:
