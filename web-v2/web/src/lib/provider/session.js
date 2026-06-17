@@ -28,8 +28,6 @@ import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 import { to } from '../utils'
 import { getAuthConfigs, setAuthToken, setAuthUser } from '../store/auth'
 
-import { useIdle } from 'react-use'
-
 const authProvider = {
   version: '',
   token: null,
@@ -51,16 +49,6 @@ const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
 
   const version = (typeof window !== 'undefined' && localStorage.getItem('version')) || null
-
-  const expiredIn = localStorage.getItem('expiredIn') && JSON.parse(localStorage.getItem('expiredIn')) // seconds
-  const idleOn = (expiredIn + 60) * 1000
-  const isIdle = useIdle(idleOn)
-
-  useEffect(() => {
-    if (isIdle) {
-      localStorage.setItem('isIdle', true)
-    }
-  }, [isIdle])
 
   const goToMetalakeListPage = () => {
     try {
