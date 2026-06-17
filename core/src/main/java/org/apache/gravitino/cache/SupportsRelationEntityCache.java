@@ -57,6 +57,24 @@ public interface SupportsRelationEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType);
 
   /**
+   * Invalidates only the cached relation result for the given key, without cascading through the
+   * reverse index.
+   *
+   * <p>Unlike {@link #invalidate(NameIdentifier, Entity.EntityType,
+   * SupportsRelationOperations.Type)}, this does not evict the reverse-index mappings (which are
+   * shared across entities, e.g. all roles bound to one metadata object) or other entities' caches.
+   * Use it when a relation result is known to be stale and the next read must re-query the backend,
+   * but the shared reverse index must be preserved.
+   *
+   * @param ident the name identifier
+   * @param type the entity type
+   * @param relType the relation type
+   * @return true if the cache entry was removed
+   */
+  boolean invalidateRelationEntry(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType);
+
+  /**
    * Checks whether an entity with the given name identifier, type, and relation type is present in
    * the cache.
    *

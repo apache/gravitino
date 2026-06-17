@@ -41,6 +41,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.EntityCache;
@@ -48,8 +49,10 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,6 +147,7 @@ public class RelationalEntityStore
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
     cache.put(e);
+    invalidateMetadataObjectRoleRelationCache(e);
   }
 
   @Override
@@ -152,6 +156,7 @@ public class RelationalEntityStore
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
     cache.invalidate(ident, entityType);
+    invalidateMetadataObjectRoleRelationCache(updatedEntity);
     return updatedEntity;
   }
 
@@ -449,6 +454,38 @@ public class RelationalEntityStore
       }
 
       cache.put(sourceId, identType, relType, entityList);
+    }
+  }
+
+  /**
+   * Invalidates the {@link SupportsRelationOperations.Type#METADATA_OBJECT_ROLE_REL} cache entries
+   * keyed by every securable object of the given role.
+   *
+   * <p>The relation cache is keyed by the metadata object (catalog/schema/table/...), while a role
+   * mutation (grant/revoke/override/create) is invalidated from the role side. The role-side BFS
+   * invalidation only reaches an object's relation cache entry when the role had previously been
+   * cached as that object's binding role; a role that is newly granted access to an object was
+   * never cached there, so without this explicit invalidation the stale role list is served until
+   * the entry's TTL elapses.
+   */
+  private void invalidateMetadataObjectRoleRelationCache(Entity entity) {
+    if (!(entity instanceof RoleEntity)) {
+      return;
+    }
+    List<SecurableObject> securableObjects = ((RoleEntity) entity).securableObjects();
+    if (securableObjects == null || securableObjects.isEmpty()) {
+      return;
+    }
+    String metalake = ((RoleEntity) entity).namespace().level(0);
+    for (SecurableObject securableObject : securableObjects) {
+      // Drop only the relation result entry for this object, not the shared reverse index. The
+      // reverse index is shared across all roles bound to the object; a full invalidate would
+      // cascade through it and evict the other roles' mappings. The next listRolesByObject
+      // re-queries the backend and rebuilds both the entry and the reverse index.
+      cache.invalidateRelationEntry(
+          MetadataObjectUtil.toEntityIdent(metalake, securableObject),
+          MetadataObjectUtil.toEntityType(securableObject.type()),
+          SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL);
     }
   }
 }
