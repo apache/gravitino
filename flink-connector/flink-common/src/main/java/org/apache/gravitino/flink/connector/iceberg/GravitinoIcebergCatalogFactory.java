@@ -124,8 +124,8 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
         catalogOptions.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND);
     // catalogBackend is only present here on the CREATE CATALOG path (raw user SQL options). On
     // the USE CATALOG path (loading a catalog already persisted in Gravitino),
-    // GravitinoCatalogStore.getCatalog() has already renamed catalog-backend -> catalog-type
-    // before this method runs, so catalogBackend is null even for a REST/JDBC catalog. This
+    // IcebergPropertiesConverter has already renamed catalog-backend -> catalog-type during
+    // property conversion, so catalogBackend is null even for a REST/JDBC catalog. This
     // normalizes the CREATE CATALOG case so both paths converge on the same catalog-type key.
     String catalogType = normalizeCatalogType(icebergCatalogOptions, catalogBackend);
     // catalogType (not catalogBackend, which is unreliable as explained above) must be used for

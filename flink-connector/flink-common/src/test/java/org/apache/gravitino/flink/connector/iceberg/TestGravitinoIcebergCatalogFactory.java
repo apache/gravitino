@@ -22,6 +22,7 @@ package org.apache.gravitino.flink.connector.iceberg;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
+import org.apache.iceberg.rest.auth.AuthProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -108,7 +109,7 @@ class TestGravitinoIcebergCatalogFactory {
             "http://localhost:9001/iceberg/",
             // Pre-set so the REST auth-propagation branch (which needs a live
             // GravitinoCatalogManager) is skipped; that branch is covered separately below.
-            org.apache.iceberg.rest.auth.AuthProperties.AUTH_TYPE,
+            AuthProperties.AUTH_TYPE,
             "none");
 
     Map<String, String> result = factory.toIcebergCatalogOptions(options);
@@ -123,8 +124,8 @@ class TestGravitinoIcebergCatalogFactory {
   @Test
   void testRestAuthPropagatedWhenLoadedFromCatalogStore() {
     // Simulates the catalog-store load path (`USE CATALOG ...`): by the time options reach this
-    // factory, GravitinoCatalogStore.getCatalog has already renamed `catalog-backend` ->
-    // `catalog-type`, so only `catalog-type=rest` is present, no `catalog-backend` key.
+    // factory, IcebergPropertiesConverter has already renamed `catalog-backend` -> `catalog-type`
+    // during property conversion, so only `catalog-type=rest` is present, no `catalog-backend`.
     Map<String, String> options =
         ImmutableMap.of(
             IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
