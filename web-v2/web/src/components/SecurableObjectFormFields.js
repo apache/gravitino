@@ -33,6 +33,7 @@ import {
 import { fetchTags } from '@/lib/store/tags'
 import { fetchPolicies } from '@/lib/store/policies'
 import { fetchJobTemplates } from '@/lib/store/jobs'
+import { getSchemasApi } from '@/lib/api/schemas'
 import { privilegeTypes, privilegeOptions } from '@/config/security'
 
 export default function SecurableObjectFormFields({ fieldName, fieldKey, metalake }) {
@@ -73,6 +74,7 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
   const [localRemoteLoading, setLocalRemoteLoading] = useState({})
   const catalogOptions = localRemoteOptions['catalog'] || []
   const rootRef = useRef(null)
+  const schemaSearchTimerRef = useRef(null)
 
   const isElementVisibleInViewport = el => {
     if (!el) return true
@@ -443,6 +445,40 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
     }
   }
 
+  const searchSchemas = async (catalog, searchText) => {
+    if (!catalog) return
+    setSchemasLoading(true)
+    try {
+      const parts = String(searchText || '').split(':')
+      const filterText = parts.pop() || ''
+      const parentSchema = parts.length > 0 ? parts.join(':') : undefined
+
+      const res = await getSchemasApi({ metalake, catalog, parentSchema })
+      const schemas = res?.identifiers || []
+
+      const options = schemas
+        .map(s => {
+          const fullName = s.name
+
+          return { label: fullName, value: fullName }
+        })
+        .filter(o => !filterText || o.label.toLowerCase().includes(filterText.toLowerCase()))
+
+      setSchemasOptions(options)
+    } catch (e) {
+      setSchemasOptions([])
+    } finally {
+      setSchemasLoading(false)
+    }
+  }
+
+  const debouncedSearchSchemas = (catalog, searchText) => {
+    if (schemaSearchTimerRef.current) clearTimeout(schemaSearchTimerRef.current)
+    schemaSearchTimerRef.current = setTimeout(() => {
+      searchSchemas(catalog, searchText)
+    }, 300)
+  }
+
   const loadResourcesForSchema = async (catalog, schema, type) => {
     if (!catalog || !schema) return
     setResourcesLoading(true)
@@ -631,13 +667,17 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
                   </Select>
                   <Select
                     showSearch
-                    filterOption={(input, option) =>
-                      String(option.label).toLowerCase().includes(String(input).toLowerCase())
-                    }
+                    filterOption={false}
                     placeholder={'Please search or select schema name'}
                     loading={schemasLoading}
                     value={localSchemaVal}
-                    onSearch={() => {}}
+                    onSearch={val => {
+                      if (val) {
+                        debouncedSearchSchemas(localCatalogVal, val)
+                      } else if (localCatalogVal) {
+                        loadSchemasForCatalog(localCatalogVal)
+                      }
+                    }}
                     onFocus={() => {
                       if (!schemasOptions.length && localCatalogVal) {
                         loadSchemasForCatalog(localCatalogVal)
@@ -718,12 +758,17 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
                   </Select>
                   <Select
                     showSearch
-                    filterOption={(input, option) =>
-                      String(option.label).toLowerCase().includes(String(input).toLowerCase())
-                    }
+                    filterOption={false}
                     placeholder={`Please search or select schema name`}
                     loading={schemasLoading}
                     value={localSchemaVal}
+                    onSearch={val => {
+                      if (val) {
+                        debouncedSearchSchemas(localCatalogVal, val)
+                      } else if (localCatalogVal) {
+                        loadSchemasForCatalog(localCatalogVal)
+                      }
+                    }}
                     onFocus={() => {
                       if (!schemasOptions.length && localCatalogVal) {
                         loadSchemasForCatalog(localCatalogVal)
