@@ -139,6 +139,7 @@ class TestGravitinoIcebergCatalogFactory {
     IllegalStateException exception =
         Assertions.assertThrows(
             IllegalStateException.class, () -> factory.toIcebergCatalogOptions(options));
-    Assertions.assertTrue(exception.getMessage().contains("GravitinoCatalogManager"));
+    String msg = exception.getMessage();
+    Assertions.assertTrue(msg != null && msg.contains("GravitinoCatalogManager"));
   }
 }

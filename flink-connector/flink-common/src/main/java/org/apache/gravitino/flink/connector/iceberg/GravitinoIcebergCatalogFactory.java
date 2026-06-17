@@ -142,7 +142,8 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
   // Copies catalog-backend into catalog-type so the CREATE CATALOG path lines up with the
   // USE CATALOG path, where the rename already happened upstream. Skipped when catalog-type or
   // catalog-impl is already set, otherwise an explicitly provided catalog-impl would conflict
-  // with it. Returns the resulting catalog-type, which is guaranteed to be set on both paths.
+  // with it. Returns the effective backend type for downstream gating: the normalized catalog-type
+  // when present, or catalog-backend as a fallback (e.g. when catalog-impl was already set).
   private static String normalizeCatalogType(
       Map<String, String> icebergCatalogOptions, String catalogBackend) {
     if (catalogBackend != null
@@ -150,7 +151,8 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
         && !icebergCatalogOptions.containsKey(IcebergPropertiesConstants.ICEBERG_CATALOG_IMPL)) {
       icebergCatalogOptions.put(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);
     }
-    return icebergCatalogOptions.get(IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE);
+    return icebergCatalogOptions.getOrDefault(
+        IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE, catalogBackend);
   }
 
   // A REST backend connects directly to the Iceberg REST service, bypassing the Gravitino
