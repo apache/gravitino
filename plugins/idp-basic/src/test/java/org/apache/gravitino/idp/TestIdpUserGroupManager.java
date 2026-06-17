@@ -38,9 +38,9 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
@@ -55,8 +55,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Integration tests for {@link IdpUserGroupManager} backed by an embedded H2 store. */
 public class TestIdpUserGroupManager {
 
-  private static final String BASIC_AUTHENTICATOR_CLASS =
-      BasicAuthenticator.class.getCanonicalName();
+  private static final String BASIC_AUTHENTICATOR = AuthenticatorType.BASIC.name().toLowerCase();
 
   private static final String VALID_PASSWORD = "Passw0rd-1234";
   private static final String ANOTHER_VALID_PASSWORD = "AnotherPass1!";
@@ -208,7 +207,7 @@ public class TestIdpUserGroupManager {
 
   @Test
   public void testInitializeConfiguredServiceAdminsCreatesMissingServiceAdmin() throws IOException {
-    loadServiceAdminConfig(BASIC_AUTHENTICATOR_CLASS, "initAdminCreate1,initAdminCreate2");
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "initAdminCreate1,initAdminCreate2");
     manager.addUser("initAdminCreate2", VALID_PASSWORD);
 
     manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
@@ -220,7 +219,7 @@ public class TestIdpUserGroupManager {
   @Test
   public void testInitializeConfiguredServiceAdminsSkipsWhenNoServiceAdminsConfigured()
       throws IOException {
-    loadServiceAdminConfig(BASIC_AUTHENTICATOR_CLASS, "");
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "");
     manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
     Assertions.assertThrows(NotFoundException.class, () -> manager.getUser("initAdminSkipList1"));
   }
@@ -228,7 +227,7 @@ public class TestIdpUserGroupManager {
   @Test
   public void testInitializeConfiguredServiceAdminsSkipsWhenAllServiceAdminsAlreadyExist()
       throws IOException {
-    loadServiceAdminConfig(BASIC_AUTHENTICATOR_CLASS, "initAdminExist1,initAdminExist2");
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "initAdminExist1,initAdminExist2");
     manager.addUser("initAdminExist1", VALID_PASSWORD);
     manager.addUser("initAdminExist2", VALID_PASSWORD);
 
@@ -240,7 +239,7 @@ public class TestIdpUserGroupManager {
 
   @Test
   public void testInitializeConfiguredServiceAdminsFailsWhenRequiredPasswordMissing() {
-    loadServiceAdminConfig(BASIC_AUTHENTICATOR_CLASS, "initAdminNoPwd1");
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "initAdminNoPwd1");
 
     IllegalArgumentException exception =
         Assertions.assertThrows(
@@ -256,7 +255,7 @@ public class TestIdpUserGroupManager {
   @ParameterizedTest
   @ValueSource(strings = {"short"})
   public void testInitializeConfiguredServiceAdminsFailsOnInvalidPasswordPayload(String payload) {
-    loadServiceAdminConfig(BASIC_AUTHENTICATOR_CLASS, "initAdminBadPwd1");
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "initAdminBadPwd1");
 
     IllegalArgumentException exception =
         Assertions.assertThrows(
@@ -271,7 +270,7 @@ public class TestIdpUserGroupManager {
   @Test
   public void testInitializeConfiguredServiceAdminsUsesSamePasswordForAllMissingServiceAdmins()
       throws IOException {
-    loadServiceAdminConfig(BASIC_AUTHENTICATOR_CLASS, "initAdminSame1,initAdminSame2");
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "initAdminSame1,initAdminSame2");
 
     manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
 
