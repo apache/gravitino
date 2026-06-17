@@ -150,13 +150,11 @@ export const logoutAction = createAsyncThunk(
 
       dispatch(clearIntervalId())
       dispatch(setAuthToken(''))
-    } else {
-      // Simple auth: clear simple auth user
-      dispatch(setAuthUser(null))
     }
 
-    // Always clear simpleAuthUser and simpleAuthToken on logout
-    // This ensures cleanup even when switching between auth types
+    // Always clear authUser in Redux and sessionStorage on logout
+    // This ensures consistent behavior for both OAuth and simple auth
+    dispatch(setAuthUser(null))
     sessionStorage.removeItem('simpleAuthUser')
     sessionStorage.removeItem('simpleAuthToken')
 

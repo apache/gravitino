@@ -201,6 +201,16 @@ const transform = {
         if (user) {
           config.headers.Authorization = `Basic ${Buffer.from(user).toString('base64')}`
         }
+      } else {
+        // authType is null during bootstrap (before /configs resolves).
+        // Fall back to persisted auth artifacts to avoid spurious 401s.
+        // localStorage.accessToken indicates a prior OAuth session (simple auth doesn't persist tokens).
+        const persistedToken = localStorage.getItem('accessToken')
+        if (persistedToken && config?.requestOptions?.withToken !== false) {
+          config.headers.Authorization = options.authenticationScheme
+            ? `${options.authenticationScheme} ${persistedToken}`
+            : persistedToken
+        }
       }
     } catch (error) {
       console.warn('Failed to get access token:', error)
