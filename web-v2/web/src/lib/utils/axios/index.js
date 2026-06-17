@@ -40,6 +40,7 @@ import { useAuth as Auth } from '../../provider/session'
 import { githubApis } from '@/lib/api/github'
 import { isProdEnv } from '@/lib/utils'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
+import { store } from '@/lib/store'
 
 /**
  * @description: Data processing to facilitate the distinction of multiple processing methods
@@ -180,19 +181,25 @@ const transform = {
       return config
     }
 
-    // Use OAuth provider factory for proper token management
-    try {
-      const token = await oauthProviderFactory.getAccessToken()
+    // Get authType from Redux store to determine which auth method to use
+    const authType = store.getState().auth.authType
 
-      if (token && config?.requestOptions?.withToken !== false) {
-        // ** jwt token
-        config.headers.Authorization = options.authenticationScheme ? `${options.authenticationScheme} ${token}` : token
-      } else if (window.sessionStorage.getItem('simpleAuthUser')) {
-        // Simple auth fallback
-        const simpleAuthToken = window.sessionStorage.getItem('simpleAuthToken')
+    try {
+      if (authType === 'oauth') {
+        // OAuth auth: use Bearer token from OAuth provider
+        const token = await oauthProviderFactory.getAccessToken()
+
+        if (token && config?.requestOptions?.withToken !== false) {
+          // ** jwt token
+          config.headers.Authorization = options.authenticationScheme
+            ? `${options.authenticationScheme} ${token}`
+            : token
+        }
+      } else if (authType === 'simple') {
+        // Simple auth: use Basic auth with username from sessionStorage
         const user = JSON.parse(window.sessionStorage.getItem('simpleAuthUser'))?.name
         if (user) {
-          config.headers.Authorization = `Basic ${Buffer.from(user || '').toString('base64')}`
+          config.headers.Authorization = `Basic ${Buffer.from(user).toString('base64')}`
         }
       }
     } catch (error) {
@@ -250,8 +257,13 @@ const transform = {
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
     if (response?.status === 401 && !originConfig._retry && response.config.url !== githubApis.GET) {
+      // Clear OAuth tokens
       localStorage.removeItem('accessToken')
       localStorage.removeItem('authParams')
+
+      // Clear simple auth data
+      sessionStorage.removeItem('simpleAuthUser')
+      sessionStorage.removeItem('simpleAuthToken')
 
       try {
         const provider = await oauthProviderFactory.getProvider()
