@@ -48,6 +48,8 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
   const displayValue = currentFull
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
+  const { systemConfig } = useAppSelector(state => state.auth) || {}
+  const separator = (systemConfig && systemConfig['gravitino.schema.separator']) || ':'
 
   const parts = String(currentFull || '')
     .split('.')
@@ -102,6 +104,15 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
     return () => {
       window.removeEventListener('scroll', handleScrollOrResize, true)
       window.removeEventListener('resize', handleScrollOrResize, true)
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (schemaSearchTimerRef.current) {
+        clearTimeout(schemaSearchTimerRef.current)
+        schemaSearchTimerRef.current = null
+      }
     }
   }, [])
 
@@ -449,9 +460,9 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
     if (!catalog) return
     setSchemasLoading(true)
     try {
-      const parts = String(searchText || '').split(':')
+      const parts = String(searchText || '').split(separator)
       const filterText = parts.pop() || ''
-      const parentSchema = parts.length > 0 ? parts.join(':') : undefined
+      const parentSchema = parts.length > 0 ? parts.join(separator) : undefined
 
       const res = await getSchemasApi({ metalake, catalog, parentSchema })
       const schemas = res?.identifiers || []
@@ -654,6 +665,10 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
                       setTimeout(() => setFieldValue(['securableObjects', fieldName, 'allowPrivileges'], []), 0)
                       setTimeout(() => setFieldValue(['securableObjects', fieldName, 'denyPrivileges'], []), 0)
 
+                      if (schemaSearchTimerRef.current) {
+                        clearTimeout(schemaSearchTimerRef.current)
+                        schemaSearchTimerRef.current = null
+                      }
                       loadSchemasForCatalog(v)
                       loadPrivilegeGroupsForField(fieldName, currentType, v)
                     }}
@@ -675,6 +690,10 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
                       if (val) {
                         debouncedSearchSchemas(localCatalogVal, val)
                       } else if (localCatalogVal) {
+                        if (schemaSearchTimerRef.current) {
+                          clearTimeout(schemaSearchTimerRef.current)
+                          schemaSearchTimerRef.current = null
+                        }
                         loadSchemasForCatalog(localCatalogVal)
                       }
                     }}
@@ -745,6 +764,10 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
                       setTimeout(() => setFieldValue(['securableObjects', fieldName, 'allowPrivileges'], []), 0)
                       setTimeout(() => setFieldValue(['securableObjects', fieldName, 'denyPrivileges'], []), 0)
 
+                      if (schemaSearchTimerRef.current) {
+                        clearTimeout(schemaSearchTimerRef.current)
+                        schemaSearchTimerRef.current = null
+                      }
                       loadSchemasForCatalog(v)
                       loadPrivilegeGroupsForField(fieldName, currentType, v)
                     }}
@@ -766,6 +789,10 @@ export default function SecurableObjectFormFields({ fieldName, fieldKey, metalak
                       if (val) {
                         debouncedSearchSchemas(localCatalogVal, val)
                       } else if (localCatalogVal) {
+                        if (schemaSearchTimerRef.current) {
+                          clearTimeout(schemaSearchTimerRef.current)
+                          schemaSearchTimerRef.current = null
+                        }
                         loadSchemasForCatalog(localCatalogVal)
                       }
                     }}
