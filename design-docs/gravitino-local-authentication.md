@@ -320,9 +320,8 @@ fresh Gravitino deployment.
    gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
-   When the idp-basic extension package is enabled, `basic` must be listed in
-   `gravitino.authenticators`. It is incompatible with the `simple` authenticator; do not list
-   `simple` together with `basic`.
+   When IdP is enabled, list `basic` in `gravitino.authenticators`. `gravitino.authenticators`
+   must not include `simple` when IdP is enabled.
 
 2. Export the initial service admin password before starting Gravitino:
 
@@ -407,10 +406,10 @@ credentials are otherwise exposed on the wire.
 
 List `basic` in `gravitino.authenticators` and `org.apache.gravitino.idp.web.rest.feature` in
 `gravitino.server.rest.extensionPackages` so Jersey registers `/api/idp/*` management APIs and the
-Web UI can use the built-in IdP login form. When the extension package is enabled, `basic` must be
-listed in `gravitino.authenticators`. Callers must use Basic authentication with a username in
-`gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`. Do not list
-`simple` together with `basic`.
+Web UI can use the built-in IdP login form. When IdP is enabled, list `basic` in
+`gravitino.authenticators`. `gravitino.authenticators` must not include `simple` when IdP is
+enabled. Callers must use Basic authentication with a username in
+`gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`.
 
 ### 8.2 Password Algorithm
 

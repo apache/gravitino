@@ -55,10 +55,8 @@ To enable Basic mode:
 - Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
   the built-in IDP.
 
-Both `basic` and the extension package are required to enable built-in IdP Basic authentication.
-When the extension package is enabled, Gravitino fails to start unless `basic` is listed in
-`gravitino.authenticators`. Built-in IdP Basic authentication is incompatible with `simple`; do not
-list both in `gravitino.authenticators`.
+When IdP is enabled, list `basic` in `gravitino.authenticators`. `gravitino.authenticators` must
+not include `simple` when IdP is enabled.
 - On the first startup, if any configured service admin does not yet have a password, set the
   `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable to the initial password (12 to 64
   characters) before starting Gravitino. The same password is applied to every configured service
@@ -376,9 +374,8 @@ This example shows how to enable built-in Basic authentication.
 
 - Gravitino distribution package (includes the idp-basic plugin on the server classpath)
 
-Built-in IdP is **incompatible** with the `simple` authenticator (the default). When enabling
-built-in IdP Basic authentication, list `basic` in `gravitino.authenticators` and do not include
-`simple`. Both `basic` and the extension package below are required.
+When IdP is enabled, list `basic` in `gravitino.authenticators`. `gravitino.authenticators` must
+not include `simple` when IdP is enabled.
 
 **Configuration:**
 

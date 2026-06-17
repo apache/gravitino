@@ -30,8 +30,8 @@ gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feat
 ```
 
 The Web UI reads `gravitino.authenticators` from `/configs` and uses the first entry as the active
-authentication type. List `basic` first when you want the built-in IdP login form. Built-in IdP is
-**incompatible** with the `simple` authenticator because both use `Authorization: Basic` headers.
+authentication type. List `basic` first when you want the built-in IdP login form. `gravitino.authenticators`
+must not include `simple` when IdP is enabled.
 
 You can combine `basic` with `oauth` (for example `basic,oauth`) when clients need both login
 flows; put the type that should drive the Web UI first.
@@ -49,13 +49,10 @@ Before you call `/api/idp/*`, ensure the following:
    gravitino.authenticators = basic
    ```
 
-   When the idp-basic extension package is enabled, `basic` must be listed in
-   `gravitino.authenticators`. Gravitino fails to start otherwise.
+   When IdP is enabled, list `basic` in `gravitino.authenticators`. Gravitino fails to start
+   otherwise. `gravitino.authenticators` must not include `simple` when IdP is enabled.
 
-2. **Server authenticator** — Built-in IdP is **incompatible** with the `simple` authenticator
-   (the default). Do not list `simple` together with `basic` in `gravitino.authenticators`.
-
-3. **Service admin passwords** — Built-in IDP requires every username in
+2. **Service admin passwords** — Built-in IDP requires every username in
    `gravitino.authorization.serviceAdmins` to have a password stored in `idp_user_meta` before you
    can call management APIs.
 
@@ -341,9 +338,8 @@ Replace these with values that match your deployment.
    gravitino.authorization.serviceAdmins = admin
    ```
 
-   Built-in IdP is **incompatible** with the `simple` authenticator. Do not list `simple` together
-   with `basic`. When the extension package is enabled, `basic` must be listed in
-   `gravitino.authenticators`.
+   When IdP is enabled, list `basic` in `gravitino.authenticators`. `gravitino.authenticators`
+   must not include `simple` when IdP is enabled.
 
 2. Before the first start, set the initial service admin password (see
    [password rules](#password-and-username-rules)):
