@@ -80,11 +80,11 @@ Before you call `/api/idp/*`, ensure the following:
 
 Set service admins in `gravitino.conf` (see also [Prerequisites](#prerequisites)):
 
-| Configuration item                        | Description                                                                         | Example |
-|-------------------------------------------|-------------------------------------------------------------------------------------|---------|
-| `gravitino.authenticators`                | Must include `basic` when the built-in IdP plugin is enabled                        | `basic` |
-| `gravitino.server.rest.extensionPackages` | Registers built-in IdP REST APIs                                                    | `org.apache.gravitino.idp.web.rest.feature` |
-| `gravitino.authorization.serviceAdmins`   | Comma-separated service admin that can call built-in IDP management APIs            | `admin` |
+| Configuration item                        | Description                                                              | Example                                     |
+|-------------------------------------------|--------------------------------------------------------------------------|---------------------------------------------|
+| `gravitino.authenticators`                | Must include `basic` when the built-in IdP plugin is enabled             | `basic`                                     |
+| `gravitino.server.rest.extensionPackages` | Registers built-in IdP REST APIs                                         | `org.apache.gravitino.idp.web.rest.feature` |
+| `gravitino.authorization.serviceAdmins`   | Comma-separated service admin that can call built-in IDP management APIs | `admin`                                     |
 
 Example:
 
