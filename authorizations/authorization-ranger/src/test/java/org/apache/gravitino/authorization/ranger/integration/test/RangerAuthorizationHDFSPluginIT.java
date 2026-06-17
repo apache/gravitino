@@ -53,17 +53,33 @@ public class RangerAuthorizationHDFSPluginIT {
 
   private static RangerAuthorizationPlugin rangerAuthPlugin;
   private static final CatalogDispatcher manager = mock(CatalogDispatcher.class);
+  private static CatalogDispatcher previousCatalogDispatcher;
+  private static CatalogDispatcher previousInternalCatalogDispatcher;
 
   @BeforeAll
   public static void setup() throws Exception {
     RangerITEnv.init(RangerITEnv.currentFunName(), true);
     rangerAuthPlugin = RangerITEnv.rangerAuthHDFSPlugin;
+    previousCatalogDispatcher =
+        (CatalogDispatcher)
+            FieldUtils.readField(GravitinoEnv.getInstance(), "catalogDispatcher", true);
+    previousInternalCatalogDispatcher =
+        (CatalogDispatcher)
+            FieldUtils.readField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", manager, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", manager, true);
     when(manager.listCatalogs(any())).thenReturn(new NameIdentifier[0]);
   }
 
   @AfterAll
-  public static void cleanup() {
+  public static void cleanup() throws IllegalAccessException {
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "catalogDispatcher", previousCatalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalCatalogDispatcher",
+        previousInternalCatalogDispatcher,
+        true);
     RangerITEnv.cleanup();
   }
 
