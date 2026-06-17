@@ -49,10 +49,13 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -147,7 +150,7 @@ public class RelationalEntityStore
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
     cache.put(e);
-    invalidateMetadataObjectRoleRelationCache(e);
+    invalidateAggregatedRoleRelationCache(e);
   }
 
   @Override
@@ -156,7 +159,7 @@ public class RelationalEntityStore
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
     cache.invalidate(ident, entityType);
-    invalidateMetadataObjectRoleRelationCache(updatedEntity);
+    invalidateAggregatedRoleRelationCache(updatedEntity);
     return updatedEntity;
   }
 
@@ -458,34 +461,69 @@ public class RelationalEntityStore
   }
 
   /**
-   * Invalidates the {@link SupportsRelationOperations.Type#METADATA_OBJECT_ROLE_REL} cache entries
-   * keyed by every securable object of the given role.
+   * Invalidates the relation cache entries keyed by the counterpart of a role-aggregating entity
+   * after that entity is written, so that reverse lookups reflect the change immediately.
    *
-   * <p>The relation cache is keyed by the metadata object (catalog/schema/table/...), while a role
-   * mutation (grant/revoke/override/create) is invalidated from the role side. The role-side BFS
-   * invalidation only reaches an object's relation cache entry when the role had previously been
-   * cached as that object's binding role; a role that is newly granted access to an object was
-   * never cached there, so without this explicit invalidation the stale role list is served until
-   * the entry's TTL elapses.
+   * <p>Three entity types aggregate role relations and are mutated through {@code store.update} /
+   * {@code store.put}, which only invalidate the entity itself:
+   *
+   * <ul>
+   *   <li>{@link RoleEntity} via {@code securableObjects} -> {@code METADATA_OBJECT_ROLE_REL},
+   *       invalidated per metadata object (catalog/schema/table/...);
+   *   <li>{@link UserEntity} via {@code roleNames} -> {@code ROLE_USER_REL}, invalidated per role;
+   *   <li>{@link GroupEntity} via {@code roleNames} -> {@code ROLE_GROUP_REL}, invalidated per
+   *       role.
+   * </ul>
+   *
+   * <p>The role-side BFS invalidation ({@code invalidate(roleIdent, ROLE)}) only reaches a
+   * counterpart's relation entry when the entity had previously been cached against it; a freshly
+   * granted binding was never cached there, so without this explicit invalidation the stale
+   * relation result is served until the entry's TTL elapses. Each entry is dropped via {@link
+   * EntityCache#invalidateRelationEntry} (no BFS cascade), preserving other entities' mappings.
    */
-  private void invalidateMetadataObjectRoleRelationCache(Entity entity) {
-    if (!(entity instanceof RoleEntity)) {
+  private void invalidateAggregatedRoleRelationCache(Entity entity) {
+    if (entity instanceof RoleEntity) {
+      RoleEntity roleEntity = (RoleEntity) entity;
+      List<SecurableObject> securableObjects = roleEntity.securableObjects();
+      if (securableObjects == null || securableObjects.isEmpty()) {
+        return;
+      }
+      String metalake = roleEntity.namespace().level(0);
+      for (SecurableObject securableObject : securableObjects) {
+        cache.invalidateRelationEntry(
+            MetadataObjectUtil.toEntityIdent(metalake, securableObject),
+            MetadataObjectUtil.toEntityType(securableObject.type()),
+            SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL);
+      }
+    } else if (entity instanceof UserEntity) {
+      UserEntity userEntity = (UserEntity) entity;
+      invalidateRoleGranteeRelations(
+          userEntity.namespace().level(0),
+          userEntity.roleNames(),
+          SupportsRelationOperations.Type.ROLE_USER_REL);
+    } else if (entity instanceof GroupEntity) {
+      GroupEntity groupEntity = (GroupEntity) entity;
+      invalidateRoleGranteeRelations(
+          groupEntity.namespace().level(0),
+          groupEntity.roleNames(),
+          SupportsRelationOperations.Type.ROLE_GROUP_REL);
+    }
+  }
+
+  /**
+   * Invalidates the {@code ROLE_USER_REL} / {@code ROLE_GROUP_REL} cache entries keyed by each role
+   * the grantee (user/group) is aggregated against.
+   */
+  private void invalidateRoleGranteeRelations(
+      String metalake, List<String> roleNames, SupportsRelationOperations.Type relType) {
+    if (roleNames == null || roleNames.isEmpty()) {
       return;
     }
-    List<SecurableObject> securableObjects = ((RoleEntity) entity).securableObjects();
-    if (securableObjects == null || securableObjects.isEmpty()) {
-      return;
-    }
-    String metalake = ((RoleEntity) entity).namespace().level(0);
-    for (SecurableObject securableObject : securableObjects) {
-      // Drop only the relation result entry for this object, not the shared reverse index. The
-      // reverse index is shared across all roles bound to the object; a full invalidate would
-      // cascade through it and evict the other roles' mappings. The next listRolesByObject
-      // re-queries the backend and rebuilds both the entry and the reverse index.
+    for (String roleName : roleNames) {
       cache.invalidateRelationEntry(
-          MetadataObjectUtil.toEntityIdent(metalake, securableObject),
-          MetadataObjectUtil.toEntityType(securableObject.type()),
-          SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL);
+          NameIdentifier.of(NamespaceUtil.ofRole(metalake), roleName),
+          Entity.EntityType.ROLE,
+          relType);
     }
   }
 }

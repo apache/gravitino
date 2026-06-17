@@ -58,6 +58,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -2122,6 +2123,216 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
             Lists.newArrayList("roleA", "roleB"),
             roleNames,
             "createRole with securable objects must be immediately visible");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  /**
+   * Covers the {@code grantRolesToUser} path: after a role is granted to a user that was never
+   * cached against that role, listEntitiesByRelation(ROLE_USER_REL, roleIdent) must immediately
+   * reflect the new user. Same defect shape as {@link
+   * #testGrantPrivilegeInvalidatesMetadataObjectRoleRelCache}, on user.roleNames instead of
+   * role.securableObjects.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testGrantRolesToUserInvalidatesRoleUserRelCache(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        RoleEntity roleA =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList())
+                .build();
+        store.put(roleA, false);
+
+        UserEntity user1 =
+            UserEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("user1")
+                .withNamespace(AuthorizationUtils.ofUserNamespace("metalake"))
+                .withRoleNames(Lists.newArrayList("roleA"))
+                .withRoleIds(Lists.newArrayList(roleA.id()))
+                .withAuditInfo(auditInfo)
+                .build();
+        store.put(user1, false);
+
+        UserEntity user2 =
+            UserEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("user2")
+                .withNamespace(AuthorizationUtils.ofUserNamespace("metalake"))
+                .withRoleNames(Lists.newArrayList())
+                .withRoleIds(Lists.newArrayList())
+                .withAuditInfo(auditInfo)
+                .build();
+        store.put(user2, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm the cache: roleA -> [user1].
+        List<UserEntity> usersBeforeGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                roleA.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        Assertions.assertEquals(1, usersBeforeGrant.size());
+        Assertions.assertEquals("user1", usersBeforeGrant.get(0).name());
+
+        // Simulate grantRolesToUser(roleA -> user2): store.update(user2, roleNames=[roleA]).
+        store.update(
+            user2.nameIdentifier(),
+            UserEntity.class,
+            Entity.EntityType.USER,
+            existing ->
+                UserEntity.builder()
+                    .withId(existing.id())
+                    .withName(existing.name())
+                    .withNamespace(existing.namespace())
+                    .withRoleNames(Lists.newArrayList("roleA"))
+                    .withRoleIds(Lists.newArrayList(roleA.id()))
+                    .withAuditInfo(auditInfo)
+                    .build());
+
+        // roleA -> users must immediately reflect user2.
+        List<UserEntity> usersAfterGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                roleA.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        List<String> names =
+            usersAfterGrant.stream().map(UserEntity::name).sorted().collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("user1", "user2"),
+            names,
+            "grantRolesToUser must be immediately visible via role->users");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  /**
+   * Covers the {@code grantRolesToGroup} path: after a role is granted to a group that was never
+   * cached against that role, listEntitiesByRelation(ROLE_GROUP_REL, roleIdent) must immediately
+   * reflect the new group.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testGrantRolesToGroupInvalidatesRoleGroupRelCache(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        RoleEntity roleA =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList())
+                .build();
+        store.put(roleA, false);
+
+        GroupEntity group1 =
+            GroupEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("group1")
+                .withNamespace(AuthorizationUtils.ofGroupNamespace("metalake"))
+                .withRoleNames(Lists.newArrayList("roleA"))
+                .withRoleIds(Lists.newArrayList(roleA.id()))
+                .withAuditInfo(auditInfo)
+                .build();
+        store.put(group1, false);
+
+        GroupEntity group2 =
+            GroupEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("group2")
+                .withNamespace(AuthorizationUtils.ofGroupNamespace("metalake"))
+                .withRoleNames(Lists.newArrayList())
+                .withRoleIds(Lists.newArrayList())
+                .withAuditInfo(auditInfo)
+                .build();
+        store.put(group2, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm the cache: roleA -> [group1].
+        List<GroupEntity> groupsBeforeGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                roleA.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        Assertions.assertEquals(1, groupsBeforeGrant.size());
+        Assertions.assertEquals("group1", groupsBeforeGrant.get(0).name());
+
+        // Simulate grantRolesToGroup(roleA -> group2): store.update(group2, roleNames=[roleA]).
+        store.update(
+            group2.nameIdentifier(),
+            GroupEntity.class,
+            Entity.EntityType.GROUP,
+            existing ->
+                GroupEntity.builder()
+                    .withId(existing.id())
+                    .withName(existing.name())
+                    .withNamespace(existing.namespace())
+                    .withRoleNames(Lists.newArrayList("roleA"))
+                    .withRoleIds(Lists.newArrayList(roleA.id()))
+                    .withAuditInfo(auditInfo)
+                    .build());
+
+        // roleA -> groups must immediately reflect group2.
+        List<GroupEntity> groupsAfterGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                roleA.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        List<String> names =
+            groupsAfterGrant.stream().map(GroupEntity::name).sorted().collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("group1", "group2"),
+            names,
+            "grantRolesToGroup must be immediately visible via role->groups");
 
       } finally {
         destroy(type);

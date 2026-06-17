@@ -204,12 +204,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return segmentedLock.withLock(
         key,
         () -> {
-          // Drop only the cached relation result and its index entry. Do NOT cascade through the
-          // reverse index: it is shared across entities (e.g. all roles bound to one metadata
-          // object), and evicting it here would drop other entities' reverse-index mappings. An
-          // explicit cacheData.invalidate does not trigger the expiry listener, so the reverse
-          // index is left intact.
+          // Drop the cached relation result, its index entry, and the reverse-index bookkeeping
+          // for this relation key only. Do NOT cascade through the reverse index to other
+          // entities: the reverse index is shared (e.g. all roles bound to one metadata object),
+          // and a BFS cascade would evict their mappings. cacheData.invalidate is explicit so it
+          // bypasses the removal listener; reverseIndex.remove(key) then cleans up only this
+          // entry's own bookkeeping (entityToReverseIndexMap + reverseIndex references to it).
           cacheData.invalidate(key);
+          reverseIndex.remove(key);
           cacheIndex.remove(key.toString());
           return true;
         });
