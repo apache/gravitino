@@ -30,8 +30,8 @@ gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feat
 ```
 
 The Web UI reads `gravitino.authenticators` from `/configs` and uses the first entry as the active
-authentication type. List `basic` first when you want the built-in IdP login form. `gravitino.authenticators`
-must not include `simple` when IdP is enabled.
+authentication type. List `basic` first when you want the built-in IdP login form. When IdP is
+enabled, do not include `simple` in `gravitino.authenticators`.
 
 ---
 
@@ -46,8 +46,8 @@ Before you call `/api/idp/*`, ensure the following:
    gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
    ```
 
-   When IdP is enabled, list `basic` in `gravitino.authenticators`. Gravitino fails to start
-   otherwise. `gravitino.authenticators` must not include `simple` when IdP is enabled.
+   When IdP is enabled, `gravitino.authenticators` must include `basic`; Gravitino fails to start
+   otherwise. Do not include `simple`.
 
 2. **Service admin passwords** — Built-in IDP requires every username in
    `gravitino.authorization.serviceAdmins` to have a password stored in `idp_user_meta` before you
@@ -335,8 +335,8 @@ Replace these with values that match your deployment.
    gravitino.authorization.serviceAdmins = admin
    ```
 
-   When IdP is enabled, list `basic` in `gravitino.authenticators`. `gravitino.authenticators`
-   must not include `simple` when IdP is enabled.
+   When IdP is enabled, `gravitino.authenticators` must include `basic` and must not include
+   `simple`.
 
 2. Before the first start, set the initial service admin password (see
    [password rules](#password-and-username-rules)):

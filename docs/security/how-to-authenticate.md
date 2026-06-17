@@ -55,8 +55,7 @@ To enable Basic mode:
 - Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
   the built-in IDP.
 
-When IdP is enabled, list `basic` in `gravitino.authenticators`. `gravitino.authenticators` must
-not include `simple` when IdP is enabled.
+When IdP is enabled, `gravitino.authenticators` must include `basic` and must not include `simple`.
 - On the first startup, if any configured service admin does not yet have a password, set the
   `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable to the initial password (12 to 64
   characters) before starting Gravitino. The same password is applied to every configured service
@@ -325,7 +324,7 @@ Gravitino server and Gravitino Iceberg REST server share the same configuration 
 | Configuration item                                  | Description                                                                                                                                                                                                                                                             | Default value                                                       | Required                                                                                        | Since version    |
 |-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|------------------|
 | `gravitino.authenticator`                           | It is deprecated since Gravitino 0.6.0. Please use `gravitino.authenticators` instead.                                                                                                                                                                                  | `simple`                                                            | No                                                                                              | 0.3.0            |
-| `gravitino.authenticators`                          | The authenticators which Gravitino uses, setting as `simple`, `basic`, `oauth` or `kerberos`. Multiple authenticators are separated by commas. If a request is supported by multiple authenticators simultaneously, the first authenticator will be used by default. The Web UI uses the first entry as the active login type. Built-in IdP requires `basic` together with `gravitino.server.rest.extensionPackages` (see [built-in IDP](how-to-use-built-in-idp.md)). | `simple`                                                            | No                                                                                              | 0.6.0-incubating |
+| `gravitino.authenticators`                          | The authenticators which Gravitino uses, setting as `simple`, `basic`, `oauth` or `kerberos`. Multiple authenticators are separated by commas. If a request is supported by multiple authenticators simultaneously, the first authenticator will be used by default. | `simple`                                                            | No                                                                                              | 0.6.0-incubating |
 | `gravitino.authenticator.oauth.serviceAudience`     | The audience name when Gravitino uses OAuth as the authenticator.                                                                                                                                                                                                       | `GravitinoServer`                                                   | No                                                                                              | 0.3.0            |
 | `gravitino.authenticator.oauth.allowSkewSecs`       | The JWT allows skew seconds when Gravitino uses OAuth as the authenticator.                                                                                                                                                                                             | `0`                                                                 | No                                                                                              | 0.3.0            |
 | `gravitino.authenticator.oauth.defaultSignKey`      | The signing key of JWT when Gravitino uses OAuth as the authenticator.                                                                                                                                                                                                  | (none)                                                              | Yes if use `oauth` as the authenticator                                                         | 0.3.0            |
@@ -374,8 +373,7 @@ This example shows how to enable built-in Basic authentication.
 
 - Gravitino distribution package (includes the idp-basic plugin on the server classpath)
 
-When IdP is enabled, list `basic` in `gravitino.authenticators`. `gravitino.authenticators` must
-not include `simple` when IdP is enabled.
+When IdP is enabled, `gravitino.authenticators` must include `basic` and must not include `simple`.
 
 **Configuration:**
 
