@@ -50,7 +50,7 @@ public class TestHiveCatalogCapability {
   }
 
   @Test
-  public void testCaseSensitiveOnNameSyntheticClassAbsent() throws ClassNotFoundException {
+  public void testCaseSensitiveOnNameSyntheticClassAbsent() {
     // The implementation must use if-else rather than switch-on-enum so that the Java compiler
     // does not generate the synthetic HiveCatalogCapability$1 helper class.
     // SchemaNormalizeDispatcher
