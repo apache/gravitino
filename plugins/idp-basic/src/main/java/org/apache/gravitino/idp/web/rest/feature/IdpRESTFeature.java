@@ -83,7 +83,7 @@ public class IdpRESTFeature implements Feature {
    * Validates that the server configuration is compatible with the built-in IdP plugin.
    *
    * <p>Called when the idp-basic extension package is enabled. Requires {@code basic} in {@link
-   * Configs#AUTHENTICATORS} and rejects {@code simple} together with {@code basic}.
+   * Configs#AUTHENTICATORS} and rejects {@code simple}.
    *
    * @param config The server configuration.
    */
@@ -105,7 +105,7 @@ public class IdpRESTFeature implements Feature {
       System.exit(1);
     }
 
-    if (usesSimple && usesBasic) {
+    if (usesSimple) {
       LOG.error(
           "Built-in IdP basic authentication is incompatible with simple authentication because "
               + "both handle Authorization: Basic headers. Remove 'simple' from "
