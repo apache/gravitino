@@ -101,6 +101,10 @@ const AuthProvider = ({ children }) => {
           goToMetalakeListPage()
         }
       } else if (authType === 'oauth') {
+        // Clear any residual simpleAuthUser when authType is oauth
+        sessionStorage.removeItem('simpleAuthUser')
+        sessionStorage.removeItem('simpleAuthToken')
+
         const tokenToUse = await oauthProviderFactory.getAccessToken()
         const user = await oauthProviderFactory.getUserProfile()
 

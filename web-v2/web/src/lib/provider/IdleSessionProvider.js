@@ -83,8 +83,13 @@ export default function IdleSessionProvider({
   const authType = useAppSelector(state => state.auth.authType)
   const authToken = useAppSelector(state => state.auth.authToken)
 
-  // Only enable idle timeout when the user is authenticated and not on login page
-  const isAuthenticated = authType === 'simple' ? !!sessionStorage.getItem('simpleAuthUser') : !!authToken
+  // Only enable idle timeout when the user is authenticated and not on login page.
+  // During bootstrap (authType === null), fall back to persisted token in localStorage
+  // to avoid prematurely treating the user as unauthenticated.
+  const isAuthenticated =
+    authType === 'simple'
+      ? !!sessionStorage.getItem('simpleAuthUser')
+      : !!(authToken || (authType === null && localStorage.getItem('accessToken')))
   const isLoginPage = pathname === '/login'
 
   const [state, setState] = useState('active')
