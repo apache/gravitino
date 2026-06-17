@@ -396,8 +396,8 @@ There are three types of catalog properties:
 :::warning
 Using `gravitino.bypass.` properties to pass credentials, tokens, or access keys can expose
 sensitive values in plaintext, because these properties are not fully managed by Gravitino and may
-be returned in REST API responses. If an underlying system requires credentials to be passed this
-way, restrict access to the related REST APIs.
+be returned in plaintext via REST API responses. If an underlying system requires credentials to be
+passed this way, restrict access to the related REST APIs.
 :::
 
 3. **Other properties**: Gravitino doesn't leverage these properties, just store them. Users
