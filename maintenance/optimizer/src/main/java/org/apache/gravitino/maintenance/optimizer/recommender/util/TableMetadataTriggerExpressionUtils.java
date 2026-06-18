@@ -22,6 +22,7 @@ package org.apache.gravitino.maintenance.optimizer.recommender.util;
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.gravitino.rel.Table;
 
 /**
@@ -65,9 +66,9 @@ public class TableMetadataTriggerExpressionUtils {
           .properties()
           .forEach(
               (k, v) -> {
-                try {
-                  context.put(k, Long.parseLong(v));
-                } catch (NumberFormatException e) {
+                if (NumberUtils.isCreatable(v)) {
+                  context.put(k, NumberUtils.createNumber(v).longValue());
+                } else {
                   // For non-numeric properties, we just put the value as is.
                   context.put(k, v);
                 }

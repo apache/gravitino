@@ -245,7 +245,10 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
       return expressionEvaluator.tryToEvaluateBool(expression, context);
     } catch (RuntimeException e) {
       LOG.warn("Failed to evaluate expression '{}' with context {}", expression, context, e);
-      return Optional.of(false);
+      // Per ExpressionEvaluator#tryToEvaluateBool, a failed evaluation yields an empty Optional so
+      // the caller falls back to per-partition evaluation instead of treating it as "do not
+      // trigger".
+      return Optional.empty();
     }
   }
 
