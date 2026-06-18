@@ -734,7 +734,11 @@ public class HiveCatalogOperations
 
       HiveTable updatedTable =
           buildAlteredHiveTable(
-              currentTable, newTableName, newComment, updatedProperties, updatedColumns,
+              currentTable,
+              newTableName,
+              newComment,
+              updatedProperties,
+              updatedColumns,
               targetDatabaseName);
 
       HiveTable finalUpdatedTable = updatedTable;

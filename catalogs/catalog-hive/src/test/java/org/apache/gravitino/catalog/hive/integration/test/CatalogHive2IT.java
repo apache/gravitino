@@ -1452,11 +1452,7 @@ public class CatalogHive2IT extends BaseIT {
     catalog
         .asTableCatalog()
         .createTable(
-            anotherTableId,
-            columns,
-            TABLE_COMMENT,
-            createProperties(),
-            Transforms.EMPTY_TRANSFORM);
+            anotherTableId, columns, TABLE_COMMENT, createProperties(), Transforms.EMPTY_TRANSFORM);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
     TableChange renameChange = TableChange.rename(anotherTable + "_moved", "non_existent_schema");
