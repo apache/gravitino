@@ -87,7 +87,11 @@ public class IdpRESTApiIT extends BaseIT {
     configs.put(Configs.CACHE_ENABLED.getKey(), String.valueOf(false));
     configs.put(Configs.STORE_DELETE_AFTER_TIME.getKey(), String.valueOf(20 * 60 * 1000L));
     configs.put(Configs.SERVICE_ADMINS.getKey(), ADMIN);
-    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.OAUTH.name().toLowerCase());
+    configs.put(
+        Configs.AUTHENTICATORS.getKey(),
+        AuthenticatorType.BASIC.name().toLowerCase()
+            + ","
+            + AuthenticatorType.OAUTH.name().toLowerCase());
     configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), "service1");
     configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), oauthPublicSignKey());
     configs.put(OAuthConfig.DEFAULT_SERVER_URI.getKey(), "test");

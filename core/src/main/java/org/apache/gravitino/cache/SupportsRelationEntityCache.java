@@ -57,6 +57,26 @@ public interface SupportsRelationEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType);
 
   /**
+   * Invalidates the cached relation result for the given key and cleans up the reverse-index
+   * bookkeeping for that entry, without cascading through the reverse index to other entities.
+   *
+   * <p>Unlike {@link #invalidate(NameIdentifier, Entity.EntityType,
+   * SupportsRelationOperations.Type)}, this does NOT perform a BFS cascade: it leaves other
+   * entities' caches and the reverse-index mappings of the entities referenced by this relation
+   * (e.g. all roles bound to one metadata object) intact. It only drops this relation result and
+   * the reverse-index references that point at this relation key, so the entry is rebuilt on the
+   * next read. Use it when a relation result is known to be stale and a full cascade would
+   * incorrectly evict other entities' state.
+   *
+   * @param ident the name identifier
+   * @param type the entity type
+   * @param relType the relation type
+   * @return true if the cache entry was removed
+   */
+  boolean invalidateRelationEntry(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType);
+
+  /**
    * Checks whether an entity with the given name identifier, type, and relation type is present in
    * the cache.
    *
