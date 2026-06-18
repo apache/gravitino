@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.s3.credential.webidentity.WebIdentityTokenSourceConfig;
@@ -45,10 +46,12 @@ class TestAwsIrsaCredentialGenerator {
 
   private HttpServer server;
   private AtomicReference<String> requestBody;
+  private AtomicInteger requestCount;
 
   @BeforeEach
   void setUp() throws IOException {
     requestBody = new AtomicReference<>();
+    requestCount = new AtomicInteger();
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext("/", this::handleAssumeRoleWithWebIdentity);
     server.start();
@@ -78,6 +81,18 @@ class TestAwsIrsaCredentialGenerator {
     assertFalse(body.contains("Policy="));
   }
 
+  @Test
+  void basicModeReusesCachedStsCredentials(@TempDir Path dir) throws IOException {
+    try (AwsIrsaCredentialGenerator generator = new AwsIrsaCredentialGenerator()) {
+      generator.initialize(createProperties(dir));
+
+      generator.generate(() -> "test-user");
+      generator.generate(() -> "test-user");
+    }
+
+    assertEquals(1, requestCount.get());
+  }
+
   private Map<String, String> createProperties(Path dir) throws IOException {
     Path tokenFile = dir.resolve("token");
     Files.write(tokenFile, "configured-token".getBytes(StandardCharsets.UTF_8));
@@ -93,6 +108,7 @@ class TestAwsIrsaCredentialGenerator {
   }
 
   private void handleAssumeRoleWithWebIdentity(HttpExchange exchange) throws IOException {
+    requestCount.incrementAndGet();
     requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
     byte[] response =
         ("<AssumeRoleWithWebIdentityResponse xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\">"

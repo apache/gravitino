@@ -19,7 +19,9 @@
 package org.apache.gravitino.s3.credential.webidentity;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.ServiceLoader;
 import org.apache.commons.lang3.StringUtils;
@@ -53,6 +55,7 @@ public final class WebIdentityTokenSources {
 
     List<String> available = new ArrayList<>();
     List<WebIdentityTokenSource> matched = new ArrayList<>();
+    Map<String, WebIdentityTokenSource> sourcesByName = new HashMap<>();
     for (WebIdentityTokenSource candidate : candidates) {
       String candidateName = candidate.name();
       if (StringUtils.isBlank(candidateName)) {
@@ -62,6 +65,18 @@ public final class WebIdentityTokenSources {
                 + " must return a non-blank name().");
       }
       available.add(candidateName);
+      String normalizedName = candidateName.toLowerCase(Locale.ROOT);
+      WebIdentityTokenSource existing = sourcesByName.putIfAbsent(normalizedName, candidate);
+      if (existing != null) {
+        throw new IllegalStateException(
+            "Multiple WebIdentity token sources registered with name '"
+                + existing.name()
+                + "': "
+                + existing.getClass().getName()
+                + ", "
+                + candidate.getClass().getName()
+                + ". Each implementation must return a unique name().");
+      }
       if (type.equalsIgnoreCase(candidateName)) {
         matched.add(candidate);
       }

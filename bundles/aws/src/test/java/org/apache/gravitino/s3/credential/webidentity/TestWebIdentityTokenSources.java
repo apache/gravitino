@@ -131,6 +131,25 @@ class TestWebIdentityTokenSources {
   }
 
   @Test
+  void throwsWhenUnselectedSourcesShareTheSameName() {
+    Map<String, String> props = new HashMap<>();
+    props.put(WebIdentityTokenSourceConfig.SOURCE, "selected");
+
+    WebIdentityTokenSource selected = new NamedNoopSource("selected");
+    WebIdentityTokenSource firstDuplicate = new NamedNoopSource("dup");
+    WebIdentityTokenSource secondDuplicate = new NamedNoopSource("dup");
+
+    IllegalStateException error =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                WebIdentityTokenSources.create(
+                    props, Arrays.asList(selected, firstDuplicate, secondDuplicate)));
+    assertTrue(error.getMessage().contains("Multiple WebIdentity token sources"));
+    assertTrue(error.getMessage().contains("dup"));
+  }
+
+  @Test
   void throwsWhenSourceNameIsBlank() {
     IllegalStateException error =
         assertThrows(
