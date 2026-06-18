@@ -98,12 +98,12 @@ IcebergRewriteDataFilesJob (Spark execution)
 
 ### 4.1 Layer Summary
 
-| Layer        | Compaction Components                                                      | Purpose                                            |
-| ------------ | -------------------------------------------------------------------------- | -------------------------------------------------- |
-| **Policy**   | `Policy.BuiltInType.ICEBERG_COMPACTION`, `IcebergDataCompactionContent`    | Define configuration, thresholds, expressions      |
-| **Strategy** | `CompactionStrategyHandler` extends `BaseExpressionStrategyHandler`         | Evaluate trigger conditions, score partitions       |
-| **Adapter**  | `GravitinoCompactionJobAdapter`, `CompactionJobContext`                     | Convert evaluation result to job configuration      |
-| **Job**      | `IcebergRewriteDataFilesJob`, registered in `BuiltInJobTemplateProvider`   | Execute Spark procedure                             |
+| Layer | Compaction Components | Purpose |
+| --- | --- | --- |
+| **Policy** | `Policy.BuiltInType.ICEBERG_COMPACTION`, `IcebergDataCompactionContent` | Define configuration, thresholds, expressions |
+| **Strategy** | `CompactionStrategyHandler` extends `BaseExpressionStrategyHandler` | Evaluate trigger conditions, score partitions |
+| **Adapter** | `GravitinoCompactionJobAdapter`, `CompactionJobContext` | Convert evaluation result to job configuration |
+| **Job** | `IcebergRewriteDataFilesJob`, registered in `BuiltInJobTemplateProvider` | Execute Spark procedure |
 
 ---
 
@@ -216,7 +216,7 @@ public class IcebergOrphanFileRemovalContent implements PolicyContent {
 | Field                 | Type      | Default | Description                                                              |
 | --------------------- | --------- | ------- | ------------------------------------------------------------------------ |
 | `olderThanDays`       | `long`    | 3       | Only remove orphan files older than this many days                        |
-| `location`            | `String`  | null    | Custom location to scan (null = table's default location)                 |
+| `location`            | `String`  | null    | Custom location to scan; when specified, **only** this location is scanned instead of the table's default location. If null, the table's registered storage location is used. |
 | `dryRun`              | `boolean` | false   | Preview-only mode — list orphan files without deleting                    |
 | `cleanupIntervalDays` | `long`    | 7       | Trigger threshold — only run when days since last cleanup exceeds this    |
 
@@ -283,8 +283,20 @@ Therefore:
 
 - `dataRequirements()` only includes `TABLE_METADATA`.
 - No partition scoring / selection logic is needed.
-- The trigger expression evaluates time since last cleanup, not data
-  statistics.
+
+**Trigger modes:** Gravitino supports two trigger mechanisms, and this
+design does not limit users to one:
+
+1. **Event trigger** — The strategy handler evaluates table metadata
+   (e.g., snapshot count changes, write events) and triggers cleanup when
+   conditions are met.
+2. **Time trigger** — The Optimizer's scheduling framework can invoke the
+   strategy handler periodically (e.g., daily or weekly), and the handler
+   decides whether cleanup is needed based on `cleanupIntervalDays` or
+   other heuristics.
+
+Both modes use the same strategy handler; the difference is in how
+often the handler is invoked.
 
 #### 5.3.2 Job Execution Context
 
@@ -399,7 +411,7 @@ CALL catalog.system.remove_orphan_files(
 | ----------- | ----------- | -------- | ------------------------------------------------------------- |
 | `table`     | `string`    | Yes      | Fully qualified table name                                    |
 | `older_than`| `timestamp` | No       | Only remove files older than this timestamp (default: 3 days) |
-| `location`  | `string`    | No       | Custom directory to scan for orphans                          |
+| `location`  | `string`    | No       | Custom directory to scan for orphans (replaces table location when set) |
 | `dry_run`   | `boolean`   | No       | If true, list orphan files without deleting them              |
 
 #### 5.5.3 Output
@@ -488,13 +500,14 @@ should be used with caution.
 
 ## 8. Proposed PR Plan
 
-| PR              | Scope                                                                        | Dependencies |
-| --------------- | ---------------------------------------------------------------------------- | ------------ |
-| **PR 1**        | Job layer: `IcebergRemoveOrphanFilesJob` + `BuiltInJobTemplateProvider` + tests | None         |
-| **PR 2**        | Policy layer: `IcebergOrphanFileRemovalContent` + `Policy.BuiltInType` + tests  | PR 1         |
-| **PR 3**        | Strategy + Adapter: handler, context, adapter, submitter registration + tests   | PR 2         |
+| PR | Scope | Dependencies |
+| --- | --- | --- |
+| **PR 1** | Job layer: `IcebergRemoveOrphanFilesJob` + `BuiltInJobTemplateProvider` + tests | None |
+| **PR 2** | Policy + Strategy + Adapter: all remaining layers + tests | PR 1 |
 
-PRs 2 and 3 can be combined into a single PR if preferred.
+Since the total code size across the policy, strategy, and adapter layers is
+expected to be well under 1000 lines, PRs 2 and 3 from the original plan are
+combined into a single PR.
 
 ---
 
@@ -505,13 +518,16 @@ PRs 2 and 3 can be combined into a single PR if preferred.
    metadata, (c) a separate statistics entry. The compaction flow uses
    partition statistics; for orphan removal we may need a different mechanism
    since it is table-level and time-driven.
-2. **Location parameter** — Should the policy support specifying a custom
-   `location`, or should this only be available for ad-hoc job submissions?
-   Custom locations add flexibility but also risk if misconfigured.
+2. **Location parameter** — When `location` is specified, only that
+   location is scanned (the table's default location is **not** scanned
+   in addition). This follows Iceberg's native `remove_orphan_files`
+   behavior. The policy supports `location` for cases where tables use
+   external storage paths, but for most use cases it should be left null
+   so the table's registered location is used.
 3. **Dry-run result persistence** — Should dry-run results be stored
    somewhere (e.g., job output metadata) for review before actual deletion?
-4. **PR granularity** — Single PR for all remaining layers or split
-   per-layer?
+4. ~~**PR granularity**~~ — Resolved: single PR for policy + strategy +
+   adapter layers since total code is expected to be under 1000 lines.
 5. **`older_than` minimum** — Should we enforce a minimum `olderThanDays`
    value (e.g., ≥ 1 day) at the policy level to prevent accidental deletion
    of in-progress files?
