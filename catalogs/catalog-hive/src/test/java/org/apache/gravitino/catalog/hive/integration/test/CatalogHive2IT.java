@@ -1398,18 +1398,12 @@ public class CatalogHive2IT extends BaseIT {
 
   @Test
   public void testCrossSchemaTableRename() throws TException, InterruptedException {
-    // Create a second schema to serve as the rename destination
+    // Create a second schema to serve as the rename destination.
+    // No explicit location needed; HMS will use the default warehouse directory.
     String targetSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX + "_target");
     Map<String, String> targetSchemaProperties = new HashMap<>();
     targetSchemaProperties.put("key1", "val1");
     targetSchemaProperties.put("key2", "val2");
-    targetSchemaProperties.put(
-        "location",
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            targetSchemaName.toLowerCase()));
     catalog.asSchemas().createSchema(targetSchemaName, "target schema", targetSchemaProperties);
 
     // Create a table in the original schema
@@ -1433,12 +1427,12 @@ public class CatalogHive2IT extends BaseIT {
     NameIdentifier newTableIdentifier = NameIdentifier.of(targetSchemaName, newTableName);
     Table loadedTable = catalog.asTableCatalog().loadTable(newTableIdentifier);
     Assertions.assertNotNull(loadedTable);
-    Assertions.assertEquals(newTableName, loadedTable.name());
+    Assertions.assertEquals(newTableName.toLowerCase(), loadedTable.name());
 
     // Verify the table exists in the new schema directly from Hive Metastore
     HiveTable hiveTable = loadHiveTable(targetSchemaName, newTableName);
     Assertions.assertEquals(targetSchemaName.toLowerCase(), hiveTable.databaseName());
-    Assertions.assertEquals(newTableName, hiveTable.name());
+    Assertions.assertEquals(newTableName.toLowerCase(), hiveTable.name());
 
     // Verify the table no longer exists in the old schema
     Assertions.assertThrows(
