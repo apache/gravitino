@@ -381,6 +381,112 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testListTagsForObjectUnderHierarchicalSchema() {
+    // Hierarchical (multi-level) schema "a:b:c" using the default separator ":". Its ancestor
+    // schemas are "a" and "a:b". A table under it must inherit tags from the schema itself, all
+    // ancestor schemas, and the catalog. The REST operation resolves the separator via
+    // MetadataObjectUtil.getParentMetadataObjects(MetadataObject), which falls back to the default
+    // ":" here because GravitinoEnv config is not booted in this unit test.
+    MetadataObject catalog = MetadataObjects.parse("hcat", MetadataObject.Type.CATALOG);
+    MetadataObject schemaA = MetadataObjects.parse("hcat.a", MetadataObject.Type.SCHEMA);
+    MetadataObject schemaB = MetadataObjects.parse("hcat.a:b", MetadataObject.Type.SCHEMA);
+    MetadataObject schemaC = MetadataObjects.parse("hcat.a:b:c", MetadataObject.Type.SCHEMA);
+    MetadataObject table = MetadataObjects.parse("hcat.a:b:c.tbl", MetadataObject.Type.TABLE);
+
+    when(tagManager.listTagsInfoForMetadataObject(metalake, catalog))
+        .thenReturn(tagInfos("catalogTag"));
+    when(tagManager.listTagsInfoForMetadataObject(metalake, schemaA))
+        .thenReturn(tagInfos("schemaATag"));
+    when(tagManager.listTagsInfoForMetadataObject(metalake, schemaB))
+        .thenReturn(tagInfos("schemaBTag"));
+    when(tagManager.listTagsInfoForMetadataObject(metalake, schemaC))
+        .thenReturn(tagInfos("schemaCTag"));
+    when(tagManager.listTagsInfoForMetadataObject(metalake, table))
+        .thenReturn(tagInfos("tableTag"));
+
+    Response response =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    TagListResponse tagListResponse = response.readEntity(TagListResponse.class);
+    Assertions.assertEquals(0, tagListResponse.getCode());
+    Assertions.assertEquals(5, tagListResponse.getTags().length);
+
+    Map<String, Tag> resultTags =
+        Arrays.stream(tagListResponse.getTags())
+            .collect(Collectors.toMap(Tag::name, Function.identity()));
+
+    Assertions.assertFalse(resultTags.get("tableTag").inherited().get());
+    Assertions.assertTrue(resultTags.get("schemaCTag").inherited().get());
+    Assertions.assertTrue(resultTags.get("schemaBTag").inherited().get());
+    Assertions.assertTrue(resultTags.get("schemaATag").inherited().get());
+    Assertions.assertTrue(resultTags.get("catalogTag").inherited().get());
+  }
+
+  private Tag[] tagInfos(String name) {
+    return new Tag[] {
+      TagEntity.builder().withName(name).withId(1L).withAuditInfo(testAuditInfo1).build()
+    };
+  }
+
+  @Test
+  public void testGetTagForObjectUnderHierarchicalSchema() {
+    // Hierarchical (multi-level) schema "a:b:c" using the default separator ":". The REST operation
+    // resolves the separator via MetadataObjectUtil.getParentMetadataObjects(MetadataObject), which
+    // falls back to the default ":" here because GravitinoEnv config is not booted in this unit
+    // test.
+    MetadataObject schemaA = MetadataObjects.parse("hcat.a", MetadataObject.Type.SCHEMA);
+    MetadataObject schemaB = MetadataObjects.parse("hcat.a:b", MetadataObject.Type.SCHEMA);
+    MetadataObject table = MetadataObjects.parse("hcat.a:b:c.tbl", MetadataObject.Type.TABLE);
+
+    TagEntity schemaATag =
+        TagEntity.builder().withName("schemaATag").withId(1L).withAuditInfo(testAuditInfo1).build();
+    TagEntity schemaBTag =
+        TagEntity.builder().withName("schemaBTag").withId(2L).withAuditInfo(testAuditInfo1).build();
+    when(tagManager.getTagForMetadataObject(metalake, schemaA, "schemaATag"))
+        .thenReturn(schemaATag);
+    when(tagManager.getTagForMetadataObject(metalake, schemaB, "schemaBTag"))
+        .thenReturn(schemaBTag);
+
+    // A tag on the intermediate schema "a:b" is inherited by a table under "a:b:c".
+    Response responseB =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("tags")
+            .path("schemaBTag")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), responseB.getStatus());
+    Tag respTagB = responseB.readEntity(TagResponse.class).getTag();
+    Assertions.assertEquals("schemaBTag", respTagB.name());
+    Assertions.assertTrue(respTagB.inherited().get());
+
+    // A tag on the ancestor schema "a" is also inherited by a table under "a:b:c".
+    Response responseA =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("tags")
+            .path("schemaATag")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), responseA.getStatus());
+    Tag respTagA = responseA.readEntity(TagResponse.class).getTag();
+    Assertions.assertEquals("schemaATag", respTagA.name());
+    Assertions.assertTrue(respTagA.inherited().get());
+  }
+
+  @Test
   public void testGetTagForObject() {
     TagEntity tag1 =
         TagEntity.builder().withName("tag1").withId(1L).withAuditInfo(testAuditInfo1).build();

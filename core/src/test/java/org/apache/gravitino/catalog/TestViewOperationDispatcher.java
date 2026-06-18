@@ -73,7 +73,9 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    viewOperationDispatcher = new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
+    viewOperationDispatcher =
+        new ViewOperationDispatcher(
+            catalogManager, entityStore, idGenerator, () -> schemaOperationDispatcher);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -81,7 +83,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
   }
 
   public static ViewOperationDispatcher getViewOperationDispatcher() {

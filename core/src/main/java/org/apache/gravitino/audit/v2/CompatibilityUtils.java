@@ -181,6 +181,7 @@ public class CompatibilityUtils {
           .put(OperationType.DROP_FUNCTION, Operation.DROP_FUNCTION)
           .put(OperationType.LIST_FUNCTION, Operation.LIST_FUNCTION)
           .put(OperationType.LIST_FUNCTION_INFOS, Operation.LIST_FUNCTION_INFOS)
+          .put(OperationType.AUTHORIZATION_DENIAL, Operation.AUTHORIZATION_DENIAL)
           .put(OperationType.UNKNOWN, Operation.UNKNOWN_OPERATION)
           .build();
 

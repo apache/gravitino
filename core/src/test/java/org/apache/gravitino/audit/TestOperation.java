@@ -75,6 +75,7 @@ import org.apache.gravitino.listener.api.event.EnableCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
 import org.apache.gravitino.listener.api.event.EnableMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationFailureEvent;
 import org.apache.gravitino.listener.api.event.GetPartitionEvent;
@@ -107,6 +108,8 @@ import org.apache.gravitino.listener.api.event.PartitionExistsEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
 import org.apache.gravitino.listener.api.event.view.CreateViewEvent;
@@ -586,6 +589,66 @@ public class TestOperation {
     Assertions.assertEquals(
         AuditLog.Operation.DISABLE_CATALOG,
         AuditLog.Operation.fromEvent(disableCatalogFailureEvent));
+  }
+
+  @Test
+  public void testAuthorizationDenialOperation() {
+    Event authzDenialEvent =
+        new AuthorizationDenialFailureEvent(
+            USER, catalogIdentifier, "listCatalogs", "CATALOG:LIST");
+    Assertions.assertEquals(
+        AuditLog.Operation.AUTHORIZATION_DENIAL, AuditLog.Operation.fromEvent(authzDenialEvent));
+
+    // null identifier variant (denial before resource resolution)
+    Event authzDenialNullIdentifier =
+        new AuthorizationDenialFailureEvent(USER, null, "loadTable", "TABLE:LOAD");
+    Assertions.assertEquals(
+        AuditLog.Operation.AUTHORIZATION_DENIAL,
+        AuditLog.Operation.fromEvent(authzDenialNullIdentifier));
+  }
+
+  @Test
+  public void testHttpRequestFailureEventMapsToUnknownOperation() {
+    // HttpRequestFailureEvent has no specific business operation — it always maps to UNKNOWN
+    Event httpFailureEvent =
+        new HttpRequestFailureEvent(
+            USER, "1.2.3.4", "GET", "/api/metalakes", 401, EventSource.GRAVITINO_SERVER);
+    Assertions.assertEquals(
+        AuditLog.Operation.UNKNOWN_OPERATION, AuditLog.Operation.fromEvent(httpFailureEvent));
+
+    // Verify the same holds for other status codes (400, 403, 404, 500)
+    for (int status : new int[] {400, 403, 404, 500}) {
+      Event e =
+          new HttpRequestFailureEvent(
+              USER, "1.2.3.4", "POST", "/api/metalakes", status, EventSource.GRAVITINO_SERVER);
+      Assertions.assertEquals(
+          AuditLog.Operation.UNKNOWN_OPERATION,
+          AuditLog.Operation.fromEvent(e),
+          "HttpRequestFailureEvent with status " + status + " must map to UNKNOWN_OPERATION");
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testSimpleFormatterHandlesServerEvents() {
+    // Smoke-test the v1 SimpleFormatter with the two new server-event types to confirm it
+    // does not NPE on their identifier/customInfo and maps to the correct Operation values.
+    SimpleFormatter formatter = new SimpleFormatter();
+
+    HttpRequestFailureEvent httpEvent =
+        new HttpRequestFailureEvent(
+            USER, "1.2.3.4", "GET", "/api/metalakes", 401, EventSource.GRAVITINO_SERVER);
+    SimpleAuditLog httpLog = formatter.format(httpEvent);
+    Assertions.assertEquals(AuditLog.Operation.UNKNOWN_OPERATION, httpLog.operation());
+    Assertions.assertEquals(AuditLog.Status.FAILURE, httpLog.status());
+    Assertions.assertNull(httpLog.identifier());
+
+    AuthorizationDenialFailureEvent authzEvent =
+        new AuthorizationDenialFailureEvent(USER, catalogIdentifier, "loadTable", "TABLE:LOAD");
+    SimpleAuditLog authzLog = formatter.format(authzEvent);
+    Assertions.assertEquals(AuditLog.Operation.AUTHORIZATION_DENIAL, authzLog.operation());
+    Assertions.assertEquals(AuditLog.Status.FAILURE, authzLog.status());
+    Assertions.assertEquals(catalogIdentifier.toString(), authzLog.identifier());
   }
 
   @Test

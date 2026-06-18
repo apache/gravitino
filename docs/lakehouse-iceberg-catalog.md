@@ -21,6 +21,15 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 Builds with Apache Iceberg `1.11.0`. The Apache Iceberg table format version is `2` by default.
 :::
 
+Flink and Spark clients may use a different Iceberg version than the server.
+
+- [Flink Iceberg catalog](flink-connector/flink-catalog-iceberg.md) — client JAR requirements
+- [Spark Iceberg catalog](spark-connector/spark-catalog-iceberg.md) — client JAR requirements
+
+:::caution
+Mixing Iceberg JARs from different versions on the client classpath is not compatible and may cause runtime errors.
+:::
+
 ## Catalog
 
 ### Catalog Capabilities
@@ -152,6 +161,7 @@ Gravitino Iceberg REST service supports using static access-key-id and secret-ac
 | `oss-endpoint`          | The endpoint of Aliyun OSS service.                                                                                             | (none)                                  | No       | 0.7.0-incubating |
 
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
+See [Catalog Properties Configuration](./gravitino-server-config.md#catalog-properties-configuration) for credential leakage risks when passing credentials or security tokens through `gravitino.bypass.` properties.
 
 :::info
 Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Gravitino Iceberg Aliyun bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
@@ -210,6 +220,7 @@ For other storages that are not managed by Gravitino directly, you can manage th
 | `io-impl`          | The IO implementation for `FileIO` in Iceberg. Use the fully qualified class name to override the default implementation. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
 
 To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
+See [Catalog Properties Configuration](./gravitino-server-config.md#catalog-properties-configuration) for credential leakage risks when passing credentials or security tokens through `gravitino.bypass.` properties.
 
 :::info
 Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the `catalogs/lakehouse-iceberg/libs/` directory.
@@ -244,6 +255,10 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 ### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+
+:::note
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+:::
 
 ## Schema
 
@@ -485,9 +500,15 @@ If you update a nullability column to non nullability, there may be compatibilit
 
 ### View Capabilities
 
-- Supports list, create, load, alter, and drop for views managed by the underlying Iceberg REST, JDBC, or Hive backend.
-- Supports dialects such as `trino`, `spark`, and `hive`.
-- Can preserve multiple SQL representations for the same logical view.
+- Supports list, create, load, alter, and drop for views managed by the underlying Iceberg backend.
+- Accepts any dialect name (e.g. `trino`, `spark`, `flink`, `hive`). No restriction on which dialects are used.
+- Can preserve multiple SQL representations for the same logical view; the full set of representations round-trips through Gravitino.
+- `defaultCatalog` and `defaultSchema` are stored and returned as-is by the backend.
+- View support depends on the Iceberg catalog backend: REST and Hive backends generally support views; JDBC backend support is in continuous validation.
+
+:::note
+Rename cannot be combined with other changes in a single `alterView` call. Submit rename as a standalone request.
+:::
 
 ### View Operations
 
