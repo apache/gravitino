@@ -20,9 +20,6 @@ package org.apache.gravitino.s3.credential;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -30,15 +27,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialGenerator;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.credential.config.S3CredentialConfig;
-import software.amazon.awssdk.auth.credentials.AwsCredentials;
-import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
-import software.amazon.awssdk.auth.credentials.WebIdentityTokenFileCredentialsProvider;
+import org.apache.gravitino.s3.credential.webidentity.WebIdentityTokenSource;
+import org.apache.gravitino.s3.credential.webidentity.WebIdentityTokenSources;
 import software.amazon.awssdk.policybuilder.iam.IamConditionOperator;
 import software.amazon.awssdk.policybuilder.iam.IamEffect;
 import software.amazon.awssdk.policybuilder.iam.IamPolicy;
@@ -54,7 +51,7 @@ import software.amazon.awssdk.services.sts.model.Credentials;
 /** Generate AWS IRSA credentials according to the read and write paths. */
 public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCredential> {
 
-  private WebIdentityTokenFileCredentialsProvider baseCredentialsProvider;
+  private WebIdentityTokenSource tokenSource;
   private String roleArn;
   private int tokenExpireSecs;
   private String region;
@@ -63,8 +60,7 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
 
   @Override
   public void initialize(Map<String, String> properties) {
-    // Use WebIdentityTokenFileCredentialsProvider for base IRSA configuration
-    this.baseCredentialsProvider = WebIdentityTokenFileCredentialsProvider.create();
+    this.tokenSource = WebIdentityTokenSources.create(properties);
 
     S3CredentialConfig s3CredentialConfig = new S3CredentialConfig(properties);
     this.roleArn = s3CredentialConfig.s3RoleArn();
@@ -77,27 +73,7 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
   @Override
   public AwsIrsaCredential generate(CredentialContext context) {
     if (!(context instanceof PathBasedCredentialContext)) {
-      // Fallback to original behavior for non-path-based contexts
-      AwsCredentials creds = baseCredentialsProvider.resolveCredentials();
-      if (creds instanceof AwsSessionCredentials) {
-        AwsSessionCredentials sessionCreds = (AwsSessionCredentials) creds;
-        if (!sessionCreds.expirationTime().isPresent()) {
-          throw new IllegalStateException(
-              "AWS IRSA session credentials must include an expiration time for vended credential"
-                  + " refresh");
-        }
-        long expiration = sessionCreds.expirationTime().get().toEpochMilli();
-        return new AwsIrsaCredential(
-            sessionCreds.accessKeyId(),
-            sessionCreds.secretAccessKey(),
-            sessionCreds.sessionToken(),
-            expiration);
-      } else {
-        throw new IllegalStateException(
-            "AWS IRSA credentials must be of type AwsSessionCredentials. "
-                + "Check your EKS/IRSA configuration. Got: "
-                + creds.getClass().getName());
-      }
+      return toAwsIrsaCredential(createCredentials(context.getUserName(), null));
     }
 
     PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
@@ -107,11 +83,7 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
             pathBasedCredentialContext.getReadPaths(),
             pathBasedCredentialContext.getWritePaths(),
             pathBasedCredentialContext.getUserName());
-    return new AwsIrsaCredential(
-        s3Token.accessKeyId(),
-        s3Token.secretAccessKey(),
-        s3Token.sessionToken(),
-        s3Token.expiration().toEpochMilli());
+    return toAwsIrsaCredential(s3Token);
   }
 
   private Credentials createCredentialsWithSessionPolicy(
@@ -119,22 +91,26 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
     validateInputParameters(readLocations, writeLocations, userName);
 
     IamPolicy sessionPolicy = createSessionPolicy(readLocations, writeLocations, region);
-    String webIdentityTokenFile = getValidatedWebIdentityTokenFile();
+    return createCredentials(userName, sessionPolicy);
+  }
+
+  private Credentials createCredentials(String userName, @Nullable IamPolicy sessionPolicy) {
     String effectiveRoleArn = getValidatedRoleArn(roleArn);
-
     try {
-      String tokenContent =
-          new String(Files.readAllBytes(Paths.get(webIdentityTokenFile)), StandardCharsets.UTF_8);
-      if (StringUtils.isBlank(tokenContent)) {
-        throw new IllegalStateException(
-            "Web identity token file is empty: " + webIdentityTokenFile);
-      }
-
-      return assumeRoleWithSessionPolicy(effectiveRoleArn, userName, tokenContent, sessionPolicy);
+      String tokenContent = tokenSource.getToken();
+      return assumeRoleWithWebIdentity(effectiveRoleArn, userName, tokenContent, sessionPolicy);
     } catch (Exception e) {
       throw new RuntimeException(
-          "Failed to create credentials with session policy for user: " + userName, e);
+          "Failed to create WebIdentity credentials for user: " + userName, e);
     }
+  }
+
+  private AwsIrsaCredential toAwsIrsaCredential(Credentials credentials) {
+    return new AwsIrsaCredential(
+        credentials.accessKeyId(),
+        credentials.secretAccessKey(),
+        credentials.sessionToken(),
+        credentials.expiration().toEpochMilli());
   }
 
   private IamPolicy createSessionPolicy(
@@ -309,20 +285,6 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
     }
   }
 
-  private String getValidatedWebIdentityTokenFile() {
-    String webIdentityTokenFile = System.getenv("AWS_WEB_IDENTITY_TOKEN_FILE");
-    if (StringUtils.isBlank(webIdentityTokenFile)) {
-      throw new IllegalStateException(
-          "AWS_WEB_IDENTITY_TOKEN_FILE environment variable is not set. "
-              + "Ensure IRSA is properly configured in your EKS cluster.");
-    }
-    if (!Files.exists(Paths.get(webIdentityTokenFile))) {
-      throw new IllegalStateException(
-          "Web identity token file does not exist: " + webIdentityTokenFile);
-    }
-    return webIdentityTokenFile;
-  }
-
   private String getValidatedRoleArn(String configRoleArn) {
     String effectiveRoleArn =
         StringUtils.isNotBlank(configRoleArn) ? configRoleArn : System.getenv("AWS_ROLE_ARN");
@@ -336,8 +298,8 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
     return effectiveRoleArn;
   }
 
-  private Credentials assumeRoleWithSessionPolicy(
-      String roleArn, String userName, String webIdentityToken, IamPolicy sessionPolicy) {
+  private Credentials assumeRoleWithWebIdentity(
+      String roleArn, String userName, String webIdentityToken, @Nullable IamPolicy sessionPolicy) {
     StsClientBuilder stsBuilder = StsClient.builder();
     if (StringUtils.isNotBlank(region)) {
       stsBuilder.region(Region.of(region));
@@ -347,20 +309,26 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
     }
 
     try (StsClient stsClient = stsBuilder.build()) {
-      AssumeRoleWithWebIdentityRequest request =
+      AssumeRoleWithWebIdentityRequest.Builder requestBuilder =
           AssumeRoleWithWebIdentityRequest.builder()
               .roleArn(roleArn)
               .roleSessionName("gravitino_irsa_session_" + userName)
               .durationSeconds(tokenExpireSecs)
-              .webIdentityToken(webIdentityToken)
-              .policy(sessionPolicy.toJson())
-              .build();
+              .webIdentityToken(webIdentityToken);
+      if (sessionPolicy != null) {
+        requestBuilder.policy(sessionPolicy.toJson());
+      }
 
-      AssumeRoleWithWebIdentityResponse response = stsClient.assumeRoleWithWebIdentity(request);
+      AssumeRoleWithWebIdentityResponse response =
+          stsClient.assumeRoleWithWebIdentity(requestBuilder.build());
       return response.credentials();
     }
   }
 
   @Override
-  public void close() throws IOException {}
+  public void close() throws IOException {
+    if (tokenSource != null) {
+      tokenSource.close();
+    }
+  }
 }
