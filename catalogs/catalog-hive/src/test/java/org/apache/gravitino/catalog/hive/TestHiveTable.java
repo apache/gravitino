@@ -65,12 +65,15 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
   protected static final String HIVE_CATALOG_NAME = "test_catalog";
   protected static final String HIVE_SCHEMA_NAME = "test_schema";
+  protected static final String HIVE_SCHEMA_NAME_NEW = HIVE_SCHEMA_NAME + "_new";
   protected static final String HIVE_COMMENT = "test_comment";
   private static HiveCatalog hiveCatalog;
   private static HiveCatalogOperations hiveCatalogOperations;
   private static HiveSchema hiveSchema;
   private static final NameIdentifier schemaIdent =
       NameIdentifier.of(META_LAKE_NAME, HIVE_CATALOG_NAME, HIVE_SCHEMA_NAME);
+  private static final NameIdentifier newSchemaIdent =
+      NameIdentifier.of(META_LAKE_NAME, HIVE_CATALOG_NAME, HIVE_SCHEMA_NAME_NEW);
 
   @BeforeAll
   public static void setup() {
@@ -81,6 +84,7 @@ public class TestHiveTable extends MiniHiveMetastoreService {
 
   @AfterEach
   public void resetSchema() {
+    hiveCatalogOperations.dropSchema(newSchemaIdent, true);
     hiveCatalogOperations.dropSchema(schemaIdent, true);
     hiveSchema = initHiveSchema();
   }
@@ -574,6 +578,48 @@ public class TestHiveTable extends MiniHiveMetastoreService {
     Assertions.assertNull(alteredTable1.auditInfo().lastModifiedTime());
     Assertions.assertNotNull(alteredTable.partitioning());
     Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
+  }
+
+  @Test
+  public void testCrossSchemaRename() {
+    // Create a second schema to serve as the destination for the cross-schema rename
+    hiveCatalogOperations.createSchema(newSchemaIdent, HIVE_COMMENT, Maps.newHashMap());
+
+    // Create a table in the original schema
+    String originalTableName = genRandomName();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), hiveSchema.name(), originalTableName);
+    HiveColumn col1 =
+        HiveColumn.builder()
+            .withName("col_1")
+            .withType(Types.ByteType.get())
+            .withComment(HIVE_COMMENT)
+            .build();
+    hiveCatalogOperations.createTable(
+        tableIdentifier,
+        new Column[] {col1},
+        HIVE_COMMENT,
+        Maps.newHashMap(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    // Alter the table to rename it and explicitly move it to the new schema
+    String newTableName = originalTableName + "_new";
+    hiveCatalogOperations.alterTable(
+        tableIdentifier, TableChange.rename(newTableName, HIVE_SCHEMA_NAME_NEW));
+
+    // Verify the table is successfully loadable from the new schema
+    NameIdentifier newTableIdentifier =
+        NameIdentifier.of(META_LAKE_NAME, hiveCatalog.name(), HIVE_SCHEMA_NAME_NEW, newTableName);
+
+    Assertions.assertTrue(hiveCatalogOperations.tableExists(newTableIdentifier));
+
+    // Verify the table is fully absent from the old schema
+    Assertions.assertFalse(hiveCatalogOperations.tableExists(tableIdentifier));
+    Assertions.assertFalse(
+        hiveCatalogOperations.tableExists(
+            NameIdentifier.of(tableIdentifier.namespace(), newTableName)));
   }
 
   @Test
