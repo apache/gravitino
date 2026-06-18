@@ -50,6 +50,15 @@ public class TestHiveCatalogCapability {
   }
 
   @Test
+  public void testCaseSensitiveOnNameNullScopeThrows() {
+    // Preconditions.checkArgument preserves fail-fast semantics for null scope.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> capability.caseSensitiveOnName(null),
+        "caseSensitiveOnName must reject null scope");
+  }
+
+  @Test
   public void testCaseSensitiveOnNameSyntheticClassAbsent() {
     // The implementation must use if-else rather than switch-on-enum so that the Java compiler
     // does not generate the synthetic HiveCatalogCapability$1 helper class.
