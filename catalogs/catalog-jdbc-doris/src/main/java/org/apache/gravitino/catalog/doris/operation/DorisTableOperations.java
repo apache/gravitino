@@ -798,7 +798,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     String upperTypeName = typeName.toUpperCase();
 
     // Check driver version compatibility first
-    boolean isDatetimeType = "DATETIME".equals(upperTypeName);
+    boolean isDatetimeType =
+        "DATETIME".equals(upperTypeName) || upperTypeName.startsWith("DATETIME(");
 
     if (isDatetimeType) {
       String driverVersion = getMySQLDriverVersion();
@@ -809,6 +810,17 @@ public class DorisTableOperations extends JdbcTableOperations {
             driverVersion,
             upperTypeName,
             driverVersion);
+        return null;
+      }
+    }
+
+    // Handle datetime(N) format from SHOW CREATE TABLE
+    if (upperTypeName.startsWith("DATETIME(") && upperTypeName.endsWith(")")) {
+      try {
+        String precisionStr = upperTypeName.substring(9, upperTypeName.length() - 1);
+        return Integer.parseInt(precisionStr);
+      } catch (NumberFormatException e) {
+        LOG.warn("Failed to parse datetime precision from type: {}", typeName);
         return null;
       }
     }
