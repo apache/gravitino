@@ -31,8 +31,13 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.sun.net.httpserver.HttpServer;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
@@ -70,6 +75,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.awaitility.Awaitility;
@@ -901,6 +907,20 @@ public class TestJobManager {
         .build();
   }
 
+  private HttpServer createLoopbackHttpServer(String response) throws IOException {
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/artifact.jar",
+        exchange -> {
+          byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream outputStream = exchange.getResponseBody()) {
+            outputStream.write(bytes);
+          }
+        });
+    return server;
+  }
+
   @Test
   public void testFetchFileFromUriWithMissingLocalFileShouldFail() throws IOException {
     File stagingDir = new File(testStagingDir);
@@ -912,6 +932,71 @@ public class TestJobManager {
 
     Assertions.assertThrows(
         RuntimeException.class, () -> JobManager.fetchFileFromUri(uri, stagingDir, 1000));
+  }
+
+  @Test
+  public void testFetchFileFromUriSsrfBlocked() {
+    File stagingDir = new File(testStagingDir);
+    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
+    FileFetcher.get().initialize(true);
+
+    // Loopback address
+    RuntimeException e1 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> JobManager.fetchFileFromUri("http://127.0.0.1:8090/configs", stagingDir, 1000));
+    assertRemoteUriBlockedMessage(e1);
+
+    // AWS / GCP / Azure cloud-metadata endpoint (link-local 169.254.x.x)
+    RuntimeException e2 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                JobManager.fetchFileFromUri(
+                    "http://169.254.169.254/latest/meta-data/", stagingDir, 1000));
+    assertRemoteUriBlockedMessage(e2);
+
+    // RFC-1918 private range
+    RuntimeException e3 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> JobManager.fetchFileFromUri("http://192.168.1.1/", stagingDir, 1000));
+    assertRemoteUriBlockedMessage(e3);
+
+    // Alibaba Cloud / Oracle Cloud metadata endpoint
+    RuntimeException e4 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> JobManager.fetchFileFromUri("http://100.100.100.200/", stagingDir, 1000));
+    assertRemoteUriBlockedMessage(e4);
+  }
+
+  @Test
+  public void testFetchFileFromUriShouldAllowLocalhostWhenBlockingDisabled() throws Exception {
+    File stagingDir = new File(testStagingDir);
+    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
+    HttpServer server = createLoopbackHttpServer("job artifact");
+
+    try {
+      server.start();
+      int port = server.getAddress().getPort();
+      FileFetcher.get().initialize(false);
+
+      String fetchedFile =
+          JobManager.fetchFileFromUri(
+              String.format("http://127.0.0.1:%d/artifact.jar", port), stagingDir, 1000);
+
+      Assertions.assertEquals("job artifact", Files.readString(Path.of(fetchedFile)));
+    } finally {
+      FileFetcher.get().initialize(true);
+      server.stop(0);
+    }
+  }
+
+  private static void assertRemoteUriBlockedMessage(RuntimeException exception) {
+    Assertions.assertTrue(exception.getCause().getMessage().contains("Gravitino server side"));
+    Assertions.assertTrue(
+        exception.getCause().getMessage().contains(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG));
   }
 
   @Test

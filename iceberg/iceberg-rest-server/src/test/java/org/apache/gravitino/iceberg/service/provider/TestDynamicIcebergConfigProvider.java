@@ -62,7 +62,7 @@ public class TestDynamicIcebergConfigProvider {
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     // Clean up GravitinoEnv and IcebergRESTServerContext state after each test
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", null, true);
     resetServerContext();
   }
 
@@ -247,6 +247,9 @@ public class TestDynamicIcebergConfigProvider {
     catalogProperties.put("catalog.backend-name", "custom_backend");
     catalogProperties.put("gravitino.bypass.custom-k1", "custom-v1");
     catalogProperties.put("custom-k2", "custom-v2");
+    catalogProperties.put(
+        IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS, "1234");
+    catalogProperties.put(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS, "5678");
 
     IcebergConfig icebergConfig =
         DynamicIcebergConfigProvider.getIcebergConfigFromCatalogProperties(catalogProperties);
@@ -255,6 +258,20 @@ public class TestDynamicIcebergConfigProvider {
     Assertions.assertTrue(icebergConfig.getIcebergCatalogProperties().containsKey("custom-k2"));
     Assertions.assertEquals(
         icebergConfig.getIcebergCatalogProperties().get("catalog.backend-name"), "custom_backend");
+    Assertions.assertEquals(
+        1234, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        5678, icebergConfig.get(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "1234",
+        icebergConfig
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "5678",
+        icebergConfig
+            .getIcebergCatalogProperties()
+            .get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
   }
 
   @Test
@@ -265,12 +282,13 @@ public class TestDynamicIcebergConfigProvider {
     // Enable authorization to use internal fetcher
     createMockServerContext(true);
 
-    // Mock CatalogDispatcher
+    // Mock CatalogDispatchers
     CatalogDispatcher mockCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    CatalogDispatcher mockInternalCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
     Catalog mockCatalog = Mockito.mock(Catalog.class);
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-    Mockito.when(mockCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
+    Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
     Mockito.when(mockCatalog.properties())
         .thenReturn(
@@ -281,9 +299,14 @@ public class TestDynamicIcebergConfigProvider {
               }
             });
 
-    // Set the mock CatalogDispatcher to GravitinoEnv
+    // Set the mock CatalogDispatchers to GravitinoEnv
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "catalogDispatcher", mockCatalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalCatalogDispatcher",
+        mockInternalCatalogDispatcher,
+        true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();
@@ -292,11 +315,12 @@ public class TestDynamicIcebergConfigProvider {
     DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
     provider.initialize(properties);
 
-    // Test that internal interface is used (CatalogDispatcher should be called)
+    // Test that internal interface is used (internal CatalogDispatcher should be called)
     Optional<IcebergConfig> icebergConfig = provider.getIcebergCatalogConfig(catalogName);
 
     Assertions.assertTrue(icebergConfig.isPresent());
-    Mockito.verify(mockCatalogDispatcher).loadCatalog(catalogIdent);
+    Mockito.verify(mockInternalCatalogDispatcher).loadCatalog(catalogIdent);
+    Mockito.verify(mockCatalogDispatcher, Mockito.never()).loadCatalog(catalogIdent);
   }
 
   @Test
@@ -345,8 +369,8 @@ public class TestDynamicIcebergConfigProvider {
     // Enable authorization to use internal fetcher
     createMockServerContext(true);
 
-    // Ensure CatalogDispatcher is null (simulating GravitinoEnv not initialized)
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", null, true);
+    // Ensure internal CatalogDispatcher is null (simulating GravitinoEnv not initialized)
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", null, true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();
@@ -355,9 +379,13 @@ public class TestDynamicIcebergConfigProvider {
     DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
     provider.initialize(properties);
 
-    // Test that IllegalStateException is thrown when CatalogDispatcher is null
-    Assertions.assertThrows(
-        IllegalStateException.class, () -> provider.getIcebergCatalogConfig(catalogName));
+    IllegalStateException exception =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> provider.getIcebergCatalogConfig(catalogName));
+    Assertions.assertEquals(
+        "Internal CatalogDispatcher is not available. "
+            + "Internal catalog fetcher requires running within Gravitino server.",
+        exception.getMessage());
   }
 
   @Test
@@ -368,16 +396,22 @@ public class TestDynamicIcebergConfigProvider {
     // Enable authorization to use internal fetcher
     createMockServerContext(true);
 
-    // Mock CatalogDispatcher to throw NoSuchCatalogException
+    // Mock internal CatalogDispatcher to throw NoSuchCatalogException
     CatalogDispatcher mockCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    CatalogDispatcher mockInternalCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
     NameIdentifier catalogIdent =
         NameIdentifierUtil.ofCatalog(metalakeName, nonExistentCatalogName);
-    Mockito.when(mockCatalogDispatcher.loadCatalog(catalogIdent))
+    Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent))
         .thenThrow(new NoSuchCatalogException("Catalog not found: %s", nonExistentCatalogName));
 
-    // Set the mock CatalogDispatcher to GravitinoEnv
+    // Set the mock CatalogDispatchers to GravitinoEnv
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "catalogDispatcher", mockCatalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalCatalogDispatcher",
+        mockInternalCatalogDispatcher,
+        true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();
@@ -390,7 +424,8 @@ public class TestDynamicIcebergConfigProvider {
     Optional<IcebergConfig> result = provider.getIcebergCatalogConfig(nonExistentCatalogName);
 
     Assertions.assertFalse(result.isPresent());
-    Mockito.verify(mockCatalogDispatcher).loadCatalog(catalogIdent);
+    Mockito.verify(mockInternalCatalogDispatcher).loadCatalog(catalogIdent);
+    Mockito.verify(mockCatalogDispatcher, Mockito.never()).loadCatalog(catalogIdent);
   }
 
   @Test
@@ -474,12 +509,13 @@ public class TestDynamicIcebergConfigProvider {
     // Enable authorization to use internal fetcher
     createMockServerContext(true);
 
-    // Mock CatalogDispatcher
+    // Mock CatalogDispatchers
     CatalogDispatcher mockCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    CatalogDispatcher mockInternalCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
     Catalog mockCatalog = Mockito.mock(Catalog.class);
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-    Mockito.when(mockCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
+    Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
     Mockito.when(mockCatalog.properties())
         .thenReturn(
@@ -490,9 +526,14 @@ public class TestDynamicIcebergConfigProvider {
               }
             });
 
-    // Set the mock CatalogDispatcher to GravitinoEnv
+    // Set the mock CatalogDispatchers to GravitinoEnv
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "catalogDispatcher", mockCatalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalCatalogDispatcher",
+        mockInternalCatalogDispatcher,
+        true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();
@@ -535,8 +576,10 @@ public class TestDynamicIcebergConfigProvider {
       Assertions.assertTrue(result.isPresent(), "Each thread should get a valid config");
     }
 
-    // Verify CatalogDispatcher was called (at least once, possibly more due to concurrency)
-    Mockito.verify(mockCatalogDispatcher, Mockito.atLeastOnce()).loadCatalog(catalogIdent);
+    // Verify internal CatalogDispatcher was called (at least once, possibly more due to
+    // concurrency)
+    Mockito.verify(mockInternalCatalogDispatcher, Mockito.atLeastOnce()).loadCatalog(catalogIdent);
+    Mockito.verify(mockCatalogDispatcher, Mockito.never()).loadCatalog(catalogIdent);
 
     executor.shutdown();
     executor.awaitTermination(5, TimeUnit.SECONDS);

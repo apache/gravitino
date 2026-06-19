@@ -240,16 +240,22 @@ public class IsolatedClassLoader implements Closeable {
    * @return true if the class is a catalog class, false otherwise.
    */
   private boolean isCatalogClass(String name) {
-    return name.startsWith("org.apache.gravitino.catalog")
-        && (name.startsWith("org.apache.gravitino.catalog.hive.")
-            || name.startsWith("org.apache.gravitino.catalog.lakehouse.")
-            || name.startsWith("org.apache.gravitino.catalog.jdbc.")
-            || name.startsWith("org.apache.gravitino.catalog.mysql.")
-            || name.startsWith("org.apache.gravitino.catalog.postgresql.")
-            || name.startsWith("org.apache.gravitino.catalog.doris.")
-            || name.startsWith("org.apache.gravitino.catalog.fileset.")
-            || name.startsWith("org.apache.gravitino.catalog.model.")
-            || name.startsWith("org.apache.gravitino.catalog.kafka."));
+    // org.apache.gravitino.hive.* covers classes moved to the shared hive-metastore-common
+    // module by the HiveClient refactoring (e.g. HiveExceptionConverter). Without this prefix
+    // those classes are treated as shared and loaded by the server classloader; their
+    // compiler-generated synthetic classes (e.g. $1 from switch-on-enum) are then requested
+    // from the server classloader which cannot find them, causing a permanent
+    // NoClassDefFoundError that is cached by the JVM for the lifetime of the process.
+    return name.startsWith("org.apache.gravitino.hive.")
+        || name.startsWith("org.apache.gravitino.catalog.hive.")
+        || name.startsWith("org.apache.gravitino.catalog.lakehouse.")
+        || name.startsWith("org.apache.gravitino.catalog.jdbc.")
+        || name.startsWith("org.apache.gravitino.catalog.mysql.")
+        || name.startsWith("org.apache.gravitino.catalog.postgresql.")
+        || name.startsWith("org.apache.gravitino.catalog.doris.")
+        || name.startsWith("org.apache.gravitino.catalog.fileset.")
+        || name.startsWith("org.apache.gravitino.catalog.model.")
+        || name.startsWith("org.apache.gravitino.catalog.kafka.");
   }
 
   /**

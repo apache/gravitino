@@ -27,18 +27,18 @@ import java.util.Optional;
 public class UserGroup {
 
   private final Optional<String> groupExternalUID;
-  private final String groupname;
+  private final String groupName;
 
   /**
    * Constructs a UserGroup instance.
    *
    * @param groupExternalUID The external UID of the group.
-   * @param groupname The name of the group.
+   * @param groupName The name of the group.
    */
-  public UserGroup(Optional<String> groupExternalUID, String groupname) {
-    Preconditions.checkArgument(groupname != null, "groupname cannot be null");
+  public UserGroup(Optional<String> groupExternalUID, String groupName) {
+    Preconditions.checkArgument(groupName != null, "groupName cannot be null");
     this.groupExternalUID = groupExternalUID;
-    this.groupname = groupname;
+    this.groupName = groupName;
   }
 
   /**
@@ -55,8 +55,8 @@ public class UserGroup {
    *
    * @return The group name.
    */
-  public String getGroupname() {
-    return groupname;
+  public String getGroupName() {
+    return groupName;
   }
 
   @Override
@@ -69,12 +69,12 @@ public class UserGroup {
     }
     UserGroup userGroup = (UserGroup) o;
     return Objects.equals(groupExternalUID, userGroup.groupExternalUID)
-        && Objects.equals(groupname, userGroup.groupname);
+        && Objects.equals(groupName, userGroup.groupName);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(groupExternalUID, groupname);
+    return Objects.hash(groupExternalUID, groupName);
   }
 
   @Override
@@ -82,8 +82,8 @@ public class UserGroup {
     return "UserGroup{"
         + "groupExternalUID="
         + groupExternalUID
-        + ", groupname='"
-        + groupname
+        + ", groupName='"
+        + groupName
         + '\''
         + '}';
   }

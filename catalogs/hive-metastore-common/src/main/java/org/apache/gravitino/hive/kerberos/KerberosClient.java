@@ -36,6 +36,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.hive.client.HiveClient;
+import org.apache.gravitino.utils.FileFetcher;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
@@ -173,7 +174,8 @@ public class KerberosClient implements java.io.Closeable {
     }
     File keytabFile = new File(path);
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
-    FetchFileUtils.fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
+    FileFetcher.get()
+        .fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf);
     return keytabFile;
   }
 
@@ -189,7 +191,6 @@ public class KerberosClient implements java.io.Closeable {
       }
 
       Files.deleteIfExists(Paths.get(keytabFilePath));
-      FetchFileUtils.removeLock(new File(keytabFilePath));
     } catch (IOException e) {
       LOG.warn("Failed to delete keytab file: {}", keytabFilePath, e);
     }
@@ -197,5 +198,18 @@ public class KerberosClient implements java.io.Closeable {
 
   public void setHiveClient(HiveClient client) {
     this.hiveClient = client;
+  }
+
+  /**
+   * Returns the real (non-proxy) {@link UserGroupInformation} that was obtained after Kerberos
+   * login via keytab. Used by callers that need to bind the JAAS Subject to the current thread
+   * (e.g., via {@code ugi.doAs(...)}) before performing a Kerberos-protected RPC call.
+   *
+   * @return the real login UGI.
+   * @throws IllegalStateException if {@link #login()} has not been called yet.
+   */
+  public UserGroupInformation getRealLoginUgi() {
+    Preconditions.checkState(realLoginUgi != null, "KerberosClient.login() has not been called");
+    return realLoginUgi;
   }
 }

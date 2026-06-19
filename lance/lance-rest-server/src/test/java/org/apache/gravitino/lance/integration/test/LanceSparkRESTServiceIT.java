@@ -182,6 +182,10 @@ public class LanceSparkRESTServiceIT extends BaseIT {
 
     Table table = catalog.asTableCatalog().loadTable(tableIdentifier);
     assertTableLocationAndFormat(table, schemaName, tableName);
+    Assertions.assertEquals(2, table.columns().length);
+    Assertions.assertEquals(
+        Set.of("id", "score"),
+        Arrays.stream(table.columns()).map(column -> column.name()).collect(Collectors.toSet()));
   }
 
   @Test
@@ -330,8 +334,9 @@ public class LanceSparkRESTServiceIT extends BaseIT {
             UnsupportedOperationException.class,
             () ->
                 sql("ALTER TABLE %s.%s RENAME COLUMN score TO final_score", schemaName, tableName));
+    String msgLower = exception.getMessage().toLowerCase(Locale.ROOT);
     Assertions.assertTrue(
-        exception.getMessage().toLowerCase(Locale.ROOT).contains("not supported"),
+        msgLower.contains("not supported") || msgLower.contains("unsupported"),
         "Expected unsupported-operation message, but got: " + exception.getMessage());
 
     sql("INSERT INTO %s.%s VALUES (1, CAST(9.9 AS FLOAT))", schemaName, tableName);
@@ -543,7 +548,7 @@ public class LanceSparkRESTServiceIT extends BaseIT {
       }
 
       if (expectedSchema.equals(actualSchema.toLowerCase(Locale.ROOT))
-          && expectedTable.equals(extractLeafTableName(rawTableName).toLowerCase(Locale.ROOT))) {
+          && expectedTable.equals(rawTableName.toLowerCase(Locale.ROOT))) {
         return true;
       }
     }
@@ -575,15 +580,6 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     }
 
     return null;
-  }
-
-  private String extractLeafTableName(String rawTableName) {
-    int delimiterIndex = Math.max(rawTableName.lastIndexOf('$'), rawTableName.lastIndexOf('.'));
-    if (delimiterIndex < 0) {
-      return rawTableName;
-    }
-
-    return rawTableName.substring(delimiterIndex + 1);
   }
 
   private void assertSparkAnalysisFailure(Throwable throwable, String... expectedMessageParts) {

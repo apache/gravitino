@@ -1,9 +1,11 @@
 ---
-title: "Apache Gravitino Trino connector supported Catalogs"
-slug: /trino-connector/supported-catalog
-keyword: gravitino connector trino
+title: "Trino Connector Catalog Support"
+slug: "/trino-connector/supported-catalog"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 The catalogs currently supported by the Apache Gravitino Trino connector are as follows:
 
@@ -11,8 +13,9 @@ The catalogs currently supported by the Apache Gravitino Trino connector are as 
 - [Iceberg](catalog-iceberg.md)
 - [MySQL](catalog-mysql.md)
 - [PostgreSQL](catalog-postgresql.md)
+- [AWS Glue](catalog-glue.md)
 
-## Create catalog
+## Create Catalog
 
 Users can create catalogs through the Gravitino Trino connector and then load them into Trino.
 The Gravitino Trino connector provides the following stored procedures to create, delete, and alter catalogs.
@@ -25,7 +28,7 @@ create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHA
 ```
 
 - CATALOG: The catalog name to be created.
-- PROVIDER: The catalog provider, currently only supports `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`.
+- PROVIDER: The catalog provider. Supported values: `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`, `glue`.
 - PROPERTIES: The properties of the catalog.
 - IGNORE_EXIST: The flag to ignore the error if the catalog already exists. It's optional, the default value is `false`.
 
@@ -34,6 +37,7 @@ The type of catalog properties reference:
 - [Iceberg catalog](../lakehouse-iceberg-catalog.md#catalog-properties)
 - [MySQL catalog](../jdbc-mysql-catalog.md#catalog-properties)
 - [PostgreSQL catalog](../jdbc-postgresql-catalog.md#catalog-properties)
+- [AWS Glue catalog](../aws-glue-catalog.md#catalog-properties)
 
 
 Drop catalog:
@@ -77,7 +81,7 @@ The result is like:
 ```
 
 Example:
-You can run the following SQL to create a catalog named `mysql` with `jdbc-mysql` provider.
+Run the following SQL to create a catalog named `mysql` with `jdbc-mysql` provider.
 
 ```sql
 -- Call stored procedures with position.
@@ -117,10 +121,11 @@ call gravitino.system.alter_catalog(
 );
 ```
 
-if you need more information about catalog, please refer to:
+If you need more information about catalog, refer to:
 [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog).
 
-## Passing Trino connector configuration
+## Pass Trino Connector Configuration
+
 A Gravitino catalog is implemented by the Trino connector, so you can pass the Trino connector configuration to the Gravitino catalog.
 For example, you want to set the `hive.config.resources` configuration for the Hive catalog, you can pass the configuration to the
 Gravitino catalog like this:
@@ -148,7 +153,7 @@ More Trino connector configurations can refer to:
 - [MySQL catalog](https://trino.io/docs/current/connector/mysql.html#general-configuration-properties)
 - [PostgreSQL catalog](https://trino.io/docs/current/connector/postgresql.html#general-configuration-properties)
 
-## Data type mapping between Trino and Apache Gravitino
+## Data Type Mapping Between Trino and Apache Gravitino
 
 Gravitino Trino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, Gravitino may not support some data types conversion for this specific catalog, for example,
 Hive does not support `TIME` data type.
@@ -175,4 +180,4 @@ Hive does not support `TIME` data type.
 | Map                   | MAP                      |
 | Struct                | ROW                      |
 
-For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravitino data types, please refer to [Gravitino data types](../manage-relational-metadata-using-gravitino.md#apache-gravitino-table-column-type).
+For more about Trino data types, refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravitino data types, refer to [Gravitino data types](../manage-relational-metadata-using-gravitino.md#table-column-type).

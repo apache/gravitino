@@ -19,13 +19,13 @@
 
 package org.apache.gravitino.lance.common.ops.gravitino;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -443,17 +443,14 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     String schemaName = nsId.levelAtListPos(1);
     List<String> tables =
         Arrays.stream(catalog.asTableCatalog().listTables(Namespace.of(schemaName)))
-            .map(ident -> Joiner.on(delimiter).join(catalogName, schemaName, ident.name()))
+            .map(ident -> ident.name())
             .sorted()
             .collect(Collectors.toList());
 
     PageUtil.Page page = PageUtil.splitPage(tables, pageToken, PageUtil.normalizePageSize(limit));
-    ListNamespacesResponse response = new ListNamespacesResponse();
-    response.setNamespaces(Sets.newHashSet(page.items()));
+    ListTablesResponse response = new ListTablesResponse();
+    response.setTables(new LinkedHashSet<>(page.items()));
     response.setPageToken(page.nextPageToken());
-
-    return new ListTablesResponse()
-        .tables(response.getNamespaces())
-        .pageToken(response.getPageToken());
+    return response;
   }
 }

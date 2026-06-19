@@ -1,12 +1,14 @@
 ---
-title: Manage user-defined functions using Gravitino
-slug: /manage-user-defined-function-using-gravitino
-keyword: Gravitino user-defined function UDF manage
-license: This software is licensed under the Apache License version 2.
+title: "Manage User-Defined Functions"
+slug: "/manage-user-defined-function-using-gravitino"
+keyword: "Gravitino user-defined function UDF manage"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+
+## Introduction
 
 This page introduces how to manage user-defined functions (UDFs) in Apache Gravitino. Gravitino
 provides a centralized function registry that allows you to define custom functions once and
@@ -33,19 +35,19 @@ same definition. To replace an existing implementation, use `updateImpl` instead
 | Java     | `className`            | Fully qualified Java class name.                     |
 | Python   | `handler`, `codeBlock` | Python handler entry point and optional inline code. |
 
-To use function management, please make sure that:
+To use function management, make sure that:
 
  - The Gravitino server has started and is serving at, e.g. [http://localhost:8090](http://localhost:8090).
  - A metalake has been created.
  - A catalog has been created within the metalake.
  - A schema has been created within the catalog.
 
-## Function operations
+## Function Operations
 
-### Register a function
+### Register a Function
 
-You can register a function by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
-endpoint or just use the Gravitino Java/Python client. The following is an example of registering
+Register a function by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
+endpoint or use the Gravitino Java/Python client. The following is an example of registering
 a scalar function:
 
 <Tabs groupId="language" queryString>
@@ -256,9 +258,9 @@ function = function_catalog.register_function(
 </TabItem>
 </Tabs>
 
-### Get a function
+### Get a Function
 
-You can get a function by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
+Get a function by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of getting
 a function:
 
@@ -298,9 +300,9 @@ function = catalog.as_function_catalog().get_function(
 </TabItem>
 </Tabs>
 
-### List functions
+### List Functions
 
-You can list all the functions in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
+List all the functions in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
 endpoint or by using the Gravitino Java/Python client. The following is an example of listing
 all the functions in a schema:
 
@@ -340,7 +342,7 @@ functions = catalog.as_function_catalog().list_functions(
 </TabItem>
 </Tabs>
 
-You can also list functions with detailed information by adding the `details` query parameter.
+List functions with detailed information by adding the `details` query parameter.
 This returns the full function objects instead of just the identifiers.
 
 <Tabs groupId="language" queryString>
@@ -379,9 +381,9 @@ functions = catalog.as_function_catalog().list_function_infos(
 </TabItem>
 </Tabs>
 
-### Alter a function
+### Alter a Function
 
-You can modify a function by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
+Modify a function by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
 endpoint or using the Gravitino Java/Python client. The following is an example of updating a
 function's comment:
 
@@ -430,7 +432,7 @@ function = catalog.as_function_catalog().alter_function(
 </TabItem>
 </Tabs>
 
-#### Supported modifications
+#### Supported Modifications
 
 The following operations are supported for altering a function:
 
@@ -519,9 +521,9 @@ function = catalog.as_function_catalog().alter_function(
 </TabItem>
 </Tabs>
 
-### Drop a function
+### Drop a Function
 
-You can drop a function by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
+Drop a function by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of dropping
 a function:
 
@@ -559,9 +561,9 @@ dropped: bool = catalog.as_function_catalog().drop_function(
 </TabItem>
 </Tabs>
 
-## Advanced examples
+## Advanced Examples
 
-### Register a function with multiple overloads
+### Register a Function with Multiple Overloads
 
 A function can have multiple definitions (overloads) with different parameter lists. Each
 definition has its own return type and implementations.
@@ -688,7 +690,7 @@ function = function_catalog.register_function(
 </TabItem>
 </Tabs>
 
-## Using functions in compute engines
+## Functions in Compute Engines
 
 Once a function is registered in Gravitino, it can be used in supported compute engines.
 The engine's connector loads the function from Gravitino and invokes the appropriate

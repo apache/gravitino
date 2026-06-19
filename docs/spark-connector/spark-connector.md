@@ -1,7 +1,7 @@
 ---
-title: "Apache Gravitino Spark connector"
-slug: /spark-connector/spark-connector
-keyword: spark connector federation query 
+title: "Spark Connector"
+slug: "/spark-connector/spark-connector"
+keyword: "spark connector federation query"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -11,7 +11,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 ## Capabilities
 
-1. Supports [Hive catalog](spark-catalog-hive.md), [Iceberg catalog](spark-catalog-iceberg.md), [Paimon catalog](spark-catalog-paimon.md) and [Jdbc catalog](spark-catalog-jdbc.md).
+1. Supports [Hive catalog](spark-catalog-hive.md), [Iceberg catalog](spark-catalog-iceberg.md), [Paimon catalog](spark-catalog-paimon.md), [Jdbc catalog](spark-catalog-jdbc.md), and [AWS Glue catalog](spark-catalog-glue.md).
 2. Supports federation query.
 3. Supports most DDL and DML SQLs.
 
@@ -21,7 +21,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 * Scala 2.12 or 2.13
 * JDK 8, 11 or 17
 
-## How to use it
+## Usage
 
 1. [Build](../how-to-build.md) or download the package ([gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3), [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4), [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)), and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
@@ -39,7 +39,7 @@ To configure the Gravitino client, use properties prefixed with `spark.sql.gravi
 
 **Example:** Setting `spark.sql.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 
-**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
+**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
 
 ```shell
 ./bin/spark-sql -v \
@@ -80,7 +80,7 @@ SELECT hs.name, is.score FROM hive.db.hive_students hs JOIN iceberg_scores is ON
 The command `SHOW CATALOGS` will only display the Spark default catalog, named spark_catalog, due to limitations within the Spark catalog manager. It does not list the catalogs present in the metalake. However, after explicitly using the `USE` command with a specific catalog name, that catalog name then becomes visible in the output of `SHOW CATALOGS`.
 :::
 
-## Datatype mapping
+## Datatype Mapping
 
 Gravitino spark connector support the following datatype mapping between Spark and Gravitino.
 
