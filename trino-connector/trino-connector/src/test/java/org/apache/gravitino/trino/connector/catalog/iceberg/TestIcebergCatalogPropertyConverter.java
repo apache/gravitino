@@ -174,7 +174,6 @@ public class TestIcebergCatalogPropertyConverter {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   public void testBuildConnectorPropertiesWithJdbcCredential() throws Exception {
     String name = "test_catalog";
     Map<String, String> properties =
