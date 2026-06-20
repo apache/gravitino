@@ -30,6 +30,9 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  * <p>Iceberg 1.10+ no longer supports {@code client.access-key-id} directly; credentials must be
  * supplied via {@code client.credentials-provider}. This class is configured in {@link
  * GlueIcebergTableHelper#createGlueCatalog} when explicit credentials are provided.
+ *
+ * <p>Adapted from Apache Doris's {@code CustomAwsCredentialsProvider} ({@code
+ * org.apache.doris.datasource.iceberg.s3tables.CustomAwsCredentialsProvider}).
  */
 class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider {
 
