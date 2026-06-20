@@ -260,6 +260,7 @@
    ./catalogs/catalog-lakehouse-paimon/src/test/java/org/apache/gravitino/catalog/lakehouse/paimon/utils/PaimonViewTestCatalogHelper.java
 
    Lance Namespace (https://github.com/lance-format/lance-namespace-impls)
+   ./lance/lance-common/src/main/java/org/apache/gravitino/lance/common/ops/gravitino/JsonArrowSchemaConverter.java
    ./lance/lance-common/src/main/java/org/apache/gravitino/lance/common/ops/gravitino/PageUtil.java
 
    Apache Hive
