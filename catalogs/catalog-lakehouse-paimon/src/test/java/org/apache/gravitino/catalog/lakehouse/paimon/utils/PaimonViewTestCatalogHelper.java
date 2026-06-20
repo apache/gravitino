@@ -30,7 +30,12 @@ import org.apache.paimon.view.View;
 import org.apache.paimon.view.ViewChange;
 import org.apache.paimon.view.ViewImpl;
 
-/** Utilities for creating in-memory view-capable catalog wrappers in Paimon unit tests. */
+/**
+ * Utilities for creating in-memory view-capable catalog wrappers in Paimon unit tests.
+ *
+ * <p>The {@code alterView} change-handling logic is derived from Apache Paimon's view change
+ * application.
+ */
 public final class PaimonViewTestCatalogHelper {
 
   private PaimonViewTestCatalogHelper() {}
