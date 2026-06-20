@@ -40,8 +40,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
  */
 public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
 
-  private static final Set<String> JDBC_BACKEND_REQUIRED_PROPERTIES =
-      Set.of("jdbc-driver", "uri", "jdbc-user", "jdbc-password");
+  private static final Set<String> JDBC_BACKEND_REQUIRED_PROPERTIES = Set.of("jdbc-driver", "uri");
 
   private static final Set<String> HIVE_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
 
