@@ -418,24 +418,33 @@ public class PolicyMetaService {
     // soft delete old versions that are smaller than or equal to (maxVersion -
     // versionRetentionCount).
     int totalDeletedCount = 0;
+    int remaining = limit;
     for (PolicyMaxVersionPO policyMaxVersion : policyMaxVersions) {
+      if (remaining <= 0) {
+        break;
+      }
+
+      int currentLimit = remaining;
       long versionRetentionLine = policyMaxVersion.getVersion() - versionRetentionCount;
       int deletedCount =
           SessionUtils.doWithCommitAndFetchResult(
               PolicyVersionMapper.class,
               mapper ->
                   mapper.softDeletePolicyVersionsByRetentionLine(
-                      policyMaxVersion.getPolicyId(), versionRetentionLine, limit));
+                      policyMaxVersion.getPolicyId(), versionRetentionLine, currentLimit));
       totalDeletedCount += deletedCount;
+      remaining -= deletedCount;
 
       // log the deletion by max policy version.
       LOG.info(
           "Soft delete policyVersions count: {} which versions are smaller than or equal to"
-              + " versionRetentionLine: {}, the current policyId and maxVersion is: <{}, {}>.",
+              + " versionRetentionLine: {}, the current policyId and maxVersion is: <{}, {}>."
+              + " Remaining budget: {}.",
           deletedCount,
           versionRetentionLine,
           policyMaxVersion.getPolicyId(),
-          policyMaxVersion.getVersion());
+          policyMaxVersion.getVersion(),
+          remaining);
     }
     return totalDeletedCount;
   }
