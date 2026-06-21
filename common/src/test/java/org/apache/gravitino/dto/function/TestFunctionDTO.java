@@ -290,4 +290,53 @@ public class TestFunctionDTO {
     Assertions.assertEquals(2, deserialized.returnColumns().length);
     Assertions.assertEquals("id", deserialized.returnColumns()[0].name());
   }
+
+  @Test
+  public void testRuntimeTypeFromString() {
+    Assertions.assertEquals(FunctionImpl.RuntimeType.SPARK, FunctionImpl.RuntimeType.fromString("SPARK"));
+    Assertions.assertEquals(FunctionImpl.RuntimeType.TRINO, FunctionImpl.RuntimeType.fromString("trino"));
+    Assertions.assertEquals(FunctionImpl.RuntimeType.RAY, FunctionImpl.RuntimeType.fromString("ray"));
+    Assertions.assertEquals(FunctionImpl.RuntimeType.DASK, FunctionImpl.RuntimeType.fromString("Dask"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> FunctionImpl.RuntimeType.fromString(""));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> FunctionImpl.RuntimeType.fromString("unknown"));
+  }
+
+  @Test
+  public void testPythonImplDTOWithAIEngineRuntime() throws JsonProcessingException {
+    // Test Python UDF with RAY runtime
+    PythonImplDTO rayPythonImpl =
+        new PythonImplDTO(
+            FunctionImpl.RuntimeType.RAY.name(),
+            null,
+            ImmutableMap.of(),
+            "add_one",
+            "def add_one(x):\n    return x + 1");
+    String rayJson = JsonUtils.objectMapper().writeValueAsString(rayPythonImpl);
+    FunctionImplDTO deserializedRay =
+        JsonUtils.objectMapper().readValue(rayJson, FunctionImplDTO.class);
+    Assertions.assertTrue(deserializedRay instanceof PythonImplDTO);
+    Assertions.assertEquals(FunctionImpl.Language.PYTHON, deserializedRay.language());
+    Assertions.assertEquals("RAY", deserializedRay.getRuntime());
+    Assertions.assertEquals("add_one", ((PythonImplDTO) deserializedRay).getHandler());
+    Assertions.assertNotNull(((PythonImplDTO) deserializedRay).getCodeBlock());
+
+    // Test Python UDF with DASK runtime
+    PythonImplDTO daskPythonImpl =
+        new PythonImplDTO(
+            FunctionImpl.RuntimeType.DASK.name(),
+            null,
+            ImmutableMap.of("dask.npartitions", "4"),
+            "my_module.transform",
+            null);
+    String daskJson = JsonUtils.objectMapper().writeValueAsString(daskPythonImpl);
+    FunctionImplDTO deserializedDask =
+        JsonUtils.objectMapper().readValue(daskJson, FunctionImplDTO.class);
+    Assertions.assertTrue(deserializedDask instanceof PythonImplDTO);
+    Assertions.assertEquals("DASK", deserializedDask.getRuntime());
+    Assertions.assertEquals(
+        "my_module.transform", ((PythonImplDTO) deserializedDask).getHandler());
+    Assertions.assertNull(((PythonImplDTO) deserializedDask).getCodeBlock());
+  }
 }

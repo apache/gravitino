@@ -50,6 +50,12 @@ class FunctionImpl(ABC):
         TRINO = "TRINO"
         """Trino runtime."""
 
+        RAY = "RAY"
+        """Ray runtime."""
+
+        DASK = "DASK"
+        """Dask runtime."""
+
         @classmethod
         def from_string(cls, value: str) -> "FunctionImpl.RuntimeType":
             """Parse a runtime value from string.
