@@ -148,6 +148,7 @@ public class TagOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       TagCreateRequest request) {
+    String tagName = request != null ? request.getName() : "unknown";
     LOG.info("Received create tag request under metalake: {}", metalake);
 
     try {
@@ -163,8 +164,7 @@ public class TagOperations {
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleTagException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      return ExceptionHandlers.handleTagException(OperationType.CREATE, tagName, metalake, e);
     }
   }
 

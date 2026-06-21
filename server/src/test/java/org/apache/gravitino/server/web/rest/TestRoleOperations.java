@@ -386,6 +386,20 @@ public class TestRoleOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateRoleWithNullRequestBodyDoesNotExposeNpe() {
+    Response resp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    ErrorResponse error = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotEquals(NullPointerException.class.getSimpleName(), error.getType());
+  }
+
+  @Test
   public void testGetRole() throws IOException {
     Role role = buildRole("role1");
 

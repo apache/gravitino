@@ -124,6 +124,7 @@ public class TopicOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TopicCreateRequest request) {
+    String topicName = request != null ? request.getName() : "unknown";
     LOG.info("Received create topic request: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
@@ -150,8 +151,7 @@ public class TopicOperations {
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleTopicException(
-          OperationType.CREATE, request.getName(), schema, e);
+      return ExceptionHandlers.handleTopicException(OperationType.CREATE, topicName, schema, e);
     }
   }
 

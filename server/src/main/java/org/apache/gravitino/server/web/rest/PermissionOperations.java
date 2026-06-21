@@ -88,6 +88,7 @@ public class PermissionOperations {
           String metalake,
       @PathParam("user") String user,
       RoleGrantRequest request) {
+    String roleNames = request != null ? StringUtils.join(request.getRoleNames(), ",") : "unknown";
     try {
       return Utils.doAs(
           httpRequest,
@@ -102,7 +103,7 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
-          OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), user, e);
+          OperationType.GRANT, roleNames, user, e);
     }
   }
 
@@ -117,6 +118,7 @@ public class PermissionOperations {
           String metalake,
       @PathParam("group") String group,
       RoleGrantRequest request) {
+    String roleNames = request != null ? StringUtils.join(request.getRoleNames(), ",") : "unknown";
     try {
       return Utils.doAs(
           httpRequest,
@@ -131,7 +133,7 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
-          OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), group, e);
+          OperationType.GRANT, roleNames, group, e);
     }
   }
 
@@ -146,6 +148,7 @@ public class PermissionOperations {
           String metalake,
       @PathParam("user") String user,
       RoleRevokeRequest request) {
+    String roleNames = request != null ? StringUtils.join(request.getRoleNames(), ",") : "unknown";
     try {
       return Utils.doAs(
           httpRequest,
@@ -160,7 +163,7 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
-          OperationType.REVOKE, StringUtils.join(request.getRoleNames(), ","), user, e);
+          OperationType.REVOKE, roleNames, user, e);
     }
   }
 
@@ -175,6 +178,7 @@ public class PermissionOperations {
           String metalake,
       @PathParam("group") String group,
       RoleRevokeRequest request) {
+    String roleNames = request != null ? StringUtils.join(request.getRoleNames(), ",") : "unknown";
     try {
       return Utils.doAs(
           httpRequest,
@@ -189,7 +193,7 @@ public class PermissionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
-          OperationType.REVOKE, StringUtils.join(request.getRoleNames(), ","), group, e);
+          OperationType.REVOKE, roleNames, group, e);
     }
   }
 

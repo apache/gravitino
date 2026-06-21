@@ -297,6 +297,20 @@ public class TestSchemaOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateSchemaWithNullRequestBodyDoesNotExposeNpe() {
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(javax.ws.rs.client.Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    ErrorResponse error = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotEquals(NullPointerException.class.getSimpleName(), error.getType());
+  }
+
+  @Test
   public void testLoadSchema() {
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
     when(dispatcher.loadSchema(any())).thenReturn(mockSchema);

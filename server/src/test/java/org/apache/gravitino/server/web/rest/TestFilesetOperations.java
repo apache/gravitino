@@ -398,6 +398,20 @@ public class TestFilesetOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateFilesetWithNullRequestBodyDoesNotExposeNpe() {
+    Response resp =
+        target(filesetPath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    ErrorResponse error = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotEquals(NullPointerException.class.getSimpleName(), error.getType());
+  }
+
+  @Test
   public void testRenameFileset() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RenameFilesetRequest("new name");
     Fileset fileset =

@@ -141,6 +141,7 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
+    String catalogName = request != null ? request.getName() : "unknown";
     LOG.info("Received create catalog request for metalake: {}", metalake);
     try {
       return Utils.doAs(
@@ -162,7 +163,7 @@ public class CatalogOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
-          OperationType.CREATE, request.getName(), metalake, e);
+          OperationType.CREATE, catalogName, metalake, e);
     }
   }
 
@@ -178,7 +179,8 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
-    LOG.info("Received test connection request for catalog: {}.{}", metalake, request.getName());
+    String catalogName = request != null ? request.getName() : "unknown";
+    LOG.info("Received test connection request for catalog: {}.{}", metalake, catalogName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -198,7 +200,7 @@ public class CatalogOperations {
           });
 
     } catch (Exception e) {
-      LOG.info("Failed to test connection for catalog: {}.{}", metalake, request.getName());
+      LOG.info("Failed to test connection for catalog: {}.{}", metalake, catalogName);
       return ExceptionHandlers.handleTestConnectionException(e);
     }
   }

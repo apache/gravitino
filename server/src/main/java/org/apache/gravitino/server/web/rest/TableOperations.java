@@ -129,8 +129,8 @@ public class TableOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TableCreateRequest request) {
-    LOG.info(
-        "Received create table request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+    String tableName = request != null ? request.getName() : "unknown";
+    LOG.info("Received create table request: {}.{}.{}.{}", metalake, catalog, schema, tableName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -155,8 +155,7 @@ public class TableOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleTableException(
-          OperationType.CREATE, request.getName(), schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.CREATE, tableName, schema, e);
     }
   }
 
