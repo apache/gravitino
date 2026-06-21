@@ -64,6 +64,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Version;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.SchemaDTO;
@@ -346,7 +347,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       FileSystemTestUtils.mkdirs(managedFilesetPath, gravitinoFileSystem);
 
       // Verify the internal cache contains a FileSystem for the local scheme
-      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+      Cache<FileSystemUtils.FileSystemCacheKey, FileSystem> cache =
           ((GravitinoVirtualFileSystem) gravitinoFileSystem)
               .getOperations()
               .internalFileSystemCache();
@@ -454,7 +455,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       // Access first fileset
       FileSystemTestUtils.mkdirs(filesetPath1, fs);
 
-      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+      Cache<FileSystemUtils.FileSystemCacheKey, FileSystem> cache =
           ((GravitinoVirtualFileSystem) fs).getOperations().internalFileSystemCache();
 
       // Should have one cached filesystem for the local scheme
