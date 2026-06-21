@@ -48,6 +48,7 @@ import java.util.Arrays;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.indexes.Index.IndexType;
 import org.apache.gravitino.rel.types.Types;
@@ -305,6 +306,17 @@ public class TestTableOpsUtils {
                     true),
                 "Paimon does not support auto increment column. Illegal column: col_1."))
         .forEach(this::assertIllegalTableChange);
+  }
+
+  @Test
+  void testAddColumnWithNullDefaultValue() {
+    assertTableChange(
+        addColumn(getFieldName("col_5"), IntegerType.get(), (Expression) null),
+        AddColumn.class,
+        schemaChange -> {
+          AddColumn addColumn = (AddColumn) schemaChange;
+          assertEquals("col_5", addColumn.fieldNames()[0]);
+        });
   }
 
   private void assertTableChange(
