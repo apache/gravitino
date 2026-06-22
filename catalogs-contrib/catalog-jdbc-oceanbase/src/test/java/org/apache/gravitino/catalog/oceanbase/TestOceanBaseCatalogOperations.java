@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.oceanbase;
 
 import java.util.Collections;
-import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.junit.jupiter.api.Assertions;
@@ -29,7 +28,7 @@ public class TestOceanBaseCatalogOperations {
 
   @Test
   public void testOceanBaseCatalogUsesOceanBaseOperations() {
-    CatalogOperations operations = new TestableOceanBaseCatalog().newOps(Collections.emptyMap());
+    CatalogOperations operations = new OceanBaseCatalog().newOps(Collections.emptyMap());
 
     Assertions.assertInstanceOf(OceanBaseCatalogOperations.class, operations);
     Assertions.assertFalse(operations instanceof MySQLProtocolCompatibleCatalogOperations);
@@ -37,16 +36,10 @@ public class TestOceanBaseCatalogOperations {
 
   @Test
   public void testCheckJDBCDriverVersionDoesNotRejectOceanBaseDriverVersion() {
+    // OceanBase JDBC driver versions can be lower than the MySQL Connector/J minimum version.
     OceanBaseCatalogOperations operations =
         new OceanBaseCatalogOperations(null, null, null, null, null);
 
     Assertions.assertDoesNotThrow(operations::checkJDBCDriverVersion);
-  }
-
-  private static class TestableOceanBaseCatalog extends OceanBaseCatalog {
-    @Override
-    protected CatalogOperations newOps(Map<String, String> config) {
-      return super.newOps(config);
-    }
   }
 }

@@ -72,7 +72,7 @@ public class OceanBaseCatalogOperations extends JdbcCatalogOperations {
           .invoke(null);
       LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
     } catch (ClassNotFoundException e) {
-      LOG.debug("MySQL AbandonedConnectionCleanupThread was not found", e);
+      LOG.debug("MySQL AbandonedConnectionCleanupThread not found on classpath, skipping shutdown");
     } catch (Exception e) {
       LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread", e);
     }
