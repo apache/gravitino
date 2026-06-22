@@ -19,13 +19,23 @@
 
 package org.apache.gravitino.idp.basic.password;
 
-/** Factory for password hasher implementations. */
-public final class PasswordHasherFactory {
+/** Default parameters for the built-in PBKDF2-HMAC-SHA512 password hasher. */
+public final class Pbkdf2Sha512Defaults {
 
-  private PasswordHasherFactory() {}
+  /** JCA algorithm name for PBKDF2 with HMAC-SHA512. */
+  public static final String PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA512";
 
-  /** Create the built-in password hasher. */
-  public static PasswordHasher create() {
-    return new Pbkdf2Sha512PasswordHasher();
-  }
+  /** OWASP minimum iteration count for PBKDF2-HMAC-SHA512. */
+  public static final int DEFAULT_ITERATIONS = 210_000;
+
+  /** PHC string prefix for stored password hashes. */
+  public static final String PHC_PREFIX = "$pbkdf2-sha512$";
+
+  /** Number of bytes in the derived password hash. */
+  public static final int DEFAULT_HASH_LENGTH = 32;
+
+  /** Number of bytes in the random salt. */
+  public static final int DEFAULT_SALT_LENGTH = 16;
+
+  private Pbkdf2Sha512Defaults() {}
 }
