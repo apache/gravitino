@@ -731,13 +731,15 @@ public abstract class BaseGVFSOperations implements Closeable {
           FilesetUtil.getUserDefinedFileSystemConfigs(
               targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
 
-      FileSystemProvider provider =
-          getFileSystemProviderByScheme(targetLocation.toUri().getScheme());
-      // Client-provided credentials take precedence over server-side vended credentials. Only vend
-      // when the client did not configure its own storage credentials; otherwise the vended
-      // credential provider would override the client's credentials.
-      if (enableCredentialVending() && !clientProvidedStorageCredentials(provider, allProperties)) {
-        allProperties.putAll(getCredentialProperties(provider, filesetIdent, locationName));
+      if (enableCredentialVending()) {
+        FileSystemProvider provider =
+            getFileSystemProviderByScheme(targetLocation.toUri().getScheme());
+        // Client-provided credentials take precedence over server-side vended credentials. Only
+        // vend when the client did not configure its own storage credentials; otherwise the vended
+        // credential provider would override the client's credentials.
+        if (!clientProvidedStorageCredentials(provider, allProperties)) {
+          allProperties.putAll(getCredentialProperties(provider, filesetIdent, locationName));
+        }
       }
 
       FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
