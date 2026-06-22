@@ -141,6 +141,7 @@ public class TestIcebergCatalogPropertyConverter {
             .put("jdbc-user", "root")
             .put("jdbc-password", "ds123")
             .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
+            .put("jdbc-schema-version", "V1")
             .put("unknown-key", "1")
             .put("trino.bypass.iceberg.unknown-key", "1")
             .put("trino.bypass.iceberg.table-statistics-enabled", "true")
@@ -163,6 +164,7 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(config.get("iceberg.jdbc-catalog.connection-password"), "ds123");
     Assertions.assertEquals(
         config.get("iceberg.jdbc-catalog.driver-class"), "com.mysql.cj.jdbc.Driver");
+    Assertions.assertEquals(config.get("iceberg.jdbc-catalog.schema-version"), "V1");
     Assertions.assertEquals(config.get("iceberg.catalog.type"), "jdbc");
 
     // test trino passing properties
