@@ -35,10 +35,6 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
-import org.apache.gravitino.server.web.
-  
-  
-  ;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
