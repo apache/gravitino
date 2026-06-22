@@ -1396,6 +1396,67 @@ public class CatalogHive2IT extends BaseIT {
                 "please ensure that the type of the new column position is compatible with the old one"));
   }
 
+  @Test
+  public void testCrossSchemaTableRename() throws TException, InterruptedException {
+    // Create a second schema to serve as the rename destination.
+    // No explicit location needed; HMS will use the default warehouse directory.
+    String targetSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX + "_target");
+    Map<String, String> targetSchemaProperties = new HashMap<>();
+    targetSchemaProperties.put("key1", "val1");
+    targetSchemaProperties.put("key2", "val2");
+    catalog.asSchemas().createSchema(targetSchemaName, "target schema", targetSchemaProperties);
+
+    // Create a table in the original schema
+    Column[] columns = createColumns();
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            TABLE_COMMENT,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM);
+
+    // Rename the table and move it to the target schema
+    String newTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX + "_renamed");
+    TableChange renameTableChange = TableChange.rename(newTableName, targetSchemaName);
+    catalog.asTableCatalog().alterTable(tableIdentifier, renameTableChange);
+
+    // Verify the table is loadable from the new schema via Gravitino API
+    NameIdentifier newTableIdentifier = NameIdentifier.of(targetSchemaName, newTableName);
+    Table loadedTable = catalog.asTableCatalog().loadTable(newTableIdentifier);
+    Assertions.assertNotNull(loadedTable);
+    Assertions.assertEquals(newTableName.toLowerCase(), loadedTable.name());
+
+    // Verify the table exists in the new schema directly from Hive Metastore
+    HiveTable hiveTable = loadHiveTable(targetSchemaName, newTableName);
+    Assertions.assertEquals(targetSchemaName.toLowerCase(), hiveTable.databaseName());
+    Assertions.assertEquals(newTableName.toLowerCase(), hiveTable.name());
+
+    // Verify the table no longer exists in the old schema
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> catalog.asTableCatalog().loadTable(tableIdentifier));
+    Assertions.assertFalse(hiveTableExists(schemaName, tableName));
+    Assertions.assertFalse(hiveTableExists(schemaName, newTableName));
+
+    // Test error case: rename to a non-existent schema should fail
+    String anotherTable = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier anotherTableId = NameIdentifier.of(targetSchemaName, anotherTable);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            anotherTableId, columns, TABLE_COMMENT, createProperties(), Transforms.EMPTY_TRANSFORM);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    TableChange renameChange = TableChange.rename(anotherTable + "_moved", "non_existent_schema");
+    Assertions.assertThrows(
+        NoSuchSchemaException.class, () -> tableCatalog.alterTable(anotherTableId, renameChange));
+
+    // Clean up the target schema
+    catalog.asSchemas().dropSchema(targetSchemaName, true);
+  }
+
   private void assertDefaultTableProperties(Table gravitinoReturnTable, HiveTable actualTable) {
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     Assertions.assertEquals(
