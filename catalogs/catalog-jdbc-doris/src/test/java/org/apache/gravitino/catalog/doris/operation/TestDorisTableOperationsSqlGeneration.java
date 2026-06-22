@@ -156,6 +156,10 @@ public class TestDorisTableOperationsSqlGeneration {
         sql.contains("INDEX PRIMARY"), "PRIMARY_KEY should be filtered out: " + sql);
     Assertions.assertFalse(
         sql.contains("USING INVERTED"), "No USING clause for PRIMARY_KEY: " + sql);
+    // PRIMARY_KEY does not generate UNIQUE KEY declaration — Doris 1.2.x doesn't support
+    // UNIQUE KEY syntax, and the default DUPLICATE KEY model is sufficient.
+    Assertions.assertFalse(
+        sql.contains("UNIQUE KEY"), "PRIMARY_KEY should not generate UNIQUE KEY: " + sql);
   }
 
   @Test
@@ -229,6 +233,8 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertEquals(
         Index.IndexType.PRIMARY_KEY, DorisTableOperations.mapDorisIndexType("BTREE", "PRIMARY"));
     Assertions.assertEquals(
+        Index.IndexType.UNIQUE_KEY, DorisTableOperations.mapDorisIndexType("BTREE", "uk_col1"));
+    Assertions.assertEquals(
         Index.IndexType.INVERTED, DorisTableOperations.mapDorisIndexType("INVERTED", "idx_name"));
     Assertions.assertEquals(
         Index.IndexType.BITMAP, DorisTableOperations.mapDorisIndexType("BITMAP", "idx_name"));
@@ -241,6 +247,13 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertEquals(
         Index.IndexType.INVERTED,
         DorisTableOperations.mapDorisIndexType("UNKNOWN_TYPE", "idx_name"));
+    // Null index type (Doris 1.2.x without Index_type column):
+    // PRIMARY index name → PRIMARY_KEY
+    Assertions.assertEquals(
+        Index.IndexType.PRIMARY_KEY, DorisTableOperations.mapDorisIndexType(null, "PRIMARY"));
+    // Non-primary index name → INVERTED (safe fallback)
+    Assertions.assertEquals(
+        Index.IndexType.INVERTED, DorisTableOperations.mapDorisIndexType(null, "idx_name"));
   }
 
   @Test
@@ -274,8 +287,44 @@ public class TestDorisTableOperationsSqlGeneration {
             "test_auto_incr", new JdbcColumn[] {idCol, nameCol}, distribution, indexes);
     Assertions.assertTrue(sql.contains("AUTO_INCREMENT"), "Should contain AUTO_INCREMENT: " + sql);
     Assertions.assertFalse(sql.contains("INDEX PRIMARY"), "PRIMARY_KEY should be filtered: " + sql);
+    // PRIMARY_KEY does not generate UNIQUE KEY (Doris 1.2.x compatibility)
+    Assertions.assertFalse(
+        sql.contains("UNIQUE KEY"), "PRIMARY_KEY should not generate UNIQUE KEY: " + sql);
+  }
+
+  @Test
+  public void testCreateTableWithUniqueKeyIndex() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn idCol =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.LongType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn nameCol =
+        JdbcColumn.builder()
+            .withName("name")
+            .withType(Types.VarCharType.of(100))
+            .withNullable(true)
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
+
+    // UNIQUE_KEY index explicitly generates UNIQUE KEY declaration (Doris 2.0+)
+    Index[] indexes =
+        new Index[] {Indexes.of(Index.IndexType.UNIQUE_KEY, "uk_id", new String[][] {{"id"}})};
+
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+
+    String sql =
+        mockOps.createTableSqlWithIndexes(
+            "test_uk", new JdbcColumn[] {idCol, nameCol}, distribution, indexes);
     Assertions.assertTrue(
-        sql.contains("UNIQUE KEY(`id`)"), "Should contain UNIQUE KEY declaration: " + sql);
+        sql.contains("UNIQUE KEY(`id`)"), "UNIQUE_KEY should generate UNIQUE KEY: " + sql);
+    Assertions.assertFalse(
+        sql.contains("INDEX `"), "UNIQUE_KEY should not appear in INDEX clause: " + sql);
   }
 
   @Test
@@ -300,6 +349,25 @@ public class TestDorisTableOperationsSqlGeneration {
             TableChange.addIndex(Index.IndexType.VECTOR, "idx_vec", new String[][] {{"embedding"}});
     sql = DorisTableOperations.addIndexDefinition(addIndex);
     Assertions.assertEquals("ADD INDEX `idx_vec` (`embedding`) USING ANN", sql);
+  }
+
+  @Test
+  public void testAddPrimaryKeyIndexDefinitionThrows() {
+    // PRIMARY_KEY cannot be added via ALTER TABLE ADD INDEX in Doris
+    TableChange.AddIndex primaryKeyIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(Index.IndexType.PRIMARY_KEY, "PRIMARY", new String[][] {{"id"}});
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> DorisTableOperations.addIndexDefinition(primaryKeyIndex));
+
+    // UNIQUE_KEY cannot be added via ALTER TABLE ADD INDEX in Doris
+    TableChange.AddIndex uniqueKeyIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(Index.IndexType.UNIQUE_KEY, "uk_id", new String[][] {{"id"}});
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> DorisTableOperations.addIndexDefinition(uniqueKeyIndex));
   }
 
   @Test

@@ -126,12 +126,14 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     appendIndexesSql(indexes, sqlBuilder);
 
+    sqlBuilder.append(NEW_LINE).append(")");
+
     // Add Doris table model key declaration (UNIQUE KEY / DUPLICATE KEY).
     // PRIMARY_KEY and UNIQUE_KEY indexes are filtered from the INDEX clause and instead emitted
     // here as table-model keys, which is the correct Doris DDL position.
+    // This must appear AFTER the closing ')' and BEFORE DISTRIBUTED BY, per Doris grammar:
+    // LEFT_PAREN columnDefs indexDefs? RIGHT_PAREN (UNIQUE KEY keys)? DISTRIBUTED BY ...
     appendTableModelKeySql(indexes, sqlBuilder);
-
-    sqlBuilder.append(NEW_LINE).append(")");
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
@@ -260,7 +262,9 @@ public class DorisTableOperations extends JdbcTableOperations {
                         && index.type() != Index.IndexType.UNIQUE_KEY)
             .collect(Collectors.toList());
 
-    LOG.debug("appendIndexesSql: {} non-key indexes after filtering", nonKeyIndexes.size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("appendIndexesSql: {} non-key indexes after filtering", nonKeyIndexes.size());
+    }
 
     if (nonKeyIndexes.isEmpty()) {
       return;
@@ -302,16 +306,33 @@ public class DorisTableOperations extends JdbcTableOperations {
       case VECTOR:
         return "USING ANN";
       default:
-        return "USING BTREE";
+        // Doris does not support BTREE as an explicit USING clause for non-key indexes.
+        // Known types that reach here (e.g. BLOOMFILTER) are table-level properties, not indexes.
+        throw new UnsupportedOperationException(
+            "Doris does not support index type " + indexType + " via ADD INDEX syntax");
     }
   }
 
   private static void appendTableModelKeySql(Index[] indexes, StringBuilder sqlBuilder) {
+    // Only emit UNIQUE KEY declaration when an explicit UNIQUE_KEY index is present.
+    // PRIMARY_KEY indexes are intentionally skipped: Doris 1.2.x does not support UNIQUE KEY
+    // syntax (only DUPLICATE KEY / AGGREGATE KEY), and the default DUPLICATE KEY model already
+    // satisfies PRIMARY_KEY's uniqueness semantics. Users targeting Doris 2.0+ who need the
+    // UNIQUE KEY model should pass Index.IndexType.UNIQUE_KEY instead.
+    long keyIndexCount =
+        Arrays.stream(indexes)
+            .filter(
+                index ->
+                    index.type() == Index.IndexType.PRIMARY_KEY
+                        || index.type() == Index.IndexType.UNIQUE_KEY)
+            .count();
+    Preconditions.checkArgument(
+        keyIndexCount <= 1,
+        "Doris table model key can have at most one PRIMARY_KEY or UNIQUE_KEY index, got: %s",
+        keyIndexCount);
+
     Arrays.stream(indexes)
-        .filter(
-            index ->
-                index.type() == Index.IndexType.PRIMARY_KEY
-                    || index.type() == Index.IndexType.UNIQUE_KEY)
+        .filter(index -> index.type() == Index.IndexType.UNIQUE_KEY)
         .findFirst()
         .ifPresent(
             keyIndex -> {
@@ -460,7 +481,19 @@ public class DorisTableOperations extends JdbcTableOperations {
       while (resultSet.next()) {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
-        String indexType = resultSet.getString("Index_type");
+        // Index_type column may not exist in older Doris versions (e.g. 1.2.x).
+        // Fall back to null so mapDorisIndexType can infer from indexName.
+        String indexType;
+        try {
+          indexType = resultSet.getString("Index_type");
+        } catch (SQLException e) {
+          LOG.warn(
+              "Index_type column not available in SHOW INDEX output, "
+                  + "inferring index type from index name '{}'. "
+                  + "Upgrade to Doris 3.0+ for accurate index type mapping.",
+              indexName);
+          indexType = null;
+        }
         Index.IndexType gravitinoIndexType = mapDorisIndexType(indexType, indexName);
         indexes.add(Indexes.of(gravitinoIndexType, indexName, new String[][] {{columnName}}));
       }
@@ -473,7 +506,18 @@ public class DorisTableOperations extends JdbcTableOperations {
   @VisibleForTesting
   static Index.IndexType mapDorisIndexType(String indexType, String indexName) {
     if (indexType == null) {
-      return Index.IndexType.PRIMARY_KEY;
+      // Index_type column unavailable (Doris 1.2.x) or returned null.
+      // Infer from index name: "PRIMARY" is the primary key, everything else defaults to
+      // INVERTED as a safe fallback (Doris 1.2.x indexes are all BTREE-based key indexes,
+      // but without Index_type we cannot distinguish UNIQUE_KEY from PRIMARY_KEY).
+      if ("PRIMARY".equals(indexName)) {
+        return Index.IndexType.PRIMARY_KEY;
+      }
+      LOG.warn(
+          "Index_type is null for index '{}', defaulting to INVERTED. "
+              + "Load table metadata from Doris 3.0+ for accurate index type mapping.",
+          indexName);
+      return Index.IndexType.INVERTED;
     }
     switch (indexType.toUpperCase()) {
       case "BTREE":
@@ -490,6 +534,10 @@ public class DorisTableOperations extends JdbcTableOperations {
       case "ANN":
         return Index.IndexType.VECTOR;
       default:
+        LOG.warn(
+            "Unknown Doris index type '{}' for index '{}', falling back to INVERTED",
+            indexType,
+            indexName);
         return Index.IndexType.INVERTED;
     }
   }
