@@ -23,37 +23,29 @@ import java.util.Base64;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestArgon2idPasswordHasher {
+public class TestSha3512PasswordHasher {
 
-  private final PasswordHasher passwordHasher = new Argon2idPasswordHasher();
+  private final PasswordHasher passwordHasher = new Sha3512PasswordHasher();
 
   @Test
-  public void testHashProducesArgon2idPhcString() {
+  public void testHashFormat() {
     String hashedPassword = passwordHasher.hash("test-password");
 
     String[] parts = hashedPassword.split("\\$");
 
-    Assertions.assertEquals(6, parts.length);
+    Assertions.assertEquals(5, parts.length);
     Assertions.assertEquals("", parts[0]);
-    Assertions.assertEquals("argon2id", parts[1]);
-    Assertions.assertEquals("v=" + Argon2idDefaults.DEFAULT_VERSION, parts[2]);
-    Assertions.assertEquals(
-        "m="
-            + Argon2idDefaults.DEFAULT_MEMORY_KB
-            + ",t="
-            + Argon2idDefaults.DEFAULT_ITERATIONS
-            + ",p="
-            + Argon2idDefaults.DEFAULT_PARALLELISM,
-        parts[3]);
+    Assertions.assertEquals("sha3-512", parts[1]);
+    Assertions.assertEquals("i=" + Sha3512Defaults.DEFAULT_ITERATIONS, parts[2]);
 
-    byte[] salt = decodeBase64(parts[4]);
-    byte[] hash = decodeBase64(parts[5]);
-    Assertions.assertEquals(Argon2idDefaults.DEFAULT_SALT_LENGTH, salt.length);
-    Assertions.assertEquals(Argon2idDefaults.DEFAULT_HASH_LENGTH, hash.length);
+    byte[] salt = decodeBase64(parts[3]);
+    byte[] hash = decodeBase64(parts[4]);
+    Assertions.assertEquals(Sha3512Defaults.DEFAULT_SALT_LENGTH, salt.length);
+    Assertions.assertEquals(Sha3512Defaults.DEFAULT_HASH_LENGTH, hash.length);
   }
 
   @Test
-  public void testVerifyMatchesExpectedPassword() {
+  public void testVerifyMatch() {
     String hashedPassword = passwordHasher.hash("test-password");
 
     Assertions.assertTrue(passwordHasher.verify("test-password", hashedPassword));
@@ -61,8 +53,8 @@ public class TestArgon2idPasswordHasher {
   }
 
   @Test
-  public void testFactoryCreatesArgon2idHasher() {
-    Assertions.assertTrue(PasswordHasherFactory.create() instanceof Argon2idPasswordHasher);
+  public void testFactoryCreatesHasher() {
+    Assertions.assertTrue(PasswordHasherFactory.create() instanceof Sha3512PasswordHasher);
   }
 
   @Test
@@ -97,9 +89,9 @@ public class TestArgon2idPasswordHasher {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> passwordHasher.verify("test-password", "$argon2id$v=19$m=65536,x=3,p=1$abc$abc"));
+            () -> passwordHasher.verify("test-password", "$sha3-512$i=100000$abc"));
 
-    Assertions.assertEquals("Invalid Argon2id hash format", exception.getMessage());
+    Assertions.assertEquals("Invalid SHA3-512 hash format", exception.getMessage());
   }
 
   @Test
@@ -111,9 +103,9 @@ public class TestArgon2idPasswordHasher {
             () ->
                 passwordHasher.verify(
                     "test-password",
-                    "$argon2id$v=19$m=65536,t=3,p=1$" + oversizedBase64 + "$" + oversizedBase64));
+                    "$sha3-512$i=100000$" + oversizedBase64 + "$" + oversizedBase64));
 
-    Assertions.assertEquals("Invalid Argon2id hash format", exception.getMessage());
+    Assertions.assertEquals("Invalid SHA3-512 hash format", exception.getMessage());
   }
 
   @Test
@@ -121,44 +113,25 @@ public class TestArgon2idPasswordHasher {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> passwordHasher.verify("test-password", "$argon2id$v=19$m=65536,t=3,p=1$a$abc"));
+            () -> passwordHasher.verify("test-password", "$sha3-512$i=100000$a$abc"));
 
-    Assertions.assertEquals("Invalid Argon2id hash format", exception.getMessage());
+    Assertions.assertEquals("Invalid SHA3-512 hash format", exception.getMessage());
   }
 
   @Test
-  public void testVerifyRejectsUnexpectedArgon2CostParameters() {
+  public void testVerifyRejectsUnexpectedIterations() {
     String hashedPassword = passwordHasher.hash("test-password");
     String unsupportedHash =
         hashedPassword.replace(
-            "m="
-                + Argon2idDefaults.DEFAULT_MEMORY_KB
-                + ",t="
-                + Argon2idDefaults.DEFAULT_ITERATIONS
-                + ",p="
-                + Argon2idDefaults.DEFAULT_PARALLELISM,
-            "m=131072,t=3,p=1");
+            "i=" + Sha3512Defaults.DEFAULT_ITERATIONS,
+            "i=" + (Sha3512Defaults.DEFAULT_ITERATIONS + 1));
 
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> passwordHasher.verify("test-password", unsupportedHash));
 
-    Assertions.assertEquals("Unsupported Argon2id hash parameters", exception.getMessage());
-  }
-
-  @Test
-  public void testVerifyRejectsUnexpectedArgon2Version() {
-    String hashedPassword = passwordHasher.hash("test-password");
-    String unsupportedHash =
-        hashedPassword.replace("v=" + Argon2idDefaults.DEFAULT_VERSION, "v=16");
-
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> passwordHasher.verify("test-password", unsupportedHash));
-
-    Assertions.assertEquals("Unsupported Argon2id hash parameters", exception.getMessage());
+    Assertions.assertEquals("Unsupported SHA3-512 hash parameters", exception.getMessage());
   }
 
   private static byte[] decodeBase64(String value) {
