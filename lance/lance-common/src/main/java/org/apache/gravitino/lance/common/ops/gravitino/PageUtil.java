@@ -23,7 +23,12 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
-/** Pagination helper for Lance REST compatible list APIs. */
+/**
+ * Pagination helper for Lance REST compatible list APIs.
+ *
+ * <p>Derived from Lance Namespace's {@code PageUtil} in the {@code lance-namespace-hive2} module:
+ * https://github.com/lance-format/lance-namespace-impls/blob/e3e202f2f655c92ee9427ab671226e1ed945a629/java/lance-namespace-hive2/src/main/java/org/lance/namespace/hive2/PageUtil.java
+ */
 class PageUtil {
 
   private static final int DEFAULT_PAGE_SIZE = 1000;

@@ -330,7 +330,6 @@
    Apache Kyuubi
    Apache Ranger
    Apache Ranger intg
-   Bouncy Castle
    Jackson JSON processor
    DataNucleus
    Modernizer Maven Plugin
@@ -436,6 +435,7 @@
    Kyligence/kylinpy
    elarivie/pyReaderWriterLock
    tkem/cachetools
+   Bouncy Castle
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
