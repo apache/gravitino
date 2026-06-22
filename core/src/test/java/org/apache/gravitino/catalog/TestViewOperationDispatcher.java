@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.VIEW;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
@@ -40,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -52,6 +54,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -70,7 +73,9 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    viewOperationDispatcher = new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
+    viewOperationDispatcher =
+        new ViewOperationDispatcher(
+            catalogManager, entityStore, idGenerator, () -> schemaOperationDispatcher);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -78,7 +83,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
   }
 
   public static ViewOperationDispatcher getViewOperationDispatcher() {
@@ -196,6 +201,41 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
       View loadedView = viewOperationDispatcher.loadView(viewIdent);
       Assertions.assertEquals("view" + i, loadedView.name());
     }
+  }
+
+  @Test
+  public void testViewOperationDispatcherRejectsNullSchemaDispatcherSupplier() {
+    Assertions.assertThrows(
+        NullPointerException.class,
+        () -> new ViewOperationDispatcher(catalogManager, entityStore, idGenerator, null));
+  }
+
+  @Test
+  public void testCreateViewFailsFastWhenSchemaDispatcherSupplierReturnsNull() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema-null-view-dispatcher");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
+
+    Supplier<SchemaDispatcher> nullSchemaDispatcherSupplier = () -> null;
+    ViewOperationDispatcher dispatcher =
+        new ViewOperationDispatcher(
+            catalogManager, entityStore, idGenerator, nullSchemaDispatcherSupplier);
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_null_dispatcher");
+    Representation[] representations =
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("spark-sql").withSql("SELECT 1").build()
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                dispatcher.createView(
+                    viewIdent, "comment", new Column[0], representations, null, null, props));
+    Assertions.assertEquals(
+        "schemaDispatcherSupplier returned null. "
+            + "SchemaDispatcher must be available for view operations.",
+        exception.getMessage());
   }
 
   @Test
@@ -464,6 +504,74 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testDropViewCleansUpAutoDroppedParentSchemas() throws Exception {
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "dropViewParentA:dropViewParentB");
+    NameIdentifier ancestorIdent = NameIdentifier.of(metalake, catalog, "dropViewParentA");
+    Namespace viewNs =
+        Namespace.of(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_auto_drop_parent");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    putSchemaEntity(ancestorIdent);
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
+
+    Assertions.assertTrue(viewOperationDispatcher.dropView(viewIdent));
+    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
+  }
+
+  @Test
+  public void testDropMissingViewCleansUpSchemas() throws Exception {
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "dropViewGoneA:dropViewGoneB");
+    NameIdentifier ancestorIdent = NameIdentifier.of(metalake, catalog, "dropViewGoneA");
+    Namespace viewNs =
+        Namespace.of(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_already_gone");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    putSchemaEntity(ancestorIdent);
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    // Simulate an out-of-band drop: the backend already removed the view and auto-dropped the
+    // now-empty namespaces, so the catalog no longer knows the view (dropView returns false),
+    // while Gravitino still holds the orphaned schema entities.
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    Assertions.assertTrue(testCatalogOperations.dropView(viewIdent));
+    Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
+    Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
+
+    // dropView returns false because the view is already gone from the catalog, but the
+    // orphaned schema entities must still be cleaned up.
+    Assertions.assertFalse(viewOperationDispatcher.dropView(viewIdent));
+    Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
+  }
+
+  @Test
   public void testListViews() throws IOException {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema_list_view");
     schemaOperationDispatcher.createSchema(
@@ -570,5 +678,17 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
                 .findFirst()
                 .orElseThrow(AssertionError::new);
     Assertions.assertEquals("SELECT 2", trino.sql());
+  }
+
+  private void putSchemaEntity(NameIdentifier ident) throws IOException {
+    SchemaEntity entity =
+        SchemaEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(entity, true);
   }
 }

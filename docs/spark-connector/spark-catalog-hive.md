@@ -1,9 +1,11 @@
 ---
-title: "Spark connector hive catalog"
-slug: /spark-connector/spark-catalog-hive
-keyword: spark connector hive catalog
+title: "Spark Connector: Hive Catalog"
+slug: "/spark-connector/spark-catalog-hive"
+keyword: "spark connector hive catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 With the Apache Gravitino Spark connector, accessing data or managing metadata in Hive catalogs becomes straightforward, enabling seamless federation queries across different Hive catalogs.
 
@@ -13,22 +15,22 @@ Supports most DDL and DML operations in SparkSQL, except such operations:
 
 - Function operations (Gravitino UDFs are supported, see [Spark connector - User-defined functions](spark-connector-udf.md))
 - Partition operations
-- View operations
+- View DDL operations (`CREATE VIEW`, `DROP VIEW`, `ALTER VIEW`)
 - `LOAD` clause
 - `CREATE TABLE LIKE` clause
-- `TRUCATE TABLE` clause
+- `TRUNCATE TABLE` clause
 
 
 :::info
 Don't support reading and writing tables with `org.apache.hadoop.hive.serde2.OpenCSVSerde` row format.
 :::
 
-## Requirement
+## Prerequisites
 
 * Hive metastore 2.x
 * HDFS 2.x or 3.x
 
-## SQL example
+## SQL Example
 
 
 ```sql
@@ -56,7 +58,20 @@ SELECT * FROM employees WHERE department = 'Engineering';
 ```
 
 
-## Catalog properties
+## View
+
+Spark DDL view operations (`CREATE VIEW`, `DROP VIEW`, `ALTER VIEW`) are not supported. However, existing views stored in the Hive Metastore can be read with `SELECT`. When `SELECT` references a view name, the connector loads the view's SQL definition from Gravitino, resolves the query, and executes it.
+
+:::caution
+The current implementation materializes all view results on the Spark driver using `LocalScan`. This is suitable only for small or bounded views. Querying a large or unbounded view may exhaust driver memory and cause an OOM error.
+:::
+
+```sql
+-- Assumes a view was created via Gravitino API, Flink, or Hive directly
+SELECT * FROM employee_view;
+```
+
+## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Hive connector configuration.
 
@@ -76,4 +91,4 @@ When using the `spark-sql` shell client, you must explicitly set the `spark.bypa
 
 ### S3
 
-Please refer to [Hive catalog with s3](../hive-catalog-with-s3.md) to set up a Hive catalog with s3 storage. To query the data stored in s3, you need to add s3 secret to the Spark configuration using `spark.sql.catalog.${hive_catalog_name}.fs.s3a.access.key` and `spark.sql.catalog.${hive_catalog_name}.fs.s3a.secret.key`. Additionally, download [hadoop aws jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of Spark.
+Refer to [Hive catalog with s3](../hive-catalog-with-cloud-storage.md) to set up a Hive catalog with s3 storage. To query the data stored in s3, you need to add s3 secret to the Spark configuration using `spark.sql.catalog.${hive_catalog_name}.fs.s3a.access.key` and `spark.sql.catalog.${hive_catalog_name}.fs.s3a.secret.key`. Additionally, download [hadoop aws jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of Spark.

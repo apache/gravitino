@@ -471,7 +471,8 @@ public class AuthorizationUtils {
 
   private static void checkCatalogType(
       NameIdentifier catalogIdent, Catalog.Type type, Privilege privilege) {
-    Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
+    Catalog catalog =
+        GravitinoEnv.getInstance().internalCatalogDispatcher().loadCatalog(catalogIdent);
     if (catalog.type() != type) {
       throw new IllegalPrivilegeException(
           "Catalog %s type %s doesn't support privilege %s",
@@ -505,7 +506,8 @@ public class AuthorizationUtils {
   private static String getHiveDefaultLocation(String metalakeName, String catalogName) {
     NameIdentifier defaultSchemaIdent =
         NameIdentifier.of(metalakeName, catalogName, "default" /*Hive default schema*/);
-    Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(defaultSchemaIdent);
+    Schema schema =
+        GravitinoEnv.getInstance().internalSchemaDispatcher().loadSchema(defaultSchemaIdent);
     if (schema.properties().containsKey(HiveConstants.LOCATION)) {
       String defaultSchemaLocation = schema.properties().get(HiveConstants.LOCATION);
       if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
@@ -533,7 +535,8 @@ public class AuthorizationUtils {
           break;
         case CATALOG:
           {
-            Catalog catalogObj = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(ident);
+            Catalog catalogObj =
+                GravitinoEnv.getInstance().internalCatalogDispatcher().loadCatalog(ident);
             if (catalogObj.provider().equals("hive")) {
               // The Hive default schema location is Hive warehouse directory
               String defaultSchemaLocation =
@@ -547,10 +550,10 @@ public class AuthorizationUtils {
         case SCHEMA:
           Catalog catalogObj =
               GravitinoEnv.getInstance()
-                  .catalogDispatcher()
+                  .internalCatalogDispatcher()
                   .loadCatalog(
                       NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1)));
-          Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
+          Schema schema = GravitinoEnv.getInstance().internalSchemaDispatcher().loadSchema(ident);
 
           switch (catalogObj.type()) {
             case RELATIONAL:
@@ -594,11 +597,11 @@ public class AuthorizationUtils {
           {
             catalogObj =
                 GravitinoEnv.getInstance()
-                    .catalogDispatcher()
+                    .internalCatalogDispatcher()
                     .loadCatalog(
                         NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1)));
             if (catalogObj.provider().equals("hive")) {
-              Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
+              Table table = GravitinoEnv.getInstance().internalTableDispatcher().loadTable(ident);
               if (table.properties().containsKey(HiveConstants.LOCATION)) {
                 String tableLocation = table.properties().get(HiveConstants.LOCATION);
                 if (StringUtils.isNotBlank(tableLocation)) {
@@ -611,7 +614,8 @@ public class AuthorizationUtils {
           }
           break;
         case FILESET:
-          FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().filesetDispatcher();
+          FilesetDispatcher filesetDispatcher =
+              GravitinoEnv.getInstance().internalFilesetDispatcher();
           Fileset fileset = filesetDispatcher.loadFileset(ident);
           Preconditions.checkArgument(
               fileset != null, String.format("Fileset %s is not found", ident));

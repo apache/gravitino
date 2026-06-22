@@ -29,10 +29,16 @@ import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceAuthenticationFilter;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
-import org.apache.gravitino.server.web.JettyServer;
+import org.apache.gravitino.server.web.
+  
+  
+  ;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -71,8 +77,9 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
             return new LanceAuthenticationFilter();
           }
         };
-    // Get MetricsSystem directly from GravitinoEnv for zero-overhead access
+    // Get MetricsSystem and EventBus from GravitinoEnv once at init time.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     server.initialize(serverConfig, SERVICE_NAME, false);
 
     this.lanceNamespace = loadNamespaceImpl(lanceConfig);
@@ -96,6 +103,8 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
     Servlet container = new ServletContainer(resourceConfig);
     server.addServlet(container, LANCE_SPEC);
+    server.addFilter(
+        new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), LANCE_SPEC);
     server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
 

@@ -185,6 +185,7 @@ public class TestCompatibilityUtils {
       {OperationType.DROP_FUNCTION, Operation.DROP_FUNCTION},
       {OperationType.LIST_FUNCTION, Operation.LIST_FUNCTION},
       {OperationType.LIST_FUNCTION_INFOS, Operation.LIST_FUNCTION_INFOS},
+      {OperationType.AUTHORIZATION_DENIAL, Operation.AUTHORIZATION_DENIAL},
       {OperationType.UNKNOWN, Operation.UNKNOWN_OPERATION},
       {null, Operation.UNKNOWN_OPERATION}
     };

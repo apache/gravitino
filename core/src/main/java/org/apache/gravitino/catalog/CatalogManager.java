@@ -582,7 +582,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               // instance,
               // we need to clean up the entity stored.
               try {
-                store.delete(ident, EntityType.CATALOG, true);
+                if (store.delete(ident, EntityType.CATALOG, true)) {
+                  // This cleanup deletion writes a DROP record to the entity change log. Mark it as
+                  // a local mutation so the change-log poller consumes that record's token instead
+                  // of one meant for a later mutation of the same identifier. Without this, the
+                  // poller could treat a subsequent local change as remote and spuriously
+                  // invalidate (and asynchronously close) a cached catalog wrapper that is still in
+                  // use, causing a NullPointerException.
+                  markLocalMutation(ident);
+                }
               } catch (IOException e4) {
                 LOG.error("Failed to clean up catalog {}", ident, e4);
               }
@@ -1001,13 +1009,24 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   /**
    * Loads the catalog with the specified identifier, wraps it in a CatalogWrapper, and caches the
-   * wrapper for reuse.
+   * wrapper for reuse. If the cached wrapper has already been closed (its underlying catalog is
+   * null), the stale entry is evicted and a fresh wrapper is loaded and cached.
    *
    * @param ident The identifier of the catalog to load.
    * @return The wrapped CatalogWrapper containing the loaded catalog.
    * @throws NoSuchCatalogException If the specified catalog does not exist.
    */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
+    CatalogWrapper wrapper = catalogCache.get(ident, this::loadCatalogInternal);
+    if (wrapper.catalog() != null) {
+      return wrapper;
+    }
+
+    // The cached wrapper has already been closed (catalog() == null), e.g. by a prior
+    // dropCatalog or cache eviction. Evict the stale entry and reload a fresh one.
+    // Use a conditional remove so we do not clobber a wrapper that another thread may
+    // have concurrently reloaded into the cache between our initial get and this remove.
+    catalogCache.asMap().remove(ident, wrapper);
     return catalogCache.get(ident, this::loadCatalogInternal);
   }
 
@@ -1134,13 +1153,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @return The resolved properties.
    */
   private Map<String, String> getResolvedProperties(CatalogEntity entity) {
-    Map<String, String> conf = entity.getProperties();
-    String provider = entity.getProvider();
-
-    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
-      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
-      return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
-    }
+    CatalogWrapper catalogWrapper = loadCatalogAndWrap(entity.nameIdentifier());
+    return catalogWrapper.classLoader.withClassLoader(
+        cl -> catalogWrapper.catalog.properties(), RuntimeException.class);
   }
 
   private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {

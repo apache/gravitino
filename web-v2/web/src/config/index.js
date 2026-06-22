@@ -127,6 +127,7 @@ export const ColumnSpesicalType = ['union', 'list', 'map', 'struct']
 
 export const UnsupportColumnType = {
   'lakehouse-iceberg': ['varchar', 'char', 'byte', 'short', 'interval_day', 'interval_year', 'union'],
+  glue: ['fixed', 'time', 'timestamp_tz', 'uuid'],
   hive: ['fixed', 'time', 'timestamp_tz', 'uuid'],
   'jdbc-mysql': [
     'boolean',
@@ -171,6 +172,11 @@ export const UnsupportColumnType = {
 }
 
 const tableLevelPropInfoMap = {
+  glue: {
+    reserved: [],
+    immutable: ['format', 'input-format', 'output-format', 'serde-lib'],
+    allowAdd: true
+  },
   hive: {
     reserved: ['comment', 'EXTERNAL', 'numFiles', 'totalSize', 'transient_lastDdlTime'],
     immutable: [

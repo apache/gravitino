@@ -1,6 +1,6 @@
 ---
-title: "PostgreSQL catalog"
-slug: /jdbc-postgresql-catalog
+title: "PostgreSQL Catalog"
+slug: "/jdbc-postgresql-catalog"
 keywords:
 - jdbc
 - PostgreSQL
@@ -16,12 +16,12 @@ import TabItem from '@theme/TabItem';
 Apache Gravitino provides the ability to manage PostgreSQL metadata.
 
 :::caution
-Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 :::
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the PostgreSQL database.
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
@@ -29,15 +29,15 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports table index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value). and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
-### Catalog properties
+### Catalog Properties
 
 Any property that isn't defined by Gravitino can pass to PostgreSQL data source by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
-You can check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
+Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-When you use the Gravitino with Trino. You can pass the Trino PostgreSQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino PostgreSQL catalog in Trino runtime.
+When using Gravitino with Trino, pass the Trino PostgreSQL connector configuration using the `trino.bypass.` prefix. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino PostgreSQL catalog in Trino runtime.
 
 If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the PostgreSQL catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the PostgreSQL catalog has the following properties:
 
 | Configuration item      | Description                                                                                                                                                       | Default value | Required | Since Version |
 |-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -51,37 +51,41 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                 | `30000`       | No       | 1.1.0         |
 
 :::caution
-You must download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
-You must explicitly specify the database in both `jdbc-url` and `jdbc-database`. An error may occur if the values in both aren't consistent.
+Download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
+Explicitly specify the database in both `jdbc-url` and `jdbc-database`. An error may occur if the values in both aren't consistent.
 :::
 :::info
 In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema corresponds to the Gravitino schema.
 :::
 
-### Catalog operations
+### Catalog Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+
+:::note
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+:::
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino schema corresponds to the PostgreSQL schema.
 - Supports creating schema with comments.
 - Supports dropping schema.
 - Supports cascade dropping schema.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support any schema property settings.
 
-### Schema operations
+### Schema Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
@@ -89,7 +93,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 - Support [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 - Doesn't support table property settings.
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type    | PostgreSQL Type  |
 |-------------------|------------------|
@@ -116,20 +120,20 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `Inter
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-### Table column auto-increment
+### Table Column Auto-Increment
 
 - Supports setting auto-increment.
 
-### Table properties
+### Table Properties
 
 - Doesn't support table properties.
 
-### Table indexes
+### Table Indexes
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -161,11 +165,11 @@ Index[] indexes = new Index[] {
 </TabItem>
 </Tabs>
 
-### Table operations
+### Table Operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Supports operations:
 

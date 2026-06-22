@@ -197,5 +197,7 @@ public enum OperationType {
   LIST_FUNCTION,
   LIST_FUNCTION_INFOS,
 
+  AUTHORIZATION_DENIAL,
+
   UNKNOWN,
 }

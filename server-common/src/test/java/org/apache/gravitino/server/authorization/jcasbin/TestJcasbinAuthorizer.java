@@ -373,6 +373,12 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testIsMetalakeUserUsesUserInfoCache() {
+    assertTrue(jcasbinAuthorizer.isMetalakeUser(METALAKE, new AuthorizationRequestContext()));
+    verify(userMetaMapper).getUserUpdatedAt(METALAKE, USERNAME);
+  }
+
+  @Test
   public void testAuthorize() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -618,27 +624,12 @@ public class TestJcasbinAuthorizer {
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
 
-    // Mock entityStore.batchGet for group entity lookup (needed for ID-based ownership
-    // verification)
-    when(entityStore.batchGet(
-            eq(ImmutableList.of(NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME))),
-            eq(Entity.EntityType.GROUP),
-            eq(GroupEntity.class)))
-        .thenReturn(ImmutableList.of(getGroupEntity()));
-
-    // For non-member principal, mock batchGet for "otherGroup"
-    when(entityStore.batchGet(
-            eq(ImmutableList.of(NameIdentifierUtil.ofGroup(METALAKE, "otherGroup"))),
-            eq(Entity.EntityType.GROUP),
-            eq(GroupEntity.class)))
-        .thenReturn(
-            ImmutableList.of(
-                GroupEntity.builder()
-                    .withId(99L)
-                    .withName("otherGroup")
-                    .withNamespace(Namespace.of(METALAKE, "group"))
-                    .withAuditInfo(AuditInfo.EMPTY)
-                    .build()));
+    // Group identity is now resolved via groupMetaMapper.getGroupUpdatedAt (per-request cache path)
+    // instead of entityStore.batchGet(GROUP); verify the new path is wired correctly.
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
+        .thenReturn(new GroupUpdatedAt(GROUP_ID, groupVersionCounter.incrementAndGet()));
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq("otherGroup")))
+        .thenReturn(new GroupUpdatedAt(99L, groupVersionCounter.incrementAndGet()));
 
     // Mock owner_meta lookup returning a GROUP-typed OwnerInfo (the owner is GROUP_ID).
     OwnerInfo groupOwnerInfo = new OwnerInfo(GROUP_ID, "GROUP");
@@ -648,6 +639,10 @@ public class TestJcasbinAuthorizer {
 
     // The principal belongs to the owning group, so isOwner should return true
     assertTrue(doAuthorizeOwner(groupPrincipal));
+
+    // entityStore.batchGet must NOT be called for GROUP entity lookups in the owner-check path
+    Mockito.verify(entityStore, Mockito.never())
+        .batchGet(anyList(), eq(Entity.EntityType.GROUP), eq(GroupEntity.class));
 
     // Clear owner and verify it returns false
     when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
@@ -673,6 +668,59 @@ public class TestJcasbinAuthorizer {
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
+  }
+
+  @Test
+  public void testGroupOwnerCheckDeduplicatesGroupInfoWithinRequest() throws Exception {
+    // Verify that repeated isOwner calls within the same AuthorizationRequestContext
+    // do not re-query group_meta; groupMetaMapper.getGroupUpdatedAt should be called at most once
+    // per (metalake, groupName) per request thanks to requestContext.groupInfoCache.
+    Mockito.clearInvocations(groupMetaMapper);
+
+    UserPrincipal groupPrincipal =
+        new UserPrincipal(USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), GROUP_NAME)));
+    principalUtilsMockedStatic.when(PrincipalUtils::getCurrentPrincipal).thenReturn(groupPrincipal);
+
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
+        .thenReturn(new GroupUpdatedAt(GROUP_ID, groupVersionCounter.incrementAndGet()));
+
+    OwnerInfo groupOwnerInfo = new OwnerInfo(GROUP_ID, "GROUP");
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(groupOwnerInfo);
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+
+    // Call isOwner twice within the same request context
+    AuthorizationRequestContext sharedContext = new AuthorizationRequestContext();
+    assertTrue(jcasbinAuthorizer.isOwner(groupPrincipal, METALAKE, catalog, sharedContext));
+    assertTrue(jcasbinAuthorizer.isOwner(groupPrincipal, METALAKE, catalog, sharedContext));
+
+    // group_meta should have been queried exactly once despite two isOwner calls
+    Mockito.verify(groupMetaMapper, Mockito.times(1))
+        .getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME));
+  }
+
+  @Test
+  public void testGroupOwnerCheckUsesProvidedPrincipalGroups() throws Exception {
+    UserPrincipal ownerGroupPrincipal =
+        new UserPrincipal(USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), GROUP_NAME)));
+    UserPrincipal currentPrincipalWithoutOwnerGroup =
+        new UserPrincipal(
+            USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), "otherGroup")));
+    principalUtilsMockedStatic
+        .when(PrincipalUtils::getCurrentPrincipal)
+        .thenReturn(currentPrincipalWithoutOwnerGroup);
+
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
+        .thenReturn(new GroupUpdatedAt(GROUP_ID, groupVersionCounter.incrementAndGet()));
+
+    OwnerInfo groupOwnerInfo = new OwnerInfo(GROUP_ID, "GROUP");
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(groupOwnerInfo);
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    assertTrue(doAuthorizeOwner(ownerGroupPrincipal));
   }
 
   @Test

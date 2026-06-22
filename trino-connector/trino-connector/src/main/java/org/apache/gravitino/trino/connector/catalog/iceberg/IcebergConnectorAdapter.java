@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.catalog.iceberg;
 import static java.util.Collections.emptyList;
 
 import io.trino.spi.session.PropertyMetadata;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
@@ -51,7 +52,10 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public Map<String, String> buildInternalConnectorConfig(
       GravitinoCatalog catalog, Credential[] credentials) throws Exception {
-    return catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
+    Map<String, String> config =
+        new HashMap<>(catalogConverter.gravitinoToEngineProperties(catalog.getProperties()));
+    IcebergCatalogPropertyConverter.applyCredentials(credentials, config);
+    return config;
   }
 
   @Override

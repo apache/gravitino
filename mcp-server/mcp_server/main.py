@@ -17,6 +17,7 @@
 
 import argparse
 import logging
+import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
 from mcp_server.server import GravitinoMCPServer
@@ -30,6 +31,9 @@ def do_main():
         tags=args.include_tool_tags,
         transport=args.transport,
         mcp_url=args.mcp_url,
+        token=args.token,
+        tls_cert=args.tls_cert,
+        tls_key=args.tls_key,
     )
     _init_logging(setting)
     logging.info("Gravitino MCP server setting: %s", setting)
@@ -44,6 +48,12 @@ def _init_logging(setting: Setting):
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    # Separate file handler for structured audit records (one JSON line per entry).
+    audit_handler = logging.FileHandler("gravitino-mcp-audit.log")
+    audit_handler.setLevel(logging.INFO)
+    audit_handler.setFormatter(logging.Formatter("%(message)s"))
+    logging.getLogger("gravitino.mcp.audit").addHandler(audit_handler)
+    logging.getLogger("gravitino.mcp.audit").propagate = False
 
 
 def _comma_separated_set(value) -> set:
@@ -83,9 +93,10 @@ def _parse_args():
     parser.add_argument(
         "--transport",
         type=str,
-        choices=["stdio", "http"],
+        choices=["stdio", "http", "streamable-http"],
         default=DefaultSetting.default_transport,
-        help=f"Transport protocol type: stdio (local), http (Streamable HTTP). "
+        help="Transport protocol type: stdio (local), http / streamable-http "
+        "(networked Streamable HTTP; the two names are equivalent). "
         f"(default: {DefaultSetting.default_transport})",
     )
 
@@ -93,7 +104,36 @@ def _parse_args():
         "--mcp-url",
         type=str,
         default=DefaultSetting.default_mcp_url,
-        help=f"The url of MCP server if using http transport. (default: {DefaultSetting.default_mcp_url})",
+        help="The url of MCP server if using http transport, http:// or https://. "
+        f"(default: {DefaultSetting.default_mcp_url})",
+    )
+
+    parser.add_argument(
+        "--token",
+        type=str,
+        default=os.environ.get("GRAVITINO_TOKEN", ""),
+        help="Static OAuth2 Bearer token used to authenticate to Gravitino. "
+        "In stdio mode it is sent on every request; in HTTP mode it is only the "
+        "fallback when an incoming request carries no Authorization header "
+        "(per-request identity takes priority). "
+        "Can also be set via the GRAVITINO_TOKEN environment variable. "
+        "When omitted, requests are sent without authentication.",
+    )
+
+    parser.add_argument(
+        "--tls-cert",
+        type=str,
+        default="",
+        help="Path to the TLS certificate (PEM) for serving the HTTP endpoint "
+        "over HTTPS. Requires --tls-key. When omitted, the endpoint serves plain HTTP.",
+    )
+
+    parser.add_argument(
+        "--tls-key",
+        type=str,
+        default="",
+        help="Path to the TLS private key (PEM) for serving the HTTP endpoint "
+        "over HTTPS. Requires --tls-cert.",
     )
 
     args = parser.parse_args()

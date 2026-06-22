@@ -1,8 +1,10 @@
 ---
-title: How to test Apache Gravitino
-slug: /how-to-test
+title: "Test Gravitino"
+slug: "/how-to-test"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 Apache Gravitino has two types of tests:
 
@@ -14,7 +16,7 @@ Apache Gravitino has two types of tests:
   environment.
 * Refer to [How to build Gravitino](./how-to-build.md) to make sure you have
   a build environment ready.
-* You can use [OrbStack](https://orbstack.dev/) to replace Docker Desktop
+* Use [OrbStack](https://orbstack.dev/) to replace Docker Desktop
   on macOS. OrbStack automatically configures the network between the Docker containers.
 * If you are using Docker Desktop for macOS, launch the
   [mac-docker-connector](https://github.com/wenjunxiao/mac-docker-connector) before running the tests.
@@ -22,7 +24,7 @@ Apache Gravitino has two types of tests:
   `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh` for more details.
 :::
 
-## Run the unit tests
+## Run the Unit Tests
 
 To run the unit tests, run the following command:
 
@@ -33,7 +35,7 @@ To run the unit tests, run the following command:
 
 This command runs all the unit tests and skips the integration tests.
 
-## Run the integration tests
+## Run the Integration Tests
 
 Gravitino has two modes to run the integration tests, the default `embedded` mode and `deploy` mode.
 
@@ -43,7 +45,7 @@ Gravitino has two modes to run the integration tests, the default `embedded` mod
   integration test launches and connects to the local Gravitino server to run the integration
   tests.
 
-### Run the integration tests in embedded mode
+### Run the Integration Tests in Embedded Mode
 
 1. Run the `./gradlew build -x test` command to build the Gravitino project.
 
@@ -54,7 +56,7 @@ Gravitino has two modes to run the integration tests, the default `embedded` mod
 Running the `./gradlew build` command triggers the build and runs the integration tests in embedded mode.
 :::
 
-### Deploy the Apache Gravitino server and run the integration tests in deploy mode
+### Deploy the Server and Run the Integration Tests in Deploy Mode
 
 To deploy the Gravitino server locally to run the integration tests, follow these steps:
 
@@ -71,21 +73,23 @@ To deploy the Gravitino server locally to run the integration tests, follow thes
    Alternatively, use `bash trino-connector/integration-test/trino-test-tools/run_test_with_versions.sh` command to execute 
    tests across different Trino versions. 
 
-## Skip tests
+## Skip Tests
 
 * Skip unit tests by using the `./gradlew build -PskipTests` command.
 * Skip integration tests by using the `./gradlew build -PskipITs` command.
 * Skip web frontend integration tests by using the `./gradlew build -x :web:integration-test:test` command.
 * Skip both unit tests and integration tests by using the `./gradlew build -x test` or `./gradlew build -PskipTests -PskipITs` commands.
 
-## Configuring parameters for integration tests
+## Configure Parameters for Integration Tests
+
 ### `DISPLAY_WEBPAGE_IN_TESTING`
+
 By default, the Gravitino web frontend page will not pop up when running integration tests. 
 If you wish to display the web frontend page during integrations test, you can set the `DISPLAY_WEBPAGE_IN_TESTING` environment variable in `setIntegrationTestEnvironment` in file build.gradle.kts. 
 For example:
 ```param.environment("DISPLAY_WEBPAGE_IN_TESTING", true)```
 
-## Docker test environment
+## Docker Test Environment
 
 Some integration test cases depend on the Gravitino CI Docker image.
 
@@ -105,7 +109,7 @@ public class CatalogHiveIT extends AbstractIT {
 }
 ```
 
-## Running all the integration tests
+## Run All Integration Tests
 
 :::note
 * Make sure that the `Docker server` is running before running all the
@@ -133,13 +137,13 @@ Using Gravitino IT Docker container to run all integration tests. [deploy test]
 Complete integration tests only run when all the required environments are met. Otherwise,
 only parts of them without the `gravitino-docker-test` tag run.
 
-## How to debug Apache Gravitino server and integration tests in embedded mode
+## Debug Server and Integration Tests in Embedded Mode
 
 By default, the integration tests run in the embedded mode, in which `MiniGravitino` starts in the
 same process. Debugging `MiniGravitino` is simple and easy, you can modify any code in the
 Gravitino project and set breakpoints anywhere.
 
-## How to debug Apache Gravitino server and integration tests in deploy mode
+## Debug Server and Integration Tests in Deploy Mode
 
 This mode is closer to the actual environment, but more complex to debug. To debug the Gravitino server code, follow these steps:
 
@@ -154,7 +158,7 @@ This mode is closer to the actual environment, but more complex to debug. To deb
   * Select the `gravitino.server.main` module classpath in the `Remote JVM Debug` to attach the
   Gravitino server process and debug it.
 
-## Running on GitHub actions
+## Run on GitHub Actions
 
 * GitHub Actions automatically run integration tests in the embedded and deploy modes when you
   submit a pull request.
@@ -164,7 +168,7 @@ This mode is closer to the actual environment, but more complex to debug. To deb
   * The Gravitino project compiles and packages in the `distribution` directory using the `./gradlew compileDistribution` command.
   * Run the `./gradlew test -PtestMode=[embedded|deploy]` command.
 
-## Test failure and test log
+## Test Failure and Test Logs
 
 If a test fails, you can retrieve valuable information from the logs and test reports. Test reports are in the `./build/reports` directory. The integration test logs are in the `./integrate-test/build` directory. In deploy mode, Gravitino server logs are in the `./distribution/package/logs/` directory. 
 

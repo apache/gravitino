@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -63,8 +64,8 @@ public class TestIcebergCatalogPropertyConverter {
         ImmutableMap.<String, String>builder()
             .put("uri", "jdbc:mysql://127.0.0.1:3306/metastore_db?createDatabaseIfNotExist=true")
             .put("catalog-backend", "jdbc")
-            .put("jdbc-user", "zhangsan")
-            .put("jdbc-password", "lisi")
+            .put("jdbc-user", "jack")
+            .put("jdbc-password", "alice")
             .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
             .put("other-key", "other")
             .build();
@@ -75,10 +76,9 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(
         hiveBackendConfig.get("iceberg.jdbc-catalog.connection-url"),
         "jdbc:mysql://127.0.0.1:3306/metastore_db?createDatabaseIfNotExist=true");
+    Assertions.assertEquals(hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "jack");
     Assertions.assertEquals(
-        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-user"), "zhangsan");
-    Assertions.assertEquals(
-        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "lisi");
+        hiveBackendConfig.get("iceberg.jdbc-catalog.connection-password"), "alice");
     Assertions.assertNull(hiveBackendConfig.get("other-key"));
     Assertions.assertEquals(hiveBackendConfig.get("iceberg.catalog.type"), "jdbc");
     Assertions.assertEquals(
@@ -171,5 +171,30 @@ public class TestIcebergCatalogPropertyConverter {
     // test unknown properties
     Assertions.assertNull(config.get("unknown-key"));
     Assertions.assertEquals(config.get("iceberg.unknown-key"), "1");
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesWithJdbcCredential() throws Exception {
+    String name = "test_catalog";
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("uri", "jdbc:mysql://localhost:3306/metastore_db?createDatabaseIfNotExist=true")
+            .put("catalog-backend", "jdbc")
+            .put("warehouse", "/tmp/warehouse")
+            .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
+            .build();
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
+    IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
+
+    Map<String, String> config =
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog),
+            new Credential[] {new JdbcCredential("root", "ds123")});
+
+    Assertions.assertEquals(config.get("iceberg.catalog.type"), "jdbc");
+    Assertions.assertEquals(config.get("iceberg.jdbc-catalog.connection-user"), "root");
+    Assertions.assertEquals(config.get("iceberg.jdbc-catalog.connection-password"), "ds123");
   }
 }

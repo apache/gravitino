@@ -1,9 +1,11 @@
 ---
-title: "Apache Gravitino Trino connector index"
-slug: /trino-connector/index
-keyword: gravitino connector trino
+title: "Trino Connector Overview"
+slug: "/trino-connector/index"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 Apache Gravitino Trino connector index:
 
@@ -16,6 +18,7 @@ Apache Gravitino Trino connector index:
     - [Iceberg](catalog-iceberg.md)
     - [MySQL](catalog-mysql.md)
     - [PostgreSQL](catalog-postgresql.md)
+    - [AWS Glue](catalog-glue.md)
   - [Trino cascading query](trino-cascading-query.md)
   - [Supported SQL](sql-support.md)
   - [UDF support](udf-support.md)

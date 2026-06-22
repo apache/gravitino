@@ -436,6 +436,7 @@ public class TestCatalogManager {
 
     catalogManager.createCatalog(relIdent, Catalog.Type.RELATIONAL, provider, "comment", props);
     catalogManager.createCatalog(fileIdent, Catalog.Type.FILESET, provider, "comment", props);
+    catalogManager.getCatalogCache().invalidateAll();
 
     Catalog[] catalogs = catalogManager.listCatalogsInfo(relIdent.namespace());
     Assertions.assertEquals(2, catalogs.length);
@@ -451,6 +452,17 @@ public class TestCatalogManager {
         Assertions.assertEquals(Catalog.Type.FILESET, catalog.type());
       }
     }
+
+    CatalogManager.CatalogWrapper relWrapper =
+        catalogManager.getCatalogCache().getIfPresent(relIdent);
+    CatalogManager.CatalogWrapper fileWrapper =
+        catalogManager.getCatalogCache().getIfPresent(fileIdent);
+    Assertions.assertNotNull(relWrapper);
+    Assertions.assertNotNull(fileWrapper);
+
+    catalogManager.listCatalogsInfo(relIdent.namespace());
+    Assertions.assertSame(relWrapper, catalogManager.getCatalogCache().getIfPresent(relIdent));
+    Assertions.assertSame(fileWrapper, catalogManager.getCatalogCache().getIfPresent(fileIdent));
 
     // Test list under non-existed metalake
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "test1");
@@ -761,6 +773,75 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testFailedCreateCatalogCleanupMarksLocalMutation() throws Exception {
+    ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+
+    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+    NameIdentifier ident = NameIdentifier.of("metalake", "failed_create_cleanup");
+
+    // A creation that fails validation (key1 is required but missing) stores the entity and then
+    // rolls it back via store.delete(), which writes a DROP record to the entity change log.
+    Map<String, String> invalidProps =
+        ImmutableMap.of(
+            "provider", "test", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "v");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            manager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", invalidProps));
+
+    // Recreate the same catalog successfully and load it into the cache.
+    Map<String, String> validProps =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+    manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", validProps);
+    Assertions.assertNotNull(manager.loadCatalogAndWrap(ident));
+    Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
+
+    // Simulate a subsequent local mutation (e.g. disableCatalog) that writes an ALTER record.
+    manager.markLocalMutation(ident);
+
+    // The poller delivers both records in one batch: the DROP from the failed-create cleanup and
+    // the ALTER from the local mutation. The cleanup DROP must carry its own local-mutation token
+    // (the fix); otherwise it consumes the ALTER's token, the ALTER is treated as remote, and the
+    // in-use cached wrapper is spuriously invalidated and asynchronously closed.
+    store
+        .listener
+        .get()
+        .onEntityChange(
+            List.of(
+                new EntityChangeRecord(
+                    1L,
+                    "metalake",
+                    "CATALOG",
+                    "metalake.failed_create_cleanup",
+                    OperateType.DROP,
+                    0L),
+                new EntityChangeRecord(
+                    2L,
+                    "metalake",
+                    "CATALOG",
+                    "metalake.failed_create_cleanup",
+                    OperateType.ALTER,
+                    0L)));
+
+    Assertions.assertNotNull(
+        manager.getCatalogCache().getIfPresent(ident),
+        "Cache should NOT be invalidated: the failed-create cleanup DROP must be tracked as a "
+            + "local mutation so it does not steal the token meant for the later ALTER");
+    manager.close();
+  }
+
+  @Test
   public void testDropCatalogSkipsImportedSchemas() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
     Map<String, String> props =
@@ -1025,6 +1106,66 @@ public class TestCatalogManager {
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+  }
+
+  @Test
+  void testDropCatalogReloadsClosedCachedWrapper() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "closed_cache_drop_test");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    Catalog catalog =
+        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
+    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    FieldUtils.writeField(catalog, "entity", entity, true);
+
+    CatalogManager.CatalogWrapper closedWrapper = catalogManager.loadCatalogAndWrap(ident);
+    closedWrapper.close();
+    Assertions.assertSame(closedWrapper, catalogManager.getCatalogCache().getIfPresent(ident));
+
+    boolean dropped = catalogManager.dropCatalog(ident);
+
+    Assertions.assertTrue(dropped);
+    Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+  }
+
+  @Test
+  void testLoadCatalogAndWrapDoesNotInvalidateConcurrentlyReloadedWrapper() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "concurrent_cache_reload_test");
+
+    CatalogManager.CatalogWrapper closedWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    CatalogManager.CatalogWrapper freshWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    BaseCatalog<?> freshCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.doReturn(freshCatalog).when(freshWrapper).catalog();
+    Mockito.doAnswer(
+            invocation -> {
+              catalogManager.getCatalogCache().put(ident, freshWrapper);
+              return null;
+            })
+        .when(closedWrapper)
+        .catalog();
+
+    try {
+      catalogManager.getCatalogCache().put(ident, closedWrapper);
+
+      CatalogManager.CatalogWrapper loadedWrapper = catalogManager.loadCatalogAndWrap(ident);
+
+      Assertions.assertSame(freshWrapper, loadedWrapper);
+      Assertions.assertSame(freshWrapper, catalogManager.getCatalogCache().getIfPresent(ident));
+      Mockito.verify(freshWrapper, Mockito.never()).close();
+    } finally {
+      catalogManager.getCatalogCache().invalidate(ident);
+    }
   }
 
   @Test

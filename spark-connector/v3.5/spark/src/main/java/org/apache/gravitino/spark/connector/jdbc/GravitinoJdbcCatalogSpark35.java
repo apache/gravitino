@@ -23,7 +23,6 @@ import java.util.Set;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
-import org.apache.gravitino.spark.connector.SparkTypeConverter34;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
@@ -33,7 +32,7 @@ public class GravitinoJdbcCatalogSpark35 extends GravitinoJdbcCatalog {
 
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
-    return new SparkTypeConverter34();
+    return new SparkJdbcTypeConverter34();
   }
 
   @Override

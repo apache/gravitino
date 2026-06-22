@@ -30,6 +30,8 @@ dependencies {
   // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
   // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
   implementation(libs.sun.activation)
+  // Include Gravitino Aliyun credential providers (OSSSecretKeyProvider, etc.) for credential vending
+  implementation(project(":bundles:aliyun"))
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -39,6 +41,11 @@ tasks.withType(ShadowJar::class.java) {
 
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))
+    // Exclude Gravitino modules to prevent class duplication with server classpath
+    exclude(project(":api"))
+    exclude(project(":common"))
+    exclude(project(":catalogs:catalog-common"))
+    exclude(project(":catalogs:hadoop-common"))
   }
 
   mergeServiceFiles()

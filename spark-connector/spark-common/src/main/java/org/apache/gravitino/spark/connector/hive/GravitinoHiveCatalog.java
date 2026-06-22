@@ -20,7 +20,14 @@
 package org.apache.gravitino.spark.connector.hive;
 
 import java.util.Map;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -30,8 +37,12 @@ import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GravitinoHiveCatalog extends BaseCatalog {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoHiveCatalog.class);
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -39,9 +50,33 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     TableCatalog hiveCatalog = new HiveTableCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
+    applyS3Credential(gravitinoCatalogClient, all);
     hiveCatalog.initialize(name, new CaseInsensitiveStringMap(all));
-
     return hiveCatalog;
+  }
+
+  static void applyS3Credential(Catalog catalog, Map<String, String> props) {
+    for (Credential credential : CredentialPropertyUtils.getCredentials(catalog)) {
+      if (credential instanceof S3SecretKeyCredential) {
+        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
+        props.put("hadoop.fs.s3a.access.key", s3.accessKeyId());
+        props.put("hadoop.fs.s3a.secret.key", s3.secretAccessKey());
+      } else if (credential instanceof OSSSecretKeyCredential) {
+        OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
+        props.put("hadoop.fs.oss.accessKeyId", oss.accessKeyId());
+        props.put("hadoop.fs.oss.accessKeySecret", oss.secretAccessKey());
+      } else if (credential instanceof AzureAccountKeyCredential) {
+        AzureAccountKeyCredential azure = (AzureAccountKeyCredential) credential;
+        props.put(
+            String.format(
+                "hadoop.fs.azure.account.key.%s.dfs.core.windows.net", azure.accountName()),
+            azure.accountKey());
+      } else {
+        LOG.warn(
+            "Received unrecognized credential type '{}' for Hive catalog, skipping",
+            credential.getClass().getName());
+      }
+    }
   }
 
   @Override
@@ -76,5 +111,17 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkHiveTypeConverter();
+  }
+
+  @Override
+  protected org.apache.spark.sql.connector.catalog.Table createSparkView(
+      Identifier ident,
+      View gravitinoView,
+      org.apache.spark.sql.connector.catalog.Table sparkTable) {
+    return new SparkHiveView(
+        gravitinoView,
+        (HiveTable) sparkTable,
+        (HiveTableCatalog) sparkCatalog,
+        getSparkTypeConverter());
   }
 }
