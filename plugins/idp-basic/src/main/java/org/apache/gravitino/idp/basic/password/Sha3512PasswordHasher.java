@@ -28,7 +28,12 @@ import java.util.Arrays;
 import java.util.Base64;
 import org.apache.commons.lang3.StringUtils;
 
-/** SHA3-512 password hasher backed by the JDK {@link MessageDigest} API. */
+/**
+ * SHA3-512 password hasher backed by the JDK {@link MessageDigest} API.
+ *
+ * <p>Built-in IdP password hashing is limited to the JDK JCA provider to reduce EAR Category 5D002
+ * export-control scope for ASF binary releases.
+ */
 public class Sha3512PasswordHasher implements PasswordHasher {
 
   private static final String PHC_PREFIX = Sha3512Defaults.PHC_PREFIX;
@@ -67,14 +72,17 @@ public class Sha3512PasswordHasher implements PasswordHasher {
 
     ParsedHash parsedHash = parse(hashedPassword);
     byte[] passwordBytes = plainPassword.getBytes(StandardCharsets.UTF_8);
-    byte[] actualHash =
-        digestPassword(
-            passwordBytes, parsedHash.salt, parsedHash.iterations, parsedHash.hash.length);
+    byte[] actualHash = null;
     try {
+      actualHash =
+          digestPassword(
+              passwordBytes, parsedHash.salt, parsedHash.iterations, parsedHash.hash.length);
       return MessageDigest.isEqual(actualHash, parsedHash.hash);
     } finally {
       Arrays.fill(passwordBytes, (byte) 0);
-      Arrays.fill(actualHash, (byte) 0);
+      if (actualHash != null) {
+        Arrays.fill(actualHash, (byte) 0);
+      }
       Arrays.fill(parsedHash.salt, (byte) 0);
       Arrays.fill(parsedHash.hash, (byte) 0);
     }
