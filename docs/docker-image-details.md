@@ -230,7 +230,7 @@ Changelog
 - apache/gravitino-playground:trino-478-gravitino-1.3.0
   - Use Gravitino release 1.3.0 Dockerfile to build the image.
 
-- apache/gravitino-playground:trino-435-gravitino-1.2.0
+- apache/gravitino-playground:trino-478-gravitino-1.2.0
   - Use Gravitino release 1.2.0 Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-1.1.0
