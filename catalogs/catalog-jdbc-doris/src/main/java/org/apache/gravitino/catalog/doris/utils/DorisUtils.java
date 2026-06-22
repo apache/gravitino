@@ -102,7 +102,7 @@ public final class DorisUtils {
   public static Optional<Transform> extractPartitionInfoFromSql(String createTableSql) {
     try {
       // Merge all lines to handle multi-line partition definitions
-      String mergedSql = createTableSql.replaceAll("\\n", " ");
+      String mergedSql = createTableSql.replace('\n', ' ');
       Matcher matcher = PARTITION_INFO_PATTERN.matcher(mergedSql);
       if (matcher.find()) {
         String partitionType = matcher.group(1);
@@ -115,14 +115,14 @@ public final class DorisUtils {
                         (s.startsWith("`") && s.endsWith("`")) ? s.substring(1, s.length() - 1) : s)
                 .toArray(String[]::new);
         if (LIST_PARTITION.equals(partitionType)) {
-          String[][] filedNames =
+          String[][] fieldNames =
               Arrays.stream(columns).map(s -> new String[] {s}).toArray(String[][]::new);
           // Try to extract partition assignments
           ListPartition[] assignments = extractListPartitionAssignments(mergedSql);
           if (assignments.length > 0) {
-            return Optional.of(Transforms.list(filedNames, assignments));
+            return Optional.of(Transforms.list(fieldNames, assignments));
           }
-          return Optional.of(Transforms.list(filedNames));
+          return Optional.of(Transforms.list(fieldNames));
         } else if (RANGE_PARTITION.equals(partitionType)) {
           return Optional.of(Transforms.range(new String[] {columns[0]}));
         }
@@ -139,7 +139,7 @@ public final class DorisUtils {
       // Locate "PARTITION <name> VALUES IN (" and extract the outer paren content manually
       // to correctly handle multi-column partitions: VALUES IN (("a", 1), ("b", 2))
       Pattern headerPattern =
-          Pattern.compile("PARTITION\\s+(?:`(\\w+)`|(\\w+))\\s+VALUES\\s+IN\\s*\\(");
+          Pattern.compile("PARTITION\\s+(?:`([^`]+)`|(\\w+))\\s+VALUES\\s+IN\\s*\\(");
       Matcher matcher = headerPattern.matcher(mergedSql);
       List<ListPartition> partitions = new ArrayList<>();
       while (matcher.find()) {

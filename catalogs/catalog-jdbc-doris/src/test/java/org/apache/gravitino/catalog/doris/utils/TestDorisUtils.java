@@ -153,6 +153,78 @@ public class TestDorisUtils {
     transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
     Assertions.assertTrue(transform.isPresent());
     Assertions.assertEquals("list", transform.get().name());
+    Transforms.ListTransform listTransform = (Transforms.ListTransform) transform.get();
+    Assertions.assertEquals(2, listTransform.assignments().length);
+    Assertions.assertEquals("p1", listTransform.assignments()[0].name());
+    Assertions.assertEquals("p2", listTransform.assignments()[1].name());
+
+    // test backtick-quoted partition names with hyphens and dots (valid Doris identifiers)
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`city` varchar(50) NOT NULL\n) ENGINE=OLAP\n"
+            + " PARTITION BY LIST (`city`)\n"
+            + "(\n"
+            + " PARTITION `p-2024_07` VALUES IN (\"beijing\"),\n"
+            + " PARTITION `p-2024.08` VALUES IN (\"shanghai\")\n"
+            + ")\n"
+            + " DISTRIBUTED BY HASH(`city`) BUCKETS 1";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    Assertions.assertTrue(transform.isPresent());
+    Assertions.assertEquals("list", transform.get().name());
+    listTransform = (Transforms.ListTransform) transform.get();
+    Assertions.assertEquals(2, listTransform.assignments().length);
+    Assertions.assertEquals("p-2024_07", listTransform.assignments()[0].name());
+    Assertions.assertEquals("p-2024.08", listTransform.assignments()[1].name());
+
+    // test list partition with empty assignment list — should return type without assignments
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` int(11) NOT NULL\n) ENGINE=OLAP\n"
+            + " PARTITION BY LIST(`col1`)\n()\n"
+            + " DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    Assertions.assertTrue(transform.isPresent());
+    listTransform = (Transforms.ListTransform) transform.get();
+    Assertions.assertEquals(0, listTransform.assignments().length);
+
+    // test multi-line SQL — partition definition split across many lines
+    createTableSql =
+        "CREATE TABLE `testTable` (\n"
+            + "  `city` varchar(50) NOT NULL\n"
+            + ") ENGINE=OLAP\n"
+            + "PARTITION BY LIST (`city`)\n"
+            + "(\n"
+            + "  PARTITION `p1` VALUES IN (\"beijing\"),\n"
+            + "  PARTITION `p2` VALUES IN (\"shanghai\"),\n"
+            + "  PARTITION `p3` VALUES IN (\"guangzhou\")\n"
+            + ")\n"
+            + "DISTRIBUTED BY HASH(`city`) BUCKETS 1";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    Assertions.assertTrue(transform.isPresent());
+    listTransform = (Transforms.ListTransform) transform.get();
+    Assertions.assertEquals(3, listTransform.assignments().length);
+    Assertions.assertEquals("p3", listTransform.assignments()[2].name());
+
+    // test backtick-quoted column name with hyphen in PARTITION BY clause
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col-1` int(11) NOT NULL\n) ENGINE=OLAP\n"
+            + " PARTITION BY LIST(`col-1`)\n()\n"
+            + " DISTRIBUTED BY HASH(`col-1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    Assertions.assertTrue(transform.isPresent());
+    Assertions.assertEquals(Transforms.list(new String[][] {{"col-1"}}), transform.get());
+
+    // test partition name with spaces inside backticks
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`city` varchar(50) NOT NULL\n) ENGINE=OLAP\n"
+            + " PARTITION BY LIST (`city`)\n"
+            + "(\n"
+            + " PARTITION `p beijing` VALUES IN (\"beijing\")\n"
+            + ")\n"
+            + " DISTRIBUTED BY HASH(`city`) BUCKETS 1";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    Assertions.assertTrue(transform.isPresent());
+    listTransform = (Transforms.ListTransform) transform.get();
+    Assertions.assertEquals(1, listTransform.assignments().length);
+    Assertions.assertEquals("p beijing", listTransform.assignments()[0].name());
   }
 
   @Test
