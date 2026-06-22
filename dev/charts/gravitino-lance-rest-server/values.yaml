@@ -141,7 +141,7 @@ readinessProbe:
 ingress:
   enabled: false
   # Resource type to render when ingress is enabled.
-  # "ingress"  renders a networking.k8s.io/v1 Ingress (default, backward compatible).
+  # "ingress"  renders a Kubernetes Ingress (apiVersion selected by cluster version; default, backward compatible).
   # "gateway"  renders a Gateway API gateway.networking.k8s.io HTTPRoute instead.
   type: ingress
   className: "nginx"
