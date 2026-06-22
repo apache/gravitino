@@ -31,9 +31,11 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.Getter;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
-import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosClient;
+import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.iceberg.common.utils.CaffeineSchedulerExtractorUtils;
 import org.apache.gravitino.iceberg.common.utils.IcebergHiveCachedClientPool;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -273,10 +275,24 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   private KerberosClient initKerberosClient() {
     try {
-      KerberosClient kerberosClient = new KerberosClient(this.properties(), this.getConf());
+      KerberosConfig kerberosConfig = new KerberosConfig(this.properties());
+      KerberosClient kerberosClient =
+          KerberosClient.builder(kerberosConfig.getPrincipalName(), this.getConf())
+              .loginMode(KerberosAuthUtils.LoginMode.CURRENT_USER)
+              .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
+              .threadNameFormat("check-Iceberg-Hive-tgt-%d")
+              .build();
       // catalog_uuid always exists for Gravitino managed catalogs, `0` is just a fallback value.
       String catalogUUID = properties().getOrDefault("catalog_uuid", "0");
-      File keytabFile = kerberosClient.saveKeyTabFileFromUri(Long.parseLong(catalogUUID));
+      File keytabFile =
+          new File(
+              String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, Long.parseLong(catalogUUID)));
+      KerberosAuthUtils.saveKeytabFromUri(
+          kerberosConfig.getKeytab(),
+          keytabFile,
+          kerberosConfig.getFetchTimeoutSec(),
+          false,
+          this.getConf());
       kerberosClient.login(keytabFile.getAbsolutePath());
       return kerberosClient;
     } catch (IOException e) {

@@ -110,6 +110,35 @@ public final class KerberosAuthUtils {
   }
 
   /**
+   * Fetches a keytab URI into {@code keytabFile}, replacing any stale file first.
+   *
+   * <p>Deletes a pre-existing destination, marks the new file for deletion on JVM exit, and then
+   * fetches the keytab. The parent directory is created if needed.
+   *
+   * @param keytabUri source keytab URI
+   * @param keytabFile local destination file
+   * @param timeoutSec fetch timeout in seconds
+   * @param allowHdfsKeytabUri whether {@code hdfs://} keytab URIs are allowed
+   * @param hadoopConf Hadoop configuration, required only when fetching an HDFS URI
+   * @return the fetched local keytab file
+   * @throws IOException if the file cannot be fetched
+   */
+  public static File saveKeytabFromUri(
+      String keytabUri,
+      File keytabFile,
+      int timeoutSec,
+      boolean allowHdfsKeytabUri,
+      @Nullable Configuration hadoopConf)
+      throws IOException {
+    keytabFile.deleteOnExit();
+    if (keytabFile.exists() && !keytabFile.delete()) {
+      throw new IllegalStateException(
+          String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
+    }
+    return fetchKeytabFromUri(keytabUri, keytabFile, timeoutSec, allowHdfsKeytabUri, hadoopConf);
+  }
+
+  /**
    * Configures the JVM Kerberos configuration path from a Hadoop configuration key.
    *
    * @param hadoopConf Hadoop configuration
