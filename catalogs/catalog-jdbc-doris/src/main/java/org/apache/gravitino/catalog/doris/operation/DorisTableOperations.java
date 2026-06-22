@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -87,19 +88,12 @@ public class DorisTableOperations extends JdbcTableOperations {
       Distribution distribution,
       Index[] indexes) {
 
-    // Log index information for debugging
     if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "generateCreateTableSql: tableName={}, indexes.length={}", tableName, indexes.length);
-      for (int i = 0; i < indexes.length; i++) {
-        LOG.debug(
-            "  indexes[{}]: name={}, type={}, type.name()={}",
-            i,
-            indexes[i].name(),
-            indexes[i].type(),
-            indexes[i].type().name());
-      }
+      LOG.debug("generateCreateTableSql: tableName={}, indexCount={}", tableName, indexes.length);
     }
+
+    // Doris auto-increment requires 2.1.0+. Validate before delegating to base class.
+    validateAutoIncrementVersion(columns);
 
     validateIncrementCol(columns, indexes);
     validateDistribution(distribution, columns);
@@ -239,32 +233,71 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
   }
 
+  /**
+   * Validates that the Doris server version supports AUTO_INCREMENT columns. AUTO_INCREMENT was
+   * introduced in Doris 2.1.0. On older versions, the SQL parser does not recognize the
+   * AUTO_INCREMENT keyword and returns a syntax error.
+   */
+  private void validateAutoIncrementVersion(JdbcColumn[] columns) {
+    boolean hasAutoIncrement = Arrays.stream(columns).anyMatch(Column::autoIncrement);
+    if (!hasAutoIncrement) {
+      return;
+    }
+    Preconditions.checkState(dataSource != null, "dataSource is required for version validation");
+    String version = null;
+    try (Connection connection = dataSource.getConnection();
+        Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT VERSION()")) {
+      if (rs.next()) {
+        version = rs.getString(1);
+      }
+    } catch (SQLException e) {
+      LOG.warn("Failed to check Doris version for AUTO_INCREMENT compatibility", e);
+    }
+    if (version != null && !isVersionAtLeast(version, 2, 1, 0)) {
+      throw new UnsupportedOperationException(
+          "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
+    }
+  }
+
+  @VisibleForTesting
+  static boolean isVersionAtLeast(String version, int major, int minor, int patch) {
+    if (version == null || version.isEmpty()) {
+      return false;
+    }
+    // Strip any suffix like "-rc01" or "-beta"
+    String normalized = version.split("-")[0].trim();
+    String[] parts = normalized.split("\\.");
+    try {
+      int vMajor = Integer.parseInt(parts[0]);
+      if (vMajor != major) {
+        return vMajor > major;
+      }
+      int vMinor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+      if (vMinor != minor) {
+        return vMinor > minor;
+      }
+      int vPatch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+      return vPatch >= patch;
+    } catch (NumberFormatException e) {
+      LOG.warn("Failed to parse Doris version: {}", version, e);
+      return false;
+    }
+  }
+
   private static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     if (indexes.length == 0) {
       return;
     }
 
-    // Log index types for debugging
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("appendIndexesSql: processing {} indexes", indexes.length);
-      for (Index index : indexes) {
-        LOG.debug("  index: name={}, type={}", index.name(), index.type());
-      }
-    }
-
-    // Filter out PRIMARY_KEY and UNIQUE_KEY indexes — they are table model keys in Doris,
-    // defined via UNIQUE KEY(col) / DUPLICATE KEY(col) syntax, not via INDEX clause.
+    // Filter out UNIQUE_KEY indexes — they are table model keys in Doris,
+    // defined via UNIQUE KEY(col) syntax. PRIMARY_KEY is kept in the INDEX clause
+    // to maintain backward compatibility with Doris 1.2.x (SHOW INDEX returns
+    // secondary indexes, not table model keys).
     List<Index> nonKeyIndexes =
         Arrays.stream(indexes)
-            .filter(
-                index ->
-                    index.type() != Index.IndexType.PRIMARY_KEY
-                        && index.type() != Index.IndexType.UNIQUE_KEY)
+            .filter(index -> index.type() != Index.IndexType.UNIQUE_KEY)
             .collect(Collectors.toList());
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("appendIndexesSql: {} non-key indexes after filtering", nonKeyIndexes.size());
-    }
 
     if (nonKeyIndexes.isEmpty()) {
       return;
@@ -282,6 +315,10 @@ public class DorisTableOperations extends JdbcTableOperations {
             .map(
                 index -> {
                   String usingClause = mapIndexTypeToUsingClause(index.type());
+                  if (usingClause.isEmpty()) {
+                    return String.format(
+                        "INDEX `%s` (`%s`)", index.name(), index.fieldNames()[0][0]);
+                  }
                   return String.format(
                       "INDEX `%s` (`%s`) %s", index.name(), index.fieldNames()[0][0], usingClause);
                 })
@@ -293,15 +330,18 @@ public class DorisTableOperations extends JdbcTableOperations {
   private static String mapIndexTypeToUsingClause(Index.IndexType indexType) {
     switch (indexType) {
       case PRIMARY_KEY:
+        // PRIMARY_KEY stays in the INDEX clause (not filtered) for backward compatibility
+        // with Doris 1.2.x. No USING clause — Doris defaults to the appropriate index type.
+        return "";
       case UNIQUE_KEY:
         throw new IllegalStateException(
-            "PRIMARY_KEY and UNIQUE_KEY should be filtered out before index SQL generation, got: "
-                + indexType);
+            "UNIQUE_KEY should be filtered out before index SQL generation, got: " + indexType);
       case INVERTED:
         return "USING INVERTED";
       case BITMAP:
-        // Doris 4.0.6 removed BITMAP index support; 3.0+ internally converts BITMAP to INVERTED.
-        // Always generate USING INVERTED for cross-version compatibility.
+        // Doris 4.0.6 removed BITMAP from Nereids grammar (USING clause only accepts
+        // INVERTED/NGRAM_BF/ANN). Generate USING INVERTED for cross-version compatibility.
+        // The read path (mapDorisIndexType) also maps BITMAP->INVERTED for consistency.
         return "USING INVERTED";
       case VECTOR:
         return "USING ANN";
@@ -314,22 +354,17 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   private static void appendTableModelKeySql(Index[] indexes, StringBuilder sqlBuilder) {
-    // Only emit UNIQUE KEY declaration when an explicit UNIQUE_KEY index is present.
-    // PRIMARY_KEY indexes are intentionally skipped: Doris 1.2.x does not support UNIQUE KEY
-    // syntax (only DUPLICATE KEY / AGGREGATE KEY), and the default DUPLICATE KEY model already
-    // satisfies PRIMARY_KEY's uniqueness semantics. Users targeting Doris 2.0+ who need the
-    // UNIQUE KEY model should pass Index.IndexType.UNIQUE_KEY instead.
-    long keyIndexCount =
-        Arrays.stream(indexes)
-            .filter(
-                index ->
-                    index.type() == Index.IndexType.PRIMARY_KEY
-                        || index.type() == Index.IndexType.UNIQUE_KEY)
-            .count();
+    // Emit UNIQUE KEY table model declaration for UNIQUE_KEY index type.
+    // PRIMARY_KEY is kept in the INDEX clause (not here) for backward compatibility
+    // with Doris 1.2.x — SHOW INDEX returns secondary indexes, not table model keys.
+    // Note: Doris requires key columns to be an ordered prefix of the schema.
+    // The caller must ensure the key column is the first column in the table definition.
+    long uniqueKeyCount =
+        Arrays.stream(indexes).filter(index -> index.type() == Index.IndexType.UNIQUE_KEY).count();
     Preconditions.checkArgument(
-        keyIndexCount <= 1,
-        "Doris table model key can have at most one PRIMARY_KEY or UNIQUE_KEY index, got: %s",
-        keyIndexCount);
+        uniqueKeyCount <= 1,
+        "Doris table model key can have at most one UNIQUE_KEY index, got: %s",
+        uniqueKeyCount);
 
     Arrays.stream(indexes)
         .filter(index -> index.type() == Index.IndexType.UNIQUE_KEY)
@@ -477,24 +512,30 @@ public class DorisTableOperations extends JdbcTableOperations {
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
+      // Check if Index_type column exists (available in Doris 2.0+).
+      boolean hasIndexType = false;
+      ResultSetMetaData metaData = resultSet.getMetaData();
+      for (int i = 1; i <= metaData.getColumnCount(); i++) {
+        if ("Index_type".equals(metaData.getColumnName(i))) {
+          hasIndexType = true;
+          break;
+        }
+      }
+
       List<Index> indexes = new ArrayList<>();
       while (resultSet.next()) {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
-        // Index_type column may not exist in older Doris versions (e.g. 1.2.x).
-        // Fall back to null so mapDorisIndexType can infer from indexName.
-        String indexType;
-        try {
-          indexType = resultSet.getString("Index_type");
-        } catch (SQLException e) {
-          LOG.warn(
-              "Index_type column not available in SHOW INDEX output, "
-                  + "inferring index type from index name '{}'. "
-                  + "Upgrade to Doris 3.0+ for accurate index type mapping.",
-              indexName);
-          indexType = null;
+        // Doris always names the primary key index "PRIMARY"; detect it first.
+        Index.IndexType gravitinoIndexType;
+        if ("PRIMARY".equals(indexName)) {
+          gravitinoIndexType = Index.IndexType.PRIMARY_KEY;
+        } else if (hasIndexType) {
+          gravitinoIndexType = mapDorisIndexType(resultSet.getString("Index_type"), indexName);
+        } else {
+          // Doris 1.2.x: no Index_type column, infer from index name
+          gravitinoIndexType = mapDorisIndexType(null, indexName);
         }
-        Index.IndexType gravitinoIndexType = mapDorisIndexType(indexType, indexName);
         indexes.add(Indexes.of(gravitinoIndexType, indexName, new String[][] {{columnName}}));
       }
       return indexes;
@@ -507,17 +548,18 @@ public class DorisTableOperations extends JdbcTableOperations {
   static Index.IndexType mapDorisIndexType(String indexType, String indexName) {
     if (indexType == null) {
       // Index_type column unavailable (Doris 1.2.x) or returned null.
-      // Infer from index name: "PRIMARY" is the primary key, everything else defaults to
-      // INVERTED as a safe fallback (Doris 1.2.x indexes are all BTREE-based key indexes,
-      // but without Index_type we cannot distinguish UNIQUE_KEY from PRIMARY_KEY).
+      // In Doris 1.2.x, all indexes are BTREE-based key indexes. Without Index_type we
+      // cannot distinguish UNIQUE_KEY from PRIMARY_KEY, so infer from index name:
+      // "PRIMARY" is the primary key, everything else defaults to UNIQUE_KEY (matching
+      // the BTREE case below).
       if ("PRIMARY".equals(indexName)) {
         return Index.IndexType.PRIMARY_KEY;
       }
       LOG.warn(
-          "Index_type is null for index '{}', defaulting to INVERTED. "
+          "Index_type is null for index '{}', defaulting to UNIQUE_KEY. "
               + "Load table metadata from Doris 3.0+ for accurate index type mapping.",
           indexName);
-      return Index.IndexType.INVERTED;
+      return Index.IndexType.UNIQUE_KEY;
     }
     switch (indexType.toUpperCase()) {
       case "BTREE":
@@ -528,7 +570,10 @@ public class DorisTableOperations extends JdbcTableOperations {
       case "INVERTED":
         return Index.IndexType.INVERTED;
       case "BITMAP":
-        return Index.IndexType.BITMAP;
+        // Doris 4.0.6 removed BITMAP from Nereids grammar (USING clause only accepts
+        // INVERTED/NGRAM_BF/ANN). Map BITMAP to INVERTED for cross-version compatibility,
+        // matching the write path in mapIndexTypeToUsingClause.
+        return Index.IndexType.INVERTED;
       case "BLOOMFILTER":
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
       case "ANN":

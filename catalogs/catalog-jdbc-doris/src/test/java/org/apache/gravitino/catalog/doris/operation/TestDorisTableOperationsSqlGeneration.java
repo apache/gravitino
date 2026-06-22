@@ -18,7 +18,11 @@
  */
 package org.apache.gravitino.catalog.doris.operation;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.Collections;
+import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -44,6 +48,22 @@ public class TestDorisTableOperationsSqlGeneration {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new DorisTypeConverter();
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+      try {
+        // Set up a mock DataSource for validateAutoIncrementVersion
+        DataSource mockDataSource = org.mockito.Mockito.mock(DataSource.class);
+        Connection mockConnection = org.mockito.Mockito.mock(Connection.class);
+        Statement mockStatement = org.mockito.Mockito.mock(Statement.class);
+        ResultSet mockResultSet = org.mockito.Mockito.mock(ResultSet.class);
+        org.mockito.Mockito.when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        org.mockito.Mockito.when(mockConnection.createStatement()).thenReturn(mockStatement);
+        org.mockito.Mockito.when(mockStatement.executeQuery("SELECT VERSION()"))
+            .thenReturn(mockResultSet);
+        org.mockito.Mockito.when(mockResultSet.next()).thenReturn(true);
+        org.mockito.Mockito.when(mockResultSet.getString(1)).thenReturn("3.0.6.2");
+        super.dataSource = mockDataSource;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
 
     public String createTableSql(
@@ -140,7 +160,8 @@ public class TestDorisTableOperationsSqlGeneration {
             .build();
     Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
 
-    // PRIMARY_KEY index should be filtered out — Doris uses table model keys, not INDEX clause
+    // PRIMARY_KEY stays in the INDEX clause (not filtered) for backward compatibility
+    // with Doris 1.2.x. No USING clause — Doris defaults to the appropriate index type.
     Index[] indexes =
         new Index[] {Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", new String[][] {{"id"}})};
 
@@ -152,12 +173,9 @@ public class TestDorisTableOperationsSqlGeneration {
     String sql =
         mockOps.createTableSqlWithIndexes(
             "test_pk", new JdbcColumn[] {idCol, nameCol}, distribution, indexes);
-    Assertions.assertFalse(
-        sql.contains("INDEX PRIMARY"), "PRIMARY_KEY should be filtered out: " + sql);
-    Assertions.assertFalse(
-        sql.contains("USING INVERTED"), "No USING clause for PRIMARY_KEY: " + sql);
-    // PRIMARY_KEY does not generate UNIQUE KEY declaration — Doris 1.2.x doesn't support
-    // UNIQUE KEY syntax, and the default DUPLICATE KEY model is sufficient.
+    Assertions.assertTrue(
+        sql.contains("INDEX `PRIMARY` (`id`)"), "PRIMARY_KEY should be in INDEX clause: " + sql);
+    Assertions.assertFalse(sql.contains("USING"), "No USING clause for PRIMARY_KEY: " + sql);
     Assertions.assertFalse(
         sql.contains("UNIQUE KEY"), "PRIMARY_KEY should not generate UNIQUE KEY: " + sql);
   }
@@ -236,8 +254,10 @@ public class TestDorisTableOperationsSqlGeneration {
         Index.IndexType.UNIQUE_KEY, DorisTableOperations.mapDorisIndexType("BTREE", "uk_col1"));
     Assertions.assertEquals(
         Index.IndexType.INVERTED, DorisTableOperations.mapDorisIndexType("INVERTED", "idx_name"));
+    // BITMAP mapped to INVERTED for cross-version compatibility (Doris 4.0.6 removed BITMAP
+    // from Nereids grammar)
     Assertions.assertEquals(
-        Index.IndexType.BITMAP, DorisTableOperations.mapDorisIndexType("BITMAP", "idx_name"));
+        Index.IndexType.INVERTED, DorisTableOperations.mapDorisIndexType("BITMAP", "idx_name"));
     Assertions.assertEquals(
         Index.IndexType.DATA_SKIPPING_BLOOM_FILTER,
         DorisTableOperations.mapDorisIndexType("BLOOMFILTER", "idx_name"));
@@ -251,9 +271,9 @@ public class TestDorisTableOperationsSqlGeneration {
     // PRIMARY index name → PRIMARY_KEY
     Assertions.assertEquals(
         Index.IndexType.PRIMARY_KEY, DorisTableOperations.mapDorisIndexType(null, "PRIMARY"));
-    // Non-primary index name → INVERTED (safe fallback)
+    // Non-primary index name → UNIQUE_KEY (Doris 1.2.x indexes are all BTREE-based key indexes)
     Assertions.assertEquals(
-        Index.IndexType.INVERTED, DorisTableOperations.mapDorisIndexType(null, "idx_name"));
+        Index.IndexType.UNIQUE_KEY, DorisTableOperations.mapDorisIndexType(null, "idx_name"));
   }
 
   @Test
@@ -286,8 +306,9 @@ public class TestDorisTableOperationsSqlGeneration {
         mockOps.createTableSqlWithIndexes(
             "test_auto_incr", new JdbcColumn[] {idCol, nameCol}, distribution, indexes);
     Assertions.assertTrue(sql.contains("AUTO_INCREMENT"), "Should contain AUTO_INCREMENT: " + sql);
-    Assertions.assertFalse(sql.contains("INDEX PRIMARY"), "PRIMARY_KEY should be filtered: " + sql);
-    // PRIMARY_KEY does not generate UNIQUE KEY (Doris 1.2.x compatibility)
+    // PRIMARY_KEY stays in INDEX clause for backward compatibility with Doris 1.2.x
+    Assertions.assertTrue(
+        sql.contains("INDEX `PRIMARY` (`id`)"), "PRIMARY_KEY should be in INDEX clause: " + sql);
     Assertions.assertFalse(
         sql.contains("UNIQUE KEY"), "PRIMARY_KEY should not generate UNIQUE KEY: " + sql);
   }
@@ -386,5 +407,26 @@ public class TestDorisTableOperationsSqlGeneration {
         (TableChange.DeleteIndex) TableChange.deleteIndex("idx_name", true);
     String sql = DorisTableOperations.deleteIndexDefinition(mockTable, deleteIndex);
     Assertions.assertEquals("DROP INDEX `idx_name`", sql);
+  }
+
+  @Test
+  public void testIsVersionAtLeast() {
+    // Exact match
+    Assertions.assertTrue(DorisTableOperations.isVersionAtLeast("2.1.0", 2, 1, 0));
+    // Higher version
+    Assertions.assertTrue(DorisTableOperations.isVersionAtLeast("3.0.6.2", 2, 1, 0));
+    Assertions.assertTrue(DorisTableOperations.isVersionAtLeast("4.0.6", 2, 1, 0));
+    // Lower version
+    Assertions.assertFalse(DorisTableOperations.isVersionAtLeast("1.2.7", 2, 1, 0));
+    Assertions.assertFalse(DorisTableOperations.isVersionAtLeast("2.0.0", 2, 1, 0));
+    // With suffix
+    Assertions.assertTrue(DorisTableOperations.isVersionAtLeast("2.1.0-rc01", 2, 1, 0));
+    Assertions.assertTrue(DorisTableOperations.isVersionAtLeast("3.0.6.2-merged", 2, 1, 0));
+    // Null/empty
+    Assertions.assertFalse(DorisTableOperations.isVersionAtLeast(null, 2, 1, 0));
+    Assertions.assertFalse(DorisTableOperations.isVersionAtLeast("", 2, 1, 0));
+    // Patch level comparison
+    Assertions.assertTrue(DorisTableOperations.isVersionAtLeast("2.1.1", 2, 1, 0));
+    Assertions.assertFalse(DorisTableOperations.isVersionAtLeast("2.1.0", 2, 1, 1));
   }
 }

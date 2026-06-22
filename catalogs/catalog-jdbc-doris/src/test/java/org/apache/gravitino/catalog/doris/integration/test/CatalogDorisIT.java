@@ -356,9 +356,13 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         Transforms.EMPTY_TRANSFORM,
         loadTable);
+    // Verify index exists (type assertion skipped: 1.2.x SHOW INDEX returns bitmap type
+    // for secondary indexes created via INDEX clause, not PRIMARY_KEY)
+    assertEquals(1, loadTable.index().length);
+    assertEquals("k1_index", loadTable.index()[0].name());
 
     // rename table
     String newTableName = GravitinoITUtils.genRandomName("new_table_name");
@@ -370,7 +374,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         Transforms.EMPTY_TRANSFORM,
         renamedTable);
   }
@@ -523,7 +527,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         Transforms.EMPTY_TRANSFORM,
         loadedTable);
 
@@ -690,7 +694,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         partitioning,
         loadTable);
 
@@ -804,7 +808,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         new Transform[] {Transforms.range(new String[] {DORIS_COL_NAME4})},
         loadedTable);
 
@@ -868,7 +872,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         new Transform[] {Transforms.list(new String[][] {{DORIS_COL_NAME1}, {DORIS_COL_NAME4}})},
         loadedTable);
 
@@ -973,7 +977,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         partitioning,
         loadTable);
 
