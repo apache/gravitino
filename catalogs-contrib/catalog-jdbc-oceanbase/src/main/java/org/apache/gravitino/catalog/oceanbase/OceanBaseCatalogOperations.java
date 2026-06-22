@@ -18,24 +18,20 @@
  */
 package org.apache.gravitino.catalog.oceanbase;
 
-import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
+import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Operations for interacting with the OceanBase catalog in Apache Gravitino.
  *
- * <p>OceanBase supports both MySQL Connector/J and the OceanBase JDBC driver, so it should not use
- * {@code MySQLProtocolCompatibleCatalogOperations}, which rejects non-MySQL Connector/J drivers by
- * major version during catalog initialization.
+ * <p>OceanBase supports both MySQL Connector/J and the OceanBase JDBC driver, so it should skip the
+ * MySQL Connector/J major-version check during catalog initialization.
  */
-public class OceanBaseCatalogOperations extends JdbcCatalogOperations {
-  private static final Logger LOG = LoggerFactory.getLogger(OceanBaseCatalogOperations.class);
+public class OceanBaseCatalogOperations extends MySQLProtocolCompatibleCatalogOperations {
 
   /**
    * Constructs a new instance of {@link OceanBaseCatalogOperations}.
@@ -61,20 +57,7 @@ public class OceanBaseCatalogOperations extends JdbcCatalogOperations {
         columnDefaultValueConverter);
   }
 
-  /** Closes the OceanBase catalog and shuts down MySQL Connector/J cleanup resources if present. */
+  /** Skips MySQL Connector/J major-version checks for OceanBase JDBC drivers. */
   @Override
-  public void close() {
-    super.close();
-
-    try {
-      Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
-          .getMethod("uncheckedShutdown")
-          .invoke(null);
-      LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
-    } catch (ClassNotFoundException e) {
-      LOG.debug("MySQL AbandonedConnectionCleanupThread not found on classpath, skipping shutdown");
-    } catch (Exception e) {
-      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread", e);
-    }
-  }
+  public void checkJDBCDriverVersion() {}
 }

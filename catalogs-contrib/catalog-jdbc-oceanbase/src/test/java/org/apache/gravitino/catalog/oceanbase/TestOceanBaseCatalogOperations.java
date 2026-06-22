@@ -31,7 +31,7 @@ public class TestOceanBaseCatalogOperations {
     CatalogOperations operations = new OceanBaseCatalog().newOps(Collections.emptyMap());
 
     Assertions.assertInstanceOf(OceanBaseCatalogOperations.class, operations);
-    Assertions.assertFalse(operations instanceof MySQLProtocolCompatibleCatalogOperations);
+    Assertions.assertInstanceOf(MySQLProtocolCompatibleCatalogOperations.class, operations);
   }
 
   @Test
