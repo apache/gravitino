@@ -26,8 +26,9 @@ paths:
       summary: Add built-in IDP user
       description: >
         Creates a built-in IDP user with the given username and password.
-        Requires the `idp-basic` plugin and built-in IdP Basic authentication.
-        `gravitino.authenticators` must not include `simple`.
+        Requires the `idp-basic` plugin and built-in IdP Basic authentication. Built-in IdP is
+        incompatible with the `simple` authenticator (the default), `gravitino.authenticators` must
+        include `basic` and must not include `simple`.
       operationId: addIdpUser
       requestBody:
         required: true

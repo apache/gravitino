@@ -103,9 +103,63 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
 
-| Argument          | Description                                                     | Default value               | Required | Since version |
-|-------------------|-----------------------------------------------------------------|-----------------------------|----------|---------------|
-| `--metalake`      | The Gravitino metalake name.                                    | none                        | Yes      | 1.0.0         |
-| `--gravitino-uri` | The URI of Gravitino server.                                    | `http://127.0.0.1:8090`     | No       | 1.0.0         |
-| `--transport`     | Transport protocol type: stdio (local), http (Streamable HTTP). | `stdio`                     | No       | 1.0.0         |
-| `--mcp-url`       | The url of MCP server if using http transport.                  | `http://127.0.0.1:8000/mcp` | No       | 1.0.0         |
+| Argument          | Description                                                                      | Default value               | Required | Since version |
+|-------------------|----------------------------------------------------------------------------------|-----------------------------|----------|---------------|
+| `--metalake`      | The Gravitino metalake name.                                                     | none                        | Yes      | 1.0.0         |
+| `--gravitino-uri` | The URI of Gravitino server.                                                     | `http://127.0.0.1:8090`     | No       | 1.0.0         |
+| `--transport`     | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).     | `stdio`                     | No       | 1.0.0         |
+| `--mcp-url`       | The URL of MCP server if using HTTP transport.                                   | `http://127.0.0.1:8000/mcp` | No       | 1.0.0         |
+| `--token`         | OAuth2 Bearer token for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. | none (anonymous)            | No       | 1.3.0         |
+| `--tls-cert`      | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.          | none                        | No       | 1.3.0         |
+| `--tls-key`       | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.         | none                        | No       | 1.3.0         |
+
+## Authentication
+
+By default the MCP server talks to Gravitino anonymously. There are two ways to attach an identity, depending on the transport.
+
+### Static startup token (stdio and HTTP)
+
+Pass `--token` (or set the `GRAVITINO_TOKEN` environment variable) to authenticate the server with a static OAuth2 Bearer token. The value is treated as a Bearer token and sent as `Authorization: Bearer <token>`. The token is masked in the server's log output.
+
+```shell
+uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 --token <your-token>
+# or
+export GRAVITINO_TOKEN=<your-token>
+uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090
+```
+
+In `stdio` mode this token is used for every request. In HTTP mode it is only the fallback, used when an incoming request does not carry its own `Authorization` header.
+
+### Per-request identity (HTTP)
+
+When the server runs with HTTP transport, the `Authorization` header of each incoming MCP request is forwarded verbatim to Gravitino. The scheme is preserved, so OAuth2 (`Bearer`), Gravitino simple authentication (`Basic <base64(user:dummy)>`) and others all work. This keeps concurrent sessions from different principals isolated — one principal's identity never leaks into another's calls — and lets Gravitino enforce authorization per caller. The per-request header takes priority over the static `--token`.
+
+Authorization itself is always enforced by Gravitino: the MCP server forwards the identity but does not make access-control decisions of its own.
+
+### Serving over HTTPS (TLS)
+
+To serve the MCP HTTP endpoint (the `--mcp-url`, not the `--gravitino-uri`) over TLS, provide both `--tls-cert` and `--tls-key` and use an `https://` `--mcp-url`. The certificate and key must be provided together, and the URL scheme must match the TLS setting (an `https://` URL without a cert/key, or a cert/key behind an `http://` URL, is rejected at startup).
+
+```shell
+uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
+  --transport streamable-http --mcp-url https://localhost:8000/mcp \
+  --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
+```
+
+## Audit Logging
+
+Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the principal derived from the request's `Authorization` header.
+
+| Field        | Description                                                                                                                                                                             |
+|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `timestamp`  | UTC ISO-8601 time of the call.                                                                                                                                                          |
+| `principal`  | Caller identity: username for `Basic` simple auth, `bearer:<first-8-chars>` for a Bearer token, or `anonymous` when no identity is present.                                             |
+| `tool`       | Name of the invoked MCP tool.                                                                                                                                                           |
+| `outcome`    | `allow` for successful calls, `deny` for failed ones. `deny` is emitted for any tool-call exception (authorization denial being the common case); inspect `error_type` to disambiguate. |
+| `error_type` | Exception class name, present only when `outcome` is `deny`.                                                                                                                            |
+
+Example record:
+
+```json
+{"timestamp": "2026-06-16T03:21:09.123456+00:00", "principal": "alice", "tool": "get_list_of_catalogs", "outcome": "allow"}
+```
