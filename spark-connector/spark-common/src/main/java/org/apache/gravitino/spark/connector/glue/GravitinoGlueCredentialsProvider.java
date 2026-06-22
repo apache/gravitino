@@ -34,6 +34,9 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  * instantiated dynamically by Iceberg's {@code AwsClientProperties} using the {@code create(Map)}
  * static factory. The properties map contains the {@code client.credentials-provider.*} entries
  * with their prefix stripped, i.e. {@code access-key-id} and {@code secret-access-key}.
+ *
+ * <p>Adapted from Apache Doris's {@code CustomAwsCredentialsProvider} ({@code
+ * org.apache.doris.datasource.iceberg.s3tables.CustomAwsCredentialsProvider}).
  */
 public class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider {
 
