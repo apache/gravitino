@@ -87,7 +87,21 @@ public class DorisTableOperations extends JdbcTableOperations {
       Distribution distribution,
       Index[] indexes) {
 
-    validateIncrementCol(columns);
+    // Log index information for debugging
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(
+          "generateCreateTableSql: tableName={}, indexes.length={}", tableName, indexes.length);
+      for (int i = 0; i < indexes.length; i++) {
+        LOG.debug(
+            "  indexes[{}]: name={}, type={}, type.name()={}",
+            i,
+            indexes[i].name(),
+            indexes[i].type(),
+            indexes[i].type().name());
+      }
+    }
+
+    validateIncrementCol(columns, indexes);
     validateDistribution(distribution, columns);
 
     StringBuilder sqlBuilder = new StringBuilder();
@@ -111,6 +125,11 @@ public class DorisTableOperations extends JdbcTableOperations {
             .collect(Collectors.joining(",\n")));
 
     appendIndexesSql(indexes, sqlBuilder);
+
+    // Add Doris table model key declaration (UNIQUE KEY / DUPLICATE KEY).
+    // PRIMARY_KEY and UNIQUE_KEY indexes are filtered from the INDEX clause and instead emitted
+    // here as table-model keys, which is the correct Doris DDL position.
+    appendTableModelKeySql(indexes, sqlBuilder);
 
     sqlBuilder.append(NEW_LINE).append(")");
 
@@ -192,16 +211,6 @@ public class DorisTableOperations extends JdbcTableOperations {
     return resultMap;
   }
 
-  private static void validateIncrementCol(JdbcColumn[] columns) {
-    // Get all auto increment column
-    List<JdbcColumn> autoIncrementCols =
-        Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
-
-    // Doris does not support auto increment column before version 2.1.0
-    Preconditions.checkArgument(
-        autoIncrementCols.isEmpty(), "Doris does not support auto-increment column");
-  }
-
   private static void validateDistribution(Distribution distribution, JdbcColumn[] columns) {
     Preconditions.checkArgument(null != distribution, "Doris must set distribution");
 
@@ -233,21 +242,85 @@ public class DorisTableOperations extends JdbcTableOperations {
       return;
     }
 
-    // validate indexes
-    Arrays.stream(indexes)
-        .forEach(
-            index -> {
-              if (index.fieldNames().length > 1) {
-                throw new IllegalArgumentException("Index does not support multi fields in Doris");
-              }
-            });
+    // Log index types for debugging
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("appendIndexesSql: processing {} indexes", indexes.length);
+      for (Index index : indexes) {
+        LOG.debug("  index: name={}, type={}", index.name(), index.type());
+      }
+    }
+
+    // Filter out PRIMARY_KEY and UNIQUE_KEY indexes — they are table model keys in Doris,
+    // defined via UNIQUE KEY(col) / DUPLICATE KEY(col) syntax, not via INDEX clause.
+    List<Index> nonKeyIndexes =
+        Arrays.stream(indexes)
+            .filter(
+                index ->
+                    index.type() != Index.IndexType.PRIMARY_KEY
+                        && index.type() != Index.IndexType.UNIQUE_KEY)
+            .collect(Collectors.toList());
+
+    LOG.debug("appendIndexesSql: {} non-key indexes after filtering", nonKeyIndexes.size());
+
+    if (nonKeyIndexes.isEmpty()) {
+      return;
+    }
+
+    nonKeyIndexes.forEach(
+        index -> {
+          if (index.fieldNames().length > 1) {
+            throw new IllegalArgumentException("Index does not support multi fields in Doris");
+          }
+        });
 
     String indexSql =
-        Arrays.stream(indexes)
-            .map(index -> String.format("INDEX %s (%s)", index.name(), index.fieldNames()[0][0]))
+        nonKeyIndexes.stream()
+            .map(
+                index -> {
+                  String usingClause = mapIndexTypeToUsingClause(index.type());
+                  return String.format(
+                      "INDEX `%s` (`%s`) %s", index.name(), index.fieldNames()[0][0], usingClause);
+                })
             .collect(Collectors.joining(",\n"));
 
     sqlBuilder.append(",").append(NEW_LINE).append(indexSql);
+  }
+
+  private static String mapIndexTypeToUsingClause(Index.IndexType indexType) {
+    switch (indexType) {
+      case PRIMARY_KEY:
+      case UNIQUE_KEY:
+        throw new IllegalStateException(
+            "PRIMARY_KEY and UNIQUE_KEY should be filtered out before index SQL generation, got: "
+                + indexType);
+      case INVERTED:
+        return "USING INVERTED";
+      case BITMAP:
+        // Doris 4.0.6 removed BITMAP index support; 3.0+ internally converts BITMAP to INVERTED.
+        // Always generate USING INVERTED for cross-version compatibility.
+        return "USING INVERTED";
+      case VECTOR:
+        return "USING ANN";
+      default:
+        return "USING BTREE";
+    }
+  }
+
+  private static void appendTableModelKeySql(Index[] indexes, StringBuilder sqlBuilder) {
+    Arrays.stream(indexes)
+        .filter(
+            index ->
+                index.type() == Index.IndexType.PRIMARY_KEY
+                    || index.type() == Index.IndexType.UNIQUE_KEY)
+        .findFirst()
+        .ifPresent(
+            keyIndex -> {
+              String cols =
+                  Arrays.stream(keyIndex.fieldNames())
+                      .map(field -> BACK_QUOTE + field[0] + BACK_QUOTE)
+                      .collect(Collectors.joining(", "));
+              sqlBuilder.append(NEW_LINE).append("UNIQUE KEY(").append(cols).append(")");
+            });
   }
 
   private static void appendPartitionSql(
@@ -387,12 +460,37 @@ public class DorisTableOperations extends JdbcTableOperations {
       while (resultSet.next()) {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
-        indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+        String indexType = resultSet.getString("Index_type");
+        Index.IndexType gravitinoIndexType = mapDorisIndexType(indexType, indexName);
+        indexes.add(Indexes.of(gravitinoIndexType, indexName, new String[][] {{columnName}}));
       }
       return indexes;
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  @VisibleForTesting
+  static Index.IndexType mapDorisIndexType(String indexType, String indexName) {
+    if (indexType == null) {
+      return Index.IndexType.PRIMARY_KEY;
+    }
+    switch (indexType.toUpperCase()) {
+      case "BTREE":
+        if ("PRIMARY".equals(indexName)) {
+          return Index.IndexType.PRIMARY_KEY;
+        }
+        return Index.IndexType.UNIQUE_KEY;
+      case "INVERTED":
+        return Index.IndexType.INVERTED;
+      case "BITMAP":
+        return Index.IndexType.BITMAP;
+      case "BLOOMFILTER":
+        return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
+      case "ANN":
+        return Index.IndexType.VECTOR;
+      default:
+        return Index.IndexType.INVERTED;
     }
   }
 
@@ -766,7 +864,17 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   static String addIndexDefinition(TableChange.AddIndex addIndex) {
-    return String.format("ADD INDEX %s (%s)", addIndex.getName(), addIndex.getFieldNames()[0][0]);
+    // PRIMARY_KEY and UNIQUE_KEY are table-level concepts in Doris, not index-level
+    // They should not be added via ALTER TABLE ADD INDEX
+    if (addIndex.getType() == Index.IndexType.PRIMARY_KEY
+        || addIndex.getType() == Index.IndexType.UNIQUE_KEY) {
+      throw new UnsupportedOperationException(
+          "PRIMARY_KEY and UNIQUE_KEY cannot be added via ALTER TABLE ADD INDEX in Doris");
+    }
+    String usingClause = mapIndexTypeToUsingClause(addIndex.getType());
+    return String.format(
+        "ADD INDEX `%s` (`%s`) %s",
+        addIndex.getName(), addIndex.getFieldNames()[0][0], usingClause);
   }
 
   static String deleteIndexDefinition(
@@ -777,7 +885,7 @@ public class DorisTableOperations extends JdbcTableOperations {
               .anyMatch(index -> index.name().equals(deleteIndex.getName())),
           "Index does not exist");
     }
-    return "DROP INDEX " + deleteIndex.getName();
+    return "DROP INDEX `" + deleteIndex.getName() + "`";
   }
 
   @Override

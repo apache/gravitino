@@ -21,13 +21,16 @@ package org.apache.gravitino.catalog.doris.operation;
 import java.util.Collections;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -53,6 +56,18 @@ public class TestDorisTableOperationsSqlGeneration {
           Transforms.EMPTY_TRANSFORM,
           distribution,
           Indexes.EMPTY_INDEXES);
+    }
+
+    public String createTableSqlWithIndexes(
+        String tableName, JdbcColumn[] columns, Distribution distribution, Index[] indexes) {
+      return generateCreateTableSql(
+          tableName,
+          columns,
+          "comment",
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          distribution,
+          indexes);
     }
   }
 
@@ -106,5 +121,202 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
+  }
+
+  @Test
+  public void testCreateTableWithPrimaryKeyIndex() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn idCol =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn nameCol =
+        JdbcColumn.builder()
+            .withName("name")
+            .withType(Types.VarCharType.of(100))
+            .withNullable(true)
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
+
+    // PRIMARY_KEY index should be filtered out — Doris uses table model keys, not INDEX clause
+    Index[] indexes =
+        new Index[] {Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", new String[][] {{"id"}})};
+
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+
+    String sql =
+        mockOps.createTableSqlWithIndexes(
+            "test_pk", new JdbcColumn[] {idCol, nameCol}, distribution, indexes);
+    Assertions.assertFalse(
+        sql.contains("INDEX PRIMARY"), "PRIMARY_KEY should be filtered out: " + sql);
+    Assertions.assertFalse(
+        sql.contains("USING INVERTED"), "No USING clause for PRIMARY_KEY: " + sql);
+  }
+
+  @Test
+  public void testCreateTableWithInvertedIndex() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn idCol =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn nameCol =
+        JdbcColumn.builder()
+            .withName("name")
+            .withType(Types.VarCharType.of(100))
+            .withNullable(true)
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
+
+    Index[] indexes =
+        new Index[] {Indexes.of(Index.IndexType.INVERTED, "idx_name", new String[][] {{"name"}})};
+
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+
+    String sql =
+        mockOps.createTableSqlWithIndexes(
+            "test_inverted", new JdbcColumn[] {idCol, nameCol}, distribution, indexes);
+    Assertions.assertTrue(
+        sql.contains("INDEX `idx_name` (`name`) USING INVERTED"),
+        "Should generate INVERTED index: " + sql);
+  }
+
+  @Test
+  public void testCreateTableWithBitmapIndex() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn idCol =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    JdbcColumn tagCol =
+        JdbcColumn.builder()
+            .withName("tag")
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
+
+    Index[] indexes =
+        new Index[] {Indexes.of(Index.IndexType.BITMAP, "idx_tag", new String[][] {{"tag"}})};
+
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+
+    String sql =
+        mockOps.createTableSqlWithIndexes(
+            "test_bitmap", new JdbcColumn[] {idCol, tagCol}, distribution, indexes);
+    Assertions.assertTrue(
+        sql.contains("INDEX `idx_tag` (`tag`) USING INVERTED"),
+        "Should generate BITMAP index: " + sql);
+  }
+
+  @Test
+  public void testMapDorisIndexType() {
+    Assertions.assertEquals(
+        Index.IndexType.PRIMARY_KEY, DorisTableOperations.mapDorisIndexType("BTREE", "PRIMARY"));
+    Assertions.assertEquals(
+        Index.IndexType.INVERTED, DorisTableOperations.mapDorisIndexType("INVERTED", "idx_name"));
+    Assertions.assertEquals(
+        Index.IndexType.BITMAP, DorisTableOperations.mapDorisIndexType("BITMAP", "idx_name"));
+    Assertions.assertEquals(
+        Index.IndexType.DATA_SKIPPING_BLOOM_FILTER,
+        DorisTableOperations.mapDorisIndexType("BLOOMFILTER", "idx_name"));
+    Assertions.assertEquals(
+        Index.IndexType.VECTOR, DorisTableOperations.mapDorisIndexType("ANN", "idx_name"));
+    // Unknown type should fall back to INVERTED
+    Assertions.assertEquals(
+        Index.IndexType.INVERTED,
+        DorisTableOperations.mapDorisIndexType("UNKNOWN_TYPE", "idx_name"));
+  }
+
+  @Test
+  public void testCreateTableWithAutoIncrement() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    JdbcColumn idCol =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.LongType.get())
+            .withNullable(false)
+            .withAutoIncrement(true)
+            .build();
+    JdbcColumn nameCol =
+        JdbcColumn.builder()
+            .withName("name")
+            .withType(Types.VarCharType.of(100))
+            .withNullable(true)
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
+
+    Index[] indexes =
+        new Index[] {Indexes.of(Index.IndexType.PRIMARY_KEY, "PRIMARY", new String[][] {{"id"}})};
+
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+
+    String sql =
+        mockOps.createTableSqlWithIndexes(
+            "test_auto_incr", new JdbcColumn[] {idCol, nameCol}, distribution, indexes);
+    Assertions.assertTrue(sql.contains("AUTO_INCREMENT"), "Should contain AUTO_INCREMENT: " + sql);
+    Assertions.assertFalse(sql.contains("INDEX PRIMARY"), "PRIMARY_KEY should be filtered: " + sql);
+    Assertions.assertTrue(
+        sql.contains("UNIQUE KEY(`id`)"), "Should contain UNIQUE KEY declaration: " + sql);
+  }
+
+  @Test
+  public void testAddIndexDefinition() {
+    // INVERTED index
+    TableChange.AddIndex addIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(Index.IndexType.INVERTED, "idx_name", new String[][] {{"col1"}});
+    String sql = DorisTableOperations.addIndexDefinition(addIndex);
+    Assertions.assertEquals("ADD INDEX `idx_name` (`col1`) USING INVERTED", sql);
+
+    // BITMAP index
+    addIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(Index.IndexType.BITMAP, "idx_tag", new String[][] {{"tag"}});
+    sql = DorisTableOperations.addIndexDefinition(addIndex);
+    Assertions.assertEquals("ADD INDEX `idx_tag` (`tag`) USING INVERTED", sql);
+
+    // VECTOR index (maps to ANN)
+    addIndex =
+        (TableChange.AddIndex)
+            TableChange.addIndex(Index.IndexType.VECTOR, "idx_vec", new String[][] {{"embedding"}});
+    sql = DorisTableOperations.addIndexDefinition(addIndex);
+    Assertions.assertEquals("ADD INDEX `idx_vec` (`embedding`) USING ANN", sql);
+  }
+
+  @Test
+  public void testDeleteIndexDefinition() {
+    // deleteIndexDefinition should quote the index name with backticks, matching addIndexDefinition
+    JdbcTable mockTable =
+        JdbcTable.builder()
+            .withName("t")
+            .withColumns(new org.apache.gravitino.catalog.jdbc.JdbcColumn[0])
+            .withIndexes(
+                new Index[] {
+                  Indexes.of(Index.IndexType.INVERTED, "idx_name", new String[][] {{"col1"}})
+                })
+            .build();
+    TableChange.DeleteIndex deleteIndex =
+        (TableChange.DeleteIndex) TableChange.deleteIndex("idx_name", true);
+    String sql = DorisTableOperations.deleteIndexDefinition(mockTable, deleteIndex);
+    Assertions.assertEquals("DROP INDEX `idx_name`", sql);
   }
 }
