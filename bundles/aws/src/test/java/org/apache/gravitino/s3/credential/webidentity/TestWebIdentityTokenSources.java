@@ -85,16 +85,17 @@ class TestWebIdentityTokenSources {
   }
 
   @Test
-  void blankSourcePropertyFallsBackToDefault(@TempDir Path dir) throws IOException {
+  void blankSourcePropertyIsRejected(@TempDir Path dir) throws IOException {
     Path tokenFile = dir.resolve("token");
     Files.write(tokenFile, "tok".getBytes(StandardCharsets.UTF_8));
 
+    // The default applies only when the key is absent; an explicitly blank value
+    // is treated as an unknown source rather than silently falling back.
     Map<String, String> props = new HashMap<>();
     props.put(WebIdentityTokenSourceConfig.SOURCE, "");
     props.put(WebIdentityTokenSourceConfig.FILE_PATH, tokenFile.toString());
 
-    WebIdentityTokenSource source = WebIdentityTokenSources.create(props);
-    assertInstanceOf(FileWebIdentityTokenSource.class, source);
+    assertThrows(IllegalArgumentException.class, () -> WebIdentityTokenSources.create(props));
   }
 
   @Test

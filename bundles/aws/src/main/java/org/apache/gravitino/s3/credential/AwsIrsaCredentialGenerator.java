@@ -25,10 +25,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.CredentialContext;
@@ -99,10 +99,10 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
     validateInputParameters(readLocations, writeLocations, userName);
 
     IamPolicy sessionPolicy = createSessionPolicy(readLocations, writeLocations, region);
-    return createCredentials(userName, sessionPolicy);
+    return createCredentials(userName, Optional.of(sessionPolicy));
   }
 
-  private Credentials createCredentials(String userName, @Nullable IamPolicy sessionPolicy) {
+  private Credentials createCredentials(String userName, Optional<IamPolicy> sessionPolicy) {
     String effectiveRoleArn = getValidatedRoleArn(roleArn);
     String tokenContent = tokenSource.getToken();
     return assumeRoleWithWebIdentity(effectiveRoleArn, userName, tokenContent, sessionPolicy);
@@ -121,7 +121,10 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
         .refreshRequest(
             () ->
                 createAssumeRoleWithWebIdentityRequest(
-                    getValidatedRoleArn(roleArn), userName, tokenSource.getToken(), null))
+                    getValidatedRoleArn(roleArn),
+                    userName,
+                    tokenSource.getToken(),
+                    Optional.empty()))
         .build();
   }
 
@@ -339,7 +342,7 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
   }
 
   private Credentials assumeRoleWithWebIdentity(
-      String roleArn, String userName, String webIdentityToken, @Nullable IamPolicy sessionPolicy) {
+      String roleArn, String userName, String webIdentityToken, Optional<IamPolicy> sessionPolicy) {
     try (StsClient stsClient = createStsClient()) {
       AssumeRoleWithWebIdentityResponse response =
           stsClient.assumeRoleWithWebIdentity(
@@ -361,16 +364,14 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
   }
 
   private AssumeRoleWithWebIdentityRequest createAssumeRoleWithWebIdentityRequest(
-      String roleArn, String userName, String webIdentityToken, @Nullable IamPolicy sessionPolicy) {
+      String roleArn, String userName, String webIdentityToken, Optional<IamPolicy> sessionPolicy) {
     AssumeRoleWithWebIdentityRequest.Builder requestBuilder =
         AssumeRoleWithWebIdentityRequest.builder()
             .roleArn(roleArn)
             .roleSessionName("gravitino_irsa_session_" + userName)
             .durationSeconds(tokenExpireSecs)
             .webIdentityToken(webIdentityToken);
-    if (sessionPolicy != null) {
-      requestBuilder.policy(sessionPolicy.toJson());
-    }
+    sessionPolicy.ifPresent(policy -> requestBuilder.policy(policy.toJson()));
     return requestBuilder.build();
   }
 

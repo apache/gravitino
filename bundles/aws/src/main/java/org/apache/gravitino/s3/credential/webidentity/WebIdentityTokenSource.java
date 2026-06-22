@@ -27,6 +27,10 @@ import java.util.Map;
  *
  * <p>Implementations decide how the token is sourced (local file, OAuth flow, etc.) and are
  * responsible for any caching and refresh behavior.
+ *
+ * <p>This SPI is scoped to AWS S3 credential vending (IRSA / {@code AssumeRoleWithWebIdentity}); it
+ * is not a generic cross-storage abstraction. Other storage backends (e.g. GCS, Azure) use
+ * different workload-identity mechanisms and are out of scope here.
  */
 public interface WebIdentityTokenSource extends Closeable {
 

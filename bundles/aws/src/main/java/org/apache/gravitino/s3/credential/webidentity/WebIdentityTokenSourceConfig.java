@@ -18,7 +18,12 @@
  */
 package org.apache.gravitino.s3.credential.webidentity;
 
-/** Property keys shared by {@link WebIdentityTokenSource} implementations. */
+/**
+ * Property keys shared by {@link WebIdentityTokenSource} implementations.
+ *
+ * <p>These keys are AWS S3-specific (prefixed {@code s3-}); the WebIdentity token source is scoped
+ * to AWS S3 credential vending and is not a generic cross-storage abstraction.
+ */
 public final class WebIdentityTokenSourceConfig {
 
   /** Selects which {@link WebIdentityTokenSource} implementation to use. */
