@@ -28,7 +28,7 @@ public class TestPbkdf2Sha512PasswordHasher {
   private final PasswordHasher passwordHasher = new Pbkdf2Sha512PasswordHasher();
 
   @Test
-  public void testHashProducesPbkdf2PhcString() {
+  public void testHashFormat() {
     String hashedPassword = passwordHasher.hash("test-password");
 
     String[] parts = hashedPassword.split("\\$");
@@ -45,7 +45,7 @@ public class TestPbkdf2Sha512PasswordHasher {
   }
 
   @Test
-  public void testVerifyMatchesExpectedPassword() {
+  public void testVerifyMatch() {
     String hashedPassword = passwordHasher.hash("test-password");
 
     Assertions.assertTrue(passwordHasher.verify("test-password", hashedPassword));
@@ -53,7 +53,7 @@ public class TestPbkdf2Sha512PasswordHasher {
   }
 
   @Test
-  public void testHashUsesUniqueSaltEachTime() {
+  public void testUniqueSalt() {
     String firstHash = passwordHasher.hash("test-password");
     String secondHash = passwordHasher.hash("test-password");
 
@@ -63,12 +63,12 @@ public class TestPbkdf2Sha512PasswordHasher {
   }
 
   @Test
-  public void testFactoryCreatesPbkdf2Hasher() {
+  public void testFactory() {
     Assertions.assertTrue(PasswordHasherFactory.create() instanceof Pbkdf2Sha512PasswordHasher);
   }
 
   @Test
-  public void testHashRejectsBlankPassword() {
+  public void testHashBlank() {
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, () -> passwordHasher.hash(" "));
 
@@ -76,7 +76,7 @@ public class TestPbkdf2Sha512PasswordHasher {
   }
 
   @Test
-  public void testVerifyRejectsBlankPlainPassword() {
+  public void testVerifyBlankPlain() {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -86,7 +86,7 @@ public class TestPbkdf2Sha512PasswordHasher {
   }
 
   @Test
-  public void testVerifyRejectsBlankHashedPassword() {
+  public void testVerifyBlankHash() {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> passwordHasher.verify("test-password", " "));
@@ -95,7 +95,7 @@ public class TestPbkdf2Sha512PasswordHasher {
   }
 
   @Test
-  public void testVerifyRejectsMalformedPhcString() {
+  public void testVerifyMalformed() {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -105,7 +105,7 @@ public class TestPbkdf2Sha512PasswordHasher {
   }
 
   @Test
-  public void testVerifyRejectsOversizedBase64PhcString() {
+  public void testVerifyOversizedB64() {
     String oversizedBase64 = "A".repeat(100);
     IllegalArgumentException exception =
         Assertions.assertThrows(
@@ -119,7 +119,7 @@ public class TestPbkdf2Sha512PasswordHasher {
   }
 
   @Test
-  public void testVerifyRejectsInvalidBase64PhcString() {
+  public void testVerifyInvalidB64() {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -129,7 +129,7 @@ public class TestPbkdf2Sha512PasswordHasher {
   }
 
   @Test
-  public void testVerifyRejectsUnexpectedIterationCount() {
+  public void testVerifyBadIterations() {
     String hashedPassword = passwordHasher.hash("test-password");
     String unsupportedHash =
         hashedPassword.replace("i=" + Pbkdf2Sha512Defaults.DEFAULT_ITERATIONS, "i=420000");
