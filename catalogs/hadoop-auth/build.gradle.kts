@@ -17,31 +17,29 @@
  * under the License.
  */
 
+description = "hadoop-auth"
+
 plugins {
   id("java")
 }
 
-// try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
   compileOnly(project(":api"))
   compileOnly(project(":common"))
 
-  implementation(libs.cglib)
-  implementation(libs.commons.io)
-  implementation(libs.commons.lang3)
-  implementation(project(":catalogs:hadoop-auth")) {
-    exclude("*")
-  }
-  implementation(libs.guava)
-  implementation(libs.hadoop3.client.api)
-  implementation(libs.hadoop3.client.runtime)
-  implementation(libs.slf4j.api)
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.guava)
+  compileOnly(libs.slf4j.api)
 
   testImplementation(project(":api"))
   testImplementation(project(":common"))
 
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
+  testImplementation(libs.guava)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

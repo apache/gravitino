@@ -18,15 +18,12 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import org.apache.gravitino.utils.FileFetcher;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -38,14 +35,13 @@ public class KerberosClient implements Closeable {
   public static final String GRAVITINO_KEYTAB_FORMAT =
       "keytabs/gravitino-lakehouse-paimon-%s-keytab";
 
-  private final ScheduledThreadPoolExecutor checkTgtExecutor;
+  private ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Map<String, String> conf;
   private final Configuration hadoopConf;
 
   public KerberosClient(Map<String, String> conf, Configuration hadoopConf) {
     this.conf = conf;
     this.hadoopConf = hadoopConf;
-    this.checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
   }
 
   /**
@@ -61,23 +57,14 @@ public class KerberosClient implements Closeable {
     String catalogPrincipal = kerberosConfig.getPrincipalName();
 
     // Login
-    UserGroupInformation.setConfiguration(hadoopConf);
-    UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
-    UserGroupInformation kerberosLoginUgi = UserGroupInformation.getCurrentUser();
+    UserGroupInformation kerberosLoginUgi =
+        KerberosAuthUtils.login(
+            catalogPrincipal, keytabFilePath, hadoopConf, KerberosAuthUtils.LoginMode.CURRENT_USER);
 
     // Refresh the cache if it's out of date.
     int checkInterval = kerberosConfig.getCheckIntervalSec();
-    checkTgtExecutor.scheduleAtFixedRate(
-        () -> {
-          try {
-            kerberosLoginUgi.checkTGTAndReloginFromKeytab();
-          } catch (Exception e) {
-            LOG.error("Fail to refresh ugi token: ", e);
-          }
-        },
-        checkInterval,
-        checkInterval,
-        TimeUnit.SECONDS);
+    checkTgtExecutor =
+        KerberosAuthUtils.startTicketRefresh(kerberosLoginUgi, checkInterval, "check-tgt-%d", LOG);
   }
 
   public File saveKeyTabFileFromUri(String catalogId) throws IOException {
@@ -101,18 +88,14 @@ public class KerberosClient implements Closeable {
     }
 
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
-    FileFetcher.get()
-        .fetchFileFromUri(
-            keyTabUri,
-            keytabFile,
-            fetchKeytabFileTimeout * 1000,
-            null /* hadoopConf: Paimon keytab URIs never use the hdfs scheme */);
+    KerberosAuthUtils.fetchKeytabFromUri(
+        keyTabUri,
+        keytabFile,
+        fetchKeytabFileTimeout,
+        false /* allowHdfsKeytabUri */,
+        null /* hadoopConf: Paimon keytab URIs never use the hdfs scheme */);
 
     return keytabFile;
-  }
-
-  private static ThreadFactory getThreadFactory(String factoryName) {
-    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
   }
 
   @Override

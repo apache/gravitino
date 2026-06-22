@@ -24,7 +24,6 @@ import static org.apache.gravitino.hive.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,11 +31,8 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.hive.client.HiveClient;
-import org.apache.gravitino.utils.FileFetcher;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
@@ -126,35 +122,19 @@ public class KerberosClient implements java.io.Closeable {
 
     // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-    List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
-    Preconditions.checkArgument(
-        principalComponents.size() == 2, "The principal has the wrong format");
+    KerberosAuthUtils.checkPrincipalAndGetRealm(catalogPrincipal);
 
     // Login
-    UserGroupInformation.setConfiguration(hadoopConf);
-    UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
-    UserGroupInformation loginUgi = UserGroupInformation.getLoginUser();
+    UserGroupInformation loginUgi =
+        KerberosAuthUtils.login(
+            catalogPrincipal, keytabFilePath, hadoopConf, KerberosAuthUtils.LoginMode.LOGIN_USER);
     realLoginUgi = loginUgi;
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
-      if (checkTgtExecutor == null) {
-        checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
-      }
       int checkInterval = kerberosConfig.getCheckIntervalSec();
-      checkTgtExecutor.scheduleAtFixedRate(
-          () -> {
-            try {
-              loginUgi.checkTGTAndReloginFromKeytab();
-            } catch (Exception e) {
-              LOG.error("Fail to refresh ugi token: ", e);
-            }
-          },
-          checkInterval,
-          checkInterval,
-          TimeUnit.SECONDS);
+      checkTgtExecutor =
+          KerberosAuthUtils.startTicketRefresh(loginUgi, checkInterval, "check-tgt-%d", LOG);
     }
 
     return loginUgi;
@@ -164,9 +144,6 @@ public class KerberosClient implements java.io.Closeable {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     String keyTabUri = kerberosConfig.getKeytab();
-    Preconditions.checkArgument(StringUtils.isNotBlank(keyTabUri), "Keytab uri can't be blank");
-    Preconditions.checkArgument(
-        !keyTabUri.trim().startsWith("hdfs"), "HDFS URIs are not supported for keytab files");
 
     File keytabsDir = new File("keytabs");
     if (!keytabsDir.exists()) {
@@ -174,13 +151,9 @@ public class KerberosClient implements java.io.Closeable {
     }
     File keytabFile = new File(path);
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
-    FileFetcher.get()
-        .fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf);
+    KerberosAuthUtils.fetchKeytabFromUri(
+        keyTabUri, keytabFile, fetchKeytabFileTimeout, false /* allowHdfsKeytabUri */, hadoopConf);
     return keytabFile;
-  }
-
-  private static ThreadFactory getThreadFactory(String factoryName) {
-    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
   }
 
   @Override

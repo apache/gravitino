@@ -22,19 +22,12 @@ package org.apache.gravitino.catalog.hadoop.fs.kerberos;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.SECURITY_KRB5_ENV;
 
-import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.utils.FileFetcher;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -61,39 +54,21 @@ public class KerberosClient implements Closeable {
 
     // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-    @SuppressWarnings("null")
-    List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
-    Preconditions.checkArgument(
-        principalComponents.size() == 2, "The principal has the wrong format");
-    kerberosRealm = principalComponents.get(1);
+    kerberosRealm = KerberosAuthUtils.checkPrincipalAndGetRealm(catalogPrincipal);
 
-    String krb5Config = hadoopConf.get(HADOOP_KRB5_CONF);
-    if (krb5Config != null) {
-      System.setProperty(SECURITY_KRB5_ENV, krb5Config);
-    }
+    KerberosAuthUtils.configureKrb5Conf(hadoopConf, HADOOP_KRB5_CONF, SECURITY_KRB5_ENV);
 
     // Login
-    UserGroupInformation.setConfiguration(hadoopConf);
     UserGroupInformation kerberosLoginUgi =
-        UserGroupInformation.loginUserFromKeytabAndReturnUGI(catalogPrincipal, keytabFilePath);
+        KerberosAuthUtils.login(
+            catalogPrincipal, keytabFilePath, hadoopConf, KerberosAuthUtils.LoginMode.RETURN_UGI);
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
-      this.checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
       int checkInterval = kerberosConfig.getCheckIntervalSec();
-      checkTgtExecutor.scheduleAtFixedRate(
-          () -> {
-            try {
-              kerberosLoginUgi.checkTGTAndReloginFromKeytab();
-            } catch (Exception e) {
-              LOG.error("Fail to refresh ugi token: ", e);
-            }
-          },
-          checkInterval,
-          checkInterval,
-          TimeUnit.SECONDS);
+      this.checkTgtExecutor =
+          KerberosAuthUtils.startTicketRefresh(
+              kerberosLoginUgi, checkInterval, "check-tgt-%d", LOG);
     }
 
     return kerberosLoginUgi;
@@ -103,12 +78,8 @@ public class KerberosClient implements Closeable {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     String keyTabUri = kerberosConfig.getKeytab();
-    Preconditions.checkArgument(StringUtils.isNotBlank(keyTabUri), "Keytab uri can't be blank");
-    // TODO: Support to download the file from Kerberos HDFS
-    Preconditions.checkArgument(
-        !keyTabUri.trim().startsWith("hdfs"), "Keytab uri doesn't support to use HDFS");
 
-    java.io.File keytabsDir = new File("keytabs");
+    File keytabsDir = new File("keytabs");
     if (!keytabsDir.exists()) {
       // Ignore the return value, because there exists many Fileset catalog operations making
       // this directory.
@@ -123,14 +94,10 @@ public class KerberosClient implements Closeable {
     }
 
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
-    FileFetcher.get()
-        .fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf);
+    KerberosAuthUtils.fetchKeytabFromUri(
+        keyTabUri, keytabFile, fetchKeytabFileTimeout, false /* allowHdfsKeytabUri */, hadoopConf);
 
     return keytabFile;
-  }
-
-  private static ThreadFactory getThreadFactory(String factoryName) {
-    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
   }
 
   @Override
