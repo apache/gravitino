@@ -19,13 +19,23 @@
 
 package org.apache.gravitino.idp.basic.password;
 
-/** Factory for password hasher implementations. */
-public final class PasswordHasherFactory {
+/** Default parameters for the built-in SHA3-512 password hasher. */
+public final class Sha3512Defaults {
 
-  private PasswordHasherFactory() {}
+  /** JCA {@link java.security.MessageDigest} algorithm name for SHA3-512. */
+  public static final String DIGEST_ALGORITHM = "SHA3-512";
 
-  /** Create the built-in password hasher. */
-  public static PasswordHasher create() {
-    return new Sha3512PasswordHasher();
-  }
+  /** Default iteration count for salted SHA3-512 password stretching. */
+  public static final int DEFAULT_ITERATIONS = 100_000;
+
+  /** PHC-style prefix for stored password hashes. */
+  public static final String PHC_PREFIX = "$sha3-512$";
+
+  /** Default salt length in bytes. */
+  public static final int DEFAULT_SALT_LENGTH = 16;
+
+  /** SHA3-512 digest output length in bytes. */
+  public static final int DEFAULT_HASH_LENGTH = 64;
+
+  private Sha3512Defaults() {}
 }
