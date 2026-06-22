@@ -127,8 +127,8 @@ database.
 Among the common password hashing algorithms, **PBKDF2-HMAC-SHA512** is the recommended choice for
 Gravitino.
 
-| Algorithm | Status |
-|---|---|
+| Algorithm          | Status              |
+|--------------------|---------------------|
 | PBKDF2-HMAC-SHA512 | Recommended default |
 
 The initial design uses **PBKDF2-HMAC-SHA512** as the only supported algorithm, which keeps the
@@ -523,16 +523,16 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### 10.1 Suggested Work Plan
 
-| Phase | Work Item | Module / Files | Notes |
-|---|---|---|---|
-| 1 | Built-in IDP module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `plugins:idp-basic` | Add the new module and register `IdpRESTFeature` through `gravitino.server.rest.extensionPackages`. |
-| 2 | Password hashing support | `PasswordHasher`, `Pbkdf2Sha512PasswordHasher`, related tests | Use PBKDF2-HMAC-SHA512 as the only supported password hashing algorithm and store PHC-style hash strings. |
-| 3 | IdP metadata schema | JDBC schema files, mapper definitions, store layer | Create `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel` with soft-delete support. |
-| 4 | Service admin initialization | startup initialization logic, validation logic | Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD`, initialize missing configured service admins during startup, and fail startup when required credentials are absent. |
-| 5 | Basic authentication flow | `BasicAuthenticator`, auth manager, filter integration | Verify Basic credentials against `idp_user_meta` and resolve the authenticated principal. |
-| 6 | Group resolution | store layer, auth manager | Load the user's active groups from `idp_user_group_rel` and `idp_group_meta` for later authorization. |
-| 7 | Local IdP management APIs | REST resources, DTOs, request/response classes | Implement user CRUD, group CRUD, and group membership management under `/api/idp`. |
-| 8 | Tests and documentation | unit tests, integration tests, design and user docs | Cover initialization flow, authentication, metadata persistence, REST APIs, and doc/config alignment. |
+| Phase | Work Item                    | Module / Files                                                        | Notes                                                                                                                                                            |
+|-------|------------------------------|-----------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1     | Built-in IDP module wiring   | `settings.gradle.kts`, `server/build.gradle.kts`, `plugins:idp-basic` | Add the new module and register `IdpRESTFeature` through `gravitino.server.rest.extensionPackages`.                                                              |
+| 2     | Password hashing support     | `PasswordHasher`, `Pbkdf2Sha512PasswordHasher`, related tests         | Use PBKDF2-HMAC-SHA512 as the only supported password hashing algorithm and store PHC-style hash strings.                                                        |
+| 3     | IdP metadata schema          | JDBC schema files, mapper definitions, store layer                    | Create `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel` with soft-delete support.                                                                     |
+| 4     | Service admin initialization | startup initialization logic, validation logic                        | Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD`, initialize missing configured service admins during startup, and fail startup when required credentials are absent. |
+| 5     | Basic authentication flow    | `BasicAuthenticator`, auth manager, filter integration                | Verify Basic credentials against `idp_user_meta` and resolve the authenticated principal.                                                                        |
+| 6     | Group resolution             | store layer, auth manager                                             | Load the user's active groups from `idp_user_group_rel` and `idp_group_meta` for later authorization.                                                            |
+| 7     | Local IdP management APIs    | REST resources, DTOs, request/response classes                        | Implement user CRUD, group CRUD, and group membership management under `/api/idp`.                                                                               |
+| 8     | Tests and documentation      | unit tests, integration tests, design and user docs                   | Cover initialization flow, authentication, metadata persistence, REST APIs, and doc/config alignment.                                                            |
 
 ### 10.2 Review Checklist
 
