@@ -115,14 +115,6 @@ public class AzureFileSystemProvider implements FileSystemProvider, SupportsCred
     return ABS_PROVIDER_NAME;
   }
 
-  @Override
-  public boolean containsClientCredentials(Map<String, String> config) {
-    return SupportsCredentialVending.allNonBlank(
-        config,
-        AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
-        AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
-  }
-
   /**
    * Add additional Azure specific configuration to tune the performance.
    *

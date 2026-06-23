@@ -571,14 +571,11 @@ class BaseGVFSOperations(ABC):
             CallerContextHolder.set(caller_context)
 
         try:
-            # Credentials are only fetched when credential vending is enabled. Client-provided
-            # credentials take precedence over server-side vended credentials, so skip vending when
-            # the client already configured its own storage credentials; otherwise the vended
-            # credentials would override the client's credentials.
+            # Credentials are only fetched when credential vending is enabled. Credential vending and
+            # client-configured storage credentials are mutually exclusive: when vending is enabled
+            # the server-vended credentials are authoritative.
             credentials = None
-            if self._enable_credential_vending and not get_storage_handler_by_path(
-                actual_location
-            ).contains_client_credentials(fileset_props):
+            if self._enable_credential_vending:
                 # Get credentials with client-side caching to avoid redundant REST calls
                 credentials = self._get_credentials_with_cache(
                     fileset_ident, fileset, target_location_name

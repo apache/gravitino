@@ -227,6 +227,15 @@ The server returns short-lived or static credentials that the client can use to 
 
 The Gravitino Spark and Flink connectors automatically call the credential vending API and inject the returned credentials into the connector's configuration, so no connector-side credential configuration is needed. For example, `GravitinoHiveCatalog`, `GravitinoGlueCatalog`, `GravitinoJdbcCatalog`, and `GravitinoIcebergCatalog` all consume the vended credentials transparently.
 
+### Fileset (GVFS) Client Integration
+
+For the Gravitino Virtual File System (GVFS), credential vending and client-configured storage credentials are **mutually exclusive**, controlled by `fs.gravitino.enableCredentialVending` (Java) / `enable_credential_vending` (Python):
+
+- When **enabled** (`true`), GVFS fetches credentials from the server and uses them to access storage. Any storage credentials configured on the client (for example `s3-access-key-id` / `s3-secret-access-key`) are **ignored**.
+- When **disabled** (`false`, the default), GVFS does not fetch vended credentials; you **must** configure your own storage credentials on the client, otherwise storage access will fail.
+
+In other words, configure credential vending **or** client-side credentials, not both: enabling vending always takes precedence.
+
 ### Backward Compatibility: `gravitino.catalog.credential.backfillToProperties`
 
 During a rolling upgrade from Gravitino < 1.4.0 to 1.4.0, older clients that read catalog properties directly (rather than calling `/credentials`) would lose access to credentials because the properties are now hidden. To allow a zero-downtime migration, set the following property in `gravitino.conf`:

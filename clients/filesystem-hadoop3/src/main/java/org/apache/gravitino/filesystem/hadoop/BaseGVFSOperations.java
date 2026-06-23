@@ -732,14 +732,11 @@ public abstract class BaseGVFSOperations implements Closeable {
               targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
 
       if (enableCredentialVending()) {
+        // Credential vending and client-configured storage credentials are mutually exclusive: when
+        // vending is enabled the server-vended credentials are authoritative.
         FileSystemProvider provider =
             getFileSystemProviderByScheme(targetLocation.toUri().getScheme());
-        // Client-provided credentials take precedence over server-side vended credentials. Only
-        // vend when the client did not configure its own storage credentials; otherwise the vended
-        // credential provider would override the client's credentials.
-        if (!clientProvidedStorageCredentials(provider, allProperties)) {
-          allProperties.putAll(getCredentialProperties(provider, filesetIdent, locationName));
-        }
+        allProperties.putAll(getCredentialProperties(provider, filesetIdent, locationName));
       }
 
       FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
@@ -969,21 +966,6 @@ public abstract class BaseGVFSOperations implements Closeable {
     return properties.entrySet().stream()
         .filter(property -> CATALOG_NECESSARY_PROPERTIES_TO_KEEP.contains(property.getKey()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-  }
-
-  /**
-   * Returns whether the client already configured its own static storage credentials for the given
-   * provider, in which case server-side credential vending must be skipped so the client-provided
-   * credentials take precedence.
-   *
-   * @param provider the file system provider resolved for the target location
-   * @param properties the merged properties (including the client configuration)
-   * @return true if the client supplied its own credentials, false otherwise
-   */
-  private boolean clientProvidedStorageCredentials(
-      FileSystemProvider provider, Map<String, String> properties) {
-    return provider instanceof SupportsCredentialVending
-        && ((SupportsCredentialVending) provider).containsClientCredentials(properties);
   }
 
   private Map<String, String> getCredentialProperties(

@@ -176,3 +176,25 @@ class TestGvfsWithS3Credential(TestGvfsWithS3):
 
         # it actually takes no effect.
         self.check_mkdir(mkdir_dir, mkdir_actual_dir, fs)
+
+    def test_credential_vending_precedence_over_client_credentials(self):
+        # Credential vending and client-configured storage credentials are mutually exclusive: when
+        # vending is enabled, the server-vended credentials take precedence. Configure deliberately
+        # invalid client credentials together with vending enabled; the write must still succeed
+        # because the vended credentials are used instead of the client-provided ones.
+        options = {
+            f"{GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY}": "invalid-access-key",
+            f"{GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY}": "invalid-secret-key",
+            f"{GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT}": self.s3_endpoint,
+            GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING: True,
+        }
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=options,
+            **self.conf,
+        )
+        file_path = self.fileset_gvfs_location + "/test_precedence/test.txt"
+        fs.touch(file_path)
+        self.assertTrue(fs.exists(file_path))
+        fs.rm(file_path)

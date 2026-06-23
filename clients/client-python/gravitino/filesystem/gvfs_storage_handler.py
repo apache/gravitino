@@ -98,21 +98,6 @@ class StorageHandler(ABC):
         """
         pass
 
-    def contains_client_credentials(self, props: Dict[str, str]) -> bool:
-        """Whether the given properties already contain client-provided static storage
-        credentials. When the client configures its own credentials, they must take precedence
-        over server-side vended credentials, so the caller should skip credential vending.
-
-        :param props: The merged fileset properties (including client options)
-        :return: True if the client supplied its own storage credentials, False otherwise
-        """
-        return False
-
-    @staticmethod
-    def _all_non_blank(props: Dict[str, str], *keys: str) -> bool:
-        """Return whether all of the given keys are present in props with a non-blank value."""
-        return all(props.get(key) not in (None, "") for key in keys)
-
     def actual_info_to_gvfs_info(
         self,
         entry: Dict,
@@ -374,13 +359,6 @@ class S3StorageHandler(StorageHandler):
             ),
         )
 
-    def contains_client_credentials(self, props: Dict[str, str]) -> bool:
-        return self._all_non_blank(
-            props,
-            GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY,
-            GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY,
-        )
-
     def get_filesystem(
         self, actual_path: Optional[str] = None, **kwargs
     ) -> AbstractFileSystem:
@@ -413,11 +391,6 @@ class GCSStorageHandler(StorageHandler):
 
     def storage_type(self):
         return StorageType.GCS
-
-    def contains_client_credentials(self, props: Dict[str, str]) -> bool:
-        return self._all_non_blank(
-            props, GVFSConfig.GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE
-        )
 
     def get_filesystem(
         self, actual_path: Optional[str] = None, **kwargs
@@ -533,13 +506,6 @@ class OSSStorageHandler(StorageHandler):
             return path[len(f"{self.storage_type().value}://") :]
         return path
 
-    def contains_client_credentials(self, props: Dict[str, str]) -> bool:
-        return self._all_non_blank(
-            props,
-            GVFSConfig.GVFS_FILESYSTEM_OSS_ACCESS_KEY,
-            GVFSConfig.GVFS_FILESYSTEM_OSS_SECRET_KEY,
-        )
-
     def get_filesystem(
         self, actual_path: Optional[str] = None, **kwargs
     ) -> AbstractFileSystem:
@@ -643,13 +609,6 @@ class ABSStorageHandler(StorageHandler):
 
     def storage_type(self):
         return StorageType.ABS
-
-    def contains_client_credentials(self, props: Dict[str, str]) -> bool:
-        return self._all_non_blank(
-            props,
-            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME,
-            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY,
-        )
 
     def get_filesystem(
         self, actual_path: Optional[str] = None, **kwargs

@@ -286,6 +286,81 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
     }
   }
 
+  /**
+   * Verifies the mutually-exclusive contract between credential vending and client-configured
+   * storage credentials: when vending is enabled, the server-vended credentials take precedence and
+   * any client-configured static credentials are ignored. The client below enables vending but also
+   * sets deliberately invalid static credentials; access must still succeed because the vended
+   * credentials are used. (Before vending and client credentials became mutually exclusive, the
+   * presence of client credentials would have skipped vending and caused this to fail.)
+   */
+  @Test
+  public void testCredentialVendingTakesPrecedenceOverClientCredentials() throws IOException {
+    String vendingCatalogName = GravitinoITUtils.genRandomName("precedence_catalog");
+    String vendingSchemaName = GravitinoITUtils.genRandomName("precedence_schema");
+    Map<String, String> catalogProps = Maps.newHashMap();
+    catalogProps.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
+    catalogProps.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
+    catalogProps.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
+    catalogProps.put(S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS, "true");
+    catalogProps.put(FILESYSTEM_PROVIDERS, "s3");
+
+    Catalog vendingCatalog =
+        metalake.createCatalog(
+            vendingCatalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", catalogProps);
+    vendingCatalog.asSchemas().createSchema(vendingSchemaName, "schema comment", catalogProps);
+
+    // Use a dedicated bucket so the underlying S3AFileSystem (cached by scheme://authority) is not
+    // shared with the other tests, which would otherwise mix credential sources.
+    String vendingBucket = "precedence-bucket-" + UUID.randomUUID().toString().replace("-", "");
+    gravitinoLocalStackContainer.executeInContainer(
+        "awslocal", "s3", "mb", "s3://" + vendingBucket);
+
+    String filesetName = GravitinoITUtils.genRandomName("precedence_fileset");
+    NameIdentifier filesetIdent = NameIdentifier.of(vendingSchemaName, filesetName);
+    String storageLocation = String.format("s3a://%s/%s", vendingBucket, filesetName);
+    vendingCatalog
+        .asFilesetCatalog()
+        .createFileset(
+            filesetIdent,
+            "fileset comment",
+            Fileset.Type.MANAGED,
+            storageLocation,
+            new HashMap<>());
+
+    // Client GVFS conf: enables credential vending AND also configures deliberately invalid static
+    // credentials. The vended credentials must take precedence, so access still succeeds.
+    Configuration clientConf = new Configuration();
+    clientConf.set(
+        "fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+    clientConf.set(
+        "fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
+    clientConf.set("fs.gvfs.impl.disable.cache", "true");
+    clientConf.set("fs.gravitino.server.uri", serverUri);
+    clientConf.set("fs.gravitino.client.metalake", metalakeName);
+    clientConf.setBoolean("fs.gravitino.enableCredentialVending", true);
+    clientConf.set(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
+    clientConf.set(S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS, "true");
+    clientConf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, "invalid-access-key");
+    clientConf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "invalid-secret-key");
+
+    Path gvfsPath =
+        new Path(
+            String.format(
+                "gvfs://fileset/%s/%s/%s", vendingCatalogName, vendingSchemaName, filesetName));
+    try (FileSystem gvfs = gvfsPath.getFileSystem(clientConf)) {
+      gvfs.mkdirs(gvfsPath);
+      Path createPath = new Path(gvfsPath + "/test_precedence.txt");
+      gvfs.create(createPath).close();
+      Assertions.assertTrue(gvfs.exists(createPath));
+      Assertions.assertTrue(gvfs.getFileStatus(createPath).isFile());
+    } finally {
+      vendingCatalog.asFilesetCatalog().dropFileset(filesetIdent);
+      vendingCatalog.asSchemas().dropSchema(vendingSchemaName, true);
+      metalake.dropCatalog(vendingCatalogName, true);
+    }
+  }
+
   @Disabled(
       "GCS does not support append, java.io.IOException: The append operation is not supported")
   public void testAppend() throws IOException {}

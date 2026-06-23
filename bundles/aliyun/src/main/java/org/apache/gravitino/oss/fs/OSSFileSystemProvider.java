@@ -88,14 +88,6 @@ public class OSSFileSystemProvider implements FileSystemProvider, SupportsCreden
   }
 
   @Override
-  public boolean containsClientCredentials(Map<String, String> config) {
-    return SupportsCredentialVending.allNonBlank(
-        config,
-        OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
-        OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
-  }
-
-  @Override
   public String scheme() {
     return "oss";
   }
