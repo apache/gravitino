@@ -21,9 +21,14 @@ package org.apache.gravitino.catalog.hadoop.auth;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
+import org.slf4j.LoggerFactory;
 
 public class TestKerberosAuthUtils {
 
@@ -33,6 +38,8 @@ public class TestKerberosAuthUtils {
   public void testCheckPrincipalAndGetRealm() {
     Assertions.assertEquals(
         "EXAMPLE.COM", KerberosAuthUtils.checkPrincipalAndGetRealm("service/host@EXAMPLE.COM"));
+    Assertions.assertEquals(
+        "EXAMPLE.COM", KerberosAuthUtils.checkPrincipalAndGetRealm(" service/host@EXAMPLE.COM "));
 
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> KerberosAuthUtils.checkPrincipalAndGetRealm(""));
@@ -79,5 +86,57 @@ public class TestKerberosAuthUtils {
                     null /* hadoopConf */));
 
     Assertions.assertTrue(exception.getMessage().contains("HDFS"));
+  }
+
+  @Test
+  public void testConfigureKrb5ConfSetsSystemProperty() {
+    String hadoopKrb5ConfKey = "gravitino.test.krb5.conf";
+    String systemKrb5ConfKey = "java.security.krb5.conf.test";
+    String krb5ConfPath = new File(tempDir, "krb5.conf").getAbsolutePath();
+    Configuration configuration = new Configuration(false);
+    configuration.set(hadoopKrb5ConfKey, krb5ConfPath);
+
+    String originalValue = System.getProperty(systemKrb5ConfKey);
+    try {
+      KerberosAuthUtils.configureKrb5Conf(configuration, hadoopKrb5ConfKey, systemKrb5ConfKey);
+      Assertions.assertEquals(krb5ConfPath, System.getProperty(systemKrb5ConfKey));
+    } finally {
+      if (originalValue == null) {
+        System.clearProperty(systemKrb5ConfKey);
+      } else {
+        System.setProperty(systemKrb5ConfKey, originalValue);
+      }
+    }
+  }
+
+  @Test
+  public void testStartTicketRefreshRejectsInvalidArguments() {
+    UserGroupInformation ugi = Mockito.mock(UserGroupInformation.class);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KerberosAuthUtils.startTicketRefresh(
+                ugi, 0, "check-test-tgt-", LoggerFactory.getLogger(getClass())));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KerberosAuthUtils.startTicketRefresh(ugi, 1, " ", LoggerFactory.getLogger(getClass())));
+  }
+
+  @Test
+  public void testStartTicketRefreshCreatesDaemonThreadWithPrefix() {
+    UserGroupInformation ugi = Mockito.mock(UserGroupInformation.class);
+    ScheduledThreadPoolExecutor executor =
+        KerberosAuthUtils.startTicketRefresh(
+            ugi, 60, "check-test-tgt-", LoggerFactory.getLogger(getClass()));
+
+    try {
+      Thread thread = executor.getThreadFactory().newThread(() -> {});
+      Assertions.assertTrue(thread.isDaemon());
+      Assertions.assertEquals("check-test-tgt-1", thread.getName());
+    } finally {
+      executor.shutdownNow();
+    }
   }
 }

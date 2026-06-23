@@ -48,7 +48,7 @@ public class TestKerberosClient {
             .loginMode(KerberosAuthUtils.LoginMode.RETURN_UGI)
             .refreshCredentials(false)
             .checkIntervalSec(30)
-            .threadNameFormat("check-test-tgt-%d")
+            .threadNamePrefix("check-test-tgt-")
             .build();
     assertNotNull(client);
   }

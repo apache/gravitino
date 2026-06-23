@@ -59,11 +59,16 @@ public final class KerberosAuthUtils {
    * @return the realm portion of the principal
    */
   public static String checkPrincipalAndGetRealm(String principal) {
-    if (principal == null || principal.trim().isEmpty()) {
+    if (principal == null) {
       throw new IllegalArgumentException("The principal can't be blank");
     }
 
-    String[] principalComponents = principal.split("@", -1);
+    String normalizedPrincipal = principal.trim();
+    if (normalizedPrincipal.isEmpty()) {
+      throw new IllegalArgumentException("The principal can't be blank");
+    }
+
+    String[] principalComponents = normalizedPrincipal.split("@", -1);
     if (principalComponents.length != 2
         || principalComponents[0].isEmpty()
         || principalComponents[1].isEmpty()) {
@@ -186,18 +191,21 @@ public final class KerberosAuthUtils {
    *
    * @param loginUgi login user to refresh
    * @param checkIntervalSec refresh interval in seconds
-   * @param threadNameFormat thread name format, for example {@code check-tgt-%d}
+   * @param threadNamePrefix refresh thread name prefix
    * @param log logger used for refresh failures
    * @return the scheduled refresh executor
    */
   public static ScheduledThreadPoolExecutor startTicketRefresh(
-      UserGroupInformation loginUgi, int checkIntervalSec, String threadNameFormat, Logger log) {
+      UserGroupInformation loginUgi, int checkIntervalSec, String threadNamePrefix, Logger log) {
     if (checkIntervalSec <= 0) {
       throw new IllegalArgumentException("The check interval must be positive");
     }
+    if (threadNamePrefix == null || threadNamePrefix.trim().isEmpty()) {
+      throw new IllegalArgumentException("The thread name prefix can't be blank");
+    }
 
     ScheduledThreadPoolExecutor executor =
-        new ScheduledThreadPoolExecutor(1, daemonThreadFactory(threadNameFormat));
+        new ScheduledThreadPoolExecutor(1, daemonThreadFactory(threadNamePrefix));
     executor.scheduleAtFixedRate(
         () -> {
           try {
@@ -221,12 +229,12 @@ public final class KerberosAuthUtils {
     }
   }
 
-  private static ThreadFactory daemonThreadFactory(String threadNameFormat) {
+  private static ThreadFactory daemonThreadFactory(String threadNamePrefix) {
     AtomicInteger threadId = new AtomicInteger(0);
     return runnable -> {
       Thread thread = new Thread(runnable);
       thread.setDaemon(true);
-      thread.setName(String.format(threadNameFormat, threadId.getAndIncrement()));
+      thread.setName(threadNamePrefix + threadId.getAndIncrement());
       return thread;
     };
   }

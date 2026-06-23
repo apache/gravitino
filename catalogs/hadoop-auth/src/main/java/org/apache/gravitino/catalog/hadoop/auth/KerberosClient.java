@@ -47,7 +47,7 @@ public class KerberosClient implements Closeable {
   private final LoginMode loginMode;
   private final boolean refreshCredentials;
   private final int checkIntervalSec;
-  private final String threadNameFormat;
+  private final String threadNamePrefix;
   @Nullable private final String hadoopKrb5ConfKey;
   @Nullable private final String systemKrb5ConfKey;
 
@@ -61,7 +61,7 @@ public class KerberosClient implements Closeable {
     this.loginMode = builder.loginMode;
     this.refreshCredentials = builder.refreshCredentials;
     this.checkIntervalSec = builder.checkIntervalSec;
-    this.threadNameFormat = builder.threadNameFormat;
+    this.threadNamePrefix = builder.threadNamePrefix;
     this.hadoopKrb5ConfKey = builder.hadoopKrb5ConfKey;
     this.systemKrb5ConfKey = builder.systemKrb5ConfKey;
   }
@@ -80,8 +80,9 @@ public class KerberosClient implements Closeable {
     }
     this.loginUser = KerberosAuthUtils.login(principal, keytabFilePath, hadoopConf, loginMode);
     if (refreshCredentials) {
+      closeTicketRefreshExecutor();
       this.checkTgtExecutor =
-          KerberosAuthUtils.startTicketRefresh(loginUser, checkIntervalSec, threadNameFormat, LOG);
+          KerberosAuthUtils.startTicketRefresh(loginUser, checkIntervalSec, threadNamePrefix, LOG);
     }
     return loginUser;
   }
@@ -98,8 +99,13 @@ public class KerberosClient implements Closeable {
 
   @Override
   public void close() {
+    closeTicketRefreshExecutor();
+  }
+
+  private void closeTicketRefreshExecutor() {
     if (checkTgtExecutor != null) {
       checkTgtExecutor.shutdownNow();
+      checkTgtExecutor = null;
     }
   }
 
@@ -121,7 +127,7 @@ public class KerberosClient implements Closeable {
     private LoginMode loginMode = LoginMode.CURRENT_USER;
     private boolean refreshCredentials = true;
     private int checkIntervalSec = 60;
-    private String threadNameFormat = "check-tgt-%d";
+    private String threadNamePrefix = "check-tgt-";
     private String hadoopKrb5ConfKey;
     private String systemKrb5ConfKey;
 
@@ -148,9 +154,9 @@ public class KerberosClient implements Closeable {
       return this;
     }
 
-    /** Sets the refresh thread name format, for example {@code check-tgt-%d}. */
-    public Builder threadNameFormat(String format) {
-      this.threadNameFormat = format;
+    /** Sets the refresh thread name prefix. */
+    public Builder threadNamePrefix(String prefix) {
+      this.threadNamePrefix = prefix;
       return this;
     }
 

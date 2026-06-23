@@ -132,9 +132,10 @@ public class KerberosClient implements java.io.Closeable {
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
+      closeTicketRefreshExecutor();
       int checkInterval = kerberosConfig.getCheckIntervalSec();
       checkTgtExecutor =
-          KerberosAuthUtils.startTicketRefresh(loginUgi, checkInterval, "check-tgt-%d", LOG);
+          KerberosAuthUtils.startTicketRefresh(loginUgi, checkInterval, "check-tgt-", LOG);
     }
 
     return loginUgi;
@@ -159,13 +160,18 @@ public class KerberosClient implements java.io.Closeable {
   @Override
   public void close() {
     try {
-      if (checkTgtExecutor != null) {
-        checkTgtExecutor.shutdown();
-      }
+      closeTicketRefreshExecutor();
 
       Files.deleteIfExists(Paths.get(keytabFilePath));
     } catch (IOException e) {
       LOG.warn("Failed to delete keytab file: {}", keytabFilePath, e);
+    }
+  }
+
+  private void closeTicketRefreshExecutor() {
+    if (checkTgtExecutor != null) {
+      checkTgtExecutor.shutdownNow();
+      checkTgtExecutor = null;
     }
   }
 
