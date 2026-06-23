@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization.jcasbin;
 
+import static org.apache.gravitino.authorization.Privilege.Name.SELECT_TABLE;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,6 +38,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -458,6 +460,55 @@ public class TestJcasbinAuthorizer {
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
     assertFalse(doAuthorize(currentPrincipal));
+  }
+
+  @Test
+  public void testHasDenyPolicyOnType() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    // With no roles assigned, the user can hold no deny policy of any type.
+    assertFalse(
+        jcasbinAuthorizer.hasDenyPolicyOnType(
+            currentPrincipal,
+            METALAKE,
+            Entity.EntityType.CATALOG,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()));
+
+    // Assign a role that DENIES USE_CATALOG on a catalog.
+    mockRoleInStore(DENY_ROLE_ID, "denyRole", ImmutableList.of(getDenySecurableObject()));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(DENY_ROLE_ID, "denyRole")));
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
+
+    // The catalog-level deny is detected for the matching type and privilege.
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicyOnType(
+            currentPrincipal,
+            METALAKE,
+            Entity.EntityType.CATALOG,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()));
+
+    // A deny on CATALOG must not be reported when querying a different metadata type.
+    assertFalse(
+        jcasbinAuthorizer.hasDenyPolicyOnType(
+            currentPrincipal,
+            METALAKE,
+            Entity.EntityType.TABLE,
+            ImmutableSet.of(SELECT_TABLE),
+            new AuthorizationRequestContext()));
+
+    // A deny on USE_CATALOG must not be reported when querying a different privilege.
+    assertFalse(
+        jcasbinAuthorizer.hasDenyPolicyOnType(
+            currentPrincipal,
+            METALAKE,
+            Entity.EntityType.CATALOG,
+            ImmutableSet.of(SELECT_TABLE),
+            new AuthorizationRequestContext()));
   }
 
   @Test

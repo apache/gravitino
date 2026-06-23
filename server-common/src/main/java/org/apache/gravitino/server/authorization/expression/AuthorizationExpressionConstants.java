@@ -166,6 +166,44 @@ public class AuthorizationExpressionConstants {
                   ANY_MODIFY_TABLE
                   """;
 
+  /**
+   * Parent-scope expression used to short-circuit table-list authorization. It is the ancestor-only
+   * portion of {@link #FILTER_TABLE_AUTHORIZATION_EXPRESSION}: ownership of, or a SELECT/MODIFY
+   * grant at, the metalake/catalog/schema scope means every table in the schema is visible unless a
+   * table-level deny overrides it. Evaluated once per list request instead of once per table.
+   */
+  public static final String TABLE_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION =
+      """
+              ANY(OWNER, METALAKE, CATALOG, SCHEMA) ||
+              (ANY(SELECT_TABLE, METALAKE, CATALOG, SCHEMA)
+                  && !ANY(DENY_SELECT_TABLE, METALAKE, CATALOG, SCHEMA)) ||
+              (ANY(MODIFY_TABLE, METALAKE, CATALOG, SCHEMA)
+                  && !ANY(DENY_MODIFY_TABLE, METALAKE, CATALOG, SCHEMA))
+              """;
+
+  /**
+   * Parent-scope expression used to short-circuit schema-list authorization. Ancestor-only portion
+   * of {@link #FILTER_SCHEMA_AUTHORIZATION_EXPRESSION}: ownership of, or a USE_SCHEMA grant at, the
+   * metalake/catalog scope means every schema in the catalog is visible unless a schema-level deny
+   * overrides it.
+   */
+  public static final String SCHEMA_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION =
+      """
+              ANY(OWNER, METALAKE, CATALOG) ||
+              (ANY(USE_SCHEMA, METALAKE, CATALOG) && !ANY(DENY_USE_SCHEMA, METALAKE, CATALOG))
+              """;
+
+  /**
+   * Parent-scope expression used to short-circuit catalog-list authorization. Ancestor-only portion
+   * of {@link #LOAD_CATALOG_AUTHORIZATION_EXPRESSION}: metalake ownership, or a USE_CATALOG grant
+   * at the metalake scope, means every catalog is visible unless a catalog-level deny overrides it.
+   */
+  public static final String CATALOG_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION =
+      """
+              METALAKE::OWNER ||
+              (ANY(USE_CATALOG, METALAKE) && !ANY(DENY_USE_CATALOG, METALAKE))
+              """;
+
   public static final String FILTER_VIEW_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG, SCHEMA, VIEW) ||

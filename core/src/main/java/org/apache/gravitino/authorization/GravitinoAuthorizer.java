@@ -19,6 +19,7 @@ package org.apache.gravitino.authorization;
 
 import java.io.Closeable;
 import java.security.Principal;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -106,6 +107,35 @@ public interface GravitinoAuthorizer extends Closeable {
    * @return authorization result
    */
   boolean isMetalakeUser(String metalake, AuthorizationRequestContext requestContext);
+
+  /**
+   * Determines whether the given principal may have any {@code DENY} privilege policy, for any of
+   * the given privileges, granted directly on metadata objects of {@code type} within the metalake.
+   *
+   * <p>This supports list-authorization short-circuiting: when a privilege is granted at a parent
+   * scope (metalake, catalog or schema), every child object of {@code type} is visible
+   * <em>unless</em> an object-level {@code DENY} overrides it. A {@code false} return therefore
+   * lets the caller skip per-object authorization for the whole list and return every identifier; a
+   * {@code true} return forces the caller to fall back to per-object authorization.
+   *
+   * <p>The default implementation conservatively returns {@code true} so that authorizers which
+   * cannot answer the question never enable an unsafe short-circuit.
+   *
+   * @param principal the user principal
+   * @param metalake the metalake
+   * @param type the metadata type of the listed objects (for example {@code TABLE}, {@code SCHEMA})
+   * @param privileges the privileges whose object-level denies would affect visibility
+   * @param requestContext authorization request context
+   * @return whether an object-level deny for the given privileges and type may exist
+   */
+  default boolean hasDenyPolicyOnType(
+      Principal principal,
+      String metalake,
+      Entity.EntityType type,
+      Set<Privilege.Name> privileges,
+      AuthorizationRequestContext requestContext) {
+    return true;
+  }
 
   /**
    * Determine whether the user can set owner

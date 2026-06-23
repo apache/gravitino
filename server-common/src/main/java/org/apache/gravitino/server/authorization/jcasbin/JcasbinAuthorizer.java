@@ -364,6 +364,41 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean hasDenyPolicyOnType(
+      Principal principal,
+      String metalake,
+      Entity.EntityType type,
+      Set<Privilege.Name> privileges,
+      AuthorizationRequestContext requestContext) {
+    Optional<UserUpdatedAt> userInfoOpt =
+        loadUserInfo(metalake, principal.getName(), requestContext);
+    if (!userInfoOpt.isPresent()) {
+      // An unknown user holds no roles and therefore no deny policies.
+      return false;
+    }
+    UserUpdatedAt userInfo = userInfoOpt.get();
+    long userId = userInfo.getUserId();
+    // Bind the user's (direct + group-inherited) roles into the enforcers so the in-memory scan
+    // below sees every policy the user can carry. Idempotent within a request.
+    loadRolePrivilege(metalake, principal.getName(), userId, userInfo, requestContext);
+
+    Set<String> privilegeNames = privileges.stream().map(Enum::name).collect(Collectors.toSet());
+    String typeName = type.name();
+    String userIdStr = String.valueOf(userId);
+    // p-row layout: [sub(roleId), metadataType, metadataId, act(privilege), eft]. Filtering by
+    // (roleId, metadataType) keeps the scan bounded by the user's role/policy count, never by the
+    // number of listed objects.
+    for (String roleId : denyEnforcer.getRolesForUser(userIdStr)) {
+      for (List<String> policy : denyEnforcer.getFilteredNamedPolicy("p", 0, roleId, typeName)) {
+        if (policy.size() > 3 && privilegeNames.contains(policy.get(3))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  @Override
   public boolean isSelf(
       Entity.EntityType type,
       NameIdentifier nameIdentifier,
