@@ -36,7 +36,7 @@ Table routing is based on the `table-format` property in Glue table parameters. 
   See [AWS IAM permissions](../aws-glue-catalog.md#aws-iam-permissions) for the required policy
 - Apache Spark 3.3, 3.4, or 3.5
 - Patched Hive and AWS Glue client JARs (see [Setup](#setup); pre-installed on Amazon EMR)
-- `iceberg-spark-runtime` and `iceberg-aws-bundle` JARs on the Spark classpath for Iceberg table support
+- `iceberg-spark-runtime` and `iceberg-aws-bundle` JARs on the Spark classpath for Iceberg table support (not required on Amazon EMR)
 
 ## Setup
 
@@ -73,17 +73,21 @@ that include the patched Hive 2.3.10 and the AWS Glue Data Catalog client for Sp
 ### Step 1: Download the JARs
 
 Download all JARs from the `spark3/glue-3.4.0` directory of
-[spark-hive-glue-libs](https://github.com/datastrato/spark-hive-glue-libs):
+[spark-hive-glue-libs](https://github.com/datastrato/spark-hive-glue-libs).
+The directory name refers to the Glue client version (3.4.0), not the Spark version;
+these JARs are compatible with Spark 3.3, 3.4, and 3.5.
 
 ```bash
 mkdir -p /opt/glue-hive-jars
-curl -s "https://api.github.com/repos/datastrato/spark-hive-glue-libs/contents/spark3/glue-3.4.0" \
-  | grep -o '"download_url": *"[^"]*\.jar"' \
-  | grep -o 'https://[^"]*' \
+curl -fsSL "https://api.github.com/repos/datastrato/spark-hive-glue-libs/contents/spark3/glue-3.4.0" \
+  | jq -r '.[] | select(.name | endswith(".jar")) | .download_url' \
   | while read -r url; do
       curl -fL "$url" -o "/opt/glue-hive-jars/$(basename "$url")"
     done
 ```
+
+Alternatively, download the JARs directly from the
+[spark-hive-glue-libs repository](https://github.com/datastrato/spark-hive-glue-libs/tree/main/spark3/glue-3.4.0).
 
 ### Step 2: Configure Spark
 
