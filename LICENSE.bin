@@ -245,6 +245,7 @@
    Apache Commons Codec
    Apache Commons Collections
    Apache Commons Configuration
+   Apache Commons CSV
    Apache Commons Daemon
    Apache Commons DBCP
    Apache Jakarta Commons Digester
@@ -384,6 +385,7 @@
    melix jmh-gradle-plugin
    Lance
    JCasbin
+   Aviator
    OGNL
    Google FlatBuffers
    IPAddress
@@ -435,7 +437,6 @@
    Kyligence/kylinpy
    elarivie/pyReaderWriterLock
    tkem/cachetools
-   Bouncy Castle
 
    This product bundles various third-party components also under the
    Common Development and Distribution License 1.0
