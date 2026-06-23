@@ -27,6 +27,8 @@ import { useEffect, useState } from 'react'
 
 import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
+import BasicLogin from './components/BasicLogin'
+
 import { useAuth } from '@/lib/provider/session'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
@@ -48,7 +50,19 @@ const LoginPage = () => {
     detectProviderType()
   }, [])
 
-  const useOidcLogin = providerType === 'oidc'
+  let loginComponent
+  switch (providerType) {
+    case 'oidc':
+      loginComponent = <OidcLogin />
+      break
+
+    case 'basic':
+      loginComponent = <BasicLogin />
+      break
+
+    default:
+      loginComponent = <DefaultLogin />
+  }
 
   return (
     <Grid container spacing={2} sx={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -67,7 +81,7 @@ const LoginPage = () => {
               </Typography>
             </Box>
 
-            {useOidcLogin ? <OidcLogin /> : <DefaultLogin />}
+            {loginComponent}
           </CardContent>
         </Card>
       </Box>

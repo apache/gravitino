@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, loginApi, basicLoginApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
@@ -90,6 +90,35 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
 
   return { token: access_token, expired: expires_in }
 })
+
+export const basicLoginAction = createAsyncThunk(
+  'auth/basicLoginAction',
+  async ({ username, password, router }, { dispatch }) => {
+    const basicToken = `Basic ${btoa(`${username}:${password}`)}`
+
+    const [err, res] = await to(basicLoginApi(basicToken))
+
+    if (err || !res) {
+      toast.error(err.response?.data?.err || err.message, {
+        id: `global_error_message_status_${err.response?.status}`
+      })
+
+      throw new Error(err)
+    }
+
+    localStorage.setItem('accessToken', basicToken)
+    localStorage.setItem('expiredIn', '') // Basic auth does not have an expiration time
+    localStorage.setItem('isIdle', false)
+
+    dispatch(setAuthToken(basicToken))
+    dispatch(setExpiredIn(''))
+
+    await dispatch(initialVersion())
+    router.push('/metalakes')
+
+    return { token: basicToken, expired: '' }
+  }
+)
 
 export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
   // Clear provider authentication data first
