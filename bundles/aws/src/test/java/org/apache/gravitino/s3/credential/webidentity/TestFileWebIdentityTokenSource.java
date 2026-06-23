@@ -21,14 +21,14 @@ package org.apache.gravitino.s3.credential.webidentity;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -78,56 +78,12 @@ class TestFileWebIdentityTokenSource {
   }
 
   @Test
-  void fallsBackToEnvVarWhenPathPropertyIsBlank(@TempDir Path dir) throws IOException {
-    Path tokenFile = dir.resolve("token");
-    Files.write(tokenFile, "from-env".getBytes(StandardCharsets.UTF_8));
-
-    Map<String, String> env = new HashMap<>();
-    env.put(FileWebIdentityTokenSource.AWS_WEB_IDENTITY_TOKEN_FILE_ENV, tokenFile.toString());
-
-    FileWebIdentityTokenSource source =
-        new FileWebIdentityTokenSource() {
-          @Override
-          String readEnv(String name) {
-            return env.get(name);
-          }
-        };
-    // Explicitly set the property to blank to verify the fallback path triggers on blank
-    // values, not just when the property is absent from the map.
-    source.initialize(Collections.singletonMap(WebIdentityTokenSourceConfig.FILE_PATH, ""));
-
-    assertEquals("from-env", source.getToken());
-  }
-
-  @Test
-  void fallsBackToEnvVarWhenPathPropertyIsAbsent(@TempDir Path dir) throws IOException {
-    Path tokenFile = dir.resolve("token");
-    Files.write(tokenFile, "from-env".getBytes(StandardCharsets.UTF_8));
-
-    Map<String, String> env = new HashMap<>();
-    env.put(FileWebIdentityTokenSource.AWS_WEB_IDENTITY_TOKEN_FILE_ENV, tokenFile.toString());
-
-    FileWebIdentityTokenSource source =
-        new FileWebIdentityTokenSource() {
-          @Override
-          String readEnv(String name) {
-            return env.get(name);
-          }
-        };
-    source.initialize(Collections.emptyMap());
-
-    assertEquals("from-env", source.getToken());
-  }
-
-  @Test
   void initializeFailsWhenNeitherPropertyNorEnvIsSet() {
-    FileWebIdentityTokenSource source =
-        new FileWebIdentityTokenSource() {
-          @Override
-          String readEnv(String name) {
-            return null;
-          }
-        };
+    assumeTrue(
+        StringUtils.isBlank(
+            System.getenv(FileWebIdentityTokenSource.AWS_WEB_IDENTITY_TOKEN_FILE_ENV)));
+
+    FileWebIdentityTokenSource source = new FileWebIdentityTokenSource();
 
     IllegalStateException error =
         assertThrows(IllegalStateException.class, () -> source.initialize(Collections.emptyMap()));

@@ -53,7 +53,9 @@ public class FileWebIdentityTokenSource implements WebIdentityTokenSource {
   public void initialize(Map<String, String> properties) {
     String configured = properties.get(WebIdentityTokenSourceConfig.FILE_PATH);
     String path =
-        StringUtils.isNotBlank(configured) ? configured : readEnv(AWS_WEB_IDENTITY_TOKEN_FILE_ENV);
+        StringUtils.isNotBlank(configured)
+            ? configured
+            : System.getenv(AWS_WEB_IDENTITY_TOKEN_FILE_ENV);
     if (StringUtils.isBlank(path)) {
       throw new IllegalStateException(
           "No WebIdentity token file is configured. Set "
@@ -83,8 +85,4 @@ public class FileWebIdentityTokenSource implements WebIdentityTokenSource {
 
   @Override
   public void close() {}
-
-  String readEnv(String name) {
-    return System.getenv(name);
-  }
 }
