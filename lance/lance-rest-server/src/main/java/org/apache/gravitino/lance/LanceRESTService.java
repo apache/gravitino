@@ -37,6 +37,7 @@ import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
+import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -103,9 +104,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addServlet(container, LANCE_SPEC);
     server.addFilter(
         new HttpAuditFilter(
-            eventBus,
-            EventSource.GRAVITINO_LANCE_REST_SERVER,
-            new LanceHealthCheckPathMatcher()),
+            eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
         LANCE_SPEC);
     server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);

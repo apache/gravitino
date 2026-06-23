@@ -130,6 +130,6 @@ public class TestLanceAuthenticationFilter {
     String json = stringWriter.toString();
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(500, errorResponse.getCode());
-    Assertions.assertEquals("Something went wrong", errorResponse.getError());
+    Assertions.assertEquals("Authentication failed", errorResponse.getError());
   }
 }
