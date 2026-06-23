@@ -21,8 +21,6 @@ package org.apache.gravitino.lance.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import javax.servlet.ServletRequest;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
@@ -32,33 +30,18 @@ import org.lance.namespace.model.ErrorResponse;
  * An {@link AuthenticationFilter} subclass for the Lance REST server that:
  *
  * <ul>
- *   <li>allows health check endpoints to bypass authentication;
+ *   <li>allows health check endpoints to bypass authentication via {@link
+ *       LanceHealthCheckPathMatcher};
  *   <li>returns Lance-compatible JSON error responses on authentication failure instead of the
  *       default HTML error pages.
  * </ul>
- *
- * <p>The default {@link AuthenticationFilter} only whitelists /health, /api/health paths. This
- * subclass additionally permits /lance/health and /lance/health/* so that Kubernetes probes and
- * monitoring systems can reach the Lance health endpoint without credentials.
  */
 public class LanceAuthenticationFilter extends AuthenticationFilter {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  @Override
-  protected boolean isHealthCheckRequest(ServletRequest request) {
-    if (super.isHealthCheckRequest(request)) {
-      return true;
-    }
-
-    if (!(request instanceof HttpServletRequest)) {
-      return false;
-    }
-    String path = ((HttpServletRequest) request).getRequestURI();
-    if (path == null) {
-      return false;
-    }
-    return path.equals("/lance/health") || path.startsWith("/lance/health/");
+  public LanceAuthenticationFilter() {
+    healthCheckMatcher = new LanceHealthCheckPathMatcher();
   }
 
   @Override
