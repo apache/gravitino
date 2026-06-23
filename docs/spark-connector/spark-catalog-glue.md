@@ -1,7 +1,7 @@
 ---
-title: "Spark connector Glue catalog"
-slug: /spark-connector/spark-catalog-glue
-keyword: spark connector glue catalog aws
+title: "Spark Connector: Glue Catalog"
+slug: "/spark-connector/spark-catalog-glue"
+keyword: "spark connector glue catalog aws"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -36,7 +36,7 @@ Table routing is based on the `table-format` property in Glue table parameters. 
   See [AWS IAM permissions](../aws-glue-catalog.md#aws-iam-permissions) for the required policy
 - Apache Spark 3.3, 3.4, or 3.5
 - Patched Hive and AWS Glue client JARs (see [Setup](#setup); pre-installed on Amazon EMR)
-- `iceberg-spark-runtime` JAR on the Spark classpath for Iceberg table support
+- `iceberg-spark-runtime` and `iceberg-aws-bundle` JARs on the Spark classpath for Iceberg table support
 
 ## Setup
 
@@ -51,26 +51,38 @@ the AWS Glue Data Catalog client is pre-installed. Skip Steps 1 and 2 below.
 For a complete walkthrough on Amazon EMR, see [Deploy on Amazon EMR](#deploy-on-amazon-emr).
 :::
 
+For Iceberg table support on non-EMR environments, also place the following JARs in the Spark classpath:
+
+- `iceberg-spark-runtime` — refer to the [Iceberg catalog](spark-catalog-iceberg.md#preparation) for the version that matches your Spark version
+- `iceberg-aws-bundle` — matching the same Iceberg version, provides the AWS SDK v2 dependencies required by `GlueCatalog`
+
+```bash
+# Example for Spark 3.5 with Iceberg 1.6.1
+curl -O https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.6.1/iceberg-spark-runtime-3.5_2.12-1.6.1.jar
+curl -O https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.6.1/iceberg-aws-bundle-1.6.1.jar
+```
+
+:::note
+On Amazon EMR, AWS SDK v2 is pre-installed on the cluster. `iceberg-aws-bundle` is not needed.
+See [Deploy on Amazon EMR](#deploy-on-amazon-emr) for the EMR-specific JAR setup.
+:::
+
 [spark-hive-glue-libs](https://github.com/datastrato/spark-hive-glue-libs) provides pre-built JARs
 that include the patched Hive 2.3.10 and the AWS Glue Data Catalog client for Spark.
 
 ### Step 1: Download the JARs
 
+Download all JARs from the `spark3/glue-3.4.0` directory of
+[spark-hive-glue-libs](https://github.com/datastrato/spark-hive-glue-libs):
+
 ```bash
-BASE=https://raw.githubusercontent.com/datastrato/spark-hive-glue-libs/main/spark3/glue-3.4.0
 mkdir -p /opt/glue-hive-jars
-for jar in \
-  aws-glue-datacatalog-spark-client-3.4.0.jar \
-  hive-exec-2.3.10.jar \
-  hive-metastore-2.3.10.jar \
-  hive-common-2.3.10.jar \
-  hive-serde-2.3.10.jar \
-  hive-shims-2.3.10.jar \
-  aws-java-sdk-glue-1.12.31.jar \
-  aws-java-sdk-core-1.12.31.jar \
-  jmespath-java-1.12.31.jar; do
-  wget "$BASE/$jar" -P /opt/glue-hive-jars/
-done
+curl -s "https://api.github.com/repos/datastrato/spark-hive-glue-libs/contents/spark3/glue-3.4.0" \
+  | grep -o '"download_url": *"[^"]*\.jar"' \
+  | grep -o 'https://[^"]*' \
+  | while read -r url; do
+      curl -fL "$url" -o "/opt/glue-hive-jars/$(basename "$url")"
+    done
 ```
 
 ### Step 2: Configure Spark
