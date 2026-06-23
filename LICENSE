@@ -253,9 +253,19 @@
    ./clients/client-java/src/main/java/org/apache/gravitino/client/OAuth2ClientUtil.java
    ./iceberg/iceberg-rest-server/src/main/java/org/apache/gravitino/iceberg/service/IcebergExceptionMapper.java
    ./iceberg/iceberg-common/src/main/java/org/apache/gravitino/iceberg/common/utils/IcebergHiveCachedClientPool.java
+   ./iceberg/iceberg-rest-server/src/main/java/org/apache/gravitino/iceberg/service/FederatedCatalogWrapper.java
 
    Apache Paimon
    ./catalogs/catalog-lakehouse-paimon/src/main/java/org/apache/gravitino/catalog/lakehouse/paimon/utils/TypeUtils.java
+   ./catalogs/catalog-lakehouse-paimon/src/test/java/org/apache/gravitino/catalog/lakehouse/paimon/utils/PaimonViewTestCatalogHelper.java
+
+   Lance Namespace (https://github.com/lance-format/lance-namespace-impls)
+   ./lance/lance-common/src/main/java/org/apache/gravitino/lance/common/ops/gravitino/JsonArrowSchemaConverter.java
+   ./lance/lance-common/src/main/java/org/apache/gravitino/lance/common/ops/gravitino/PageUtil.java
+
+   Apache Doris
+   ./catalogs/catalog-glue/src/main/java/org/apache/gravitino/catalog/glue/GravitinoGlueCredentialsProvider.java
+   ./spark-connector/spark-common/src/main/java/org/apache/gravitino/spark/connector/glue/GravitinoGlueCredentialsProvider.java
 
    Apache Hive
    ./catalogs/hive-metastore-common/src/test/resources/hive-schema-3.1.0.derby.sql

@@ -80,6 +80,10 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
  * federation-aware {@code *Internal} methods so client-facing FileIO and credential properties are
  * extracted from the remote catalog's {@code table.io()}. Credentials are vended by the remote
  * catalog, so this wrapper never injects Gravitino-generated credentials.
+ *
+ * <p>Portions of the table create and update handling are derived from Apache Iceberg's {@code
+ * org.apache.iceberg.rest.CatalogHandlers}:
+ * https://github.com/apache/iceberg/blob/2abac79fcae94b5ad039bd09f7235be191b0761e/core/src/main/java/org/apache/iceberg/rest/CatalogHandlers.java
  */
 public class FederatedCatalogWrapper extends CatalogWrapperForREST {
 
