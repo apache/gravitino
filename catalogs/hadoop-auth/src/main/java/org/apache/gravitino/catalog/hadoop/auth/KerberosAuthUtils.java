@@ -152,6 +152,16 @@ public final class KerberosAuthUtils {
    */
   public static void configureKrb5Conf(
       Configuration hadoopConf, String hadoopKrb5ConfKey, String systemKrb5ConfKey) {
+    if (hadoopConf == null) {
+      throw new IllegalArgumentException("Hadoop configuration can't be null");
+    }
+    if (hadoopKrb5ConfKey == null || hadoopKrb5ConfKey.trim().isEmpty()) {
+      throw new IllegalArgumentException("Hadoop krb5.conf key can't be blank");
+    }
+    if (systemKrb5ConfKey == null || systemKrb5ConfKey.trim().isEmpty()) {
+      throw new IllegalArgumentException("System krb5.conf key can't be blank");
+    }
+
     String krb5Config = hadoopConf.get(hadoopKrb5ConfKey);
     if (krb5Config != null) {
       System.setProperty(systemKrb5ConfKey, krb5Config);

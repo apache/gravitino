@@ -110,6 +110,19 @@ public class TestKerberosAuthUtils {
   }
 
   @Test
+  public void testConfigureKrb5ConfRejectsInvalidKeys() {
+    Configuration configuration = new Configuration(false);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> KerberosAuthUtils.configureKrb5Conf(configuration, " ", "java.security.krb5.conf"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KerberosAuthUtils.configureKrb5Conf(configuration, "hadoop.security.krb5.conf", null));
+  }
+
+  @Test
   public void testStartTicketRefreshRejectsInvalidArguments() {
     UserGroupInformation ugi = Mockito.mock(UserGroupInformation.class);
 
@@ -127,14 +140,18 @@ public class TestKerberosAuthUtils {
   @Test
   public void testStartTicketRefreshCreatesDaemonThreadWithPrefix() {
     UserGroupInformation ugi = Mockito.mock(UserGroupInformation.class);
+    String threadNamePrefix = "check-test-tgt-" + System.nanoTime() + "-";
     ScheduledThreadPoolExecutor executor =
         KerberosAuthUtils.startTicketRefresh(
-            ugi, 60, "check-test-tgt-", LoggerFactory.getLogger(getClass()));
+            ugi, 60, threadNamePrefix, LoggerFactory.getLogger(getClass()));
 
     try {
-      Thread thread = executor.getThreadFactory().newThread(() -> {});
+      Thread thread =
+          Thread.getAllStackTraces().keySet().stream()
+              .filter(candidate -> candidate.getName().equals(threadNamePrefix + "0"))
+              .findFirst()
+              .orElseThrow();
       Assertions.assertTrue(thread.isDaemon());
-      Assertions.assertEquals("check-test-tgt-1", thread.getName());
     } finally {
       executor.shutdownNow();
     }

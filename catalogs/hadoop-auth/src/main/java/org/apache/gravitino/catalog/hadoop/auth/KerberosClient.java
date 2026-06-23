@@ -175,6 +175,21 @@ public class KerberosClient implements Closeable {
       Preconditions.checkArgument(
           principal != null && !principal.trim().isEmpty(), "principal can't be blank");
       Preconditions.checkArgument(hadoopConf != null, "hadoopConf can't be null");
+      Preconditions.checkArgument(loginMode != null, "loginMode can't be null");
+      if (refreshCredentials) {
+        Preconditions.checkArgument(checkIntervalSec > 0, "checkIntervalSec must be positive");
+        Preconditions.checkArgument(
+            threadNamePrefix != null && !threadNamePrefix.trim().isEmpty(),
+            "threadNamePrefix can't be blank");
+      }
+      if (hadoopKrb5ConfKey != null || systemKrb5ConfKey != null) {
+        Preconditions.checkArgument(
+            hadoopKrb5ConfKey != null && !hadoopKrb5ConfKey.trim().isEmpty(),
+            "hadoopKrb5ConfKey can't be blank");
+        Preconditions.checkArgument(
+            systemKrb5ConfKey != null && !systemKrb5ConfKey.trim().isEmpty(),
+            "systemKrb5ConfKey can't be blank");
+      }
       return new KerberosClient(this);
     }
   }

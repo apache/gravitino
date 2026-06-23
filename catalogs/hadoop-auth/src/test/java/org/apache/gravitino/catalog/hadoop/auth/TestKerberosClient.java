@@ -42,6 +42,51 @@ public class TestKerberosClient {
   }
 
   @Test
+  public void testBuilderRejectsInvalidRefreshConfiguration() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KerberosClient.builder("hdfs/localhost@EXAMPLE.COM", new Configuration())
+                .checkIntervalSec(0)
+                .build());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KerberosClient.builder("hdfs/localhost@EXAMPLE.COM", new Configuration())
+                .threadNamePrefix(" ")
+                .build());
+  }
+
+  @Test
+  public void testBuilderAllowsInvalidRefreshConfigurationWhenRefreshDisabled() {
+    KerberosClient client =
+        KerberosClient.builder("hdfs/localhost@EXAMPLE.COM", new Configuration())
+            .refreshCredentials(false)
+            .checkIntervalSec(0)
+            .threadNamePrefix(" ")
+            .build();
+    assertNotNull(client);
+  }
+
+  @Test
+  public void testBuilderRejectsInvalidKrb5ConfKeys() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KerberosClient.builder("hdfs/localhost@EXAMPLE.COM", new Configuration())
+                .krb5Conf(" ", "java.security.krb5.conf")
+                .build());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KerberosClient.builder("hdfs/localhost@EXAMPLE.COM", new Configuration())
+                .krb5Conf("hadoop.security.krb5.conf", null)
+                .build());
+  }
+
+  @Test
   public void testBuilderBuildsWithDefaults() {
     KerberosClient client =
         KerberosClient.builder("hdfs/localhost@EXAMPLE.COM", new Configuration())
