@@ -34,6 +34,7 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.catalog.FederatedIcebergCatalog;
 import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
@@ -143,8 +144,14 @@ public class IcebergCatalogUtil {
     Map<String, String> properties = Maps.newHashMap(icebergConfig.getIcebergCatalogProperties());
     applyDefaultResolvingFileIO(properties);
 
-    // REST catalog must use forward access token from the user request
-    properties.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
+    // If the catalog has OAuth2 credentials (e.g. connecting to Polaris), let Iceberg's
+    // built-in OAuth2Manager handle client-credentials auth. Otherwise, forward the
+    // Gravitino user's access token (the original behavior for principal-propagation).
+    if (properties.containsKey("credential")) {
+      properties.putIfAbsent(AuthProperties.AUTH_TYPE, "oauth2");
+    } else {
+      properties.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
+    }
     applyRestCatalogHttpTimeoutProperties(icebergConfig, properties);
 
     properties.forEach(hdfsConfiguration::set);
@@ -160,6 +167,13 @@ public class IcebergCatalogUtil {
     applyDefaultResolvingFileIO(properties);
     return CatalogUtil.loadCatalog(
         className, customCatalogName, properties, new HdfsConfiguration());
+  }
+
+  private static Catalog loadFederatedCatalog(IcebergConfig icebergConfig) {
+    String catalogName = icebergConfig.getCatalogBackendName();
+    Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
+    return CatalogUtil.loadCatalog(
+        FederatedIcebergCatalog.class.getName(), catalogName, properties, new HdfsConfiguration());
   }
 
   @VisibleForTesting
@@ -201,6 +215,8 @@ public class IcebergCatalogUtil {
         return loadRestCatalog(icebergConfig);
       case CUSTOM:
         return loadCustomCatalog(icebergConfig);
+      case FEDERATED:
+        return loadFederatedCatalog(icebergConfig);
       default:
         throw new RuntimeException(
             catalogBackend

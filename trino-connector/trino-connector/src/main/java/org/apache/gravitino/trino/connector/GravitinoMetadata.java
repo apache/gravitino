@@ -30,6 +30,7 @@ import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.AggregationApplicationResult;
 import io.trino.spi.connector.Assignment;
 import io.trino.spi.connector.BeginTableExecuteResult;
+import io.trino.spi.connector.CatalogSchemaTableName;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
@@ -134,6 +135,12 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   public Map<String, Object> getSchemaProperties(ConnectorSession session, String schemaName) {
     GravitinoSchema schema = catalogConnectorMetadata.getSchema(schemaName);
     return metadataAdapter.getSchemaProperties(schema);
+  }
+
+  @Override
+  public Optional<CatalogSchemaTableName> redirectTable(
+      ConnectorSession session, SchemaTableName tableName) {
+    return internalMetadata.redirectTable(session, tableName);
   }
 
   @Override

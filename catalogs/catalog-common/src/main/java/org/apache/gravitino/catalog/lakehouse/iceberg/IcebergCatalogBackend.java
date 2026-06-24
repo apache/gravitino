@@ -23,5 +23,6 @@ public enum IcebergCatalogBackend {
   JDBC,
   MEMORY,
   REST,
-  CUSTOM
+  CUSTOM,
+  FEDERATED
 }
