@@ -23,6 +23,8 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.base.Preconditions;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -47,14 +49,54 @@ import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.utils.IsolatedClassLoader;
 
 public class CapabilityHelpers {
 
+  /**
+   * Returns a classloader-aware {@link Capability} proxy for the catalog identified by {@code
+   * ident}.
+   *
+   * <p>{@link CatalogManager.CatalogWrapper#capabilities()} returns a {@link Capability}
+   * implementation loaded by the catalog's {@link IsolatedClassLoader}. Calling any method on that
+   * object <em>outside</em> {@code withClassLoader()} causes the JVM to request compiler-generated
+   * synthetic classes (e.g. the {@code $1} anonymous class produced by {@code switch-on-enum}) via
+   * the server classloader, which cannot find them. Because the JVM permanently caches the lookup
+   * failure, the error is unrecoverable for the lifetime of the process.
+   *
+   * <p>This method wraps the delegate in a JDK dynamic proxy whose invocation handler executes
+   * every method call inside {@code classLoader.withClassLoader()}, ensuring the correct
+   * classloader context is active whenever a {@link Capability} method is invoked — regardless of
+   * where in the call stack the invocation occurs.
+   *
+   * <p>The proxy introduces JDK reflection overhead per method call. This is acceptable because
+   * {@link Capability} methods are invoked during metadata-layer operations, not in data-path hot
+   * loops.
+   *
+   * @param ident any {@link NameIdentifier} that belongs to the target catalog
+   * @param catalogManager the catalog manager used to load the catalog
+   * @return a classloader-aware {@link Capability} proxy
+   */
   public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
     try {
-      return c.capabilities();
+      Capability delegate = c.capabilities();
+      IsolatedClassLoader cl = c.classLoader();
+      if (cl == null) {
+        return delegate;
+      }
+      return (Capability)
+          Proxy.newProxyInstance(
+              Capability.class.getClassLoader(),
+              new Class<?>[] {Capability.class},
+              (proxy, method, args) -> {
+                try {
+                  return cl.withClassLoader(__ -> method.invoke(delegate, args));
+                } catch (InvocationTargetException e) {
+                  throw e.getCause();
+                }
+              });
     } catch (Exception e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
     }
