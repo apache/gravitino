@@ -24,6 +24,30 @@ plugins {
   id("idea")
 }
 
+// Pin the Lance Namespace API to the version Gravitino standardizes on. lance-namespace-hive2
+// 0.3.0 is built against lance-namespace 0.7.2; force the core/apache-client artifacts to 0.7.5
+// so the whole module resolves to a single, consistent Lance Namespace version.
+configurations.all {
+  // Legacy Netty fat-jars (netty-all 4.0.x, netty 3.x) arrive transitively via Hadoop/Hive/
+  // lance-core and shadow the modern netty-buffer 4.1.x that Arrow's allocation manager requires,
+  // breaking arrow-memory-netty initialization on JDK 17. Arrow uses netty-buffer/netty-common
+  // directly, so drop the fat-jars everywhere in this module.
+  exclude(group = "io.netty", module = "netty-all")
+  exclude(group = "io.netty", module = "netty")
+  resolutionStrategy {
+    // Keep the whole module on the Lance Namespace version Gravitino standardizes on (0.7.5).
+    // lance-namespace-hive2 0.3.0 is built against 0.7.2; force its transitive core/apache-client up.
+    force("org.lance:lance-namespace-core:0.7.5")
+    force("org.lance:lance-namespace-apache-client:0.7.5")
+    // lance-namespace-impls-core pulls Arrow 15.x; pin all Arrow modules to Gravitino's 18.x so the
+    // arrow-memory-netty allocation manager matches arrow-memory-core.
+    force("org.apache.arrow:arrow-memory-netty:${libs.versions.arrow.get()}")
+    force("org.apache.arrow:arrow-memory-core:${libs.versions.arrow.get()}")
+    force("org.apache.arrow:arrow-vector:${libs.versions.arrow.get()}")
+    force("org.apache.arrow:arrow-format:${libs.versions.arrow.get()}")
+  }
+}
+
 dependencies {
   // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
   constraints {
@@ -99,6 +123,30 @@ dependencies {
     exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
     exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
     exclude(group = "org.apache.opendal", module = "*")
+    exclude(group = "org.junit.jupiter", module = "*")
+  }
+
+  // Official Lance Hive 2 namespace implementation. It pulls Hadoop 2.8.5 + an embedded
+  // metastore stack (Derby/DataNucleus); exclude those so we run on Gravitino's Hadoop 3
+  // metastore client. lance-namespace-impls-core provides LanceTableUtil/RestClient.
+  implementation(libs.lance.namespace.hive2) {
+    exclude(group = "org.lance", module = "lance-core")
+    exclude(group = "org.apache.hadoop")
+    exclude(group = "org.apache.derby")
+    exclude(group = "org.datanucleus")
+    exclude(group = "org.apache.hive", module = "hive-exec")
+    exclude(group = "org.apache.hive", module = "hive-service")
+    exclude(group = "com.google.guava", module = "guava") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
+    exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
+    exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
+    // arrow-dataset / arrow-c-data (and their legacy io.netty 3.x/4.0.x transitives) are not used
+    // by the Hive namespace; drop them so they don't shadow Gravitino's arrow-vector runtime.
+    exclude(group = "org.apache.arrow", module = "arrow-dataset")
+    exclude(group = "org.apache.arrow", module = "arrow-c-data")
+    exclude(group = "io.netty", module = "netty-all")
+    exclude(group = "io.netty", module = "netty")
+    exclude(group = "org.slf4j", module = "slf4j-simple")
     exclude(group = "org.junit.jupiter", module = "*")
   }
   implementation(libs.slf4j.api)

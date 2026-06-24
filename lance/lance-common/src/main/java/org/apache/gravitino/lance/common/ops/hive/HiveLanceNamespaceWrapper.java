@@ -19,6 +19,10 @@
 package org.apache.gravitino.lance.common.ops.hive;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
@@ -26,12 +30,18 @@ import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.lance.namespace.hive2.Hive2Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * {@link NamespaceWrapper} backed by a Hive Metastore. A namespace maps to a Hive database and a
- * table maps to a {@code db.table} entry registered in the metastore as an external Lance table.
+ * {@link NamespaceWrapper} backed by the official {@code lance-namespace-hive2} implementation
+ * ({@link Hive2Namespace}). A namespace maps to a Hive database and a table maps to a {@code
+ * db.table} entry registered in the Hive Metastore as an external Lance table.
+ *
+ * <p>This wrapper owns a single {@link Hive2Namespace} instance and exposes it to the namespace and
+ * table operation adapters, which translate between Gravitino's flat-parameter operation interfaces
+ * and the Lance Namespace request/response model.
  */
 public class HiveLanceNamespaceWrapper extends NamespaceWrapper {
 
@@ -40,8 +50,14 @@ public class HiveLanceNamespaceWrapper extends NamespaceWrapper {
   /** Prefix for raw Hadoop/Hive properties forwarded into the Hadoop configuration. */
   private static final String HIVE_CONFIG_PREFIX = "hive.";
 
-  private HiveClientPool clientPool;
-  private String root;
+  /** {@link Hive2Namespace} config key for the client pool size. */
+  private static final String HIVE2_CLIENT_POOL_SIZE = "client.pool-size";
+
+  /** {@link Hive2Namespace} config key for the storage root used to derive default locations. */
+  private static final String HIVE2_ROOT = "root";
+
+  private Hive2Namespace delegate;
+  private BufferAllocator allocator;
 
   private LanceNamespaceOperations namespaceOperations;
   private LanceTableOperations tableOperations;
@@ -61,21 +77,12 @@ public class HiveLanceNamespaceWrapper extends NamespaceWrapper {
   }
 
   /**
-   * Get the Hive Metastore client pool.
+   * Get the underlying Lance Hive 2 namespace implementation.
    *
-   * @return the client pool, or null if {@link #initialize()} has not run
+   * @return the delegate, or null if {@link #initialize()} has not run
    */
-  public HiveClientPool getClientPool() {
-    return clientPool;
-  }
-
-  /**
-   * Get the storage root (warehouse) location used to derive default database/table locations.
-   *
-   * @return the configured root location without a trailing slash
-   */
-  public String getRoot() {
-    return root;
+  public Hive2Namespace getDelegate() {
+    return delegate;
   }
 
   @Override
@@ -103,8 +110,16 @@ public class HiveLanceNamespaceWrapper extends NamespaceWrapper {
               }
             });
 
-    this.root = HiveUtil.makeQualified(warehouse);
-    this.clientPool = new HiveClientPool(poolSize, hadoopConf);
+    Map<String, String> namespaceProperties = new HashMap<>();
+    namespaceProperties.put(HIVE2_CLIENT_POOL_SIZE, String.valueOf(poolSize));
+    if (StringUtils.isNotBlank(warehouse)) {
+      namespaceProperties.put(HIVE2_ROOT, warehouse);
+    }
+
+    this.allocator = new RootAllocator();
+    this.delegate = new Hive2Namespace();
+    this.delegate.setHadoopConf(hadoopConf);
+    this.delegate.initialize(namespaceProperties, allocator);
 
     LOG.info(
         "Hive Lance namespace backend initialized with metastore uris '{}', warehouse '{}',"
@@ -113,8 +128,8 @@ public class HiveLanceNamespaceWrapper extends NamespaceWrapper {
         warehouse,
         poolSize);
 
-    this.namespaceOperations = new HiveLanceNamespaceOperations(this);
-    this.tableOperations = new HiveLanceTableOperations(this);
+    this.namespaceOperations = new HiveLanceNamespaceOperations(delegate);
+    this.tableOperations = new HiveLanceTableOperations(delegate);
   }
 
   @Override
@@ -129,11 +144,11 @@ public class HiveLanceNamespaceWrapper extends NamespaceWrapper {
 
   @Override
   public void close() {
-    if (clientPool != null) {
+    if (allocator != null) {
       try {
-        clientPool.close();
+        allocator.close();
       } catch (Exception e) {
-        LOG.warn("Error closing Hive Metastore client pool", e);
+        LOG.warn("Error closing Arrow allocator for Hive Lance namespace backend", e);
       }
     }
   }

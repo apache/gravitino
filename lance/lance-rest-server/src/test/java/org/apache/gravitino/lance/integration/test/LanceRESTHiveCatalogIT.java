@@ -67,7 +67,6 @@ import org.lance.namespace.model.ListTablesRequest;
 import org.lance.namespace.model.ListTablesResponse;
 import org.lance.namespace.model.NamespaceExistsRequest;
 import org.lance.namespace.model.RegisterTableRequest;
-import org.lance.namespace.model.RegisterTableResponse;
 import org.lance.namespace.model.TableExistsRequest;
 
 /**
@@ -288,34 +287,44 @@ public class LanceRESTHiveCatalogIT extends BaseIT {
   }
 
   @Test
-  public void testRegisterAndDeregisterTable() {
+  public void testDeclareAndDeregisterTable() {
     String db = GravitinoITUtils.genRandomName("lance_hive_register").toLowerCase();
     createDatabase(db);
 
-    String location = tableLocation(db, "registered");
-    RegisterTableRequest registerReq = new RegisterTableRequest();
-    registerReq.setId(List.of(db, "registered"));
-    registerReq.setLocation(location);
-    registerReq.setMode("create");
-    registerReq.setProperties(ImmutableMap.of("key1", "value1"));
-    RegisterTableResponse registerResp = ns.registerTable(registerReq);
-    Assertions.assertEquals(location, registerResp.getLocation());
-
-    Assertions.assertEquals(location, describeTable(db, "registered").getLocation());
+    // The Hive backend creates tables through declareTable (metastore pointer); createTable and
+    // registerTable are not supported by the underlying lance-namespace-hive2 implementation.
+    String location = tableLocation(db, "declared");
+    declareTable(db, "declared", location);
+    Assertions.assertEquals(location, describeTable(db, "declared").getLocation());
 
     // Deregister keeps no data (external table) and removes the metastore entry.
     DeregisterTableRequest deregisterReq = new DeregisterTableRequest();
-    deregisterReq.setId(List.of(db, "registered"));
+    deregisterReq.setId(List.of(db, "declared"));
     DeregisterTableResponse deregisterResp = ns.deregisterTable(deregisterReq);
     Assertions.assertEquals(location, deregisterResp.getLocation());
 
     // Describing the deregistered table should fail.
     DescribeTableRequest describeReq = new DescribeTableRequest();
-    describeReq.setId(List.of(db, "registered"));
+    describeReq.setId(List.of(db, "declared"));
     describeReq.setLoadDetailedMetadata(false);
     RuntimeException ex =
         Assertions.assertThrows(RuntimeException.class, () -> ns.describeTable(describeReq));
     assertLanceErrorCode(ex, ErrorCode.TABLE_NOT_FOUND);
+
+    dropDatabase(db);
+  }
+
+  @Test
+  public void testRegisterTableUnsupported() {
+    String db = GravitinoITUtils.genRandomName("lance_hive_register_unsupported").toLowerCase();
+    createDatabase(db);
+
+    RegisterTableRequest registerReq = new RegisterTableRequest();
+    registerReq.setId(List.of(db, "registered"));
+    registerReq.setLocation(tableLocation(db, "registered"));
+    registerReq.setMode("create");
+    // registerTable is not supported by the Hive backend.
+    Assertions.assertThrows(RuntimeException.class, () -> ns.registerTable(registerReq));
 
     dropDatabase(db);
   }

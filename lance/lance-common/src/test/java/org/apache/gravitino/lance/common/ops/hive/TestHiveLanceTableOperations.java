@@ -20,199 +20,139 @@ package org.apache.gravitino.lance.common.ops.hive;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Optional;
-import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
-import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.Table;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.lance.namespace.errors.InvalidInputException;
-import org.lance.namespace.errors.TableAlreadyExistsException;
 import org.lance.namespace.errors.TableNotFoundException;
-import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.hive2.Hive2Namespace;
+import org.lance.namespace.model.AlterTableDropColumnsRequest;
+import org.lance.namespace.model.AlterTableDropColumnsResponse;
+import org.lance.namespace.model.DeclareTableRequest;
+import org.lance.namespace.model.DeclareTableResponse;
+import org.lance.namespace.model.DeregisterTableRequest;
+import org.lance.namespace.model.DeregisterTableResponse;
+import org.lance.namespace.model.DescribeTableRequest;
 import org.lance.namespace.model.DescribeTableResponse;
-import org.lance.namespace.model.RegisterTableResponse;
+import org.lance.namespace.model.DropTableRequest;
+import org.lance.namespace.model.DropTableResponse;
+import org.lance.namespace.model.TableExistsRequest;
 import org.mockito.ArgumentCaptor;
-import org.mockito.invocation.InvocationOnMock;
 
-/** Unit tests for {@link HiveLanceTableOperations} backed by a mocked client pool. */
+/**
+ * Unit tests for {@link HiveLanceTableOperations}, which adapts Gravitino's table-operation
+ * interface onto a mocked {@link Hive2Namespace}.
+ */
 class TestHiveLanceTableOperations {
 
   private static final String DELIMITER = "$";
 
-  private HiveClientPool pool;
-  private IMetaStoreClient client;
+  private Hive2Namespace delegate;
   private HiveLanceTableOperations ops;
 
   @BeforeEach
-  @SuppressWarnings("unchecked")
-  void setUp() throws Exception {
-    pool = mock(HiveClientPool.class);
-    client = mock(IMetaStoreClient.class);
-    when(pool.run(any()))
-        .thenAnswer(
-            (InvocationOnMock inv) -> {
-              ClientPoolImpl.Action<Object, IMetaStoreClient, Exception> action =
-                  inv.getArgument(0);
-              return action.run(client);
-            });
-    ops = new HiveLanceTableOperations(pool, "s3://bucket/wh");
-  }
-
-  private static Table lanceTable(String location) {
-    Table table = new Table();
-    table.setDbName("db");
-    table.setTableName("t");
-    table.setParameters(ImmutableMap.of("table_type", "lance"));
-    StorageDescriptor sd = new StorageDescriptor();
-    sd.setLocation(location);
-    table.setSd(sd);
-    return table;
+  void setUp() {
+    delegate = mock(Hive2Namespace.class);
+    ops = new HiveLanceTableOperations(delegate);
   }
 
   @Test
-  void testCreateTableRegistersExternalLanceTable() throws Exception {
-    when(client.getTable("db", "t")).thenThrow(new NoSuchObjectException("no table"));
+  void testDescribeTableTranslatesRequestAndReturnsResponse() {
+    DescribeTableResponse expected = new DescribeTableResponse();
+    when(delegate.describeTable(any(DescribeTableRequest.class))).thenReturn(expected);
 
-    CreateTableResponse response =
-        ops.createTable(
-            "db$t", "create", DELIMITER, "s3://bucket/wh/db/t", ImmutableMap.of("k", "v"), null);
-    assertEquals("s3://bucket/wh/db/t", response.getLocation());
-    assertEquals("lance", response.getProperties().get("table_type"));
-    assertEquals("storage", response.getProperties().get("managed_by"));
-    assertEquals("v", response.getProperties().get("k"));
+    DescribeTableResponse actual =
+        ops.describeTable("db$t", DELIMITER, Optional.of(3L), true, false);
 
-    ArgumentCaptor<Table> captor = ArgumentCaptor.forClass(Table.class);
-    verify(client).createTable(captor.capture());
-    Table created = captor.getValue();
-    assertEquals("EXTERNAL_TABLE", created.getTableType());
-    assertEquals("s3://bucket/wh/db/t", created.getSd().getLocation());
-    assertEquals("org.lance.mapred.LanceInputFormat", created.getSd().getInputFormat());
-    assertEquals("org.lance.mapred.LanceOutputFormat", created.getSd().getOutputFormat());
-    assertEquals(
-        "org.lance.mapred.LanceSerDe", created.getSd().getSerdeInfo().getSerializationLib());
-    assertTrue(created.getSd().getCols().isEmpty());
+    assertSame(expected, actual);
+    ArgumentCaptor<DescribeTableRequest> captor =
+        ArgumentCaptor.forClass(DescribeTableRequest.class);
+    verify(delegate).describeTable(captor.capture());
+    DescribeTableRequest sent = captor.getValue();
+    assertEquals(List.of("db", "t"), sent.getId());
+    assertEquals(3L, sent.getVersion());
+    assertEquals(Boolean.TRUE, sent.getCheckDeclared());
+    assertEquals(Boolean.FALSE, sent.getLoadDetailedMetadata());
   }
 
   @Test
-  void testCreateTableCreateModeThrowsWhenExists() throws Exception {
-    when(client.getTable("db", "t")).thenReturn(lanceTable("s3://bucket/wh/db/t"));
-    assertThrows(
-        TableAlreadyExistsException.class,
-        () -> ops.createTable("db$t", "create", DELIMITER, "s3://bucket/wh/db/t", null, null));
+  void testDeclareTableTranslatesRequestAndReturnsResponse() {
+    DeclareTableResponse expected = new DeclareTableResponse();
+    when(delegate.declareTable(any(DeclareTableRequest.class))).thenReturn(expected);
+
+    DeclareTableResponse actual =
+        ops.declareTable("db$t", DELIMITER, "s3://bucket/db/t", ImmutableMap.of("k", "v"));
+
+    assertSame(expected, actual);
+    ArgumentCaptor<DeclareTableRequest> captor = ArgumentCaptor.forClass(DeclareTableRequest.class);
+    verify(delegate).declareTable(captor.capture());
+    DeclareTableRequest sent = captor.getValue();
+    assertEquals(List.of("db", "t"), sent.getId());
+    assertEquals("s3://bucket/db/t", sent.getLocation());
+    assertEquals("v", sent.getProperties().get("k"));
   }
 
   @Test
-  void testDescribeTableReturnsLocationAndManagedVersioningFalse() throws Exception {
-    when(client.getTable("db", "t")).thenReturn(lanceTable("s3://bucket/wh/db/t"));
-    DescribeTableResponse response =
-        ops.describeTable("db$t", DELIMITER, Optional.empty(), false, false);
-    assertEquals("s3://bucket/wh/db/t", response.getLocation());
-    assertFalse(response.getManagedVersioning());
+  void testDropTableTranslatesRequestAndReturnsResponse() {
+    DropTableResponse expected = new DropTableResponse();
+    when(delegate.dropTable(any(DropTableRequest.class))).thenReturn(expected);
+
+    DropTableResponse actual = ops.dropTable("db$t", DELIMITER);
+
+    assertSame(expected, actual);
+    ArgumentCaptor<DropTableRequest> captor = ArgumentCaptor.forClass(DropTableRequest.class);
+    verify(delegate).dropTable(captor.capture());
+    assertEquals(List.of("db", "t"), captor.getValue().getId());
   }
 
   @Test
-  void testDescribeTableThrowsWhenLoadDetailedMetadata() {
-    assertThrows(
-        InvalidInputException.class,
-        () -> ops.describeTable("db$t", DELIMITER, Optional.empty(), false, true));
+  void testDeregisterTableTranslatesRequestAndReturnsResponse() {
+    DeregisterTableResponse expected = new DeregisterTableResponse();
+    when(delegate.deregisterTable(any(DeregisterTableRequest.class))).thenReturn(expected);
+
+    DeregisterTableResponse actual = ops.deregisterTable("db$t", DELIMITER);
+
+    assertSame(expected, actual);
+    ArgumentCaptor<DeregisterTableRequest> captor =
+        ArgumentCaptor.forClass(DeregisterTableRequest.class);
+    verify(delegate).deregisterTable(captor.capture());
+    assertEquals(List.of("db", "t"), captor.getValue().getId());
   }
 
   @Test
-  void testDescribeTableThrowsWhenAbsent() throws Exception {
-    when(client.getTable("db", "t")).thenThrow(new NoSuchObjectException("no table"));
-    assertThrows(
-        TableNotFoundException.class,
-        () -> ops.describeTable("db$t", DELIMITER, Optional.empty(), false, false));
+  void testTableExistsTrueWhenDelegateDoesNotThrow() {
+    HiveLanceTableOperations operations = new HiveLanceTableOperations(delegate);
+    assertTrue(operations.tableExists("db$t", DELIMITER));
+    verify(delegate).tableExists(any(TableExistsRequest.class));
   }
 
   @Test
-  void testRegisterTableUsesLocationFromProperties() throws Exception {
-    when(client.getTable("db", "t")).thenThrow(new NoSuchObjectException("no table"));
-    RegisterTableResponse response =
-        ops.registerTable(
-            "db$t", "create", DELIMITER, ImmutableMap.of("location", "s3://bucket/data/t"));
-    assertEquals("s3://bucket/data/t", response.getLocation());
-    verify(client).createTable(any(Table.class));
-  }
-
-  @Test
-  void testRegisterTableThrowsWhenLocationMissing() {
-    assertThrows(
-        InvalidInputException.class,
-        () -> ops.registerTable("db$t", "create", DELIMITER, ImmutableMap.of()));
-  }
-
-  @Test
-  void testDropTableDeletesData() throws Exception {
-    when(client.getTable("db", "t")).thenReturn(lanceTable("s3://bucket/wh/db/t"));
-    ops.dropTable("db$t", DELIMITER);
-    verify(client).dropTable("db", "t", true, true);
-  }
-
-  @Test
-  void testDeregisterTableKeepsData() throws Exception {
-    when(client.getTable("db", "t")).thenReturn(lanceTable("s3://bucket/wh/db/t"));
-    ops.deregisterTable("db$t", DELIMITER);
-    verify(client).dropTable("db", "t", false, true);
-  }
-
-  @Test
-  void testTableExistsTrueForLanceTable() throws Exception {
-    when(client.getTable("db", "t")).thenReturn(lanceTable("s3://bucket/wh/db/t"));
-    assertTrue(ops.tableExists("db$t", DELIMITER));
-  }
-
-  @Test
-  void testTableExistsFalseWhenAbsent() throws Exception {
-    when(client.getTable("db", "t")).thenThrow(new NoSuchObjectException("no table"));
+  void testTableExistsFalseWhenDelegateThrowsNotFound() {
+    org.mockito.Mockito.doThrow(new TableNotFoundException("missing", null, "db.t"))
+        .when(delegate)
+        .tableExists(any(TableExistsRequest.class));
     assertFalse(ops.tableExists("db$t", DELIMITER));
   }
 
   @Test
-  void testAlterTableThrowsInvalidInput() {
-    assertThrows(
-        InvalidInputException.class, () -> ops.alterTable("db$t", DELIMITER, new Object()));
-  }
+  void testAlterTableDropColumnsDelegates() {
+    AlterTableDropColumnsResponse expected = new AlterTableDropColumnsResponse();
+    when(delegate.alterTableDropColumns(any(AlterTableDropColumnsRequest.class)))
+        .thenReturn(expected);
 
-  @Test
-  void testWrongArityThrows() {
-    assertThrows(
-        InvalidInputException.class,
-        () -> ops.describeTable("db", DELIMITER, Optional.empty(), false, false));
-    assertThrows(InvalidInputException.class, () -> ops.tableExists("db$t$x", DELIMITER));
-  }
+    AlterTableDropColumnsRequest request = new AlterTableDropColumnsRequest();
+    request.setColumns(List.of("c1"));
+    Object actual = ops.alterTable("db$t", DELIMITER, request);
 
-  @Test
-  void testDeclareTableDerivesLocationFromDatabaseWhenAbsent() throws Exception {
-    when(client.getTable("db", "t")).thenThrow(new NoSuchObjectException("no table"));
-    org.apache.hadoop.hive.metastore.api.Database database =
-        new org.apache.hadoop.hive.metastore.api.Database();
-    database.setName("db");
-    database.setLocationUri("s3://bucket/wh/db");
-    when(client.getDatabase("db")).thenReturn(database);
-
-    assertEquals(
-        "s3://bucket/wh/db/t",
-        ops.declareTable("db$t", DELIMITER, null, ImmutableMap.of()).getLocation());
-    verify(client).createTable(any(Table.class));
-  }
-
-  @Test
-  void testCreateTableOverwriteDropsExisting() throws Exception {
-    when(client.getTable("db", "t")).thenReturn(lanceTable("s3://bucket/wh/db/t"));
-    ops.createTable("db$t", "overwrite", DELIMITER, "s3://bucket/wh/db/t", null, null);
-    verify(client).dropTable(eq("db"), eq("t"), eq(false), eq(true));
-    verify(client).createTable(any(Table.class));
+    assertSame(expected, actual);
+    assertEquals(List.of("db", "t"), request.getId());
   }
 }
