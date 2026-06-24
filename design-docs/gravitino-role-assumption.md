@@ -242,9 +242,9 @@ The mechanism is a request header. Engines differ only in whether they can forwa
 **Trino upstream outlook:** acceptance of a *Gravitino-named* header in Trino core is uncertain, since
 Trino avoids vendor-specific coupling. The durable fix is to standardize the header (or an OAuth2 scope)
 in the Iceberg REST spec, after which Trino support becomes generic and vendor-neutral. Short-term, an
-internal Trino patch is viable for teams that build their own Trino. The token-bound option (Section 8)
-likely needs no Trino change at all, because in OAuth mode Trino already forwards the user's bearer
-token.
+internal Trino patch is viable for teams that build their own Trino. The identity-level route (Section 8)
+— a pre-scoped credential or an IdP-issued scoped token — likely needs no Trino change at all, because in
+OAuth mode Trino already forwards the user's bearer token.
 
 ---
 
@@ -252,27 +252,19 @@ token.
 
 It's worth being honest about what the header does and doesn't protect against.
 
-Because the server validates membership and only ever *removes* roles from the evaluated set, the
-declaration can never escalate access — at worst a client ignores it and gets today's normal,
-un-narrowed access. That makes the header a solid defense against *accidental* over-reach: a buggy job,
-a misconfigured pipeline, an agent drifting outside its task. In all of those cases, out-of-scope access
-turns into a hard, auditable deny.
+The header is a *cooperative* control. Because the server validates membership and only ever *removes*
+roles, it can never escalate access — a client that ignores or strips the header just falls back to its
+normal, already-granted access. That makes it a solid defense against *accidental* over-reach (a buggy
+job, a drifting agent), turning out-of-scope access into a hard, auditable deny, and it means the header
+doesn't need to be tamper-proof to be safe.
 
-What the header does *not* stop is a *deliberately* malicious client — one that simply declines to
-narrow, or strips the header, to keep its full access. In other words, the header is a cooperative
-control: it constrains clients that opt in, not ones that refuse to.
-
-Closing that gap is possible, but it means binding the narrowed scope into the caller's token instead of
-carrying it in a header the client controls. If the active roles live inside a *signed* bearer token,
-the client can't widen them back without breaking the signature, so the narrowing is enforced from the
-credential itself. The real question is who issues that narrowed token. Ideally the IdP would, but Azure
-Entra can't — it emits all of a user's groups and offers no way to request a token scoped to a single
-role. So in practice Gravitino mints the narrowed token itself: it trusts Entra for *identity*, checks
-that the user actually holds the requested role, and issues a short-lived token carrying just the active
-set. That's more moving parts — a small token-minting step inside Gravitino — which is why it's staged
-as a later phase rather than part of the first cut. The header lands first and covers the common
-(accidental) case; the token-bound version follows for deployments that need to defend against a hostile
-client.
+What it doesn't do is constrain a principal that refuses to cooperate. Enforcing narrowing on an
+untrusted or compromised principal means binding the scope to the *identity* it's issued — e.g. a token
+whose claims carry only the active role — not a header it controls. Gravitino is the resource server, not
+the authorization server, so it shouldn't mint that token itself; the scoping would come from the IdP.
+Not all IdPs can do this (Azure Entra, for one, emits all of a user's groups with no per-role
+down-scoping), so this is a real complexity rather than a guaranteed option — noted here, to be detailed
+if there's interest.
 
 ---
 
@@ -293,11 +285,11 @@ to the user or group directly, which is exactly why the ownership decision in Se
 
 ## 10. Options considered
 
-| Option | Narrows enforcement? | Resists malicious client? | Engine support | Verdict |
+| Option | Narrows enforcement? | Enforces on uncooperative principal? | Engine support | Verdict |
 |---|---|---|---|---|
 | **A. Request header** (`X-Gravitino-Active-Role`) — caller declares the active role in an HTTP header | ✅ | ❌ (cooperative) | Spark ✅, API ✅, Trino needs setting | **Phase 1** — ship first |
 | **B. Native API parameter** — same as A, exposed as a client call argument instead of a raw header | ✅ | ❌ | Native clients | Fold into A (nicer ergonomics) |
-| **C. Token-bound / OAuth2 scope** — active roles baked into a signed, Gravitino-minted token | ✅ | ✅ | Spark/Trino via bearer token | **Phase 2** — strongest; needs token-minting |
+| **C. IdP-issued scoped token** — active set comes from access-token claims, issued already-narrowed by the authorization server | ✅ | ✅ | Engine via bearer token | Depends on IdP support (Entra can't per-role); Gravitino stays the resource server |
 | **D. Dynamic SQL `SET ROLE`** — `SET ROLE` mid-session in Spark/Trino SQL, narrowing later queries | ✅ | depends | Needs per-engine session propagation | **Phase 3** — large; only if demand |
 | **E. Separate scoped catalogs/identities** — pre-provision a distinct narrow identity/catalog per job (today's workaround) | ✅ | ✅ | All | Operationally heavy; doesn't scale per-job — the thing we're replacing |
 
@@ -310,8 +302,10 @@ the declared roles, enforcing per active role, and keeping list filtering and cr
 consistent — together with the header transport. That alone covers the native API and Spark today, and
 it's backward compatible, so it lands the motivating use cases without waiting on anything else. A small
 follow-up (call it Phase 1b) adds the typed Trino setting that emits the header, which brings Trino in.
-Phase 2 is the token-bound option, which resists a malicious client by binding the reduced scope into a
-Gravitino-minted token, and reaches Trino without a connector change. Phase 3 — dynamic in-session
+Phase 2 binds the narrow scope to the caller's *identity* rather than a header — an IdP-issued scoped
+token — so it holds even against an uncooperative client and reaches Trino through the existing OAuth
+path. It depends on IdP capabilities (Gravitino doesn't mint the token), so it's a later, optional step.
+Phase 3 — dynamic in-session
 `SET ROLE` — is the largest piece, and only worth doing if there's real demand for switching roles
 mid-session.
 
@@ -332,8 +326,9 @@ mid-session.
 4. **Standardization.** Pursue an Iceberg REST spec proposal (a standard header or OAuth2 scope) so
    Trino and other engines get vendor-neutral support, instead of relying on a Gravitino-specific
    header long-term?
-5. **Token-bound option (Phase 2).** Agree it's deferred to Phase 2, and that resisting a *malicious*
-   client requires a Gravitino-minted token because Entra can't down-scope at login?
+5. **Enforcing on an uncooperative principal (Phase 2).** Agree the header is a cooperative control, and
+   that enforcing narrowing on an untrusted principal belongs in an IdP-issued scoped token — not minted
+   by Gravitino, which stays the resource server — accepting that IdP support for this varies?
 
 **Flagged for later (not a v1 decision):** when narrowed `CREATE` is eventually supported, which role
 owns newly created objects? Snowflake ties this to a primary role; noting it now only so the v1 grammar
