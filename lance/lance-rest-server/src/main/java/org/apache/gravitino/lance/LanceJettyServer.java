@@ -23,8 +23,8 @@ import org.apache.gravitino.lance.service.LanceAuthenticationFilter;
 import org.apache.gravitino.server.web.JettyServer;
 
 /**
- * A {@link JettyServer} subclass that creates a {@link LanceAuthenticationFilter} for the
- * Lance REST service authentication layer.
+ * A {@link JettyServer} subclass that creates a {@link LanceAuthenticationFilter} for the Lance
+ * REST service authentication layer.
  */
 class LanceJettyServer extends JettyServer {
 

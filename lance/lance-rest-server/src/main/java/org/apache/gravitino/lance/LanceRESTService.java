@@ -28,7 +28,6 @@ import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
-import org.apache.gravitino.lance.service.LanceAuthenticationFilter;
 import org.apache.gravitino.lance.service.LanceHealthCheckPathMatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;

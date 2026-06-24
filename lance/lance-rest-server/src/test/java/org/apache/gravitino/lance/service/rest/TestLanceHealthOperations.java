@@ -19,6 +19,7 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.HealthCheckDTO;
@@ -50,6 +51,7 @@ public class TestLanceHealthOperations {
   @Test
   public void testReadyReturns200WhenWrapperInitialized() {
     NamespaceWrapper wrapper = mock(NamespaceWrapper.class);
+    when(wrapper.isInitialized()).thenReturn(true);
     LanceHealthOperations ops = operationsWithWrapper(wrapper);
     Response resp = ops.ready();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -71,6 +73,7 @@ public class TestLanceHealthOperations {
   @Test
   public void testHealthReturns200WhenWrapperInitialized() {
     NamespaceWrapper wrapper = mock(NamespaceWrapper.class);
+    when(wrapper.isInitialized()).thenReturn(true);
     LanceHealthOperations ops = operationsWithWrapper(wrapper);
     Response resp = ops.health();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
