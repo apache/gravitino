@@ -59,6 +59,7 @@ import org.junit.jupiter.api.Test;
  * correctly mapped to INVERTED (since Doris 4.0.6 removed BITMAP from Nereids grammar).
  */
 @Tag("gravitino-docker-test")
+@Tag("doris-multi-version")
 public class CatalogDoris4xIT extends BaseIT {
 
   private static final String PROVIDER = "jdbc-doris";

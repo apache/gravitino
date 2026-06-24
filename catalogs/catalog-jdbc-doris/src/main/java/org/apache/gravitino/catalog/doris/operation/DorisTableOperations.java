@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -306,7 +307,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     nonKeyIndexes.forEach(
         index -> {
           if (index.fieldNames().length > 1) {
-            throw new IllegalArgumentException("Index does not support multi fields in Doris");
+            throw new IllegalArgumentException(
+                "Index '" + index.name() + "' does not support multi fields in Doris");
           }
         });
 
@@ -561,7 +563,7 @@ public class DorisTableOperations extends JdbcTableOperations {
           indexName);
       return Index.IndexType.UNIQUE_KEY;
     }
-    switch (indexType.toUpperCase()) {
+    switch (indexType.toUpperCase(Locale.ROOT)) {
       case "BTREE":
         if ("PRIMARY".equals(indexName)) {
           return Index.IndexType.PRIMARY_KEY;

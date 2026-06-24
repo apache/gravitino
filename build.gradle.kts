@@ -264,9 +264,16 @@ allprojects {
 
       val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
       param.environment("dockerTest", dockerTest.toString())
+      val dorisMultiVersion = project.hasProperty("dorisMultiVersionTest")
       param.useJUnitPlatform {
         if (!dockerTest) {
           excludeTags("gravitino-docker-test")
+        }
+        if (!dorisMultiVersion) {
+          // Running multiple Doris versions in one CI runner exhausts memory.
+          // CI runs only the default 1.2.x suite; run all versions locally with
+          // -PdorisMultiVersionTest.
+          excludeTags("doris-multi-version")
         }
       }
     }

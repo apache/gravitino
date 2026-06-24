@@ -50,16 +50,15 @@ public class TestDorisTableOperationsSqlGeneration {
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
       try {
         // Set up a mock DataSource for validateAutoIncrementVersion
-        DataSource mockDataSource = org.mockito.Mockito.mock(DataSource.class);
-        Connection mockConnection = org.mockito.Mockito.mock(Connection.class);
-        Statement mockStatement = org.mockito.Mockito.mock(Statement.class);
-        ResultSet mockResultSet = org.mockito.Mockito.mock(ResultSet.class);
-        org.mockito.Mockito.when(mockDataSource.getConnection()).thenReturn(mockConnection);
-        org.mockito.Mockito.when(mockConnection.createStatement()).thenReturn(mockStatement);
-        org.mockito.Mockito.when(mockStatement.executeQuery("SELECT VERSION()"))
-            .thenReturn(mockResultSet);
-        org.mockito.Mockito.when(mockResultSet.next()).thenReturn(true);
-        org.mockito.Mockito.when(mockResultSet.getString(1)).thenReturn("3.0.6.2");
+        DataSource mockDataSource = Mockito.mock(DataSource.class);
+        Connection mockConnection = Mockito.mock(Connection.class);
+        Statement mockStatement = Mockito.mock(Statement.class);
+        ResultSet mockResultSet = Mockito.mock(ResultSet.class);
+        Mockito.when(mockDataSource.getConnection()).thenReturn(mockConnection);
+        Mockito.when(mockConnection.createStatement()).thenReturn(mockStatement);
+        Mockito.when(mockStatement.executeQuery("SELECT VERSION()")).thenReturn(mockResultSet);
+        Mockito.when(mockResultSet.next()).thenReturn(true);
+        Mockito.when(mockResultSet.getString(1)).thenReturn("3.0.6.2");
         super.dataSource = mockDataSource;
       } catch (Exception e) {
         throw new RuntimeException(e);

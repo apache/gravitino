@@ -58,6 +58,7 @@ import org.junit.jupiter.api.Test;
  * index read-back mapping. Uses Doris 3.0.x Docker image as requested by the community reviewer.
  */
 @Tag("gravitino-docker-test")
+@Tag("doris-multi-version")
 public class CatalogDoris3xIT extends BaseIT {
 
   private static final String PROVIDER = "jdbc-doris";
