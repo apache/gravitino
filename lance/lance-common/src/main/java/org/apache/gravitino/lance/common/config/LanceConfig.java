@@ -39,6 +39,9 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
   public static final String GRAVITINO_NAMESPACE_BACKEND = "gravitino";
   public static final String GRAVITINO_URI = "http://localhost:8090";
 
+  public static final String HIVE_NAMESPACE_BACKEND = "hive";
+  public static final int DEFAULT_HIVE_CLIENT_POOL_SIZE = 3;
+
   public static final ConfigEntry<String> NAMESPACE_BACKEND =
       new ConfigBuilder(CONFIG_NAMESPACE_BACKEND)
           .doc("The backend implementation for namespace operations")
@@ -60,6 +63,27 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault(GRAVITINO_URI);
 
+  public static final ConfigEntry<String> HIVE_METASTORE_URIS =
+      new ConfigBuilder(HIVE_NAMESPACE_BACKEND + "-metastore-uris")
+          .doc("The Hive Metastore thrift URIs, e.g., thrift://host:9083")
+          .version(ConfigConstants.VERSION_1_1_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> HIVE_WAREHOUSE =
+      new ConfigBuilder(HIVE_NAMESPACE_BACKEND + "-warehouse")
+          .doc("The warehouse/root storage location for the Hive Lance namespace backend")
+          .version(ConfigConstants.VERSION_1_1_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<Integer> HIVE_CLIENT_POOL_SIZE =
+      new ConfigBuilder(HIVE_NAMESPACE_BACKEND + "-client-pool-size")
+          .doc("The size of the Hive Metastore client pool")
+          .version(ConfigConstants.VERSION_1_1_0)
+          .intConf()
+          .createWithDefault(DEFAULT_HIVE_CLIENT_POOL_SIZE);
+
   public LanceConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, key -> true);
@@ -79,6 +103,18 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
 
   public String getGravitinoMetalake() {
     return get(METALAKE_NAME);
+  }
+
+  public String getHiveMetastoreUris() {
+    return get(HIVE_METASTORE_URIS);
+  }
+
+  public String getHiveWarehouse() {
+    return get(HIVE_WAREHOUSE);
+  }
+
+  public int getHiveClientPoolSize() {
+    return get(HIVE_CLIENT_POOL_SIZE);
   }
 
   @Override
