@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
@@ -58,6 +59,12 @@ public class LanceAuthenticationFilter extends AuthenticationFilter {
       message = exception.getMessage();
       if (message == null || message.isEmpty()) {
         message = "Authentication failed";
+      }
+    } else if (exception instanceof ForbiddenException) {
+      status = HttpServletResponse.SC_FORBIDDEN;
+      message = exception.getMessage();
+      if (message == null || message.isEmpty()) {
+        message = "Access denied";
       }
     } else {
       status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;

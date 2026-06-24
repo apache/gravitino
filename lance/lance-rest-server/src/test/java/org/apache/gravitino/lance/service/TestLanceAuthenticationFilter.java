@@ -28,6 +28,7 @@ import java.io.StringWriter;
 import javax.servlet.ServletRequest;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.junit.jupiter.api.Assertions;
@@ -112,6 +113,27 @@ public class TestLanceAuthenticationFilter {
     ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
     Assertions.assertEquals(401, errorResponse.getCode());
     Assertions.assertEquals("The provided credentials did not support", errorResponse.getError());
+  }
+
+  @Test
+  public void testForbiddenExceptionReturnsJson() throws Exception {
+    LanceAuthenticationFilter filter = new LanceAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new ForbiddenException("Access denied"));
+
+    verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(403, errorResponse.getCode());
+    Assertions.assertEquals("Access denied", errorResponse.getError());
   }
 
   @Test
