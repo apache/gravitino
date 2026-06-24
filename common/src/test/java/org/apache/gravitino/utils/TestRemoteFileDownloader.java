@@ -375,6 +375,142 @@ public class TestRemoteFileDownloader {
     assertDownloadRejected(response, "bad-terminator");
   }
 
+  @Test
+  public void testHttpDownloadRejectsMultiCodingTransferEncoding() throws Exception {
+    // "gzip, chunked" is de-chunkable but still gzip-compressed; since we do not gunzip,
+    // de-chunking
+    // alone would write corrupt bytes. Anything other than a sole "chunked" coding must be
+    // rejected.
+    byte[] response =
+        ("HTTP/1.1 200 OK\r\n"
+                + "Transfer-Encoding: gzip, chunked\r\n"
+                + "Connection: close\r\n"
+                + "\r\n"
+                + "4\r\nWiki\r\n0\r\n\r\n")
+            .getBytes(StandardCharsets.US_ASCII);
+    try (RawServer server = new RawServer(response)) {
+      File dest = new File(tempDir, "multi-coding");
+      URI uri = new URI("http://ssrf-rebind.invalid:" + server.port() + "/keytab");
+      InetAddress pinned = InetAddress.getByName("127.0.0.1");
+
+      IOException exception =
+          Assertions.assertThrows(
+              IOException.class, () -> RemoteFileDownloader.download(uri, pinned, dest, 30000));
+      Assertions.assertTrue(
+          exception.getMessage().contains("Unsupported Transfer-Encoding"), exception.getMessage());
+      Assertions.assertFalse(dest.exists());
+    }
+  }
+
+  @Test
+  public void testHttpDownloadRejectsChunkedSubstringTransferEncoding() throws Exception {
+    // "xchunked" contains the substring "chunked" but is not the chunked coding; it must not be
+    // mistaken for it. The message is asserted so the unsupported-coding guard, not a later chunk
+    // parse error, is what satisfies the test.
+    byte[] response =
+        ("HTTP/1.1 200 OK\r\n"
+                + "Transfer-Encoding: xchunked\r\n"
+                + "Connection: close\r\n"
+                + "\r\n"
+                + "4\r\nWiki\r\n0\r\n\r\n")
+            .getBytes(StandardCharsets.US_ASCII);
+    try (RawServer server = new RawServer(response)) {
+      File dest = new File(tempDir, "x-chunked");
+      URI uri = new URI("http://ssrf-rebind.invalid:" + server.port() + "/keytab");
+      InetAddress pinned = InetAddress.getByName("127.0.0.1");
+
+      IOException exception =
+          Assertions.assertThrows(
+              IOException.class, () -> RemoteFileDownloader.download(uri, pinned, dest, 30000));
+      Assertions.assertTrue(
+          exception.getMessage().contains("Unsupported Transfer-Encoding"), exception.getMessage());
+      Assertions.assertFalse(dest.exists());
+    }
+  }
+
+  @Test
+  public void testHttpDownloadRejectsConflictingDuplicateContentLength() throws Exception {
+    // Two conflicting Content-Length values (RFC 7230 §3.3.2) are a response-splitting/smuggling
+    // vector; a silent last-wins would let parsers disagree, so the conflict is rejected outright.
+    byte[] response =
+        ("HTTP/1.0 200 OK\r\n"
+                + "Content-Length: 4\r\n"
+                + "Content-Length: 5\r\n"
+                + "Connection: close\r\n"
+                + "\r\n"
+                + "abcd")
+            .getBytes(StandardCharsets.US_ASCII);
+    try (RawServer server = new RawServer(response)) {
+      File dest = new File(tempDir, "dup-cl");
+      URI uri = new URI("http://ssrf-rebind.invalid:" + server.port() + "/keytab");
+      InetAddress pinned = InetAddress.getByName("127.0.0.1");
+
+      IOException exception =
+          Assertions.assertThrows(
+              IOException.class, () -> RemoteFileDownloader.download(uri, pinned, dest, 30000));
+      Assertions.assertTrue(
+          exception.getMessage().contains("Conflicting duplicate"), exception.getMessage());
+      Assertions.assertFalse(dest.exists());
+    }
+  }
+
+  @Test
+  public void testHttpDownloadRejectsConflictingDuplicateTransferEncoding() throws Exception {
+    // Conflicting duplicate Transfer-Encoding headers (a last-wins "chunked" would otherwise pass
+    // the chunked check) must be rejected as a smuggling vector before any body decode.
+    byte[] response =
+        ("HTTP/1.1 200 OK\r\n"
+                + "Transfer-Encoding: gzip\r\n"
+                + "Transfer-Encoding: chunked\r\n"
+                + "Connection: close\r\n"
+                + "\r\n"
+                + "4\r\nWiki\r\n0\r\n\r\n")
+            .getBytes(StandardCharsets.US_ASCII);
+    try (RawServer server = new RawServer(response)) {
+      File dest = new File(tempDir, "dup-te");
+      URI uri = new URI("http://ssrf-rebind.invalid:" + server.port() + "/keytab");
+      InetAddress pinned = InetAddress.getByName("127.0.0.1");
+
+      IOException exception =
+          Assertions.assertThrows(
+              IOException.class, () -> RemoteFileDownloader.download(uri, pinned, dest, 30000));
+      Assertions.assertTrue(
+          exception.getMessage().contains("Conflicting duplicate"), exception.getMessage());
+      Assertions.assertFalse(dest.exists());
+    }
+  }
+
+  @Test
+  public void testHttpDownloadSendsHttp11Request() throws Exception {
+    AtomicReference<String> protocol = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/keytab",
+        exchange -> {
+          protocol.set(exchange.getProtocol());
+          byte[] bytes = "data".getBytes(StandardCharsets.UTF_8);
+          exchange.sendResponseHeaders(200, bytes.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(bytes);
+          }
+        });
+    try {
+      server.start();
+      int port = server.getAddress().getPort();
+      File dest = new File(tempDir, "http11");
+      URI uri = new URI("http://ssrf-rebind.invalid:" + port + "/keytab");
+      InetAddress pinned = InetAddress.getByName("127.0.0.1");
+
+      RemoteFileDownloader.download(uri, pinned, dest, 30000);
+
+      // The request must be HTTP/1.1 so origins frame the body (Content-Length or chunked) rather
+      // than relying on connection close, which the downloader rejects.
+      Assertions.assertEquals("HTTP/1.1", protocol.get());
+    } finally {
+      server.stop(0);
+    }
+  }
+
   private void assertDownloadRejected(byte[] response, String name) throws Exception {
     try (RawServer server = new RawServer(response)) {
       File dest = new File(tempDir, name);

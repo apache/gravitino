@@ -126,7 +126,10 @@ public final class RemoteUriValidator {
         return lowestFourBytes(bytes);
       }
     }
-    // NAT64 well-known prefix 64:ff9b::/96 (RFC 6052): the IPv4 is the low 32 bits.
+    // NAT64 well-known prefix 64:ff9b::/96 (RFC 6052): the IPv4 is the low 32 bits. Only the
+    // well-known prefix is matched; network-specific prefixes (RFC 6052 §2.2, e.g. RFC 8215's
+    // 64:ff9b:1::/48) are site-defined and routable only where explicitly deployed, so detecting
+    // them would require configuration this validator does not have.
     if ((bytes[0] & 0xFF) == 0x00
         && (bytes[1] & 0xFF) == 0x64
         && (bytes[2] & 0xFF) == 0xFF

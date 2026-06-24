@@ -47,7 +47,7 @@ import javax.net.ssl.SSLSocketFactory;
  * <p>This closes the DNS-rebinding TOCTOU window between SSRF validation and the actual fetch: the
  * host is resolved and validated once by {@link RemoteUriValidator#resolveAndValidate}, and the
  * resulting {@link InetAddress} is connected to directly here, so the hostname is never
- * re-resolved. A minimal HTTP/1.0 client is used so the connection can be pinned at the socket
+ * re-resolved. A minimal HTTP/1.1 client is used so the connection can be pinned at the socket
  * level (the JDK exposes no per-connection address override for plain {@code HttpURLConnection},
  * and silently drops a {@code Host} header set via {@code setRequestProperty}). The original
  * hostname is still used for the HTTP {@code Host} header and, for {@code https}, for TLS SNI and
@@ -160,13 +160,14 @@ final class RemoteFileDownloader {
 
   private static void sendGetRequest(OutputStream out, String target, String hostHeader)
       throws IOException {
-    // HTTP/1.0 with "Connection: close" requests a non-persistent connection. The response must be
-    // framed by Content-Length or chunked encoding; an unframed (close-delimited) body is rejected
-    // by writeBody because its completeness cannot be verified.
+    // HTTP/1.1 with "Connection: close" requests a single non-persistent exchange while biasing the
+    // origin toward framing the body with Content-Length or chunked encoding. An unframed
+    // (close-delimited) body is still rejected by writeBody because its completeness cannot be
+    // verified.
     String request =
         "GET "
             + target
-            + " HTTP/1.0\r\n"
+            + " HTTP/1.1\r\n"
             + "Host: "
             + hostHeader
             + "\r\n"
@@ -216,7 +217,15 @@ final class RemoteFileDownloader {
       }
       String name = line.substring(0, colon).trim().toLowerCase(Locale.ROOT);
       String value = line.substring(colon + 1).trim();
-      headers.put(name, value);
+      String previous = headers.put(name, value);
+      // A duplicate Content-Length or Transfer-Encoding with a different value (RFC 7230 §3.3.2 /
+      // §3.3.3) is a request-smuggling vector: parsers that disagree on which copy wins frame the
+      // body differently. Reject the conflict rather than silently keeping the last one.
+      if (previous != null
+          && !previous.equals(value)
+          && (name.equals("content-length") || name.equals("transfer-encoding"))) {
+        throw new IOException("Conflicting duplicate " + name + " headers from pinned host");
+      }
     }
     throw new IOException("Unexpected end of stream while reading HTTP headers from pinned host");
   }
@@ -224,7 +233,17 @@ final class RemoteFileDownloader {
   private static void writeBody(InputStream in, Map<String, String> headers, OutputStream out)
       throws IOException {
     String transferEncoding = headers.get("transfer-encoding");
-    if (transferEncoding != null && transferEncoding.toLowerCase(Locale.ROOT).contains("chunked")) {
+    if (transferEncoding != null) {
+      // Accept only a sole "chunked" coding. A value such as "gzip, chunked" is de-chunkable but
+      // still compressed, and we do not gunzip, so de-chunking alone would write corrupt bytes; a
+      // substring like "xchunked" must likewise not be mistaken for chunked. Reject anything other
+      // than an exact "chunked" rather than emit a mis-decoded body.
+      if (!transferEncoding.trim().equalsIgnoreCase("chunked")) {
+        throw new IOException(
+            "Unsupported Transfer-Encoding '"
+                + transferEncoding
+                + "' from pinned host; only 'chunked' is supported");
+      }
       copyChunked(in, out);
       return;
     }
