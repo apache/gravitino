@@ -29,6 +29,7 @@ import javax.servlet.ServletRequest;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,7 +38,7 @@ import org.lance.namespace.model.ErrorResponse;
 
 public class TestLanceAuthenticationFilter {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final ObjectMapper MAPPER = ObjectMapperProvider.objectMapper();
 
   /** Exposes the protected {@code isHealthCheckRequest} method for white-box testing. */
   private static class TestableFilter extends LanceAuthenticationFilter {

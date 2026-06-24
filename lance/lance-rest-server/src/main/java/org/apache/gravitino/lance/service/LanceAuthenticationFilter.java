@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.lance.namespace.model.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +42,7 @@ import org.slf4j.LoggerFactory;
 public class LanceAuthenticationFilter extends AuthenticationFilter {
 
   private static final Logger LOG = LoggerFactory.getLogger(LanceAuthenticationFilter.class);
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final ObjectMapper MAPPER = ObjectMapperProvider.objectMapper();
 
   public LanceAuthenticationFilter() {
     healthCheckMatcher = new LanceHealthCheckPathMatcher();
