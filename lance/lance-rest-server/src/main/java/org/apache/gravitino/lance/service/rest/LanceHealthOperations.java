@@ -70,7 +70,7 @@ public class LanceHealthOperations {
   @Timed(name = "lance.health.live." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "lance.health.live", absolute = true)
   public Response live() {
-    HealthCheckDTO check = up(CHECK_HTTP_SERVER, Collections.<String, String>emptyMap());
+    HealthCheckDTO check = up(CHECK_HTTP_SERVER, Collections.emptyMap());
     HealthResponse healthResponse =
         new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check));
     return Utils.ok(healthResponse);
@@ -102,7 +102,7 @@ public class LanceHealthOperations {
   @ResponseMetered(name = "lance.health", absolute = true)
   public Response health() {
     List<HealthCheckDTO> checks = new ArrayList<>(2);
-    checks.add(up(CHECK_HTTP_SERVER, Collections.<String, String>emptyMap()));
+    checks.add(up(CHECK_HTTP_SERVER, Collections.emptyMap()));
     checks.add(checkNamespaceWrapper());
 
     HealthCheckDTO.Status overall =
@@ -121,7 +121,7 @@ public class LanceHealthOperations {
     }
     try {
       wrapper.asNamespaceOps();
-      return up(CHECK_NAMESPACE_WRAPPER, Collections.<String, String>emptyMap());
+      return up(CHECK_NAMESPACE_WRAPPER, Collections.emptyMap());
     } catch (Exception e) {
       return down(CHECK_NAMESPACE_WRAPPER, "reason", e.getMessage());
     }
