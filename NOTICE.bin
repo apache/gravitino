@@ -51,6 +51,9 @@ Copyright 2016-2023 The Apache Software Foundation
 Apache Ranger
 Copyright 2014-2024 The Apache Software Foundation
 
+Micrometer
+Copyright (c) 2017-Present VMware, Inc. All Rights Reserved.
+
 Apache Hadoop
 Copyright 2006 and onwards The Apache Software Foundation.
 
@@ -130,6 +133,9 @@ Copyright 2001-2015 The Apache Software Foundation
 
 Apache Commons Configuration
 Copyright 2001-2008 The Apache Software Foundation
+
+Apache Commons CSV
+Copyright 2005-2024 The Apache Software Foundation
 
 Apache Commons Daemon
 Copyright 1999-2013 The Apache Software Foundation
