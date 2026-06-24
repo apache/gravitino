@@ -60,6 +60,7 @@ public class IdpUserGroupManager implements Closeable {
   private final IdpGarbageCollector garbageCollector;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
+  private final IdpUserGroupsCache userGroupsCache;
 
   /**
    * Returns the shared built-in IdP user and group manager for the server process.
@@ -83,6 +84,7 @@ public class IdpUserGroupManager implements Closeable {
     this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
     this.passwordHasher = PasswordHasherFactory.create();
+    this.userGroupsCache = new IdpUserGroupsCache(config);
     this.garbageCollector = new IdpGarbageCollector(config);
     this.garbageCollector.start();
   }
@@ -137,7 +139,11 @@ public class IdpUserGroupManager implements Closeable {
    * @return True if the user was removed, false if it did not exist.
    */
   public boolean removeUser(String username) {
-    return USER_SERVICE.deleteIdpUser(username);
+    boolean removed = USER_SERVICE.deleteIdpUser(username);
+    if (removed) {
+      userGroupsCache.invalidate(username);
+    }
+    return removed;
   }
 
   /**
@@ -150,18 +156,31 @@ public class IdpUserGroupManager implements Closeable {
     return USER_SERVICE.getIdpUser(username);
   }
 
+  /**
+   * Authenticates credentials against built-in IdP user metadata.
+   *
+   * <p>Password verification always hits storage. Group membership is served from {@link
+   * IdpUserGroupsCache} keyed by username.
+   *
+   * @param username The username.
+   * @param password The plaintext password.
+   * @return The authenticated built-in IdP user.
+   */
   public IdpUser authenticate(String username, String password) {
     try {
-      IdpUser user = USER_SERVICE.getIdpUser(username);
-      if (user.passwordHash() == null || !passwordHasher.verify(password, user.passwordHash())) {
+      IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
+      if (userPO.getPasswordHash() == null
+          || !passwordHasher.verify(password, userPO.getPasswordHash())) {
         throw new UnauthorizedException(
             "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
       }
-      return user;
     } catch (NotFoundException e) {
       throw new UnauthorizedException(
           "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
     }
+    return new IdpUser(
+        username,
+        userGroupsCache.get(username, () -> USER_SERVICE.listGroupNamesByUsername(username)));
   }
 
   /**
@@ -195,7 +214,12 @@ public class IdpUserGroupManager implements Closeable {
    * @return True if the group was removed, false if it did not exist.
    */
   public boolean removeGroup(String groupName, boolean force) {
-    return GROUP_SERVICE.deleteIdpGroup(groupName, force);
+    List<String> members = GROUP_SERVICE.listUsernamesByGroupName(groupName);
+    boolean removed = GROUP_SERVICE.deleteIdpGroup(groupName, force, members);
+    if (removed) {
+      userGroupsCache.invalidate(members);
+    }
+    return removed;
   }
 
   /**
@@ -225,6 +249,8 @@ public class IdpUserGroupManager implements Closeable {
         !usersToAddList.isEmpty() || !usersToRemoveList.isEmpty(),
         "usersToAdd and usersToRemove cannot both be empty");
     GROUP_SERVICE.changeGroupMembership(groupName, usersToAddList, usersToRemoveList);
+    userGroupsCache.invalidate(usersToAddList);
+    userGroupsCache.invalidate(usersToRemoveList);
     return getGroup(groupName);
   }
 

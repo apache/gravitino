@@ -103,13 +103,14 @@ public class IdpGroupMetaService {
    * @param groupName the group name
    * @param force when false, rejects deletion if the group still has members; when true, removes
    *     memberships and deletes the group
+   * @param members the usernames that currently belong to the group
    * @return true if the group was deleted
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteIdpGroup")
-  public boolean deleteIdpGroup(String groupName, boolean force) {
-    if (!force && !listUsernamesByGroupName(groupName).isEmpty()) {
+  public boolean deleteIdpGroup(String groupName, boolean force, List<String> members) {
+    if (!force && !members.isEmpty()) {
       throw new IllegalStateException(
           String.format("IdP group %s is not empty, use force=true to delete it", groupName));
     }
