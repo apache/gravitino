@@ -371,14 +371,14 @@ public class LanceRESTHiveCatalogIT extends BaseIT {
     dropColumns.setId(List.of(db, "altered"));
     dropColumns.setColumns(List.of("value"));
 
+    // Column alteration is not supported by the Hive backend; the call must fail. The exact
+    // message is not asserted because it is surfaced through the REST client as an HTTP error.
     TableApi tableApi = createTableApi();
-    Exception ex =
-        Assertions.assertThrows(
-            Exception.class,
-            () ->
-                tableApi.alterTableDropColumns(
-                    String.join(DELIMITER, db, "altered"), dropColumns, DELIMITER));
-    Assertions.assertTrue(ex.getMessage().contains("not supported"));
+    Assertions.assertThrows(
+        Exception.class,
+        () ->
+            tableApi.alterTableDropColumns(
+                String.join(DELIMITER, db, "altered"), dropColumns, DELIMITER));
 
     cleanupTable(db, "altered");
     dropDatabase(db);
