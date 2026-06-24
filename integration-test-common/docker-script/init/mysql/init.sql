@@ -18,8 +18,8 @@
  */
 GRANT ALL PRIVILEGES on *.* to 'trino'@'%';
 FLUSH PRIVILEGES;
-CREATE DATABASE iceberg_db;
-CREATE TABLE iceberg_db.iceberg_tables(
+CREATE DATABASE IF NOT EXISTS iceberg_db;
+CREATE TABLE IF NOT EXISTS iceberg_db.iceberg_tables(
     catalog_name VARCHAR(255) NOT NULL,
     table_namespace VARCHAR(255) NOT NULL,
     table_name VARCHAR(255) NOT NULL,
@@ -28,7 +28,7 @@ CREATE TABLE iceberg_db.iceberg_tables(
     iceberg_type VARCHAR(5),
     PRIMARY KEY (catalog_name, table_namespace, table_name)
 );
-CREATE TABLE iceberg_db.iceberg_namespace_properties(
+CREATE TABLE IF NOT EXISTS iceberg_db.iceberg_namespace_properties(
     catalog_name VARCHAR(255) NOT NULL,
     namespace VARCHAR(255) NOT NULL,
     property_key VARCHAR(255) NOT NULL,
