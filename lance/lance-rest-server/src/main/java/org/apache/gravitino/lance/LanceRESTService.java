@@ -69,13 +69,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     LanceConfig lanceConfig = new LanceConfig(properties);
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
 
-    server =
-        new JettyServer() {
-          @Override
-          protected javax.servlet.Filter createAuthenticationFilter() {
-            return new LanceAuthenticationFilter();
-          }
-        };
+    server = new LanceJettyServer();
     // Get MetricsSystem and EventBus from GravitinoEnv once at init time.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();

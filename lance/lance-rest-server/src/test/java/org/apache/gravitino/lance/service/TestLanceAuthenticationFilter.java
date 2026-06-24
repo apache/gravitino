@@ -124,8 +124,7 @@ public class TestLanceAuthenticationFilter {
     PrintWriter printWriter = new PrintWriter(stringWriter);
     when(response.getWriter()).thenReturn(printWriter);
 
-    filter.sendAuthErrorResponse(
-        response, new ForbiddenException("Access denied"));
+    filter.sendAuthErrorResponse(response, new ForbiddenException("Access denied"));
 
     verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
 

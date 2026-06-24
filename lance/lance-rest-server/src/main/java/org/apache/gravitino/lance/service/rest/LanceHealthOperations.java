@@ -119,11 +119,10 @@ public class LanceHealthOperations {
     if (wrapper == null) {
       return down(CHECK_NAMESPACE_WRAPPER, "reason", "namespace wrapper not initialized");
     }
-    try {
-      wrapper.asNamespaceOps();
+    if (wrapper.isInitialized()) {
       return up(CHECK_NAMESPACE_WRAPPER, Collections.emptyMap());
-    } catch (Exception e) {
-      return down(CHECK_NAMESPACE_WRAPPER, "reason", e.getMessage());
+    } else {
+      return down(CHECK_NAMESPACE_WRAPPER, "reason", "namespace wrapper not initialized");
     }
   }
 
