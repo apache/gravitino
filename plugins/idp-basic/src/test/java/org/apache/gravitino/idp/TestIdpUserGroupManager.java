@@ -338,6 +338,23 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testGroupsCacheGroup", second.groupNames().get(0));
   }
 
+  @Test
+  public void testRemoveUserCache() throws IOException {
+    manager.addUser("testRemoveUserCache", VALID_PASSWORD);
+    manager.addGroup("testRemoveUserCacheGroup");
+    manager.changeGroupMembership(
+        "testRemoveUserCacheGroup", Lists.newArrayList("testRemoveUserCache"), null);
+
+    IdpUser beforeRemove = manager.authenticate("testRemoveUserCache", VALID_PASSWORD);
+    Assertions.assertEquals(1, beforeRemove.groupNames().size());
+
+    Assertions.assertTrue(manager.removeUser("testRemoveUserCache"));
+    manager.addUser("testRemoveUserCache", VALID_PASSWORD);
+
+    IdpUser afterRecreate = manager.authenticate("testRemoveUserCache", VALID_PASSWORD);
+    Assertions.assertEquals(0, afterRecreate.groupNames().size());
+  }
+
   private static Config createH2Config(Path h2Path) {
     Config backendConfig = new Config(false) {};
     backendConfig.set(ENTITY_STORE, RELATIONAL_ENTITY_STORE);
