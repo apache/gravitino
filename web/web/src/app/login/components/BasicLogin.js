@@ -61,7 +61,7 @@ function BasicLogin() {
   }, [store.intervalId])
 
   const onSubmit = async data => {
-    await dispatch(basicLoginAction({ params: data, router }))
+    await dispatch(basicLoginAction({ username: data.username, password: data.password, router }))
     await dispatch(setIntervalIdAction())
 
     reset({ ...data })

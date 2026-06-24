@@ -185,8 +185,12 @@ const transform = {
       const token = await oauthProviderFactory.getAccessToken()
 
       if (token && config?.requestOptions?.withToken !== false) {
-        // ** jwt token
-        config.headers.Authorization = options.authenticationScheme ? `${options.authenticationScheme} ${token}` : token
+        // ** Determine if the token already includes the authentication scheme (e.g., "Bearer" or "Basic")
+        const isFullAuthHeader = token.startsWith('Basic ') || token.startsWith('Bearer ')
+
+        // ** Set the Authorization header, preserving tokens that already include their authentication scheme
+        config.headers.Authorization =
+          isFullAuthHeader || !options.authenticationScheme ? token : `${options.authenticationScheme} ${token}`
       }
     } catch (error) {
       console.warn('Failed to get access token:', error)

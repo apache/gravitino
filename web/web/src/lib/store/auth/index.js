@@ -107,12 +107,10 @@ export const basicLoginAction = createAsyncThunk(
     }
 
     localStorage.setItem('accessToken', basicToken)
-    localStorage.setItem('expiredIn', '') // Basic auth does not have an expiration time
     localStorage.setItem('isIdle', false)
+    localStorage.removeItem('expiredIn') // Basic auth does not have an expiration time
 
     dispatch(setAuthToken(basicToken))
-    dispatch(setExpiredIn(''))
-
     await dispatch(initialVersion())
     router.push('/metalakes')
 

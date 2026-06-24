@@ -42,7 +42,7 @@ export const loginApi = (url, params) => {
 export const basicLoginApi = basicToken => {
   return defHttp.get(
     {
-      url: '/version',
+      url: '/api/version',
       headers: {
         Authorization: basicToken,
         Accept: 'application/vnd.gravitino.v1+json',
