@@ -36,9 +36,6 @@ public class LanceHealthCheckPathMatcher extends HealthCheckPathMatcher {
     if (super.isHealthCheckPath(path)) {
       return true;
     }
-    if (path == null) {
-      return false;
-    }
     return path.equals("/lance/health") || path.startsWith("/lance/health/");
   }
 }
