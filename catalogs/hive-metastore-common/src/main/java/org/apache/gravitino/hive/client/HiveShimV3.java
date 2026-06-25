@@ -61,6 +61,7 @@ class HiveShimV3 extends HiveShimV2 {
   private final Method addPartitionMethod;
   private final Method dropPartitionMethod;
   private final Method getTableObjectsByNameMethod;
+  private final Method getPartitionsByNamesMethod;
   private final Method databaseSetCatalogNameMethod;
   private final Method getCatalogsMethod;
   private final Method createCatalogMethod;
@@ -142,6 +143,9 @@ class HiveShimV3 extends HiveShimV2 {
       this.getTableObjectsByNameMethod =
           IMetaStoreClient.class.getMethod(
               "getTableObjectsByName", String.class, String.class, List.class);
+      this.getPartitionsByNamesMethod =
+          IMetaStoreClient.class.getMethod(
+              "getPartitionsByNames", String.class, String.class, String.class, List.class);
       this.getCatalogsMethod = IMetaStoreClient.class.getMethod("getCatalogs");
 
       this.catalogClass = this.getClass().getClassLoader().loadClass(CATALOG_CLASS);
@@ -383,6 +387,23 @@ class HiveShimV3 extends HiveShimV2 {
                 table.name(),
                 filterPartitionValueList,
                 pageSizeArg);
+    return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
+  }
+
+  @Override
+  public List<HivePartition> listPartitionsByNames(HiveTable table, List<String> partitionNames) {
+    String catalogName = table.catalogName();
+    String databaseName = table.databaseName();
+    var partitions =
+        (List<org.apache.hadoop.hive.metastore.api.Partition>)
+            invoke(
+                ExceptionTarget.table(table.name()),
+                client,
+                getPartitionsByNamesMethod,
+                catalogName,
+                databaseName,
+                table.name(),
+                partitionNames);
     return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
   }
 
