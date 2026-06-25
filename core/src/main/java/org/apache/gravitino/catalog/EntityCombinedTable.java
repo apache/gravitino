@@ -139,17 +139,28 @@ public final class EntityCombinedTable implements Table {
 
   @Override
   public Audit auditInfo() {
-    AuditInfo mergedAudit =
-        AuditInfo.builder()
-            .withCreator(table.auditInfo().creator())
-            .withCreateTime(table.auditInfo().createTime())
-            .withLastModifier(table.auditInfo().lastModifier())
-            .withLastModifiedTime(table.auditInfo().lastModifiedTime())
-            .build();
+    if (tableEntity == null) {
+      return table.auditInfo();
+    }
 
-    return tableEntity == null
-        ? table.auditInfo()
-        : mergedAudit.merge(tableEntity.auditInfo(), true /* overwrite */);
+    Audit catalogAudit = table.auditInfo();
+    Audit entityAudit = tableEntity.auditInfo();
+
+    // Entity store values take priority when non-null (they track actual Gravitino operations),
+    // but fall back to catalog-provided values (e.g., owner from Iceberg metadata).
+    return AuditInfo.builder()
+        .withCreator(entityAudit.creator() != null ? entityAudit.creator() : catalogAudit.creator())
+        .withCreateTime(
+            entityAudit.createTime() != null ? entityAudit.createTime() : catalogAudit.createTime())
+        .withLastModifier(
+            entityAudit.lastModifier() != null
+                ? entityAudit.lastModifier()
+                : catalogAudit.lastModifier())
+        .withLastModifiedTime(
+            entityAudit.lastModifiedTime() != null
+                ? entityAudit.lastModifiedTime()
+                : catalogAudit.lastModifiedTime())
+        .build();
   }
 
   StringIdentifier stringIdentifier() {
