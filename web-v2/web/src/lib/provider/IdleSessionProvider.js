@@ -23,6 +23,7 @@ import { useEffect, useCallback, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { useIdleTimeout } from '@/lib/hooks/useIdleTimeout'
+import { useAbsoluteSessionTimeout } from '@/lib/hooks/useAbsoluteSessionTimeout'
 import { useBroadcastChannel } from '@/lib/hooks/useBroadcastChannel'
 import { logoutAction } from '@/lib/store/auth'
 import IdleSessionContext from './IdleSessionContext'
@@ -83,9 +84,18 @@ export default function IdleSessionProvider({
   const authType = useAppSelector(state => state.auth.authType)
   const authToken = useAppSelector(state => state.auth.authToken)
 
-  // Only enable idle timeout when the user is authenticated and not on login page
-  const isAuthenticated = authType === 'simple' ? !!sessionStorage.getItem('simpleAuthUser') : !!authToken
-  const isLoginPage = pathname === '/login'
+  // Only enable idle timeout when the user is authenticated and not on login page.
+  // Fall back to persisted token in localStorage to avoid prematurely treating
+  // the user as unauthenticated during the bootstrap window where authType has
+  // been set (via getAuthConfigs) but authToken has not yet been dispatched
+  // (initAuth is still running). Without this fallback, a race between the two
+  // Redux updates causes isAuthenticated to briefly flip to false, which
+  // triggers a cross-tab logout via BroadcastChannel.
+  const isAuthenticated =
+    authType === 'simple'
+      ? !!sessionStorage.getItem('simpleAuthUser')
+      : !!(authToken || localStorage.getItem('accessToken'))
+  const isLoginPage = pathname.endsWith('/login')
 
   const [state, setState] = useState('active')
   const [warningCountdown, setWarningCountdown] = useState(msToSeconds(warningLeadMs))
@@ -102,6 +112,11 @@ export default function IdleSessionProvider({
     // Pause DOM activity detection during warning state so the modal stays
     // visible until the user explicitly clicks "Stay signed in" or "Sign out now"
     paused: state === 'warning'
+  })
+
+  // Absolute session duration: forces logout after a fixed time regardless of activity
+  const { isExpired: isAbsoluteExpired } = useAbsoluteSessionTimeout({
+    isAuthenticated
   })
 
   const { sendMessage, onMessage } = useBroadcastChannel()
@@ -140,21 +155,36 @@ export default function IdleSessionProvider({
   }, [state, idleTimeRemaining])
 
   // Handle logout (either from timeout or "Sign out now")
-  const handleLogout = useCallback(() => {
-    if (loggedOutRef.current) {
-      return
-    }
+  const handleLogout = useCallback(
+    (reason = 'inactive') => {
+      if (loggedOutRef.current) {
+        return
+      }
 
-    loggedOutRef.current = true
-    setState('expired')
+      loggedOutRef.current = true
+      setState('expired')
 
-    // Broadcast logout with reason to other tabs
-    sendMessage({ type: 'logout', reason: 'inactive', timestamp: Date.now() })
+      // Broadcast logout with reason to other tabs
+      sendMessage({ type: 'logout', reason, timestamp: Date.now() })
 
-    // Dispatch logout action (handles both OAuth and simple auth)
-    // Pass reason to show inactivity message on login page
-    dispatch(logoutAction({ router, reason: 'inactive' }))
-  }, [dispatch, router, sendMessage])
+      // Dispatch logout action (handles both OAuth and simple auth)
+      // Pass reason to show appropriate message on login page
+      dispatch(logoutAction({ router, reason }))
+
+      // Safety net: navigate to login page after a short delay.
+      // logoutAction is an async thunk — if it rejects (e.g., OIDC
+      // signoutRedirect throws) the error is silently swallowed and
+      // router.push inside the thunk never executes.  This fallback
+      // guarantees the user lands on /login regardless.
+      const loginUrl = reason ? `/login?reason=${encodeURIComponent(reason)}` : '/login'
+      setTimeout(() => {
+        if (!window.location.pathname.endsWith('/login')) {
+          router.push(loginUrl)
+        }
+      }, 1500)
+    },
+    [dispatch, router, sendMessage]
+  )
 
   // Handle "Stay signed in" action (IST-REQ-003)
   const handleStaySignedIn = useCallback(() => {
@@ -188,6 +218,15 @@ export default function IdleSessionProvider({
         if (!loggedOutRef.current) {
           loggedOutRef.current = true
           dispatch(logoutAction({ router, reason: message.reason }))
+
+          // Same safety net as handleLogout — ensures navigation even if
+          // logoutAction's internal router.push never executes.
+          const loginUrl = message.reason ? `/login?reason=${encodeURIComponent(message.reason)}` : '/login'
+          setTimeout(() => {
+            if (!window.location.pathname.endsWith('/login')) {
+              router.push(loginUrl)
+            }
+          }, 1500)
         }
       }
     })
@@ -218,13 +257,20 @@ export default function IdleSessionProvider({
     }
   }, [state, handleLogout])
 
-  // Detect authenticated→unauthenticated transition (e.g., manual logout from user menu)
-  // and broadcast logout to other tabs
+  // Auto-logout when absolute session duration is exceeded
+  useEffect(() => {
+    if (isAbsoluteExpired && !loggedOutRef.current) {
+      handleLogout('max_duration')
+    }
+  }, [isAbsoluteExpired, handleLogout])
+
+  // Detect authentication state transitions and coordinate cross-tab state
   useEffect(() => {
     const wasAuthenticated = wasAuthenticatedRef.current
 
     // Reset guard and timer state on unauthenticated→authenticated transition
-    // This handles SPA flows where user logs out and logs back in without a full page reload
+    // This handles both SPA flows and cross-tab re-login scenarios where
+    // another tab triggered a login that refreshed localStorage tokens.
     if (!wasAuthenticated && isAuthenticated) {
       loggedOutRef.current = false
       setState('active')
