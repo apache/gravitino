@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateProvider;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteDataFilesJob;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateStatsAndMetricsJob;
 import org.apache.gravitino.maintenance.jobs.spark.SparkPiJob;
@@ -45,7 +46,8 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
       ImmutableList.of(
           new SparkPiJob(),
           new IcebergRewriteDataFilesJob(),
-          new IcebergUpdateStatsAndMetricsJob());
+          new IcebergUpdateStatsAndMetricsJob(),
+          new IcebergExpireSnapshotsJob());
 
   @Override
   public List<? extends JobTemplate> jobTemplates() {
