@@ -57,6 +57,7 @@ public class StarRocksDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   public String generateDropDatabaseSql(String databaseName, boolean cascade) {
+    validateBacktickQuotedIdentifier(databaseName);
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append(String.format("DROP DATABASE `%s`", databaseName));
     if (cascade) {
