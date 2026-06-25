@@ -145,39 +145,39 @@ X-Gravitino-Active-Role: admin     →  403 Forbidden   (caller is not a member 
 
 ## 4. How the server enforces narrowing
 
-Gravitino evaluates authorization per operation against the set of roles a user holds — their direct
-roles plus those inherited from groups. Today that set is always the full union. Narrowing changes one
-thing: when an active-role declaration is present, the server evaluates against only the validated
-active roles instead of the union.
+Without an `X-Gravitino-Active-Role` header, Gravitino evaluates each operation against the user's full
+set of roles — those granted directly plus those inherited from groups. The header narrows that set for
+the request:
 
-This fits the existing model cleanly, because authorization policies are already keyed on the role. The
-server can evaluate a chosen subset of roles **without any change to the underlying Casbin model** — it
-simply evaluates the active roles rather than expanding the user to all of theirs. Deny rules still win
-within the narrowed scope, so an explicit deny on an active role continues to deny.
+1. **Resolve** the caller's effective roles the normal way — direct grants plus group-inherited ones.
+   Say that's `{analyst, editor, auditor}`.
+2. **Validate** the header against that set. The declared role must be one the caller actually holds; a
+   role they don't hold is rejected. This is the guardrail that keeps narrowing *subtractive* — you can
+   reduce what you use, never assume a role you were never granted.
+3. **Enforce** using only the validated active role(s). With `X-Gravitino-Active-Role: analyst`, the
+   request is evaluated as `analyst` alone; `editor` and `auditor` are simply not consulted.
 
-Concretely, this falls out of how the enforce call is shaped today. Authorization is checked by calling
-the enforcer with the **user** as the subject; a grouping rule then expands that user to every role they
-hold, and that expansion is where the union comes from. But the policies themselves are written against
-*roles*, so the very same enforcer can be called with a **role** as the subject to evaluate exactly one
-role's grants. Narrowing is therefore just a change of subject: evaluate each validated active role
-directly and combine the results, instead of letting the user fan out to their full set. The deny
-enforcer is evaluated over the same active subset, so deny-wins is preserved within the narrowed scope.
-No policy, grouping, or model definition has to change.
+So the active set is `(roles named in the header) ∩ (the caller's effective roles)` — always a subset,
+never a way to widen or switch into a role you don't hold. Because it keys on the role and not how the
+role was acquired, a role held only through a group works exactly the same — group-based authorization is
+covered with nothing extra.
 
-The active-role value is read at the request boundary — the Iceberg REST entry point, or the
-authentication filter for the native API — validated against the caller's roles, and carried through the
-request so every check sees the same scope.
+This needs **no change to the Casbin model**. Authorization is already checked with the user as the
+subject, and a grouping rule expands the user to all their roles — that expansion is the union. Since
+policies are written against *roles*, the same enforcer is instead called with each active *role* as the
+subject. Narrowing is just that change of subject, and deny rules run over the same active subset, so
+deny-wins is preserved — an explicit deny on an active role still denies.
 
-Two properties matter for correctness:
+The one identity-derived exception is **ownership**: access a user (or their group) gets from *owning* an
+object comes from the ownership grant, not a role, so under the proposed default it still applies when
+roles are narrowed. Whether narrowing should also suppress owner access is the open decision in Section 5.
 
-- **Applied at evaluation time, never by mutating shared state.** The authorization enforcers are shared
-  process-wide across all users, so narrowing must work by choosing which roles to evaluate for this
-  request — never by editing a user's role bindings, which would affect other concurrent requests.
-- **Reaches every authorization decision, because they share one path.** List filtering and credential
-  vending run through the same authorization check as direct access. Narrowing therefore cascades
-  automatically: a narrowed caller lists only the tables its active roles allow, and is never vended a
-  storage credential broader than those roles grant. Credential vending must be wired in deliberately —
-  otherwise the narrowing could be bypassed through the storage token.
+Two implementation properties keep this correct. Narrowing is applied by *choosing which roles to
+evaluate* for the request — never by editing the user's bindings, since the enforcers are shared
+process-wide across all users. And it must reach **every** decision: list filtering and credential
+vending go through the same check as direct access, so a narrowed caller lists only what its active roles
+allow and is never vended a broader storage credential — provided vending is wired in deliberately, or
+the narrowing could be bypassed through the storage token.
 
 ---
 
@@ -229,7 +229,7 @@ The mechanism is a request header. Engines differ only in whether they can forwa
 | Direct Gravitino API | ✅ Yes | Server-side change only |
 | **Spark** (via Iceberg REST) | ✅ Yes | No code change — a catalog config setting |
 | **Trino** (via Iceberg REST) | ❌ No | A small connector setting, *or* the token path (no Trino change) |
-| Native Java/Python client | ✅ Yes* | Header passthrough; a first-class param is cleaner |
+| Native Java/Python client | ✅ Yes | Header passthrough; a first-class param is cleaner |
 
 **Why Spark works but Trino doesn't:**
 
@@ -305,9 +305,8 @@ follow-up (call it Phase 1b) adds the typed Trino setting that emits the header,
 Phase 2 binds the narrow scope to the caller's *identity* rather than a header — an IdP-issued scoped
 token — so it holds even against an uncooperative client and reaches Trino through the existing OAuth
 path. It depends on IdP capabilities (Gravitino doesn't mint the token), so it's a later, optional step.
-Phase 3 — dynamic in-session
-`SET ROLE` — is the largest piece, and only worth doing if there's real demand for switching roles
-mid-session.
+Phase 3 — dynamic in-session `SET ROLE` — is the largest piece, and only worth doing if there's real
+demand for switching roles mid-session.
 
 ---
 
