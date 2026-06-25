@@ -41,6 +41,11 @@ import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class AuthenticationFilter implements Filter {
+  /**
+   * The matcher used to identify health check paths that bypass authentication. Subclasses may
+   * replace this with a server-specific matcher (e.g. {@code IcebergHealthCheckPathMatcher}).
+   */
+  protected HealthCheckPathMatcher healthCheckMatcher = new HealthCheckPathMatcher();
 
   private final List<Authenticator> filterAuthenticators;
 
@@ -51,12 +56,6 @@ public class AuthenticationFilter implements Filter {
     return request instanceof HttpServletRequest
         && "true".equalsIgnoreCase(((HttpServletRequest) request).getHeader(WEB_LOGIN_HEADER));
   }
-
-  /**
-   * The matcher used to identify health check paths that bypass authentication. Subclasses may
-   * replace this with a server-specific matcher (e.g. {@code IcebergHealthCheckPathMatcher}).
-   */
-  protected HealthCheckPathMatcher healthCheckMatcher = new HealthCheckPathMatcher();
 
   public AuthenticationFilter() {
     filterAuthenticators = null;
