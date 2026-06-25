@@ -95,7 +95,7 @@ export default function IdleSessionProvider({
     authType === 'simple'
       ? !!sessionStorage.getItem('simpleAuthUser')
       : !!(authToken || localStorage.getItem('accessToken'))
-  const isLoginPage = pathname === '/login'
+  const isLoginPage = pathname.endsWith('/login')
 
   const [state, setState] = useState('active')
   const [warningCountdown, setWarningCountdown] = useState(msToSeconds(warningLeadMs))
@@ -178,7 +178,7 @@ export default function IdleSessionProvider({
       // guarantees the user lands on /login regardless.
       const loginUrl = reason ? `/login?reason=${encodeURIComponent(reason)}` : '/login'
       setTimeout(() => {
-        if (window.location.pathname !== '/login') {
+        if (!window.location.pathname.endsWith('/login')) {
           router.push(loginUrl)
         }
       }, 1500)
@@ -223,7 +223,7 @@ export default function IdleSessionProvider({
           // logoutAction's internal router.push never executes.
           const loginUrl = message.reason ? `/login?reason=${encodeURIComponent(message.reason)}` : '/login'
           setTimeout(() => {
-            if (window.location.pathname !== '/login') {
+            if (!window.location.pathname.endsWith('/login')) {
               router.push(loginUrl)
             }
           }, 1500)

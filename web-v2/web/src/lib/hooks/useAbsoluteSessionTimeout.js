@@ -72,6 +72,15 @@ export function useAbsoluteSessionTimeout({ isAuthenticated, maxDurationMs = DEF
         // expiry so that if a new login refreshed the timestamp, this tab
         // clears its stale isExpired flag.
         const start = Number(existing)
+        if (!Number.isFinite(start) || start <= 0) {
+          const now = Date.now()
+          localStorage.setItem(SESSION_START_KEY, String(now))
+          setRemainingMs(maxDurationMs)
+          setIsExpired(false)
+
+          return
+        }
+
         const elapsed = Date.now() - start
         const remaining = Math.max(0, maxDurationMs - elapsed)
 
@@ -104,15 +113,24 @@ export function useAbsoluteSessionTimeout({ isAuthenticated, maxDurationMs = DEF
       }
 
       const start = Number(startStr)
+
+      // Guard against corrupted or tampered values
+      if (!Number.isFinite(start) || start <= 0) {
+        const now = Date.now()
+
+        localStorage.setItem(SESSION_START_KEY, String(now))
+        setIsExpired(false)
+        setRemainingMs(maxDurationMs)
+
+        return
+      }
+
       const now = Date.now()
       const elapsed = now - start
       const remaining = Math.max(0, maxDurationMs - elapsed)
 
       setRemainingMs(remaining)
-
-      if (remaining <= 0) {
-        setIsExpired(true)
-      }
+      setIsExpired(remaining <= 0)
     }
 
     // Check immediately, then every second
