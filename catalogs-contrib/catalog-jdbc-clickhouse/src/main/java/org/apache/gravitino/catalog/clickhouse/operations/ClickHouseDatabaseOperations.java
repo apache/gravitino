@@ -226,8 +226,10 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
    */
   @VisibleForTesting
   String generateDropDatabaseSql(String databaseName, String clusterName) {
+    validateBacktickQuotedIdentifier(databaseName);
     StringBuilder sql = new StringBuilder(String.format("DROP DATABASE `%s`", databaseName));
     if (StringUtils.isNotBlank(clusterName)) {
+      validateBacktickQuotedIdentifier(clusterName);
       sql.append(String.format(" ON CLUSTER `%s`", clusterName));
     }
     LOG.info("Generated drop database:{} sql: {}", databaseName, sql);
