@@ -42,7 +42,7 @@ if [ ! -f "${trino_dir}/packages/gravitino-trino-connector/mysql-connector-java-
 fi
 
 # Download PostgreSQL jdbc driver if it does not exist.
-if [ ! -f "${trino_dir}/packages/gravitino-trino-connector/postgresql-{PG_VERSION}.jar" ]; then
+if [ ! -f "${trino_dir}/packages/gravitino-trino-connector/postgresql-${PG_VERSION}.jar" ]; then
   cd "${trino_dir}/packages/gravitino-trino-connector/" && curl -O "$PG_JAVA_CONNECTOR_URL" && cd -
 fi
 
