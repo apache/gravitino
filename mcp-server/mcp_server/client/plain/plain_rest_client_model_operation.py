@@ -81,3 +81,31 @@ class PlainRESTClientModelOperation(ModelOperation):
             f"/aliases/{encode_path_segment(alias)}"
         )
         return response.json().get("modelVersion", {})
+
+    # pylint: disable=R0917
+    async def update_model_version_aliases(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        version: int,
+        aliases_to_add: list,
+        aliases_to_remove: list,
+    ) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/models/{encode_path_segment(model_name)}"
+            f"/versions/{encode_path_segment(version)}",
+            json={
+                "updates": [
+                    {
+                        "@type": "updateAliases",
+                        "aliasesToAdd": aliases_to_add,
+                        "aliasesToRemove": aliases_to_remove,
+                    }
+                ]
+            },
+        )
+        return response.json().get("modelVersion", {})

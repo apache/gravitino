@@ -19,6 +19,165 @@ from fastmcp import Context, FastMCP
 
 
 def load_statistic_tools(mcp: FastMCP):
+    # Disable the update_statistics tool by default as it is a write operation.
+    @mcp.tool(tags={"statistic"})
+    async def update_statistics(
+        ctx: Context,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        statistics: dict,
+    ) -> None:
+        """
+        Update (create or overwrite) custom statistics for a metadata object.
+        Only custom (non-reserved) statistics can be updated. Currently this only
+        supports statistics for tables, so `metadata_type` should always be "table"
+        and `metadata_fullname` should be in the format "{catalog}.{schema}.{table}".
+
+        Args:
+            ctx (Context): The request context.
+            metalake_name (str): The name of the metalake.
+            metadata_type (str): The type of metadata (e.g., table).
+            metadata_fullname (str): The full name of the metadata object.
+            statistics (dict): Dictionary mapping statistic name to its value.
+
+        Example input for statistics:
+            {
+              "custom-key1": "value1",
+              "custom-key2": 100
+            }
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If the update fails, an exception is raised with an error message.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_statistic_operation().update_statistics(
+            metalake_name, metadata_type, metadata_fullname, statistics
+        )
+
+    # Disable the drop_statistics tool by default as it can be destructive.
+    @mcp.tool(tags={"statistic"})
+    async def drop_statistics(
+        ctx: Context,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        statistic_names: list,
+    ) -> str:
+        """
+        Drop custom statistics from a metadata object. Currently this only supports
+        statistics for tables, so `metadata_type` should always be "table" and
+        `metadata_fullname` should be in the format "{catalog}.{schema}.{table}".
+
+        Args:
+            ctx (Context): The request context.
+            metalake_name (str): The name of the metalake.
+            metadata_type (str): The type of metadata (e.g., table).
+            metadata_fullname (str): The full name of the metadata object.
+            statistic_names (list): List of statistic names to drop.
+
+        Example input for statistic_names:
+            ["custom-key1", "custom-key2"]
+
+        Returns:
+            str: A JSON string indicating whether any statistic was dropped (true/false).
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_statistic_operation().drop_statistics(
+            metalake_name, metadata_type, metadata_fullname, statistic_names
+        )
+
+    # pylint: disable=R0917
+    # Disable the update_partition_statistics tool by default as it is a write operation.
+    @mcp.tool(tags={"statistic"})
+    async def update_partition_statistics(
+        ctx: Context,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        partition_updates: list,
+    ) -> None:
+        """
+        Update (create or overwrite) custom statistics for partitions of a table.
+        Note: This is currently only supported for partitions of tables, so
+        `metadata_type` should always be "table".
+
+        Args:
+            ctx (Context): The request context.
+            metalake_name (str): The name of the metalake.
+            metadata_type (str): The type of metadata, should be "table".
+            metadata_fullname (str): The full name of the table, the format should be
+                "{catalog}.{schema}.{table}".
+            partition_updates (list): List of partition statistic updates.
+
+        Example input for partition_updates:
+            [
+              {
+                "partitionName": "p1",
+                "statistics": {
+                  "custom-key1": "value1"
+                }
+              }
+            ]
+
+        Returns:
+            None
+
+        Raises:
+            Exception: If the update fails, an exception is raised with an error message.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return (
+            await client.as_statistic_operation().update_partition_statistics(
+                metalake_name,
+                metadata_type,
+                metadata_fullname,
+                partition_updates,
+            )
+        )
+
+    # pylint: disable=R0917
+    # Disable the drop_partition_statistics tool by default as it can be destructive.
+    @mcp.tool(tags={"statistic"})
+    async def drop_partition_statistics(
+        ctx: Context,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        partition_drops: list,
+    ) -> str:
+        """
+        Drop custom statistics from partitions of a table.
+        Note: This is currently only supported for partitions of tables, so
+        `metadata_type` should always be "table".
+
+        Args:
+            ctx (Context): The request context.
+            metalake_name (str): The name of the metalake.
+            metadata_type (str): The type of metadata, should be "table".
+            metadata_fullname (str): The full name of the table, the format should be
+                "{catalog}.{schema}.{table}".
+            partition_drops (list): List of partition statistic drops.
+
+        Example input for partition_drops:
+            [
+              {
+                "partitionName": "p1",
+                "statisticNames": ["custom-key1"]
+              }
+            ]
+
+        Returns:
+            str: A JSON string indicating whether any statistic was dropped (true/false).
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_statistic_operation().drop_partition_statistics(
+            metalake_name, metadata_type, metadata_fullname, partition_drops
+        )
+
     @mcp.tool(tags={"statistic"})
     async def list_statistics_for_metadata(
         ctx: Context,
@@ -145,3 +304,13 @@ def load_statistic_tools(mcp: FastMCP):
                 to_inclusive,
             )
         )
+
+    mcp.disable(
+        names={
+            "update_statistics",
+            "drop_statistics",
+            "update_partition_statistics",
+            "drop_partition_statistics",
+        },
+        components={"tool"},
+    )

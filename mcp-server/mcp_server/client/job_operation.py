@@ -74,6 +74,34 @@ class JobOperation(ABC):
         pass
 
     @abstractmethod
+    async def register_job_template(self, job_template: dict) -> None:
+        """
+        Register a new job template within the metalake.
+
+        Args:
+            job_template: Dictionary describing the job template. It must include a
+                "jobType" ("shell" or "spark"), a "name", an "executable" and other
+                type-specific fields.
+
+        Returns:
+            None
+        """
+        pass
+
+    @abstractmethod
+    async def delete_job_template(self, name: str) -> str:
+        """
+        Delete a job template by its name.
+
+        Args:
+            name: Name of the job template to delete
+
+        Returns:
+            str: JSON-formatted string indicating whether the job template was deleted
+        """
+        pass
+
+    @abstractmethod
     async def run_job(self, job_template_name: str, job_config: dict) -> str:
         """
         Run a job based on the specified job template and parameters.

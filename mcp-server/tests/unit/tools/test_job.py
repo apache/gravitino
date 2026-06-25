@@ -100,3 +100,53 @@ class TestJobTool(unittest.TestCase):
                 )
 
         asyncio.run(_test_cancel_job(self.mcp))
+
+    def test_write_job_template_tools_disabled_by_default(self):
+        async def _test_write_job_template_tools_disabled_by_default(
+            mcp_server,
+        ):
+            tool_names = {tool.name for tool in await mcp_server.list_tools()}
+
+            self.assertIn("list_of_job_templates", tool_names)
+            self.assertNotIn("register_job_template", tool_names)
+            self.assertNotIn("delete_job_template", tool_names)
+
+        asyncio.run(
+            _test_write_job_template_tools_disabled_by_default(self.mcp)
+        )
+
+    def test_register_job_template(self):
+        async def _test_register_job_template(mcp_server):
+            self.mcp.enable(
+                names={"register_job_template"}, components={"tool"}
+            )
+            job_template = {
+                "jobType": "shell",
+                "name": "shell_test",
+                "executable": "/path/to/script.sh",
+            }
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "register_job_template",
+                    {"job_template": job_template},
+                )
+                self.assertEqual(
+                    f"mock_job_template_registered: {job_template}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test_register_job_template(self.mcp))
+
+    def test_delete_job_template(self):
+        async def _test_delete_job_template(mcp_server):
+            self.mcp.enable(names={"delete_job_template"}, components={"tool"})
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "delete_job_template", {"name": "shell_test"}
+                )
+                self.assertEqual(
+                    "mock_job_template_deleted: shell_test",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test_delete_job_template(self.mcp))

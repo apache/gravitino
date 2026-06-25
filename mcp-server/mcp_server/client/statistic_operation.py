@@ -39,6 +39,104 @@ class StatisticOperation(ABC):
         """
         pass
 
+    @abstractmethod
+    async def update_statistics(
+        self,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        statistics: dict,
+    ) -> None:
+        """
+        Update (create or overwrite) custom statistics for a metadata object.
+        Only custom (non-reserved) statistics can be updated.
+
+        Args:
+            metalake_name: Name of the metalake
+            metadata_type: Type of metadata (e.g., table)
+            metadata_fullname: Full name of the metadata item
+            statistics: Dictionary mapping statistic name to its value, e.g.
+                {"custom-key1": "value1", "custom-key2": 100}
+
+        Returns:
+            None
+        """
+        pass
+
+    @abstractmethod
+    async def drop_statistics(
+        self,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        statistic_names: list,
+    ) -> str:
+        """
+        Drop custom statistics from a metadata object.
+
+        Args:
+            metalake_name: Name of the metalake
+            metadata_type: Type of metadata (e.g., table)
+            metadata_fullname: Full name of the metadata item
+            statistic_names: List of statistic names to drop
+
+        Returns:
+            str: JSON-formatted string indicating whether any statistic was dropped
+        """
+        pass
+
+    # pylint: disable=R0917
+    @abstractmethod
+    async def update_partition_statistics(
+        self,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        partition_updates: list,
+    ) -> None:
+        """
+        Update (create or overwrite) custom statistics for partitions of a table.
+
+        Args:
+            metalake_name: Name of the metalake
+            metadata_type: Type of metadata, should be "table" for partition statistics
+            metadata_fullname: Full name of the table, the format should be
+                "{catalog}.{schema}.{table}".
+            partition_updates: List of partition statistic updates, each entry is a
+                dictionary with "partitionName" and a "statistics" map, e.g.
+                [{"partitionName": "p1", "statistics": {"custom-key1": "value1"}}]
+
+        Returns:
+            None
+        """
+        pass
+
+    # pylint: disable=R0917
+    @abstractmethod
+    async def drop_partition_statistics(
+        self,
+        metalake_name: str,
+        metadata_type: str,
+        metadata_fullname: str,
+        partition_drops: list,
+    ) -> str:
+        """
+        Drop custom statistics from partitions of a table.
+
+        Args:
+            metalake_name: Name of the metalake
+            metadata_type: Type of metadata, should be "table" for partition statistics
+            metadata_fullname: Full name of the table, the format should be
+                "{catalog}.{schema}.{table}".
+            partition_drops: List of partition statistic drops, each entry is a
+                dictionary with "partitionName" and a "statisticNames" list, e.g.
+                [{"partitionName": "p1", "statisticNames": ["custom-key1"]}]
+
+        Returns:
+            str: JSON-formatted string indicating whether any statistic was dropped
+        """
+        pass
+
     # pylint: disable=R0917
     @abstractmethod
     async def list_statistic_for_partition(

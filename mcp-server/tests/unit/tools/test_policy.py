@@ -138,3 +138,72 @@ class TestPolicyTool(unittest.TestCase):
                 )
 
         asyncio.run(_test_get_policy_for_metadata(self.mcp))
+
+    def test_write_policy_tools_disabled_by_default(self):
+        async def _test_write_policy_tools_disabled_by_default(mcp_server):
+            tool_names = {tool.name for tool in await mcp_server.list_tools()}
+
+            self.assertIn("get_list_of_policies", tool_names)
+            self.assertNotIn("create_policy", tool_names)
+            self.assertNotIn("alter_policy", tool_names)
+            self.assertNotIn("delete_policy", tool_names)
+
+        asyncio.run(_test_write_policy_tools_disabled_by_default(self.mcp))
+
+    def test_create_policy(self):
+        async def _test_create_policy(mcp_server):
+            self.mcp.enable(names={"create_policy"}, components={"tool"})
+            content = {
+                "customRules": {"rule1": 123},
+                "properties": {"key1": "value1"},
+                "supportedObjectTypes": ["table"],
+            }
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_policy",
+                    {
+                        "name": "mock_policy",
+                        "policy_type": "custom",
+                        "comment": "mock_comment",
+                        "content": content,
+                        "enabled": True,
+                    },
+                )
+                self.assertEqual(
+                    f"mock_policy_created: mock_policy, custom, mock_comment, "
+                    f"True, {content}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test_create_policy(self.mcp))
+
+    def test_alter_policy(self):
+        async def _test_alter_policy(mcp_server):
+            self.mcp.enable(names={"alter_policy"}, components={"tool"})
+            updates = [{"@type": "rename", "newName": "policy2"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_policy",
+                    {"name": "mock_policy", "updates": updates},
+                )
+                self.assertEqual(
+                    f"mock_policy_altered: mock_policy with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test_alter_policy(self.mcp))
+
+    def test_delete_policy(self):
+        async def _test_delete_policy(mcp_server):
+            self.mcp.enable(names={"delete_policy"}, components={"tool"})
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "delete_policy",
+                    {"name": "mock_policy"},
+                )
+                self.assertEqual(
+                    "mock_policy_deleted: mock_policy",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test_delete_policy(self.mcp))

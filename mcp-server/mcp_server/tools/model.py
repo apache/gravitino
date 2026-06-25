@@ -230,3 +230,70 @@ def load_model_tools(mcp: FastMCP):
         return await client.as_model_operation().load_model_version_by_alias(
             catalog_name, schema_name, model_name, alias
         )
+
+    # pylint: disable=R0917
+    # Disable the update_model_version_aliases tool by default as it can be destructive.
+    @mcp.tool(tags={"model"})
+    async def update_model_version_aliases(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        version: int,
+        aliases_to_add: list,
+        aliases_to_remove: list,
+    ):
+        """
+        Update the aliases of a specific version of a model.
+
+        Parameters:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            catalog_name (str): The name of the catalog the model belongs to.
+            schema_name (str): The name of the schema the model belongs to.
+            model_name (str): The name of the model.
+            version (int): Version identifier of the model.
+            aliases_to_add (list): List of aliases to add to the model version.
+            aliases_to_remove (list): List of aliases to remove from the model version.
+
+        Example input:
+            catalog_name: "model_catalog"
+            schema_name: "schema1"
+            model_name: "model1"
+            version: 0
+            aliases_to_add: ["alias1", "alias2"]
+            aliases_to_remove: ["alias3"]
+
+        Returns:
+            str: A JSON string containing the updated model version metadata.
+
+        Example Return Value:
+            {
+              "version": 0,
+              "comment": "this is version0",
+              "aliases": [
+                "alias1",
+                "alias2"
+              ],
+              "uri": "/tmp/version0",
+              "properties": {},
+              "audit": {
+                "creator": "anonymous",
+                "createTime": "2025-08-11T06:56:06.340031Z"
+              }
+            }
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_model_operation().update_model_version_aliases(
+            catalog_name,
+            schema_name,
+            model_name,
+            version,
+            aliases_to_add,
+            aliases_to_remove,
+        )
+
+    mcp.disable(
+        names={"update_model_version_aliases"},
+        components={"tool"},
+    )
