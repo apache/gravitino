@@ -31,6 +31,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConvert
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcViewOperations;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.meta.AuditInfo;
@@ -72,6 +73,11 @@ public class TestJdbcCatalogCredential {
 
     @Override
     protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
+      throw new UnsupportedOperationException("Not needed for credential test");
+    }
+
+    @Override
+    protected JdbcViewOperations createJdbcViewOperations() {
       throw new UnsupportedOperationException("Not needed for credential test");
     }
   }

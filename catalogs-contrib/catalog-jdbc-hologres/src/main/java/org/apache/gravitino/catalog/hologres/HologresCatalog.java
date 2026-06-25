@@ -30,6 +30,8 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcViewOperations;
+import org.apache.gravitino.catalog.jdbc.operation.PostgreSqlViewOperations;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 
@@ -56,7 +58,13 @@ public class HologresCatalog extends JdbcCatalog {
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
+        createJdbcViewOperations(),
         createJdbcColumnDefaultValueConverter());
+  }
+
+  @Override
+  protected JdbcViewOperations createJdbcViewOperations() {
+    return new PostgreSqlViewOperations();
   }
 
   @Override
