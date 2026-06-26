@@ -39,6 +39,7 @@ const { Title } = Typography
 const LoginContent = () => {
   const searchParams = useSearchParams()
   const inactiveReason = searchParams.get('reason') === 'inactive'
+  const maxDurationReason = searchParams.get('reason') === 'max_duration'
   const [providerType, setProviderType] = useState(null)
   const dispatch = useAppDispatch()
 
@@ -77,6 +78,16 @@ const LoginContent = () => {
           <Alert
             message='Your session has expired due to inactivity. Please sign in again.'
             type='info'
+            showIcon
+            closable
+            className='mb-6'
+          />
+        )}
+
+        {maxDurationReason && (
+          <Alert
+            message='Your session has reached its maximum duration. Please sign in again.'
+            type='warning'
             showIcon
             closable
             className='mb-6'
