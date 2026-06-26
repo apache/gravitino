@@ -76,11 +76,17 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 
 public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final String CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Clickhouse does not support nested column names.";
+  /** Index property key carrying the data skipping index GRANULARITY value. */
+  private static final String INDEX_GRANULARITY_KEY = "granularity";
+  /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
+  private static final String DEFAULT_INDEX_GRANULARITY = "1";
+
   private static final Pattern ORDER_BY_PATTERN =
       Pattern.compile(
           "(?is)\\bORDER\\s+BY\\s*(.+?)(?=\\bPARTITION\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
@@ -346,10 +352,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         StringUtils.isNotBlank(remoteTable), "Remote table must be specified for Distributed");
 
     // User must ensure the sharding key is a trusted value.
-    // TODO(yuqi) WE need to check the columns in shard keys should be integer and not nullable,
-    //  as clickhouse distributed table requires the sharding key to be integer and not nullable.
-    //  We can add this validation after we support user defined sharding key in index, as we can
-    //  reuse the index field definition for validation.
     Preconditions.checkArgument(
         StringUtils.isNotBlank(shardingKey), "Sharding key must be specified for Distributed");
 
@@ -359,12 +361,28 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     if (ArrayUtils.isNotEmpty(columns)) {
       List<String> shardingColumns = ClickHouseTableSqlUtils.extractShardingKeyColumns(shardingKey);
       if (CollectionUtils.isNotEmpty(shardingColumns)) {
+        // Only enforce type/nullability checks for bare-column shard keys.
+        // Function-wrapped keys (e.g. cityHash64(string_col)) produce valid integer results
+        // regardless of the inner column type.
+        boolean isBareColumn = ClickHouseTableSqlUtils.isSimpleIdentifier(shardingKey.trim());
+
         for (String columnName : shardingColumns) {
           JdbcColumn shardingColumn = findColumn(columns, columnName);
           Preconditions.checkArgument(
               shardingColumn != null,
               "Sharding key column %s must be defined in the table",
               columnName);
+          if (isBareColumn) {
+            Preconditions.checkArgument(
+                !shardingColumn.nullable(),
+                "Sharding key column %s must not be nullable",
+                columnName);
+            Preconditions.checkArgument(
+                shardingColumn.dataType() instanceof Type.IntegralType,
+                "Sharding key column %s must be an integer type, but got %s",
+                columnName,
+                shardingColumn.dataType());
+          }
         }
       }
     }
@@ -479,27 +497,41 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         case DATA_SKIPPING_MINMAX:
           Preconditions.checkArgument(
               StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
-          // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
-          // no field for it.
-          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           sqlBuilder.append(
-              " INDEX %s %s TYPE minmax GRANULARITY 1"
-                  .formatted(quoteIdentifier(index.name()), fieldStr));
+              " INDEX %s %s TYPE minmax GRANULARITY %s"
+                  .formatted(quoteIdentifier(index.name()), fieldStr, resolveGranularity(index)));
           break;
         case DATA_SKIPPING_BLOOM_FILTER:
-          // The GRANULARITY value is always 3 here currently.
-          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           Preconditions.checkArgument(
               StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
           sqlBuilder.append(
-              " INDEX %s %s TYPE bloom_filter GRANULARITY 3"
-                  .formatted(quoteIdentifier(index.name()), fieldStr));
+              " INDEX %s %s TYPE bloom_filter GRANULARITY %s"
+                  .formatted(quoteIdentifier(index.name()), fieldStr, resolveGranularity(index)));
           break;
         default:
           throw new IllegalArgumentException(
               "Gravitino Clickhouse doesn't support index : " + index.type());
       }
     }
+  }
+
+  /**
+   * Resolves the GRANULARITY value for a data skipping index from its properties, falling back to
+   * the ClickHouse default. The value is interpolated directly into DDL, so it must be a
+   * non-negative integer to avoid generating malformed SQL.
+   *
+   * @param index the index whose {@code granularity} property is read
+   * @return the validated GRANULARITY value as a string
+   */
+  private static String resolveGranularity(Index index) {
+    String granularity =
+        index.properties().getOrDefault(INDEX_GRANULARITY_KEY, DEFAULT_INDEX_GRANULARITY);
+    Preconditions.checkArgument(
+        StringUtils.isNumeric(granularity),
+        "Index %s granularity must be a non-negative integer, but got %s",
+        index.name(),
+        granularity);
+    return granularity;
   }
 
   @Override
@@ -860,7 +892,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
 
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY 3"
+        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY 1"
             .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
 
       case PRIMARY_KEY:
@@ -1258,7 +1290,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     List<Index> secondaryIndexes = new ArrayList<>();
     try (PreparedStatement preparedStatement =
         connection.prepareStatement(
-            "SELECT name, type, expr FROM system.data_skipping_indices "
+            "SELECT name, type, expr, granularity FROM system.data_skipping_indices "
                 + "WHERE database = ? AND table = ? ORDER BY name")) {
       preparedStatement.setString(1, databaseName);
       preparedStatement.setString(2, tableName);
@@ -1267,12 +1299,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           String name = resultSet.getString("name");
           String type = resultSet.getString("type");
           String expression = resultSet.getString("expr");
+          long granularity = resultSet.getLong("granularity");
           try {
             String[][] fields = parseIndexFields(expression);
             if (ArrayUtils.isEmpty(fields)) {
               continue;
             }
-            secondaryIndexes.add(Indexes.of(getClickHouseIndexType(type), name, fields));
+            Map<String, String> properties =
+                Map.of(INDEX_GRANULARITY_KEY, String.valueOf(granularity));
+            secondaryIndexes.add(
+                Indexes.of(getClickHouseIndexType(type), name, fields, properties));
           } catch (IllegalArgumentException e) {
             LOG.warn(
                 "Skip unsupported data skipping index {} for {}.{} with expression {}",

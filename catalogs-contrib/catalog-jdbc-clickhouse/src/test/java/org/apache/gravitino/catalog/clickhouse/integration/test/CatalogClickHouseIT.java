@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -554,6 +555,62 @@ public class CatalogClickHouseIT extends BaseIT {
                 idx ->
                     idx.type() == Index.IndexType.DATA_SKIPPING_MINMAX
                         && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"amount"}})));
+  }
+
+  @Test
+  void testCreateAndLoadWithCustomGranularity() {
+    String table = GravitinoITUtils.genRandomName("granularity_roundtrip");
+    NameIdentifier ident = NameIdentifier.of(schemaName, table);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("val", Types.StringType.get(), "val", true, false, DEFAULT_VALUE_NOT_SET),
+        };
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"id"}}),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_MINMAX,
+              "idx_minmax",
+              new String[][] {{"val"}},
+              Map.of("granularity", "5")),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_BLOOM_FILTER,
+              "idx_bloom",
+              new String[][] {{"val"}},
+              Map.of("granularity", "10")),
+        };
+
+    SortOrder[] sortOrders =
+        new SortOrder[] {SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING)};
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "granularity test",
+            createProperties(),
+            null,
+            Distributions.NONE,
+            sortOrders,
+            indexes);
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Index[] loadedIndexes = loaded.index();
+
+    // Verify minmax index has custom GRANULARITY
+    Optional<Index> minmaxIdx =
+        Arrays.stream(loadedIndexes).filter(idx -> "idx_minmax".equals(idx.name())).findFirst();
+    Assertions.assertTrue(minmaxIdx.isPresent(), "idx_minmax should exist");
+    Assertions.assertEquals("5", minmaxIdx.get().properties().get("granularity"));
+
+    // Verify bloom_filter index has custom GRANULARITY
+    Optional<Index> bloomIdx =
+        Arrays.stream(loadedIndexes).filter(idx -> "idx_bloom".equals(idx.name())).findFirst();
+    Assertions.assertTrue(bloomIdx.isPresent(), "idx_bloom should exist");
+    Assertions.assertEquals("10", bloomIdx.get().properties().get("granularity"));
   }
 
   @Test
