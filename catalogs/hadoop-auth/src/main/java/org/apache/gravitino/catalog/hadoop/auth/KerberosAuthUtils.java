@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +36,11 @@ import org.slf4j.Logger;
 
 /** Shared Kerberos helpers for Hadoop-aware Gravitino modules. */
 public final class KerberosAuthUtils {
+
+  private static final String TICKET_REFRESH_THREAD_NAME_PREFIX = "kerberos-ticket-refresh-";
+  private static final AtomicInteger TICKET_REFRESH_TASK_ID = new AtomicInteger(0);
+  private static final ScheduledThreadPoolExecutor TICKET_REFRESH_EXECUTOR =
+      newTicketRefreshExecutor();
 
   private KerberosAuthUtils() {}
 
@@ -182,30 +188,35 @@ public final class KerberosAuthUtils {
       String principal, String keytabFilePath, Configuration hadoopConf, LoginMode loginMode)
       throws IOException {
     checkPrincipalAndGetRealm(principal);
+    if (loginMode == null) {
+      throw new IllegalArgumentException("loginMode can't be null");
+    }
     UserGroupInformation.setConfiguration(hadoopConf);
 
-    if (loginMode == LoginMode.RETURN_UGI) {
-      return UserGroupInformation.loginUserFromKeytabAndReturnUGI(principal, keytabFilePath);
+    switch (loginMode) {
+      case RETURN_UGI:
+        return UserGroupInformation.loginUserFromKeytabAndReturnUGI(principal, keytabFilePath);
+      case CURRENT_USER:
+        UserGroupInformation.loginUserFromKeytab(principal, keytabFilePath);
+        return UserGroupInformation.getCurrentUser();
+      case LOGIN_USER:
+        UserGroupInformation.loginUserFromKeytab(principal, keytabFilePath);
+        return UserGroupInformation.getLoginUser();
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported loginMode: %s", loginMode));
     }
-
-    UserGroupInformation.loginUserFromKeytab(principal, keytabFilePath);
-    if (loginMode == LoginMode.CURRENT_USER) {
-      return UserGroupInformation.getCurrentUser();
-    }
-
-    return UserGroupInformation.getLoginUser();
   }
 
   /**
-   * Starts a daemon executor that periodically refreshes a keytab-backed TGT.
+   * Starts a daemon task that periodically refreshes a keytab-backed TGT.
    *
    * @param loginUgi login user to refresh
    * @param checkIntervalSec refresh interval in seconds
    * @param threadNamePrefix refresh thread name prefix
    * @param log logger used for refresh failures
-   * @return the scheduled refresh executor
+   * @return the scheduled refresh task
    */
-  public static ScheduledThreadPoolExecutor startTicketRefresh(
+  public static ScheduledFuture<?> startTicketRefresh(
       UserGroupInformation loginUgi, int checkIntervalSec, String threadNamePrefix, Logger log) {
     if (checkIntervalSec <= 0) {
       throw new IllegalArgumentException("The check interval must be positive");
@@ -214,20 +225,12 @@ public final class KerberosAuthUtils {
       throw new IllegalArgumentException("The thread name prefix can't be blank");
     }
 
-    ScheduledThreadPoolExecutor executor =
-        new ScheduledThreadPoolExecutor(1, daemonThreadFactory(threadNamePrefix));
-    executor.scheduleAtFixedRate(
-        () -> {
-          try {
-            loginUgi.checkTGTAndReloginFromKeytab();
-          } catch (Exception e) {
-            log.error("Fail to refresh ugi token: ", e);
-          }
-        },
+    String refreshTaskName = threadNamePrefix + TICKET_REFRESH_TASK_ID.getAndIncrement();
+    return TICKET_REFRESH_EXECUTOR.scheduleAtFixedRate(
+        () -> refreshTicket(loginUgi, refreshTaskName, log),
         checkIntervalSec,
         checkIntervalSec,
         TimeUnit.SECONDS);
-    return executor;
   }
 
   private static boolean isHdfsUri(String keytabUri) {
@@ -236,6 +239,27 @@ public final class KerberosAuthUtils {
       return "hdfs".equalsIgnoreCase(uri.getScheme());
     } catch (URISyntaxException e) {
       return keytabUri.trim().startsWith("hdfs");
+    }
+  }
+
+  private static ScheduledThreadPoolExecutor newTicketRefreshExecutor() {
+    ScheduledThreadPoolExecutor executor =
+        new ScheduledThreadPoolExecutor(1, daemonThreadFactory(TICKET_REFRESH_THREAD_NAME_PREFIX));
+    executor.setRemoveOnCancelPolicy(true);
+    return executor;
+  }
+
+  private static void refreshTicket(
+      UserGroupInformation loginUgi, String refreshTaskName, Logger log) {
+    Thread currentThread = Thread.currentThread();
+    String originalThreadName = currentThread.getName();
+    currentThread.setName(refreshTaskName);
+    try {
+      loginUgi.checkTGTAndReloginFromKeytab();
+    } catch (Exception e) {
+      log.error("Fail to refresh ugi token: ", e);
+    } finally {
+      currentThread.setName(originalThreadName);
     }
   }
 

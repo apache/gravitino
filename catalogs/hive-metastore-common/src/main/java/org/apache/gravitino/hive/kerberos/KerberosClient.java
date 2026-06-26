@@ -23,14 +23,13 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_TOK
 import static org.apache.gravitino.hive.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ScheduledFuture;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.hadoop.conf.Configuration;
@@ -41,11 +40,16 @@ import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Kerberos client for Hive Metastore. */
-public class KerberosClient implements java.io.Closeable {
+/**
+ * Kerberos client for Hive Metastore.
+ *
+ * <p>This class keeps HMS-specific behavior on top of the shared Hadoop Kerberos helpers, including
+ * proxy user creation, delegation-token retrieval, Hive client wiring, and local keytab lifecycle.
+ */
+public class KerberosClient implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
 
-  private ScheduledThreadPoolExecutor checkTgtExecutor;
+  private ScheduledFuture<?> checkTgtRefreshTask;
   private final Properties conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
@@ -81,10 +85,7 @@ public class KerberosClient implements java.io.Closeable {
 
       String tokenSignature = conf.getProperty(HIVE_METASTORE_TOKEN_SIGNATURE, "");
       String principal = conf.getProperty(PRINCIPAL_KEY, "");
-      List<String> principalComponents = Splitter.on('@').splitToList(principal);
-      Preconditions.checkArgument(
-          principalComponents.size() == 2, "The principal has the wrong format");
-      String kerberosRealm = principalComponents.get(1);
+      String kerberosRealm = KerberosAuthUtils.checkPrincipalAndGetRealm(principal);
 
       UserGroupInformation proxyUser;
       final String finalPrincipalName;
@@ -120,9 +121,7 @@ public class KerberosClient implements java.io.Closeable {
   public UserGroupInformation login() throws Exception {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
-    // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
-    KerberosAuthUtils.checkPrincipalAndGetRealm(catalogPrincipal);
 
     // Login
     UserGroupInformation loginUgi =
@@ -132,9 +131,9 @@ public class KerberosClient implements java.io.Closeable {
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
-      closeTicketRefreshExecutor();
+      cancelTicketRefreshTask();
       int checkInterval = kerberosConfig.getCheckIntervalSec();
-      checkTgtExecutor =
+      checkTgtRefreshTask =
           KerberosAuthUtils.startTicketRefresh(loginUgi, checkInterval, "check-tgt-", LOG);
     }
 
@@ -160,7 +159,7 @@ public class KerberosClient implements java.io.Closeable {
   @Override
   public void close() {
     try {
-      closeTicketRefreshExecutor();
+      cancelTicketRefreshTask();
 
       Files.deleteIfExists(Paths.get(keytabFilePath));
     } catch (IOException e) {
@@ -168,10 +167,10 @@ public class KerberosClient implements java.io.Closeable {
     }
   }
 
-  private void closeTicketRefreshExecutor() {
-    if (checkTgtExecutor != null) {
-      checkTgtExecutor.shutdownNow();
-      checkTgtExecutor = null;
+  private void cancelTicketRefreshTask() {
+    if (checkTgtRefreshTask != null) {
+      checkTgtRefreshTask.cancel(true);
+      checkTgtRefreshTask = null;
     }
   }
 

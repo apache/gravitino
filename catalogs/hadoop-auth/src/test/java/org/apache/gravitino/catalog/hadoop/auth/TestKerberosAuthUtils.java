@@ -21,7 +21,7 @@ package org.apache.gravitino.catalog.hadoop.auth;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ScheduledFuture;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Assertions;
@@ -138,22 +138,47 @@ public class TestKerberosAuthUtils {
   }
 
   @Test
-  public void testStartTicketRefreshCreatesDaemonThreadWithPrefix() {
+  public void testLoginRejectsNullLoginMode() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                KerberosAuthUtils.login(
+                    "service/host@EXAMPLE.COM",
+                    new File(tempDir, "missing.keytab").getAbsolutePath(),
+                    new Configuration(false),
+                    null));
+
+    Assertions.assertTrue(exception.getMessage().contains("loginMode"));
+  }
+
+  @Test
+  public void testStartTicketRefreshReturnsCancelableTaskFromGlobalExecutor() {
     UserGroupInformation ugi = Mockito.mock(UserGroupInformation.class);
     String threadNamePrefix = "check-test-tgt-" + System.nanoTime() + "-";
-    ScheduledThreadPoolExecutor executor =
+    ScheduledFuture<?> firstRefresh =
+        KerberosAuthUtils.startTicketRefresh(
+            ugi, 60, threadNamePrefix, LoggerFactory.getLogger(getClass()));
+    ScheduledFuture<?> secondRefresh =
         KerberosAuthUtils.startTicketRefresh(
             ugi, 60, threadNamePrefix, LoggerFactory.getLogger(getClass()));
 
     try {
-      Thread thread =
+      Assertions.assertNotSame(firstRefresh, secondRefresh);
+      Assertions.assertFalse(firstRefresh.isCancelled());
+      Assertions.assertFalse(secondRefresh.isCancelled());
+      Assertions.assertTrue(
           Thread.getAllStackTraces().keySet().stream()
-              .filter(candidate -> candidate.getName().equals(threadNamePrefix + "0"))
-              .findFirst()
-              .orElseThrow();
-      Assertions.assertTrue(thread.isDaemon());
+              .anyMatch(
+                  candidate ->
+                      candidate.isDaemon()
+                          && candidate.getName().startsWith("kerberos-ticket-refresh-")));
     } finally {
-      executor.shutdownNow();
+      firstRefresh.cancel(true);
+      secondRefresh.cancel(true);
     }
+
+    Assertions.assertTrue(firstRefresh.isCancelled());
+    Assertions.assertTrue(secondRefresh.isCancelled());
   }
 }

@@ -22,7 +22,7 @@ package org.apache.gravitino.catalog.hadoop.auth;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ScheduledFuture;
 import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils.LoginMode;
 import org.apache.hadoop.conf.Configuration;
@@ -51,7 +51,7 @@ public class KerberosClient implements Closeable {
   @Nullable private final String hadoopKrb5ConfKey;
   @Nullable private final String systemKrb5ConfKey;
 
-  private ScheduledThreadPoolExecutor checkTgtExecutor;
+  private ScheduledFuture<?> checkTgtRefreshTask;
   private UserGroupInformation loginUser;
   private String realm;
 
@@ -80,8 +80,8 @@ public class KerberosClient implements Closeable {
     }
     this.loginUser = KerberosAuthUtils.login(principal, keytabFilePath, hadoopConf, loginMode);
     if (refreshCredentials) {
-      closeTicketRefreshExecutor();
-      this.checkTgtExecutor =
+      cancelTicketRefreshTask();
+      this.checkTgtRefreshTask =
           KerberosAuthUtils.startTicketRefresh(loginUser, checkIntervalSec, threadNamePrefix, LOG);
     }
     return loginUser;
@@ -99,13 +99,13 @@ public class KerberosClient implements Closeable {
 
   @Override
   public void close() {
-    closeTicketRefreshExecutor();
+    cancelTicketRefreshTask();
   }
 
-  private void closeTicketRefreshExecutor() {
-    if (checkTgtExecutor != null) {
-      checkTgtExecutor.shutdownNow();
-      checkTgtExecutor = null;
+  private void cancelTicketRefreshTask() {
+    if (checkTgtRefreshTask != null) {
+      checkTgtRefreshTask.cancel(true);
+      checkTgtRefreshTask = null;
     }
   }
 
