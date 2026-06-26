@@ -246,7 +246,20 @@ public class IsolatedClassLoader implements Closeable {
     // compiler-generated synthetic classes (e.g. $1 from switch-on-enum) are then requested
     // from the server classloader which cannot find them, causing a permanent
     // NoClassDefFoundError that is cached by the JVM for the lifetime of the process.
+    // org.apache.gravitino.authorization.{ranger,chain,jdbc,common}.* are authorization plugin
+    // classes loaded through this IsolatedClassLoader. They must be treated as isolated (catalog)
+    // classes; otherwise they are delegated to the server classloader, and their nested or
+    // compiler-generated synthetic classes (e.g. the inner enum
+    // RangerPrivileges$RangerHdfsPrivilege)
+    // cannot be resolved from the server classpath, producing a permanently cached
+    // NoClassDefFoundError. Note org.apache.gravitino.authorization.* (without these sub-packages)
+    // holds server-side classes (e.g. RoleManager) that must stay shared, so only the plugin
+    // sub-packages are whitelisted here.
     return name.startsWith("org.apache.gravitino.hive.")
+        || name.startsWith("org.apache.gravitino.authorization.ranger.")
+        || name.startsWith("org.apache.gravitino.authorization.chain.")
+        || name.startsWith("org.apache.gravitino.authorization.jdbc.")
+        || name.startsWith("org.apache.gravitino.authorization.common.")
         || name.startsWith("org.apache.gravitino.catalog.hive.")
         || name.startsWith("org.apache.gravitino.catalog.lakehouse.")
         || name.startsWith("org.apache.gravitino.catalog.jdbc.")

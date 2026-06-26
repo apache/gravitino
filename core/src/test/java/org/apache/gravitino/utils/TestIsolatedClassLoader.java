@@ -80,11 +80,33 @@ public class TestIsolatedClassLoader {
   }
 
   @Test
+  public void testAuthorizationPluginPackagesRecognizedAsCatalogClass() throws Exception {
+    // Authorization plugin classes are loaded through the IsolatedClassLoader. They must be
+    // treated as catalog classes; otherwise they are delegated to the server classloader and their
+    // nested classes (e.g. the inner enum RangerPrivileges$RangerHdfsPrivilege) fail to load,
+    // causing a permanently cached NoClassDefFoundError.
+    Assertions.assertTrue(
+        isCatalogClass("org.apache.gravitino.authorization.ranger.RangerPrivileges"));
+    Assertions.assertTrue(
+        isCatalogClass(
+            "org.apache.gravitino.authorization.ranger.RangerPrivileges$RangerHdfsPrivilege"));
+    Assertions.assertTrue(
+        isCatalogClass("org.apache.gravitino.authorization.chain.ChainedAuthorizationPlugin"));
+    Assertions.assertTrue(
+        isCatalogClass("org.apache.gravitino.authorization.jdbc.JdbcAuthorizationPlugin"));
+    Assertions.assertTrue(
+        isCatalogClass("org.apache.gravitino.authorization.common.AuthorizationProperties"));
+  }
+
+  @Test
   public void testNonCatalogPackagesNotRecognizedAsCatalogClass() throws Exception {
     // Server-side / shared classes must NOT be treated as catalog classes.
     Assertions.assertFalse(isCatalogClass("org.apache.gravitino.connector.BaseCatalog"));
     Assertions.assertFalse(isCatalogClass("org.apache.gravitino.NameIdentifier"));
     Assertions.assertFalse(isCatalogClass("org.apache.gravitino.catalog.SomeSharedClass"));
+    // Server-side authorization classes (without a plugin sub-package) must stay shared.
+    Assertions.assertFalse(isCatalogClass("org.apache.gravitino.authorization.RoleManager"));
+    Assertions.assertFalse(isCatalogClass("org.apache.gravitino.authorization.AuthorizationUtils"));
     Assertions.assertFalse(isCatalogClass("java.lang.String"));
     Assertions.assertFalse(isCatalogClass("org.slf4j.Logger"));
   }
