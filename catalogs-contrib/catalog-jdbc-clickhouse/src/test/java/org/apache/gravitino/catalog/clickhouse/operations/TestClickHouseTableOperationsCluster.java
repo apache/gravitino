@@ -31,6 +31,8 @@ import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefault
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -360,6 +362,77 @@ class TestClickHouseTableOperationsCluster {
     Assertions.assertEquals("", stripClusterMetadata(stored));
   }
 
+  /** ALTER TABLE with ON CLUSTER=true should include ON CLUSTER in SQL. */
+  @Test
+  void testAlterTableWithOnCluster() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTableWithCluster("ck_cluster", true));
+
+    String sql =
+        ops.buildAlterSql(
+            "default",
+            "orders",
+            new TableChange[] {
+              TableChange.addColumn(new String[] {"new_col"}, Types.IntegerType.get())
+            });
+
+    Assertions.assertTrue(sql.contains("ON CLUSTER"), "ALTER TABLE should include ON CLUSTER");
+    Assertions.assertTrue(sql.contains("`ck_cluster`"), "ALTER TABLE should include cluster name");
+  }
+
+  /** ALTER TABLE with ON CLUSTER=false should NOT include ON CLUSTER in SQL. */
+  @Test
+  void testAlterTableWithoutOnCluster() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTableWithCluster("ck_cluster", false));
+
+    String sql =
+        ops.buildAlterSql(
+            "default",
+            "orders",
+            new TableChange[] {
+              TableChange.addColumn(new String[] {"new_col"}, Types.IntegerType.get())
+            });
+
+    Assertions.assertFalse(sql.contains("ON CLUSTER"), "ALTER TABLE should NOT include ON CLUSTER");
+  }
+
+  /** ALTER TABLE with null properties should NOT throw NPE. */
+  @Test
+  void testAlterTableWithNullProperties() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTableWithNullProperties());
+
+    String sql =
+        ops.buildAlterSql(
+            "default",
+            "orders",
+            new TableChange[] {
+              TableChange.addColumn(new String[] {"new_col"}, Types.IntegerType.get())
+            });
+
+    Assertions.assertFalse(sql.contains("ON CLUSTER"), "ALTER TABLE should NOT include ON CLUSTER");
+    Assertions.assertTrue(sql.contains("ADD COLUMN"), "ALTER TABLE should contain ADD COLUMN");
+  }
+
   private static class TestableClickHouseTableOperations extends ClickHouseTableOperations {
     String buildCreateSql(
         String tableName,
@@ -377,5 +450,55 @@ class TestClickHouseTableOperationsCluster {
     String buildDropSql(String tableName, Map<String, String> properties) {
       return generateDropTableSql(tableName, properties);
     }
+  }
+
+  private static final class StubClickHouseTableOperations extends ClickHouseTableOperations {
+    private JdbcTable table;
+
+    void setTable(JdbcTable table) {
+      this.table = table;
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(
+        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      return table;
+    }
+
+    String buildAlterSql(String db, String tableName, TableChange[] changes) {
+      return generateAlterTableSql(db, tableName, changes);
+    }
+  }
+
+  private static JdbcTable buildStubTableWithCluster(String clusterName, boolean onCluster) {
+    JdbcColumn c1 =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    Map<String, String> props = new HashMap<>();
+    props.put(ClusterConstants.CLUSTER_NAME, clusterName);
+    props.put(ClusterConstants.ON_CLUSTER, String.valueOf(onCluster));
+    return JdbcTable.builder()
+        .withName("orders")
+        .withColumns(new JdbcColumn[] {c1})
+        .withProperties(props)
+        .withTableOperation(null)
+        .build();
+  }
+
+  private static JdbcTable buildStubTableWithNullProperties() {
+    JdbcColumn c1 =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    return JdbcTable.builder()
+        .withName("orders")
+        .withColumns(new JdbcColumn[] {c1})
+        .withTableOperation(null)
+        .build();
   }
 }
