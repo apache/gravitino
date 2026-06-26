@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
+import org.apache.iceberg.RegisterTableOverwrite;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 
@@ -36,6 +38,21 @@ public class MemoryCatalogWithMetadataLocationSupport extends InMemoryCatalog
   public void initialize(String name, Map<String, String> properties) {
     super.initialize(name, properties);
     loadFields();
+  }
+
+  /**
+   * Registers a table from an existing metadata file, optionally overwriting an existing
+   * registration.
+   *
+   * @param identifier table identifier to register
+   * @param metadataFileLocation location of the metadata file to register
+   * @param overwrite whether to overwrite an existing table registration
+   * @return the registered table
+   */
+  @Override
+  public Table registerTable(
+      TableIdentifier identifier, String metadataFileLocation, boolean overwrite) {
+    return RegisterTableOverwrite.registerTable(this, identifier, metadataFileLocation, overwrite);
   }
 
   @Override

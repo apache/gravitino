@@ -23,6 +23,8 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
+import org.apache.iceberg.RegisterTableOverwrite;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
 
@@ -66,6 +68,21 @@ public class JdbcCatalogWithMetadataLocationSupport extends JdbcCatalog
   public boolean supportsViewsWithSchemaVersion() {
     // V0 doesn't support views, only V1 and later versions do
     return jdbcSchemaVersion != null && jdbcSchemaVersion != SchemaVersion.V0;
+  }
+
+  /**
+   * Registers a table from an existing metadata file, optionally overwriting an existing
+   * registration.
+   *
+   * @param identifier table identifier to register
+   * @param metadataFileLocation location of the metadata file to register
+   * @param overwrite whether to overwrite an existing table registration
+   * @return the registered table
+   */
+  @Override
+  public Table registerTable(
+      TableIdentifier identifier, String metadataFileLocation, boolean overwrite) {
+    return RegisterTableOverwrite.registerTable(this, identifier, metadataFileLocation, overwrite);
   }
 
   private void loadFields() {

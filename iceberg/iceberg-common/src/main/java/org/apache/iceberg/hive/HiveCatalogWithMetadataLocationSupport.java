@@ -25,9 +25,10 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.iceberg.BaseMetastoreTableOperations;
 import org.apache.iceberg.ClientPool;
+import org.apache.iceberg.RegisterTableOverwrite;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.thrift.TException;
 
@@ -41,19 +42,36 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
     loadFields();
   }
 
+  /**
+   * Registers a table from an existing metadata file, optionally overwriting an existing
+   * registration.
+   *
+   * @param identifier table identifier to register
+   * @param metadataFileLocation location of the metadata file to register
+   * @param overwrite whether to overwrite an existing table registration
+   * @return the registered table
+   */
+  @Override
+  public Table registerTable(
+      TableIdentifier identifier, String metadataFileLocation, boolean overwrite) {
+    return RegisterTableOverwrite.registerTable(this, identifier, metadataFileLocation, overwrite);
+  }
+
   @Override
   public String metadataLocation(TableIdentifier tableIdentifier) {
     String dbName = tableIdentifier.namespace().level(0);
     String tableName = tableIdentifier.name();
 
     try {
-      Table table = metaClients.run(client -> client.getTable(dbName, tableName));
-      String tableType = table.getParameters().get(BaseMetastoreTableOperations.TABLE_TYPE_PROP);
+      org.apache.hadoop.hive.metastore.api.Table hiveTable =
+          metaClients.run(client -> client.getTable(dbName, tableName));
+      String tableType =
+          hiveTable.getParameters().get(BaseMetastoreTableOperations.TABLE_TYPE_PROP);
       if (tableType == null
           || !tableType.equalsIgnoreCase(BaseMetastoreTableOperations.ICEBERG_TABLE_TYPE_VALUE)) {
         return null;
       }
-      return table.getParameters().get(METADATA_LOCATION_PROP);
+      return hiveTable.getParameters().get(METADATA_LOCATION_PROP);
     } catch (Exception e) {
       return null;
     }

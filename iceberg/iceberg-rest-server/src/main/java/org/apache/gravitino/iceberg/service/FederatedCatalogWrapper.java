@@ -302,7 +302,8 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   private LoadTableResponse registerTableInternal(
       Namespace namespace, RegisterTableRequest request) {
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    Table table = getCatalog().registerTable(ident, request.metadataLocation());
+    Table table =
+        getCatalog().registerTable(ident, request.metadataLocation(), request.overwrite());
 
     if (table instanceof BaseTable) {
       return buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
