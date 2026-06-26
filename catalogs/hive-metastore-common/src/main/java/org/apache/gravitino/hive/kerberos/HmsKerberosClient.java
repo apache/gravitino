@@ -46,8 +46,8 @@ import org.slf4j.LoggerFactory;
  * <p>This class keeps HMS-specific behavior on top of the shared Hadoop Kerberos helpers, including
  * proxy user creation, delegation-token retrieval, Hive client wiring, and local keytab lifecycle.
  */
-public class KerberosClient implements Closeable {
-  private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
+public class HmsKerberosClient implements Closeable {
+  private static final Logger LOG = LoggerFactory.getLogger(HmsKerberosClient.class);
 
   private ScheduledFuture<?> checkTgtRefreshTask;
   private final Properties conf;
@@ -57,7 +57,7 @@ public class KerberosClient implements Closeable {
   private final String keytabFilePath;
   private HiveClient hiveClient = null;
 
-  public KerberosClient(
+  public HmsKerberosClient(
       Properties properties,
       Configuration hadoopConf,
       boolean refreshCredentials,
@@ -133,8 +133,7 @@ public class KerberosClient implements Closeable {
     if (refreshCredentials) {
       cancelTicketRefreshTask();
       int checkInterval = kerberosConfig.getCheckIntervalSec();
-      checkTgtRefreshTask =
-          KerberosAuthUtils.startTicketRefresh(loginUgi, checkInterval, "check-tgt-", LOG);
+      checkTgtRefreshTask = KerberosAuthUtils.startTicketRefresh(loginUgi, checkInterval, LOG);
     }
 
     return loginUgi;
@@ -187,7 +186,7 @@ public class KerberosClient implements Closeable {
    * @throws IllegalStateException if {@link #login()} has not been called yet.
    */
   public UserGroupInformation getRealLoginUgi() {
-    Preconditions.checkState(realLoginUgi != null, "KerberosClient.login() has not been called");
+    Preconditions.checkState(realLoginUgi != null, "HmsKerberosClient.login() has not been called");
     return realLoginUgi;
   }
 }

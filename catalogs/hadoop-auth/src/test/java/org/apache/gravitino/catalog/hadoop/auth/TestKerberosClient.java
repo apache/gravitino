@@ -49,13 +49,6 @@ public class TestKerberosClient {
             KerberosClient.builder("hdfs/localhost@EXAMPLE.COM", new Configuration())
                 .checkIntervalSec(0)
                 .build());
-
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            KerberosClient.builder("hdfs/localhost@EXAMPLE.COM", new Configuration())
-                .threadNamePrefix(" ")
-                .build());
   }
 
   @Test
@@ -64,7 +57,6 @@ public class TestKerberosClient {
         KerberosClient.builder("hdfs/localhost@EXAMPLE.COM", new Configuration())
             .refreshCredentials(false)
             .checkIntervalSec(0)
-            .threadNamePrefix(" ")
             .build();
     assertNotNull(client);
   }
@@ -93,7 +85,6 @@ public class TestKerberosClient {
             .loginMode(KerberosAuthUtils.LoginMode.RETURN_UGI)
             .refreshCredentials(false)
             .checkIntervalSec(30)
-            .threadNamePrefix("check-test-tgt-")
             .build();
     assertNotNull(client);
   }

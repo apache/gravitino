@@ -280,7 +280,6 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
           KerberosClient.builder(kerberosConfig.getPrincipalName(), this.getConf())
               .loginMode(KerberosAuthUtils.LoginMode.CURRENT_USER)
               .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
-              .threadNamePrefix("check-Iceberg-Hive-tgt-")
               .build();
       // catalog_uuid always exists for Gravitino managed catalogs, `0` is just a fallback value.
       String catalogUUID = properties().getOrDefault("catalog_uuid", "0");

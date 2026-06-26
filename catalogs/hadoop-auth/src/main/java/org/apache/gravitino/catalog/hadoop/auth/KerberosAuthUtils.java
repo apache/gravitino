@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.hadoop.auth;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -38,7 +39,6 @@ import org.slf4j.Logger;
 public final class KerberosAuthUtils {
 
   private static final String TICKET_REFRESH_THREAD_NAME_PREFIX = "kerberos-ticket-refresh-";
-  private static final AtomicInteger TICKET_REFRESH_TASK_ID = new AtomicInteger(0);
   private static final ScheduledThreadPoolExecutor TICKET_REFRESH_EXECUTOR =
       newTicketRefreshExecutor();
 
@@ -65,21 +65,17 @@ public final class KerberosAuthUtils {
    * @return the realm portion of the principal
    */
   public static String checkPrincipalAndGetRealm(String principal) {
-    if (principal == null) {
-      throw new IllegalArgumentException("The principal can't be blank");
-    }
+    Preconditions.checkArgument(principal != null, "The principal can't be blank");
 
     String normalizedPrincipal = principal.trim();
-    if (normalizedPrincipal.isEmpty()) {
-      throw new IllegalArgumentException("The principal can't be blank");
-    }
+    Preconditions.checkArgument(!normalizedPrincipal.isEmpty(), "The principal can't be blank");
 
     String[] principalComponents = normalizedPrincipal.split("@", -1);
-    if (principalComponents.length != 2
-        || principalComponents[0].isEmpty()
-        || principalComponents[1].isEmpty()) {
-      throw new IllegalArgumentException("The principal has the wrong format");
-    }
+    Preconditions.checkArgument(
+        principalComponents.length == 2
+            && !principalComponents[0].isEmpty()
+            && !principalComponents[1].isEmpty(),
+        "The principal has the wrong format");
 
     return principalComponents[1];
   }
@@ -102,13 +98,11 @@ public final class KerberosAuthUtils {
       boolean allowHdfsKeytabUri,
       @Nullable Configuration hadoopConf)
       throws IOException {
-    if (keytabUri == null || keytabUri.trim().isEmpty()) {
-      throw new IllegalArgumentException("Keytab uri can't be blank");
-    }
-
-    if (!allowHdfsKeytabUri && isHdfsUri(keytabUri)) {
-      throw new IllegalArgumentException("HDFS URIs are not supported for keytab files");
-    }
+    Preconditions.checkArgument(
+        keytabUri != null && !keytabUri.trim().isEmpty(), "Keytab uri can't be blank");
+    Preconditions.checkArgument(
+        allowHdfsKeytabUri || !isHdfsUri(keytabUri),
+        "HDFS URIs are not supported for keytab files");
 
     File parentFile = keytabFile.getParentFile();
     if (parentFile != null && !parentFile.exists() && !parentFile.mkdirs()) {
@@ -158,15 +152,13 @@ public final class KerberosAuthUtils {
    */
   public static void configureKrb5Conf(
       Configuration hadoopConf, String hadoopKrb5ConfKey, String systemKrb5ConfKey) {
-    if (hadoopConf == null) {
-      throw new IllegalArgumentException("Hadoop configuration can't be null");
-    }
-    if (hadoopKrb5ConfKey == null || hadoopKrb5ConfKey.trim().isEmpty()) {
-      throw new IllegalArgumentException("Hadoop krb5.conf key can't be blank");
-    }
-    if (systemKrb5ConfKey == null || systemKrb5ConfKey.trim().isEmpty()) {
-      throw new IllegalArgumentException("System krb5.conf key can't be blank");
-    }
+    Preconditions.checkArgument(hadoopConf != null, "Hadoop configuration can't be null");
+    Preconditions.checkArgument(
+        hadoopKrb5ConfKey != null && !hadoopKrb5ConfKey.trim().isEmpty(),
+        "Hadoop krb5.conf key can't be blank");
+    Preconditions.checkArgument(
+        systemKrb5ConfKey != null && !systemKrb5ConfKey.trim().isEmpty(),
+        "System krb5.conf key can't be blank");
 
     String krb5Config = hadoopConf.get(hadoopKrb5ConfKey);
     if (krb5Config != null) {
@@ -188,9 +180,7 @@ public final class KerberosAuthUtils {
       String principal, String keytabFilePath, Configuration hadoopConf, LoginMode loginMode)
       throws IOException {
     checkPrincipalAndGetRealm(principal);
-    if (loginMode == null) {
-      throw new IllegalArgumentException("loginMode can't be null");
-    }
+    Preconditions.checkArgument(loginMode != null, "loginMode can't be null");
     UserGroupInformation.setConfiguration(hadoopConf);
 
     switch (loginMode) {
@@ -212,25 +202,15 @@ public final class KerberosAuthUtils {
    *
    * @param loginUgi login user to refresh
    * @param checkIntervalSec refresh interval in seconds
-   * @param threadNamePrefix refresh thread name prefix
    * @param log logger used for refresh failures
    * @return the scheduled refresh task
    */
   public static ScheduledFuture<?> startTicketRefresh(
-      UserGroupInformation loginUgi, int checkIntervalSec, String threadNamePrefix, Logger log) {
-    if (checkIntervalSec <= 0) {
-      throw new IllegalArgumentException("The check interval must be positive");
-    }
-    if (threadNamePrefix == null || threadNamePrefix.trim().isEmpty()) {
-      throw new IllegalArgumentException("The thread name prefix can't be blank");
-    }
+      UserGroupInformation loginUgi, int checkIntervalSec, Logger log) {
+    Preconditions.checkArgument(checkIntervalSec > 0, "The check interval must be positive");
 
-    String refreshTaskName = threadNamePrefix + TICKET_REFRESH_TASK_ID.getAndIncrement();
     return TICKET_REFRESH_EXECUTOR.scheduleAtFixedRate(
-        () -> refreshTicket(loginUgi, refreshTaskName, log),
-        checkIntervalSec,
-        checkIntervalSec,
-        TimeUnit.SECONDS);
+        () -> refreshTicket(loginUgi, log), checkIntervalSec, checkIntervalSec, TimeUnit.SECONDS);
   }
 
   private static boolean isHdfsUri(String keytabUri) {
@@ -249,17 +229,11 @@ public final class KerberosAuthUtils {
     return executor;
   }
 
-  private static void refreshTicket(
-      UserGroupInformation loginUgi, String refreshTaskName, Logger log) {
-    Thread currentThread = Thread.currentThread();
-    String originalThreadName = currentThread.getName();
-    currentThread.setName(refreshTaskName);
+  private static void refreshTicket(UserGroupInformation loginUgi, Logger log) {
     try {
       loginUgi.checkTGTAndReloginFromKeytab();
     } catch (Exception e) {
       log.error("Fail to refresh ugi token: ", e);
-    } finally {
-      currentThread.setName(originalThreadName);
     }
   }
 

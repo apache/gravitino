@@ -128,13 +128,7 @@ public class TestKerberosAuthUtils {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            KerberosAuthUtils.startTicketRefresh(
-                ugi, 0, "check-test-tgt-", LoggerFactory.getLogger(getClass())));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            KerberosAuthUtils.startTicketRefresh(ugi, 1, " ", LoggerFactory.getLogger(getClass())));
+        () -> KerberosAuthUtils.startTicketRefresh(ugi, 0, LoggerFactory.getLogger(getClass())));
   }
 
   @Test
@@ -155,13 +149,10 @@ public class TestKerberosAuthUtils {
   @Test
   public void testStartTicketRefreshReturnsCancelableTaskFromGlobalExecutor() {
     UserGroupInformation ugi = Mockito.mock(UserGroupInformation.class);
-    String threadNamePrefix = "check-test-tgt-" + System.nanoTime() + "-";
     ScheduledFuture<?> firstRefresh =
-        KerberosAuthUtils.startTicketRefresh(
-            ugi, 60, threadNamePrefix, LoggerFactory.getLogger(getClass()));
+        KerberosAuthUtils.startTicketRefresh(ugi, 60, LoggerFactory.getLogger(getClass()));
     ScheduledFuture<?> secondRefresh =
-        KerberosAuthUtils.startTicketRefresh(
-            ugi, 60, threadNamePrefix, LoggerFactory.getLogger(getClass()));
+        KerberosAuthUtils.startTicketRefresh(ugi, 60, LoggerFactory.getLogger(getClass()));
 
     try {
       Assertions.assertNotSame(firstRefresh, secondRefresh);

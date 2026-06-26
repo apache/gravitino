@@ -47,7 +47,6 @@ public class KerberosClient implements Closeable {
   private final LoginMode loginMode;
   private final boolean refreshCredentials;
   private final int checkIntervalSec;
-  private final String threadNamePrefix;
   @Nullable private final String hadoopKrb5ConfKey;
   @Nullable private final String systemKrb5ConfKey;
 
@@ -61,7 +60,6 @@ public class KerberosClient implements Closeable {
     this.loginMode = builder.loginMode;
     this.refreshCredentials = builder.refreshCredentials;
     this.checkIntervalSec = builder.checkIntervalSec;
-    this.threadNamePrefix = builder.threadNamePrefix;
     this.hadoopKrb5ConfKey = builder.hadoopKrb5ConfKey;
     this.systemKrb5ConfKey = builder.systemKrb5ConfKey;
   }
@@ -82,7 +80,7 @@ public class KerberosClient implements Closeable {
     if (refreshCredentials) {
       cancelTicketRefreshTask();
       this.checkTgtRefreshTask =
-          KerberosAuthUtils.startTicketRefresh(loginUser, checkIntervalSec, threadNamePrefix, LOG);
+          KerberosAuthUtils.startTicketRefresh(loginUser, checkIntervalSec, LOG);
     }
     return loginUser;
   }
@@ -127,7 +125,6 @@ public class KerberosClient implements Closeable {
     private LoginMode loginMode = LoginMode.CURRENT_USER;
     private boolean refreshCredentials = true;
     private int checkIntervalSec = 60;
-    private String threadNamePrefix = "check-tgt-";
     private String hadoopKrb5ConfKey;
     private String systemKrb5ConfKey;
 
@@ -154,12 +151,6 @@ public class KerberosClient implements Closeable {
       return this;
     }
 
-    /** Sets the refresh thread name prefix. */
-    public Builder threadNamePrefix(String prefix) {
-      this.threadNamePrefix = prefix;
-      return this;
-    }
-
     /**
      * Points the JVM krb5.conf system property at the path stored under {@code hadoopKrb5ConfKey}
      * in the Hadoop configuration before login. When not set, the JVM krb5.conf is left untouched.
@@ -178,9 +169,6 @@ public class KerberosClient implements Closeable {
       Preconditions.checkArgument(loginMode != null, "loginMode can't be null");
       if (refreshCredentials) {
         Preconditions.checkArgument(checkIntervalSec > 0, "checkIntervalSec must be positive");
-        Preconditions.checkArgument(
-            threadNamePrefix != null && !threadNamePrefix.trim().isEmpty(),
-            "threadNamePrefix can't be blank");
       }
       if (hadoopKrb5ConfKey != null || systemKrb5ConfKey != null) {
         Preconditions.checkArgument(
