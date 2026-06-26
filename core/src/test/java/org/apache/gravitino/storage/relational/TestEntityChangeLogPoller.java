@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -80,11 +81,12 @@ public class TestEntityChangeLogPoller {
   }
 
   @Test
-  void testListenerFailureDoesNotBlockOtherListenersAndCursorStillAdvances() {
+  void testListenerFailureDoesNotBlockOthersAndPausesCursorForRetry() {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
     EntityChangeRecord change = change(1L, "CATALOG", "ml1.cat1");
+    // The cursor must NOT advance past a batch that any listener failed to apply, so the same batch
+    // is re-fetched from id 0 on every cycle until the failing listener recovers.
     when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of(change));
-    when(mapper.selectEntityChanges(1L, 500)).thenReturn(List.of());
 
     List<EntityChangeRecord> received = new ArrayList<>();
 
@@ -108,7 +110,85 @@ public class TestEntityChangeLogPoller {
       poller.pollChanges();
     }
 
+    // Healthy listener is never blocked by the failing one; because the cursor stays put, the batch
+    // is re-dispatched on both cycles.
+    Assertions.assertEquals(List.of(change, change), received);
+  }
+
+  @Test
+  void testCursorAdvancesOnceFailingListenerRecovers() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    EntityChangeRecord change = change(1L, "CATALOG", "ml1.cat1");
+    when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of(change));
+    when(mapper.selectEntityChanges(1L, 500)).thenReturn(List.of());
+
+    List<EntityChangeRecord> received = new ArrayList<>();
+    AtomicBoolean firstCall = new AtomicBoolean(true);
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      sessionUtils
+          .when(() -> SessionUtils.getWithoutCommit(any(), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<Object, Object> func = invocation.getArgument(1);
+                return func.apply(mapper);
+              });
+
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      poller.registerListener(
+          changes -> {
+            if (firstCall.getAndSet(false)) {
+              throw new RuntimeException("transient listener failure");
+            }
+            received.addAll(changes);
+          });
+
+      // Cycle 1 fails -> cursor stays at 0. Cycle 2 succeeds -> cursor advances to 1. Cycle 3 then
+      // fetches from the advanced cursor and finds nothing.
+      poller.pollChanges();
+      poller.pollChanges();
+      poller.pollChanges();
+    }
+
     Assertions.assertEquals(List.of(change), received);
+    // Proves the cursor advanced to 1 after recovery (cycle 3 queried from id 1).
+    verify(mapper).selectEntityChanges(1L, 500);
+  }
+
+  @Test
+  void testDetectsLateCommittedRowAsMissedGap() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    EntityChangeRecord seen = change(2L, "CATALOG", "ml1.cat2");
+    EntityChangeRecord late = change(1L, "CATALOG", "ml1.cat1");
+
+    // Cycle 1: only id=2 is visible; id=1 was assigned but not yet committed, leaving a gap at 1.
+    when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of(seen));
+    when(mapper.selectEntityChanges(2L, 500)).thenReturn(List.of());
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      sessionUtils
+          .when(() -> SessionUtils.getWithoutCommit(any(), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<Object, Object> func = invocation.getArgument(1);
+                return func.apply(mapper);
+              });
+
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      poller.registerListener(records -> {});
+
+      poller.pollChanges();
+      // The skipped id is tracked as a candidate missed row.
+      Assertions.assertTrue(poller.pendingGapIds().contains(1L));
+
+      // id=1 now commits late, below the already-advanced cursor (id=2). A non-overlapping
+      // id>cursor cursor can never re-read it, so the poller surfaces it as a missed row and clears
+      // the candidate.
+      when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of(late, seen));
+      poller.pollChanges();
+
+      Assertions.assertFalse(poller.pendingGapIds().contains(1L));
+    }
   }
 
   @Test
