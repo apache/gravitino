@@ -21,12 +21,14 @@ package org.apache.iceberg.memory;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
-import org.apache.iceberg.RegisterTableOverwrite;
+import org.apache.iceberg.MetastoreRegisterTableUtils;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 
 public class MemoryCatalogWithMetadataLocationSupport extends InMemoryCatalog
@@ -52,12 +54,34 @@ public class MemoryCatalogWithMetadataLocationSupport extends InMemoryCatalog
   @Override
   public Table registerTable(
       TableIdentifier identifier, String metadataFileLocation, boolean overwrite) {
-    return RegisterTableOverwrite.registerTable(this, identifier, metadataFileLocation, overwrite);
+    return MetastoreRegisterTableUtils.registerTable(
+        this, identifier, metadataFileLocation, overwrite, this::overwriteMetadataLocation);
   }
 
   @Override
   public String metadataLocation(TableIdentifier tableIdentifier) {
     return tableStore.get(tableIdentifier);
+  }
+
+  private void overwriteMetadataLocation(
+      TableIdentifier tableIdentifier,
+      String expectedMetadataLocation,
+      String newMetadataLocation) {
+    tableStore.compute(
+        tableIdentifier,
+        (ignored, existingLocation) -> {
+          if (!Objects.equals(existingLocation, expectedMetadataLocation)) {
+            if (existingLocation == null) {
+              throw new CommitFailedException("Table does not exist: %s", tableIdentifier);
+            }
+
+            throw new CommitFailedException(
+                "Cannot overwrite table %s metadata location from %s to %s because it has been "
+                    + "concurrently modified to %s",
+                tableIdentifier, expectedMetadataLocation, newMetadataLocation, existingLocation);
+          }
+          return newMetadataLocation;
+        });
   }
 
   private void loadFields() {

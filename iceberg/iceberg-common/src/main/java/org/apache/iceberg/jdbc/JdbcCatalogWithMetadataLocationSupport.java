@@ -20,12 +20,14 @@
 package org.apache.iceberg.jdbc;
 
 import com.google.common.base.Preconditions;
+import java.sql.SQLException;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
-import org.apache.iceberg.RegisterTableOverwrite;
+import org.apache.iceberg.MetastoreRegisterTableUtils;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
 
 // Use Iceberg package to reuse JdbcUtil related classes.
@@ -82,7 +84,34 @@ public class JdbcCatalogWithMetadataLocationSupport extends JdbcCatalog
   @Override
   public Table registerTable(
       TableIdentifier identifier, String metadataFileLocation, boolean overwrite) {
-    return RegisterTableOverwrite.registerTable(this, identifier, metadataFileLocation, overwrite);
+    return MetastoreRegisterTableUtils.registerTable(
+        this, identifier, metadataFileLocation, overwrite, this::overwriteMetadataLocation);
+  }
+
+  private void overwriteMetadataLocation(
+      TableIdentifier tableIdentifier,
+      String expectedMetadataLocation,
+      String newMetadataLocation) {
+    try {
+      int updatedRecords =
+          JdbcUtil.updateTable(
+              jdbcSchemaVersion,
+              jdbcConnections,
+              jdbcCatalogName,
+              tableIdentifier,
+              newMetadataLocation,
+              expectedMetadataLocation);
+
+      if (updatedRecords != 1) {
+        throw new CommitFailedException(
+            "Failed to update table %s from catalog %s", tableIdentifier, jdbcCatalogName);
+      }
+    } catch (SQLException | InterruptedException e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+      throw new UncheckedSQLException(e, "Failed to update table %s", tableIdentifier);
+    }
   }
 
   private void loadFields() {

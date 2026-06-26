@@ -21,15 +21,27 @@ package org.apache.iceberg.hive;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.iceberg.BaseMetastoreTableOperations;
 import org.apache.iceberg.ClientPool;
-import org.apache.iceberg.RegisterTableOverwrite;
+import org.apache.iceberg.MetastoreRegisterTableUtils;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.CommitFailedException;
+import org.apache.iceberg.exceptions.CommitStateUnknownException;
+import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.hadoop.ConfigProperties;
 import org.apache.thrift.TException;
 
 public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
@@ -54,7 +66,8 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
   @Override
   public Table registerTable(
       TableIdentifier identifier, String metadataFileLocation, boolean overwrite) {
-    return RegisterTableOverwrite.registerTable(this, identifier, metadataFileLocation, overwrite);
+    return MetastoreRegisterTableUtils.registerTable(
+        this, identifier, metadataFileLocation, overwrite, this::overwriteMetadataLocation);
   }
 
   @Override
@@ -75,6 +88,114 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
     } catch (Exception e) {
       return null;
     }
+  }
+
+  private void overwriteMetadataLocation(
+      TableIdentifier tableIdentifier,
+      String expectedMetadataLocation,
+      String newMetadataLocation) {
+    HiveTableOperations ops = (HiveTableOperations) newTableOps(tableIdentifier);
+    HiveOperationsBase hiveOps = ops;
+    Configuration conf = getConf();
+
+    TableMetadata base = ops.current();
+    TableMetadata targetMetadata =
+        TableMetadataParser.read(ops.io().newInputFile(newMetadataLocation));
+
+    boolean hiveEngineEnabled = hiveEngineEnabled(targetMetadata, conf);
+    boolean keepHiveStats = conf.getBoolean(ConfigProperties.KEEP_HIVE_STATS, false);
+
+    Set<String> removedProps =
+        base.properties().keySet().stream()
+            .filter(key -> !targetMetadata.properties().containsKey(key))
+            .collect(Collectors.toSet());
+
+    Preconditions.checkArgument(
+        !removedProps.contains(TableProperties.ENCRYPTION_TABLE_KEY),
+        "Cannot remove key ID from an encrypted table");
+    Preconditions.checkArgument(
+        Objects.equals(
+            base.properties().get(TableProperties.ENCRYPTION_TABLE_KEY),
+            targetMetadata.properties().get(TableProperties.ENCRYPTION_TABLE_KEY)),
+        "Cannot remove key ID of an encrypted table");
+
+    HiveLock lock = ops.lockObject(base);
+    try {
+      lock.lock();
+
+      org.apache.hadoop.hive.metastore.api.Table tbl = hiveOps.loadHmsTable();
+      if (tbl == null) {
+        throw new NoSuchTableException("Table does not exist: %s", tableIdentifier);
+      }
+
+      HiveOperationsBase.validateTableIsIceberg(tbl, tableIdentifier.toString());
+
+      tbl.setSd(
+          HiveOperationsBase.storageDescriptor(
+              targetMetadata.schema(), targetMetadata.location(), hiveEngineEnabled));
+
+      String hmsMetadataLocation =
+          tbl.getParameters().get(BaseMetastoreTableOperations.METADATA_LOCATION_PROP);
+      if (!Objects.equals(expectedMetadataLocation, hmsMetadataLocation)) {
+        throw new CommitFailedException(
+            "Cannot overwrite table %s: metadata location %s has changed from %s",
+            tableIdentifier, hmsMetadataLocation, expectedMetadataLocation);
+      }
+
+      HMSTablePropertyHelper.updateHmsTableForIcebergTable(
+          newMetadataLocation,
+          tbl,
+          targetMetadata,
+          removedProps,
+          hiveEngineEnabled,
+          hiveOps.maxHiveTablePropertySize(),
+          expectedMetadataLocation);
+
+      if (!keepHiveStats) {
+        tbl.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
+        tbl.getParameters().put(StatsSetupConst.DO_NOT_UPDATE_STATS, StatsSetupConst.TRUE);
+      }
+
+      lock.ensureActive();
+      hiveOps.persistTable(
+          tbl, true, hiveLockEnabled(base, conf) ? null : expectedMetadataLocation);
+      lock.ensureActive();
+    } catch (LockException e) {
+      throw new CommitStateUnknownException(
+          String.format(
+              "Failed to heartbeat for hive lock while overwriting table registration for %s",
+              tableIdentifier),
+          e);
+    } catch (TException e) {
+      throw new RuntimeException(
+          String.format(
+              "Metastore operation failed while overwriting table registration for %s",
+              tableIdentifier),
+          e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while overwriting table registration", e);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private static boolean hiveEngineEnabled(TableMetadata metadata, Configuration conf) {
+    if (metadata.properties().get(TableProperties.ENGINE_HIVE_ENABLED) != null) {
+      return metadata.propertyAsBoolean(TableProperties.ENGINE_HIVE_ENABLED, false);
+    }
+
+    return conf.getBoolean(
+        ConfigProperties.ENGINE_HIVE_ENABLED, TableProperties.ENGINE_HIVE_ENABLED_DEFAULT);
+  }
+
+  private static boolean hiveLockEnabled(TableMetadata metadata, Configuration conf) {
+    if (metadata != null && metadata.properties().get(TableProperties.HIVE_LOCK_ENABLED) != null) {
+      return metadata.propertyAsBoolean(TableProperties.HIVE_LOCK_ENABLED, false);
+    }
+
+    return conf.getBoolean(
+        ConfigProperties.LOCK_HIVE_ENABLED, TableProperties.HIVE_LOCK_ENABLED_DEFAULT);
   }
 
   private void loadFields() {
