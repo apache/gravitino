@@ -143,6 +143,11 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
     jdbcProperties.put(
         "iceberg.jdbc-catalog.catalog-name",
         IcebergPropertiesUtils.getCatalogBackendName(properties));
+    if (properties.containsKey(IcebergConstants.GRAVITINO_JDBC_SCHEMA_VERSION)) {
+      jdbcProperties.put(
+          "iceberg.jdbc-catalog.schema-version",
+          properties.get(IcebergConstants.GRAVITINO_JDBC_SCHEMA_VERSION));
+    }
 
     return jdbcProperties;
   }

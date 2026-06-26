@@ -138,7 +138,7 @@ create them in advance and set the database and schema in the JDBC URL.
 ### Step 3: Place the PostgreSQL Connector Jar
 
 You should **download** the PostgreSQL connector Jar for the corresponding version of PostgreSQL you use
-(You can download it from the [PostgreSQL-driver-jar](https://jdbc.postgresql.org/download/postgresql-42.7.0.jar)),
+(You can download it from the [PostgreSQL-driver-jar](https://jdbc.postgresql.org/download/postgresql-42.7.11.jar)),
 which is name like `postgresql-{version}.jar`.
 
 Then place it in the distribution package directory:
