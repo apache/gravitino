@@ -20,7 +20,6 @@ package org.apache.gravitino.storage.relational;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -30,6 +29,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -40,12 +40,13 @@ import org.slf4j.LoggerFactory;
  * Global poller for {@code entity_change_log}.
  *
  * <p>The poller owns the single high-water mark for a Gravitino server process and dispatches each
- * consumed batch to registered listeners. Listeners should only perform idempotent local cache
- * invalidation. The cursor is advanced only after every listener applies the batch; if any listener
- * fails, forward progress is paused and the same batch is re-dispatched on subsequent cycles until
- * all listeners succeed, so a transient listener failure cannot silently drop a batch's
- * invalidations. Because the process owns one shared cursor, a persistently failing listener blocks
- * progress for all listeners until the stuck rows age past the retention window (logged at ERROR).
+ * consumed batch to registered listeners. The cursor is advanced only after every listener applies
+ * the batch; if any listener fails, forward progress is paused and the same batch is retried only
+ * for listeners that have not applied it yet, so a transient listener failure cannot silently drop
+ * a batch's invalidations or re-deliver the batch to listeners that already succeeded. Because the
+ * process owns one shared cursor, a persistently failing listener blocks progress for all
+ * listeners; if the process restarts after the stuck rows age past the retention window, their
+ * invalidations can be lost permanently (logged at ERROR).
  */
 public class EntityChangeLogPoller implements AutoCloseable {
 
@@ -87,6 +88,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * {@code doPollChanges}' monitor.
    */
   private final TreeSet<Long> pendingGapIds = new TreeSet<>();
+
+  @Nullable private PausedBatch pausedBatch;
 
   private ScheduledExecutorService scheduler;
   private volatile long entityPollHighWaterId = 0;
@@ -203,6 +206,13 @@ public class EntityChangeLogPoller implements AutoCloseable {
   }
 
   private synchronized void doPollChanges() {
+    if (pausedBatch != null) {
+      retryPausedBatch();
+      detectFilledGaps();
+      pruneExpiredChangesIfNeeded();
+      return;
+    }
+
     List<EntityChangeRecord> changes = fetchEntityChanges();
 
     if (!changes.isEmpty()) {
@@ -216,34 +226,24 @@ public class EntityChangeLogPoller implements AutoCloseable {
         }
       }
 
-      List<EntityChangeRecord> dispatchedChanges = Collections.unmodifiableList(changes);
-      boolean allListenersSucceeded = true;
-      for (EntityChangeLogListener listener : listeners) {
-        try {
-          listener.onEntityChange(dispatchedChanges);
-        } catch (Exception e) {
-          allListenersSucceeded = false;
-          LOG.warn("Entity change listener {} failed", listener.getClass().getName(), e);
-        }
-      }
+      List<EntityChangeRecord> dispatchedChanges = List.copyOf(changes);
+      Set<EntityChangeLogListener> failedListeners = dispatchChanges(dispatchedChanges, null);
 
       // Only advance the cursor when every listener applied the batch. A listener failure must not
-      // drop the batch's invalidations: keeping the cursor in place re-dispatches the same batch on
-      // the next cycle until all listeners succeed. Listeners are idempotent, so re-dispatching to
-      // an already-applied listener is harmless.
-      if (allListenersSucceeded) {
+      // drop the batch's invalidations: keeping the cursor in place retries failed listeners with
+      // this same batch on the next cycle until all listeners have applied it.
+      if (failedListeners.isEmpty()) {
         entityPollHighWaterId = maxSeenId;
         recordNewGaps(previousCursor, maxSeenId, receivedIds);
       } else {
+        pausedBatch =
+            new PausedBatch(
+                dispatchedChanges, previousCursor, maxSeenId, receivedIds, failedListeners);
         // Forward progress is paused until every listener applies the batch; the same batch is
-        // re-dispatched every cycle. If this persists, the stuck rows will eventually be pruned by
-        // retention cleanup and their invalidations lost permanently, leaving caches to serve stale
-        // data. Surface at ERROR so operators can act.
-        LOG.error(
-            "Entity change cursor is paused at id {} because at least one listener failed to apply "
-                + "the current batch; invalidations will be lost if this is not resolved before the "
-                + "stuck rows age past the retention window",
-            entityPollHighWaterId);
+        // retried for failed listeners every cycle. If this persists and the process restarts after
+        // retention cleanup prunes the stuck rows, their invalidations are lost permanently.
+        // Surface at ERROR so operators can act.
+        logPausedCursor();
       }
     }
 
@@ -259,12 +259,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * Observability only; does not affect dispatch or the cursor.
    */
   private void recordNewGaps(long previousCursor, long maxSeenId, Set<Long> receivedIds) {
-    for (long id = previousCursor + 1; id <= maxSeenId; id++) {
-      if (id > previousCursor + MAX_GAP_WIDTH && pendingGapIds.isEmpty()) {
-        // The batch's id span is far wider than a plausible concurrent-commit gap and we have no
-        // gaps to confirm; treat the bulk as rolled-back ids rather than scanning the whole span.
-        break;
-      }
+    long trackedUpperBound = Math.min(maxSeenId, previousCursor + MAX_GAP_WIDTH);
+    for (long id = previousCursor + 1; id <= trackedUpperBound; id++) {
       if (!receivedIds.contains(id)) {
         pendingGapIds.add(id);
       }
@@ -280,6 +276,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * permanently skipped — a missed cache invalidation. Purely diagnostic; it re-reads from below
    * the lowest pending gap and never dispatches the rows. Stale gaps (far below the cursor, never
    * committed) are pruned so the lookback stays cheap.
+   *
+   * <p>Limitation: because this scans from the oldest pending gap with a bounded page size, one old
+   * unfilled gap can delay detection of later filled gaps until the old candidate becomes stale.
    */
   private void detectFilledGaps() {
     if (pendingGapIds.isEmpty()) {
@@ -362,6 +361,76 @@ public class EntityChangeLogPoller implements AutoCloseable {
 
   private static long getOrDefault(Long value) {
     return value == null ? 0L : value;
+  }
+
+  private void retryPausedBatch() {
+    PausedBatch currentPausedBatch = pausedBatch;
+    if (currentPausedBatch == null) {
+      return;
+    }
+
+    Set<EntityChangeLogListener> failedListeners =
+        dispatchChanges(currentPausedBatch.changes, currentPausedBatch.pendingListeners);
+    if (failedListeners.isEmpty()) {
+      entityPollHighWaterId = currentPausedBatch.maxSeenId;
+      recordNewGaps(
+          currentPausedBatch.previousCursor,
+          currentPausedBatch.maxSeenId,
+          currentPausedBatch.receivedIds);
+      pausedBatch = null;
+    } else {
+      currentPausedBatch.pendingListeners = failedListeners;
+      logPausedCursor();
+    }
+  }
+
+  private Set<EntityChangeLogListener> dispatchChanges(
+      List<EntityChangeRecord> dispatchedChanges,
+      @Nullable Set<EntityChangeLogListener> pendingListenersOnly) {
+    Set<EntityChangeLogListener> failedListeners = new HashSet<>();
+    boolean retryOnlyPendingListeners = pendingListenersOnly != null;
+    for (EntityChangeLogListener listener : listeners) {
+      if (retryOnlyPendingListeners && !pendingListenersOnly.contains(listener)) {
+        continue;
+      }
+
+      try {
+        listener.onEntityChange(dispatchedChanges);
+      } catch (Exception e) {
+        failedListeners.add(listener);
+        LOG.warn("Entity change listener {} failed", listener.getClass().getName(), e);
+      }
+    }
+    return failedListeners;
+  }
+
+  private void logPausedCursor() {
+    LOG.error(
+        "Entity change cursor is paused at id {} because at least one listener failed to apply "
+            + "the current batch; invalidations may be lost on restart if this is not resolved "
+            + "before the stuck rows age past the retention window",
+        entityPollHighWaterId);
+  }
+
+  private static class PausedBatch {
+    private final List<EntityChangeRecord> changes;
+    private final long previousCursor;
+    private final long maxSeenId;
+    private final Set<Long> receivedIds;
+    private Set<EntityChangeLogListener> pendingListeners;
+
+    private PausedBatch(
+        List<EntityChangeRecord> changes,
+        long previousCursor,
+        long maxSeenId,
+        Set<Long> receivedIds,
+        Set<EntityChangeLogListener> pendingListeners) {
+      this.changes = changes;
+      this.previousCursor = previousCursor;
+      this.maxSeenId = maxSeenId;
+      this.receivedIds = receivedIds;
+      this.pendingListeners = pendingListeners;
+    }
   }
 
   @VisibleForTesting

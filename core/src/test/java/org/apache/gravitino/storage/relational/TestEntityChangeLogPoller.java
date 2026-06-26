@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -81,14 +82,18 @@ public class TestEntityChangeLogPoller {
   }
 
   @Test
-  void testListenerFailureDoesNotBlockOthersAndPausesCursorForRetry() {
+  void testListenerFailureDoesNotRedispatchAlreadySucceededListeners() {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
     EntityChangeRecord change = change(1L, "CATALOG", "ml1.cat1");
     // The cursor must NOT advance past a batch that any listener failed to apply, so the same batch
-    // is re-fetched from id 0 on every cycle until the failing listener recovers.
+    // is paused until the failing listener recovers. Listeners that already applied the paused
+    // batch must not receive that same batch again.
     when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of(change));
+    when(mapper.selectEntityChanges(1L, 500)).thenReturn(List.of());
 
     List<EntityChangeRecord> received = new ArrayList<>();
+    AtomicInteger failingListenerCalls = new AtomicInteger();
+    AtomicBoolean firstCall = new AtomicBoolean(true);
 
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       sessionUtils
@@ -102,17 +107,23 @@ public class TestEntityChangeLogPoller {
       EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
       poller.registerListener(
           changes -> {
-            throw new RuntimeException("listener failed");
+            failingListenerCalls.incrementAndGet();
+            if (firstCall.getAndSet(false)) {
+              throw new RuntimeException("listener failed");
+            }
           });
       poller.registerListener(received::addAll);
 
       poller.pollChanges();
       poller.pollChanges();
+      poller.pollChanges();
     }
 
-    // Healthy listener is never blocked by the failing one; because the cursor stays put, the batch
-    // is re-dispatched on both cycles.
-    Assertions.assertEquals(List.of(change, change), received);
+    // Healthy listener is not blocked by the failing one, but it is not re-dispatched the same
+    // paused batch after it has already succeeded.
+    Assertions.assertEquals(2, failingListenerCalls.get());
+    Assertions.assertEquals(List.of(change), received);
+    verify(mapper).selectEntityChanges(1L, 500);
   }
 
   @Test
@@ -188,6 +199,34 @@ public class TestEntityChangeLogPoller {
       poller.pollChanges();
 
       Assertions.assertFalse(poller.pendingGapIds().contains(1L));
+    }
+  }
+
+  @Test
+  void testTracksOnlyNarrowGapIds() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    EntityChangeRecord seen = change(1_000L, "CATALOG", "ml1.cat1000");
+    when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of(seen));
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      sessionUtils
+          .when(() -> SessionUtils.getWithoutCommit(any(), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<Object, Object> func = invocation.getArgument(1);
+                return func.apply(mapper);
+              });
+
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      poller.registerListener(records -> {});
+
+      poller.pollChanges();
+
+      Assertions.assertEquals(256, poller.pendingGapIds().size());
+      Assertions.assertTrue(poller.pendingGapIds().contains(1L));
+      Assertions.assertTrue(poller.pendingGapIds().contains(256L));
+      Assertions.assertFalse(poller.pendingGapIds().contains(257L));
+      Assertions.assertFalse(poller.pendingGapIds().contains(999L));
     }
   }
 
