@@ -47,6 +47,7 @@ function BasicLogin() {
     control,
     handleSubmit,
     reset,
+    setError,
     formState: { errors }
   } = useForm({
     defaultValues: Object.assign({}, defaultValues),
@@ -56,15 +57,24 @@ function BasicLogin() {
 
   useEffect(() => {
     if (store.intervalId) {
-      clearIntervalId()
+      dispatch(clearIntervalId())
     }
-  }, [store.intervalId])
+  }, [store.intervalId, dispatch])
 
   const onSubmit = async data => {
-    await dispatch(basicLoginAction({ username: data.username, password: data.password, router }))
-    await dispatch(setIntervalIdAction())
+    try {
+      //Using .unwrap() to catch failed login errors
+      await dispatch(basicLoginAction({ username: data.username, password: data.password, router })).unwrap()
+      await dispatch(setIntervalIdAction())
 
-    reset({ ...data })
+      reset({ ...data })
+    } catch (error) {
+      // Insert UI error here
+      setError('password', {
+        type: 'manual',
+        message: 'Invalid username or password'
+      })
+    }
   }
 
   const onError = errors => {

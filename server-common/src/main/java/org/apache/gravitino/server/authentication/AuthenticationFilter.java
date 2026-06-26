@@ -49,7 +49,7 @@ public class AuthenticationFilter implements Filter {
   // Skip HTTP challenge for Web UI login requests to avoid the browser's native Basic auth popup.
   private boolean isWebLoginRequest(ServletRequest request) {
     return request instanceof HttpServletRequest
-      && "true".equalsIgnoreCase(((HttpServletRequest) request).getHeader(WEB_LOGIN_HEADER));
+        && "true".equalsIgnoreCase(((HttpServletRequest) request).getHeader(WEB_LOGIN_HEADER));
   }
 
   /**

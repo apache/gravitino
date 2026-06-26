@@ -20,6 +20,7 @@
 'use client'
 
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { Roboto } from 'next/font/google'
 import { Box, Card, Grid, CardContent, Typography } from '@mui/material'
 import clsx from 'clsx'
@@ -35,7 +36,16 @@ import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const LoginPage = () => {
+  const router = useRouter()
   const [providerType, setProviderType] = useState(null)
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken')
+
+    if (token) {
+      router.replace('/metalakes')
+    }
+  }, [router])
 
   useEffect(() => {
     const detectProviderType = async () => {

@@ -217,6 +217,12 @@ const transform = {
     const errorMessageMode = originConfig?.requestOptions?.errorMessageMode || 'none'
     const msg = response?.data?.error?.message ?? response?.data?.message ?? ''
     const err = error?.toString?.() ?? ''
+
+    const isFailedWebUILoginRequest =
+      response?.status === 401 &&
+      originConfig?.url === '/api/version' &&
+      originConfig?.headers?.['X-Gravitino-Web-Login'] === 'true'
+
     let errMessage = ''
 
     if (axios.isCancel(error)) {
@@ -224,9 +230,10 @@ const transform = {
     }
 
     try {
-      if (code === 'ECONNABORTED' && message.indexOf('timeout') !== -1) {
+      if (code === 'ECONNABORTED' && message?.indexOf('timeout') !== -1) {
         errMessage = 'The interface request timed out, please refresh the page and try again!'
       }
+
       if (err?.includes('Network Error')) {
         errMessage = 'Unable to connect to Gravitino. Please check if Gravitino is running.'
       }
@@ -244,9 +251,14 @@ const transform = {
       throw new Error(error)
     }
 
-    checkStatus(error?.response?.status, msg, errorMessageMode)
+    if (isFailedWebUILoginRequest) {
+      checkStatus(response?.status, msg, errorMessageMode)
 
-    if (response?.status === 401 && !originConfig._retry && response.config.url !== githubApis.GET) {
+      return Promise.reject(error)
+    }
+
+    // Normal 401 Redirect Block
+    if (response?.status === 401 && !originConfig?._retry && response?.config?.url !== githubApis.GET) {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('authParams')
 
@@ -264,11 +276,16 @@ const transform = {
       } else {
         window.location.href = '/login'
       }
+
+      return Promise.reject(error)
     }
 
+    checkStatus(response?.status, msg, errorMessageMode)
+
     const retryRequest = new AxiosRetry()
-    const { isOpenRetry } = originConfig.requestOptions.retryRequest
-    originConfig.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
+    const { isOpenRetry } = originConfig?.requestOptions?.retryRequest || {}
+
+    originConfig?.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
 
     return Promise.reject(error)
   }

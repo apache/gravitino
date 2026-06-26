@@ -99,11 +99,14 @@ export const basicLoginAction = createAsyncThunk(
     const [err, res] = await to(basicLoginApi(basicToken))
 
     if (err || !res) {
-      toast.error(err.response?.data?.err || err.message, {
-        id: `global_error_message_status_${err.response?.status}`
+      const message =
+        err?.response?.status === 401 ? 'Invalid username or password' : err?.response?.data?.err || err?.message
+
+      toast.error(message, {
+        id: `global_error_message_status_${err?.response?.status}`
       })
 
-      throw new Error(err)
+      throw new Error(message)
     }
 
     localStorage.setItem('accessToken', basicToken)
@@ -172,10 +175,10 @@ export const authSlice = createSlice({
   name: 'auth',
   initialState: {
     oauthUrl: null,
-    authType: null,
-    authToken: null,
-    authParams: null,
-    expiredIn: null,
+    authType: typeof window !== 'undefined' ? localStorage.getItem('authType') : null,
+    authToken: typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null,
+    authParams: typeof window !== 'undefined' ? localStorage.getItem('authParams') : null,
+    expiredIn: typeof window !== 'undefined' ? localStorage.getItem('expiredIn') : null,
     intervalId: null
   },
   reducers: {
@@ -200,6 +203,8 @@ export const authSlice = createSlice({
   },
   extraReducers: builder => {
     builder.addCase(getAuthConfigs.fulfilled, (state, action) => {
+      localStorage.setItem('authType', action.payload.authType)
+
       state.oauthUrl = action.payload.oauthUrl
       state.authType = action.payload.authType
     })
