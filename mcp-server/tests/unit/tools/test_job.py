@@ -101,19 +101,17 @@ class TestJobTool(unittest.TestCase):
 
         asyncio.run(_test_cancel_job(self.mcp))
 
-    def test_write_job_template_tools_disabled_by_default(self):
-        async def _test_write_job_template_tools_disabled_by_default(
+    def test_write_job_template_tools_enabled_by_default(self):
+        async def _test_write_job_template_tools_enabled_by_default(
             mcp_server,
         ):
             tool_names = {tool.name for tool in await mcp_server.list_tools()}
 
             self.assertIn("list_of_job_templates", tool_names)
-            self.assertNotIn("register_job_template", tool_names)
-            self.assertNotIn("delete_job_template", tool_names)
+            self.assertIn("register_job_template", tool_names)
+            self.assertIn("delete_job_template", tool_names)
 
-        asyncio.run(
-            _test_write_job_template_tools_disabled_by_default(self.mcp)
-        )
+        asyncio.run(_test_write_job_template_tools_enabled_by_default(self.mcp))
 
     def test_register_job_template(self):
         async def _test_register_job_template(mcp_server):

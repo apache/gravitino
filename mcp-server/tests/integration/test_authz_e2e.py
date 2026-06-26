@@ -35,6 +35,7 @@ import asyncio
 import json
 import os
 import time
+import uuid
 
 import pytest
 from fastmcp import Client
@@ -46,6 +47,18 @@ ADMIN = "admin"
 BOB = "bob"
 CATALOG_ALLOWED = "cat_allowed"
 CATALOG_DENIED = "cat_denied"
+
+# Tokens that identify an authorization denial in an error message, as opposed
+# to an unrelated failure (transport error, missing tool, server crash, ...).
+_DENIAL_TOKENS = (
+    "forbidden",
+    "unauthorized",
+    "not authorized",
+    "permission",
+    "denied",
+    "access",
+    "403",
+)
 
 
 def _client_for(principal: str, mcp_url: str) -> Client:
@@ -177,6 +190,272 @@ def test_audit_trail_attribution(gravitino_fixture, integration_env):
         for r in records
         if r.get("principal") == BOB
         and r.get("tool") == "create_tag"
+        and r.get("outcome") == "deny"
+    ]
+
+    assert admin_allows, "expected an allow record attributed to admin"
+    assert bob_denies, "expected a deny record attributed to bob"
+
+
+def _assert_denial(exc: Exception) -> None:
+    message = str(exc).lower()
+    assert any(
+        token in message for token in _DENIAL_TOKENS
+    ), f"expected an authorization denial, got: {exc!r}"
+
+
+# ---------------------------------------------------------------------------
+# Job-template write authorization (register_job_template), added in #11804.
+# This is a metalake-level write (METALAKE::OWNER || METALAKE::REGISTER_JOB_
+# TEMPLATE), so it needs no pre-existing entity: admin (metalake owner) is
+# allowed and bob is denied.
+# ---------------------------------------------------------------------------
+
+
+def _shell_job_template(name: str) -> dict:
+    return {"jobType": "shell", "name": name, "executable": "/bin/echo"}
+
+
+async def _register_job_template(principal: str, mcp_url: str, template: dict):
+    async with _client_for(principal, mcp_url) as client:
+        return await client.call_tool(
+            "register_job_template", {"job_template": template}
+        )
+
+
+def test_register_job_template_allowed_for_admin(
+    gravitino_fixture, integration_env
+):
+    """Admin (metalake owner) can register a job template through MCP."""
+    mcp_url = integration_env["mcp_url"]
+    template = _shell_job_template(f"it_job_allow_{uuid.uuid4().hex[:8]}")
+
+    # Succeeds when it does not raise; register_job_template returns no payload.
+    asyncio.run(_register_job_template(ADMIN, mcp_url, template))
+
+
+def test_register_job_template_denied_for_readonly_principal(
+    gravitino_fixture, integration_env
+):
+    """Bob (no register-job-template grant) is denied through MCP."""
+    mcp_url = integration_env["mcp_url"]
+    template = _shell_job_template(f"it_job_deny_{uuid.uuid4().hex[:8]}")
+
+    with pytest.raises(Exception) as exc_info:  # noqa: B017
+        asyncio.run(_register_job_template(BOB, mcp_url, template))
+
+    _assert_denial(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# Model-version-alias write authorization (update_model_version_aliases), added
+# in #11804. The fixture provisions an admin-owned model version under
+# cat_allowed; admin can alter its aliases while bob (only USE_CATALOG, no
+# USE_SCHEMA) is denied.
+# ---------------------------------------------------------------------------
+
+
+async def _update_model_version_aliases(
+    principal: str,
+    mcp_url: str,
+    fixture,
+    aliases_to_add: list,
+    aliases_to_remove: list,
+):
+    async with _client_for(principal, mcp_url) as client:
+        return await client.call_tool(
+            "update_model_version_aliases",
+            {
+                "catalog_name": fixture.catalog_allowed,
+                "schema_name": fixture.schema_name,
+                "model_name": fixture.model_name,
+                "version": fixture.model_version,
+                "aliases_to_add": aliases_to_add,
+                "aliases_to_remove": aliases_to_remove,
+            },
+        )
+
+
+def test_update_model_version_aliases_allowed_for_admin(
+    gravitino_fixture, integration_env
+):
+    """Admin can update aliases on the model version through MCP."""
+    mcp_url = integration_env["mcp_url"]
+    alias = f"it_alias_{uuid.uuid4().hex[:8]}"
+
+    result = asyncio.run(
+        _update_model_version_aliases(
+            ADMIN, mcp_url, gravitino_fixture, [alias], []
+        )
+    )
+
+    payload = json.loads(result.content[0].text)
+    assert alias in payload.get("aliases", [])
+
+
+def test_update_model_version_aliases_denied_for_readonly_principal(
+    gravitino_fixture, integration_env
+):
+    """Bob (no USE_SCHEMA / model ownership) is denied through MCP."""
+    mcp_url = integration_env["mcp_url"]
+    alias = f"it_alias_deny_{uuid.uuid4().hex[:8]}"
+
+    with pytest.raises(Exception) as exc_info:  # noqa: B017
+        asyncio.run(
+            _update_model_version_aliases(
+                BOB, mcp_url, gravitino_fixture, [alias], []
+            )
+        )
+
+    _assert_denial(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# Statistic write authorization (update_statistics), added in #11804.
+# Statistics only apply to TABLE objects, and this lightweight harness has no
+# relational catalog to host a table, so the allowed path is not exercised
+# here. The denial path is still robust: the @AuthorizationExpression is
+# evaluated before the resource method resolves the object, so bob (USE_CATALOG
+# but no USE_SCHEMA / table modify) is denied with 403 regardless of whether
+# the table exists.
+# ---------------------------------------------------------------------------
+
+
+async def _update_statistics(principal: str, mcp_url: str, table_fullname: str):
+    async with _client_for(principal, mcp_url) as client:
+        return await client.call_tool(
+            "update_statistics",
+            {
+                "metadata_type": "table",
+                "metadata_fullname": table_fullname,
+                "statistics": {"custom-key1": "value1"},
+            },
+        )
+
+
+def test_update_statistics_denied_for_readonly_principal(
+    gravitino_fixture, integration_env
+):
+    """Bob is denied when updating table statistics through MCP."""
+    mcp_url = integration_env["mcp_url"]
+    table_fullname = (
+        f"{gravitino_fixture.catalog_allowed}"
+        f".{gravitino_fixture.schema_name}.authz_table"
+    )
+
+    with pytest.raises(Exception) as exc_info:  # noqa: B017
+        asyncio.run(_update_statistics(BOB, mcp_url, table_fullname))
+
+    _assert_denial(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# Write-tool authorization (create_policy), covering the write tools added in
+# #11804. The policy write path is metalake-level and needs no pre-existing
+# entity, so it exercises authorization cleanly: admin (metalake owner) is
+# allowed, while bob (granted only USE_CATALOG on one catalog) is denied.
+# ---------------------------------------------------------------------------
+
+
+def _unique_policy_name(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+
+def _policy_content() -> dict:
+    return {
+        "customRules": {"rule1": 1},
+        "properties": {"key1": "value1"},
+        "supportedObjectTypes": ["table"],
+    }
+
+
+async def _create_policy(principal: str, mcp_url: str, name: str):
+    async with _client_for(principal, mcp_url) as client:
+        return await client.call_tool(
+            "create_policy",
+            {
+                "name": name,
+                "policy_type": "custom",
+                "comment": "authz integration test policy",
+                "content": _policy_content(),
+            },
+        )
+
+
+def _read_audit_records(audit_log: str) -> list:
+    records = []
+    with open(audit_log, "r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    return records
+
+
+def test_create_policy_allowed_for_admin(gravitino_fixture, integration_env):
+    """Admin (metalake owner) can create a policy through MCP."""
+    mcp_url = integration_env["mcp_url"]
+    name = _unique_policy_name("it_policy_allow")
+
+    result = asyncio.run(_create_policy(ADMIN, mcp_url, name))
+
+    payload = json.loads(result.content[0].text)
+    assert payload["name"] == name
+
+
+def test_create_policy_denied_for_readonly_principal(
+    gravitino_fixture, integration_env
+):
+    """Bob (no policy-write grant) is denied when creating a policy via MCP."""
+    mcp_url = integration_env["mcp_url"]
+    name = _unique_policy_name("it_policy_deny")
+
+    with pytest.raises(Exception) as exc_info:  # noqa: B017
+        asyncio.run(_create_policy(BOB, mcp_url, name))
+
+    message = str(exc_info.value).lower()
+    assert any(
+        token in message for token in _DENIAL_TOKENS
+    ), f"expected an authorization denial, got: {exc_info.value!r}"
+
+
+def test_create_policy_audit_attribution(gravitino_fixture, integration_env):
+    """The allowed and denied policy writes are attributed to the right user."""
+    audit_log = os.environ.get("MCP_AUDIT_LOG")
+    if not audit_log or not os.path.exists(audit_log):
+        pytest.skip("MCP_AUDIT_LOG not set or file missing")
+
+    mcp_url = integration_env["mcp_url"]
+
+    # One allowed write (admin) and one denied write (bob).
+    asyncio.run(_create_policy(ADMIN, mcp_url, _unique_policy_name("it_audit")))
+    try:
+        asyncio.run(
+            _create_policy(BOB, mcp_url, _unique_policy_name("it_audit_deny"))
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        # Expected denial for an unauthorized principal.
+        pass
+
+    # Give the server a moment to flush the audit handler.
+    time.sleep(1.0)
+
+    records = _read_audit_records(audit_log)
+    admin_allows = [
+        r
+        for r in records
+        if r.get("principal") == ADMIN
+        and r.get("tool") == "create_policy"
+        and r.get("outcome") == "allow"
+    ]
+    bob_denies = [
+        r
+        for r in records
+        if r.get("principal") == BOB
+        and r.get("tool") == "create_policy"
         and r.get("outcome") == "deny"
     ]
 

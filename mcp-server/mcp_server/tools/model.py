@@ -232,7 +232,7 @@ def load_model_tools(mcp: FastMCP):
         )
 
     # pylint: disable=R0917
-    # Disable the update_model_version_aliases tool by default as it can be destructive.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"model"})
     async def update_model_version_aliases(
         ctx: Context,
@@ -292,8 +292,3 @@ def load_model_tools(mcp: FastMCP):
             aliases_to_add,
             aliases_to_remove,
         )
-
-    mcp.disable(
-        names={"update_model_version_aliases"},
-        components={"tool"},
-    )

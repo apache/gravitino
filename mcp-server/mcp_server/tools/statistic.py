@@ -19,11 +19,10 @@ from fastmcp import Context, FastMCP
 
 
 def load_statistic_tools(mcp: FastMCP):
-    # Disable the update_statistics tool by default as it is a write operation.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"statistic"})
     async def update_statistics(
         ctx: Context,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         statistics: dict,
@@ -36,7 +35,6 @@ def load_statistic_tools(mcp: FastMCP):
 
         Args:
             ctx (Context): The request context.
-            metalake_name (str): The name of the metalake.
             metadata_type (str): The type of metadata (e.g., table).
             metadata_fullname (str): The full name of the metadata object.
             statistics (dict): Dictionary mapping statistic name to its value.
@@ -55,14 +53,13 @@ def load_statistic_tools(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_statistic_operation().update_statistics(
-            metalake_name, metadata_type, metadata_fullname, statistics
+            metadata_type, metadata_fullname, statistics
         )
 
-    # Disable the drop_statistics tool by default as it can be destructive.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"statistic"})
     async def drop_statistics(
         ctx: Context,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         statistic_names: list,
@@ -74,7 +71,6 @@ def load_statistic_tools(mcp: FastMCP):
 
         Args:
             ctx (Context): The request context.
-            metalake_name (str): The name of the metalake.
             metadata_type (str): The type of metadata (e.g., table).
             metadata_fullname (str): The full name of the metadata object.
             statistic_names (list): List of statistic names to drop.
@@ -87,15 +83,14 @@ def load_statistic_tools(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_statistic_operation().drop_statistics(
-            metalake_name, metadata_type, metadata_fullname, statistic_names
+            metadata_type, metadata_fullname, statistic_names
         )
 
     # pylint: disable=R0917
-    # Disable the update_partition_statistics tool by default as it is a write operation.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"statistic"})
     async def update_partition_statistics(
         ctx: Context,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         partition_updates: list,
@@ -107,7 +102,6 @@ def load_statistic_tools(mcp: FastMCP):
 
         Args:
             ctx (Context): The request context.
-            metalake_name (str): The name of the metalake.
             metadata_type (str): The type of metadata, should be "table".
             metadata_fullname (str): The full name of the table, the format should be
                 "{catalog}.{schema}.{table}".
@@ -132,7 +126,6 @@ def load_statistic_tools(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return (
             await client.as_statistic_operation().update_partition_statistics(
-                metalake_name,
                 metadata_type,
                 metadata_fullname,
                 partition_updates,
@@ -140,11 +133,10 @@ def load_statistic_tools(mcp: FastMCP):
         )
 
     # pylint: disable=R0917
-    # Disable the drop_partition_statistics tool by default as it can be destructive.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"statistic"})
     async def drop_partition_statistics(
         ctx: Context,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         partition_drops: list,
@@ -156,7 +148,6 @@ def load_statistic_tools(mcp: FastMCP):
 
         Args:
             ctx (Context): The request context.
-            metalake_name (str): The name of the metalake.
             metadata_type (str): The type of metadata, should be "table".
             metadata_fullname (str): The full name of the table, the format should be
                 "{catalog}.{schema}.{table}".
@@ -175,7 +166,7 @@ def load_statistic_tools(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_statistic_operation().drop_partition_statistics(
-            metalake_name, metadata_type, metadata_fullname, partition_drops
+            metadata_type, metadata_fullname, partition_drops
         )
 
     @mcp.tool(tags={"statistic"})
@@ -304,13 +295,3 @@ def load_statistic_tools(mcp: FastMCP):
                 to_inclusive,
             )
         )
-
-    mcp.disable(
-        names={
-            "update_statistics",
-            "drop_statistics",
-            "update_partition_statistics",
-            "drop_partition_statistics",
-        },
-        components={"tool"},
-    )

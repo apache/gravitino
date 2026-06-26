@@ -64,7 +64,7 @@ class PolicyOperation(ABC):
         pass
 
     @abstractmethod
-    async def delete_policy(self, policy_name: str) -> None:
+    async def delete_policy(self, policy_name: str) -> str:
         """
         Delete a policy by its name.
 
@@ -72,7 +72,7 @@ class PolicyOperation(ABC):
             policy_name: Name of the policy to delete
 
         Returns:
-            None
+            str: JSON-formatted string indicating whether the policy was deleted
         """
         pass
 

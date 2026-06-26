@@ -286,51 +286,47 @@ class MockStatisticOperation(StatisticOperation):
 
     async def update_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         statistics: dict,
     ) -> str:
         return (
-            f"mock_statistics_updated: {metalake_name}, {metadata_type}, "
+            f"mock_statistics_updated: {metadata_type}, "
             f"{metadata_fullname}, {statistics}"
         )
 
     async def drop_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         statistic_names: list,
     ) -> str:
         return (
-            f"mock_statistics_dropped: {metalake_name}, {metadata_type}, "
+            f"mock_statistics_dropped: {metadata_type}, "
             f"{metadata_fullname}, {statistic_names}"
         )
 
     # pylint: disable=R0917
     async def update_partition_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         partition_updates: list,
     ) -> str:
         return (
-            f"mock_partition_statistics_updated: {metalake_name}, {metadata_type}, "
+            f"mock_partition_statistics_updated: {metadata_type}, "
             f"{metadata_fullname}, {partition_updates}"
         )
 
     # pylint: disable=R0917
     async def drop_partition_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         partition_drops: list,
     ) -> str:
         return (
-            f"mock_partition_statistics_dropped: {metalake_name}, {metadata_type}, "
+            f"mock_partition_statistics_dropped: {metadata_type}, "
             f"{metadata_fullname}, {partition_drops}"
         )
 

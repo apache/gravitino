@@ -71,17 +71,17 @@ class TestStatisticTool(unittest.TestCase):
 
         asyncio.run(_test_list_statistics_for_partition(self.mcp))
 
-    def test_write_statistic_tools_disabled_by_default(self):
-        async def _test_write_statistic_tools_disabled_by_default(mcp_server):
+    def test_write_statistic_tools_enabled_by_default(self):
+        async def _test_write_statistic_tools_enabled_by_default(mcp_server):
             tool_names = {tool.name for tool in await mcp_server.list_tools()}
 
             self.assertIn("list_statistics_for_metadata", tool_names)
-            self.assertNotIn("update_statistics", tool_names)
-            self.assertNotIn("drop_statistics", tool_names)
-            self.assertNotIn("update_partition_statistics", tool_names)
-            self.assertNotIn("drop_partition_statistics", tool_names)
+            self.assertIn("update_statistics", tool_names)
+            self.assertIn("drop_statistics", tool_names)
+            self.assertIn("update_partition_statistics", tool_names)
+            self.assertIn("drop_partition_statistics", tool_names)
 
-        asyncio.run(_test_write_statistic_tools_disabled_by_default(self.mcp))
+        asyncio.run(_test_write_statistic_tools_enabled_by_default(self.mcp))
 
     def test_update_statistics(self):
         async def _test_update_statistics(mcp_server):
@@ -91,15 +91,13 @@ class TestStatisticTool(unittest.TestCase):
                 result = await client.call_tool(
                     "update_statistics",
                     {
-                        "metalake_name": "mock_metalake",
                         "metadata_type": "table",
                         "metadata_fullname": "c.s.t",
                         "statistics": statistics,
                     },
                 )
                 self.assertEqual(
-                    f"mock_statistics_updated: mock_metalake, table, c.s.t, "
-                    f"{statistics}",
+                    f"mock_statistics_updated: table, c.s.t, {statistics}",
                     result.content[0].text,
                 )
 
@@ -113,14 +111,13 @@ class TestStatisticTool(unittest.TestCase):
                 result = await client.call_tool(
                     "drop_statistics",
                     {
-                        "metalake_name": "mock_metalake",
                         "metadata_type": "table",
                         "metadata_fullname": "c.s.t",
                         "statistic_names": names,
                     },
                 )
                 self.assertEqual(
-                    f"mock_statistics_dropped: mock_metalake, table, c.s.t, {names}",
+                    f"mock_statistics_dropped: table, c.s.t, {names}",
                     result.content[0].text,
                 )
 
@@ -138,15 +135,13 @@ class TestStatisticTool(unittest.TestCase):
                 result = await client.call_tool(
                     "update_partition_statistics",
                     {
-                        "metalake_name": "mock_metalake",
                         "metadata_type": "table",
                         "metadata_fullname": "c.s.t",
                         "partition_updates": updates,
                     },
                 )
                 self.assertEqual(
-                    f"mock_partition_statistics_updated: mock_metalake, table, "
-                    f"c.s.t, {updates}",
+                    f"mock_partition_statistics_updated: table, c.s.t, {updates}",
                     result.content[0].text,
                 )
 
@@ -162,15 +157,13 @@ class TestStatisticTool(unittest.TestCase):
                 result = await client.call_tool(
                     "drop_partition_statistics",
                     {
-                        "metalake_name": "mock_metalake",
                         "metadata_type": "table",
                         "metadata_fullname": "c.s.t",
                         "partition_drops": drops,
                     },
                 )
                 self.assertEqual(
-                    f"mock_partition_statistics_dropped: mock_metalake, table, "
-                    f"c.s.t, {drops}",
+                    f"mock_partition_statistics_dropped: table, c.s.t, {drops}",
                     result.content[0].text,
                 )
 

@@ -20,7 +20,7 @@ from fastmcp import Context, FastMCP
 
 def load_policy_tools(mcp: FastMCP):
     # pylint: disable=R0917
-    # Disable the create_policy tool by default as it is a write operation.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"policy"})
     async def create_policy(
         ctx: Context,
@@ -99,7 +99,7 @@ def load_policy_tools(mcp: FastMCP):
             name, policy_type, comment, enabled, content
         )
 
-    # Disable the alter_policy tool by default as it can be destructive.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"policy"})
     async def alter_policy(ctx: Context, name: str, updates: list) -> str:
         """
@@ -142,9 +142,9 @@ def load_policy_tools(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_policy_operation().alter_policy(name, updates)
 
-    # Disable the delete_policy tool by default as it can be destructive.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"policy"})
-    async def delete_policy(ctx: Context, name: str) -> None:
+    async def delete_policy(ctx: Context, name: str) -> str:
         """
         Delete a policy by its name.
 
@@ -154,7 +154,7 @@ def load_policy_tools(mcp: FastMCP):
             name (str): Name of the policy to delete.
 
         Returns:
-            None
+            str: A JSON string indicating whether the policy was deleted (true/false).
 
         Raises:
             Exception: If the deletion fails, an exception is raised with an error message.
@@ -534,8 +534,3 @@ def load_policy_tools(mcp: FastMCP):
         return await client.as_policy_operation().get_policy_for_metadata(
             metadata_full_name, metadata_type, policy_name
         )
-
-    mcp.disable(
-        names={"create_policy", "alter_policy", "delete_policy"},
-        components={"tool"},
-    )

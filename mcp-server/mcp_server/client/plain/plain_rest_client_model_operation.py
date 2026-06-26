@@ -16,7 +16,10 @@
 # under the License.
 
 from mcp_server.client import ModelOperation
-from mcp_server.client.plain.utils import encode_path_segment
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    extract_content_from_response,
+)
 
 
 class PlainRESTClientModelOperation(ModelOperation):
@@ -108,4 +111,4 @@ class PlainRESTClientModelOperation(ModelOperation):
                 ]
             },
         )
-        return response.json().get("modelVersion", {})
+        return extract_content_from_response(response, "modelVersion", {})

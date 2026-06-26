@@ -30,13 +30,12 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
 
     async def update_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         statistics: dict,
     ) -> None:
         response = await self.rest_client.put(
-            f"/api/metalakes/{encode_path_segment(metalake_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/objects/{encode_path_segment(metadata_type)}"
             f"/{encode_path_segment(metadata_fullname)}/statistics",
             json={"updates": statistics},
@@ -49,13 +48,12 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
 
     async def drop_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         statistic_names: list,
     ) -> str:
         response = await self.rest_client.post(
-            f"/api/metalakes/{encode_path_segment(metalake_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/objects/{encode_path_segment(metadata_type)}"
             f"/{encode_path_segment(metadata_fullname)}/statistics",
             json={"names": statistic_names},
@@ -65,13 +63,12 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
     # pylint: disable=R0917
     async def update_partition_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         partition_updates: list,
     ) -> None:
         response = await self.rest_client.put(
-            f"/api/metalakes/{encode_path_segment(metalake_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/objects/{encode_path_segment(metadata_type)}"
             f"/{encode_path_segment(metadata_fullname)}/statistics/partitions",
             json={"updates": partition_updates},
@@ -86,13 +83,12 @@ class PlainRESTClientStatisticOperation(StatisticOperation):
     # pylint: disable=R0917
     async def drop_partition_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         partition_drops: list,
     ) -> str:
         response = await self.rest_client.post(
-            f"/api/metalakes/{encode_path_segment(metalake_name)}"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/objects/{encode_path_segment(metadata_type)}"
             f"/{encode_path_segment(metadata_fullname)}/statistics/partitions",
             json={"drops": partition_drops},

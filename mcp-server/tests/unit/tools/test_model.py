@@ -107,14 +107,14 @@ class TestModelTool(unittest.TestCase):
 
         asyncio.run(_test_load_model_version_by_alias(self.mcp))
 
-    def test_write_model_tools_disabled_by_default(self):
-        async def _test_write_model_tools_disabled_by_default(mcp_server):
+    def test_write_model_tools_enabled_by_default(self):
+        async def _test_write_model_tools_enabled_by_default(mcp_server):
             tool_names = {tool.name for tool in await mcp_server.list_tools()}
 
             self.assertIn("load_model", tool_names)
-            self.assertNotIn("update_model_version_aliases", tool_names)
+            self.assertIn("update_model_version_aliases", tool_names)
 
-        asyncio.run(_test_write_model_tools_disabled_by_default(self.mcp))
+        asyncio.run(_test_write_model_tools_enabled_by_default(self.mcp))
 
     def test_update_model_version_aliases(self):
         async def _test_update_model_version_aliases(mcp_server):

@@ -16,7 +16,6 @@
 # under the License.
 
 from mcp_server.client import PolicyOperation
-from mcp_server.client.plain.exception import GravitinoException
 from mcp_server.client.plain.utils import (
     encode_path_segment,
     extract_content_from_response,
@@ -63,16 +62,12 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
         )
         return extract_content_from_response(response, "policy", {})
 
-    async def delete_policy(self, policy_name: str) -> None:
+    async def delete_policy(self, policy_name: str) -> str:
         response = await self.rest_client.delete(
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/policies/{encode_path_segment(policy_name)}"
         )
-        if response.status_code != 200:
-            raise GravitinoException(
-                f"Failed to delete policy {policy_name}: {response.text}"
-            )
-        return None
+        return extract_content_from_response(response, "dropped", False)
 
     async def get_list_of_policies(self) -> str:
         response = await self.rest_client.get(

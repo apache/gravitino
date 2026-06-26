@@ -250,7 +250,7 @@ def load_job_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().cancel_job(job_id)
 
-    # Disable the register_job_template tool by default as it is a write operation.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"job"})
     async def register_job_template(
         ctx: Context,
@@ -304,7 +304,7 @@ def load_job_tool(mcp: FastMCP):
             job_template
         )
 
-    # Disable the delete_job_template tool by default as it can be destructive.
+    # Write operation; access is enforced by Gravitino authorization.
     @mcp.tool(tags={"job"})
     async def delete_job_template(
         ctx: Context,
@@ -325,8 +325,3 @@ def load_job_tool(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().delete_job_template(name)
-
-    mcp.disable(
-        names={"register_job_template", "delete_job_template"},
-        components={"tool"},
-    )

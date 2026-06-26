@@ -42,7 +42,6 @@ class StatisticOperation(ABC):
     @abstractmethod
     async def update_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         statistics: dict,
@@ -52,7 +51,6 @@ class StatisticOperation(ABC):
         Only custom (non-reserved) statistics can be updated.
 
         Args:
-            metalake_name: Name of the metalake
             metadata_type: Type of metadata (e.g., table)
             metadata_fullname: Full name of the metadata item
             statistics: Dictionary mapping statistic name to its value, e.g.
@@ -66,7 +64,6 @@ class StatisticOperation(ABC):
     @abstractmethod
     async def drop_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         statistic_names: list,
@@ -75,7 +72,6 @@ class StatisticOperation(ABC):
         Drop custom statistics from a metadata object.
 
         Args:
-            metalake_name: Name of the metalake
             metadata_type: Type of metadata (e.g., table)
             metadata_fullname: Full name of the metadata item
             statistic_names: List of statistic names to drop
@@ -89,7 +85,6 @@ class StatisticOperation(ABC):
     @abstractmethod
     async def update_partition_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         partition_updates: list,
@@ -98,7 +93,6 @@ class StatisticOperation(ABC):
         Update (create or overwrite) custom statistics for partitions of a table.
 
         Args:
-            metalake_name: Name of the metalake
             metadata_type: Type of metadata, should be "table" for partition statistics
             metadata_fullname: Full name of the table, the format should be
                 "{catalog}.{schema}.{table}".
@@ -115,7 +109,6 @@ class StatisticOperation(ABC):
     @abstractmethod
     async def drop_partition_statistics(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         partition_drops: list,
@@ -124,7 +117,6 @@ class StatisticOperation(ABC):
         Drop custom statistics from partitions of a table.
 
         Args:
-            metalake_name: Name of the metalake
             metadata_type: Type of metadata, should be "table" for partition statistics
             metadata_fullname: Full name of the table, the format should be
                 "{catalog}.{schema}.{table}".

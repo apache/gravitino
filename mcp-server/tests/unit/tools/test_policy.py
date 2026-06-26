@@ -139,16 +139,16 @@ class TestPolicyTool(unittest.TestCase):
 
         asyncio.run(_test_get_policy_for_metadata(self.mcp))
 
-    def test_write_policy_tools_disabled_by_default(self):
-        async def _test_write_policy_tools_disabled_by_default(mcp_server):
+    def test_write_policy_tools_enabled_by_default(self):
+        async def _test_write_policy_tools_enabled_by_default(mcp_server):
             tool_names = {tool.name for tool in await mcp_server.list_tools()}
 
             self.assertIn("get_list_of_policies", tool_names)
-            self.assertNotIn("create_policy", tool_names)
-            self.assertNotIn("alter_policy", tool_names)
-            self.assertNotIn("delete_policy", tool_names)
+            self.assertIn("create_policy", tool_names)
+            self.assertIn("alter_policy", tool_names)
+            self.assertIn("delete_policy", tool_names)
 
-        asyncio.run(_test_write_policy_tools_disabled_by_default(self.mcp))
+        asyncio.run(_test_write_policy_tools_enabled_by_default(self.mcp))
 
     def test_create_policy(self):
         async def _test_create_policy(mcp_server):
