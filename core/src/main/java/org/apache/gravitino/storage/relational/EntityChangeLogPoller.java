@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -47,6 +46,31 @@ import org.slf4j.LoggerFactory;
  * process owns one shared cursor, a persistently failing listener blocks progress for all
  * listeners; if the process restarts after the stuck rows age past the retention window, their
  * invalidations can be lost permanently (logged at ERROR).
+ *
+ * <p><b>Known limitation — the commit-ordering gap (currently accepted, not worked around).</b> The
+ * cursor advances with {@code WHERE id > lastConsumedId ORDER BY id}. Auto-increment ids are
+ * assigned at INSERT but a row only becomes visible at COMMIT, so when two change-log rows are
+ * written concurrently the one with the smaller id can commit <i>after</i> the larger id has
+ * already been consumed and the cursor advanced past it. {@code id > cursor} then never returns the
+ * smaller-id row again, so its invalidation is permanently dropped on this node and the
+ * corresponding cache entry can stay stale until it is otherwise reloaded or (for the catalog
+ * cache) evicted by its {@code expireAfterAccess} TTL.
+ *
+ * <p><b>When / how likely.</b> It requires all of: (a) two or more transactions writing {@code
+ * entity_change_log} with overlapping lifetimes, (b) the lower-id transaction committing later than
+ * a higher-id one, and (c) a poll cycle landing between the two commits. So it only happens under
+ * concurrent mutations and is rare in practice; for the catalog cache it is further bounded by TTL
+ * eviction, which eventually refreshes a stale entry even if its invalidation was missed.
+ *
+ * <p><b>Why it is not fixed here.</b> No cheap, robust fix is currently known. Preventing the miss
+ * by re-reading an overlapping {@code created_at} window re-delivers rows and is only safe if every
+ * listener is perfectly idempotent — it is not: re-delivery once made the poller invalidate and
+ * tear down an in-use catalog, closing its classloader and connection pool (a permanently cached
+ * {@code NoClassDefFoundError}). Reliably <i>detecting</i> the miss is also impractical: the only
+ * contiguity-independent signals need per-row bookkeeping that is lost on restart and is confused
+ * by legitimate id gaps (e.g. {@code auto_increment_increment > 1}, sequence caching, rollbacks).
+ * The gap is therefore documented and accepted; revisit with a dedicated design if it is shown to
+ * matter in production.
  */
 public class EntityChangeLogPoller implements AutoCloseable {
 
@@ -55,39 +79,11 @@ public class EntityChangeLogPoller implements AutoCloseable {
   /** Max entity-change rows to fetch per poller cycle. */
   private static final int ENTITY_CHANGE_POLLER_MAX_ROWS = 500;
 
-  /**
-   * Upper bound on the number of candidate "missed id" gaps tracked at once, so the detection state
-   * can never grow without bound regardless of write/rollback patterns.
-   */
-  private static final int MAX_TRACKED_GAP_IDS = 10_000;
-
-  /**
-   * Gaps wider than this are not tracked as missed-row candidates. A real commit-ordering gap (a
-   * few concurrent in-flight transactions whose ids are interleaved with their commit order) is
-   * narrow; a wide gap is almost always rolled-back/abandoned auto-increment ids that will never
-   * commit, and tracking them would only add noise.
-   */
-  private static final long MAX_GAP_WIDTH = 256;
-
-  /**
-   * Candidate gap ids further than this below the cursor are dropped as stale (never committed).
-   */
-  private static final long GAP_STALE_LOOKBACK = 1_000_000;
-
   private final List<EntityChangeLogListener> listeners = new CopyOnWriteArrayList<>();
   private final long pollIntervalSecs;
   private final long retentionMs;
   private final long cleanupIntervalMs;
   private final LongSupplier clockMs;
-
-  /**
-   * Auto-increment ids below the cursor that were absent when the cursor advanced past them. If
-   * such an id later becomes visible it was committed after the {@code id > cursor} query had
-   * already skipped it — i.e. a permanently missed change-log row (see {@link
-   * #detectFilledGaps()}). This is observability-only state; it never affects dispatch. Guarded by
-   * {@code doPollChanges}' monitor.
-   */
-  private final TreeSet<Long> pendingGapIds = new TreeSet<>();
 
   @Nullable private PausedBatch pausedBatch;
 
@@ -208,7 +204,6 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private synchronized void doPollChanges() {
     if (pausedBatch != null) {
       retryPausedBatch();
-      detectFilledGaps();
       pruneExpiredChangesIfNeeded();
       return;
     }
@@ -216,11 +211,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
     List<EntityChangeRecord> changes = fetchEntityChanges();
 
     if (!changes.isEmpty()) {
-      long previousCursor = entityPollHighWaterId;
-      Set<Long> receivedIds = new HashSet<>();
       long maxSeenId = entityPollHighWaterId;
       for (EntityChangeRecord change : changes) {
-        receivedIds.add(change.getId());
         if (change.getId() > maxSeenId) {
           maxSeenId = change.getId();
         }
@@ -234,11 +226,8 @@ public class EntityChangeLogPoller implements AutoCloseable {
       // this same batch on the next cycle until all listeners have applied it.
       if (failedListeners.isEmpty()) {
         entityPollHighWaterId = maxSeenId;
-        recordNewGaps(previousCursor, maxSeenId, receivedIds);
       } else {
-        pausedBatch =
-            new PausedBatch(
-                dispatchedChanges, previousCursor, maxSeenId, receivedIds, failedListeners);
+        pausedBatch = new PausedBatch(dispatchedChanges, maxSeenId, failedListeners);
         // Forward progress is paused until every listener applies the batch; the same batch is
         // retried for failed listeners every cycle. If this persists and the process restarts after
         // retention cleanup prunes the stuck rows, their invalidations are lost permanently.
@@ -247,69 +236,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
       }
     }
 
-    // A missed row's id is below the cursor, so the id>cursor fetch above never returns it; the
-    // fill check must therefore run on every cycle, including cycles where the fetch was empty.
-    detectFilledGaps();
     pruneExpiredChangesIfNeeded();
-  }
-
-  /**
-   * Records ids in {@code (previousCursor, maxSeenId]} that were absent from this batch as
-   * candidate missed rows. Narrow gaps only (see {@link #MAX_GAP_WIDTH}) and bounded in total.
-   * Observability only; does not affect dispatch or the cursor.
-   */
-  private void recordNewGaps(long previousCursor, long maxSeenId, Set<Long> receivedIds) {
-    long trackedUpperBound = Math.min(maxSeenId, previousCursor + MAX_GAP_WIDTH);
-    for (long id = previousCursor + 1; id <= trackedUpperBound; id++) {
-      if (!receivedIds.contains(id)) {
-        pendingGapIds.add(id);
-      }
-    }
-    while (pendingGapIds.size() > MAX_TRACKED_GAP_IDS) {
-      pendingGapIds.pollFirst();
-    }
-  }
-
-  /**
-   * Logs any previously recorded gap id that has since become visible in the DB: such a row was
-   * committed after the {@code id > cursor} cursor had already advanced past it, so it was
-   * permanently skipped — a missed cache invalidation. Purely diagnostic; it re-reads from below
-   * the lowest pending gap and never dispatches the rows. Stale gaps (far below the cursor, never
-   * committed) are pruned so the lookback stays cheap.
-   *
-   * <p>Limitation: because this scans from the oldest pending gap with a bounded page size, one old
-   * unfilled gap can delay detection of later filled gaps until the old candidate becomes stale.
-   */
-  private void detectFilledGaps() {
-    if (pendingGapIds.isEmpty()) {
-      return;
-    }
-
-    long staleFloor = entityPollHighWaterId - GAP_STALE_LOOKBACK;
-    pendingGapIds.headSet(staleFloor).clear();
-    if (pendingGapIds.isEmpty()) {
-      return;
-    }
-
-    long lookbackFrom = pendingGapIds.first() - 1;
-    List<EntityChangeRecord> filled =
-        SessionUtils.getWithoutCommit(
-            EntityChangeLogMapper.class,
-            m -> m.selectEntityChanges(lookbackFrom, ENTITY_CHANGE_POLLER_MAX_ROWS));
-    for (EntityChangeRecord record : filled) {
-      if (pendingGapIds.remove(record.getId())) {
-        LOG.warn(
-            "entity_change_log MISSED a change row (commit-ordering gap): id={} fullName={} "
-                + "entityType={} operateType={} became visible below the poll cursor (current "
-                + "cursor id={}) and was permanently skipped by the id>cursor query, so its cache "
-                + "invalidation was dropped on this node",
-            record.getId(),
-            record.getFullName(),
-            record.getEntityType(),
-            record.getOperateType(),
-            entityPollHighWaterId);
-      }
-    }
   }
 
   private List<EntityChangeRecord> fetchEntityChanges() {
@@ -373,10 +300,6 @@ public class EntityChangeLogPoller implements AutoCloseable {
         dispatchChanges(currentPausedBatch.changes, currentPausedBatch.pendingListeners);
     if (failedListeners.isEmpty()) {
       entityPollHighWaterId = currentPausedBatch.maxSeenId;
-      recordNewGaps(
-          currentPausedBatch.previousCursor,
-          currentPausedBatch.maxSeenId,
-          currentPausedBatch.receivedIds);
       pausedBatch = null;
     } else {
       currentPausedBatch.pendingListeners = failedListeners;
@@ -414,27 +337,16 @@ public class EntityChangeLogPoller implements AutoCloseable {
 
   private static class PausedBatch {
     private final List<EntityChangeRecord> changes;
-    private final long previousCursor;
     private final long maxSeenId;
-    private final Set<Long> receivedIds;
     private Set<EntityChangeLogListener> pendingListeners;
 
     private PausedBatch(
         List<EntityChangeRecord> changes,
-        long previousCursor,
         long maxSeenId,
-        Set<Long> receivedIds,
         Set<EntityChangeLogListener> pendingListeners) {
       this.changes = changes;
-      this.previousCursor = previousCursor;
       this.maxSeenId = maxSeenId;
-      this.receivedIds = receivedIds;
       this.pendingListeners = pendingListeners;
     }
-  }
-
-  @VisibleForTesting
-  Set<Long> pendingGapIds() {
-    return pendingGapIds;
   }
 }
