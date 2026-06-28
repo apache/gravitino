@@ -226,7 +226,13 @@ public class GravitinoConnector implements Connector {
   }
 
   private CatalogConnectorMetadata resolveSessionMetadata(ConnectorSession session) {
-    String credKey = "simple:" + session.getUser();
+    String credKey =
+        catalogConnectorContext
+                .getConfig()
+                .getClientConfig()
+                .getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple")
+            + ":"
+            + session.getUser();
     try {
       return perUserSessionCache.get(
               credKey,
@@ -265,10 +271,11 @@ public class GravitinoConnector implements Connector {
           "gravitino.client.session.forwardUser=true requires gravitino.client.authType to be set");
     }
     GravitinoAuthProvider.AuthType authType = GravitinoAuthProvider.parseAuthType(authTypeStr);
-    if (authType != GravitinoAuthProvider.AuthType.SIMPLE) {
+    if (authType != GravitinoAuthProvider.AuthType.SIMPLE
+        && authType != GravitinoAuthProvider.AuthType.OAUTH2) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-          "gravitino.client.session.forwardUser=true only supports authType=simple, got: "
+          "gravitino.client.session.forwardUser=true only supports authType=simple or oauth2, got: "
               + authTypeStr);
     }
 
