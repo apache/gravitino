@@ -165,8 +165,10 @@ public class GravitinoAuthProvider {
    * connector session. This is the entry point for the per-user client cache when {@code
    * forwardUser=true}.
    *
-   * <p>Currently only {@code authType=simple} is supported: the Trino session username is used as
-   * the Gravitino simple-auth identity.
+   * <p>For {@code authType=simple} the Trino session username is used as the Gravitino simple-auth
+   * identity. For {@code authType=oauth2} the end-user IdP token forwarded into the connector
+   * session (extra-credential key {@code token}) is presented to Gravitino as the bearer token, so
+   * the server authorizes against the end user rather than a shared service identity.
    *
    * @param config the Gravitino connector configuration
    * @param session the current Trino connector session
@@ -196,13 +198,29 @@ public class GravitinoAuthProvider {
 
     GravitinoAdminClient.AdminClientBuilder builder = GravitinoAdminClient.builder(uri);
 
-    if (authType != AuthType.SIMPLE) {
-      throw new UnsupportedOperationException(
-          "Auth type "
-              + authType
-              + " does not support session forwarding. Only simple is supported.");
+    switch (authType) {
+      case SIMPLE:
+        builder.withSimpleAuth(session.getUser());
+        break;
+      case OAUTH2:
+        {
+          String userToken = session.getIdentity().getExtraCredentials().get("token");
+          if (StringUtils.isBlank(userToken)) {
+            throw new IllegalArgumentException(
+                "No forwarded user token found in session extra-credentials under key 'token'. "
+                    + "Ensure Trino is configured with "
+                    + "http-server.authentication.oauth2.forward-token-to-connectors=true and the "
+                    + "patched OAuth2Authenticator that injects the user token is in use.");
+          }
+          builder.withOAuth(new StaticUserTokenProvider(userToken));
+        }
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Auth type "
+                + authType
+                + " does not support session forwarding. Only simple and oauth2 are supported.");
     }
-    builder.withSimpleAuth(session.getUser());
 
     removeAuthSpecificKeys(clientConfig);
     builder.withClientConfig(clientConfig);
