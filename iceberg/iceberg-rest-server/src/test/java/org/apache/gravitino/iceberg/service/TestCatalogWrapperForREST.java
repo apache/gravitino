@@ -667,7 +667,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testFederatedRegisterTablePassesOverwrite() {
+  void testFederatedRegisterTableOverwrite() {
     RESTCatalog catalog = mock(RESTCatalog.class);
     BaseTable table = mock(BaseTable.class);
     TableOperations ops = mock(TableOperations.class);

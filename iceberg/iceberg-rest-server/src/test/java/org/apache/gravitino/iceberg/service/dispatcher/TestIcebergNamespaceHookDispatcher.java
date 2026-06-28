@@ -251,7 +251,7 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testRegisterTableOverwriteSkipsImportAndOwnership() {
+  public void testRegisterTableOverwriteSkipsHooks() {
     Namespace namespace = Namespace.of("test_schema");
     RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
     when(mockRequest.name()).thenReturn("test_table");

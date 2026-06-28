@@ -84,16 +84,14 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
           || !tableType.equalsIgnoreCase(BaseMetastoreTableOperations.ICEBERG_TABLE_TYPE_VALUE)) {
         return null;
       }
-      return hiveTable.getParameters().get(METADATA_LOCATION_PROP);
+      return hiveTable.getParameters().get(BaseMetastoreTableOperations.METADATA_LOCATION_PROP);
     } catch (Exception e) {
       return null;
     }
   }
 
   private void overwriteMetadataLocation(
-      TableIdentifier tableIdentifier,
-      String expectedMetadataLocation,
-      String newMetadataLocation) {
+      TableIdentifier tableIdentifier, String oldMetadataLocation, String newMetadataLocation) {
     HiveTableOperations ops = (HiveTableOperations) newTableOps(tableIdentifier);
     HiveOperationsBase hiveOps = ops;
     Configuration conf = getConf();
@@ -117,7 +115,7 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
         Objects.equals(
             base.properties().get(TableProperties.ENCRYPTION_TABLE_KEY),
             targetMetadata.properties().get(TableProperties.ENCRYPTION_TABLE_KEY)),
-        "Cannot remove key ID of an encrypted table");
+        "Cannot modify key ID of an encrypted table");
 
     HiveLock lock = ops.lockObject(base);
     try {
@@ -136,10 +134,10 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
 
       String hmsMetadataLocation =
           tbl.getParameters().get(BaseMetastoreTableOperations.METADATA_LOCATION_PROP);
-      if (!Objects.equals(expectedMetadataLocation, hmsMetadataLocation)) {
+      if (!Objects.equals(oldMetadataLocation, hmsMetadataLocation)) {
         throw new CommitFailedException(
             "Cannot overwrite table %s: metadata location %s has changed from %s",
-            tableIdentifier, hmsMetadataLocation, expectedMetadataLocation);
+            tableIdentifier, hmsMetadataLocation, oldMetadataLocation);
       }
 
       HMSTablePropertyHelper.updateHmsTableForIcebergTable(
@@ -149,7 +147,7 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
           removedProps,
           hiveEngineEnabled,
           hiveOps.maxHiveTablePropertySize(),
-          expectedMetadataLocation);
+          oldMetadataLocation);
 
       if (!keepHiveStats) {
         tbl.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
@@ -157,8 +155,7 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
       }
 
       lock.ensureActive();
-      hiveOps.persistTable(
-          tbl, true, hiveLockEnabled(base, conf) ? null : expectedMetadataLocation);
+      hiveOps.persistTable(tbl, true, hiveLockEnabled(base, conf) ? null : oldMetadataLocation);
       lock.ensureActive();
     } catch (LockException e) {
       throw new CommitStateUnknownException(
@@ -180,6 +177,17 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
     }
   }
 
+  private void loadFields() {
+    try {
+      this.metaClients =
+          (ClientPool<IMetaStoreClient, TException>) FieldUtils.readField(this, "clients", true);
+      Preconditions.checkState(
+          metaClients != null, "Failed to get clients field from hive catalog");
+    } catch (IllegalAccessException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private static boolean hiveEngineEnabled(TableMetadata metadata, Configuration conf) {
     if (metadata.properties().get(TableProperties.ENGINE_HIVE_ENABLED) != null) {
       return metadata.propertyAsBoolean(TableProperties.ENGINE_HIVE_ENABLED, false);
@@ -196,16 +204,5 @@ public class HiveCatalogWithMetadataLocationSupport extends ClosableHiveCatalog
 
     return conf.getBoolean(
         ConfigProperties.LOCK_HIVE_ENABLED, TableProperties.HIVE_LOCK_ENABLED_DEFAULT);
-  }
-
-  private void loadFields() {
-    try {
-      this.metaClients =
-          (ClientPool<IMetaStoreClient, TException>) FieldUtils.readField(this, "clients", true);
-      Preconditions.checkState(
-          metaClients != null, "Failed to get clients field from hive catalog");
-    } catch (IllegalAccessException e) {
-      throw new RuntimeException(e);
-    }
   }
 }

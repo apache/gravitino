@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 public class TestMetastoreRegisterTableUtils {
 
   @Test
-  void testRegisterTableWithoutOverwriteDelegatesToCatalog() {
+  void testRegisterWithoutOverwrite() {
     BaseMetastoreCatalog catalog = mock(BaseMetastoreCatalog.class);
     MetastoreRegisterTableUtils.MetadataLocationOverwrite metadataLocationOverwrite =
         mock(MetastoreRegisterTableUtils.MetadataLocationOverwrite.class);
@@ -50,7 +50,7 @@ public class TestMetastoreRegisterTableUtils {
   }
 
   @Test
-  void testRegisterTableWithOverwriteRejectsEmptyMetadataLocation() {
+  void testOverwriteRejectsEmptyLocation() {
     BaseMetastoreCatalog catalog = mock(BaseMetastoreCatalog.class);
     MetastoreRegisterTableUtils.MetadataLocationOverwrite metadataLocationOverwrite =
         mock(MetastoreRegisterTableUtils.MetadataLocationOverwrite.class);

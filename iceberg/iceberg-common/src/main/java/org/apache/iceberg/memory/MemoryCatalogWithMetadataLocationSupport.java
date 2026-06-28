@@ -21,7 +21,6 @@ package org.apache.iceberg.memory;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
@@ -64,24 +63,12 @@ public class MemoryCatalogWithMetadataLocationSupport extends InMemoryCatalog
   }
 
   private void overwriteMetadataLocation(
-      TableIdentifier tableIdentifier,
-      String expectedMetadataLocation,
-      String newMetadataLocation) {
-    tableStore.compute(
-        tableIdentifier,
-        (ignored, existingLocation) -> {
-          if (!Objects.equals(existingLocation, expectedMetadataLocation)) {
-            if (existingLocation == null) {
-              throw new CommitFailedException("Table does not exist: %s", tableIdentifier);
-            }
-
-            throw new CommitFailedException(
-                "Cannot overwrite table %s metadata location from %s to %s because it has been "
-                    + "concurrently modified to %s",
-                tableIdentifier, expectedMetadataLocation, newMetadataLocation, existingLocation);
-          }
-          return newMetadataLocation;
-        });
+      TableIdentifier tableIdentifier, String oldMetadataLocation, String newMetadataLocation) {
+    if (!tableStore.replace(tableIdentifier, oldMetadataLocation, newMetadataLocation)) {
+      throw new CommitFailedException(
+          "Cannot overwrite table %s metadata location from %s to %s",
+          tableIdentifier, oldMetadataLocation, newMetadataLocation);
+    }
   }
 
   private void loadFields() {

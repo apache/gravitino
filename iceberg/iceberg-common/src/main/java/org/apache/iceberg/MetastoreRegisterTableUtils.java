@@ -32,11 +32,11 @@ public class MetastoreRegisterTableUtils {
   public interface MetadataLocationOverwrite {
     /**
      * @param identifier table identifier
-     * @param expectedMetadataLocation expected current metadata file location
+     * @param oldMetadataLocation current metadata file location before overwrite
      * @param newMetadataLocation metadata file location to register
      */
     void overwrite(
-        TableIdentifier identifier, String expectedMetadataLocation, String newMetadataLocation);
+        TableIdentifier identifier, String oldMetadataLocation, String newMetadataLocation);
   }
 
   /**
@@ -86,8 +86,8 @@ public class MetastoreRegisterTableUtils {
 
     TableMetadataParser.read(metastoreOps.io().newInputFile(metadataFileLocation));
 
-    String expectedMetadataLocation = base.metadataFileLocation();
-    metadataLocationOverwrite.overwrite(identifier, expectedMetadataLocation, metadataFileLocation);
+    String oldMetadataLocation = base.metadataFileLocation();
+    metadataLocationOverwrite.overwrite(identifier, oldMetadataLocation, metadataFileLocation);
     metastoreOps.refresh();
 
     return new BaseTable(
