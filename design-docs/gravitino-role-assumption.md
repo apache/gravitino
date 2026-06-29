@@ -238,23 +238,20 @@ The mechanism is a request header. Engines differ only in whether they can forwa
 | **Trino** (via Iceberg REST) | ✅ Yes (Trino ≥ 481) | Catalog config — `iceberg.rest-catalog.http-headers` (static) |
 | Native Java/Python client | ✅ Yes | Header passthrough; a first-class param is cleaner |
 
-**How Spark and Trino forward the header:**
+**How each engine forwards the header — no code changes:**
 
-- Iceberg's REST catalog forwards any `header.*` catalog property as an HTTP header. So
-  `spark.sql.catalog.x.header.X-Gravitino-Active-Roles=<roles>` just works — no client change.
-- Trino (≥ 481) supports `iceberg.rest-catalog.http-headers` (added in
-  [trinodb/trino#29132](https://github.com/trinodb/trino/pull/29132), closing
-  [#24236](https://github.com/trinodb/trino/issues/24236)), so a catalog can forward
-  `X-Gravitino-Active-Roles` with no connector change. The caveat: this is **catalog-level and static**
-  — it pins one active set for the whole catalog connection and can't vary per Trino user, session, or
-  query. Per-session dynamic narrowing remains Phase 3.
+- **Spark** — Iceberg's REST catalog forwards any `header.*` catalog property as an HTTP header, so
+  `spark.sql.catalog.x.header.X-Gravitino-Active-Roles=<roles>` just works.
+- **Trino (≥ 481)** — set the catalog property
+  `iceberg.rest-catalog.http-headers=X-Gravitino-Active-Roles: <roles>` and Trino forwards it on every
+  REST call to Gravitino (added in [trinodb/trino#29132](https://github.com/trinodb/trino/pull/29132),
+  closing [#24236](https://github.com/trinodb/trino/issues/24236)). No connector patch or fork.
 
-**Trino upstream outlook:** the generic `iceberg.rest-catalog.http-headers` mechanism is exactly the
-vendor-neutral path — a Gravitino header rides on it with no Trino-specific coupling, so no upstream
-change is needed for the static case. The remaining gap is *dynamic, per-session* narrowing, which a
-static config can't express; standardizing the header (or an OAuth2 scope) in the Iceberg REST spec, or
-the identity-level route (Section 8), is the durable answer there. In OAuth mode Trino already forwards
-the user's bearer token, so the IdP-issued scoped-token route likely needs no Trino change at all.
+**Static vs. dynamic.** Both of the above are **catalog-level and static** — the header is fixed in the
+catalog config and is identical for every user, session, and query on that catalog. That's enough to pin
+a catalog to a reduced role set, but it can't vary per session. Per-session narrowing (SQL `SET ROLE`)
+is Phase 3, and enforcing a scope the client can't override is the identity-bound token (Phase 2 /
+Section 8).
 
 ---
 
