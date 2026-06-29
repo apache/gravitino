@@ -40,7 +40,7 @@ holds them, and authorization is evaluated against only that active set. The fea
 caller's effective permissions, never expand them. If no role is declared, behavior is exactly as it is
 today.
 
-The mechanism is intentionally simple: a request header, `X-Gravitino-Active-Role`, carries the active
+The mechanism is intentionally simple: a request header, `X-Gravitino-Active-Roles`, carries the active
 role(s), and the server narrows enforcement to match — across access checks, list results, and credential
 vending alike. Section 3 defines the header and its values; Section 4 explains how the server enforces
 it. Transport is the easy part — the common instinct is to treat this as "just a Trino change," but the
@@ -93,7 +93,7 @@ capability today, and this restores it.
 The interface is a single request header:
 
 ```
-X-Gravitino-Active-Role: <value>
+X-Gravitino-Active-Roles: <value>
 ```
 
 The caller sets it to declare which of its roles should be active for that request. The server validates
@@ -117,20 +117,27 @@ Here `analyst` and `reader` are example role names, not keywords; only `ALL` and
 This mirrors the vocabulary users already know from Hive (`SET ROLE role | ALL | NONE`) and Snowflake
 (`USE SECONDARY ROLES ALL | NONE`).
 
+`NONE` is the only way to express the *empty* active set. An absent header already means `ALL`, so
+without an explicit keyword there is no way to declare "use none of my roles" — running with only
+ownership/baseline access. That mode is genuinely useful: owner-only execution for a job or agent that
+should touch nothing its roles grant, and verifying deny paths (confirming what is reachable with no
+role active). It costs nothing to support — an empty active set simply means no role policies are
+consulted.
+
 ### 3.2 Examples
 
 A reporting job that should only ever read through its `analyst` role:
 
 ```
 GET /iceberg/v1/namespaces/sales/tables
-X-Gravitino-Active-Role: analyst
+X-Gravitino-Active-Roles: analyst
 ```
 
 Declaring a role the caller does not actually hold is rejected — this is what keeps the feature
 subtractive:
 
 ```
-X-Gravitino-Active-Role: admin     →  403 Forbidden   (caller is not a member of admin)
+X-Gravitino-Active-Roles: admin     →  403 Forbidden   (caller is not a member of admin)
 ```
 
 ### 3.3 Semantics
@@ -145,7 +152,7 @@ X-Gravitino-Active-Role: admin     →  403 Forbidden   (caller is not a member 
 
 ## 4. How the server enforces narrowing
 
-Without an `X-Gravitino-Active-Role` header, Gravitino evaluates each operation against the user's full
+Without an `X-Gravitino-Active-Roles` header, Gravitino evaluates each operation against the user's full
 set of roles — those granted directly plus those inherited from groups. The header narrows that set for
 the request:
 
@@ -154,7 +161,7 @@ the request:
 2. **Validate** the header against that set. The declared role must be one the caller actually holds; a
    role they don't hold is rejected. This is the guardrail that keeps narrowing *subtractive* — you can
    reduce what you use, never assume a role you were never granted.
-3. **Enforce** using only the validated active role(s). With `X-Gravitino-Active-Role: analyst`, the
+3. **Enforce** using only the validated active role(s). With `X-Gravitino-Active-Roles: analyst`, the
    request is evaluated as `analyst` alone; `editor` and `auditor` are simply not consulted.
 
 So the active set is `(roles named in the header) ∩ (the caller's effective roles)` — always a subset,
@@ -228,23 +235,26 @@ The mechanism is a request header. Engines differ only in whether they can forwa
 |---|---|---|
 | Direct Gravitino API | ✅ Yes | Server-side change only |
 | **Spark** (via Iceberg REST) | ✅ Yes | No code change — a catalog config setting |
-| **Trino** (via Iceberg REST) | ❌ No | A small connector setting, *or* the token path (no Trino change) |
+| **Trino** (via Iceberg REST) | ✅ Yes (Trino ≥ 481) | Catalog config — `iceberg.rest-catalog.http-headers` (static) |
 | Native Java/Python client | ✅ Yes | Header passthrough; a first-class param is cleaner |
 
-**Why Spark works but Trino doesn't:**
+**How Spark and Trino forward the header:**
 
 - Iceberg's REST catalog forwards any `header.*` catalog property as an HTTP header. So
-  `spark.sql.catalog.x.header.X-Gravitino-Active-Role=<role>` just works — no client change.
-- Trino's Iceberg REST connector builds a curated, strongly-typed config with no arbitrary `header.*`
-  passthrough, so Trino needs a small typed setting (e.g. `iceberg.rest-catalog.active-role`) to emit
-  the header.
+  `spark.sql.catalog.x.header.X-Gravitino-Active-Roles=<roles>` just works — no client change.
+- Trino (≥ 481) supports `iceberg.rest-catalog.http-headers` (added in
+  [trinodb/trino#29132](https://github.com/trinodb/trino/pull/29132), closing
+  [#24236](https://github.com/trinodb/trino/issues/24236)), so a catalog can forward
+  `X-Gravitino-Active-Roles` with no connector change. The caveat: this is **catalog-level and static**
+  — it pins one active set for the whole catalog connection and can't vary per Trino user, session, or
+  query. Per-session dynamic narrowing remains Phase 3.
 
-**Trino upstream outlook:** acceptance of a *Gravitino-named* header in Trino core is uncertain, since
-Trino avoids vendor-specific coupling. The durable fix is to standardize the header (or an OAuth2 scope)
-in the Iceberg REST spec, after which Trino support becomes generic and vendor-neutral. Short-term, an
-internal Trino patch is viable for teams that build their own Trino. The identity-level route (Section 8)
-— a pre-scoped credential or an IdP-issued scoped token — likely needs no Trino change at all, because in
-OAuth mode Trino already forwards the user's bearer token.
+**Trino upstream outlook:** the generic `iceberg.rest-catalog.http-headers` mechanism is exactly the
+vendor-neutral path — a Gravitino header rides on it with no Trino-specific coupling, so no upstream
+change is needed for the static case. The remaining gap is *dynamic, per-session* narrowing, which a
+static config can't express; standardizing the header (or an OAuth2 scope) in the Iceberg REST spec, or
+the identity-level route (Section 8), is the durable answer there. In OAuth mode Trino already forwards
+the user's bearer token, so the IdP-issued scoped-token route likely needs no Trino change at all.
 
 ---
 
@@ -287,7 +297,7 @@ to the user or group directly, which is exactly why the ownership decision in Se
 
 | Option | Narrows enforcement? | Enforces on uncooperative principal? | Engine support | Verdict |
 |---|---|---|---|---|
-| **A. Request header** (`X-Gravitino-Active-Role`) — caller declares the active role in an HTTP header | ✅ | ❌ (cooperative) | Spark ✅, API ✅, Trino needs setting | **Phase 1** — ship first |
+| **A. Request header** (`X-Gravitino-Active-Roles`) — caller declares the active roles in an HTTP header | ✅ | ❌ (cooperative) | Spark ✅, API ✅, Trino ✅ (≥ 481, static) | **Phase 1** — ship first |
 | **B. Native API parameter** — same as A, exposed as a client call argument instead of a raw header | ✅ | ❌ | Native clients | Fold into A (nicer ergonomics) |
 | **C. IdP-issued scoped token** — active set comes from access-token claims, issued already-narrowed by the authorization server | ✅ | ✅ | Engine via bearer token | Depends on IdP support (Entra can't per-role); Gravitino stays the resource server |
 | **D. Dynamic SQL `SET ROLE`** — `SET ROLE` mid-session in Spark/Trino SQL, narrowing later queries | ✅ | depends | Needs per-engine session propagation | **Phase 3** — large; only if demand |
@@ -300,9 +310,10 @@ to the user or group directly, which is exactly why the ownership decision in Se
 The work splits naturally into a few phases. Phase 1 is the server-side narrowing itself — validating
 the declared roles, enforcing per active role, and keeping list filtering and credential vending
 consistent — together with the header transport. That alone covers the native API and Spark today, and
-it's backward compatible, so it lands the motivating use cases without waiting on anything else. A small
-follow-up (call it Phase 1b) adds the typed Trino setting that emits the header, which brings Trino in.
-Phase 2 binds the narrow scope to the caller's *identity* rather than a header — an IdP-issued scoped
+it's backward compatible, so it lands the motivating use cases without waiting on anything else. Trino
+(≥ 481) is covered too at the static/catalog level — it forwards the header via its
+`iceberg.rest-catalog.http-headers` config with no extra work; only per-session dynamic narrowing is
+deferred (Phase 3). Phase 2 binds the narrow scope to the caller's *identity* rather than a header — an IdP-issued scoped
 token — so it holds even against an uncooperative client and reaches Trino through the existing OAuth
 path. It depends on IdP capabilities (Gravitino doesn't mint the token), so it's a later, optional step.
 Phase 3 — dynamic in-session `SET ROLE` — is the largest piece, and only worth doing if there's real
@@ -322,9 +333,10 @@ demand for switching roles mid-session.
    Proposed default: ship A, with the grammar designed so C can be added later without a breaking change.
 3. **v1 grammar.** Start with a single active role plus `ALL` / `NONE`, and add comma-separated lists
    shortly after?
-4. **Standardization.** Pursue an Iceberg REST spec proposal (a standard header or OAuth2 scope) so
-   Trino and other engines get vendor-neutral support, instead of relying on a Gravitino-specific
-   header long-term?
+4. **Standardization.** Static header forwarding already works generically (Spark `header.*`, Trino
+   `iceberg.rest-catalog.http-headers`). Pursue an Iceberg REST spec proposal (a standard header or
+   OAuth2 scope) so that *per-session* narrowing and uncooperative-principal enforcement also become
+   vendor-neutral across engines?
 5. **Enforcing on an uncooperative principal (Phase 2).** Agree the header is a cooperative control, and
    that enforcing narrowing on an untrusted principal belongs in an IdP-issued scoped token — not minted
    by Gravitino, which stays the resource server — accepting that IdP support for this varies?
