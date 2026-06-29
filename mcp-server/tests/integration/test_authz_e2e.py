@@ -83,6 +83,15 @@ def test_authorization_scoped_discovery(gravitino_fixture, integration_env):
     assert admin_catalogs != bob_catalogs
 
 
+@pytest.mark.skip(
+    reason="Depends on the 'create_tag' write tool, which is disabled by default "
+    "in the MCP server (destructive-tool gating in tools/tag.py). With it disabled "
+    "the call fails as 'Unknown tool' rather than an authorization denial. No other "
+    "enabled write tool works as a drop-in here: associate_tag/policy_with_metadata "
+    "and run_job all require fixture entities that the setup does not create, so they "
+    "would fail with 'not found' instead of a denial. Re-enable this test once the PR "
+    "that enables 'create_tag' is merged."
+)
 def test_write_denied_for_readonly_principal(
     gravitino_fixture, integration_env
 ):

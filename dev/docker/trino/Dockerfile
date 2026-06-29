@@ -23,7 +23,7 @@ USER root
 
 COPY --chown=trino:trino packages/trino/conf /etc/trino
 COPY --chown=trino:trino packages/gravitino-trino-connector/mysql-connector-java-8.0.27.jar /usr/lib/trino/plugin/iceberg/
-COPY --chown=trino:trino packages/gravitino-trino-connector/postgresql-42.7.0.jar /usr/lib/trino/plugin/iceberg/
+COPY --chown=trino:trino packages/gravitino-trino-connector/postgresql-42.7.11.jar /usr/lib/trino/plugin/iceberg/
 
 RUN mkdir /tmp/gravitino
 COPY --chown=trino:trino packages/gravitino-trino-connector /tmp/gravitino

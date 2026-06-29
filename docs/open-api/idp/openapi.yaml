@@ -25,10 +25,11 @@ info:
   version: 1.3.0-SNAPSHOT
   description: |
     OpenAPI specification for built-in IDP user and group management APIs exposed
-    by the `idp-basic` plugin. Clients authenticate with Basic credentials
-    validated against built-in IdP user metadata. Enable the plugin via
-    `gravitino.server.rest.extensionPackages`; `gravitino.authenticators` must not
-    include `simple` when IdP is enabled.
+    by the `idp-basic` plugin. Clients authenticate with Basic credentials validated against
+    built-in IdP user metadata. Enable built-in IdP by registering
+    `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages`.
+    Built-in IdP is incompatible with the `simple` authenticator (the default),
+    `gravitino.authenticators` must include `basic` and must not include `simple`.
 
 servers:
   - url: "{scheme}://{host}:{port}/{basePath}"

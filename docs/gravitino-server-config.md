@@ -392,6 +392,14 @@ There are three types of catalog properties:
    configurations for the catalog to work properly.
 2. **Properties with the `gravitino.bypass.` prefix**: These properties are not managed by
    Gravitino and pass directly to the underlying system for advanced usage.
+
+:::warning
+Using `gravitino.bypass.` properties to pass credentials, tokens, or access keys can expose
+sensitive values in plaintext, because these properties are not fully managed by Gravitino and may
+be returned in plaintext via REST API responses. If an underlying system requires credentials to be
+passed this way, restrict access to the related REST APIs.
+:::
+
 3. **Other properties**: Gravitino doesn't leverage these properties, just store them. Users
    can use them for their own purposes.
 

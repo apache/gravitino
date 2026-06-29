@@ -35,7 +35,7 @@ jobs:
       mcp_or_authz_changes: ${{ steps.filter.outputs.mcp_or_authz_changes }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
           filters: |
@@ -59,7 +59,7 @@ jobs:
           java-version: 17
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
 
       - name: Build Gravitino distribution
         run: ./gradlew compileDistribution -x test -PskipWeb=true

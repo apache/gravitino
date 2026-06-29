@@ -124,31 +124,32 @@ The `plugins:idp-basic` module provides:
 User credentials must never be stored in plaintext. Passwords are stored as password hashes in the
 database.
 
-Among the common password hashing algorithms, **Argon2id** is the recommended choice for
-Gravitino.
+Among the common password hashing algorithms, **SHA3-512** (via JDK `MessageDigest`) is the
+recommended choice for Gravitino.
 
-| Algorithm | Status |
-|---|---|
-| Argon2id | Recommended default |
+| Algorithm          | Status              |
+|--------------------|---------------------|
+| SHA3-512           | Recommended default |
 
-The initial design uses **Argon2id** as the only supported algorithm, which keeps the
-implementation simple while aligning with modern password storage recommendations.
+The initial design uses **SHA3-512** as the only supported algorithm, which keeps the
+implementation simple while relying on the JDK built-in digest API and avoiding additional
+third-party cryptographic dependencies in the server distribution.
 
 To make this implementable, the password hashing design should also define the storage and
 dependency model explicitly:
 
-- introduce one dedicated server-side password-hashing dependency that supports Argon2id
-- store the full Argon2id hash string in `password_hash`, including algorithm marker, parameters,
+- use the JDK JCA `MessageDigest` implementation for `SHA3-512`
+- store the full SHA3-512 hash string in `password_hash`, including algorithm marker, parameters,
   salt, and hash output
 - use a self-describing format so future parameter tuning does not require schema changes
 
 For example, `password_hash` should store a PHC-style string such as:
 
 ```text
-$argon2id$v=19$m=65536,t=3,p=1$<salt>$<hash>
+$sha3-512$i=100000$<salt>$<hash>
 ```
 
-This keeps verification logic simple and allows future upgrades of Argon2id cost parameters without
+This keeps verification logic simple and allows future upgrades of SHA3-512 cost parameters without
 introducing additional columns.
 
 ---
@@ -297,7 +298,7 @@ The initialization process should be:
 5. If the service admin already has a password in `idp_user_meta`, continue startup without
    modifying the stored password.
 6. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is configured and the service admin does not yet have a
-   password stored in `idp_user_meta`, hash the supplied password with Argon2id and create that
+   password stored in `idp_user_meta`, hash the supplied password with SHA3-512 and create that
    service admin account in `idp_user_meta`.
 7. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is not configured and any configured service admin does not
    yet have a password stored in `idp_user_meta`, fail startup immediately and prompt the user to
@@ -315,12 +316,13 @@ fresh Gravitino deployment.
 1. Deploy Gravitino with built-in IDP enabled:
 
    ```properties
+   gravitino.authenticators=basic
    gravitino.server.rest.extensionPackages=org.apache.gravitino.idp.web.rest.feature
    gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
-   Built-in IdP is incompatible with the `simple` authenticator. When the `idp-basic` plugin is
-   enabled, `gravitino.authenticators` must not include `simple`.
+   Built-in IdP is incompatible with the `simple` authenticator (the default),
+   `gravitino.authenticators` must include `basic` and must not include `simple`.
 
 2. Export the initial service admin password before starting Gravitino:
 
@@ -399,16 +401,20 @@ credentials are otherwise exposed on the wire.
 
 | Key                                         | Value                                           | Required when using built-in IDP |
 |---------------------------------------------|-------------------------------------------------|----------------------------------|
+| `gravitino.authenticators`                  | Must include `basic`                            | Yes                              |
 | `gravitino.server.rest.extensionPackages`   | `org.apache.gravitino.idp.web.rest.feature`     | Yes                              |
 | `gravitino.authorization.serviceAdmins`     | Comma-separated service admin                   | Yes                              |
 
-List `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages` so
-Jersey registers `/api/idp/*` management APIs. Callers must use Basic authentication with a username
+List `basic` in `gravitino.authenticators` and `org.apache.gravitino.idp.web.rest.feature` in
+`gravitino.server.rest.extensionPackages` so Jersey registers `/api/idp/*` management APIs and the
+Web UI can use the built-in IdP login form. Built-in IdP is incompatible with the `simple`
+authenticator (the default), `gravitino.authenticators` must include `basic` and must not include
+`simple`. Callers must use Basic authentication with a username
 in `gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`.
 
 ### 8.2 Password Algorithm
 
-The initial implementation uses Argon2id as the fixed password hashing algorithm.
+The initial implementation uses SHA3-512 as the fixed password hashing algorithm.
 
 ---
 
@@ -520,7 +526,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 | Phase | Work Item | Module / Files | Notes |
 |---|---|---|---|
 | 1 | Built-in IDP module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `plugins:idp-basic` | Add the new module and register `IdpRESTFeature` through `gravitino.server.rest.extensionPackages`. |
-| 2 | Password hashing support | `PasswordHasher`, `Argon2idPasswordHasher`, related tests | Use Argon2id as the only supported password hashing algorithm and store PHC-style hash strings. |
+| 2 | Password hashing support | `PasswordHasher`, `Sha3512PasswordHasher`, related tests | Use SHA3-512 as the only supported password hashing algorithm and store PHC-style hash strings. |
 | 3 | IdP metadata schema | JDBC schema files, mapper definitions, store layer | Create `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel` with soft-delete support. |
 | 4 | Service admin initialization | startup initialization logic, validation logic | Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD`, initialize missing configured service admins during startup, and fail startup when required credentials are absent. |
 | 5 | Basic authentication flow | `BasicAuthenticator`, auth manager, filter integration | Verify Basic credentials against `idp_user_meta` and resolve the authenticated principal. |
@@ -564,7 +570,7 @@ either unavailable or unnecessarily heavy. The key design choices are:
 - **Basic authentication**
 - **username/password credentials**
 - **database-backed storage**
-- **Argon2id password hashing**
+- **SHA3-512 password hashing**
 - **startup-time service admin initialization**
 
 The result is a self-contained authentication path that is easy to deploy, fast to evaluate, and
