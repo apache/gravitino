@@ -198,7 +198,7 @@ When Trino connects to Gravitino IRC with `iceberg.rest-catalog.security=OAUTH2`
 before 482, each recursive call creates a separate OAuth session, which can trigger excessive token
 requests and cause errors such as `Connection pool shut down` or `StackOverflowError`.
 
-Upgrade to **Trino 482+**.
+**Solution:** Upgrade to **Trino 482+**.
 
 ### `TIMESTAMP WITH TIME ZONE` Values Are Not Adjusted to the Client Session Time Zone
 
