@@ -19,18 +19,23 @@
 
 package org.apache.gravitino.idp.basic.password;
 
-import org.bouncycastle.crypto.params.Argon2Parameters;
+/** Default parameters for the built-in SHA3-512 password hasher. */
+public final class Sha3512Defaults {
 
-/** Default parameters for the built-in Argon2id password hasher. */
-public final class Argon2idDefaults {
+  /** JCA {@link java.security.MessageDigest} algorithm name for SHA3-512. */
+  public static final String DIGEST_ALGORITHM = "SHA3-512";
 
-  public static final int DEFAULT_VERSION = Argon2Parameters.ARGON2_VERSION_13;
-  public static final int DEFAULT_TYPE = Argon2Parameters.ARGON2_id;
-  public static final int DEFAULT_HASH_LENGTH = 32;
-  public static final int DEFAULT_MEMORY_KB = 1 << 16;
-  public static final int DEFAULT_ITERATIONS = 3;
-  public static final int DEFAULT_PARALLELISM = 1;
+  /** Default iteration count for salted SHA3-512 password stretching. */
+  public static final int DEFAULT_ITERATIONS = 100_000;
+
+  /** PHC-style prefix for stored password hashes. */
+  public static final String PHC_PREFIX = "$sha3-512$";
+
+  /** Default salt length in bytes. */
   public static final int DEFAULT_SALT_LENGTH = 16;
 
-  private Argon2idDefaults() {}
+  /** SHA3-512 digest output length in bytes. */
+  public static final int DEFAULT_HASH_LENGTH = 64;
+
+  private Sha3512Defaults() {}
 }
