@@ -628,8 +628,10 @@ public class TestCatalogWrapperForREST {
     BaseTable table = mock(BaseTable.class);
     TableOperations ops = mock(TableOperations.class);
     FileIO fileIO = mock(FileIO.class);
+    TableIdentifier ident = TableIdentifier.of("db", "tbl");
     when(catalog.registerTable(any(TableIdentifier.class), anyString(), anyBoolean()))
         .thenReturn(table);
+    when(catalog.loadTable(ident)).thenReturn(table);
     when(table.operations()).thenReturn(ops);
     when(ops.current()).thenReturn(minimalTableMetadataForStagedCreateTest());
     when(table.io()).thenReturn(fileIO);
@@ -658,8 +660,8 @@ public class TestCatalogWrapperForREST {
 
     LoadTableResponse response = wrapper.registerTable(Namespace.of("db"), request, false);
 
-    verify(catalog)
-        .registerTable(TableIdentifier.of("db", "tbl"), request.metadataLocation(), false);
+    verify(catalog).registerTable(ident, request.metadataLocation(), false);
+    verify(catalog).loadTable(ident);
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
     Assertions.assertEquals(
@@ -672,8 +674,10 @@ public class TestCatalogWrapperForREST {
     BaseTable table = mock(BaseTable.class);
     TableOperations ops = mock(TableOperations.class);
     FileIO fileIO = mock(FileIO.class);
+    TableIdentifier ident = TableIdentifier.of("db", "tbl");
     when(catalog.registerTable(any(TableIdentifier.class), anyString(), anyBoolean()))
         .thenReturn(table);
+    when(catalog.loadTable(ident)).thenReturn(table);
     when(table.operations()).thenReturn(ops);
     when(ops.current()).thenReturn(minimalTableMetadataForStagedCreateTest());
     when(table.io()).thenReturn(fileIO);
@@ -697,8 +701,8 @@ public class TestCatalogWrapperForREST {
 
     wrapper.registerTable(Namespace.of("db"), request, false);
 
-    verify(catalog)
-        .registerTable(TableIdentifier.of("db", "tbl"), request.metadataLocation(), true);
+    verify(catalog).registerTable(ident, request.metadataLocation(), true);
+    verify(catalog).loadTable(ident);
   }
 
   @Test
