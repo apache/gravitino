@@ -464,6 +464,31 @@ public class JobManager implements JobOperationDispatcher {
     try {
       entityStore.put(jobEntity, false /* overwrite */);
     } catch (IOException e) {
+      // Attempt to cancel the submitted job to avoid orphaned executions
+      try {
+        jobExecutor.cancelJob(jobExecutionId);
+        LOG.info(
+            "Successfully cancelled submitted job {} after persistence failure", jobExecutionId);
+      } catch (Exception cancelException) {
+        LOG.warn(
+            "Failed to cancel submitted job {} after persistence failure",
+            jobExecutionId,
+            cancelException);
+      }
+
+      // Best-effort cleanup of staging directory
+      try {
+        FileUtils.deleteDirectory(jobStagingDir);
+        LOG.info(
+            "Successfully cleaned up staging directory {} after persistence failure",
+            jobStagingDir);
+      } catch (IOException cleanupException) {
+        LOG.warn(
+            "Failed to clean up staging directory {} after persistence failure",
+            jobStagingDir,
+            cleanupException);
+      }
+
       throw new RuntimeException("Failed to register the job entity " + jobEntity, e);
     }
 
