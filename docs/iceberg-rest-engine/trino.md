@@ -192,24 +192,23 @@ WITH (
 
 ### `SHOW SCHEMAS` Fails on Gravitino IRC (OAuth2, Nested Namespaces)
 
-When Trino connects to Gravitino IRC with `iceberg.rest-catalog.security=OAUTH2`,
+**Cause:** When Trino connects to Gravitino IRC with `iceberg.rest-catalog.security=OAUTH2`,
 `iceberg.rest-catalog.nested-namespace-enabled=true`, and `iceberg.rest-catalog.session=NONE`
 (the default), `SHOW SCHEMAS` recursively calls Iceberg REST `listNamespaces`. On Trino releases
 before 482, each recursive call creates a separate OAuth session, which can trigger excessive token
 requests and cause errors such as `Connection pool shut down` or `StackOverflowError`.
 
-```
-Solution: Upgrade to Trino 482+.
-```
+**Solution:**
+Upgrade to Trino 482+.
 
 ### `TIMESTAMP WITH TIME ZONE` Values Are Not Adjusted to the Client Session Time Zone
 
-For `TIMESTAMP WITH TIME ZONE` values, Trino does not adjust query results according to the client
-session time zone. Unlike Spark and Flink, Trino displays these values based on the stored
-timestamp-with-time-zone value.
+**Cause:** For `TIMESTAMP WITH TIME ZONE` values, Trino does not adjust query results according to
+the client session time zone. Unlike Spark and Flink, Trino displays these values based on the
+stored timestamp-with-time-zone value.
 
-To convert a `TIMESTAMP WITH TIME ZONE` value to the current client session time zone, use
-`at_timezone` together with `current_timezone()`:
+**Solution:**
+Use `at_timezone` together with `current_timezone()`:
 
 ```sql
 SELECT
