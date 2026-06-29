@@ -24,27 +24,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class TestIdpBaseSQLProviders {
+class TestIdpSoftDeleteSQLProvider {
 
   private static final String MILLISECOND_TIMESTAMP_COMPONENT =
       "EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
 
   @Test
-  void testSoftDeleteIdpUserUsesMillisecondPrecisionDeletedAt() {
+  void testUserDeletedAtPrecision() {
     String sql = new IdpUserMetaBaseSQLProvider().softDeleteIdpUser("user1");
 
     assertUsesMillisecondTimestamp(sql);
   }
 
   @Test
-  void testSoftDeleteIdpGroupUsesMillisecondPrecisionDeletedAt() {
+  void testGroupDeletedAtPrecision() {
     String sql = new IdpGroupMetaBaseSQLProvider().softDeleteIdpGroup("group1");
 
     assertUsesMillisecondTimestamp(sql);
   }
 
   @Test
-  void testSoftDeleteIdpUserGroupRelUsesMillisecondPrecisionDeletedAt() {
+  void testRelationDeletedAtPrecision() {
     IdpUserGroupRelBaseSQLProvider provider = new IdpUserGroupRelBaseSQLProvider();
 
     assertUsesMillisecondTimestamp(provider.softDeleteRelations("group1", List.of("user1")));
