@@ -161,9 +161,19 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
           "Missing required property for Rest backend: " + missingProperty);
     }
 
-    Map<String, String> jdbcProperties = new HashMap<>();
-    jdbcProperties.put("iceberg.catalog.type", "rest");
-    jdbcProperties.put("iceberg.rest-catalog.uri", properties.get(IcebergConstants.URI));
-    return jdbcProperties;
+    Map<String, String> restProperties = new HashMap<>();
+    restProperties.put("iceberg.catalog.type", "rest");
+    restProperties.put("iceberg.rest-catalog.uri", properties.get(IcebergConstants.URI));
+    if (properties.containsKey(IcebergConstants.WAREHOUSE)) {
+      restProperties.put(
+          "iceberg.rest-catalog.warehouse", properties.get(IcebergConstants.WAREHOUSE));
+    }
+    // Forward the end-user IdP token to the IRC for per-user authorization. The patched
+    // Trino captures the user token into the session and TrinoRestCatalog forwards it as-is
+    // when session security is USER. Bootstrap credential, server-uri, scope, and S3 config
+    // are supplied through the catalog's trino.bypass.* properties.
+    restProperties.put("iceberg.rest-catalog.security", "OAUTH2");
+    restProperties.put("iceberg.rest-catalog.session", "USER");
+    return restProperties;
   }
 }
