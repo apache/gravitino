@@ -125,6 +125,6 @@ public class IdpUserGroupRelBaseSQLProvider {
   }
 
   protected String currentTimeMillisExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0)";
+    return "(UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
   }
 }
