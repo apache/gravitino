@@ -464,6 +464,12 @@ public class JobManager implements JobOperationDispatcher {
     try {
       entityStore.put(jobEntity, false /* overwrite */);
     } catch (IOException e) {
+      try {
+        jobExecutor.cancelJob(jobExecutionId);
+        LOG.warn("Rolled back job execution {} after store failure", jobExecutionId);
+      } catch (Exception cancelEx) {
+        LOG.error("Failed to cancel orphaned job execution {} during rollback", jobExecutionId, cancelEx);
+      }
       throw new RuntimeException("Failed to register the job entity " + jobEntity, e);
     }
 
