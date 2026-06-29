@@ -258,10 +258,10 @@ public class MetadataAuthzHelper {
       return false;
     }
 
-    // Parent scope grants access to every object; the only thing that can still hide one is an
-    // object-level deny, so the short-circuit is only safe when no such deny may exist.
-    return !authorizer.hasDenyPolicyOnType(
-        principal, metalake, entityType, spec.denyPrivileges, requestContext);
+    // Parent scope grants access to every object; the only thing that can still hide one is a
+    // deny on these privileges (at the parent scope or on an individual object), so the
+    // short-circuit is only safe when no such deny may exist.
+    return !authorizer.hasDenyPolicy(principal, metalake, spec.denyPrivileges, requestContext);
   }
 
   /**

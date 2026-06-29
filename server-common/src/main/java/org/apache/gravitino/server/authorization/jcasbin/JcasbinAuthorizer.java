@@ -115,6 +115,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizer.class);
 
+  /**
+   * Field index of {@code sub} (the role/user/group id) in a jcasbin {@code p} policy row. See the
+   * {@code policy_definition} in {@code jcasbin_model.conf}: {@code p = sub, metadataType,
+   * metadataId, act, eft}.
+   */
+  private static final int POLICY_SUBJECT_FIELD_INDEX = 0;
+
+  /** Field index of {@code act} (the privilege) in a jcasbin {@code p} policy row. */
+  private static final int POLICY_ACTION_FIELD_INDEX = 3;
+
   /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer allowEnforcer;
 
@@ -364,10 +374,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean hasDenyPolicyOnType(
+  public boolean hasDenyPolicy(
       Principal principal,
       String metalake,
-      Entity.EntityType type,
       Set<Privilege.Name> privileges,
       AuthorizationRequestContext requestContext) {
     Optional<UserUpdatedAt> userInfoOpt =
@@ -383,14 +392,19 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     loadRolePrivilege(metalake, principal.getName(), userId, userInfo, requestContext);
 
     Set<String> privilegeNames = privileges.stream().map(Enum::name).collect(Collectors.toSet());
-    String typeName = type.name();
     String userIdStr = String.valueOf(userId);
-    // p-row layout: [sub(roleId), metadataType, metadataId, act(privilege), eft]. Filtering by
-    // (roleId, metadataType) keeps the scan bounded by the user's role/policy count, never by the
-    // number of listed objects.
+    // This is an existence query, not a per-object check: it answers "does any deny on these
+    // privileges exist for the user's roles, at any scope?" The standard enforce path needs a
+    // concrete metadataId, so reusing it would mean iterating every listed object and defeat the
+    // short-circuit. Filtering the deny enforcer's policies by role keeps the scan bounded by the
+    // user's role/policy count, never by the number of listed objects. The match is intentionally
+    // scope-agnostic (no metadataType filter): a parent-scope deny hides the whole subtree and an
+    // object-scope deny hides one object, and both must disable the short-circuit.
     for (String roleId : denyEnforcer.getRolesForUser(userIdStr)) {
-      for (List<String> policy : denyEnforcer.getFilteredNamedPolicy("p", 0, roleId, typeName)) {
-        if (policy.size() > 3 && privilegeNames.contains(policy.get(3))) {
+      for (List<String> policy :
+          denyEnforcer.getFilteredNamedPolicy("p", POLICY_SUBJECT_FIELD_INDEX, roleId)) {
+        if (policy.size() > POLICY_ACTION_FIELD_INDEX
+            && privilegeNames.contains(policy.get(POLICY_ACTION_FIELD_INDEX))) {
           return true;
         }
       }

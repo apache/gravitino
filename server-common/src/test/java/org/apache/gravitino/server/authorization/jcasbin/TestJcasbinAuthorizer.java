@@ -463,50 +463,40 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testHasDenyPolicyOnType() throws Exception {
+  public void testHasDenyPolicy() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
 
-    // With no roles assigned, the user can hold no deny policy of any type.
+    // With no roles assigned, the user can hold no deny policy.
     assertFalse(
-        jcasbinAuthorizer.hasDenyPolicyOnType(
+        jcasbinAuthorizer.hasDenyPolicy(
             currentPrincipal,
             METALAKE,
-            Entity.EntityType.CATALOG,
             ImmutableSet.of(USE_CATALOG),
             new AuthorizationRequestContext()));
 
-    // Assign a role that DENIES USE_CATALOG on a catalog.
+    // Assign a role that DENIES USE_CATALOG at the catalog scope.
     mockRoleInStore(DENY_ROLE_ID, "denyRole", ImmutableList.of(getDenySecurableObject()));
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
         .thenReturn(ImmutableList.of(buildRolePO(DENY_ROLE_ID, "denyRole")));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
 
-    // The catalog-level deny is detected for the matching type and privilege.
+    // The deny on USE_CATALOG is detected. The match is scope-agnostic: the deny lives on a
+    // catalog, which is a parent scope for a schema/catalog list, so it must be reported and
+    // disable the short-circuit.
     assertTrue(
-        jcasbinAuthorizer.hasDenyPolicyOnType(
+        jcasbinAuthorizer.hasDenyPolicy(
             currentPrincipal,
             METALAKE,
-            Entity.EntityType.CATALOG,
             ImmutableSet.of(USE_CATALOG),
-            new AuthorizationRequestContext()));
-
-    // A deny on CATALOG must not be reported when querying a different metadata type.
-    assertFalse(
-        jcasbinAuthorizer.hasDenyPolicyOnType(
-            currentPrincipal,
-            METALAKE,
-            Entity.EntityType.TABLE,
-            ImmutableSet.of(SELECT_TABLE),
             new AuthorizationRequestContext()));
 
     // A deny on USE_CATALOG must not be reported when querying a different privilege.
     assertFalse(
-        jcasbinAuthorizer.hasDenyPolicyOnType(
+        jcasbinAuthorizer.hasDenyPolicy(
             currentPrincipal,
             METALAKE,
-            Entity.EntityType.CATALOG,
             ImmutableSet.of(SELECT_TABLE),
             new AuthorizationRequestContext()));
   }

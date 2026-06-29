@@ -226,7 +226,7 @@ public class TestMetadataAuthzHelper {
             });
     lenient().when(authorizer.isOwner(any(), eq("testMetalake"), any(), any())).thenReturn(owner);
     lenient()
-        .when(authorizer.hasDenyPolicyOnType(any(), eq("testMetalake"), any(), anySet(), any()))
+        .when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any()))
         .thenReturn(denyGate);
     return authorizer;
   }
@@ -252,7 +252,7 @@ public class TestMetadataAuthzHelper {
         .thenReturn(false);
     lenient().when(authorizer.isOwner(any(), eq("testMetalake"), any(), any())).thenReturn(false);
     lenient()
-        .when(authorizer.hasDenyPolicyOnType(any(), eq("testMetalake"), any(), anySet(), any()))
+        .when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any()))
         .thenReturn(false);
     return authorizer;
   }

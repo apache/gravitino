@@ -109,29 +109,31 @@ public interface GravitinoAuthorizer extends Closeable {
   boolean isMetalakeUser(String metalake, AuthorizationRequestContext requestContext);
 
   /**
-   * Determines whether the given principal may have any {@code DENY} privilege policy, for any of
-   * the given privileges, granted directly on metadata objects of {@code type} within the metalake.
+   * Determines whether the given principal may have any {@code DENY} policy, for any of the given
+   * privileges, at any scope (metalake, catalog, schema or the object itself) within the metalake.
    *
    * <p>This supports list-authorization short-circuiting: when a privilege is granted at a parent
-   * scope (metalake, catalog or schema), every child object of {@code type} is visible
-   * <em>unless</em> an object-level {@code DENY} overrides it. A {@code false} return therefore
-   * lets the caller skip per-object authorization for the whole list and return every identifier; a
-   * {@code true} return forces the caller to fall back to per-object authorization.
+   * scope (metalake, catalog or schema), every child object is visible <em>unless</em> a {@code
+   * DENY} overrides it at some scope. A {@code false} return therefore lets the caller skip
+   * per-object authorization for the whole list and return every identifier; a {@code true} return
+   * forces the caller to fall back to per-object authorization.
+   *
+   * <p>The query is scope-agnostic on purpose: a deny granted at a parent scope hides the whole
+   * subtree, while a deny granted on a single object hides just that object. Both cases must
+   * disable the short-circuit, so the privilege match is not restricted to a metadata type.
    *
    * <p>The default implementation conservatively returns {@code true} so that authorizers which
    * cannot answer the question never enable an unsafe short-circuit.
    *
    * @param principal the user principal
    * @param metalake the metalake
-   * @param type the metadata type of the listed objects (for example {@code TABLE}, {@code SCHEMA})
-   * @param privileges the privileges whose object-level denies would affect visibility
+   * @param privileges the privileges whose denies would affect visibility
    * @param requestContext authorization request context
-   * @return whether an object-level deny for the given privileges and type may exist
+   * @return whether a deny for any of the given privileges may exist
    */
-  default boolean hasDenyPolicyOnType(
+  default boolean hasDenyPolicy(
       Principal principal,
       String metalake,
-      Entity.EntityType type,
       Set<Privilege.Name> privileges,
       AuthorizationRequestContext requestContext) {
     return true;
