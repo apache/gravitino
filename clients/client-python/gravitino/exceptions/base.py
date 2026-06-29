@@ -259,19 +259,10 @@ class NoSuchMetadataObjectException(NotFoundException):
 
 class RoleAlreadyExistsException(AlreadyExistsException):
     """Exception thrown when a role with specified name already exists."""
+class NoSuchViewException(Exception):
+    """Exception raised when a view does not exist."""
+    pass
+class NoSuchViewException(Exception):
+    """Exception raised when a view does not exist."""
+    pass
 
-
-class NoSuchUserException(NotFoundException):
-    """An exception thrown when a user is not found."""
-
-
-class UserAlreadyExistsException(AlreadyExistsException):
-    """An exception thrown when a user already exists."""
-
-
-class NoSuchGroupException(NotFoundException):
-    """An exception thrown when a group is not found."""
-
-
-class GroupAlreadyExistsException(AlreadyExistsException):
-    """An exception thrown when a group already exists."""

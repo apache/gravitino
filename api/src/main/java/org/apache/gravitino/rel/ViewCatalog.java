@@ -91,17 +91,35 @@ public interface ViewCatalog {
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws ViewAlreadyExistsException If the view already exists.
    */
-  default View createView(
-      NameIdentifier ident,
-      @Nullable String comment,
-      Column[] columns,
-      Representation[] representations,
-      @Nullable String defaultCatalog,
-      @Nullable String defaultSchema,
-      Map<String, String> properties)
-      throws NoSuchSchemaException, ViewAlreadyExistsException {
-    throw new UnsupportedOperationException("createView is not supported");
-  }
+    @abstractmethod
+    def create_view(
+        self,
+        identifier: NameIdentifier,
+        comment: Optional[str] = None,
+        columns: Optional[list] = None,
+        representations: Optional[list[dict]] = None,
+        default_catalog: Optional[str] = None,
+        default_schema: Optional[str] = None,
+        properties: Optional[dict[str, str]] = None,
+    ) -> View:
+        """Create a view in the catalog.
+
+        Args:
+            identifier: A view identifier.
+            comment: The view comment, may be None.
+            columns: The output columns of the view.
+            representations: The representations of the view.
+            default_catalog: The default catalog for unqualified identifiers.
+            default_schema: The default schema for unqualified identifiers.
+            properties: The view properties.
+
+        Raises:
+            NoSuchSchemaException: If the schema does not exist.
+            ViewAlreadyExistsException: If the view already exists.
+
+        Returns:
+            View: The created view metadata.
+        """
 
   /**
    * Apply the {@link ViewChange changes} to a view in the catalog.
