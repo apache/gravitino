@@ -198,8 +198,7 @@ WITH (
 before 482, each recursive call creates a separate OAuth session, which can trigger excessive token
 requests and cause errors such as `Connection pool shut down` or `StackOverflowError`.
 
-**Solution:**
-Upgrade to Trino 482+.
+**Solution:** Upgrade to Trino 482+.
 
 ### `TIMESTAMP WITH TIME ZONE` Values Are Not Adjusted to the Client Session Time Zone
 
@@ -207,8 +206,8 @@ Upgrade to Trino 482+.
 the client session time zone. Unlike Spark and Flink, Trino displays these values based on the
 stored timestamp-with-time-zone value.
 
-**Solution:**
-Use `at_timezone` together with `current_timezone()`:
+**Solution:** To convert a `TIMESTAMP WITH TIME ZONE` value to the current client session time
+zone, use `at_timezone` together with `current_timezone()`:
 
 ```sql
 SELECT
