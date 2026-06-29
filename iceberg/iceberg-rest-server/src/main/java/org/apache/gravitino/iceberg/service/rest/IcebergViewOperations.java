@@ -33,12 +33,14 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
@@ -77,6 +79,8 @@ import org.slf4j.LoggerFactory;
 public class IcebergViewOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergViewOperations.class);
+
+  @VisibleForTesting public static final String IF_NONE_MATCH = "If-None-Match";
 
   private ObjectMapper icebergObjectMapper;
   private IcebergViewOperationDispatcher viewOperationDispatcher;
@@ -161,7 +165,7 @@ public class IcebergViewOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.createView(context, icebergNS, createViewRequest);
-            return IcebergRESTUtils.ok(loadViewResponse);
+            return IcebergRESTUtils.buildViewResponseWithETag(loadViewResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -187,7 +191,8 @@ public class IcebergViewOperations {
           @AuthorizationMetadata(type = EntityType.VIEW)
           @Encoded()
           @PathParam("view")
-          String view) {
+          String view,
+      @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -206,7 +211,12 @@ public class IcebergViewOperations {
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.loadView(context, viewIdentifier);
-            return IcebergRESTUtils.ok(loadViewResponse);
+            Optional<EntityTag> etag =
+                IcebergRESTUtils.generateETag(loadViewResponse.metadata().metadataFileLocation());
+            if (etag.isPresent() && IcebergRESTUtils.etagMatches(ifNoneMatch, etag.get())) {
+              return Response.notModified(etag.get()).build();
+            }
+            return IcebergRESTUtils.buildViewResponseWithETag(loadViewResponse, etag);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -246,7 +256,7 @@ public class IcebergViewOperations {
             TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
             LoadViewResponse loadViewResponse =
                 viewOperationDispatcher.replaceView(context, viewIdentifier, replaceViewRequest);
-            return IcebergRESTUtils.ok(loadViewResponse);
+            return IcebergRESTUtils.buildViewResponseWithETag(loadViewResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);

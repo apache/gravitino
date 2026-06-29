@@ -30,6 +30,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewEvent;
@@ -510,5 +511,165 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
             Mockito.mock(IcebergRequestContext.class),
             NameIdentifier.of("metalake", "catalog", "schema"));
     Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "etag_foo1");
+
+    Response response = doLoadView(namespace, "etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in load view response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewReturns304WhenETagMatches(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "etag_304_foo1");
+
+    // First, load the view to get the ETag
+    Response firstResponse = doLoadView(namespace, "etag_304_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstResponse.getStatus());
+    String etag = firstResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present");
+
+    // Second, load the view with If-None-Match header set to the ETag
+    Response secondResponse =
+        getViewClientBuilder(namespace, Optional.of("etag_304_foo1"))
+            .header(IcebergViewOperations.IF_NONE_MATCH, etag)
+            .get();
+    Assertions.assertEquals(
+        Status.NOT_MODIFIED.getStatusCode(),
+        secondResponse.getStatus(),
+        "Should return 304 when ETag matches");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewReturns200WhenETagDoesNotMatch(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "etag_mismatch_foo1");
+
+    // Load with a non-matching If-None-Match header
+    Response response =
+        getViewClientBuilder(namespace, Optional.of("etag_mismatch_foo1"))
+            .header(IcebergViewOperations.IF_NONE_MATCH, "\"non-matching-etag-value\"")
+            .get();
+    Assertions.assertEquals(
+        Status.OK.getStatusCode(),
+        response.getStatus(),
+        "Should return 200 when ETag does not match");
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewETagConsistency(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "etag_consistent_foo1");
+
+    // Load the view twice and verify the ETag is the same
+    Response firstResponse = doLoadView(namespace, "etag_consistent_foo1");
+    String firstEtag = firstResponse.getHeaderString("ETag");
+
+    Response secondResponse = doLoadView(namespace, "etag_consistent_foo1");
+    String secondEtag = secondResponse.getHeaderString("ETag");
+
+    Assertions.assertEquals(
+        firstEtag, secondEtag, "ETag should be consistent for the same view metadata");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadViewETagChangesAfterReplace(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "etag_replace_foo1");
+
+    // Load the view and get the initial ETag
+    Response firstResponse = doLoadView(namespace, "etag_replace_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstResponse.getStatus());
+    String firstEtag = firstResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(firstEtag, "ETag header should be present");
+
+    // Replace the view
+    ViewMetadata metadata = getViewMeta(namespace, "etag_replace_foo1");
+    verifyReplaceSucc(namespace, "etag_replace_foo1", metadata);
+
+    // Load the view again and verify the ETag has changed
+    Response secondResponse = doLoadView(namespace, "etag_replace_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), secondResponse.getStatus());
+    String secondEtag = secondResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(secondEtag, "ETag header should be present after replace");
+    Assertions.assertNotEquals(
+        firstEtag, secondEtag, "ETag should change after view metadata is updated");
+
+    // Verify old ETag no longer returns 304
+    Response thirdResponse =
+        getViewClientBuilder(namespace, Optional.of("etag_replace_foo1"))
+            .header(IcebergViewOperations.IF_NONE_MATCH, firstEtag)
+            .get();
+    Assertions.assertEquals(
+        Status.OK.getStatusCode(),
+        thirdResponse.getStatus(),
+        "Old ETag should not return 304 after view update");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateViewReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    Response response = doCreateView(namespace, "create_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in create view response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateViewETagMatchesLoadViewETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    Response createResponse = doCreateView(namespace, "create_load_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), createResponse.getStatus());
+    String createEtag = createResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(createEtag, "ETag should be present in create response");
+
+    // Load the same view — ETag should match
+    Response loadResponse = doLoadView(namespace, "create_load_etag_foo1");
+    Assertions.assertEquals(Status.OK.getStatusCode(), loadResponse.getStatus());
+    String loadEtag = loadResponse.getHeaderString("ETag");
+    Assertions.assertNotNull(loadEtag, "ETag should be present in load response");
+
+    Assertions.assertEquals(
+        createEtag, loadEtag, "ETag from createView should match ETag from loadView");
+
+    // The create ETag should be reusable for If-None-Match on a subsequent loadView
+    Response conditionalResponse =
+        getViewClientBuilder(namespace, Optional.of("create_load_etag_foo1"))
+            .header(IcebergViewOperations.IF_NONE_MATCH, createEtag)
+            .get();
+    Assertions.assertEquals(
+        Status.NOT_MODIFIED.getStatusCode(),
+        conditionalResponse.getStatus(),
+        "Create ETag should produce 304 on subsequent unchanged loadView");
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testReplaceViewReturnsETag(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "replace_etag_foo1");
+    ViewMetadata metadata = getViewMeta(namespace, "replace_etag_foo1");
+    Response response = doReplaceView(namespace, "replace_etag_foo1", metadata);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    String etag = response.getHeaderString("ETag");
+    Assertions.assertNotNull(etag, "ETag header should be present in replace view response");
+    Assertions.assertFalse(etag.isEmpty(), "ETag header should not be empty");
   }
 }
