@@ -22,7 +22,7 @@ package org.apache.gravitino.catalog.hadoop.auth;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils.LoginMode;
 import org.apache.hadoop.conf.Configuration;
@@ -50,7 +50,7 @@ public class KerberosClient implements Closeable {
   @Nullable private final String hadoopKrb5ConfKey;
   @Nullable private final String systemKrb5ConfKey;
 
-  private ScheduledFuture<?> checkTgtRefreshTask;
+  private ScheduledExecutorService checkTgtRefreshExecutor;
   private UserGroupInformation loginUser;
   private String realm;
 
@@ -78,8 +78,8 @@ public class KerberosClient implements Closeable {
     }
     this.loginUser = KerberosAuthUtils.login(principal, keytabFilePath, hadoopConf, loginMode);
     if (refreshCredentials) {
-      cancelTicketRefreshTask();
-      this.checkTgtRefreshTask =
+      shutdownTicketRefresh();
+      this.checkTgtRefreshExecutor =
           KerberosAuthUtils.startTicketRefresh(loginUser, checkIntervalSec, LOG);
     }
     return loginUser;
@@ -87,23 +87,26 @@ public class KerberosClient implements Closeable {
 
   /** Returns the realm parsed from the principal, available after {@link #login(String)}. */
   public String getRealm() {
+    Preconditions.checkState(realm != null, "login() has not been called");
     return realm;
   }
 
   /** Returns the login UGI, available after {@link #login(String)}. */
   public UserGroupInformation getLoginUser() {
+    Preconditions.checkState(loginUser != null, "login() has not been called");
     return loginUser;
   }
 
   @Override
   public void close() {
-    cancelTicketRefreshTask();
+    shutdownTicketRefresh();
   }
 
-  private void cancelTicketRefreshTask() {
-    if (checkTgtRefreshTask != null) {
-      checkTgtRefreshTask.cancel(true);
-      checkTgtRefreshTask = null;
+  private void shutdownTicketRefresh() {
+    if (checkTgtRefreshExecutor != null) {
+      // Graceful shutdown: let any in-flight relogin finish before the thread is torn down.
+      checkTgtRefreshExecutor.shutdown();
+      checkTgtRefreshExecutor = null;
     }
   }
 

@@ -24,8 +24,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -39,8 +39,7 @@ import org.slf4j.Logger;
 public final class KerberosAuthUtils {
 
   private static final String TICKET_REFRESH_THREAD_NAME_PREFIX = "kerberos-ticket-refresh-";
-  private static final ScheduledThreadPoolExecutor TICKET_REFRESH_EXECUTOR =
-      newTicketRefreshExecutor();
+  private static final AtomicInteger TICKET_REFRESH_THREAD_ID = new AtomicInteger(0);
 
   private KerberosAuthUtils() {}
 
@@ -198,19 +197,28 @@ public final class KerberosAuthUtils {
   }
 
   /**
-   * Starts a daemon task that periodically refreshes a keytab-backed TGT.
+   * Starts a dedicated single-thread daemon scheduler that periodically refreshes a keytab-backed
+   * TGT.
+   *
+   * <p>Each caller gets its own executor so a slow or unreachable KDC only blocks that caller's
+   * refresh. The caller owns the returned executor and must shut it down (via {@link
+   * ScheduledExecutorService#shutdown()}) when it is no longer needed.
    *
    * @param loginUgi login user to refresh
    * @param checkIntervalSec refresh interval in seconds
    * @param log logger used for refresh failures
-   * @return the scheduled refresh task
+   * @return the scheduler running the refresh task, owned by the caller
    */
-  public static ScheduledFuture<?> startTicketRefresh(
+  public static ScheduledExecutorService startTicketRefresh(
       UserGroupInformation loginUgi, int checkIntervalSec, Logger log) {
     Preconditions.checkArgument(checkIntervalSec > 0, "The check interval must be positive");
 
-    return TICKET_REFRESH_EXECUTOR.scheduleAtFixedRate(
+    ScheduledExecutorService executor =
+        Executors.newSingleThreadScheduledExecutor(
+            daemonThreadFactory(TICKET_REFRESH_THREAD_NAME_PREFIX));
+    executor.scheduleAtFixedRate(
         () -> refreshTicket(loginUgi, log), checkIntervalSec, checkIntervalSec, TimeUnit.SECONDS);
+    return executor;
   }
 
   private static boolean isHdfsUri(String keytabUri) {
@@ -222,13 +230,6 @@ public final class KerberosAuthUtils {
     }
   }
 
-  private static ScheduledThreadPoolExecutor newTicketRefreshExecutor() {
-    ScheduledThreadPoolExecutor executor =
-        new ScheduledThreadPoolExecutor(1, daemonThreadFactory(TICKET_REFRESH_THREAD_NAME_PREFIX));
-    executor.setRemoveOnCancelPolicy(true);
-    return executor;
-  }
-
   private static void refreshTicket(UserGroupInformation loginUgi, Logger log) {
     try {
       loginUgi.checkTGTAndReloginFromKeytab();
@@ -238,11 +239,10 @@ public final class KerberosAuthUtils {
   }
 
   private static ThreadFactory daemonThreadFactory(String threadNamePrefix) {
-    AtomicInteger threadId = new AtomicInteger(0);
     return runnable -> {
       Thread thread = new Thread(runnable);
       thread.setDaemon(true);
-      thread.setName(threadNamePrefix + threadId.getAndIncrement());
+      thread.setName(threadNamePrefix + TICKET_REFRESH_THREAD_ID.getAndIncrement());
       return thread;
     };
   }

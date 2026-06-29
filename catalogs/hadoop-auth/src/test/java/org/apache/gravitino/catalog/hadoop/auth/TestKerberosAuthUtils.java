@@ -21,7 +21,7 @@ package org.apache.gravitino.catalog.hadoop.auth;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Assertions;
@@ -147,17 +147,17 @@ public class TestKerberosAuthUtils {
   }
 
   @Test
-  public void testStartTicketRefreshReturnsCancelableTaskFromGlobalExecutor() {
+  public void testStartTicketRefreshReturnsDedicatedExecutorPerCall() {
     UserGroupInformation ugi = Mockito.mock(UserGroupInformation.class);
-    ScheduledFuture<?> firstRefresh =
+    ScheduledExecutorService firstRefresh =
         KerberosAuthUtils.startTicketRefresh(ugi, 60, LoggerFactory.getLogger(getClass()));
-    ScheduledFuture<?> secondRefresh =
+    ScheduledExecutorService secondRefresh =
         KerberosAuthUtils.startTicketRefresh(ugi, 60, LoggerFactory.getLogger(getClass()));
 
     try {
       Assertions.assertNotSame(firstRefresh, secondRefresh);
-      Assertions.assertFalse(firstRefresh.isCancelled());
-      Assertions.assertFalse(secondRefresh.isCancelled());
+      Assertions.assertFalse(firstRefresh.isShutdown());
+      Assertions.assertFalse(secondRefresh.isShutdown());
       Assertions.assertTrue(
           Thread.getAllStackTraces().keySet().stream()
               .anyMatch(
@@ -165,11 +165,11 @@ public class TestKerberosAuthUtils {
                       candidate.isDaemon()
                           && candidate.getName().startsWith("kerberos-ticket-refresh-")));
     } finally {
-      firstRefresh.cancel(true);
-      secondRefresh.cancel(true);
+      firstRefresh.shutdownNow();
+      secondRefresh.shutdownNow();
     }
 
-    Assertions.assertTrue(firstRefresh.isCancelled());
-    Assertions.assertTrue(secondRefresh.isCancelled());
+    Assertions.assertTrue(firstRefresh.isShutdown());
+    Assertions.assertTrue(secondRefresh.isShutdown());
   }
 }

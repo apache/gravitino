@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Properties;
-import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.hadoop.conf.Configuration;
@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 public class HmsKerberosClient implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(HmsKerberosClient.class);
 
-  private ScheduledFuture<?> checkTgtRefreshTask;
+  private ScheduledExecutorService checkTgtRefreshExecutor;
   private final Properties conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
@@ -131,9 +131,9 @@ public class HmsKerberosClient implements Closeable {
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
-      cancelTicketRefreshTask();
+      shutdownTicketRefresh();
       int checkInterval = kerberosConfig.getCheckIntervalSec();
-      checkTgtRefreshTask = KerberosAuthUtils.startTicketRefresh(loginUgi, checkInterval, LOG);
+      checkTgtRefreshExecutor = KerberosAuthUtils.startTicketRefresh(loginUgi, checkInterval, LOG);
     }
 
     return loginUgi;
@@ -144,10 +144,6 @@ public class HmsKerberosClient implements Closeable {
 
     String keyTabUri = kerberosConfig.getKeytab();
 
-    File keytabsDir = new File("keytabs");
-    if (!keytabsDir.exists()) {
-      keytabsDir.mkdir();
-    }
     File keytabFile = new File(path);
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
     KerberosAuthUtils.fetchKeytabFromUri(
@@ -158,7 +154,7 @@ public class HmsKerberosClient implements Closeable {
   @Override
   public void close() {
     try {
-      cancelTicketRefreshTask();
+      shutdownTicketRefresh();
 
       Files.deleteIfExists(Paths.get(keytabFilePath));
     } catch (IOException e) {
@@ -166,10 +162,11 @@ public class HmsKerberosClient implements Closeable {
     }
   }
 
-  private void cancelTicketRefreshTask() {
-    if (checkTgtRefreshTask != null) {
-      checkTgtRefreshTask.cancel(true);
-      checkTgtRefreshTask = null;
+  private void shutdownTicketRefresh() {
+    if (checkTgtRefreshExecutor != null) {
+      // Graceful shutdown: let any in-flight relogin finish before the thread is torn down.
+      checkTgtRefreshExecutor.shutdown();
+      checkTgtRefreshExecutor = null;
     }
   }
 
