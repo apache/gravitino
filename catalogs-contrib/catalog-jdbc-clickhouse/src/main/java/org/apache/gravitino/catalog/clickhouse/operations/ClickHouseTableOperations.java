@@ -98,6 +98,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
       Pattern.compile(
           "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
+  /** Matches ClickHouse wide integer type names (Int128/256, UInt128/256, and future variants). */
+  private static final Pattern WIDE_INTEGER_PATTERN = Pattern.compile("^U?INT\\d+$");
 
   private static final String QUERY_INDEXES_SQL =
       """
@@ -543,8 +545,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
    * the ClickHouse naming convention {@code U?INT<width>} to automatically cover future integer
    * variants (e.g. Int512) without code changes.
    */
-  private static final Pattern WIDE_INTEGER_PATTERN = Pattern.compile("^U?INT\\d+$");
-
   private static boolean isIntegerType(Type type) {
     if (type instanceof Type.IntegralType) {
       return true;
