@@ -635,6 +635,14 @@ public class GravitinoEnv {
       }
     }
 
+    if (lockManager != null) {
+      try {
+        lockManager.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close LockManager.", e);
+      }
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
