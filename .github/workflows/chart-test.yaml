@@ -42,7 +42,7 @@ jobs:
           check-latest: true
 
       - name: Set up chart-testing
-        uses: helm/chart-testing-action@2fe8321ec9b8d234608c02c67623a886b72d7335
+        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
 
       - name: List changed
         id: list-changed
