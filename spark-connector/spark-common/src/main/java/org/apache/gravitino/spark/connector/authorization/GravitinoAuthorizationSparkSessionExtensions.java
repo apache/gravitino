@@ -29,7 +29,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructType;
 import scala.Function1;
-import scala.collection.Seq;
+import scala.collection.immutable.Seq;
 
 /** Registers Gravitino authorization checks with a Spark session. */
 public class GravitinoAuthorizationSparkSessionExtensions
