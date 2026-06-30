@@ -251,11 +251,12 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testRegisterTableOverwriteSkipsHooks() {
+  public void testRegisterTableOverwriteSkipsExisting() {
     Namespace namespace = Namespace.of("test_schema");
     RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
     when(mockRequest.name()).thenReturn("test_table");
     when(mockRequest.overwrite()).thenReturn(true);
+    when(mockInternalTableDispatcher.tableExists(any())).thenReturn(true);
 
     LoadTableResponse mockResponse = mock(LoadTableResponse.class);
     when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
@@ -266,6 +267,26 @@ public class TestIcebergNamespaceHookDispatcher {
     Assertions.assertSame(mockResponse, response);
     verify(mockInternalTableDispatcher, never()).loadTable(any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRegisterTableOverwriteImportsMissing() {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
+    when(mockRequest.name()).thenReturn("test_table");
+    when(mockRequest.overwrite()).thenReturn(true);
+    when(mockInternalTableDispatcher.tableExists(any())).thenReturn(false);
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
+        .thenReturn(mockResponse);
+
+    LoadTableResponse response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
+
+    Assertions.assertSame(mockResponse, response);
+    verify(mockInternalTableDispatcher).loadTable(any());
+    verify(mockInternalOwnerDispatcher).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 

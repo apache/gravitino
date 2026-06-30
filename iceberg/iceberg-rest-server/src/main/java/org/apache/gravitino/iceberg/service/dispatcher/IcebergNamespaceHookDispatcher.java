@@ -184,9 +184,18 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
 
     if (registerTableRequest.overwrite()) {
-      // overwrite=true updates the Iceberg metadata pointer in place. The Gravitino table entity,
-      // table_id, and existing role/owner/tag/policy bindings must be preserved.
-      return response;
+      TableDispatcher tableDispatcher = GravitinoEnv.getInstance().internalTableDispatcher();
+      if (tableDispatcher != null
+          && tableDispatcher.tableExists(
+              IcebergIdentifierUtils.toGravitinoTableIdentifier(
+                  metalake,
+                  context.catalogName(),
+                  TableIdentifier.of(namespace, registerTableRequest.name()),
+                  HierarchicalSchemaUtil.schemaSeparator()))) {
+        // overwrite=true updates the Iceberg metadata pointer in place. When the Gravitino table
+        // entity already exists, preserve table_id and existing role/owner/tag/policy bindings.
+        return response;
+      }
     }
 
     // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
