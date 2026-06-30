@@ -77,6 +77,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 
 public class ClickHouseTableOperations extends JdbcTableOperations {
 
@@ -378,7 +379,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 "Sharding key column %s must not be nullable",
                 columnName);
             Preconditions.checkArgument(
-                shardingColumn.dataType() instanceof Type.IntegralType,
+                isIntegerType(shardingColumn.dataType()),
                 "Sharding key column %s must be an integer type, but got %s",
                 columnName,
                 shardingColumn.dataType());
@@ -517,8 +518,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   /**
    * Resolves the GRANULARITY value for a data skipping index from its properties, falling back to
-   * the ClickHouse default. The value is interpolated directly into DDL, so it must be a
-   * non-negative integer to avoid generating malformed SQL.
+   * the ClickHouse default. The value is interpolated directly into DDL, so it must be a positive
+   * integer (≥ 1) to avoid generating malformed SQL.
    *
    * @param index the index whose {@code granularity} property is read
    * @return the validated GRANULARITY value as a string
@@ -527,11 +528,30 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String granularity =
         index.properties().getOrDefault(INDEX_GRANULARITY_KEY, DEFAULT_INDEX_GRANULARITY);
     Preconditions.checkArgument(
-        StringUtils.isNumeric(granularity),
-        "Index %s granularity must be a non-negative integer, but got %s",
+        StringUtils.isNumeric(granularity) && !granularity.equals("0"),
+        "Index %s granularity must be a positive integer (>= 1), but got %s",
         index.name(),
         granularity);
     return granularity;
+  }
+
+  /**
+   * Checks whether the given type represents an integer type suitable for shard keys. Covers both
+   * Gravitino's built-in integral types (Int8–Int64, UInt8–UInt64) and ClickHouse-specific wide
+   * integers (Int128/256, UInt128/256) that map to {@link Types.ExternalType}.
+   */
+  private static boolean isIntegerType(Type type) {
+    if (type instanceof Type.IntegralType) {
+      return true;
+    }
+    if (type instanceof Types.ExternalType ext) {
+      String name = ext.catalogString().toUpperCase();
+      return name.startsWith("INT128")
+          || name.startsWith("INT256")
+          || name.startsWith("UINT128")
+          || name.startsWith("UINT256");
+    }
+    return false;
   }
 
   @Override
@@ -1309,8 +1329,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             if (ArrayUtils.isEmpty(fields)) {
               continue;
             }
+            // Only include granularity in properties when it differs from the default,
+            // so that indexes created without explicit granularity have empty properties
+            // and match the original creation state (avoids false index-change diffs).
             Map<String, String> properties =
-                Map.of(INDEX_GRANULARITY_KEY, String.valueOf(granularity));
+                String.valueOf(granularity).equals(DEFAULT_INDEX_GRANULARITY)
+                    ? Map.of()
+                    : Map.of(INDEX_GRANULARITY_KEY, String.valueOf(granularity));
             secondaryIndexes.add(
                 Indexes.of(getClickHouseIndexType(type), name, fields, properties));
           } catch (IllegalArgumentException e) {
