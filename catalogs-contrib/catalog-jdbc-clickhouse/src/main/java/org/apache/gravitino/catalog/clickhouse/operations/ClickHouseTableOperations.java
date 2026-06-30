@@ -888,12 +888,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String fieldStr = getIndexFieldStr(addIndex.getFieldNames());
     switch (addIndex.getType()) {
       case DATA_SKIPPING_MINMAX:
-        return "ADD INDEX %s %s TYPE minmax GRANULARITY 1"
-            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+        // TableChange.AddIndex has no properties field, so custom GRANULARITY cannot be passed
+        // through ALTER TABLE ADD INDEX. Use the ClickHouse default.
+        return "ADD INDEX %s %s TYPE minmax GRANULARITY %s"
+            .formatted(quoteIdentifier(addIndex.getName()), fieldStr, DEFAULT_INDEX_GRANULARITY);
 
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY 1"
-            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+        // TableChange.AddIndex has no properties field, so custom GRANULARITY cannot be passed
+        // through ALTER TABLE ADD INDEX. Use the ClickHouse default.
+        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY %s"
+            .formatted(quoteIdentifier(addIndex.getName()), fieldStr, DEFAULT_INDEX_GRANULARITY);
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
