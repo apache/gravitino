@@ -502,6 +502,30 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testHasDenyPolicyDetectsGroupInheritedDeny() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    // The user holds no direct roles; the deny role is only reachable through group membership.
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+    mockRoleInStore(DENY_ROLE_ID, "denyRole", ImmutableList.of(getDenySecurableObject()));
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(GROUP_NAME, ImmutableList.of(DENY_ROLE_ID), ImmutableList.of("denyRole"));
+
+    // A deny inherited via a group must still be detected, otherwise the list short-circuit would
+    // over-expose objects that a group-level deny is meant to hide.
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            groupPrincipal,
+            METALAKE,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  @Test
   public void testUserRoleCacheDoesNotReuseRolesAfterUsernameRecreate() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();

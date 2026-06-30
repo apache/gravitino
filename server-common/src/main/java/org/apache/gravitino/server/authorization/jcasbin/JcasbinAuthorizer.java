@@ -401,6 +401,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     // scope-agnostic (no metadataType filter): a parent-scope deny hides the whole subtree and an
     // object-scope deny hides one object, and both must disable the short-circuit.
     for (String roleId : denyEnforcer.getRolesForUser(userIdStr)) {
+      // getFilteredNamedPolicy returns every "p" row (p = sub, metadataType, metadataId, act, eft)
+      // whose field at POLICY_SUBJECT_FIELD_INDEX (sub) equals roleId, i.e. all rules carried by
+      // this role. denyEnforcer is a dedicated enforcer that is only ever loaded with privileges
+      // whose condition is DENY (see loadPolicyByRoleEntity), so every row here represents a deny
+      // regardless of its stored eft string. Each returned row is the list of those five fields,
+      // so we read field POLICY_ACTION_FIELD_INDEX (act) to compare the denied privilege.
       for (List<String> policy :
           denyEnforcer.getFilteredNamedPolicy("p", POLICY_SUBJECT_FIELD_INDEX, roleId)) {
         if (policy.size() > POLICY_ACTION_FIELD_INDEX

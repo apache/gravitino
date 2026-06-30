@@ -321,6 +321,123 @@ public class TestMetadataAuthzHelper {
     }
   }
 
+  /**
+   * Builds an authorizer that grants {@code SELECT_TABLE} at the schema scope, but only for the
+   * schema whose simple name equals {@code grantedSchema}. Used to prove the short-circuit never
+   * applies one parent's grant to siblings under a different parent.
+   */
+  private GravitinoAuthorizer mockSchemaScopedTableAuthorizer(String grantedSchema) {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    lenient()
+        .when(authorizer.authorize(any(), eq("testMetalake"), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              Privilege.Name privilege = invocation.getArgument(3);
+              return object.type() == MetadataObject.Type.SCHEMA
+                  && grantedSchema.equals(object.name())
+                  && privilege == Privilege.Name.SELECT_TABLE;
+            });
+    lenient()
+        .when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
+        .thenReturn(false);
+    lenient().when(authorizer.isOwner(any(), eq("testMetalake"), any(), any())).thenReturn(false);
+    lenient()
+        .when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any()))
+        .thenReturn(false);
+    return authorizer;
+  }
+
+  /**
+   * Builds an authorizer that grants no parent-scope privilege at all and only owns a single table
+   * ({@code ownedTable}). No ancestor grant means the short-circuit must not trigger, falling back
+   * to per-object filtering that exposes only the owned table.
+   */
+  private GravitinoAuthorizer mockTableOwnerOnlyAuthorizer(String ownedTable) {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    lenient()
+        .when(authorizer.authorize(any(), eq("testMetalake"), any(), any(), any()))
+        .thenReturn(false);
+    lenient()
+        .when(authorizer.deny(any(), eq("testMetalake"), any(), any(), any()))
+        .thenReturn(false);
+    lenient()
+        .when(authorizer.isOwner(any(), eq("testMetalake"), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              MetadataObject object = invocation.getArgument(2);
+              return object.type() == MetadataObject.Type.TABLE && ownedTable.equals(object.name());
+            });
+    lenient()
+        .when(authorizer.hasDenyPolicy(any(), eq("testMetalake"), anySet(), any()))
+        .thenReturn(false);
+    return authorizer;
+  }
+
+  @Test
+  public void testListShortCircuitDoesNotLeakAcrossParents() {
+    makeCompletableFutureUseCurrentThread();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      // Grant SELECT_TABLE only at schema s1; t2 lives under a different schema s2.
+      GravitinoAuthorizer authorizer = mockSchemaScopedTableAuthorizer("s1");
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      NameIdentifier[] tables =
+          new NameIdentifier[] {
+            NameIdentifierUtil.ofTable("testMetalake", "testCatalog", "s1", "t1"),
+            NameIdentifierUtil.ofTable("testMetalake", "testCatalog", "s2", "t2")
+          };
+      NameIdentifier[] filtered =
+          MetadataAuthzHelper.filterByExpression(
+              "testMetalake",
+              AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+              Entity.EntityType.TABLE,
+              tables);
+
+      // Identifiers span two schemas, so the single-parent short-circuit must not fire. Per-object
+      // filtering keeps only t1 (granted via s1) and never leaks t2 from the ungranted schema s2.
+      Assertions.assertEquals(1, filtered.length);
+      Assertions.assertEquals("t1", filtered[0].name());
+    }
+  }
+
+  @Test
+  public void testListNoParentGrantFallsBackToPerObject() {
+    makeCompletableFutureUseCurrentThread();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      GravitinoAuthorizer authorizer = mockTableOwnerOnlyAuthorizer("t1");
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      NameIdentifier[] filtered =
+          MetadataAuthzHelper.filterByExpression(
+              "testMetalake",
+              AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+              Entity.EntityType.TABLE,
+              threeTables());
+
+      // No ancestor grant exists, so the short-circuit is skipped and per-object filtering returns
+      // only the single table the user owns.
+      Assertions.assertEquals(1, filtered.length);
+      Assertions.assertEquals("t1", filtered[0].name());
+    }
+  }
+
   private static NameIdentifier[] threeTables() {
     return new NameIdentifier[] {
       NameIdentifierUtil.ofTable("testMetalake", "testCatalog", "testSchema", "t1"),
