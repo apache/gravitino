@@ -547,6 +547,35 @@ class TestClickHouseTableOperationsCluster {
     Assertions.assertTrue(sql.contains("Distributed"));
   }
 
+  /**
+   * Bare UInt128 column as shard key should be accepted, same as Int128 — both are wide integer
+   * types recognized by isIntegerType().
+   */
+  @Test
+  void testShardingKeyUInt128ColumnAccepted() {
+    Map<String, String> props = new HashMap<>();
+    props.put(ClusterConstants.CLUSTER_NAME, "ck_cluster");
+    props.put(ClusterConstants.ON_CLUSTER, "true");
+    props.put(GRAVITINO_ENGINE_KEY, "Distributed");
+    props.put(DistributedTableConstants.REMOTE_DATABASE, "remote_db");
+    props.put(DistributedTableConstants.REMOTE_TABLE, "remote_table");
+    props.put(DistributedTableConstants.SHARDING_KEY, "id");
+
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("id")
+              .withType(Types.ExternalType.of("UInt128"))
+              .withNullable(false)
+              .build()
+        };
+
+    String sql =
+        ops.buildCreateSql(
+            "tbl", columns, "comment", props, null, Distributions.NONE, new Index[0], null);
+    Assertions.assertTrue(sql.contains("Distributed"));
+  }
+
   /** A non-numeric index granularity should be rejected to avoid malformed DDL. */
   @Test
   void testIndexNonNumericGranularityRejected() {
@@ -601,6 +630,41 @@ class TestClickHouseTableOperationsCluster {
               "idx_c1",
               new String[][] {{"c1"}},
               Map.of("granularity", "0"))
+        };
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "tbl",
+                columns,
+                "comment",
+                new HashMap<>(),
+                null,
+                Distributions.NONE,
+                indexes,
+                null));
+  }
+
+  /** Index with leading-zero GRANULARITY (e.g. "00") should be rejected as it parses to 0. */
+  @Test
+  void testIndexLeadingZeroGranularityRejected() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build()
+        };
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_MINMAX,
+              "idx_c1",
+              new String[][] {{"c1"}},
+              Map.of("granularity", "00"))
         };
 
     Assertions.assertThrows(

@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -528,7 +529,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String granularity =
         index.properties().getOrDefault(INDEX_GRANULARITY_KEY, DEFAULT_INDEX_GRANULARITY);
     Preconditions.checkArgument(
-        StringUtils.isNumeric(granularity) && !granularity.equals("0"),
+        StringUtils.isNumeric(granularity) && Long.parseLong(granularity) >= 1,
         "Index %s granularity must be a positive integer (>= 1), but got %s",
         index.name(),
         granularity);
@@ -538,18 +539,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   /**
    * Checks whether the given type represents an integer type suitable for shard keys. Covers both
    * Gravitino's built-in integral types (Int8–Int64, UInt8–UInt64) and ClickHouse-specific wide
-   * integers (Int128/256, UInt128/256) that map to {@link Types.ExternalType}.
+   * integers (Int128/256, UInt128/256) that map to {@link Types.ExternalType}. The regex matches
+   * the ClickHouse naming convention {@code U?INT<width>} to automatically cover future integer
+   * variants (e.g. Int512) without code changes.
    */
+  private static final Pattern WIDE_INTEGER_PATTERN = Pattern.compile("^U?INT\\d+$");
+
   private static boolean isIntegerType(Type type) {
     if (type instanceof Type.IntegralType) {
       return true;
     }
     if (type instanceof Types.ExternalType ext) {
-      String name = ext.catalogString().toUpperCase();
-      return name.startsWith("INT128")
-          || name.startsWith("INT256")
-          || name.startsWith("UINT128")
-          || name.startsWith("UINT256");
+      return WIDE_INTEGER_PATTERN.matcher(ext.catalogString().toUpperCase(Locale.ROOT)).matches();
     }
     return false;
   }
