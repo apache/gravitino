@@ -74,7 +74,7 @@ public class GravitinoAuthorizationSparkSessionExtensions
 
     @Override
     public Seq<String> parseMultipartIdentifier(String sqlText) throws ParseException {
-      return delegate.parseMultipartIdentifier(sqlText);
+      return delegate.parseMultipartIdentifier(sqlText).toList();
     }
 
     @Override
