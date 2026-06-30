@@ -53,6 +53,10 @@ public abstract class NamespaceWrapper {
     return tableOps;
   }
 
+  public boolean isInitialized() {
+    return initialized;
+  }
+
   public LanceConfig config() {
     return config;
   }
