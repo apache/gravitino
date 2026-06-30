@@ -42,6 +42,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -72,6 +74,8 @@ public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String NEW_LINE = "\n";
+  private static final Pattern DORIS_VERSION_PATTERN =
+      Pattern.compile("(\\d+\\.\\d+\\.\\d+\\.?\\d*)");
 
   @Override
   public JdbcTablePartitionOperations createJdbcTablePartitionOperations(JdbcTable loadedTable) {
@@ -246,16 +250,42 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
     Preconditions.checkState(dataSource != null, "dataSource is required for version validation");
     String version = null;
+    // SELECT VERSION() returns the MySQL protocol version (e.g. "5.7.99"), not the Doris version.
+    // SHOW FRONTENDS returns the actual Doris version in the "Version" column
+    // (e.g. "doris-3.0.6.2-rc01-910c4249c5").
     try (Connection connection = dataSource.getConnection();
         Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT VERSION()")) {
-      if (rs.next()) {
-        version = rs.getString(1);
+        ResultSet rs = stmt.executeQuery("SHOW FRONTENDS")) {
+      ResultSetMetaData meta = rs.getMetaData();
+      int versionCol = -1;
+      for (int i = 1; i <= meta.getColumnCount(); i++) {
+        if ("Version".equals(meta.getColumnLabel(i))) {
+          versionCol = i;
+          break;
+        }
+      }
+      if (rs.next() && versionCol > 0) {
+        String versionStr = rs.getString(versionCol);
+        // Extract X.Y.Z from "doris-X.Y.Z-suffix-commit" using regex for robustness
+        Matcher matcher = DORIS_VERSION_PATTERN.matcher(versionStr);
+        if (matcher.find()) {
+          version = matcher.group(1);
+        }
       }
     } catch (SQLException e) {
-      LOG.warn("Failed to check Doris version for AUTO_INCREMENT compatibility", e);
+      throw new UnsupportedOperationException(
+          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
+              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
+              + "and the Doris FE is reachable.",
+          e);
     }
-    if (version != null && !isVersionAtLeast(version, 2, 1, 0)) {
+    if (version == null) {
+      throw new UnsupportedOperationException(
+          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
+              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
+              + "and the Doris FE is reachable.");
+    }
+    if (!isVersionAtLeast(version, 2, 1, 0)) {
       throw new UnsupportedOperationException(
           "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
     }
@@ -341,10 +371,12 @@ public class DorisTableOperations extends JdbcTableOperations {
       case INVERTED:
         return "USING INVERTED";
       case BITMAP:
-        // Doris 4.0.6 removed BITMAP from Nereids grammar (USING clause only accepts
-        // INVERTED/NGRAM_BF/ANN). Generate USING INVERTED for cross-version compatibility.
-        // The read path (mapDorisIndexType) also maps BITMAP->INVERTED for consistency.
-        return "USING INVERTED";
+        // Omit the USING clause for BITMAP indexes to maintain backward compatibility.
+        // Doris 1.2.x defaults bare INDEX to BITMAP; 3.0+/4.0+ defaults to INVERTED.
+        // The read path (mapDorisIndexType) maps BITMAP->INVERTED for cross-version consistency.
+        // Note: Doris 4.0.6 removed BITMAP from Nereids grammar (USING only accepts
+        // INVERTED/NGRAM_BF/ANN), so emitting USING BITMAP would fail on 4.0.x.
+        return "";
       case VECTOR:
         return "USING ANN";
       default:
@@ -967,6 +999,10 @@ public class DorisTableOperations extends JdbcTableOperations {
           "PRIMARY_KEY and UNIQUE_KEY cannot be added via ALTER TABLE ADD INDEX in Doris");
     }
     String usingClause = mapIndexTypeToUsingClause(addIndex.getType());
+    if (usingClause.isEmpty()) {
+      return String.format(
+          "ADD INDEX `%s` (`%s`)", addIndex.getName(), addIndex.getFieldNames()[0][0]);
+    }
     return String.format(
         "ADD INDEX `%s` (`%s`) %s",
         addIndex.getName(), addIndex.getFieldNames()[0][0], usingClause);

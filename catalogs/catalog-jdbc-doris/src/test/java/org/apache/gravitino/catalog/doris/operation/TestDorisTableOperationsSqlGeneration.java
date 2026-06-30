@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.doris.operation;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.util.Collections;
 import javax.sql.DataSource;
@@ -50,15 +51,20 @@ public class TestDorisTableOperationsSqlGeneration {
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
       try {
         // Set up a mock DataSource for validateAutoIncrementVersion
+        // Uses SHOW FRONTENDS to get the actual Doris version (not MySQL protocol version)
         DataSource mockDataSource = Mockito.mock(DataSource.class);
         Connection mockConnection = Mockito.mock(Connection.class);
         Statement mockStatement = Mockito.mock(Statement.class);
         ResultSet mockResultSet = Mockito.mock(ResultSet.class);
+        ResultSetMetaData mockMetaData = Mockito.mock(ResultSetMetaData.class);
         Mockito.when(mockDataSource.getConnection()).thenReturn(mockConnection);
         Mockito.when(mockConnection.createStatement()).thenReturn(mockStatement);
-        Mockito.when(mockStatement.executeQuery("SELECT VERSION()")).thenReturn(mockResultSet);
+        Mockito.when(mockStatement.executeQuery("SHOW FRONTENDS")).thenReturn(mockResultSet);
+        Mockito.when(mockResultSet.getMetaData()).thenReturn(mockMetaData);
+        Mockito.when(mockMetaData.getColumnCount()).thenReturn(1);
+        Mockito.when(mockMetaData.getColumnLabel(1)).thenReturn("Version");
         Mockito.when(mockResultSet.next()).thenReturn(true);
-        Mockito.when(mockResultSet.getString(1)).thenReturn("3.0.6.2");
+        Mockito.when(mockResultSet.getString(1)).thenReturn("doris-3.0.6.2-rc01-910c4249c5");
         super.dataSource = mockDataSource;
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -241,8 +247,8 @@ public class TestDorisTableOperationsSqlGeneration {
         mockOps.createTableSqlWithIndexes(
             "test_bitmap", new JdbcColumn[] {idCol, tagCol}, distribution, indexes);
     Assertions.assertTrue(
-        sql.contains("INDEX `idx_tag` (`tag`) USING INVERTED"),
-        "Should generate BITMAP index: " + sql);
+        sql.contains("INDEX `idx_tag` (`tag`)") && !sql.contains("INDEX `idx_tag` (`tag`) USING"),
+        "BITMAP index should omit USING clause for cross-version compatibility: " + sql);
   }
 
   @Test
@@ -356,12 +362,12 @@ public class TestDorisTableOperationsSqlGeneration {
     String sql = DorisTableOperations.addIndexDefinition(addIndex);
     Assertions.assertEquals("ADD INDEX `idx_name` (`col1`) USING INVERTED", sql);
 
-    // BITMAP index
+    // BITMAP index — omits USING clause for cross-version compatibility
     addIndex =
         (TableChange.AddIndex)
             TableChange.addIndex(Index.IndexType.BITMAP, "idx_tag", new String[][] {{"tag"}});
     sql = DorisTableOperations.addIndexDefinition(addIndex);
-    Assertions.assertEquals("ADD INDEX `idx_tag` (`tag`) USING INVERTED", sql);
+    Assertions.assertEquals("ADD INDEX `idx_tag` (`tag`)", sql);
 
     // VECTOR index (maps to ANN)
     addIndex =
