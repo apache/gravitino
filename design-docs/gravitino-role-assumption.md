@@ -148,6 +148,28 @@ X-Gravitino-Active-Roles: admin     →  403 Forbidden   (caller is not a member
   direct access checks, the filtering of list results, and the privileges used for credential vending.
 - **Backward compatible.** No header (or `ALL`) means today's union behavior, unchanged.
 
+### 3.4 Validation and error handling
+
+The header is parsed and validated before any authorization runs, and there are two distinct failure
+classes:
+
+- **Malformed value → `400 Bad Request`.** The value is syntactically invalid — an empty entry (e.g. a
+  trailing comma `analyst,`), a reserved keyword combined with anything else (`ALL,analyst`,
+  `NONE,reader`, `ALL,NONE`), or an unrecognized keyword. `ALL` and `NONE` are exclusive: each must
+  appear alone. Surrounding whitespace is trimmed and duplicate names collapse, so `analyst, analyst `
+  is fine; role names are matched exactly (case-sensitive), since that's how they're stored.
+- **Unauthorized role → `403 Forbidden`.** The value is well-formed but names a role the caller does not
+  currently hold. A **non-existent role and a role the caller simply isn't granted are treated
+  identically** — both are "not in your effective set" and both 403. We deliberately don't distinguish
+  them, so the response can't be used to probe which role names exist.
+
+This is a **fail-closed** choice: any unknown or unheld role rejects the whole request rather than being
+silently dropped. Silent dropping would be *safe* in the escalation sense — narrowing can only ever
+remove roles, so an ignored role could never grant access — but it would turn a typo into a confusing
+partial or total loss of access that's hard to debug. Rejecting surfaces the mistake immediately. (A
+role that's deleted or revoked mid-flight is just the non-existent / not-held case on the next request:
+it drops out of the effective set and a header naming it returns 403.)
+
 ---
 
 ## 4. How the server enforces narrowing
@@ -159,8 +181,9 @@ the request:
 1. **Resolve** the caller's effective roles the normal way — direct grants plus group-inherited ones.
    Say that's `{analyst, editor, auditor}`.
 2. **Validate** the header against that set. The declared role must be one the caller actually holds; a
-   role they don't hold is rejected. This is the guardrail that keeps narrowing *subtractive* — you can
-   reduce what you use, never assume a role you were never granted.
+   role they don't hold — including one that doesn't exist — is rejected (see Section 3.4 for the exact
+   `400` vs `403` rules). This is the guardrail that keeps narrowing *subtractive* — you can reduce what
+   you use, never assume a role you were never granted.
 3. **Enforce** using only the validated active role(s). With `X-Gravitino-Active-Roles: analyst`, the
    request is evaluated as `analyst` alone; `editor` and `auditor` are simply not consulted.
 
