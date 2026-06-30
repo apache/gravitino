@@ -59,11 +59,9 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 public class AuthorizationTable implements Table, SupportsRead, SupportsWrite {
 
   // Denied tables discovered while resolving the relations of a single query, keyed by the fully
-  // qualified table identifier. Held per-thread because Spark analyzes one query per thread, and
-  // drained by RequiredPrivilegesCheck once resolution completes.
-  private static final ThreadLocal<Map<String, Set<Privilege.Name>>> DENIED_TABLES =
-      ThreadLocal.withInitial(TreeMap::new);
-  private static final ThreadLocal<ForbiddenException> FIRST_FAILURE = new ThreadLocal<>();
+  // qualified table identifier. Held per-thread because Spark analyzes one query per thread.
+  private static final ThreadLocal<DeniedTables> DENIED_TABLES =
+      ThreadLocal.withInitial(DeniedTables::new);
 
   private static final StructType EMPTY_SCHEMA = new StructType();
   private static final Transform[] EMPTY_PARTITIONING = new Transform[0];
@@ -98,13 +96,7 @@ public class AuthorizationTable implements Table, SupportsRead, SupportsWrite {
       String tableIdentifier,
       Set<Privilege.Name> requiredPrivileges,
       ForbiddenException forbiddenException) {
-    DENIED_TABLES
-        .get()
-        .computeIfAbsent(tableIdentifier, ignored -> new TreeSet<>())
-        .addAll(requiredPrivileges);
-    if (FIRST_FAILURE.get() == null) {
-      FIRST_FAILURE.set(forbiddenException);
-    }
+    DENIED_TABLES.get().record(tableIdentifier, requiredPrivileges, forbiddenException);
     return new AuthorizationTable(name, forbiddenException);
   }
 
@@ -115,32 +107,16 @@ public class AuthorizationTable implements Table, SupportsRead, SupportsWrite {
    * @return the aggregated failure, or empty if there is none
    */
   public static Optional<ForbiddenException> drainFailure() {
-    Map<String, Set<Privilege.Name>> deniedTables = DENIED_TABLES.get();
-    if (deniedTables.isEmpty()) {
+    try {
+      return DENIED_TABLES.get().failure();
+    } finally {
       clear();
-      return Optional.empty();
     }
-    ForbiddenException firstFailure = FIRST_FAILURE.get();
-    String requirements =
-        deniedTables.entrySet().stream()
-            .map(
-                entry ->
-                    entry.getKey()
-                        + ": "
-                        + entry.getValue().stream()
-                            .map(Privilege.Name::name)
-                            .collect(Collectors.joining(", ")))
-            .collect(Collectors.joining("; "));
-    clear();
-    return Optional.of(
-        new ForbiddenException(
-            firstFailure, "Missing required privileges for Spark tables: [%s]", requirements));
   }
 
   /** Clears the denied tables collected on the current thread. */
   public static void clear() {
     DENIED_TABLES.remove();
-    FIRST_FAILURE.remove();
   }
 
   @Override
@@ -176,5 +152,42 @@ public class AuthorizationTable implements Table, SupportsRead, SupportsWrite {
   @Override
   public WriteBuilder newWriteBuilder(LogicalWriteInfo info) {
     throw forbiddenException;
+  }
+
+  private static class DeniedTables {
+    private final Map<String, Set<Privilege.Name>> tables = new TreeMap<>();
+    private ForbiddenException firstFailure;
+
+    private void record(
+        String tableIdentifier,
+        Set<Privilege.Name> requiredPrivileges,
+        ForbiddenException forbiddenException) {
+      tables
+          .computeIfAbsent(tableIdentifier, ignored -> new TreeSet<>())
+          .addAll(requiredPrivileges);
+      if (firstFailure == null) {
+        firstFailure = forbiddenException;
+      }
+    }
+
+    private Optional<ForbiddenException> failure() {
+      if (tables.isEmpty()) {
+        return Optional.empty();
+      }
+
+      String requirements =
+          tables.entrySet().stream()
+              .map(
+                  entry ->
+                      entry.getKey()
+                          + ": "
+                          + entry.getValue().stream()
+                              .map(Privilege.Name::name)
+                              .collect(Collectors.joining(", ")))
+              .collect(Collectors.joining("; "));
+      return Optional.of(
+          new ForbiddenException(
+              firstFailure, "Missing required privileges for Spark tables: [%s]", requirements));
+    }
   }
 }

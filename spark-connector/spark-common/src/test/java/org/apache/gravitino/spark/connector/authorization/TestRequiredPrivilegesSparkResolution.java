@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.authorization;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -113,6 +114,19 @@ public class TestRequiredPrivilegesSparkResolution {
             ForbiddenException.class, () -> spark.sql("SELECT missing_col FROM denied.db.t1"));
 
     assertTrue(failure.getMessage().contains("denied.db.t1: SELECT_TABLE"), failure.getMessage());
+  }
+
+  @Test
+  void testSqlParserClearsStaleDeniedTablesBeforeNextQuery() throws Exception {
+    AuthorizationTable.deny(
+        "stale_table",
+        "catalog.schema.stale_table",
+        ImmutableSet.of(Privilege.Name.SELECT_TABLE),
+        new ForbiddenException("denied stale table"));
+
+    spark.sessionState().sqlParser().parsePlan("SELECT 1");
+
+    assertFalse(AuthorizationTable.drainFailure().isPresent());
   }
 
   /** A catalog that denies every table, used to exercise the authorization resolution path. */
