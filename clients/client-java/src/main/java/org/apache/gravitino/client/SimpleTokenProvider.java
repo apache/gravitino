@@ -24,35 +24,49 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.apache.gravitino.auth.AuthConstants;
 
-/* *
- * SimpleAuthProvider will use the environment variable `GRAVITINO_USER` or
- * the user of the system to generate a basic token for every request.
+/**
+ * SimpleAuthProvider will use the environment variable {@code GRAVITINO_USER} or the user of the
+ * system to generate a basic token for every request.
  */
 final class SimpleTokenProvider implements AuthDataProvider {
 
   private final byte[] token;
 
+  /** Creates a SimpleTokenProvider using the {@code GRAVITINO_USER} env var or system username. */
   public SimpleTokenProvider() {
     String gravitinoUser = System.getenv("GRAVITINO_USER");
     if (gravitinoUser == null) {
       gravitinoUser = System.getProperty("user.name");
     }
-    this.token = buildToken(gravitinoUser);
+    this.token = buildToken(gravitinoUser, "dummy");
   }
 
+  /**
+   * Creates a SimpleTokenProvider with an explicit username.
+   *
+   * @param gravitinoUser The username to authenticate with.
+   */
   public SimpleTokenProvider(String gravitinoUser) {
-    this.token = buildToken(gravitinoUser);
+    this.token = buildToken(gravitinoUser, "dummy");
   }
 
-  private byte[] buildToken(String gravitinoUser) {
-    String userInformation = gravitinoUser + ":dummy";
-    byte[] token =
-        (AuthConstants.AUTHORIZATION_BASIC_HEADER
-                + new String(
-                    Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8)),
-                    StandardCharsets.UTF_8))
-            .getBytes(StandardCharsets.UTF_8);
-    return token;
+  /**
+   * Creates a SimpleTokenProvider with an explicit username and password.
+   *
+   * @param gravitinoUser The username to authenticate with.
+   * @param password The password to authenticate with.
+   */
+  public SimpleTokenProvider(String gravitinoUser, String password) {
+    this.token = buildToken(gravitinoUser, password);
+  }
+
+  private static byte[] buildToken(String gravitinoUser, String password) {
+    String userInformation = gravitinoUser + ":" + password;
+    return (AuthConstants.AUTHORIZATION_BASIC_HEADER
+            + new String(
+                Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8)),
+                StandardCharsets.UTF_8))
+        .getBytes(StandardCharsets.UTF_8);
   }
 
   @Override
