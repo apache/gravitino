@@ -25,7 +25,9 @@ import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.ME
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.PRINCIPAL;
 import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_FILTER_FIELD_PARAMS;
 import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_URIS;
+import static org.apache.gravitino.catalog.hive.HiveConstants.NUM_PARTITIONS;
 import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
+import static org.apache.gravitino.catalog.hive.HiveConstants.TOTAL_SIZE;
 import static org.apache.gravitino.catalog.hive.TableType.EXTERNAL_TABLE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.hive.HiveTable.SUPPORT_TABLE_TYPES;
@@ -69,6 +71,7 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
+import org.apache.gravitino.hive.HivePartition;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
@@ -114,6 +117,9 @@ public class HiveCatalogOperations
   // The maximum number of tables that can be returned by the listTableNamesByFilter function.
   // The default value is -1, which means that all tables are returned.
   private static final short MAX_TABLES = -1;
+  // The batch size for partition statistics aggregation to avoid loading all partitions
+  // into memory at once.
+  private static final int PARTITION_BATCH_SIZE = 1000;
   static final String ALL_TABLE_PATTERN = "*";
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
@@ -491,11 +497,127 @@ public class HiveCatalogOperations
     try {
       HiveTable table =
           clientPool.run(c -> c.getTable(catalogName, schemaIdent.name(), tableIdent.name()));
+      aggregatePartitionTotalSize(table);
       return new HiveTableHandle(table, clientPool);
 
     } catch (InterruptedException e) {
       throw new RuntimeException(
           "Failed to load Hive table " + tableIdent.name() + " from Hive metastore", e);
+    }
+  }
+
+  /**
+   * Aggregates partition-level totalSize into table-level properties for partitioned Hive tables.
+   * Uses batched partition loading (batch size = {@value #PARTITION_BATCH_SIZE}) to control memory
+   * usage, mimicking Hive's DESCRIBE TABLE behavior.
+   *
+   * <p>Steps:
+   *
+   * <ol>
+   *   <li>Fetch all partition names via lightweight {@code listPartitionNames} call
+   *   <li>Chunk names into batches of {@value #PARTITION_BATCH_SIZE}
+   *   <li>For each batch, fetch partition objects via {@code listPartitionsByNames}
+   *   <li>Accumulate totalSize from partition metadata
+   *   <li>Write aggregated totalSize and numPartitions into table properties
+   * </ol>
+   *
+   * <p>Failures are logged at WARN level and do not block the table load. Aggregated values exist
+   * only in memory and are NOT persisted back to HMS.
+   *
+   * @param table the HiveTable whose properties will be enriched
+   */
+  private void aggregatePartitionTotalSize(HiveTable table) {
+    // Only aggregate for partitioned tables
+    if (table == null || table.partitionFieldNames().isEmpty()) {
+      return;
+    }
+
+    Map<String, String> tableProps = table.properties();
+    // Skip if table-level totalSize already exists, to avoid redundant work
+    if (tableProps != null && tableProps.containsKey(TOTAL_SIZE)) {
+      return;
+    }
+
+    try {
+      // Step 1: Get all partition names (lightweight, only strings)
+      List<String> allPartitionNames = clientPool.run(c -> c.listPartitionNames(table, (short) -1));
+
+      if (allPartitionNames == null || allPartitionNames.isEmpty()) {
+        tableProps.put(TOTAL_SIZE, "0");
+        tableProps.put(NUM_PARTITIONS, "0");
+        return;
+      }
+
+      long totalSizeSum = 0L;
+      int totalPartitions = 0;
+
+      // Step 2 & 3: Iterate in batches
+      int totalCount = allPartitionNames.size();
+      for (int i = 0; i < totalCount; i += PARTITION_BATCH_SIZE) {
+        int end = Math.min(i + PARTITION_BATCH_SIZE, totalCount);
+        List<String> batch = new ArrayList<>(allPartitionNames.subList(i, end));
+
+        List<HivePartition> partitions = clientPool.run(c -> c.listPartitionsByNames(table, batch));
+
+        // Step 4: Extract totalSize from each partition in the batch
+        for (HivePartition partition : partitions) {
+          Map<String, String> partProps = partition.properties();
+          if (partProps != null) {
+            String totalSizeStr = partProps.get(TOTAL_SIZE);
+            if (totalSizeStr != null) {
+              try {
+                totalSizeSum += Long.parseLong(totalSizeStr);
+              } catch (NumberFormatException e) {
+                LOG.warn(
+                    "Invalid {} value '{}' for partition {} of table {}.{}",
+                    TOTAL_SIZE,
+                    totalSizeStr,
+                    partition.name(),
+                    table.databaseName(),
+                    table.name());
+              }
+            }
+          }
+          totalPartitions++;
+        }
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(
+              "Aggregated batch {}-{} / {} partitions for Hive table {}.{}",
+              i + 1,
+              end,
+              totalCount,
+              table.databaseName(),
+              table.name());
+        }
+      }
+
+      // Step 5: Write aggregated values to table properties (in-memory only, not persisted to HMS)
+      tableProps.put(TOTAL_SIZE, Long.toString(totalSizeSum));
+      tableProps.put(NUM_PARTITIONS, Integer.toString(totalPartitions));
+
+      LOG.info(
+          "Aggregated partition totalSize for Hive table {}.{}: totalSize={}, numPartitions={}",
+          table.databaseName(),
+          table.name(),
+          totalSizeSum,
+          totalPartitions);
+
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.warn(
+          "Interrupted while aggregating partition totalSize for Hive table {}.{}, "
+              + "returning table without aggregated totalSize",
+          table.databaseName(),
+          table.name(),
+          e);
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to aggregate partition totalSize for Hive table {}.{}, "
+              + "returning table without aggregated totalSize",
+          table.databaseName(),
+          table.name(),
+          e);
     }
   }
 
