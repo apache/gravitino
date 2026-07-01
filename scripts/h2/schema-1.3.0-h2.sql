@@ -176,8 +176,11 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'user deleted at',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
+    `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external id',
+    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled',
     PRIMARY KEY (`user_id`),
     CONSTRAINT `uk_mid_us_del` UNIQUE (`metalake_id`, `user_name`, `deleted_at`),
+    CONSTRAINT `uk_mid_ueid_del` UNIQUE (`metalake_id`, `external_id`, `deleted_at`),
     KEY `idx_user_meta_name_del_upd` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB;
 
@@ -223,6 +226,19 @@ CREATE TABLE IF NOT EXISTS `user_role_rel` (
     KEY `idx_rid` (`role_id`)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS `user_group_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
+    `audit_info` CLOB NOT NULL COMMENT 'relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
+    PRIMARY KEY (`id`),
+    CONSTRAINT `uk_ui_gi_del` UNIQUE (`user_id`, `group_id`, `deleted_at`),
+    KEY `idx_gid` (`group_id`)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS `group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
@@ -232,8 +248,10 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
+    `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external id',
     PRIMARY KEY (`group_id`),
     CONSTRAINT `uk_mid_gr_del` UNIQUE (`metalake_id`, `group_name`, `deleted_at`),
+    CONSTRAINT `uk_mid_geid_del` UNIQUE (`metalake_id`, `external_id`, `deleted_at`),
     KEY `idx_group_meta_name_del_upd` (`metalake_id`, `group_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB;
 
@@ -248,6 +266,19 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     PRIMARY KEY (`id`),
     CONSTRAINT `uk_gi_ri_del` UNIQUE (`group_id`, `role_id`, `deleted_at`),
     KEY `idx_gid` (`group_id`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `scim_token` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `token_name` VARCHAR(256) NOT NULL COMMENT 'scim token name',
+    `token_hash` VARCHAR(64) NOT NULL COMMENT 'SHA-256 hex digest of scim token value',
+    `expires_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'token expiry time in ms; 0 = never expires',
+    `audit_info` CLOB NOT NULL COMMENT 'scim token audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'token deleted at',
+    PRIMARY KEY (`id`),
+    CONSTRAINT `uk_mid_tn_del` UNIQUE (`metalake_id`, `token_name`, `deleted_at`),
+    KEY `idx_st_hash` (`token_hash`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `idp_user_meta` (
