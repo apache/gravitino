@@ -19,33 +19,11 @@
 
 package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
-import org.apache.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.condition.DisabledIf;
 
 /**
  * Spark 3.3 integration tests for automatic Iceberg REST catalog registration via {@code
  * spark.sql.gravitino.iceberg.enableRestAccess=true} with dynamic-config-provider.
- *
- * <p>Spark 3.3 pins Iceberg to 1.8.x; the Gravitino REST server runs Iceberg 1.11. Tests run in
- * non-embedded mode only to avoid classpath conflicts.
  */
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
-public class SparkIcebergCatalogAutoRestAccessIT33 extends SparkIcebergCatalogAutoRestAccessIT {
-
-  @Override
-  protected SparkMetadataColumnInfo[] getIcebergMetadataColumns() {
-    return new SparkMetadataColumnInfo[] {
-      new SparkMetadataColumnInfo("_spec_id", DataTypes.IntegerType, false),
-      new SparkMetadataColumnInfo(
-          "_partition",
-          DataTypes.createStructType(
-              new StructField[] {DataTypes.createStructField("name", DataTypes.StringType, true)}),
-          true),
-      new SparkMetadataColumnInfo("_file", DataTypes.StringType, false),
-      new SparkMetadataColumnInfo("_pos", DataTypes.LongType, false),
-      new SparkMetadataColumnInfo("_deleted", DataTypes.BooleanType, false)
-    };
-  }
-}
+public class SparkIcebergCatalogAutoRestAccessIT33 extends SparkIcebergCatalogAutoRestAccessIT {}
