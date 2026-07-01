@@ -25,27 +25,91 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.OptimisticLockException;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestTreeLockUtils {
 
-  @Test
-  void testHolderMultipleLock() throws Exception {
+  @BeforeEach
+  void setUp() throws Exception {
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+  }
 
+  @Test
+  void testHolderMultipleLock() throws Exception {
     TreeLockUtils.doWithTreeLock(
         NameIdentifier.of("test"),
         LockType.READ,
         () ->
             TreeLockUtils.doWithTreeLock(
                 NameIdentifier.of("test", "test1"), LockType.WRITE, () -> null));
+  }
+
+  @Test
+  void testOccRetrySucceedsOnSecondAttempt() throws Exception {
+    AtomicInteger callCount = new AtomicInteger(0);
+
+    String result =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of("test"),
+            LockType.WRITE,
+            () -> {
+              if (callCount.incrementAndGet() == 1) {
+                throw new OptimisticLockException("simulated conflict");
+              }
+              return "success";
+            });
+
+    Assertions.assertEquals("success", result);
+    Assertions.assertEquals(2, callCount.get());
+  }
+
+  @Test
+  void testOccReadDoesNotRetry() {
+    AtomicInteger callCount = new AtomicInteger(0);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of("test"),
+                LockType.READ,
+                () -> {
+                  callCount.incrementAndGet();
+                  throw new OptimisticLockException("should not retry");
+                }));
+
+    // READ operations are never retried
+    Assertions.assertEquals(1, callCount.get());
+  }
+
+  @Test
+  void testOccRetryExhausted() {
+    AtomicInteger callCount = new AtomicInteger(0);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of("test"),
+                LockType.WRITE,
+                () -> {
+                  callCount.incrementAndGet();
+                  throw new OptimisticLockException("persistent conflict");
+                }));
+
+    // 1 original attempt + OCC_MAX_RETRIES retries
+    Assertions.assertEquals(TreeLockUtils.OCC_MAX_RETRIES + 1, callCount.get());
   }
 }

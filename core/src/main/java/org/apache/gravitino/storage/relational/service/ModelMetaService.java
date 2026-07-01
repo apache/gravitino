@@ -35,6 +35,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.OptimisticLockException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
@@ -408,7 +409,7 @@ public class ModelMetaService {
     if (updateResult.get() > 0) {
       return newEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + identifier);
+      throw new OptimisticLockException("Concurrent modification detected for: %s", identifier);
     }
   }
 

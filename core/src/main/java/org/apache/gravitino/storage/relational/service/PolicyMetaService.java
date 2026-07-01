@@ -34,6 +34,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.OptimisticLockException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -178,7 +179,8 @@ public class PolicyMetaService {
     if (updateResult > 0) {
       return updatedPolicyEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + updatedPolicyEntity);
+      throw new OptimisticLockException(
+          "Concurrent modification detected for: %s", updatedPolicyEntity.nameIdentifier());
     }
   }
 
