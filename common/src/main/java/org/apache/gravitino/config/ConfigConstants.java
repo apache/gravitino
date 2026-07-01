@@ -92,6 +92,9 @@ public final class ConfigConstants {
   /** The version number for the 1.3.0 release. */
   public static final String VERSION_1_3_0 = "1.3.0";
 
+  /** The version number for the 2.0.0 release. */
+  public static final String VERSION_2_0_0 = "2.0.0";
+
   /** The current version of backend storage initialization script. */
-  public static final String CURRENT_SCRIPT_VERSION = VERSION_1_3_0;
+  public static final String CURRENT_SCRIPT_VERSION = VERSION_2_0_0;
 }
