@@ -93,8 +93,10 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // First, register the view in the underlying catalog
     LoadViewResponse response = dispatcher.registerView(context, namespace, registerViewRequest);
 
-    // Then import it into Gravitino so Gravitino is aware of the view
-    importView(context.catalogName(), namespace, registerViewRequest.name());
+    // Import is intentionally NOT wrapped in try-catch: if it fails the view exists in Iceberg
+    // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
+    // entity is registered. Surface the failure so the caller can react.
+    importViewForRegister(context.catalogName(), namespace, registerViewRequest.name());
 
     // Set ownership for the newly registered view.
     IcebergOwnershipUtils.setViewOwner(
@@ -193,6 +195,52 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // stale entity on the source or miss importing a re-created destination.
     bestEffortReconcileViewEntity(context, renameViewRequest.source());
     bestEffortReconcileViewEntity(context, renameViewRequest.destination());
+  }
+
+  /**
+   * Import a view into Gravitino's metadata catalog for the register-view operation.
+   *
+   * <p>Unlike {@link #importView}, this method is NOT best-effort: if the import fails, the
+   * exception propagates to the caller. Registration's purpose is to register the entity in
+   * Gravitino, so a silent failure would mislead callers into thinking the entity is registered.
+   *
+   * <p>Skips the import if the view entity already exists in the Gravitino EntityStore.
+   *
+   * @param catalogName The name of the Gravitino catalog.
+   * @param namespace The Iceberg namespace containing the view.
+   * @param viewName The name of the view.
+   */
+  private void importViewForRegister(String catalogName, Namespace namespace, String viewName) {
+    NameIdentifier viewIdent =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            catalogName,
+            TableIdentifier.of(namespace, viewName),
+            HierarchicalSchemaUtil.schemaSeparator());
+
+    // Skip import/setOwner when the view entity already exists in Gravitino EntityStore
+    EntityStore store = GravitinoEnv.getInstance().entityStore();
+    if (store != null) {
+      try {
+        if (store.exists(viewIdent, Entity.EntityType.VIEW)) {
+          LOG.info("View entity already exists in Gravitino store, skipping import: {}", viewIdent);
+          return;
+        }
+      } catch (Exception e) {
+        LOG.warn("Failed to check view entity existence: {}", viewIdent, e);
+      }
+    }
+
+    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
+    if (viewDispatcher != null) {
+      viewDispatcher.loadView(viewIdent);
+      LOG.info(
+          "Successfully imported view into Gravitino: {}.{}.{}.{}",
+          metalake,
+          catalogName,
+          namespace,
+          viewName);
+    }
   }
 
   /**
