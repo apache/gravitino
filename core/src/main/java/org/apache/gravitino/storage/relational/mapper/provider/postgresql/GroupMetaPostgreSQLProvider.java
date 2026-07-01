@@ -73,9 +73,13 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
 
   @Override
   public String listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "SELECT "
-        + groupMetaSelectColumns("gt")
-        + ", JSON_AGG(rot.role_name) as roleNames,"
+    return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
+        + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
+        + " gt.audit_info as auditInfo,"
+        + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
+        + " gt.deleted_at as deletedAt,"
+        + " JSON_AGG(rot.role_name) as roleNames,"
         + " JSON_AGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME
@@ -99,9 +103,13 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return "<script>"
-        + "SELECT "
-        + groupMetaSelectColumns("gt")
-        + ", JSON_AGG(rot.role_name) as roleNames,"
+        + "SELECT gt.group_id as groupId, gt.group_name as groupName,"
+        + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
+        + " gt.audit_info as auditInfo,"
+        + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
+        + " gt.deleted_at as deletedAt,"
+        + " JSON_AGG(rot.role_name) as roleNames,"
         + " JSON_AGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME

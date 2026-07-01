@@ -32,21 +32,6 @@ import org.apache.ibatis.annotations.Param;
 
 public class UserMetaBaseSQLProvider {
 
-  protected static final String USER_META_INSERT_COLUMNS =
-      " user_id, user_name, metalake_id, external_id, enabled, audit_info,"
-          + " current_version, last_version, deleted_at";
-
-  protected static final String USER_META_INSERT_VALUES =
-      " #{userMeta.userId},"
-          + " #{userMeta.userName},"
-          + " #{userMeta.metalakeId},"
-          + " #{userMeta.externalId},"
-          + " #{userMeta.enabled},"
-          + " #{userMeta.auditInfo},"
-          + " #{userMeta.currentVersion},"
-          + " #{userMeta.lastVersion},"
-          + " #{userMeta.deletedAt}";
-
   protected String userMetaSelectColumns(String tableAlias) {
     String prefix = tableAlias + ".";
     return prefix
@@ -100,22 +85,36 @@ public class UserMetaBaseSQLProvider {
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + " ("
-        + USER_META_INSERT_COLUMNS
-        + ")"
+        + " (user_id, user_name, metalake_id, external_id, enabled,"
+        + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES ("
-        + USER_META_INSERT_VALUES
+        + " #{userMeta.userId},"
+        + " #{userMeta.userName},"
+        + " #{userMeta.metalakeId},"
+        + " #{userMeta.externalId},"
+        + " #{userMeta.enabled},"
+        + " #{userMeta.auditInfo},"
+        + " #{userMeta.currentVersion},"
+        + " #{userMeta.lastVersion},"
+        + " #{userMeta.deletedAt}"
         + " )";
   }
 
   public String insertUserMetaOnDuplicateKeyUpdate(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + " ("
-        + USER_META_INSERT_COLUMNS
-        + ")"
+        + " (user_id, user_name, metalake_id, external_id, enabled,"
+        + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES ("
-        + USER_META_INSERT_VALUES
+        + " #{userMeta.userId},"
+        + " #{userMeta.userName},"
+        + " #{userMeta.metalakeId},"
+        + " #{userMeta.externalId},"
+        + " #{userMeta.enabled},"
+        + " #{userMeta.auditInfo},"
+        + " #{userMeta.currentVersion},"
+        + " #{userMeta.lastVersion},"
+        + " #{userMeta.deletedAt}"
         + " )"
         + " ON DUPLICATE KEY UPDATE"
         + " user_name = #{userMeta.userName},"
@@ -180,8 +179,11 @@ public class UserMetaBaseSQLProvider {
   }
 
   public String listUsersByRoleId(@Param("roleId") Long roleId) {
-    return "SELECT "
-        + userMetaSelectColumns("us")
+    return "SELECT us.user_id as userId, us.user_name as userName,"
+        + " us.metalake_id as metalakeId,"
+        + " us.external_id as externalId, us.enabled as enabled,"
+        + " us.audit_info as auditInfo, us.current_version as currentVersion,"
+        + " us.last_version as lastVersion, us.deleted_at as deletedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " us JOIN "
@@ -192,8 +194,12 @@ public class UserMetaBaseSQLProvider {
   }
 
   public String listUserPOsByMetalake(@Param("metalakeName") String metalakeName) {
-    return "SELECT "
-        + userMetaSelectColumns("ut")
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.external_id as externalId, ut.enabled as enabled,"
+        + " ut.audit_info as auditInfo,"
+        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
+        + " ut.deleted_at as deletedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " ut JOIN "
@@ -204,9 +210,13 @@ public class UserMetaBaseSQLProvider {
   }
 
   public String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "SELECT "
-        + userMetaSelectColumns("ut")
-        + ", JSON_ARRAYAGG(rot.role_name) as roleNames,"
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.external_id as externalId, ut.enabled as enabled,"
+        + " ut.audit_info as auditInfo,"
+        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
+        + " ut.deleted_at as deletedAt,"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
         + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + USER_TABLE_NAME

@@ -74,9 +74,13 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
 
   @Override
   public String listExtendedUserPOsByMetalakeId(Long metalakeId) {
-    return "SELECT "
-        + userMetaSelectColumns("ut")
-        + ", JSON_AGG(rot.role_name) as roleNames,"
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.external_id as externalId, ut.enabled as enabled,"
+        + " ut.audit_info as auditInfo,"
+        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
+        + " ut.deleted_at as deletedAt,"
+        + " JSON_AGG(rot.role_name) as roleNames,"
         + " JSON_AGG(rot.role_id) as roleIds"
         + " FROM "
         + USER_TABLE_NAME
