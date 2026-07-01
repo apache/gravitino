@@ -479,7 +479,7 @@ COMMENT ON COLUMN scim_token.id IS 'auto increment id';
 COMMENT ON COLUMN scim_token.metalake_id IS 'metalake id';
 COMMENT ON COLUMN scim_token.token_name IS 'scim token name';
 COMMENT ON COLUMN scim_token.token_hash IS 'SHA-256 hex digest of scim token value';
-COMMENT ON COLUMN scim_token.expires_at IS 'token expiry time in ms; 0 = never expires';
+COMMENT ON COLUMN scim_token.expires_at IS 'token expiry time in ms, 0 means never expires';
 COMMENT ON COLUMN scim_token.audit_info IS 'scim token audit info';
 COMMENT ON COLUMN scim_token.deleted_at IS 'token deleted at';
 

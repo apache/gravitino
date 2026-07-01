@@ -264,7 +264,7 @@ CREATE TABLE IF NOT EXISTS `scim_token` (
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `token_name` VARCHAR(256) NOT NULL COMMENT 'scim token name',
     `token_hash` VARCHAR(64) NOT NULL COMMENT 'SHA-256 hex digest of scim token value',
-    `expires_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'token expiry time in ms; 0 = never expires',
+    `expires_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'token expiry time in ms, 0 means never expires',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'scim token audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'token deleted at',
     PRIMARY KEY (`id`),
