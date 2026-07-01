@@ -29,6 +29,7 @@ public class GroupPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+  private String externalId;
 
   public Long getGroupId() {
     return groupId;
@@ -58,6 +59,10 @@ public class GroupPO {
     return deletedAt;
   }
 
+  public String getExternalId() {
+    return externalId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -73,7 +78,8 @@ public class GroupPO {
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
+        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt())
+        && Objects.equal(getExternalId(), tablePO.getExternalId());
   }
 
   @Override
@@ -85,7 +91,8 @@ public class GroupPO {
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
-        getDeletedAt());
+        getDeletedAt(),
+        getExternalId());
   }
 
   public static class Builder {
@@ -127,6 +134,11 @@ public class GroupPO {
 
     public Builder withDeletedAt(Long deletedAt) {
       groupPO.deletedAt = deletedAt;
+      return this;
+    }
+
+    public Builder withExternalId(String externalId) {
+      groupPO.externalId = externalId;
       return this;
     }
 

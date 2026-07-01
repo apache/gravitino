@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -70,6 +71,12 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public User addUser(String metalake, String user, String externalId)
+      throws UserAlreadyExistsException, NoSuchMetalakeException {
+    return dispatcher.addUser(metalake, user, externalId);
+  }
+
+  @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     return dispatcher.removeUser(metalake, user);
   }
@@ -81,8 +88,37 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public User getUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.getUserByExternalId(metalake, externalId);
+  }
+
+  @Override
+  public User enableUser(String metalake, String user)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.enableUser(metalake, user);
+  }
+
+  @Override
+  public User disableUser(String metalake, String user)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.disableUser(metalake, user);
+  }
+
+  @Override
   public User[] listUsers(String metalake) throws NoSuchMetalakeException {
     return dispatcher.listUsers(metalake);
+  }
+
+  @Override
+  public PagedResult<User> listUsers(String metalake, int offset, int limit)
+      throws NoSuchMetalakeException {
+    return dispatcher.listUsers(metalake, offset, limit);
+  }
+
+  @Override
+  public long countUsers(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.countUsers(metalake);
   }
 
   @Override
@@ -97,6 +133,12 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public Group addGroup(String metalake, String group, String externalId)
+      throws GroupAlreadyExistsException, NoSuchMetalakeException {
+    return dispatcher.addGroup(metalake, group, externalId);
+  }
+
+  @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     return dispatcher.removeGroup(metalake, group);
   }
@@ -108,8 +150,24 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public Group getGroupByExternalId(String metalake, String externalId)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    return dispatcher.getGroupByExternalId(metalake, externalId);
+  }
+
+  @Override
   public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
     return dispatcher.listGroups(metalake);
+  }
+
+  @Override
+  public PagedResult<Group> listGroups(String metalake, int offset, int limit) {
+    return dispatcher.listGroups(metalake, offset, limit);
+  }
+
+  @Override
+  public long countGroups(String metalake) {
+    return dispatcher.countGroups(metalake);
   }
 
   @Override

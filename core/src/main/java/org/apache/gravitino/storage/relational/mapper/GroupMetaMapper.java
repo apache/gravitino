@@ -102,4 +102,19 @@ public interface GroupMetaMapper {
   @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "getGroupUpdatedAt")
   GroupUpdatedAt getGroupUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("groupName") String groupName);
+
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "selectGroupMetaByMetalakeIdAndExternalId")
+  GroupPO selectGroupMetaByMetalakeIdAndExternalId(
+      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId);
+
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "countGroupMetasByMetalakeId")
+  Long countGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "listExtendedGroupPOsByMetalakeIdPaginated")
+  List<ExtendedGroupPO> listExtendedGroupPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId, @Param("offset") int offset, @Param("limit") int limit);
 }

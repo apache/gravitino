@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -39,4 +40,12 @@ public interface Group extends Auditable {
    * @return The roles of the group.
    */
   List<String> roles();
+
+  /**
+   * The external identifier from an upstream identity system, such as a SCIM provider.
+   *
+   * @return The external identifier, or null if not set.
+   */
+  @Nullable
+  String externalId();
 }

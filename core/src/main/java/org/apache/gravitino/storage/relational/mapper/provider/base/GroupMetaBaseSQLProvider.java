@@ -29,6 +29,40 @@ import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaBaseSQLProvider {
 
+  protected static final String GROUP_META_INSERT_COLUMNS =
+      " group_id, group_name, metalake_id, audit_info, external_id,"
+          + " current_version, last_version, deleted_at";
+
+  protected static final String GROUP_META_INSERT_VALUES =
+      " #{groupMeta.groupId},"
+          + " #{groupMeta.groupName},"
+          + " #{groupMeta.metalakeId},"
+          + " #{groupMeta.auditInfo},"
+          + " #{groupMeta.externalId},"
+          + " #{groupMeta.currentVersion},"
+          + " #{groupMeta.lastVersion},"
+          + " #{groupMeta.deletedAt}";
+
+  protected String groupMetaSelectColumns(String tableAlias) {
+    String prefix = tableAlias + ".";
+    return prefix
+        + "group_id as groupId,"
+        + prefix
+        + "group_name as groupName,"
+        + prefix
+        + "metalake_id as metalakeId,"
+        + prefix
+        + "audit_info as auditInfo,"
+        + prefix
+        + "external_id as externalId,"
+        + prefix
+        + "current_version as currentVersion,"
+        + prefix
+        + "last_version as lastVersion,"
+        + prefix
+        + "deleted_at as deletedAt";
+  }
+
   public String selectGroupIdBySchemaIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name) {
     return "SELECT group_id as groupId FROM "
@@ -38,9 +72,9 @@ public class GroupMetaBaseSQLProvider {
   }
 
   public String listGroupPOsByMetalake(@Param("metalakeName") String metalakeName) {
-    return "SELECT gt.group_id as groupId, gt.group_name as groupName, gt.metalake_id as metalakeId,"
-        + " gt.audit_info as auditInfo, gt.current_version as currentVersion, gt.last_version as lastVersion,"
-        + " gt.deleted_at as deletedAt FROM "
+    return "SELECT "
+        + groupMetaSelectColumns("gt")
+        + " FROM "
         + GROUP_TABLE_NAME
         + " gt JOIN "
         + MetalakeMetaMapper.TABLE_NAME
@@ -49,12 +83,9 @@ public class GroupMetaBaseSQLProvider {
   }
 
   public String listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
-        + " gt.metalake_id as metalakeId,"
-        + " gt.audit_info as auditInfo,"
-        + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
-        + " gt.deleted_at as deletedAt,"
-        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+    return "SELECT "
+        + groupMetaSelectColumns("gt")
+        + ", JSON_ARRAYAGG(rot.role_name) as roleNames,"
         + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME
@@ -74,28 +105,69 @@ public class GroupMetaBaseSQLProvider {
         + " GROUP BY gt.group_id";
   }
 
+  public String listExtendedGroupPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return "SELECT "
+        + groupMetaSelectColumns("gt")
+        + ", JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
+        + " FROM ("
+        + " SELECT group_id FROM "
+        + GROUP_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " ORDER BY group_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " ) paginated"
+        + " JOIN "
+        + GROUP_TABLE_NAME
+        + " gt ON gt.group_id = paginated.group_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.group_id = gt.group_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " GROUP BY gt.group_id"
+        + " ORDER BY gt.group_id ASC";
+  }
+
+  public String countGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "SELECT COUNT(*) FROM "
+        + GROUP_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+  }
+
   public String selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name) {
-    return "SELECT group_id as groupId, group_name as groupName,"
-        + " metalake_id as metalakeId,"
-        + " audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
+    return "SELECT "
+        + groupMetaSelectColumns(GROUP_TABLE_NAME)
         + " FROM "
         + GROUP_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND group_name = #{groupName}"
         + " AND deleted_at = 0";
   }
 
+  public String selectGroupMetaByMetalakeIdAndExternalId(
+      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId) {
+    return "SELECT "
+        + groupMetaSelectColumns(GROUP_TABLE_NAME)
+        + " FROM "
+        + GROUP_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND external_id = #{externalId}"
+        + " AND deleted_at = 0";
+  }
+
   public String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return "<script>"
-        + "SELECT gt.group_id as groupId, gt.group_name as groupName,"
-        + " gt.metalake_id as metalakeId,"
-        + " gt.audit_info as auditInfo,"
-        + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
-        + " gt.deleted_at as deletedAt,"
-        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + "SELECT "
+        + groupMetaSelectColumns("gt")
+        + ", JSON_ARRAYAGG(rot.role_name) as roleNames,"
         + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME
@@ -118,46 +190,35 @@ public class GroupMetaBaseSQLProvider {
         + "</foreach>"
         + " )"
         + " GROUP BY gt.group_id, gt.group_name, gt.metalake_id, gt.audit_info,"
-        + " gt.current_version, gt.last_version, gt.deleted_at"
+        + " gt.external_id, gt.current_version, gt.last_version, gt.deleted_at"
         + "</script>";
   }
 
   public String insertGroupMeta(@Param("groupMeta") GroupPO groupPO) {
     return "INSERT INTO "
         + GROUP_TABLE_NAME
-        + " (group_id, group_name,"
-        + " metalake_id, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " ("
+        + GROUP_META_INSERT_COLUMNS
+        + ")"
         + " VALUES ("
-        + " #{groupMeta.groupId},"
-        + " #{groupMeta.groupName},"
-        + " #{groupMeta.metalakeId},"
-        + " #{groupMeta.auditInfo},"
-        + " #{groupMeta.currentVersion},"
-        + " #{groupMeta.lastVersion},"
-        + " #{groupMeta.deletedAt}"
+        + GROUP_META_INSERT_VALUES
         + " )";
   }
 
   public String insertGroupMetaOnDuplicateKeyUpdate(@Param("groupMeta") GroupPO groupPO) {
     return "INSERT INTO "
         + GROUP_TABLE_NAME
-        + " (group_id, group_name,"
-        + " metalake_id, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " ("
+        + GROUP_META_INSERT_COLUMNS
+        + ")"
         + " VALUES ("
-        + " #{groupMeta.groupId},"
-        + " #{groupMeta.groupName},"
-        + " #{groupMeta.metalakeId},"
-        + " #{groupMeta.auditInfo},"
-        + " #{groupMeta.currentVersion},"
-        + " #{groupMeta.lastVersion},"
-        + " #{groupMeta.deletedAt}"
+        + GROUP_META_INSERT_VALUES
         + " )"
         + " ON DUPLICATE KEY UPDATE"
         + " group_name = #{groupMeta.groupName},"
         + " metalake_id = #{groupMeta.metalakeId},"
         + " audit_info = #{groupMeta.auditInfo},"
+        + " external_id = #{groupMeta.externalId},"
         + " current_version = #{groupMeta.currentVersion},"
         + " last_version = #{groupMeta.lastVersion},"
         + " deleted_at = #{groupMeta.deletedAt}";
@@ -186,6 +247,7 @@ public class GroupMetaBaseSQLProvider {
         + " SET group_name = #{newGroupMeta.groupName},"
         + " metalake_id = #{newGroupMeta.metalakeId},"
         + " audit_info = #{newGroupMeta.auditInfo},"
+        + " external_id = #{newGroupMeta.externalId},"
         + " current_version = #{newGroupMeta.currentVersion},"
         + " last_version = #{newGroupMeta.lastVersion},"
         + " deleted_at = #{newGroupMeta.deletedAt}"
@@ -199,10 +261,8 @@ public class GroupMetaBaseSQLProvider {
   }
 
   public String listGroupsByRoleId(@Param("roleId") Long roleId) {
-    return "SELECT gr.group_id as groupId, gr.group_name as groupName,"
-        + " gr.metalake_id as metalakeId,"
-        + " gr.audit_info as auditInfo, gr.current_version as currentVersion,"
-        + " gr.last_version as lastVersion, gr.deleted_at as deletedAt"
+    return "SELECT "
+        + groupMetaSelectColumns("gr")
         + " FROM "
         + GROUP_TABLE_NAME
         + " gr JOIN "

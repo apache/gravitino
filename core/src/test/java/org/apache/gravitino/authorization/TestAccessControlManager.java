@@ -60,6 +60,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -452,6 +453,91 @@ public class TestAccessControlManager {
 
     accessControlManager.deleteRole("metalake_list", "testList1");
     accessControlManager.deleteRole("metalake_list", "testList2");
+  }
+
+  @Test
+  public void testUserExternalIdEnableDisableAndLookup() {
+    String userName = "scim_user";
+    String externalId = "ext-scim-user-1";
+
+    User added = accessControlManager.addUser(METALAKE, userName, externalId);
+    Assertions.assertEquals(externalId, added.externalId());
+    Assertions.assertTrue(added.enabled());
+
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    accessControlManager.createRole(
+        METALAKE,
+        "scim_role",
+        props,
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
+    accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("scim_role"), userName);
+
+    User disabled = accessControlManager.disableUser(METALAKE, userName);
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertEquals(Lists.newArrayList("scim_role"), disabled.roles());
+
+    User lookedUp = accessControlManager.getUserByExternalId(METALAKE, externalId);
+    Assertions.assertEquals(userName, lookedUp.name());
+    Assertions.assertFalse(lookedUp.enabled());
+
+    User enabled = accessControlManager.enableUser(METALAKE, userName);
+    Assertions.assertTrue(enabled.enabled());
+    Assertions.assertEquals(Lists.newArrayList("scim_role"), enabled.roles());
+
+    accessControlManager.revokeRolesFromUser(METALAKE, Lists.newArrayList("scim_role"), userName);
+    accessControlManager.deleteRole(METALAKE, "scim_role");
+    accessControlManager.removeUser(METALAKE, userName);
+  }
+
+  @Test
+  public void testUserPagination() {
+    long beforeCount = accessControlManager.countUsers(METALAKE);
+    for (int i = 0; i < 5; i++) {
+      accessControlManager.addUser(METALAKE, "page_user_" + i);
+    }
+
+    Assertions.assertEquals(beforeCount + 5, accessControlManager.countUsers(METALAKE));
+
+    PagedResult<User> page = accessControlManager.listUsers(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(beforeCount + 5, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+
+    PagedResult<User> lastPage =
+        accessControlManager.listUsers(METALAKE, (int) beforeCount + 4, 10);
+    Assertions.assertEquals(beforeCount + 5, lastPage.totalCount());
+    Assertions.assertEquals(1, lastPage.items().size());
+
+    for (int i = 0; i < 5; i++) {
+      accessControlManager.removeUser(METALAKE, "page_user_" + i);
+    }
+  }
+
+  @Test
+  public void testGroupExternalIdAndPagination() {
+    long beforeCount = accessControlManager.countGroups(METALAKE);
+    String groupName = "scim_group";
+    String externalId = "ext-scim-group-1";
+    Group added = accessControlManager.addGroup(METALAKE, groupName, externalId);
+    Assertions.assertEquals(externalId, added.externalId());
+
+    Group lookedUp = accessControlManager.getGroupByExternalId(METALAKE, externalId);
+    Assertions.assertEquals(groupName, lookedUp.name());
+
+    for (int i = 0; i < 3; i++) {
+      accessControlManager.addGroup(METALAKE, "page_group_" + i);
+    }
+    Assertions.assertEquals(beforeCount + 4, accessControlManager.countGroups(METALAKE));
+
+    PagedResult<Group> page = accessControlManager.listGroups(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(beforeCount + 4, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+
+    accessControlManager.removeGroup(METALAKE, groupName);
+    for (int i = 0; i < 3; i++) {
+      accessControlManager.removeGroup(METALAKE, "page_group_" + i);
+    }
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

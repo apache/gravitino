@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -52,6 +53,20 @@ public interface AccessControlDispatcher {
       throws UserAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Adds a new User with an external identifier.
+   *
+   * @param metalake The Metalake of the User.
+   * @param user The name of the User.
+   * @param externalId The external identifier from an upstream identity system.
+   * @return The added User instance.
+   * @throws UserAlreadyExistsException If a User with the same name already exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the User encounters storage issues.
+   */
+  User addUser(String metalake, String user, String externalId)
+      throws UserAlreadyExistsException, NoSuchMetalakeException;
+
+  /**
    * Removes a User.
    *
    * @param metalake The Metalake of the User.
@@ -76,6 +91,42 @@ public interface AccessControlDispatcher {
   User getUser(String metalake, String user) throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
+   * Gets a User by external identifier.
+   *
+   * @param metalake The Metalake of the User.
+   * @param externalId The external identifier of the User.
+   * @return The getting User instance.
+   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the User encounters storage issues.
+   */
+  User getUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException;
+
+  /**
+   * Enables a User without removing role bindings.
+   *
+   * @param metalake The Metalake of the User.
+   * @param user The name of the User.
+   * @return The updated User instance.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  User enableUser(String metalake, String user) throws NoSuchUserException, NoSuchMetalakeException;
+
+  /**
+   * Disables a User without removing role bindings.
+   *
+   * @param metalake The Metalake of the User.
+   * @param user The name of the User.
+   * @return The updated User instance.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  User disableUser(String metalake, String user)
+      throws NoSuchUserException, NoSuchMetalakeException;
+
+  /**
    * Lists the users.
    *
    * @param metalake The Metalake of the User.
@@ -83,6 +134,27 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   User[] listUsers(String metalake) throws NoSuchMetalakeException;
+
+  /**
+   * Lists users with pagination.
+   *
+   * @param metalake The Metalake of the User.
+   * @param offset The number of users to skip.
+   * @param limit The maximum number of users to return.
+   * @return The paginated User result.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  PagedResult<User> listUsers(String metalake, int offset, int limit)
+      throws NoSuchMetalakeException;
+
+  /**
+   * Counts users in a metalake.
+   *
+   * @param metalake The Metalake of the User.
+   * @return The total number of users.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  long countUsers(String metalake) throws NoSuchMetalakeException;
 
   /**
    * Lists the usernames.
@@ -104,6 +176,20 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If adding the Group encounters storage issues.
    */
   Group addGroup(String metalake, String group)
+      throws GroupAlreadyExistsException, NoSuchMetalakeException;
+
+  /**
+   * Adds a new Group with an external identifier.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param group The name of the Group.
+   * @param externalId The external identifier from an upstream identity system.
+   * @return The Added Group instance.
+   * @throws GroupAlreadyExistsException If a Group with the same name already exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Group encounters storage issues.
+   */
+  Group addGroup(String metalake, String group, String externalId)
       throws GroupAlreadyExistsException, NoSuchMetalakeException;
 
   /**
@@ -132,6 +218,19 @@ public interface AccessControlDispatcher {
       throws NoSuchGroupException, NoSuchMetalakeException;
 
   /**
+   * Gets a Group by external identifier.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param externalId The external identifier of the Group.
+   * @return The getting Group instance.
+   * @throws NoSuchGroupException If the Group with the given external id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the Group encounters storage issues.
+   */
+  Group getGroupByExternalId(String metalake, String externalId)
+      throws NoSuchGroupException, NoSuchMetalakeException;
+
+  /**
    * List groups
    *
    * @param metalake The Metalake of the Group.
@@ -139,6 +238,26 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   Group[] listGroups(String metalake);
+
+  /**
+   * Lists groups with pagination.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param offset The number of groups to skip.
+   * @param limit The maximum number of groups to return.
+   * @return The paginated Group result.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  PagedResult<Group> listGroups(String metalake, int offset, int limit);
+
+  /**
+   * Counts groups in a metalake.
+   *
+   * @param metalake The Metalake of the Group.
+   * @return The total number of groups.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  long countGroups(String metalake);
 
   /**
    * List group names

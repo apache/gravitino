@@ -39,6 +39,12 @@ public class UserDTO implements User {
   @JsonProperty("roles")
   private List<String> roles;
 
+  @JsonProperty("externalId")
+  private String externalId;
+
+  @JsonProperty("enabled")
+  private boolean enabled = true;
+
   /** Default constructor for Jackson deserialization. */
   protected UserDTO() {}
 
@@ -49,10 +55,13 @@ public class UserDTO implements User {
    * @param roles The roles of the User DTO.
    * @param audit The audit information of the User DTO.
    */
-  protected UserDTO(String name, List<String> roles, AuditDTO audit) {
+  protected UserDTO(
+      String name, List<String> roles, AuditDTO audit, String externalId, boolean enabled) {
     this.name = name;
     this.audit = audit;
     this.roles = roles;
+    this.externalId = externalId;
+    this.enabled = enabled;
   }
 
   /**
@@ -81,6 +90,16 @@ public class UserDTO implements User {
     return audit;
   }
 
+  @Override
+  public String externalId() {
+    return externalId;
+  }
+
+  @Override
+  public boolean enabled() {
+    return enabled;
+  }
+
   /**
    * Creates a new Builder for constructing a User DTO.
    *
@@ -105,6 +124,12 @@ public class UserDTO implements User {
 
     /** The audit information of the user. */
     protected AuditDTO audit;
+
+    /** The external id of the user. */
+    protected String externalId;
+
+    /** Whether the user is enabled. */
+    protected boolean enabled = true;
 
     /**
      * Sets the name of the user.
@@ -143,6 +168,28 @@ public class UserDTO implements User {
     }
 
     /**
+     * Sets the external id of the user.
+     *
+     * @param externalId The external id of the user.
+     * @return The builder instance.
+     */
+    public S withExternalId(String externalId) {
+      this.externalId = externalId;
+      return (S) this;
+    }
+
+    /**
+     * Sets whether the user is enabled.
+     *
+     * @param enabled Whether the user is enabled.
+     * @return The builder instance.
+     */
+    public S withEnabled(boolean enabled) {
+      this.enabled = enabled;
+      return (S) this;
+    }
+
+    /**
      * Builds an instance of UserDTO using the builder's properties.
      *
      * @return An instance of UserDTO.
@@ -151,7 +198,7 @@ public class UserDTO implements User {
     public UserDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new UserDTO(name, roles, audit);
+      return new UserDTO(name, roles, audit, externalId, enabled);
     }
   }
 }

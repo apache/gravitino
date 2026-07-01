@@ -29,6 +29,8 @@ public class UserPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+  private String externalId;
+  private Boolean enabled;
 
   public Long getUserId() {
     return userId;
@@ -58,6 +60,14 @@ public class UserPO {
     return deletedAt;
   }
 
+  public String getExternalId() {
+    return externalId;
+  }
+
+  public Boolean getEnabled() {
+    return enabled;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -73,7 +83,9 @@ public class UserPO {
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
+        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt())
+        && Objects.equal(getExternalId(), tablePO.getExternalId())
+        && Objects.equal(getEnabled(), tablePO.getEnabled());
   }
 
   @Override
@@ -85,7 +97,9 @@ public class UserPO {
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
-        getDeletedAt());
+        getDeletedAt(),
+        getExternalId(),
+        getEnabled());
   }
 
   public static class Builder {
@@ -130,6 +144,16 @@ public class UserPO {
       return this;
     }
 
+    public Builder withExternalId(String externalId) {
+      userPO.externalId = externalId;
+      return this;
+    }
+
+    public Builder withEnabled(Boolean enabled) {
+      userPO.enabled = enabled;
+      return this;
+    }
+
     private void validate() {
       Preconditions.checkArgument(userPO.userId != null, "User id is required");
       Preconditions.checkArgument(userPO.userName != null, "User name is required");
@@ -138,6 +162,9 @@ public class UserPO {
       Preconditions.checkArgument(userPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(userPO.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(userPO.deletedAt != null, "Deleted at is required");
+      if (userPO.enabled == null) {
+        userPO.enabled = Boolean.TRUE;
+      }
     }
 
     public UserPO build() {

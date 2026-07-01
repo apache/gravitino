@@ -51,12 +51,20 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   public static final Field ROLE_IDS =
       Field.optional("role_ids", List.class, "The role ids of the user entity");
 
+  public static final Field EXTERNAL_ID =
+      Field.optional("external_id", String.class, "The external id of the user entity.");
+
+  public static final Field ENABLED =
+      Field.optional("enabled", Boolean.class, "Whether the user entity is enabled.");
+
   private Long id;
   private String name;
   private AuditInfo auditInfo;
   private List<String> roleNames;
   private List<Long> roleIds;
   private Namespace namespace;
+  private String externalId;
+  private boolean enabled = true;
 
   private UserEntity() {}
 
@@ -73,6 +81,8 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(ROLE_NAMES, roleNames);
     fields.put(ROLE_IDS, roleIds);
+    fields.put(EXTERNAL_ID, externalId);
+    fields.put(ENABLED, enabled);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -137,6 +147,16 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     return roleNames;
   }
 
+  @Override
+  public String externalId() {
+    return externalId;
+  }
+
+  @Override
+  public boolean enabled() {
+    return enabled;
+  }
+
   /**
    * Returns the role names of the user entity.
    *
@@ -165,13 +185,15 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
+        && Objects.equals(externalId, that.externalId)
+        && enabled == that.enabled
         && CollectionUtils.isEqualCollection(roleNames, that.roleNames)
         && CollectionUtils.isEqualCollection(roleIds, that.roleIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, roleNames, roleIds);
+    return Objects.hash(id, name, auditInfo, externalId, enabled, roleNames, roleIds);
   }
 
   public static Builder builder() {
@@ -248,6 +270,28 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
      */
     public Builder withNamespace(Namespace namespace) {
       userEntity.namespace = namespace;
+      return this;
+    }
+
+    /**
+     * Sets the external id of the user entity.
+     *
+     * @param externalId The external id of the user entity.
+     * @return The builder instance.
+     */
+    public Builder withExternalId(String externalId) {
+      userEntity.externalId = externalId;
+      return this;
+    }
+
+    /**
+     * Sets whether the user entity is enabled.
+     *
+     * @param enabled Whether the user entity is enabled.
+     * @return The builder instance.
+     */
+    public Builder withEnabled(boolean enabled) {
+      userEntity.enabled = enabled;
       return this;
     }
 

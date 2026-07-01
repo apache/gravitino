@@ -39,6 +39,9 @@ public class GroupDTO implements Group {
   @JsonProperty("roles")
   private List<String> roles;
 
+  @JsonProperty("externalId")
+  private String externalId;
+
   /** Default constructor for Jackson deserialization. */
   protected GroupDTO() {}
 
@@ -49,10 +52,11 @@ public class GroupDTO implements Group {
    * @param roles The roles of the Group DTO.
    * @param audit The audit information of the Group DTO.
    */
-  protected GroupDTO(String name, List<String> roles, AuditDTO audit) {
+  protected GroupDTO(String name, List<String> roles, AuditDTO audit, String externalId) {
     this.name = name;
     this.audit = audit;
     this.roles = roles;
+    this.externalId = externalId;
   }
 
   /**
@@ -81,6 +85,11 @@ public class GroupDTO implements Group {
     return audit;
   }
 
+  @Override
+  public String externalId() {
+    return externalId;
+  }
+
   /**
    * Creates a new Builder for constructing a Group DTO.
    *
@@ -105,6 +114,9 @@ public class GroupDTO implements Group {
 
     /** The audit information of the group. */
     protected AuditDTO audit;
+
+    /** The external id of the group. */
+    protected String externalId;
 
     /**
      * Sets the name of the group.
@@ -143,6 +155,17 @@ public class GroupDTO implements Group {
     }
 
     /**
+     * Sets the external id of the group.
+     *
+     * @param externalId The external id of the group.
+     * @return The builder instance.
+     */
+    public S withExternalId(String externalId) {
+      this.externalId = externalId;
+      return (S) this;
+    }
+
+    /**
      * Builds an instance of GroupDTO using the builder's properties.
      *
      * @return An instance of GroupDTO.
@@ -151,7 +174,7 @@ public class GroupDTO implements Group {
     public GroupDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new GroupDTO(name, roles, audit);
+      return new GroupDTO(name, roles, audit, externalId);
     }
   }
 }

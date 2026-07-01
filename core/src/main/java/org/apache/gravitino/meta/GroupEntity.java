@@ -48,12 +48,16 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the group entity.");
 
+  public static final Field EXTERNAL_ID =
+      Field.optional("external_id", String.class, "The external id of the group entity.");
+
   private Long id;
   private String name;
   private AuditInfo auditInfo;
   private List<String> roleNames;
   private List<Long> roleIds;
   private Namespace namespace;
+  private String externalId;
 
   private GroupEntity() {}
 
@@ -70,6 +74,7 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(ROLE_NAMES, roleNames);
     fields.put(ROLE_IDS, roleIds);
+    fields.put(EXTERNAL_ID, externalId);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -134,6 +139,11 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     return roleNames;
   }
 
+  @Override
+  public String externalId() {
+    return externalId;
+  }
+
   /**
    * Returns the role names of the group entity.
    *
@@ -162,13 +172,14 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
+        && Objects.equals(externalId, that.externalId)
         && CollectionUtils.isEqualCollection(roleNames, that.roleNames)
         && CollectionUtils.isEqualCollection(roleIds, that.roleIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, roleNames, roleIds);
+    return Objects.hash(id, name, auditInfo, externalId, roleNames, roleIds);
   }
 
   public static Builder builder() {
@@ -245,6 +256,17 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
      */
     public Builder withNamespace(Namespace namespace) {
       groupEntity.namespace = namespace;
+      return this;
+    }
+
+    /**
+     * Sets the external id of the group entity.
+     *
+     * @param externalId The external id of the group entity.
+     * @return The builder instance.
+     */
+    public Builder withExternalId(String externalId) {
+      groupEntity.externalId = externalId;
       return this;
     }
 

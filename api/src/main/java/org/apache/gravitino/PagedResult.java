@@ -16,44 +16,45 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino;
 
+import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
-import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
-/** The interface of a user. The user is the entity which executes every operation. */
+/** A paginated query result containing the total count and a page of items. */
 @Evolving
-public interface User extends Auditable {
+public final class PagedResult<T> {
+
+  private final long totalCount;
+  private final List<T> items;
 
   /**
-   * The name of the user. It's the identifier of User. It must be unique. Usually the name comes
-   * from an external user management system like LDAP, IAM and so on.
+   * Creates a paginated result.
    *
-   * @return The name of the user.
+   * @param totalCount The total number of matching items.
+   * @param items The items in the current page.
    */
-  String name();
+  public PagedResult(long totalCount, List<T> items) {
+    this.totalCount = totalCount;
+    this.items = items != null ? items : Collections.emptyList();
+  }
 
   /**
-   * The roles of the user. A user can have multiple roles. Every role binds several privileges.
+   * Returns the total number of matching items.
    *
-   * @return The roles of the user.
+   * @return The total count.
    */
-  List<String> roles();
+  public long totalCount() {
+    return totalCount;
+  }
 
   /**
-   * The external identifier from an upstream identity system, such as a SCIM provider.
+   * Returns the items in the current page.
    *
-   * @return The external identifier, or null if not set.
+   * @return The page items.
    */
-  @Nullable
-  String externalId();
-
-  /**
-   * Whether the user is enabled.
-   *
-   * @return True if the user is enabled, false otherwise.
-   */
-  boolean enabled();
+  public List<T> items() {
+    return items;
+  }
 }

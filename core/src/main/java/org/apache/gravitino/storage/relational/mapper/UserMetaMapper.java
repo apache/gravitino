@@ -98,6 +98,24 @@ public interface UserMetaMapper {
   UserUpdatedAt getUserUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("userName") String userName);
 
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "selectUserMetaByMetalakeIdAndExternalId")
+  UserPO selectUserMetaByMetalakeIdAndExternalId(
+      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId);
+
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "countUserMetasByMetalakeId")
+  Long countUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "listExtendedUserPOsByMetalakeIdPaginated")
+  List<ExtendedUserPO> listExtendedUserPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId, @Param("offset") int offset, @Param("limit") int limit);
+
+  @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "updateUserEnabled")
+  Integer updateUserEnabled(@Param("userId") Long userId, @Param("enabled") boolean enabled);
+
   /**
    * Single-round-trip auth prefetch for the JCasbin authorize hot path. Returns every version
    * sentinel the request needs:

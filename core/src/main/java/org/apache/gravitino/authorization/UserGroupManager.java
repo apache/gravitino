@@ -28,6 +28,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -38,6 +39,8 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.GroupMetaService;
+import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,19 +64,27 @@ class UserGroupManager {
   }
 
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
+    return addUser(metalake, name, null);
+  }
+
+  User addUser(String metalake, String name, String externalId) throws UserAlreadyExistsException {
     try {
-      UserEntity userEntity =
+      UserEntity.Builder builder =
           UserEntity.builder()
               .withId(idGenerator.nextId())
               .withName(name)
               .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
               .withRoleNames(Lists.newArrayList())
+              .withEnabled(true)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                       .withCreateTime(Instant.now())
-                      .build())
-              .build();
+                      .build());
+      if (externalId != null) {
+        builder.withExternalId(externalId);
+      }
+      UserEntity userEntity = builder.build();
       store.put(userEntity, false /* overwritten */);
       return userEntity;
     } catch (EntityAlreadyExistsException e) {
@@ -110,6 +121,46 @@ class UserGroupManager {
     }
   }
 
+  User getUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
+    try {
+      return UserMetaService.getInstance().getUserByExternalId(metalake, externalId);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchUserException(
+          AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, externalId, metalake);
+    }
+  }
+
+  User enableUser(String metalake, String user) throws NoSuchUserException {
+    try {
+      return UserMetaService.getInstance().updateUserEnabled(metalake, user, true);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
+      throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
+    }
+  }
+
+  User disableUser(String metalake, String user) throws NoSuchUserException {
+    try {
+      return UserMetaService.getInstance().updateUserEnabled(metalake, user, false);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
+      throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
+    }
+  }
+
+  long countUsers(String metalake) {
+    return UserMetaService.getInstance().countUsersByMetalake(metalake);
+  }
+
+  PagedResult<User> listUsers(String metalake, int offset, int limit) {
+    PagedResult<UserEntity> result =
+        UserMetaService.getInstance().listUsersByMetalakePaginated(metalake, offset, limit);
+    return new PagedResult<>(
+        result.totalCount(), Arrays.asList(result.items().toArray(new User[0])));
+  }
+
   String[] listUserNames(String metalake) {
 
     return Arrays.stream(listUsersInternal(metalake, false /* allFields */))
@@ -122,8 +173,13 @@ class UserGroupManager {
   }
 
   Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
+    return addGroup(metalake, group, null);
+  }
+
+  Group addGroup(String metalake, String group, String externalId)
+      throws GroupAlreadyExistsException {
     try {
-      GroupEntity groupEntity =
+      GroupEntity.Builder builder =
           GroupEntity.builder()
               .withId(idGenerator.nextId())
               .withName(group)
@@ -133,8 +189,11 @@ class UserGroupManager {
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                       .withCreateTime(Instant.now())
-                      .build())
-              .build();
+                      .build());
+      if (externalId != null) {
+        builder.withExternalId(externalId);
+      }
+      GroupEntity groupEntity = builder.build();
       store.put(groupEntity, false /* overwritten */);
       return groupEntity;
     } catch (EntityAlreadyExistsException e) {
@@ -172,6 +231,28 @@ class UserGroupManager {
       LOG.error("Getting group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  Group getGroupByExternalId(String metalake, String externalId) {
+    try {
+      return GroupMetaService.getInstance().getGroupByExternalId(metalake, externalId);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "Group with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchGroupException(
+          AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, externalId, metalake);
+    }
+  }
+
+  long countGroups(String metalake) {
+    return GroupMetaService.getInstance().countGroupsByMetalake(metalake);
+  }
+
+  PagedResult<Group> listGroups(String metalake, int offset, int limit) {
+    PagedResult<GroupEntity> result =
+        GroupMetaService.getInstance().listGroupsByMetalakePaginated(metalake, offset, limit);
+    return new PagedResult<>(
+        result.totalCount(), Arrays.asList(result.items().toArray(new Group[0])));
   }
 
   Group[] listGroups(String metalake) {

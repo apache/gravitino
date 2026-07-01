@@ -496,6 +496,8 @@ public class DTOConverters {
         .withName(user.name())
         .withRoles(user.roles())
         .withAudit(toDTO(user.auditInfo()))
+        .withExternalId(user.externalId())
+        .withEnabled(user.enabled())
         .build();
   }
 
@@ -514,6 +516,7 @@ public class DTOConverters {
         .withName(group.name())
         .withRoles(group.roles())
         .withAudit(toDTO(group.auditInfo()))
+        .withExternalId(group.externalId())
         .build();
   }
 

@@ -32,6 +32,43 @@ import org.apache.ibatis.annotations.Param;
 
 public class UserMetaBaseSQLProvider {
 
+  protected static final String USER_META_INSERT_COLUMNS =
+      " user_id, user_name, metalake_id, audit_info, external_id, enabled,"
+          + " current_version, last_version, deleted_at";
+
+  protected static final String USER_META_INSERT_VALUES =
+      " #{userMeta.userId},"
+          + " #{userMeta.userName},"
+          + " #{userMeta.metalakeId},"
+          + " #{userMeta.auditInfo},"
+          + " #{userMeta.externalId},"
+          + " #{userMeta.enabled},"
+          + " #{userMeta.currentVersion},"
+          + " #{userMeta.lastVersion},"
+          + " #{userMeta.deletedAt}";
+
+  protected String userMetaSelectColumns(String tableAlias) {
+    String prefix = tableAlias + ".";
+    return prefix
+        + "user_id as userId,"
+        + prefix
+        + "user_name as userName,"
+        + prefix
+        + "metalake_id as metalakeId,"
+        + prefix
+        + "audit_info as auditInfo,"
+        + prefix
+        + "external_id as externalId,"
+        + prefix
+        + "enabled as enabled,"
+        + prefix
+        + "current_version as currentVersion,"
+        + prefix
+        + "last_version as lastVersion,"
+        + prefix
+        + "deleted_at as deletedAt";
+  }
+
   public String selectUserIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name) {
     return "SELECT user_id as userId FROM "
@@ -42,53 +79,56 @@ public class UserMetaBaseSQLProvider {
 
   public String selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name) {
-    return "SELECT user_id as userId, user_name as userName,"
-        + " metalake_id as metalakeId,"
-        + " audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
+    return "SELECT "
+        + userMetaSelectColumns(USER_TABLE_NAME)
         + " FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
         + " AND deleted_at = 0";
   }
 
+  public String selectUserMetaByMetalakeIdAndExternalId(
+      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId) {
+    return "SELECT "
+        + userMetaSelectColumns(USER_TABLE_NAME)
+        + " FROM "
+        + USER_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND external_id = #{externalId}"
+        + " AND deleted_at = 0";
+  }
+
+  public String countUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "SELECT COUNT(*) FROM "
+        + USER_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+  }
+
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + " (user_id, user_name,"
-        + " metalake_id, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " ("
+        + USER_META_INSERT_COLUMNS
+        + ")"
         + " VALUES ("
-        + " #{userMeta.userId},"
-        + " #{userMeta.userName},"
-        + " #{userMeta.metalakeId},"
-        + " #{userMeta.auditInfo},"
-        + " #{userMeta.currentVersion},"
-        + " #{userMeta.lastVersion},"
-        + " #{userMeta.deletedAt}"
+        + USER_META_INSERT_VALUES
         + " )";
   }
 
   public String insertUserMetaOnDuplicateKeyUpdate(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + " (user_id, user_name,"
-        + " metalake_id, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " ("
+        + USER_META_INSERT_COLUMNS
+        + ")"
         + " VALUES ("
-        + " #{userMeta.userId},"
-        + " #{userMeta.userName},"
-        + " #{userMeta.metalakeId},"
-        + " #{userMeta.auditInfo},"
-        + " #{userMeta.currentVersion},"
-        + " #{userMeta.lastVersion},"
-        + " #{userMeta.deletedAt}"
+        + USER_META_INSERT_VALUES
         + " )"
         + " ON DUPLICATE KEY UPDATE"
         + " user_name = #{userMeta.userName},"
         + " metalake_id = #{userMeta.metalakeId},"
         + " audit_info = #{userMeta.auditInfo},"
+        + " external_id = #{userMeta.externalId},"
+        + " enabled = #{userMeta.enabled},"
         + " current_version = #{userMeta.currentVersion},"
         + " last_version = #{userMeta.lastVersion},"
         + " deleted_at = #{userMeta.deletedAt}";
@@ -117,6 +157,8 @@ public class UserMetaBaseSQLProvider {
         + " SET user_name = #{newUserMeta.userName},"
         + " metalake_id = #{newUserMeta.metalakeId},"
         + " audit_info = #{newUserMeta.auditInfo},"
+        + " external_id = #{newUserMeta.externalId},"
+        + " enabled = #{newUserMeta.enabled},"
         + " current_version = #{newUserMeta.currentVersion},"
         + " last_version = #{newUserMeta.lastVersion},"
         + " deleted_at = #{newUserMeta.deletedAt}"
@@ -129,11 +171,16 @@ public class UserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  public String updateUserEnabled(@Param("userId") Long userId, @Param("enabled") boolean enabled) {
+    return "UPDATE "
+        + USER_TABLE_NAME
+        + " SET enabled = #{enabled}"
+        + " WHERE user_id = #{userId} AND deleted_at = 0";
+  }
+
   public String listUsersByRoleId(@Param("roleId") Long roleId) {
-    return "SELECT us.user_id as userId, us.user_name as userName,"
-        + " us.metalake_id as metalakeId,"
-        + " us.audit_info as auditInfo, us.current_version as currentVersion,"
-        + " us.last_version as lastVersion, us.deleted_at as deletedAt"
+    return "SELECT "
+        + userMetaSelectColumns("us")
         + " FROM "
         + USER_TABLE_NAME
         + " us JOIN "
@@ -144,11 +191,8 @@ public class UserMetaBaseSQLProvider {
   }
 
   public String listUserPOsByMetalake(@Param("metalakeName") String metalakeName) {
-    return "SELECT ut.user_id as userId, ut.user_name as userName,"
-        + " ut.metalake_id as metalakeId,"
-        + " ut.audit_info as auditInfo,"
-        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
-        + " ut.deleted_at as deletedAt"
+    return "SELECT "
+        + userMetaSelectColumns("ut")
         + " FROM "
         + USER_TABLE_NAME
         + " ut JOIN "
@@ -159,12 +203,9 @@ public class UserMetaBaseSQLProvider {
   }
 
   public String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "SELECT ut.user_id as userId, ut.user_name as userName,"
-        + " ut.metalake_id as metalakeId,"
-        + " ut.audit_info as auditInfo,"
-        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
-        + " ut.deleted_at as deletedAt,"
-        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+    return "SELECT "
+        + userMetaSelectColumns("ut")
+        + ", JSON_ARRAYAGG(rot.role_name) as roleNames,"
         + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + USER_TABLE_NAME
@@ -182,6 +223,37 @@ public class UserMetaBaseSQLProvider {
         + " ut.deleted_at = 0 AND"
         + " ut.metalake_id = #{metalakeId}"
         + " GROUP BY ut.user_id";
+  }
+
+  public String listExtendedUserPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return "SELECT "
+        + userMetaSelectColumns("ut")
+        + ", JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
+        + " FROM ("
+        + " SELECT user_id FROM "
+        + USER_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " ORDER BY user_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " ) paginated"
+        + " JOIN "
+        + USER_TABLE_NAME
+        + " ut ON ut.user_id = paginated.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.user_id = ut.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " GROUP BY ut.user_id"
+        + " ORDER BY ut.user_id ASC";
   }
 
   public String deleteUserMetasByLegacyTimeline(
