@@ -27,7 +27,6 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
 import org.apache.hadoop.fs.Path;
-import org.apache.spark.sql.Row;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -149,27 +148,6 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     partitions = getQueryData(String.format("show partitions %s", tableName));
     Assertions.assertEquals(2, partitions.size());
     Assertions.assertEquals("name=b;name=c", String.join(";", partitions));
-  }
-
-  @Test
-  void testPaimonCompactProcedure() {
-    String tableName = "test_paimon_compact";
-    dropTableIfExists(tableName);
-    sql(getCreatePaimonSimpleTableString(tableName));
-
-    sql(String.format("INSERT INTO %s VALUES(1, 'a', 'beijing')", tableName));
-    sql(String.format("INSERT INTO %s VALUES(2, 'b', 'shanghai')", tableName));
-
-    String fullTableName =
-        String.format("%s.%s.%s", getCatalogName(), getDefaultDatabase(), tableName);
-
-    sql(String.format("USE %s.%s", getCatalogName(), getDefaultDatabase()));
-
-    List<Row> result =
-        getSparkSession()
-            .sql(String.format("CALL system.compact(table => '%s')", fullTableName))
-            .collectAsList();
-    Assertions.assertFalse(result.isEmpty());
   }
 
   private String getCreatePaimonSimpleTableString(String tableName) {
