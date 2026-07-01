@@ -205,7 +205,7 @@ CREATE TABLE IF NOT EXISTS user_group_rel (
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    CONSTRAINT uk_ui_gi_del UNIQUE (user_id, group_id, deleted_at)
+    UNIQUE (user_id, group_id, deleted_at)
 );
 
 CREATE INDEX IF NOT EXISTS user_group_rel_idx_user_id ON user_group_rel (user_id);
@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS scim_token (
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    CONSTRAINT uk_mid_tn_del UNIQUE (metalake_id, token_name, deleted_at)
+    UNIQUE (metalake_id, token_name, deleted_at)
 );
 
 CREATE INDEX IF NOT EXISTS scim_token_idx_token_hash ON scim_token (token_hash);
