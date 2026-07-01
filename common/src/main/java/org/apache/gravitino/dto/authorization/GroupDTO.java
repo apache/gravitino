@@ -33,14 +33,14 @@ public class GroupDTO implements Group {
   @JsonProperty("name")
   private String name;
 
+  @JsonProperty("externalId")
+  private String externalId;
+
   @JsonProperty("audit")
   private AuditDTO audit;
 
   @JsonProperty("roles")
   private List<String> roles;
-
-  @JsonProperty("externalId")
-  private String externalId;
 
   /** Default constructor for Jackson deserialization. */
   protected GroupDTO() {}
@@ -49,15 +49,15 @@ public class GroupDTO implements Group {
    * Creates a new instance of GroupDTO.
    *
    * @param name The name of the Group DTO.
+   * @param externalId The external id of the Group DTO.
    * @param roles The roles of the Group DTO.
    * @param audit The audit information of the Group DTO.
-   * @param externalId The external id of the Group DTO.
    */
-  protected GroupDTO(String name, List<String> roles, AuditDTO audit, String externalId) {
+  protected GroupDTO(String name, String externalId, List<String> roles, AuditDTO audit) {
     this.name = name;
+    this.externalId = externalId;
     this.audit = audit;
     this.roles = roles;
-    this.externalId = externalId;
   }
 
   /**
@@ -66,6 +66,11 @@ public class GroupDTO implements Group {
   @Override
   public String name() {
     return name;
+  }
+
+  @Override
+  public String externalId() {
+    return externalId;
   }
 
   /**
@@ -84,11 +89,6 @@ public class GroupDTO implements Group {
   @Override
   public Audit auditInfo() {
     return audit;
-  }
-
-  @Override
-  public String externalId() {
-    return externalId;
   }
 
   /**
@@ -110,14 +110,14 @@ public class GroupDTO implements Group {
     /** The name of the group. */
     protected String name;
 
+    /** The external id of the group. */
+    protected String externalId;
+
     /** The roles of the group. */
     protected List<String> roles = Collections.emptyList();
 
     /** The audit information of the group. */
     protected AuditDTO audit;
-
-    /** The external id of the group. */
-    protected String externalId;
 
     /**
      * Sets the name of the group.
@@ -127,6 +127,17 @@ public class GroupDTO implements Group {
      */
     public S withName(String name) {
       this.name = name;
+      return (S) this;
+    }
+
+    /**
+     * Sets the external id of the group.
+     *
+     * @param externalId The external id of the group.
+     * @return The builder instance.
+     */
+    public S withExternalId(String externalId) {
+      this.externalId = externalId;
       return (S) this;
     }
 
@@ -156,17 +167,6 @@ public class GroupDTO implements Group {
     }
 
     /**
-     * Sets the external id of the group.
-     *
-     * @param externalId The external id of the group.
-     * @return The builder instance.
-     */
-    public S withExternalId(String externalId) {
-      this.externalId = externalId;
-      return (S) this;
-    }
-
-    /**
      * Builds an instance of GroupDTO using the builder's properties.
      *
      * @return An instance of GroupDTO.
@@ -175,7 +175,7 @@ public class GroupDTO implements Group {
     public GroupDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new GroupDTO(name, roles, audit, externalId);
+      return new GroupDTO(name, externalId, roles, audit);
     }
   }
 }

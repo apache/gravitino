@@ -82,6 +82,11 @@ public class ListGroups extends Command {
       public Audit auditInfo() {
         return null;
       }
+
+      @Override
+      public String externalId() {
+        return null;
+      }
     };
   }
 }

@@ -82,6 +82,16 @@ public class ListUsers extends Command {
       public Audit auditInfo() {
         return null;
       }
+
+      @Override
+      public String externalId() {
+        return null;
+      }
+
+      @Override
+      public boolean enabled() {
+        return true;
+      }
     };
   }
 }
