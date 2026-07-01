@@ -943,7 +943,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             Distributions.NONE,
             indexes,
             ClickHouseUtils.getSortOrders("c1"));
-    Assertions.assertTrue(dayPartitionSql.contains("PARTITION BY toDate(`c1`)"));
+    Assertions.assertTrue(dayPartitionSql.contains("PARTITION BY toYYYYMMDD(`c1`)"));
 
     String multiPartitionSql =
         ops.buildCreateSql(
@@ -956,7 +956,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             indexes,
             ClickHouseUtils.getSortOrders("c1"));
     Assertions.assertTrue(
-        multiPartitionSql.contains("PARTITION BY tuple(toYear(`c1`), toDate(`c1`))"));
+        multiPartitionSql.contains("PARTITION BY tuple(toYear(`c1`), toYYYYMMDD(`c1`))"));
 
     IllegalArgumentException exception =
         Assertions.assertThrows(

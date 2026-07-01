@@ -35,6 +35,8 @@ final class ClickHouseTableSqlUtils {
 
   private static final Pattern TO_DATE_PATTERN =
       Pattern.compile("toDate\\((.+)\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_DAY_PATTERN =
+      Pattern.compile("toYYYYMMDD\\((.+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_YEAR_PATTERN =
       Pattern.compile("toYear\\((.+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_MONTH_PATTERN =
@@ -76,7 +78,7 @@ final class ClickHouseTableSqlUtils {
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       case Transforms.NAME_OF_MONTH -> "toYYYYMM(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
-      case Transforms.NAME_OF_DAY -> "toDate(%s)"
+      case Transforms.NAME_OF_DAY -> "toYYYYMMDD(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       default -> throw new IllegalArgumentException(
           "Unsupported partition transform: " + transform.name());
@@ -181,28 +183,25 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
     if (toYearMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYearMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
+      String identifier = extractPartitionColumn(toYearMatcher.group(1), originalPartitionKey);
       return Transforms.year(identifier);
     }
 
     Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
     if (toYYYYMMMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYYYYMMMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
+      String identifier = extractPartitionColumn(toYYYYMMMatcher.group(1), originalPartitionKey);
       return Transforms.month(identifier);
+    }
+
+    Matcher toYYYYMMDDMatcher = TO_DAY_PATTERN.matcher(trimmedExpression);
+    if (toYYYYMMDDMatcher.matches()) {
+      String identifier = extractPartitionColumn(toYYYYMMDDMatcher.group(1), originalPartitionKey);
+      return Transforms.day(identifier);
     }
 
     Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
     if (toDateMatcher.matches()) {
-      String identifier = normalizeIdentifier(toDateMatcher.group(1));
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(identifier),
-          "Unsupported partition expression: " + originalPartitionKey);
+      String identifier = extractPartitionColumn(toDateMatcher.group(1), originalPartitionKey);
       return Transforms.day(identifier);
     }
 
@@ -218,6 +217,18 @@ final class ClickHouseTableSqlUtils {
         "Only simple identifier is supported for partition expression, but got: "
             + originalPartitionKey);
     return Transforms.identity(identifier);
+  }
+
+  private static String extractPartitionColumn(String expression, String originalPartitionKey) {
+    String identifier = normalizeIdentifier(expression);
+    Matcher toDateMatcher = TO_DATE_PATTERN.matcher(identifier);
+    if (toDateMatcher.matches()) {
+      identifier = normalizeIdentifier(toDateMatcher.group(1));
+    }
+    Preconditions.checkArgument(
+        isStrictIdentifier(identifier),
+        "Unsupported partition expression: " + originalPartitionKey);
+    return identifier;
   }
 
   private static String normalizePartitionKey(String partitionKey) {

@@ -32,9 +32,18 @@ public class TestClickHouseTableOperationsPartitioning {
     Assertions.assertEquals(1, dayPartitions.length);
     assertSingleFieldTransform(dayPartitions[0], Transforms.NAME_OF_DAY, "event_time");
 
+    Transform[] dayNumberPartitions = operations.parsePartitioning("toYYYYMMDD(event_time)");
+    Assertions.assertEquals(1, dayNumberPartitions.length);
+    assertSingleFieldTransform(dayNumberPartitions[0], Transforms.NAME_OF_DAY, "event_time");
+
     Transform[] monthPartitions = operations.parsePartitioning("toYYYYMM(event_time)");
     Assertions.assertEquals(1, monthPartitions.length);
     assertSingleFieldTransform(monthPartitions[0], Transforms.NAME_OF_MONTH, "event_time");
+
+    Transform[] nestedMonthPartitions =
+        operations.parsePartitioning("toYYYYMM(toDate(event_time))");
+    Assertions.assertEquals(1, nestedMonthPartitions.length);
+    assertSingleFieldTransform(nestedMonthPartitions[0], Transforms.NAME_OF_MONTH, "event_time");
 
     Transform[] yearPartitions = operations.parsePartitioning("toYear(event_time)");
     Assertions.assertEquals(1, yearPartitions.length);
@@ -55,6 +64,13 @@ public class TestClickHouseTableOperationsPartitioning {
 
     Assertions.assertEquals(0, operations.parsePartitioning("tuple()").length);
     Assertions.assertEquals(0, operations.parsePartitioning("  ").length);
+  }
+
+  @Test
+  public void testFormatDayPartitionExpression() {
+    Assertions.assertEquals(
+        "toYYYYMMDD(`event_time`)",
+        ClickHouseTableSqlUtils.toPartitionExpression(Transforms.day("event_time")));
   }
 
   private void assertSingleFieldTransform(

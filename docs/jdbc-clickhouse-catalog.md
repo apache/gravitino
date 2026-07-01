@@ -252,7 +252,7 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 - `PARTITION BY`: single-column identity and some functions are supported only, and only for MergeTree-family engines. For example `PARTITION BY created_at` or `PARTITION BY toYYYYMM(created_at)` are supported, but `PARTITION BY (created_at + 1)` are not supported.
    In all, the following partitioning expressions are supported:
    - Identity: `PARTITION BY column_name`
-   - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`. Other functions are not supported.
+   - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYYYYMMDD(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`. Other functions are not supported.
    - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc. (Note: ClickHouse itself does support arbitrary partitioning expressions, but Gravitino supports only the above patterns for partitioning). 
 
 - Distribution: fixed to `Distributions.NONE`. For a `Distributed` engine table, you can specify the sharding key and remote database/table through table properties to fulfill the same use cases. We will later consider adding more flexible distribution strategies if there is demand.
