@@ -40,6 +40,7 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.UnauthorizedException;
@@ -75,6 +76,8 @@ class TestBasicAuthenticationIntegration {
     config.set(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS, 1000L);
     config.set(STORE_DELETE_AFTER_TIME, 20 * 60 * 1000L);
     config.set(CACHE_ENABLED, false);
+    config.set(Configs.BASIC_AUTHENTICATION_GROUPS_CACHE_TTL_SECS, 60L);
+    config.set(Configs.BASIC_AUTHENTICATION_GROUPS_CACHE_SIZE, 100L);
 
     userGroupManager = IdpUserGroupManagerTestHelper.newManager(config, RandomIdGenerator.INSTANCE);
     userGroupManager.addUser(USER, PASSWORD);

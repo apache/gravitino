@@ -80,11 +80,13 @@ Before you call `/api/idp/*`, ensure the following:
 
 Set service admins in `gravitino.conf` (see also [Prerequisites](#prerequisites)):
 
-| Configuration item                        | Description                                                              | Example                                     |
-|-------------------------------------------|--------------------------------------------------------------------------|---------------------------------------------|
-| `gravitino.authenticators`                | Must include `basic` when the built-in IdP plugin is enabled             | `basic`                                     |
-| `gravitino.server.rest.extensionPackages` | Registers built-in IdP REST APIs                                         | `org.apache.gravitino.idp.web.rest.feature` |
-| `gravitino.authorization.serviceAdmins`   | Comma-separated service admin that can call built-in IDP management APIs | `admin`                                     |
+| Configuration item                                 | Description                                                              | Example                                     |
+|----------------------------------------------------|--------------------------------------------------------------------------|---------------------------------------------|
+| `gravitino.authenticators`                         | Must include `basic` when the built-in IdP plugin is enabled             | `basic`                                     |
+| `gravitino.server.rest.extensionPackages`          | Registers built-in IdP REST APIs                                         | `org.apache.gravitino.idp.web.rest.feature` |
+| `gravitino.authorization.serviceAdmins`            | Comma-separated service admin that can call built-in IDP management APIs | `admin`                                     |
+| `gravitino.authenticator.basic.groupsCacheTtlSecs` | Expiration in seconds for cached group names keyed by username.          | `3600` (default)                            |
+| `gravitino.authenticator.basic.groupsCacheSize`    | Maximum number of cached usernames for group names.                      | `10000` (default)                           |
 
 Example:
 

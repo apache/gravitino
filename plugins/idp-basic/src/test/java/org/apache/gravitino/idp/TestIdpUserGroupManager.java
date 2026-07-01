@@ -41,6 +41,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
@@ -278,6 +279,80 @@ public class TestIdpUserGroupManager {
         "initAdminSame1", manager.authenticate("initAdminSame1", VALID_PASSWORD).name());
     Assertions.assertEquals(
         "initAdminSame2", manager.authenticate("initAdminSame2", VALID_PASSWORD).name());
+  }
+
+  @Test
+  public void testAuthWithGroups() throws IOException {
+    manager.addUser("testAuthPrincipalUser", VALID_PASSWORD);
+    manager.addGroup("testAuthPrincipalGroup");
+    manager.changeGroupMembership(
+        "testAuthPrincipalGroup", Lists.newArrayList("testAuthPrincipalUser"), null);
+
+    IdpUser user = manager.authenticate("testAuthPrincipalUser", VALID_PASSWORD);
+
+    Assertions.assertEquals("testAuthPrincipalUser", user.name());
+    Assertions.assertEquals(1, user.groupNames().size());
+    Assertions.assertEquals("testAuthPrincipalGroup", user.groupNames().get(0));
+  }
+
+  @Test
+  public void testAuthWrongPassword() throws IOException {
+    manager.addUser("testAuthPwdVerifyUser", VALID_PASSWORD);
+
+    manager.authenticate("testAuthPwdVerifyUser", VALID_PASSWORD);
+    manager.authenticate("testAuthPwdVerifyUser", VALID_PASSWORD);
+
+    Assertions.assertThrows(
+        UnauthorizedException.class,
+        () -> manager.authenticate("testAuthPwdVerifyUser", "wrong-password"));
+  }
+
+  @Test
+  public void testAuthOldPassword() throws IOException {
+    manager.addUser("testAuthPwdChangeUser", VALID_PASSWORD);
+
+    manager.authenticate("testAuthPwdChangeUser", VALID_PASSWORD);
+    manager.changePassword("testAuthPwdChangeUser", NEW_VALID_PASSWORD);
+
+    Assertions.assertThrows(
+        UnauthorizedException.class,
+        () -> manager.authenticate("testAuthPwdChangeUser", VALID_PASSWORD));
+
+    IdpUser user = manager.authenticate("testAuthPwdChangeUser", NEW_VALID_PASSWORD);
+    Assertions.assertEquals("testAuthPwdChangeUser", user.name());
+  }
+
+  @Test
+  public void testInvalidateGroupsCache() throws IOException {
+    manager.addUser("testGroupsCacheUser", VALID_PASSWORD);
+
+    IdpUser first = manager.authenticate("testGroupsCacheUser", VALID_PASSWORD);
+    Assertions.assertEquals(0, first.groupNames().size());
+
+    manager.addGroup("testGroupsCacheGroup");
+    manager.changeGroupMembership(
+        "testGroupsCacheGroup", Lists.newArrayList("testGroupsCacheUser"), null);
+
+    IdpUser second = manager.authenticate("testGroupsCacheUser", VALID_PASSWORD);
+    Assertions.assertEquals(1, second.groupNames().size());
+    Assertions.assertEquals("testGroupsCacheGroup", second.groupNames().get(0));
+  }
+
+  @Test
+  public void testRemoveUserCache() throws IOException {
+    manager.addUser("testRemoveUserCache", VALID_PASSWORD);
+    manager.addGroup("testRemoveUserCacheGroup");
+    manager.changeGroupMembership(
+        "testRemoveUserCacheGroup", Lists.newArrayList("testRemoveUserCache"), null);
+
+    IdpUser beforeRemove = manager.authenticate("testRemoveUserCache", VALID_PASSWORD);
+    Assertions.assertEquals(1, beforeRemove.groupNames().size());
+
+    Assertions.assertTrue(manager.removeUser("testRemoveUserCache"));
+    manager.addUser("testRemoveUserCache", VALID_PASSWORD);
+
+    IdpUser afterRecreate = manager.authenticate("testRemoveUserCache", VALID_PASSWORD);
+    Assertions.assertEquals(0, afterRecreate.groupNames().size());
   }
 
   private static Config createH2Config(Path h2Path) {

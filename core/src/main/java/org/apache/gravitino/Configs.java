@@ -245,6 +245,30 @@ public class Configs {
               ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(Lists.newArrayList("simple"));
 
+  public static final long DEFAULT_BASIC_AUTHENTICATION_GROUPS_CACHE_TTL_SECS = 3600L;
+
+  public static final ConfigEntry<Long> BASIC_AUTHENTICATION_GROUPS_CACHE_TTL_SECS =
+      new ConfigBuilder("gravitino.authenticator.basic.groupsCacheTtlSecs")
+          .doc(
+              "The expiration time in seconds for the built-in IdP Basic authentication "
+                  + "group-name cache keyed by username")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_BASIC_AUTHENTICATION_GROUPS_CACHE_TTL_SECS);
+
+  public static final long DEFAULT_BASIC_AUTHENTICATION_GROUPS_CACHE_SIZE = 10000L;
+
+  public static final ConfigEntry<Long> BASIC_AUTHENTICATION_GROUPS_CACHE_SIZE =
+      new ConfigBuilder("gravitino.authenticator.basic.groupsCacheSize")
+          .doc(
+              "The maximum number of cached usernames for the built-in IdP Basic authentication "
+                  + "group-name cache")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_BASIC_AUTHENTICATION_GROUPS_CACHE_SIZE);
+
   public static final ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
       new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")
           .doc("The maximum skew time of transactions in milliseconds")

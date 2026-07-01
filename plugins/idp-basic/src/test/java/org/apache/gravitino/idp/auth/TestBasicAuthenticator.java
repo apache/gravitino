@@ -108,10 +108,10 @@ class TestBasicAuthenticator {
   @Test
   void testValidCredentials() throws Exception {
     IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
+    String authHeader = basicAuthHeader("alice", "Passw0rd-For-Alice");
     when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice"))
         .thenReturn(new IdpUser("alice", Arrays.asList("group-a", "group-b")));
     BasicAuthenticator authenticator = authenticator(userGroupManager);
-    String authHeader = basicAuthHeader("alice", "Passw0rd-For-Alice");
 
     UserPrincipal principal =
         (UserPrincipal) authenticator.authenticateToken(basicAuthBytes(authHeader));
@@ -194,14 +194,16 @@ class TestBasicAuthenticator {
     when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice"))
         .thenReturn(new IdpUser("alice", Arrays.asList()));
     BasicAuthenticator authenticator = authenticator(userGroupManager);
-    String credential =
-        "  "
-            + Base64.getEncoder()
-                .encodeToString("alice:Passw0rd-For-Alice".getBytes(StandardCharsets.UTF_8))
-            + "  ";
 
     UserPrincipal principal =
-        (UserPrincipal) authenticator.authenticateToken(basicAuthBytesWithCredential(credential));
+        (UserPrincipal)
+            authenticator.authenticateToken(
+                basicAuthBytesWithCredential(
+                    "  "
+                        + Base64.getEncoder()
+                            .encodeToString(
+                                "alice:Passw0rd-For-Alice".getBytes(StandardCharsets.UTF_8))
+                        + "  "));
 
     assertEquals("alice", principal.getName());
   }
@@ -222,6 +224,7 @@ class TestBasicAuthenticator {
   @Test
   void testWrongPassword() throws Exception {
     IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
+    String authHeader = basicAuthHeader("alice", "Passw0rd-For-Alice");
     when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice"))
         .thenThrow(
             new UnauthorizedException(
@@ -231,9 +234,7 @@ class TestBasicAuthenticator {
     UnauthorizedException exception =
         assertThrows(
             UnauthorizedException.class,
-            () ->
-                authenticator.authenticateToken(
-                    basicAuthBytes(basicAuthHeader("alice", "Passw0rd-For-Alice"))));
+            () -> authenticator.authenticateToken(basicAuthBytes(authHeader)));
 
     assertUnauthorized(exception);
   }
@@ -261,12 +262,11 @@ class TestBasicAuthenticator {
     return authenticator(mock(IdpUserGroupManager.class));
   }
 
-  private static BasicAuthenticator authenticator(IdpUserGroupManager userGroupManager)
-      throws Exception {
+  private BasicAuthenticator authenticator(IdpUserGroupManager userGroupManager) throws Exception {
     BasicAuthenticator authenticator = new BasicAuthenticator();
-    Field field = BasicAuthenticator.class.getDeclaredField("userGroupManager");
-    field.setAccessible(true);
-    field.set(authenticator, userGroupManager);
+    Field userGroupManagerField = BasicAuthenticator.class.getDeclaredField("userGroupManager");
+    userGroupManagerField.setAccessible(true);
+    userGroupManagerField.set(authenticator, userGroupManager);
     return authenticator;
   }
 }

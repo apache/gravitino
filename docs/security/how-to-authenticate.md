@@ -94,6 +94,10 @@ The Web UI uses the first entry in `gravitino.authenticators` from `/configs`. W
 the login page shows a username and password form backed by built-in IdP user metadata. See
 [built-in IDP Web UI](how-to-use-built-in-idp.md#web-ui).
 
+Built-in IdP Basic authentication caches each user's group names keyed by username. Tune the cache
+with `gravitino.authenticator.basic.groupsCacheTtlSecs` and
+`gravitino.authenticator.basic.groupsCacheSize` (see [built-in IDP configuration](how-to-use-built-in-idp.md#configuration)).
+
 ### OAuth Mode
 
 Gravitino supports external OAuth 2.0 servers with two token validation methods:
