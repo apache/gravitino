@@ -148,6 +148,21 @@ tests:
             name: audit-config
             mountPath: /opt/gravitino/audit
 
+  - it: renders priorityClassName when set
+    template: deployment.yaml
+    set:
+      priorityClassName: high-priority
+    asserts:
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: high-priority
+
+  - it: omits priorityClassName when not set
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.priorityClassName
+
   - it: renders security contexts, resources, and custom probes
     template: deployment.yaml
     set:
@@ -264,4 +279,37 @@ tests:
           content:
             name: GRAVITINO_DB
             value: gravitino
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-postgresql
+                key: password
+          any: true
+
+  - it: renders custom PostgreSQL secret name when existingSecretName is set
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: true
+        existingSecretName: gravitino-cnpg-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: init-postgresql
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-cnpg-secret
+                key: password
           any: true
