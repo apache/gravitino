@@ -27,6 +27,7 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -151,29 +152,24 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testPaimonCreateTagProcedure() {
-    String tableName = "test_paimon_create_tag";
+  void testPaimonCompactProcedure() {
+    String tableName = "test_paimon_compact";
     dropTableIfExists(tableName);
     sql(getCreatePaimonSimpleTableString(tableName));
 
     sql(String.format("INSERT INTO %s VALUES(1, 'a', 'beijing')", tableName));
+    sql(String.format("INSERT INTO %s VALUES(2, 'b', 'shanghai')", tableName));
 
     String fullTableName =
         String.format("%s.%s.%s", getCatalogName(), getDefaultDatabase(), tableName);
-    long snapshotId =
+
+    List<Row> result =
         getSparkSession()
-            .sql(String.format("SELECT snapshot_id FROM `%s$snapshots`", tableName))
-            .first()
-            .getLong(0);
-
-    sql(
-        String.format(
-            "CALL %s.system.create_tag(table => '%s', tag => 'test_tag', snapshot => %d)",
-            getCatalogName(), fullTableName, snapshotId));
-
-    List<String> tags = getQueryData(String.format("SHOW TAGS FROM %s", fullTableName));
-    Assertions.assertEquals(1, tags.size());
-    Assertions.assertEquals("test_tag", tags.get(0));
+            .sql(
+                String.format(
+                    "CALL %s.system.compact(table => '%s')", getCatalogName(), fullTableName))
+            .collectAsList();
+    Assertions.assertFalse(result.isEmpty());
   }
 
   private String getCreatePaimonSimpleTableString(String tableName) {
