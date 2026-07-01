@@ -56,6 +56,19 @@ public class TestIcebergRestCatalogRegistrar {
         "http://gravitino.example.com:9001/iceberg/", registrar.getResolvedRestUri());
   }
 
+  @Test
+  void testRestUriInferredFromHttpsGravitinoUri() {
+    // HTTPS gravitino URI must infer port 9433 (Gravitino default HTTPS port for Iceberg REST),
+    // not the HTTP default 9001.
+    SparkConf conf =
+        new SparkConf()
+            .set(GravitinoSparkConfig.GRAVITINO_URI, "https://gravitino.example.com:8443")
+            .set(GravitinoSparkConfig.GRAVITINO_METALAKE, "test");
+    IcebergRestCatalogRegistrar registrar = new IcebergRestCatalogRegistrar(conf);
+    Assertions.assertEquals(
+        "https://gravitino.example.com:9433/iceberg/", registrar.getResolvedRestUri());
+  }
+
   // ── Base catalog properties ────────────────────────────────────────────────
 
   @Test

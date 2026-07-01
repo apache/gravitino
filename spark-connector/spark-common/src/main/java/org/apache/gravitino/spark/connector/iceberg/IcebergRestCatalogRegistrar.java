@@ -58,7 +58,11 @@ public class IcebergRestCatalogRegistrar {
 
   private static final String ICEBERG_SPARK_CATALOG_CLASS = "org.apache.iceberg.spark.SparkCatalog";
   private static final String CATALOG_TYPE_REST = "rest";
-  private static final int ICEBERG_REST_DEFAULT_PORT = 9001;
+  /** Default HTTP port for the Gravitino Iceberg REST service (mirrors {@code IcebergConfig}). */
+  private static final int ICEBERG_REST_DEFAULT_HTTP_PORT = 9001;
+  /** Default HTTPS port for the Gravitino Iceberg REST service (mirrors {@code IcebergConfig}). */
+  private static final int ICEBERG_REST_DEFAULT_HTTPS_PORT = 9433;
+
   private static final String ICEBERG_REST_DEFAULT_PATH = "/iceberg/";
   private static final String VENDED_CREDENTIALS = "vended-credentials";
   private static final String ACCESS_DELEGATION_HEADER = "header.X-Iceberg-Access-Delegation";
@@ -169,13 +173,13 @@ public class IcebergRestCatalogRegistrar {
     String gravitinoUri = sparkConf.get(GravitinoSparkConfig.GRAVITINO_URI);
     try {
       URI base = new URI(gravitinoUri);
+      String scheme = base.getScheme();
+      int defaultPort =
+          "https".equalsIgnoreCase(scheme)
+              ? ICEBERG_REST_DEFAULT_HTTPS_PORT
+              : ICEBERG_REST_DEFAULT_HTTP_PORT;
       String inferred =
-          base.getScheme()
-              + "://"
-              + base.getHost()
-              + ":"
-              + ICEBERG_REST_DEFAULT_PORT
-              + ICEBERG_REST_DEFAULT_PATH;
+          scheme + "://" + base.getHost() + ":" + defaultPort + ICEBERG_REST_DEFAULT_PATH;
       LOG.warn(
           "spark.sql.gravitino.iceberg.restUri is not set; inferred Iceberg REST URI {} from"
               + " spark.sql.gravitino.uri={}. Production deployments should set the explicit"
