@@ -217,19 +217,6 @@ CREATE TABLE IF NOT EXISTS `user_role_rel` (
     KEY `idx_rid` (`role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user role relation';
 
-CREATE TABLE IF NOT EXISTS `user_group_rel` (
-    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
-    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
-    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation current version',
-    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ui_gi_del` (`user_id`, `group_id`, `deleted_at`),
-    KEY `user_group_rel_idx_user_id` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user group relation';
-
 CREATE TABLE IF NOT EXISTS `group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
@@ -258,19 +245,6 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     UNIQUE KEY `uk_gi_ri_del` (`group_id`, `role_id`, `deleted_at`),
     KEY `idx_rid` (`group_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group role relation';
-
-CREATE TABLE IF NOT EXISTS `scim_token` (
-    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
-    `token_name` VARCHAR(256) NOT NULL COMMENT 'scim token name',
-    `token_hash` VARCHAR(64) NOT NULL COMMENT 'SHA-256 hex digest of scim token value',
-    `expires_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'token expiry time in ms, 0 means never expires',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'scim token audit info',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'token deleted at',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_mid_tn_del` (`metalake_id`, `token_name`, `deleted_at`),
-    KEY `scim_token_idx_token_hash` (`token_hash`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'scim token metadata';
 
 CREATE TABLE IF NOT EXISTS `idp_user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
