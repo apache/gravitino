@@ -97,12 +97,6 @@ public class UserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String countUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "SELECT COUNT(*) FROM "
-        + USER_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-  }
-
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
@@ -223,37 +217,6 @@ public class UserMetaBaseSQLProvider {
         + " ut.deleted_at = 0 AND"
         + " ut.metalake_id = #{metalakeId}"
         + " GROUP BY ut.user_id";
-  }
-
-  public String listExtendedUserPOsByMetalakeIdPaginated(
-      @Param("metalakeId") Long metalakeId,
-      @Param("offset") int offset,
-      @Param("limit") int limit) {
-    return "SELECT "
-        + userMetaSelectColumns("ut")
-        + ", JSON_ARRAYAGG(rot.role_name) as roleNames,"
-        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
-        + " FROM ("
-        + " SELECT user_id FROM "
-        + USER_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
-        + " ORDER BY user_id ASC LIMIT #{limit} OFFSET #{offset}"
-        + " ) paginated"
-        + " JOIN "
-        + USER_TABLE_NAME
-        + " ut ON ut.user_id = paginated.user_id"
-        + " LEFT OUTER JOIN ("
-        + " SELECT * FROM "
-        + USER_ROLE_RELATION_TABLE_NAME
-        + " WHERE deleted_at = 0)"
-        + " AS rt ON rt.user_id = ut.user_id"
-        + " LEFT OUTER JOIN ("
-        + " SELECT * FROM "
-        + ROLE_TABLE_NAME
-        + " WHERE deleted_at = 0)"
-        + " AS rot ON rot.role_id = rt.role_id"
-        + " GROUP BY ut.user_id"
-        + " ORDER BY ut.user_id ASC";
   }
 
   public String deleteUserMetasByLegacyTimeline(

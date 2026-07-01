@@ -115,15 +115,4 @@ public class GroupMetaSQLProviderFactory {
       @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId) {
     return getProvider().selectGroupMetaByMetalakeIdAndExternalId(metalakeId, externalId);
   }
-
-  public static String countGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().countGroupMetasByMetalakeId(metalakeId);
-  }
-
-  public static String listExtendedGroupPOsByMetalakeIdPaginated(
-      @Param("metalakeId") Long metalakeId,
-      @Param("offset") int offset,
-      @Param("limit") int limit) {
-    return getProvider().listExtendedGroupPOsByMetalakeIdPaginated(metalakeId, offset, limit);
-  }
 }

@@ -28,7 +28,6 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -162,17 +161,6 @@ class UserGroupManager {
     }
   }
 
-  long countUsers(String metalake) {
-    return UserMetaService.getInstance().countUsersByMetalake(metalake);
-  }
-
-  PagedResult<User> listUsers(String metalake, int offset, int limit) {
-    PagedResult<UserEntity> result =
-        UserMetaService.getInstance().listUsersByMetalakePaginated(metalake, offset, limit);
-    return new PagedResult<>(
-        result.totalCount(), Arrays.asList(result.items().toArray(new User[0])));
-  }
-
   String[] listUserNames(String metalake) {
 
     return Arrays.stream(listUsersInternal(metalake, false /* allFields */))
@@ -261,17 +249,6 @@ class UserGroupManager {
       throw new NoSuchGroupException(
           AuthorizationUtils.GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
     }
-  }
-
-  long countGroups(String metalake) {
-    return GroupMetaService.getInstance().countGroupsByMetalake(metalake);
-  }
-
-  PagedResult<Group> listGroups(String metalake, int offset, int limit) {
-    PagedResult<GroupEntity> result =
-        GroupMetaService.getInstance().listGroupsByMetalakePaginated(metalake, offset, limit);
-    return new PagedResult<>(
-        result.totalCount(), Arrays.asList(result.items().toArray(new Group[0])));
   }
 
   Group[] listGroups(String metalake) {

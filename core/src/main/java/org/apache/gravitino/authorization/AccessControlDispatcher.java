@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -136,27 +135,6 @@ public interface AccessControlDispatcher {
   User[] listUsers(String metalake) throws NoSuchMetalakeException;
 
   /**
-   * Lists users with pagination.
-   *
-   * @param metalake The Metalake of the User.
-   * @param offset The number of users to skip.
-   * @param limit The maximum number of users to return.
-   * @return The paginated User result.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   */
-  PagedResult<User> listUsers(String metalake, int offset, int limit)
-      throws NoSuchMetalakeException;
-
-  /**
-   * Counts users in a metalake.
-   *
-   * @param metalake The Metalake of the User.
-   * @return The total number of users.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   */
-  long countUsers(String metalake) throws NoSuchMetalakeException;
-
-  /**
    * Lists the usernames.
    *
    * @param metalake The Metalake of the User.
@@ -238,26 +216,6 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   Group[] listGroups(String metalake);
-
-  /**
-   * Lists groups with pagination.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param offset The number of groups to skip.
-   * @param limit The maximum number of groups to return.
-   * @return The paginated Group result.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   */
-  PagedResult<Group> listGroups(String metalake, int offset, int limit);
-
-  /**
-   * Counts groups in a metalake.
-   *
-   * @param metalake The Metalake of the Group.
-   * @return The total number of groups.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   */
-  long countGroups(String metalake);
 
   /**
    * List group names

@@ -41,7 +41,6 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -1262,60 +1261,45 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testExternalIdEnableDisablePaginationAndDuplicateExternalId() throws IOException {
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
+  void testUserExtId() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    UserMetaService svc = UserMetaService.getInstance();
+    svc.insertUser(userWithExtId("u1", "ext-1"), false);
+    UserEntity found = svc.getUserByExternalId(metalakeName, "ext-1");
+    Assertions.assertEquals("u1", found.name());
+    Assertions.assertEquals("ext-1", found.externalId());
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> svc.getUserByExternalId(metalakeName, "missing-ext-id"));
+  }
 
-    UserMetaService userMetaService = UserMetaService.getInstance();
-    String externalId = "ext-user-meta-1";
-    UserEntity user =
-        UserEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("scim_user")
-            .withNamespace(AuthorizationUtils.ofUserNamespace(metalakeName))
-            .withExternalId(externalId)
-            .withEnabled(true)
-            .withAuditInfo(auditInfo)
-            .build();
-    userMetaService.insertUser(user, false);
+  @TestTemplate
+  void testUserEnabled() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    UserMetaService svc = UserMetaService.getInstance();
+    svc.insertUser(userWithExtId("u1", "ext-1"), false);
+    Assertions.assertFalse(svc.updateUserEnabled(metalakeName, "u1", false).enabled());
+    Assertions.assertTrue(svc.updateUserEnabled(metalakeName, "u1", true).enabled());
+  }
 
-    UserEntity lookedUp = userMetaService.getUserByExternalId(metalakeName, externalId);
-    Assertions.assertEquals(user.name(), lookedUp.name());
-    Assertions.assertEquals(externalId, lookedUp.externalId());
-    Assertions.assertTrue(lookedUp.enabled());
-
-    UserEntity disabled = userMetaService.updateUserEnabled(metalakeName, user.name(), false);
-    Assertions.assertFalse(disabled.enabled());
-
-    UserEntity enabled = userMetaService.updateUserEnabled(metalakeName, user.name(), true);
-    Assertions.assertTrue(enabled.enabled());
-
-    Assertions.assertEquals(1, userMetaService.countUsersByMetalake(metalakeName));
-
-    PagedResult<UserEntity> page =
-        userMetaService.listUsersByMetalakePaginated(metalakeName, 0, 10);
-    Assertions.assertEquals(1, page.totalCount());
-    Assertions.assertEquals(1, page.items().size());
-    Assertions.assertEquals(user.name(), page.items().get(0).name());
-
-    UserEntity duplicateExternalIdUser =
-        UserEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("another_user")
-            .withNamespace(AuthorizationUtils.ofUserNamespace(metalakeName))
-            .withExternalId(externalId)
-            .withAuditInfo(auditInfo)
-            .build();
+  @TestTemplate
+  void testDupUserExtId() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    UserMetaService svc = UserMetaService.getInstance();
+    svc.insertUser(userWithExtId("u1", "ext-1"), false);
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,
-        () -> userMetaService.insertUser(duplicateExternalIdUser, false));
+        () -> svc.insertUser(userWithExtId("u2", "ext-1"), false));
+  }
 
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> userMetaService.getUserByExternalId(metalakeName, "missing-external-id"));
+  private UserEntity userWithExtId(String name, String externalId) {
+    return UserEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(AuthorizationUtils.ofUserNamespace(metalakeName))
+        .withExternalId(externalId)
+        .withEnabled(true)
+        .withAuditInfo(AUDIT_INFO)
+        .build();
   }
 
   private Integer countUsers(Long metalakeId) {

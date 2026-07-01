@@ -97,35 +97,6 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   }
 
   @Override
-  public String listExtendedUserPOsByMetalakeIdPaginated(Long metalakeId, int offset, int limit) {
-    return "SELECT "
-        + userMetaSelectColumns("ut")
-        + ", JSON_AGG(rot.role_name) as roleNames,"
-        + " JSON_AGG(rot.role_id) as roleIds"
-        + " FROM ("
-        + " SELECT user_id FROM "
-        + USER_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
-        + " ORDER BY user_id ASC LIMIT #{limit} OFFSET #{offset}"
-        + " ) paginated"
-        + " JOIN "
-        + USER_TABLE_NAME
-        + " ut ON ut.user_id = paginated.user_id"
-        + " LEFT OUTER JOIN ("
-        + " SELECT * FROM "
-        + USER_ROLE_RELATION_TABLE_NAME
-        + " WHERE deleted_at = 0)"
-        + " AS rt ON rt.user_id = ut.user_id"
-        + " LEFT OUTER JOIN ("
-        + " SELECT * FROM "
-        + ROLE_TABLE_NAME
-        + " WHERE deleted_at = 0)"
-        + " AS rot ON rot.role_id = rt.role_id"
-        + " GROUP BY ut.user_id"
-        + " ORDER BY ut.user_id ASC";
-  }
-
-  @Override
   public String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "

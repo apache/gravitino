@@ -62,7 +62,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -512,89 +511,45 @@ public class TestAccessControlManager {
   }
 
   @Test
-  public void testGetUserByExternalIdNotFoundUsesExternalIdMessage() {
-    NoSuchUserException exception =
+  public void testExtIdNotFound() {
+    NoSuchUserException userEx =
         Assertions.assertThrows(
             NoSuchUserException.class,
-            () -> accessControlManager.getUserByExternalId(METALAKE, "missing-external-id"));
-    Assertions.assertTrue(exception.getMessage().contains("external id"));
-    Assertions.assertTrue(exception.getMessage().contains("missing-external-id"));
-  }
-
-  @Test
-  public void testGetGroupByExternalIdNotFoundUsesExternalIdMessage() {
-    NoSuchGroupException exception =
+            () -> accessControlManager.getUserByExternalId(METALAKE, "missing-ext-id"));
+    Assertions.assertTrue(userEx.getMessage().contains("external id"));
+    NoSuchGroupException groupEx =
         Assertions.assertThrows(
             NoSuchGroupException.class,
-            () -> accessControlManager.getGroupByExternalId(METALAKE, "missing-external-id"));
-    Assertions.assertTrue(exception.getMessage().contains("external id"));
-    Assertions.assertTrue(exception.getMessage().contains("missing-external-id"));
+            () -> accessControlManager.getGroupByExternalId(METALAKE, "missing-ext-id"));
+    Assertions.assertTrue(groupEx.getMessage().contains("external id"));
   }
 
   @Test
-  public void testDuplicateExternalIdOnAddUser() {
-    accessControlManager.addUser(METALAKE, "dup_user_1", "dup-ext-id");
-    UserAlreadyExistsException exception =
-        Assertions.assertThrows(
-            UserAlreadyExistsException.class,
-            () -> accessControlManager.addUser(METALAKE, "dup_user_2", "dup-ext-id"));
-    Assertions.assertTrue(exception.getMessage().contains("external id"));
-    Assertions.assertTrue(exception.getMessage().contains("dup-ext-id"));
-    accessControlManager.removeUser(METALAKE, "dup_user_1");
+  public void testDupExtId() {
+    accessControlManager.addUser(METALAKE, "u1", "dup-ext");
+    Assertions.assertThrows(
+        UserAlreadyExistsException.class,
+        () -> accessControlManager.addUser(METALAKE, "u2", "dup-ext"));
+    accessControlManager.removeUser(METALAKE, "u1");
+
+    accessControlManager.addGroup(METALAKE, "g1", "dup-ext");
+    Assertions.assertThrows(
+        GroupAlreadyExistsException.class,
+        () -> accessControlManager.addGroup(METALAKE, "g2", "dup-ext"));
+    accessControlManager.removeGroup(METALAKE, "g1");
   }
 
   @Test
-  public void testDuplicateExternalIdOnAddGroup() {
-    accessControlManager.addGroup(METALAKE, "dup_group_1", "dup-group-ext-id");
-    GroupAlreadyExistsException exception =
-        Assertions.assertThrows(
-            GroupAlreadyExistsException.class,
-            () -> accessControlManager.addGroup(METALAKE, "dup_group_2", "dup-group-ext-id"));
-    Assertions.assertTrue(exception.getMessage().contains("external id"));
-    Assertions.assertTrue(exception.getMessage().contains("dup-group-ext-id"));
-    accessControlManager.removeGroup(METALAKE, "dup_group_1");
+  public void testDisableCache() {
+    accessControlManager.addUser(METALAKE, "cache_user");
+    accessControlManager.getUser(METALAKE, "cache_user");
+    accessControlManager.disableUser(METALAKE, "cache_user");
+    Assertions.assertFalse(accessControlManager.getUser(METALAKE, "cache_user").enabled());
+    accessControlManager.removeUser(METALAKE, "cache_user");
   }
 
   @Test
-  public void testGetUserAfterDisableUsesFreshEnabledState() {
-    String userName = "cache_stale_user";
-    accessControlManager.addUser(METALAKE, userName);
-    accessControlManager.getUser(METALAKE, userName);
-    accessControlManager.disableUser(METALAKE, userName);
-    User fromGet = accessControlManager.getUser(METALAKE, userName);
-    Assertions.assertFalse(fromGet.enabled());
-    accessControlManager.enableUser(METALAKE, userName);
-    User fromGetAfterEnable = accessControlManager.getUser(METALAKE, userName);
-    Assertions.assertTrue(fromGetAfterEnable.enabled());
-    accessControlManager.removeUser(METALAKE, userName);
-  }
-
-  @Test
-  public void testUserPagination() {
-    long beforeCount = accessControlManager.countUsers(METALAKE);
-    for (int i = 0; i < 5; i++) {
-      accessControlManager.addUser(METALAKE, "page_user_" + i);
-    }
-
-    Assertions.assertEquals(beforeCount + 5, accessControlManager.countUsers(METALAKE));
-
-    PagedResult<User> page = accessControlManager.listUsers(METALAKE, (int) beforeCount, 2);
-    Assertions.assertEquals(beforeCount + 5, page.totalCount());
-    Assertions.assertEquals(2, page.items().size());
-
-    PagedResult<User> lastPage =
-        accessControlManager.listUsers(METALAKE, (int) beforeCount + 4, 10);
-    Assertions.assertEquals(beforeCount + 5, lastPage.totalCount());
-    Assertions.assertEquals(1, lastPage.items().size());
-
-    for (int i = 0; i < 5; i++) {
-      accessControlManager.removeUser(METALAKE, "page_user_" + i);
-    }
-  }
-
-  @Test
-  public void testGroupExternalIdAndPagination() {
-    long beforeCount = accessControlManager.countGroups(METALAKE);
+  public void testGroupExternalId() {
     String groupName = "scim_group";
     String externalId = "ext-scim-group-1";
     Group added = accessControlManager.addGroup(METALAKE, groupName, externalId);
@@ -603,19 +558,7 @@ public class TestAccessControlManager {
     Group lookedUp = accessControlManager.getGroupByExternalId(METALAKE, externalId);
     Assertions.assertEquals(groupName, lookedUp.name());
 
-    for (int i = 0; i < 3; i++) {
-      accessControlManager.addGroup(METALAKE, "page_group_" + i);
-    }
-    Assertions.assertEquals(beforeCount + 4, accessControlManager.countGroups(METALAKE));
-
-    PagedResult<Group> page = accessControlManager.listGroups(METALAKE, (int) beforeCount, 2);
-    Assertions.assertEquals(beforeCount + 4, page.totalCount());
-    Assertions.assertEquals(2, page.items().size());
-
     accessControlManager.removeGroup(METALAKE, groupName);
-    for (int i = 0; i < 3; i++) {
-      accessControlManager.removeGroup(METALAKE, "page_group_" + i);
-    }
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

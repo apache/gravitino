@@ -39,7 +39,6 @@ import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -1065,50 +1064,36 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testExternalIdLookupPaginationAndDuplicateExternalId() throws IOException {
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+  void testGroupExtId() throws IOException {
     createAndInsertMakeLake(metalakeName);
-
-    GroupMetaService groupMetaService = GroupMetaService.getInstance();
-    String externalId = "ext-group-meta-1";
-    GroupEntity group =
-        GroupEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("scim_group")
-            .withNamespace(AuthorizationUtils.ofGroupNamespace(metalakeName))
-            .withExternalId(externalId)
-            .withAuditInfo(auditInfo)
-            .build();
-    groupMetaService.insertGroup(group, false);
-
-    GroupEntity lookedUp = groupMetaService.getGroupByExternalId(metalakeName, externalId);
-    Assertions.assertEquals(group.name(), lookedUp.name());
-    Assertions.assertEquals(externalId, lookedUp.externalId());
-
-    Assertions.assertEquals(1, groupMetaService.countGroupsByMetalake(metalakeName));
-
-    PagedResult<GroupEntity> page =
-        groupMetaService.listGroupsByMetalakePaginated(metalakeName, 0, 10);
-    Assertions.assertEquals(1, page.totalCount());
-    Assertions.assertEquals(1, page.items().size());
-    Assertions.assertEquals(group.name(), page.items().get(0).name());
-
-    GroupEntity duplicateExternalIdGroup =
-        GroupEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("another_group")
-            .withNamespace(AuthorizationUtils.ofGroupNamespace(metalakeName))
-            .withExternalId(externalId)
-            .withAuditInfo(auditInfo)
-            .build();
-    Assertions.assertThrows(
-        EntityAlreadyExistsException.class,
-        () -> groupMetaService.insertGroup(duplicateExternalIdGroup, false));
-
+    GroupMetaService svc = GroupMetaService.getInstance();
+    svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
+    GroupEntity found = svc.getGroupByExternalId(metalakeName, "ext-1");
+    Assertions.assertEquals("g1", found.name());
+    Assertions.assertEquals("ext-1", found.externalId());
     Assertions.assertThrows(
         NoSuchEntityException.class,
-        () -> groupMetaService.getGroupByExternalId(metalakeName, "missing-external-id"));
+        () -> svc.getGroupByExternalId(metalakeName, "missing-ext-id"));
+  }
+
+  @TestTemplate
+  void testDupGroupExtId() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    GroupMetaService svc = GroupMetaService.getInstance();
+    svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () -> svc.insertGroup(groupWithExtId("g2", "ext-1"), false));
+  }
+
+  private GroupEntity groupWithExtId(String name, String externalId) {
+    return GroupEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(AuthorizationUtils.ofGroupNamespace(metalakeName))
+        .withExternalId(externalId)
+        .withAuditInfo(AUDIT_INFO)
+        .build();
   }
 
   private GroupEntity createGroupEntity(
