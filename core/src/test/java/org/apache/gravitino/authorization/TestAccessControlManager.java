@@ -511,6 +511,15 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testAddUserEnabled() {
+    User disabled =
+        accessControlManager.addUser(METALAKE, "disabled_user", "ext-disabled-user", false);
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertEquals("ext-disabled-user", disabled.externalId());
+    accessControlManager.removeUser(METALAKE, "disabled_user");
+  }
+
+  @Test
   public void testMissingExtId() {
     NoSuchUserException userEx =
         Assertions.assertThrows(

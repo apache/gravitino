@@ -76,6 +76,12 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public User addUser(String metalake, String user, String externalId, boolean enabled)
+      throws UserAlreadyExistsException, NoSuchMetalakeException {
+    return dispatcher.addUser(metalake, user, externalId, enabled);
+  }
+
+  @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     return dispatcher.removeUser(metalake, user);
   }

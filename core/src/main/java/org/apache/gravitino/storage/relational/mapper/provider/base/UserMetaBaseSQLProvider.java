@@ -32,28 +32,6 @@ import org.apache.ibatis.annotations.Param;
 
 public class UserMetaBaseSQLProvider {
 
-  protected String userMetaSelectColumns(String tableAlias) {
-    String prefix = tableAlias + ".";
-    return prefix
-        + "user_id as userId,"
-        + prefix
-        + "user_name as userName,"
-        + prefix
-        + "metalake_id as metalakeId,"
-        + prefix
-        + "external_id as externalId,"
-        + prefix
-        + "enabled as enabled,"
-        + prefix
-        + "audit_info as auditInfo,"
-        + prefix
-        + "current_version as currentVersion,"
-        + prefix
-        + "last_version as lastVersion,"
-        + prefix
-        + "deleted_at as deletedAt";
-  }
-
   public String selectUserIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name) {
     return "SELECT user_id as userId FROM "
@@ -64,8 +42,11 @@ public class UserMetaBaseSQLProvider {
 
   public String selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name) {
-    return "SELECT "
-        + userMetaSelectColumns(USER_TABLE_NAME)
+    return "SELECT user_id as userId, user_name as userName,"
+        + " metalake_id as metalakeId,"
+        + " external_id as externalId, enabled as enabled,"
+        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
@@ -74,8 +55,11 @@ public class UserMetaBaseSQLProvider {
 
   public String selectUserMetaByMetalakeIdAndExternalId(
       @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId) {
-    return "SELECT "
-        + userMetaSelectColumns(USER_TABLE_NAME)
+    return "SELECT user_id as userId, user_name as userName,"
+        + " metalake_id as metalakeId,"
+        + " external_id as externalId, enabled as enabled,"
+        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND external_id = #{externalId}"

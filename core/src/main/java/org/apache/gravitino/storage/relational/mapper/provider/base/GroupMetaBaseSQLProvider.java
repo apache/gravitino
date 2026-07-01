@@ -29,26 +29,6 @@ import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaBaseSQLProvider {
 
-  protected String groupMetaSelectColumns(String tableAlias) {
-    String prefix = tableAlias + ".";
-    return prefix
-        + "group_id as groupId,"
-        + prefix
-        + "group_name as groupName,"
-        + prefix
-        + "metalake_id as metalakeId,"
-        + prefix
-        + "external_id as externalId,"
-        + prefix
-        + "audit_info as auditInfo,"
-        + prefix
-        + "current_version as currentVersion,"
-        + prefix
-        + "last_version as lastVersion,"
-        + prefix
-        + "deleted_at as deletedAt";
-  }
-
   public String selectGroupIdBySchemaIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name) {
     return "SELECT group_id as groupId FROM "
@@ -98,8 +78,11 @@ public class GroupMetaBaseSQLProvider {
 
   public String selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name) {
-    return "SELECT "
-        + groupMetaSelectColumns(GROUP_TABLE_NAME)
+    return "SELECT group_id as groupId, group_name as groupName,"
+        + " metalake_id as metalakeId,"
+        + " external_id as externalId,"
+        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + GROUP_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND group_name = #{groupName}"
@@ -108,8 +91,11 @@ public class GroupMetaBaseSQLProvider {
 
   public String selectGroupMetaByMetalakeIdAndExternalId(
       @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId) {
-    return "SELECT "
-        + groupMetaSelectColumns(GROUP_TABLE_NAME)
+    return "SELECT group_id as groupId, group_name as groupName,"
+        + " metalake_id as metalakeId,"
+        + " external_id as externalId,"
+        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + GROUP_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND external_id = #{externalId}"

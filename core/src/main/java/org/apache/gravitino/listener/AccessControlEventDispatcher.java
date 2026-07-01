@@ -154,6 +154,13 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public User addUser(String metalake, String user, String externalId, boolean enabled)
+      throws UserAlreadyExistsException, NoSuchMetalakeException {
+    return dispatcher.addUser(metalake, user, externalId, enabled);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 

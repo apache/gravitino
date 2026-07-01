@@ -64,13 +64,15 @@ class UserGroupManager {
   }
 
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
-    return addUser(metalake, name, null);
+    return addUser(metalake, name, null, true);
   }
 
   User addUser(String metalake, String name, String externalId) throws UserAlreadyExistsException {
-    if (externalId != null) {
-      checkUserExternalIdNotExists(metalake, externalId);
-    }
+    return addUser(metalake, name, externalId, true);
+  }
+
+  User addUser(String metalake, String name, String externalId, boolean enabled)
+      throws UserAlreadyExistsException {
     try {
       UserEntity.Builder builder =
           UserEntity.builder()
@@ -78,7 +80,7 @@ class UserGroupManager {
               .withName(name)
               .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
               .withRoleNames(Lists.newArrayList())
-              .withEnabled(true)
+              .withEnabled(enabled)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -91,10 +93,6 @@ class UserGroupManager {
       store.put(userEntity, false /* overwritten */);
       return userEntity;
     } catch (EntityAlreadyExistsException e) {
-      if (externalId != null && isUserExternalIdTaken(metalake, externalId)) {
-        throw new UserAlreadyExistsException(
-            AuthorizationUtils.USER_WITH_EXTERNAL_ID_ALREADY_EXISTS_MSG, externalId, metalake);
-      }
       LOG.warn("User {} in the metalake {} already exists", name, metalake, e);
       throw new UserAlreadyExistsException(
           "User %s in the metalake %s already exists", name, metalake);
@@ -184,9 +182,6 @@ class UserGroupManager {
 
   Group addGroup(String metalake, String group, String externalId)
       throws GroupAlreadyExistsException {
-    if (externalId != null) {
-      checkGroupExternalIdNotExists(metalake, externalId);
-    }
     try {
       GroupEntity.Builder builder =
           GroupEntity.builder()
@@ -206,10 +201,6 @@ class UserGroupManager {
       store.put(groupEntity, false /* overwritten */);
       return groupEntity;
     } catch (EntityAlreadyExistsException e) {
-      if (externalId != null && isGroupExternalIdTaken(metalake, externalId)) {
-        throw new GroupAlreadyExistsException(
-            AuthorizationUtils.GROUP_WITH_EXTERNAL_ID_ALREADY_EXISTS_MSG, externalId, metalake);
-      }
       LOG.warn("Group {} in the metalake {} already exists", group, metalake, e);
       throw new GroupAlreadyExistsException(
           "Group %s in the metalake %s already exists", group, metalake);
@@ -294,38 +285,6 @@ class UserGroupManager {
     } catch (IOException ioe) {
       LOG.error("Listing group under metalake {} failed due to storage issues", metalake, ioe);
       throw new RuntimeException(ioe);
-    }
-  }
-
-  private void checkUserExternalIdNotExists(String metalake, String externalId) {
-    if (isUserExternalIdTaken(metalake, externalId)) {
-      throw new UserAlreadyExistsException(
-          AuthorizationUtils.USER_WITH_EXTERNAL_ID_ALREADY_EXISTS_MSG, externalId, metalake);
-    }
-  }
-
-  private boolean isUserExternalIdTaken(String metalake, String externalId) {
-    try {
-      UserMetaService.getInstance().getUserByExternalId(metalake, externalId);
-      return true;
-    } catch (NoSuchEntityException e) {
-      return false;
-    }
-  }
-
-  private void checkGroupExternalIdNotExists(String metalake, String externalId) {
-    if (isGroupExternalIdTaken(metalake, externalId)) {
-      throw new GroupAlreadyExistsException(
-          AuthorizationUtils.GROUP_WITH_EXTERNAL_ID_ALREADY_EXISTS_MSG, externalId, metalake);
-    }
-  }
-
-  private boolean isGroupExternalIdTaken(String metalake, String externalId) {
-    try {
-      GroupMetaService.getInstance().getGroupByExternalId(metalake, externalId);
-      return true;
-    } catch (NoSuchEntityException e) {
-      return false;
     }
   }
 
