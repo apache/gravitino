@@ -39,6 +39,8 @@ final class ClickHouseTableSqlUtils {
       Pattern.compile("toYear\\((.+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_MONTH_PATTERN =
       Pattern.compile("toYYYYMM\\((.+)\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TO_DAY_PATTERN =
+      Pattern.compile("toYYYYMMDD\\((.+)\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern FUNCTION_WRAPPER_PATTERN =
       Pattern.compile("^\\s*([A-Za-z0-9_]+)\\((.*)\\)\\s*$");
 
@@ -76,7 +78,7 @@ final class ClickHouseTableSqlUtils {
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       case Transforms.NAME_OF_MONTH -> "toYYYYMM(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
-      case Transforms.NAME_OF_DAY -> "toDate(%s)"
+      case Transforms.NAME_OF_DAY -> "toYYYYMMDD(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       default -> throw new IllegalArgumentException(
           "Unsupported partition transform: " + transform.name());
@@ -171,6 +173,42 @@ final class ClickHouseTableSqlUtils {
         && !StringUtils.containsAny(identifier, "(", ")", " ", "%", "+", "-", "*", "/");
   }
 
+  /**
+   * Recursively unwraps known ClickHouse date/time function wrappers to extract the innermost
+   * simple column identifier. For example:
+   *
+   * <ul>
+   *   <li>{@code toDate(dt)} → {@code dt}
+   *   <li>{@code toDateTime(event_time)} → {@code event_time}
+   *   <li>{@code toYYYYMM(toDate(dt))} → {@code dt}
+   * </ul>
+   *
+   * Returns {@code null} if the innermost value is not a simple identifier (e.g. arithmetic
+   * expressions) or if the nesting depth exceeds {@code maxDepth}.
+   */
+  static String extractInnermostField(String expression) {
+    return extractInnermostField(expression, 10);
+  }
+
+  private static String extractInnermostField(String expression, int maxDepth) {
+    if (maxDepth <= 0) {
+      return null;
+    }
+    String trimmed = StringUtils.trim(expression);
+    String normalized = normalizeIdentifier(trimmed);
+    if (isSimpleIdentifier(normalized)) {
+      return normalized;
+    }
+    Matcher m = FUNCTION_WRAPPER_PATTERN.matcher(trimmed);
+    if (m.matches()) {
+      String inner = StringUtils.trim(m.group(2));
+      if (!inner.contains(",")) {
+        return extractInnermostField(inner, maxDepth - 1);
+      }
+    }
+    return null;
+  }
+
   private static boolean isStrictIdentifier(String identifier) {
     return StringUtils.isNotBlank(identifier) && identifier.matches("^[a-zA-Z_][a-zA-Z0-9_]*$");
   }
@@ -181,7 +219,7 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
     if (toYearMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYearMatcher.group(1));
+      String identifier = extractInnermostField(toYearMatcher.group(1));
       Preconditions.checkArgument(
           StringUtils.isNotBlank(identifier),
           "Unsupported partition expression: " + originalPartitionKey);
@@ -190,7 +228,7 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
     if (toYYYYMMMatcher.matches()) {
-      String identifier = normalizeIdentifier(toYYYYMMMatcher.group(1));
+      String identifier = extractInnermostField(toYYYYMMMatcher.group(1));
       Preconditions.checkArgument(
           StringUtils.isNotBlank(identifier),
           "Unsupported partition expression: " + originalPartitionKey);
@@ -199,7 +237,16 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
     if (toDateMatcher.matches()) {
-      String identifier = normalizeIdentifier(toDateMatcher.group(1));
+      String identifier = extractInnermostField(toDateMatcher.group(1));
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(identifier),
+          "Unsupported partition expression: " + originalPartitionKey);
+      return Transforms.day(identifier);
+    }
+
+    Matcher toDayMatcher = TO_DAY_PATTERN.matcher(trimmedExpression);
+    if (toDayMatcher.matches()) {
+      String identifier = extractInnermostField(toDayMatcher.group(1));
       Preconditions.checkArgument(
           StringUtils.isNotBlank(identifier),
           "Unsupported partition expression: " + originalPartitionKey);
@@ -208,7 +255,7 @@ final class ClickHouseTableSqlUtils {
 
     if (trimmedExpression.contains("(") && trimmedExpression.contains(")")) {
       throw new UnsupportedOperationException(
-          "Currently Gravitino only supports toYear, toYYYYMM, toDate partition expressions, but got: "
+          "Currently Gravitino only supports toYear, toYYYYMM, toDate, toYYYYMMDD partition expressions, but got: "
               + trimmedExpression);
     }
 
