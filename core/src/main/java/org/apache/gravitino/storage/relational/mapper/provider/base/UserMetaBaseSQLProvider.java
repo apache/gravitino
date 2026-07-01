@@ -33,16 +33,16 @@ import org.apache.ibatis.annotations.Param;
 public class UserMetaBaseSQLProvider {
 
   protected static final String USER_META_INSERT_COLUMNS =
-      " user_id, user_name, metalake_id, audit_info, external_id, enabled,"
+      " user_id, user_name, metalake_id, external_id, enabled, audit_info,"
           + " current_version, last_version, deleted_at";
 
   protected static final String USER_META_INSERT_VALUES =
       " #{userMeta.userId},"
           + " #{userMeta.userName},"
           + " #{userMeta.metalakeId},"
-          + " #{userMeta.auditInfo},"
           + " #{userMeta.externalId},"
           + " #{userMeta.enabled},"
+          + " #{userMeta.auditInfo},"
           + " #{userMeta.currentVersion},"
           + " #{userMeta.lastVersion},"
           + " #{userMeta.deletedAt}";
@@ -56,11 +56,11 @@ public class UserMetaBaseSQLProvider {
         + prefix
         + "metalake_id as metalakeId,"
         + prefix
-        + "audit_info as auditInfo,"
-        + prefix
         + "external_id as externalId,"
         + prefix
         + "enabled as enabled,"
+        + prefix
+        + "audit_info as auditInfo,"
         + prefix
         + "current_version as currentVersion,"
         + prefix

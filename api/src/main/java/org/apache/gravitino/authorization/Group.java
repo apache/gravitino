@@ -35,17 +35,17 @@ public interface Group extends Auditable {
   String name();
 
   /**
-   * The roles of the group.
-   *
-   * @return The roles of the group.
-   */
-  List<String> roles();
-
-  /**
    * The external identifier from an upstream identity system, such as a SCIM provider.
    *
    * @return The external identifier, or null if not set.
    */
   @Nullable
   String externalId();
+
+  /**
+   * The roles of the group.
+   *
+   * @return The roles of the group.
+   */
+  List<String> roles();
 }

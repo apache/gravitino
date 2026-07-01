@@ -48,15 +48,15 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String insertGroupMetaOnDuplicateKeyUpdate(GroupPO groupPO) {
     return "INSERT INTO "
         + GROUP_TABLE_NAME
-        + " (group_id, group_name,"
-        + " metalake_id, audit_info, external_id,"
+        + " (group_id, group_name, metalake_id, external_id,"
+        + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{groupMeta.groupId},"
         + " #{groupMeta.groupName},"
         + " #{groupMeta.metalakeId},"
-        + " #{groupMeta.auditInfo},"
         + " #{groupMeta.externalId},"
+        + " #{groupMeta.auditInfo},"
         + " #{groupMeta.currentVersion},"
         + " #{groupMeta.lastVersion},"
         + " #{groupMeta.deletedAt}"
@@ -64,8 +64,8 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " ON CONFLICT(group_id) DO UPDATE SET"
         + " group_name = #{groupMeta.groupName},"
         + " metalake_id = #{groupMeta.metalakeId},"
-        + " audit_info = #{groupMeta.auditInfo},"
         + " external_id = #{groupMeta.externalId},"
+        + " audit_info = #{groupMeta.auditInfo},"
         + " current_version = #{groupMeta.currentVersion},"
         + " last_version = #{groupMeta.lastVersion},"
         + " deleted_at = #{groupMeta.deletedAt}";

@@ -36,13 +36,6 @@ public interface User extends Auditable {
   String name();
 
   /**
-   * The roles of the user. A user can have multiple roles. Every role binds several privileges.
-   *
-   * @return The roles of the user.
-   */
-  List<String> roles();
-
-  /**
    * The external identifier from an upstream identity system, such as a SCIM provider.
    *
    * @return The external identifier, or null if not set.
@@ -56,4 +49,11 @@ public interface User extends Auditable {
    * @return True if the user is enabled, false otherwise.
    */
   boolean enabled();
+
+  /**
+   * The roles of the user. A user can have multiple roles. Every role binds several privileges.
+   *
+   * @return The roles of the user.
+   */
+  List<String> roles();
 }

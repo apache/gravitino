@@ -74,16 +74,6 @@ public class ListUsers extends Command {
       }
 
       @Override
-      public List<String> roles() {
-        return null;
-      }
-
-      @Override
-      public Audit auditInfo() {
-        return null;
-      }
-
-      @Override
       public String externalId() {
         return null;
       }
@@ -91,6 +81,16 @@ public class ListUsers extends Command {
       @Override
       public boolean enabled() {
         return true;
+      }
+
+      @Override
+      public List<String> roles() {
+        return null;
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return null;
       }
     };
   }

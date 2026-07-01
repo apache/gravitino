@@ -30,15 +30,15 @@ import org.apache.ibatis.annotations.Param;
 public class GroupMetaBaseSQLProvider {
 
   protected static final String GROUP_META_INSERT_COLUMNS =
-      " group_id, group_name, metalake_id, audit_info, external_id,"
+      " group_id, group_name, metalake_id, external_id, audit_info,"
           + " current_version, last_version, deleted_at";
 
   protected static final String GROUP_META_INSERT_VALUES =
       " #{groupMeta.groupId},"
           + " #{groupMeta.groupName},"
           + " #{groupMeta.metalakeId},"
-          + " #{groupMeta.auditInfo},"
           + " #{groupMeta.externalId},"
+          + " #{groupMeta.auditInfo},"
           + " #{groupMeta.currentVersion},"
           + " #{groupMeta.lastVersion},"
           + " #{groupMeta.deletedAt}";
@@ -52,9 +52,9 @@ public class GroupMetaBaseSQLProvider {
         + prefix
         + "metalake_id as metalakeId,"
         + prefix
-        + "audit_info as auditInfo,"
-        + prefix
         + "external_id as externalId,"
+        + prefix
+        + "audit_info as auditInfo,"
         + prefix
         + "current_version as currentVersion,"
         + prefix

@@ -74,17 +74,17 @@ public class ListGroups extends Command {
       }
 
       @Override
+      public String externalId() {
+        return null;
+      }
+
+      @Override
       public List<String> roles() {
         return null;
       }
 
       @Override
       public Audit auditInfo() {
-        return null;
-      }
-
-      @Override
-      public String externalId() {
         return null;
       }
     };

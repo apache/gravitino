@@ -1267,9 +1267,9 @@ public class POConverters {
       return GroupPO.builder()
           .withGroupId(oldGroupPO.getGroupId())
           .withGroupName(newGroup.name())
-          .withMetalakeId(oldGroupPO.getMetalakeId())
           .withExternalId(
               newGroup.externalId() != null ? newGroup.externalId() : oldGroupPO.getExternalId())
+          .withMetalakeId(oldGroupPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newGroup.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)

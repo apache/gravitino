@@ -25,12 +25,12 @@ public class UserPO {
   private Long userId;
   private String userName;
   private Long metalakeId;
+  private String externalId;
+  private Boolean enabled;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
-  private String externalId;
-  private Boolean enabled;
 
   public Long getUserId() {
     return userId;
@@ -42,6 +42,14 @@ public class UserPO {
 
   public Long getMetalakeId() {
     return metalakeId;
+  }
+
+  public String getExternalId() {
+    return externalId;
+  }
+
+  public Boolean getEnabled() {
+    return enabled;
   }
 
   public String getAuditInfo() {
@@ -60,14 +68,6 @@ public class UserPO {
     return deletedAt;
   }
 
-  public String getExternalId() {
-    return externalId;
-  }
-
-  public Boolean getEnabled() {
-    return enabled;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -80,12 +80,12 @@ public class UserPO {
     return Objects.equal(getUserId(), tablePO.getUserId())
         && Objects.equal(getUserName(), tablePO.getUserName())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
+        && Objects.equal(getExternalId(), tablePO.getExternalId())
+        && Objects.equal(getEnabled(), tablePO.getEnabled())
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt())
-        && Objects.equal(getExternalId(), tablePO.getExternalId())
-        && Objects.equal(getEnabled(), tablePO.getEnabled());
+        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
   }
 
   @Override
@@ -94,12 +94,12 @@ public class UserPO {
         getUserId(),
         getUserName(),
         getMetalakeId(),
+        getExternalId(),
+        getEnabled(),
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
-        getDeletedAt(),
-        getExternalId(),
-        getEnabled());
+        getDeletedAt());
   }
 
   public static class Builder {
@@ -124,6 +124,16 @@ public class UserPO {
       return this;
     }
 
+    public Builder withExternalId(String externalId) {
+      userPO.externalId = externalId;
+      return this;
+    }
+
+    public Builder withEnabled(Boolean enabled) {
+      userPO.enabled = enabled;
+      return this;
+    }
+
     public Builder withAuditInfo(String auditInfo) {
       userPO.auditInfo = auditInfo;
       return this;
@@ -141,16 +151,6 @@ public class UserPO {
 
     public Builder withDeletedAt(Long deletedAt) {
       userPO.deletedAt = deletedAt;
-      return this;
-    }
-
-    public Builder withExternalId(String externalId) {
-      userPO.externalId = externalId;
-      return this;
-    }
-
-    public Builder withEnabled(Boolean enabled) {
-      userPO.enabled = enabled;
       return this;
     }
 

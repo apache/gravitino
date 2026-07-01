@@ -25,11 +25,11 @@ public class GroupPO {
   private Long groupId;
   private String groupName;
   private Long metalakeId;
+  private String externalId;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
-  private String externalId;
 
   public Long getGroupId() {
     return groupId;
@@ -41,6 +41,10 @@ public class GroupPO {
 
   public Long getMetalakeId() {
     return metalakeId;
+  }
+
+  public String getExternalId() {
+    return externalId;
   }
 
   public String getAuditInfo() {
@@ -59,10 +63,6 @@ public class GroupPO {
     return deletedAt;
   }
 
-  public String getExternalId() {
-    return externalId;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -75,11 +75,11 @@ public class GroupPO {
     return Objects.equal(getGroupId(), tablePO.getGroupId())
         && Objects.equal(getGroupName(), tablePO.getGroupName())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
+        && Objects.equal(getExternalId(), tablePO.getExternalId())
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt())
-        && Objects.equal(getExternalId(), tablePO.getExternalId());
+        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
   }
 
   @Override
@@ -88,11 +88,11 @@ public class GroupPO {
         getGroupId(),
         getGroupName(),
         getMetalakeId(),
+        getExternalId(),
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
-        getDeletedAt(),
-        getExternalId());
+        getDeletedAt());
   }
 
   public static class Builder {
@@ -117,6 +117,11 @@ public class GroupPO {
       return this;
     }
 
+    public Builder withExternalId(String externalId) {
+      groupPO.externalId = externalId;
+      return this;
+    }
+
     public Builder withAuditInfo(String auditInfo) {
       groupPO.auditInfo = auditInfo;
       return this;
@@ -134,11 +139,6 @@ public class GroupPO {
 
     public Builder withDeletedAt(Long deletedAt) {
       groupPO.deletedAt = deletedAt;
-      return this;
-    }
-
-    public Builder withExternalId(String externalId) {
-      groupPO.externalId = externalId;
       return this;
     }
 
