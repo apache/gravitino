@@ -294,7 +294,7 @@ CREATE TABLE IF NOT EXISTS user_meta (
     external_id VARCHAR(256) DEFAULT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     PRIMARY KEY (user_id),
-    UNIQUE (metalake_id, user_name, deleted_at),
+    CONSTRAINT uk_mid_us_del UNIQUE (metalake_id, user_name, deleted_at),
     CONSTRAINT uk_mid_ueid_del UNIQUE (metalake_id, external_id, deleted_at)
 );
 COMMENT ON TABLE user_meta IS 'user metadata';
@@ -396,7 +396,7 @@ CREATE TABLE IF NOT EXISTS user_group_rel (
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    UNIQUE (user_id, group_id, deleted_at)
+    CONSTRAINT uk_ui_gi_del UNIQUE (user_id, group_id, deleted_at)
 );
 
 CREATE INDEX IF NOT EXISTS user_group_rel_idx_user_id ON user_group_rel (user_id);
@@ -422,7 +422,7 @@ CREATE TABLE IF NOT EXISTS group_meta (
     updated_at BIGINT NOT NULL DEFAULT 0,
     external_id VARCHAR(256) DEFAULT NULL,
     PRIMARY KEY (group_id),
-    UNIQUE (metalake_id, group_name, deleted_at),
+    CONSTRAINT uk_mid_gr_del UNIQUE (metalake_id, group_name, deleted_at),
     CONSTRAINT uk_mid_geid_del UNIQUE (metalake_id, external_id, deleted_at)
 );
 COMMENT ON TABLE group_meta IS 'group metadata';

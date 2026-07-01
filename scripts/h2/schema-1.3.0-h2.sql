@@ -236,7 +236,7 @@ CREATE TABLE IF NOT EXISTS `user_group_rel` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
     CONSTRAINT `uk_ui_gi_del` UNIQUE (`user_id`, `group_id`, `deleted_at`),
-    KEY `idx_gid` (`group_id`)
+    KEY `user_group_rel_idx_user_id` (`user_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `group_meta` (
@@ -278,7 +278,7 @@ CREATE TABLE IF NOT EXISTS `scim_token` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'token deleted at',
     PRIMARY KEY (`id`),
     CONSTRAINT `uk_mid_tn_del` UNIQUE (`metalake_id`, `token_name`, `deleted_at`),
-    KEY `idx_st_hash` (`token_hash`)
+    KEY `scim_token_idx_token_hash` (`token_hash`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `idp_user_meta` (

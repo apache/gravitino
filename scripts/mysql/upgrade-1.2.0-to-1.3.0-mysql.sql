@@ -158,7 +158,7 @@ CREATE TABLE IF NOT EXISTS `user_group_rel` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_ui_gi_del` (`user_id`, `group_id`, `deleted_at`),
-    KEY `idx_gid` (`group_id`)
+    KEY `user_group_rel_idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user group relation';
 
 CREATE TABLE IF NOT EXISTS `scim_token` (
@@ -171,5 +171,5 @@ CREATE TABLE IF NOT EXISTS `scim_token` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'token deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_mid_tn_del` (`metalake_id`, `token_name`, `deleted_at`),
-    KEY `idx_st_hash` (`token_hash`)
+    KEY `scim_token_idx_token_hash` (`token_hash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'scim token metadata';
