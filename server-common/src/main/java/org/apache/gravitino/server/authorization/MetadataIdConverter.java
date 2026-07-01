@@ -95,8 +95,8 @@ public class MetadataIdConverter {
       return ident;
     }
 
-    Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
-    return CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
+    return CapabilityHelpers.withCapability(
+        ident, catalogManager, cap -> CapabilityHelpers.applyCaseSensitive(ident, scope, cap));
   }
 
   private static Long extractIdFromEntity(Entity entity) {
