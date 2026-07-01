@@ -61,7 +61,10 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public User addUser(String metalake, String user)
       throws UserAlreadyExistsException, NoSuchMetalakeException {
-    return addUser(metalake, user, null, true);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> userGroupManager.addUser(metalake, user));
   }
 
   @Override
@@ -136,7 +139,10 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public Group addGroup(String metalake, String group)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    return addGroup(metalake, group, null);
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> userGroupManager.addGroup(metalake, group));
   }
 
   @Override
