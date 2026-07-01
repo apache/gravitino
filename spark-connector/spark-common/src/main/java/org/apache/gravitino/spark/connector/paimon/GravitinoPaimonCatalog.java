@@ -29,12 +29,16 @@ import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
 import org.apache.paimon.spark.SparkCatalog;
 import org.apache.paimon.spark.SparkTable;
+import org.apache.paimon.spark.analysis.NoSuchProcedureException;
+import org.apache.paimon.spark.catalog.ProcedureCatalog;
+import org.apache.paimon.spark.catalog.SparkBaseCatalog;
+import org.apache.paimon.spark.procedure.Procedure;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-public class GravitinoPaimonCatalog extends BaseCatalog {
+public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCatalog {
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -83,5 +87,10 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     return gravitinoCatalogClient
         .asTableCatalog()
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
+  }
+
+  @Override
+  public Procedure loadProcedure(Identifier identifier) throws NoSuchProcedureException {
+    return ((SparkBaseCatalog) sparkCatalog).loadProcedure(identifier);
   }
 }
