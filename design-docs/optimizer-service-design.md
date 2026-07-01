@@ -917,7 +917,7 @@ The service should provide:
 #### Phase 1: Service Shell and Shared Runtime
 
 Create the service entry point, REST server, health endpoint, task runtime, in-memory task store, and
-common DTOs. Add unit tests for state transitions, cancellation, serialization, and request listing.
+common DTOs. Add unit tests for status transitions, cancellation, serialization, and task listing.
 
 #### Phase 2: Updater APIs and CLI Service Mode
 
@@ -952,11 +952,11 @@ shutdown semantics, and optional multi-node deployment support.
 
 - [ ] Add optimizer service configuration keys to `OptimizerConfig`.
 - [ ] Add `OptimizerServiceServer` entry point and startup script in the optimizer distribution.
-- [ ] Add common request, response, task record, task state, and error DTOs.
-- [ ] Implement `TaskRuntime` with in-memory task storage, bounded queues, worker pools, state
+- [ ] Add common request, response, task record, task status, and error DTOs.
+- [ ] Implement `TaskRuntime` with in-memory task storage, bounded queues, worker pools, status
       transitions, list/query support, and best-effort cancellation.
 - [ ] Add `GET /api/optimizer/v1/health`.
-- [ ] Add unit tests for task state transitions, task listing filters, cancellation, and DTO
+- [ ] Add unit tests for task status transitions, task listing filters, cancellation, and DTO
       serialization.
 
 ### Phase 2: Updater APIs and CLI Service Mode
