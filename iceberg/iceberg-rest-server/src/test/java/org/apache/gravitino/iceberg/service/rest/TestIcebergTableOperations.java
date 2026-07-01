@@ -73,12 +73,14 @@ import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
+import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.metrics.CommitReport;
 import org.apache.iceberg.metrics.ImmutableCommitMetricsResult;
 import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.rest.PlanStatus;
+import org.apache.iceberg.rest.RESTCatalogProperties;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
@@ -738,27 +740,53 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   @ParameterizedTest
   @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
-  void testRemoteSigningNotSupported(Namespace namespace) {
+  void testCreateTableWithRemoteSigning(Namespace namespace) {
     verifyCreateNamespaceSucc(namespace);
 
-    // Attempt to create table with "remote-signing" access delegation
-    // This should fail with UnsupportedOperationException -> 406 Not Acceptable
+    String localTableName = "create_with_remote_signing_local";
+    Response response =
+        doCreateTableWithRemoteSigning(namespace, localTableName, "file:///tmp/" + localTableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertFalse(
+        loadTableResponse.config().containsKey(S3FileIOProperties.REMOTE_SIGNING_ENABLED));
+
+    String s3TableName = "create_with_remote_signing_s3";
+    String s3Location = "s3://dummy-bucket/" + s3TableName;
+    response = doCreateTableWithRemoteSigning(namespace, s3TableName, s3Location);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadTableResponse s3LoadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertEquals(
+        "true", s3LoadTableResponse.config().get(S3FileIOProperties.REMOTE_SIGNING_ENABLED));
+    Assertions.assertTrue(
+        s3LoadTableResponse
+            .config()
+            .get(RESTCatalogProperties.SIGNER_ENDPOINT)
+            .endsWith("/tables/" + s3TableName + "/sign"));
+
+    response = doLoadTableWithRemoteSigning(namespace, s3TableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertEquals(
+        "true", loadTableResponse.config().get(S3FileIOProperties.REMOTE_SIGNING_ENABLED));
+  }
+
+  private Response doCreateTableWithRemoteSigning(Namespace ns, String name, String location) {
     CreateTableRequest createTableRequest =
         CreateTableRequest.builder()
-            .withName("test_remote_signing")
+            .withName(name)
             .withSchema(tableSchema)
+            .withLocation(location)
             .build();
+    return getTableClientBuilder(ns, Optional.empty())
+        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
+        .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
 
-    Response response =
-        getTableClientBuilder(namespace, Optional.empty())
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
-            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(406, response.getStatus());
-    String errorBody = response.readEntity(String.class);
-    Assertions.assertTrue(
-        errorBody.contains("remote signing") || errorBody.contains("remote-signing"),
-        "Error message should mention remote signing: " + errorBody);
+  private Response doLoadTableWithRemoteSigning(Namespace ns, String name) {
+    return getTableClientBuilder(ns, Optional.of(name))
+        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
+        .get();
   }
 
   @ParameterizedTest

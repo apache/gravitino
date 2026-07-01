@@ -39,12 +39,14 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.requests.RemoteSignRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.rest.responses.RemoteSignResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -174,6 +176,14 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   public LoadCredentialsResponse getTableCredentials(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     return dispatcher.getTableCredentials(context, tableIdentifier);
+  }
+
+  @Override
+  public RemoteSignResponse remoteSign(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      RemoteSignRequest remoteSignRequest) {
+    return dispatcher.remoteSign(context, tableIdentifier, remoteSignRequest);
   }
 
   /**

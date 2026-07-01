@@ -57,12 +57,14 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.requests.RemoteSignRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.rest.responses.RemoteSignResponse;
 
 /**
  * {@code IcebergTableEventDispatcher} is a decorator for {@link IcebergTableOperationExecutor} that
@@ -271,6 +273,14 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     }
     eventBus.dispatchEvent(new IcebergLoadTableCredentialEvent(context, gravitinoNameIdentifier));
     return loadCredentialsResponse;
+  }
+
+  @Override
+  public RemoteSignResponse remoteSign(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      RemoteSignRequest remoteSignRequest) {
+    return icebergTableOperationDispatcher.remoteSign(context, tableIdentifier, remoteSignRequest);
   }
 
   /**

@@ -229,7 +229,7 @@ If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-
 `data-access` is returned in `/v1/config` defaults for REST clients:
 
 - `vended-credentials`: clients should request credential vending (`X-Iceberg-Access-Delegation: vended-credentials`).
-- `remote-signing`: Gravitino doesn't support this mode yet.
+- `remote-signing`: clients should request remote signing (`X-Iceberg-Access-Delegation: remote-signing`). Gravitino signs S3 requests via `POST .../tables/{table}/sign` and returns pre-signed URLs. Configure S3 credential providers on the Iceberg REST server.
 
 #### Custom Backend Configuration
 

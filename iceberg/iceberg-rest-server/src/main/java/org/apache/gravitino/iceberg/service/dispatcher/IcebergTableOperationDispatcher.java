@@ -25,12 +25,14 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.requests.RemoteSignRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.rest.responses.RemoteSignResponse;
 
 /**
  * The {@code IcebergTableOperationDispatcher} interface defines the public API for managing Iceberg
@@ -116,6 +118,19 @@ public interface IcebergTableOperationDispatcher {
    */
   LoadCredentialsResponse getTableCredentials(
       IcebergRequestContext context, TableIdentifier tableIdentifier);
+
+  /**
+   * Remotely signs an object-storage request for a table.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param remoteSignRequest The remote sign request from the client.
+   * @return A {@link RemoteSignResponse} containing the signed URI and headers.
+   */
+  RemoteSignResponse remoteSign(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      RemoteSignRequest remoteSignRequest);
 
   /**
    * Plan table scan and return scan tasks.

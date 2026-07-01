@@ -34,6 +34,7 @@ import com.google.common.collect.ImmutableMap;
 import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,6 +49,7 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.gravitino.iceberg.service.extension.S3SigningTestCredentialProvider;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
@@ -60,6 +62,7 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateRequirement;
+import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
@@ -73,14 +76,17 @@ import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.rest.RESTCatalogProperties;
 import org.apache.iceberg.rest.auth.AuthProperties;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.ImmutableRemoteSignRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.RemoteSignResponse;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -415,6 +421,119 @@ public class TestCatalogWrapperForREST {
 
     Assertions.assertEquals(1, response.credentials().size());
     Assertions.assertEquals("s3://bucket/wh/db/tbl", response.credentials().get(0).prefix());
+  }
+
+  @Test
+  void testLoadTableRemoteSigningConfig() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse",
+                CredentialConstants.CREDENTIAL_PROVIDERS,
+                S3SigningTestCredentialProvider.CREDENTIAL_TYPE));
+
+    CatalogWrapperForREST wrapper = new CatalogWrapperForREST("irc-catalog", config);
+    Namespace namespace = Namespace.of("db");
+    Catalog catalog = wrapper.getCatalog();
+    ((SupportsNamespaces) catalog).createNamespace(namespace);
+    TableIdentifier table = TableIdentifier.of(namespace, "tbl");
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    catalog.createTable(
+        table,
+        schema,
+        PartitionSpec.unpartitioned(),
+        "s3://bucket/wh/db/tbl",
+        Collections.emptyMap());
+
+    LoadTableResponse response = wrapper.loadTable(table, false, true, CredentialPrivilege.READ);
+
+    Assertions.assertEquals(
+        "true", response.config().get(S3FileIOProperties.REMOTE_SIGNING_ENABLED));
+    Assertions.assertEquals(
+        "v1/irc-catalog/namespaces/db/tables/tbl/sign",
+        response.config().get(RESTCatalogProperties.SIGNER_ENDPOINT));
+  }
+
+  @Test
+  void testRemoteSignPutObject() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse",
+                CredentialConstants.CREDENTIAL_PROVIDERS,
+                S3SigningTestCredentialProvider.CREDENTIAL_TYPE));
+
+    CatalogWrapperForREST wrapper = new CatalogWrapperForREST("irc-catalog", config);
+    Namespace namespace = Namespace.of("db");
+    Catalog catalog = wrapper.getCatalog();
+    ((SupportsNamespaces) catalog).createNamespace(namespace);
+    TableIdentifier table = TableIdentifier.of(namespace, "tbl");
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    catalog.createTable(
+        table,
+        schema,
+        PartitionSpec.unpartitioned(),
+        "s3://bucket/wh/db/tbl",
+        Collections.emptyMap());
+
+    RemoteSignResponse response =
+        wrapper.remoteSign(
+            table,
+            ImmutableRemoteSignRequest.builder()
+                .region("us-east-1")
+                .method("PUT")
+                .uri(URI.create("s3://bucket/wh/db/tbl/data/file.parquet"))
+                .headers(Collections.emptyMap())
+                .build(),
+            CredentialPrivilege.WRITE);
+
+    Assertions.assertNotNull(response.uri());
+    Assertions.assertTrue(response.uri().toString().contains("bucket"));
+  }
+
+  @Test
+  void testRemoteSignRejectsUriOutsideTableLocation() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse",
+                CredentialConstants.CREDENTIAL_PROVIDERS,
+                S3SigningTestCredentialProvider.CREDENTIAL_TYPE));
+
+    CatalogWrapperForREST wrapper = new CatalogWrapperForREST("irc-catalog", config);
+    Namespace namespace = Namespace.of("db");
+    Catalog catalog = wrapper.getCatalog();
+    ((SupportsNamespaces) catalog).createNamespace(namespace);
+    TableIdentifier table = TableIdentifier.of(namespace, "tbl");
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    catalog.createTable(
+        table,
+        schema,
+        PartitionSpec.unpartitioned(),
+        "s3://bucket/wh/db/tbl",
+        Collections.emptyMap());
+
+    Assertions.assertThrows(
+        ForbiddenException.class,
+        () ->
+            wrapper.remoteSign(
+                table,
+                ImmutableRemoteSignRequest.builder()
+                    .region("us-east-1")
+                    .method("PUT")
+                    .uri(URI.create("s3://other-bucket/data/file.parquet"))
+                    .headers(Collections.emptyMap())
+                    .build(),
+                CredentialPrivilege.WRITE));
   }
 
   @Test

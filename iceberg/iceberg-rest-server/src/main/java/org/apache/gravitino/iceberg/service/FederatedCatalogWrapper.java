@@ -67,9 +67,11 @@ import org.apache.iceberg.rest.auth.AuthSession;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RemoteSignRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.RemoteSignResponse;
 
 /**
  * A {@link CatalogWrapperForREST} for a federated Iceberg REST catalog (the underlying catalog is a
@@ -103,21 +105,108 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
-    // The remote REST catalog vends its own credentials, so the requestCredential flag is not used
-    // here; FileIO-derived client config is extracted by createTableInternal.
-    return createTableInternal(namespace, request);
+    return createTable(namespace, request, requestCredential, false);
+  }
+
+  @Override
+  public LoadTableResponse createTable(
+      Namespace namespace,
+      CreateTableRequest request,
+      boolean requestCredential,
+      boolean requestRemoteSigning) {
+    return createTableInternal(namespace, request, requestCredential, requestRemoteSigning);
   }
 
   @Override
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
-    return loadTableInternal(identifier);
+    return loadTable(identifier, requestCredential, false, privilege);
+  }
+
+  @Override
+  public LoadTableResponse loadTable(
+      TableIdentifier identifier,
+      boolean requestCredential,
+      boolean requestRemoteSigning,
+      CredentialPrivilege privilege) {
+    LoadTableResponse response = loadTableInternal(identifier);
+    return maybeInjectDataAccessConfig(
+        identifier, response, requestCredential, requestRemoteSigning, privilege);
   }
 
   @Override
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
-    return registerTableInternal(namespace, request);
+    return registerTable(namespace, request, requestCredential, false);
+  }
+
+  @Override
+  public LoadTableResponse registerTable(
+      Namespace namespace,
+      RegisterTableRequest request,
+      boolean requestCredential,
+      boolean requestRemoteSigning) {
+    LoadTableResponse response = registerTableInternal(namespace, request);
+    return maybeInjectDataAccessConfig(
+        TableIdentifier.of(namespace, request.name()),
+        response,
+        requestCredential,
+        requestRemoteSigning,
+        CredentialPrivilege.WRITE);
+  }
+
+  @Override
+  public RemoteSignResponse remoteSign(
+      TableIdentifier tableIdentifier, RemoteSignRequest request, CredentialPrivilege privilege) {
+    RESTCatalog restCatalog = (RESTCatalog) getCatalog();
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
+    String signPath = ResourcePaths.forCatalogProperties(properties).remoteSign(tableIdentifier);
+
+    AuthManager authManager = null;
+    RESTClient client = null;
+    AuthSession authSession = null;
+    try {
+      authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
+      client =
+          HTTPClient.builder(properties)
+              .uri(properties.get(CatalogProperties.URI))
+              .withHeaders(RESTUtil.configHeaders(properties))
+              .build();
+      authSession = authManager.catalogSession(client, properties);
+      return client
+          .withAuthSession(authSession)
+          .post(
+              signPath,
+              request,
+              RemoteSignResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.tableErrorHandler());
+    } finally {
+      if (authSession != null) {
+        try {
+          authSession.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close auth session when remote signing for table: {}", tableIdentifier, e);
+        }
+      }
+      if (client != null) {
+        try {
+          client.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close REST client when remote signing for table: {}", tableIdentifier, e);
+        }
+      }
+      if (authManager != null) {
+        try {
+          authManager.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close auth manager when remote signing for table: {}", tableIdentifier, e);
+        }
+      }
+    }
   }
 
   @Override
@@ -212,6 +301,14 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    * extracts client-facing FileIO/credential properties from {@code table.io()}.
    */
   private LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
+    return createTableInternal(namespace, request, false, false);
+  }
+
+  private LoadTableResponse createTableInternal(
+      Namespace namespace,
+      CreateTableRequest request,
+      boolean requestCredential,
+      boolean requestRemoteSigning) {
     Catalog loadedCatalog = getCatalog();
 
     request.validate();
@@ -231,7 +328,9 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
             .create();
 
     if (table instanceof BaseTable) {
-      return buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
+      LoadTableResponse response = buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
+      return maybeInjectDataAccessConfig(
+          ident, response, requestCredential, requestRemoteSigning, CredentialPrivilege.WRITE);
     }
 
     throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");

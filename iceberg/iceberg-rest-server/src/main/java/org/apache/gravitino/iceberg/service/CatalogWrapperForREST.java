@@ -44,6 +44,8 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
+import org.apache.gravitino.iceberg.service.sign.RemoteSignPathValidator;
+import org.apache.gravitino.iceberg.service.sign.S3RemoteRequestSigner;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.MapUtils;
@@ -55,19 +57,25 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
+import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
+import org.apache.iceberg.rest.RESTCatalogProperties;
+import org.apache.iceberg.rest.ResourcePaths;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RemoteSignRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.rest.responses.RemoteSignResponse;
 
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
@@ -115,38 +123,82 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
+    return createTable(namespace, request, requestCredential, false);
+  }
+
+  /**
+   * Creates a table and optionally injects vended credentials or remote-signing configuration.
+   *
+   * @param namespace Iceberg namespace
+   * @param request create table request
+   * @param requestCredential whether to vend credentials
+   * @param requestRemoteSigning whether to enable remote signing
+   * @return load table response for the created table
+   */
+  public LoadTableResponse createTable(
+      Namespace namespace,
+      CreateTableRequest request,
+      boolean requestCredential,
+      boolean requestRemoteSigning) {
     LoadTableResponse loadTableResponse = super.createTable(namespace, request);
-    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
-      return injectCredentialConfig(
-          TableIdentifier.of(namespace, request.name()),
-          loadTableResponse,
-          CredentialPrivilege.WRITE);
-    }
-    return loadTableResponse;
+    return maybeInjectDataAccessConfig(
+        TableIdentifier.of(namespace, request.name()),
+        loadTableResponse,
+        requestCredential,
+        requestRemoteSigning,
+        CredentialPrivilege.WRITE);
   }
 
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
+    return loadTable(identifier, requestCredential, false, privilege);
+  }
+
+  /**
+   * Loads a table and optionally injects vended credentials or remote-signing configuration.
+   *
+   * @param identifier table identifier
+   * @param requestCredential whether to vend credentials
+   * @param requestRemoteSigning whether to enable remote signing
+   * @param privilege credential privilege when vending credentials
+   * @return load table response
+   */
+  public LoadTableResponse loadTable(
+      TableIdentifier identifier,
+      boolean requestCredential,
+      boolean requestRemoteSigning,
+      CredentialPrivilege privilege) {
     LoadTableResponse loadTableResponse = super.loadTable(identifier);
-    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
-      return injectCredentialConfig(identifier, loadTableResponse, privilege);
-    }
-    return loadTableResponse;
+    return maybeInjectDataAccessConfig(
+        identifier, loadTableResponse, requestCredential, requestRemoteSigning, privilege);
   }
 
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
+    return registerTable(namespace, request, requestCredential, false);
+  }
+
+  /**
+   * Registers a table and optionally injects vended credentials or remote-signing configuration.
+   *
+   * @param namespace Iceberg namespace
+   * @param request register table request
+   * @param requestCredential whether to vend credentials
+   * @param requestRemoteSigning whether to enable remote signing
+   * @return load table response for the registered table
+   */
+  public LoadTableResponse registerTable(
+      Namespace namespace,
+      RegisterTableRequest request,
+      boolean requestCredential,
+      boolean requestRemoteSigning) {
     LoadTableResponse loadTableResponse = super.registerTable(namespace, request);
-    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
-      // Vend WRITE credentials: the registering user becomes the table owner
-      // (IcebergNamespaceHookDispatcher.setTableOwner runs after this call
-      // returns), consistent with createTable which also vends WRITE.
-      return injectCredentialConfig(
-          TableIdentifier.of(namespace, request.name()),
-          loadTableResponse,
-          CredentialPrivilege.WRITE);
-    }
-    return loadTableResponse;
+    return maybeInjectDataAccessConfig(
+        TableIdentifier.of(namespace, request.name()),
+        loadTableResponse,
+        requestCredential,
+        requestRemoteSigning,
+        CredentialPrivilege.WRITE);
   }
 
   /**
@@ -332,12 +384,131 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @VisibleForTesting
   protected boolean shouldGenerateCredential(
       LoadTableResponse loadTableResponse, boolean requestCredential) {
-    if (!requestCredential) {
+    return shouldInjectDataAccess(loadTableResponse, requestCredential, false);
+  }
+
+  @VisibleForTesting
+  protected boolean shouldInjectDataAccess(
+      LoadTableResponse loadTableResponse,
+      boolean requestCredential,
+      boolean requestRemoteSigning) {
+    if (!requestCredential && !requestRemoteSigning) {
       return false;
     }
 
     validateCredentialLocation(loadTableResponse.tableMetadata().location());
     return !isLocalOrHdfsTable(loadTableResponse.tableMetadata());
+  }
+
+  protected LoadTableResponse maybeInjectDataAccessConfig(
+      TableIdentifier tableIdentifier,
+      LoadTableResponse loadTableResponse,
+      boolean requestCredential,
+      boolean requestRemoteSigning,
+      CredentialPrivilege privilege) {
+    if (!shouldInjectDataAccess(loadTableResponse, requestCredential, requestRemoteSigning)) {
+      return loadTableResponse;
+    }
+
+    LoadTableResponse response = loadTableResponse;
+    if (requestRemoteSigning) {
+      response = injectRemoteSigningConfig(tableIdentifier, response);
+    }
+    if (requestCredential) {
+      response = injectCredentialConfig(tableIdentifier, response, privilege);
+    }
+    return response;
+  }
+
+  @VisibleForTesting
+  protected LoadTableResponse injectRemoteSigningConfig(
+      TableIdentifier tableIdentifier, LoadTableResponse loadTableResponse) {
+    Map<String, String> remoteSignConfig = new HashMap<>();
+    remoteSignConfig.put(S3FileIOProperties.REMOTE_SIGNING_ENABLED, "true");
+    remoteSignConfig.put(
+        RESTCatalogProperties.SIGNER_ENDPOINT, remoteSignEndpoint(tableIdentifier));
+
+    String region = getIcebergConfig().getRawString(IcebergConfig.S3_REGION.getKey());
+    if (StringUtils.isNotBlank(region)) {
+      remoteSignConfig.put(IcebergConstants.AWS_S3_REGION, region);
+    }
+
+    return LoadTableResponse.builder()
+        .withTableMetadata(loadTableResponse.tableMetadata())
+        .addAllConfig(loadTableResponse.config())
+        .addAllConfig(getCatalogConfigToClient())
+        .addAllConfig(remoteSignConfig)
+        .addAllCredentials(loadTableResponse.credentials())
+        .build();
+  }
+
+  /**
+   * Remotely signs an object-storage request for a table.
+   *
+   * @param tableIdentifier table receiving the sign request
+   * @param request Iceberg REST remote sign request
+   * @param privilege credential privilege used to obtain signing credentials
+   * @return signed URI and headers
+   */
+  public RemoteSignResponse remoteSign(
+      TableIdentifier tableIdentifier, RemoteSignRequest request, CredentialPrivilege privilege) {
+    LoadTableResponse loadTableResponse = super.loadTable(tableIdentifier);
+    TableMetadata tableMetadata = loadTableResponse.tableMetadata();
+    validateCredentialLocation(tableMetadata.location());
+    if (isLocalOrHdfsTable(tableMetadata)) {
+      throw new ForbiddenException(
+          "Remote signing is not supported for local or HDFS table locations");
+    }
+
+    RemoteSignPathValidator.validateUriWithinPrefixes(
+        request.uri(), tableStoragePrefixes(tableMetadata));
+
+    Credential credential = getCredential(tableMetadata, privilege);
+    S3RemoteRequestSigner signer = createS3RemoteRequestSigner();
+    return signer.sign(request, credential);
+  }
+
+  private S3RemoteRequestSigner createS3RemoteRequestSigner() {
+    String endpoint = getIcebergConfig().get(IcebergConfig.S3_ENDPOINT);
+    boolean pathStyleAccess = getIcebergConfig().get(IcebergConfig.S3_PATH_STYLE_ACCESS);
+    return new S3RemoteRequestSigner(
+        endpoint, pathStyleAccess, S3RemoteRequestSigner.DEFAULT_SIGNATURE_DURATION);
+  }
+
+  private String remoteSignEndpoint(TableIdentifier tableIdentifier) {
+    Map<String, String> pathProperties =
+        ImmutableMap.of("prefix", catalogCredentialManager.catalogName());
+    return ResourcePaths.forCatalogProperties(pathProperties).remoteSign(tableIdentifier);
+  }
+
+  private static ImmutableSet<String> tableStoragePrefixes(TableMetadata tableMetadata) {
+    return Stream.of(
+            tableMetadata.location(),
+            tableMetadata.property(TableProperties.WRITE_DATA_LOCATION, ""),
+            tableMetadata.property(TableProperties.WRITE_METADATA_LOCATION, ""))
+        .filter(StringUtils::isNotBlank)
+        .collect(ImmutableSet.toImmutableSet());
+  }
+
+  /**
+   * Maps an HTTP method from a remote sign request to a credential privilege.
+   *
+   * @param method HTTP method from the remote sign request
+   * @return write privilege for mutating methods, otherwise read
+   */
+  public static CredentialPrivilege credentialPrivilegeForSignMethod(String method) {
+    if (StringUtils.isBlank(method)) {
+      return CredentialPrivilege.READ;
+    }
+    switch (method.toUpperCase(Locale.ROOT)) {
+      case "PUT":
+      case "POST":
+      case "DELETE":
+      case "PATCH":
+        return CredentialPrivilege.WRITE;
+      default:
+        return CredentialPrivilege.READ;
+    }
   }
 
   private boolean isLocalOrHdfsTable(TableMetadata tableMetadata) {

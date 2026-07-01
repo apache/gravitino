@@ -53,6 +53,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
+import org.apache.gravitino.iceberg.service.IcebergAccessDelegation;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -76,12 +77,14 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.requests.RemoteSignRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.rest.responses.RemoteSignResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -173,24 +176,25 @@ public class IcebergTableOperations {
           String namespace,
       CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
-    boolean isCredentialVending = isCredentialVending(accessDelegation);
+    IcebergAccessDelegation accessDelegationMode = parseAccessDelegation(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
-            + "accessDelegation: {}, isCredentialVending: {}",
+            + "accessDelegation: {}, credential vending: {}, remote signing: {}",
         catalogName,
         icebergNS,
         createTableRequest,
         accessDelegation,
-        isCredentialVending);
+        accessDelegationMode.requestVendedCredentials(),
+        accessDelegationMode.requestRemoteSigning());
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+                new IcebergRequestContext(httpServletRequest(), catalogName, accessDelegationMode);
             LoadTableResponse loadTableResponse =
                 tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
             return buildResponseWithETag(loadTableResponse);
@@ -312,22 +316,23 @@ public class IcebergTableOperations {
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
-    boolean isCredentialVending = isCredentialVending(accessDelegation);
+    IcebergAccessDelegation accessDelegationMode = parseAccessDelegation(accessDelegation);
     LOG.info(
         "Load Iceberg table, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
-            + "credential vending: {}",
+            + "credential vending: {}, remote signing: {}",
         catalogName,
         icebergNS,
         tableName,
         accessDelegation,
-        isCredentialVending);
+        accessDelegationMode.requestVendedCredentials(),
+        accessDelegationMode.requestRemoteSigning());
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+                new IcebergRequestContext(httpServletRequest(), catalogName, accessDelegationMode);
 
             // Fast path: if client sent If-None-Match, try to resolve ETag without full table load
             if (StringUtils.isNotBlank(ifNoneMatch)) {
@@ -497,6 +502,50 @@ public class IcebergTableOperations {
     }
   }
 
+  @POST
+  @Path("{table}/sign")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "remote-sign-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "remote-sign-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
+  public Response remoteSignTable(
+      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
+          String namespace,
+      @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table,
+      RemoteSignRequest remoteSignRequest) {
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+    String tableName = RESTUtil.decodeString(table);
+    LOG.info(
+        "Remote sign for Iceberg table, catalog: {}, namespace: {}, table: {}, method: {}, uri: {}",
+        catalogName,
+        icebergNS,
+        tableName,
+        remoteSignRequest.method(),
+        remoteSignRequest.uri());
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            RemoteSignResponse remoteSignResponse =
+                tableOperationDispatcher.remoteSign(context, tableIdentifier, remoteSignRequest);
+            return Response.ok(remoteSignResponse).header("Cache-Control", "private").build();
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
+  }
+
   /**
    * Plan table scan endpoint. Allows clients to request a scan plan from the server to optimize
    * scan planning by leveraging server-side resources.
@@ -620,29 +669,23 @@ public class IcebergTableOperations {
   }
 
   /**
+   * Parses the {@code X-Iceberg-Access-Delegation} header value.
+   *
+   * @param accessDelegation raw header value
+   * @return parsed access delegation mode
+   */
+  static IcebergAccessDelegation parseAccessDelegation(String accessDelegation) {
+    return IcebergAccessDelegation.parse(accessDelegation);
+  }
+
+  /**
    * Parses the {@code X-Iceberg-Access-Delegation} header value and returns whether the client is
    * requesting credential vending. Package-private and static so that {@link
    * IcebergNamespaceOperations#registerTable} can reuse the same parsing logic from the same
    * package.
    */
   static boolean isCredentialVending(String accessDelegation) {
-    if (StringUtils.isBlank(accessDelegation)) {
-      return false;
-    }
-    if ("vended-credentials".equalsIgnoreCase(accessDelegation)) {
-      return true;
-    }
-    if ("remote-signing".equalsIgnoreCase(accessDelegation)) {
-      throw new UnsupportedOperationException(
-          "Gravitino IcebergRESTServer doesn't support remote signing");
-    } else {
-      throw new IllegalArgumentException(
-          X_ICEBERG_ACCESS_DELEGATION
-              + ": "
-              + accessDelegation
-              + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
-              + "Gravitino Iceberg REST server supports: vended-credentials");
-    }
+    return parseAccessDelegation(accessDelegation).requestVendedCredentials();
   }
 
   private NameIdentifier[] toNameIdentifiers(

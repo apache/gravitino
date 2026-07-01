@@ -29,6 +29,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJob;
@@ -42,12 +43,14 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.requests.RemoteSignRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.rest.responses.RemoteSignResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,7 +108,11 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .createTable(namespace, createTableRequest, context.requestCredentialVending());
+        .createTable(
+            namespace,
+            createTableRequest,
+            context.requestCredentialVending(),
+            context.requestRemoteSigning());
   }
 
   @Override
@@ -168,7 +175,11 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .loadTable(tableIdentifier, context.requestCredentialVending(), privilege);
+        .loadTable(
+            tableIdentifier,
+            context.requestCredentialVending(),
+            context.requestRemoteSigning(),
+            privilege);
   }
 
   @Override
@@ -199,6 +210,18 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .getTableCredentials(tableIdentifier, privilege);
+  }
+
+  @Override
+  public RemoteSignResponse remoteSign(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      RemoteSignRequest remoteSignRequest) {
+    CredentialPrivilege privilege =
+        CatalogWrapperForREST.credentialPrivilegeForSignMethod(remoteSignRequest.method());
+    return icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .remoteSign(tableIdentifier, remoteSignRequest, privilege);
   }
 
   private static CredentialPrivilege getCredentialPrivilege(

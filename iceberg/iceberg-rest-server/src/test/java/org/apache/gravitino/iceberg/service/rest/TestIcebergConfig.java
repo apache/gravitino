@@ -158,4 +158,23 @@ public class TestIcebergConfig extends IcebergTestBase {
         hasBrokenScanPlanEndpoint,
         "Config response must not advertise the namespace-less scan plan path from Iceberg 1.10.1");
   }
+
+  @Test
+  public void testConfigRemoteSignEndpoint() {
+    Response resp = getConfigClientBuilder().get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+
+    boolean hasRemoteSignEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().contains("namespaces/{namespace}/tables/{table}/sign"));
+    Assertions.assertTrue(
+        hasRemoteSignEndpoint,
+        "Config response must advertise the table remote sign path: "
+            + "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/sign");
+  }
 }

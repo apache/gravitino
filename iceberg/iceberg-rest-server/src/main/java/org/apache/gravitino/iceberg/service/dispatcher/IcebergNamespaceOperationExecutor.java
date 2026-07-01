@@ -131,6 +131,10 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
 
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .registerTable(namespace, registerTableRequest, context.requestCredentialVending());
+        .registerTable(
+            namespace,
+            registerTableRequest,
+            context.requestCredentialVending(),
+            context.requestRemoteSigning());
   }
 }

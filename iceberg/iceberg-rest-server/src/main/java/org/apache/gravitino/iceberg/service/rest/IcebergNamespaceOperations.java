@@ -47,6 +47,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.iceberg.service.IcebergAccessDelegation;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -321,24 +322,26 @@ public class IcebergNamespaceOperations {
           String namespace,
       RegisterTableRequest registerTableRequest,
       @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
-    boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
+    IcebergAccessDelegation accessDelegationMode =
+        IcebergTableOperations.parseAccessDelegation(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Register Iceberg table, catalog: {}, namespace: {}, registerTableRequest: {}, "
-            + "accessDelegation: {}, isCredentialVending: {}",
+            + "accessDelegation: {}, credential vending: {}, remote signing: {}",
         catalogName,
         icebergNS,
         registerTableRequest,
         accessDelegation,
-        isCredentialVending);
+        accessDelegationMode.requestVendedCredentials(),
+        accessDelegationMode.requestRemoteSigning());
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+                new IcebergRequestContext(httpServletRequest(), catalogName, accessDelegationMode);
             LoadTableResponse loadTableResponse =
                 namespaceOperationDispatcher.registerTable(
                     context, icebergNS, registerTableRequest);

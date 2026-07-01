@@ -75,6 +75,7 @@ public class IcebergConfigOperations {
           .add(Endpoint.V1_REGISTER_TABLE)
           .add(Endpoint.V1_REPORT_METRICS)
           .add(Endpoint.V1_TABLE_CREDENTIALS)
+          .add(Endpoint.V1_TABLE_REMOTE_SIGN)
           .add(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN)
           .build();
 

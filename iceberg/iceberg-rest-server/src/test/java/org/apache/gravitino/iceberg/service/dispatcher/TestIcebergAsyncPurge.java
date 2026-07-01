@@ -158,7 +158,7 @@ class TestIcebergAsyncPurge {
                       .createTable(context(false), DB, createReq()));
       Assertions.assertTrue(e.getMessage().contains("being purged"), e.getMessage());
     }
-    verify(wrapper, never()).createTable(any(), any(), anyBoolean());
+    verify(wrapper, never()).createTable(any(), any(), anyBoolean(), anyBoolean());
   }
 
   @Test
@@ -170,7 +170,7 @@ class TestIcebergAsyncPurge {
     try (MockedStatic<GravitinoEnv> ignored = mockCatalogId()) {
       tableExecutor(wrapper, Optional.of(cleanup)).createTable(context(false), DB, createReq());
     }
-    verify(wrapper).createTable(any(), any(), anyBoolean());
+    verify(wrapper).createTable(any(), any(), anyBoolean(), anyBoolean());
   }
 
   @Test
@@ -188,7 +188,7 @@ class TestIcebergAsyncPurge {
                       .registerTable(context(false), DB, registerReq()));
       Assertions.assertTrue(e.getMessage().contains("being purged"), e.getMessage());
     }
-    verify(wrapper, never()).registerTable(any(), any(), anyBoolean());
+    verify(wrapper, never()).registerTable(any(), any(), anyBoolean(), anyBoolean());
   }
 
   @Test
@@ -201,7 +201,7 @@ class TestIcebergAsyncPurge {
       namespaceExecutor(wrapper, Optional.of(cleanup))
           .registerTable(context(false), DB, registerReq());
     }
-    verify(wrapper).registerTable(any(), any(), anyBoolean());
+    verify(wrapper).registerTable(any(), any(), anyBoolean(), anyBoolean());
   }
 
   // --- helpers ---

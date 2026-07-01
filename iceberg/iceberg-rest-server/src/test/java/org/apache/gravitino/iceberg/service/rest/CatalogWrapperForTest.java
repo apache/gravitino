@@ -56,7 +56,17 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
-    LoadTableResponse loadTableResponse = super.createTable(namespace, request, requestCredential);
+    return createTable(namespace, request, requestCredential, false);
+  }
+
+  @Override
+  public LoadTableResponse createTable(
+      Namespace namespace,
+      CreateTableRequest request,
+      boolean requestCredential,
+      boolean requestRemoteSigning) {
+    LoadTableResponse loadTableResponse =
+        super.createTable(namespace, request, requestCredential, requestRemoteSigning);
     if (shouldGeneratePlanTasksData(request)) {
       appendSampleData(namespace, request.name());
     }
@@ -66,6 +76,15 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
+    return registerTable(namespace, request, requestCredential, false);
+  }
+
+  @Override
+  public LoadTableResponse registerTable(
+      Namespace namespace,
+      RegisterTableRequest request,
+      boolean requestCredential,
+      boolean requestRemoteSigning) {
     if (request.name().contains("fail")) {
       throw new AlreadyExistsException("Already exits exception for test");
     }
@@ -88,21 +107,20 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
             .withTableMetadata(tableMetadata)
             .addAllConfig(ImmutableMap.of())
             .build();
-    // We must replicate the credential-vending check + injection here (rather than reuse
+    // We must replicate the data-access injection here (rather than reuse
     // CatalogWrapperForREST.registerTable via super) because the in-memory test catalog
     // cannot natively perform registerTable. Above, we synthesized a mock LoadTableResponse
     // instead of delegating to super.registerTable; that means the parent class never sees
-    // this call and therefore never runs its vending logic. Calling shouldGenerateCredential
-    // / injectCredentialConfig directly (now protected on the parent) re-applies the exact
-    // same vending behavior to the mock response, so credential-vending tests exercise the
-    // production code path end-to-end. Privilege must match the production wrapper (WRITE).
-    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
-      return injectCredentialConfig(
-          TableIdentifier.of(namespace, request.name()),
-          loadTableResponse,
-          CredentialPrivilege.WRITE);
-    }
-    return loadTableResponse;
+    // this call and therefore never runs its vending logic. Calling maybeInjectDataAccessConfig
+    // directly re-applies the exact same behavior to the mock response, so data-access tests
+    // exercise the production code path end-to-end. Privilege must match the production wrapper
+    // (WRITE).
+    return maybeInjectDataAccessConfig(
+        TableIdentifier.of(namespace, request.name()),
+        loadTableResponse,
+        requestCredential,
+        requestRemoteSigning,
+        CredentialPrivilege.WRITE);
   }
 
   private boolean shouldGeneratePlanTasksData(CreateTableRequest request) {

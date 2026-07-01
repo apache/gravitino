@@ -22,6 +22,7 @@ package org.apache.gravitino.listener.api.event;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.iceberg.service.IcebergAccessDelegation;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -41,6 +42,7 @@ public class IcebergRequestContext {
   private final String remoteHostName;
   private final Map<String, String> httpHeaders;
   private final boolean requestCredentialVending;
+  private final boolean requestRemoteSigning;
 
   /**
    * Constructs a new {@code IcebergRequestContext} instance.
@@ -49,7 +51,7 @@ public class IcebergRequestContext {
    * @param catalogName The name of the catalog to be accessed in the request.
    */
   public IcebergRequestContext(HttpServletRequest httpRequest, String catalogName) {
-    this(httpRequest, catalogName, false);
+    this(httpRequest, catalogName, IcebergAccessDelegation.none());
   }
 
   /**
@@ -61,12 +63,27 @@ public class IcebergRequestContext {
    */
   public IcebergRequestContext(
       HttpServletRequest httpRequest, String catalogName, boolean requestCredentialVending) {
+    this(httpRequest, catalogName, IcebergAccessDelegation.of(requestCredentialVending, false));
+  }
+
+  /**
+   * Constructs a new {@code IcebergRequestContext} instance.
+   *
+   * @param httpRequest The HttpServletRequest object containing request details.
+   * @param catalogName The name of the catalog to be accessed in the request.
+   * @param accessDelegation parsed access delegation header
+   */
+  public IcebergRequestContext(
+      HttpServletRequest httpRequest,
+      String catalogName,
+      IcebergAccessDelegation accessDelegation) {
     this.httpServletRequest = httpRequest;
     this.remoteHostName = resolveClientAddress(httpRequest);
     this.httpHeaders = IcebergRESTUtils.getHttpHeaders(httpRequest);
     this.catalogName = catalogName;
     this.userName = PrincipalUtils.getCurrentUserName();
-    this.requestCredentialVending = requestCredentialVending;
+    this.requestCredentialVending = accessDelegation.requestVendedCredentials();
+    this.requestRemoteSigning = accessDelegation.requestRemoteSigning();
   }
 
   private static String resolveClientAddress(HttpServletRequest request) {
@@ -141,6 +158,15 @@ public class IcebergRequestContext {
    */
   public boolean requestCredentialVending() {
     return requestCredentialVending;
+  }
+
+  /**
+   * Checks if the request is for remote signing.
+   *
+   * @return true if the request is for remote signing, false otherwise.
+   */
+  public boolean requestRemoteSigning() {
+    return requestRemoteSigning;
   }
 
   /**
