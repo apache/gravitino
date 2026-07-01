@@ -29,15 +29,15 @@ evaluation, strategy recommendation, and job submission.
 
 The current optimizer execution model is local-process oriented:
 
-| Command | Current execution style | Main responsibility |
-| --- | --- | --- |
-| `update-statistics` | CLI loads optimizer config and runs updater logic locally | Calculate and persist table or partition statistics |
-| `append-metrics` | CLI loads optimizer config and runs updater logic locally | Calculate and append table, partition, or job metrics |
-| `submit-strategy-jobs` | CLI loads optimizer config and runs recommender logic locally | Evaluate policies and optionally submit jobs |
-| `monitor-metrics` | CLI loads optimizer config and runs monitor logic locally | Evaluate before/after metrics around an action time |
-| `list-table-metrics` | CLI queries metrics storage locally | Query stored table or partition metrics |
-| `list-job-metrics` | CLI queries metrics storage locally | Query stored job metrics |
-| `submit-update-stats-job` | CLI submits Gravitino jobs | Submit built-in Iceberg update stats/metrics Spark jobs |
+| Command                   | Current execution style                                       | Main responsibility                                     |
+| ------------------------- | ------------------------------------------------------------- | ------------------------------------------------------- |
+| `update-statistics`       | CLI loads optimizer config and runs updater logic locally     | Calculate and persist table or partition statistics     |
+| `append-metrics`          | CLI loads optimizer config and runs updater logic locally     | Calculate and append table, partition, or job metrics   |
+| `submit-strategy-jobs`    | CLI loads optimizer config and runs recommender logic locally | Evaluate policies and optionally submit jobs            |
+| `monitor-metrics`         | CLI loads optimizer config and runs monitor logic locally     | Evaluate before/after metrics around an action time     |
+| `list-table-metrics`      | CLI queries metrics storage locally                           | Query stored table or partition metrics                 |
+| `list-job-metrics`        | CLI queries metrics storage locally                           | Query stored job metrics                                |
+| `submit-update-stats-job` | CLI submits Gravitino jobs                                    | Submit built-in Iceberg update stats/metrics Spark jobs |
 
 This model is useful for local validation and batch scripts, but it has operational limitations:
 
@@ -76,12 +76,12 @@ client and local execution tool.
 
 1. **Service Mode for Optimizer Workloads**: Users can run a long-running optimizer service and
    submit updater, recommender, monitor, and metrics-query requests through REST APIs.
-2. **Asynchronous Task Execution**: Mutating or long-running optimizer commands return a request ID
+2. **Asynchronous Task Execution**: Mutating or long-running optimizer commands return a task ID
    immediately and expose status, result, and error details through query APIs.
 3. **CLI Compatibility**: Existing optimizer CLI commands and options continue to work. A
    configuration switch controls whether supported commands execute locally or call the service.
-4. **Shared Task Runtime**: Updater, recommender, and monitor modules use one task state model,
-   request ID format, cancellation contract, and list/query behavior.
+4. **Shared Task Runtime**: Updater, recommender, and monitor modules use one task status model,
+   task ID format, cancellation contract, and list/query behavior.
 5. **Operational Controls**: The service exposes health checks, bounded queues, configurable worker
    pools, request validation, structured lifecycle logs, and metrics for task execution.
 6. **Incremental Migration**: The design can be implemented in phases without requiring all optimizer
@@ -112,12 +112,56 @@ client and local execution tool.
 
 ## Solution Investigations
 
-| Approach | Pros | Cons | Decision |
-| --- | --- | --- | --- |
-| Keep CLI-only execution | No new server process. Minimal implementation work. Preserves current behavior. | Does not solve async status tracking, centralized observability, retries, queueing, or structured automation APIs. Each invocation remains an isolated runtime. | Rejected because it does not address the operational problems. |
-| Embed optimizer execution in the Gravitino server | Reuses the existing server process, REST stack, auth, and deployment path. Avoids another daemon. | Couples maintenance workloads to the metadata server. Heavy optimizer tasks, provider dependencies, and worker pools can affect metadata API latency and server stability. The optimizer package already has a separate distribution and configuration model. | Rejected for MVP because optimizer workloads should be isolated from the metadata control plane. |
-| Add an independent Optimizer Service | Keeps optimizer workloads isolated, preserves the optimizer distribution boundary, and allows independent scaling and resource limits. The CLI can become a client without losing local mode. | Adds a daemon, service configuration, REST resources, and task runtime that must be operated and tested. | **Chosen** because it solves the target operational issues while respecting existing Gravitino boundaries. |
-| Use only the existing Gravitino job framework for every optimizer action | Provides persisted job status and existing server APIs for job execution. | Updater, recommender, monitor, and metrics-query commands are not all jobs. Some requests need provider execution and immediate result payloads, while Spark job submission already has a separate job manager. Forcing all optimizer actions into jobs would blur responsibilities. | Rejected because the job framework should remain the execution backend for submitted jobs, not the universal optimizer control API. |
+### Option A: Keep CLI-only execution
+
+Continue running all optimizer work inside the CLI process, with no server component.
+
+**Pros:** No new server process. Minimal implementation work. Preserves current behavior.
+
+**Cons:** Does not solve async status tracking, centralized observability, retries, queueing, or
+structured automation APIs. Each invocation remains an isolated runtime.
+
+**Decision:** Rejected because it does not address the operational problems.
+
+### Option B: Embed optimizer execution in the Gravitino server
+
+Run the optimizer modules inside the existing Gravitino metadata server process.
+
+**Pros:** Reuses the existing server process, REST stack, auth, and deployment path. Avoids another
+daemon.
+
+**Cons:** Couples maintenance workloads to the metadata server. Heavy optimizer tasks, provider
+dependencies, and worker pools can affect metadata API latency and server stability. The optimizer
+package already has a separate distribution and configuration model.
+
+**Decision:** Rejected for MVP because optimizer workloads should be isolated from the metadata
+control plane.
+
+### Option C: Use only the existing Gravitino job framework for every optimizer action
+
+Model every optimizer command (updater, recommender, monitor, metrics query) as a Gravitino job.
+
+**Pros:** Provides persisted job status and existing server APIs for job execution.
+
+**Cons:** Updater, recommender, monitor, and metrics-query commands are not all jobs. Some requests
+need provider execution and immediate result payloads, while Spark job submission already has a
+separate job manager. Forcing all optimizer actions into jobs would blur responsibilities.
+
+**Decision:** Rejected because the job framework should remain the execution backend for submitted
+jobs, not the universal optimizer control API.
+
+### Option D: Add an independent Optimizer Service (Chosen)
+
+Introduce a standalone Optimizer Service in the optimizer distribution, with the CLI as one client.
+
+**Pros:** Keeps optimizer workloads isolated, preserves the optimizer distribution boundary, and
+allows independent scaling and resource limits. The CLI can become a client without losing local mode.
+
+**Cons:** Adds a daemon, service configuration, REST resources, and task runtime that must be operated
+and tested.
+
+**Decision:** **Chosen** because it solves the target operational issues while respecting existing
+Gravitino boundaries.
 
 ---
 
@@ -168,97 +212,116 @@ service-level authentication, routing, and documentation.
 
 ### Components
 
-| Component | Responsibility |
-| --- | --- |
-| `OptimizerServiceServer` | Starts the HTTP server, registers REST resources, initializes modules, exposes lifecycle hooks, and owns graceful shutdown. |
-| `TaskRuntime` | Creates request IDs, stores task records, runs asynchronous tasks, handles state transitions, lists tasks, and performs best-effort cancellation. |
-| `UpdaterModule` | Converts updater REST requests into calls to `Updater` for statistics and metrics updates. |
-| `RecommenderModule` | Converts recommender REST requests into calls to `Recommender` for dry-run recommendation or job submission. |
-| `MonitorModule` | Converts monitor REST requests into calls to `Monitor` for rule evaluation and callback execution. |
-| `MetricsQueryModule` | Serves structured table, partition, and job metrics query APIs using existing metrics storage/provider logic. |
-| `OptimizerServiceClient` | Client used by the CLI when service mode is enabled. |
+| Component                | Responsibility                                                                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OptimizerServiceServer` | Starts the HTTP server, registers REST resources, initializes modules, exposes lifecycle hooks, and owns graceful shutdown.                     |
+| `TaskRuntime`            | Creates task IDs, stores task records, runs asynchronous tasks, handles status transitions, lists tasks, and performs best-effort cancellation. |
+| `UpdaterModule`          | Converts updater REST requests into calls to `Updater` for statistics and metrics updates.                                                      |
+| `RecommenderModule`      | Converts recommender REST requests into calls to `Recommender` for dry-run recommendation or job submission.                                    |
+| `MonitorModule`          | Converts monitor REST requests into calls to `Monitor` for rule evaluation and callback execution.                                              |
+| `MetricsQueryModule`     | Serves structured table, partition, and job metrics query APIs using existing metrics storage/provider logic.                                   |
+| `OptimizerServiceClient` | Client used by the CLI when service mode is enabled.                                                                                            |
 
-### Task State Model
+### Task Status Model
 
-The task runtime uses one state model across updater, recommender, and monitor tasks:
+The task runtime uses one status model across updater, recommender, and monitor tasks. The status
+vocabulary follows the Gravitino job model (`queued`, `started`, `succeeded`, `failed`, `cancelling`,
+`canceled`) so that optimizer tasks read the same way as job runs:
 
-| State | Meaning |
-| --- | --- |
-| `PENDING` | The service accepted the request and queued it for execution. |
-| `RUNNING` | A worker is executing the request. |
-| `SUCCEEDED` | Execution finished and the task record contains a result payload. |
-| `FAILED` | Execution failed and the task record contains a sanitized error summary. |
-| `CANCELED` | The request was canceled before completion or the worker observed cancellation. |
+| Status       | Meaning                                                                 |
+| ------------ | ----------------------------------------------------------------------- |
+| `queued`     | The service accepted the request and queued it for execution.           |
+| `started`    | A worker is executing the request.                                      |
+| `succeeded`  | Execution finished and the task record contains a result payload.       |
+| `failed`     | Execution failed and the task record contains a sanitized error object. |
+| `cancelling` | Cancellation was requested for a started task and is being applied.     |
+| `canceled`   | The request was canceled before or during execution.                    |
 
-`SUCCEEDED`, `FAILED`, and `CANCELED` are terminal states. The allowed transitions are:
+`succeeded`, `failed`, and `canceled` are terminal statuses. The allowed transitions are:
 
 ```text
-PENDING --> RUNNING --> SUCCEEDED
-   |           |
-   |           +------> FAILED
-   |           |
-   +-----------+------> CANCELED
+queued --> started --> succeeded
+  |          |
+  |          +--------> failed
+  |          |
+  |          +--------> cancelling --> canceled
+  |
+  +-------------------------------> canceled
 ```
 
-A task in `PENDING` can move directly to `CANCELED` if it is canceled before a worker picks it up. A
-task in `RUNNING` reaches `CANCELED` only when the worker or provider observes cancellation.
+A task in `queued` moves directly to `canceled` if it is canceled before a worker picks it up. A
+`started` task first enters `cancelling` and reaches `canceled` only when the worker or provider
+observes cancellation.
 
-Each task record stores:
+Each task record follows the job record shape (identifier, status, `audit`) plus optimizer-specific
+timing and payload fields:
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `requestId` | string | Unique optimizer task ID. |
-| `module` | enum | `UPDATER`, `RECOMMENDER`, or `MONITOR`. |
-| `state` | enum | Current task state. |
-| `createdAt` | string | ISO-8601 creation time. |
-| `startedAt` | string | ISO-8601 start time, if started. |
-| `endedAt` | string | ISO-8601 end time, if completed. |
-| `requestHash` | string | Hash of normalized request payload for audit and troubleshooting. |
-| `result` | object | Module-specific result payload for successful tasks. |
-| `error` | object | Sanitized error code, message, and optional stack summary for failed tasks. |
+| Field         | Type   | Description                                                                 |
+| ------------- | ------ | --------------------------------------------------------------------------- |
+| `taskId`      | string | Unique optimizer task ID, for example `updater-018f2f4f`.                   |
+| `module`      | string | `updater`, `recommender`, or `monitor`.                                     |
+| `status`      | string | Current task status.                                                        |
+| `startedAt`   | string | ISO-8601 start time, if started.                                            |
+| `finishedAt`  | string | ISO-8601 completion time, if in a terminal status.                          |
+| `requestHash` | string | Hash of the normalized request payload for audit and troubleshooting.       |
+| `result`      | object | Module-specific result payload for successful tasks.                        |
+| `error`       | object | Sanitized error object for failed tasks.                                    |
+| `audit`       | object | Audit info (`createTime`, `creator`), matching the Gravitino `Audit` model. |
 
-For a `FAILED` task, the `error` object has a stable shape so clients and automation can branch on it:
+For a `failed` task, the `error` object mirrors the Gravitino `ErrorModel` (`code`, `type`, `message`)
+so clients and automation branch on the same shape used by the metadata APIs:
 
 ```json
 {
-  "code": "INVALID_INPUT",
-  "message": "statisticsPayload and filePath cannot both be set",
-  "stackSummary": ""
+  "code": 1001,
+  "type": "IllegalArgumentException",
+  "message": "statisticsPayload and filePath cannot both be set"
 }
 ```
 
-`code` is a machine-readable error category, `message` is a sanitized human-readable summary, and
-`stackSummary` is an optional truncated trace that never includes secrets from config files, job
-options, or provider exceptions.
+`message` is always sanitized and never exposes secrets from config files, job options, or provider
+exceptions.
 
 The MVP may use an in-memory task store. The storage API should be pluggable so a later
 implementation can add a DB-backed store without changing REST semantics.
 
 ### REST API
 
-All endpoints use JSON payloads and responses. List APIs support pagination in the service model even
-if the MVP initially returns an in-memory bounded list.
+The API follows the same conventions as the Gravitino job run APIs (`/metalakes/{metalake}/jobs/runs`):
 
-#### POST /api/optimizer/v1/updater/requests
+- All endpoints exchange JSON using the `application/vnd.gravitino.v1+json` media type.
+- Every response body carries an integer `code` (`0` for success) wrapping the payload.
+- Each asynchronous module exposes the same four operations as job runs: submit (`POST .../tasks`),
+  get (`GET .../tasks/{taskId}`), list (`GET .../tasks`), and cancel (`POST .../tasks/{taskId}`).
+- Errors use the Gravitino `ErrorModel` (`code`, `type`, `message`, `stack`), so a missing task
+  returns a `NoSuchTaskException` and an invalid payload returns an `IllegalArgumentException`.
+- List APIs support pagination in the service model even if the MVP initially returns an in-memory
+  bounded list.
 
-Creates an asynchronous updater task.
+#### POST /api/optimizer/v1/updater/tasks
+
+Submits an asynchronous updater task.
 
 **Request:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `updateType` | string | yes | `STATISTICS` for `update-statistics` or `METRICS` for `append-metrics`. |
-| `calculatorName` | string | yes | Statistics calculator name, for example `local-stats-calculator`. |
-| `identifiers` | array[string] | no | Table or job identifiers. Empty means the selected calculator/provider decides scope. |
-| `statisticsPayload` | string | no | Inline JSON Lines payload. Mutually exclusive with `filePath`. |
-| `filePath` | string | no | Server-local JSON Lines input file path. Mutually exclusive with `statisticsPayload`. |
+| Field               | Type          | Required | Description                                                                           |
+| ------------------- | ------------- | -------- | ------------------------------------------------------------------------------------- |
+| `updateType`        | string        | yes      | `STATISTICS` for `update-statistics` or `METRICS` for `append-metrics`.               |
+| `calculatorName`    | string        | yes      | Statistics calculator name, for example `local-stats-calculator`.                     |
+| `identifiers`       | array[string] | no       | Table or job identifiers. Empty means the selected calculator/provider decides scope. |
+| `statisticsPayload` | string        | no       | Inline JSON Lines payload. Mutually exclusive with `filePath`.                        |
+| `filePath`          | string        | no       | Server-local JSON Lines input file path. Mutually exclusive with `statisticsPayload`. |
 
-**Response:** `202 Accepted`
+**Response:** `200 OK`
 
 ```json
 {
-  "requestId": "updater-018f2f4f",
-  "state": "PENDING"
+  "code": 0,
+  "task": {
+    "taskId": "updater-018f2f4f",
+    "module": "updater",
+    "status": "queued"
+  }
 }
 ```
 
@@ -268,7 +331,7 @@ The service validates the same command rules as the CLI. For `local-stats-calcul
 `statisticsPayload` or `filePath` is required. `statisticsPayload` and `filePath` cannot both be set.
 The task result includes the updater summary currently printed by the CLI.
 
-#### GET /api/optimizer/v1/updater/requests/{requestId}
+#### GET /api/optimizer/v1/updater/tasks/{taskId}
 
 Returns one updater task.
 
@@ -276,18 +339,24 @@ Returns one updater task.
 
 ```json
 {
-  "requestId": "updater-018f2f4f",
-  "module": "UPDATER",
-  "state": "SUCCEEDED",
-  "createdAt": "2026-06-30T10:00:00Z",
-  "startedAt": "2026-06-30T10:00:01Z",
-  "endedAt": "2026-06-30T10:00:03Z",
-  "result": {
-    "updateType": "STATISTICS",
-    "summary": {
-      "updatedTables": 1,
-      "updatedPartitions": 0,
-      "updatedJobs": 0
+  "code": 0,
+  "task": {
+    "taskId": "updater-018f2f4f",
+    "module": "updater",
+    "status": "succeeded",
+    "startedAt": "2026-06-30T10:00:01Z",
+    "finishedAt": "2026-06-30T10:00:03Z",
+    "result": {
+      "updateType": "STATISTICS",
+      "summary": {
+        "updatedTables": 1,
+        "updatedPartitions": 0,
+        "updatedJobs": 0
+      }
+    },
+    "audit": {
+      "createTime": "2026-06-30T10:00:00Z",
+      "creator": "anonymous"
     }
   }
 }
@@ -295,75 +364,89 @@ Returns one updater task.
 
 **Behavior:**
 
-Returns `404 Not Found` if the request ID does not exist in the task store.
+Returns `404 Not Found` with a `NoSuchTaskException` `ErrorModel` if the task ID does not exist in the
+task store.
 
-#### GET /api/optimizer/v1/updater/requests
+#### GET /api/optimizer/v1/updater/tasks
 
 Lists updater tasks.
 
 **Request query parameters:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `state` | string | no | Filter by task state. |
-| `fromTime` | string | no | Include tasks created at or after this ISO-8601 time. |
-| `toTime` | string | no | Include tasks created before or at this ISO-8601 time. |
-| `limit` | integer | no | Maximum records to return. |
-| `pageToken` | string | no | Pagination token for later persistent stores. |
+| Field       | Type    | Required | Description                                            |
+| ----------- | ------- | -------- | ------------------------------------------------------ |
+| `status`    | string  | no       | Filter by task status.                                 |
+| `fromTime`  | string  | no       | Include tasks created at or after this ISO-8601 time.  |
+| `toTime`    | string  | no       | Include tasks created before or at this ISO-8601 time. |
+| `limit`     | integer | no       | Maximum records to return.                             |
+| `pageToken` | string  | no       | Pagination token for later persistent stores.          |
 
 **Response:** `200 OK`
 
 ```json
 {
-  "requests": [
+  "code": 0,
+  "tasks": [
     {
-      "requestId": "updater-018f2f4f",
-      "module": "UPDATER",
-      "state": "SUCCEEDED",
-      "createdAt": "2026-06-30T10:00:00Z"
+      "taskId": "updater-018f2f4f",
+      "module": "updater",
+      "status": "succeeded",
+      "audit": {
+        "createTime": "2026-06-30T10:00:00Z",
+        "creator": "anonymous"
+      }
     }
   ],
   "nextPageToken": ""
 }
 ```
 
-#### POST /api/optimizer/v1/updater/requests/{requestId}/cancel
+#### POST /api/optimizer/v1/updater/tasks/{taskId}
 
-Requests best-effort cancellation for one updater task.
+Requests best-effort cancellation for one updater task, mirroring `POST /jobs/runs/{jobId}`.
 
 **Response:** `200 OK`
 
 ```json
 {
-  "requestId": "updater-018f2f4f",
-  "state": "CANCELED"
+  "code": 0,
+  "task": {
+    "taskId": "updater-018f2f4f",
+    "module": "updater",
+    "status": "cancelling"
+  }
 }
 ```
 
 **Behavior:**
 
-Queued tasks can be canceled before execution. Running tasks are interrupted only when the provider
-or worker observes cancellation. Completed tasks remain in their terminal state.
+A `queued` task moves directly to `canceled`. A `started` task moves to `cancelling` and reaches
+`canceled` only when the provider or worker observes cancellation. Completed tasks remain in their
+terminal status.
 
-#### POST /api/optimizer/v1/recommender/requests
+#### POST /api/optimizer/v1/recommender/tasks
 
-Creates an asynchronous recommender task.
+Submits an asynchronous recommender task.
 
 **Request:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `strategyName` | string | yes | Policy name to evaluate, matching CLI `--strategy-name`. |
-| `identifiers` | array[string] | yes | Table identifiers. |
-| `dryRun` | boolean | no | Preview recommendations without submitting jobs. Default is `false`. |
-| `limit` | integer | no | Maximum number of recommendations or submissions to process. |
+| Field          | Type          | Required | Description                                                          |
+| -------------- | ------------- | -------- | -------------------------------------------------------------------- |
+| `strategyName` | string        | yes      | Policy name to evaluate, matching CLI `--strategy-name`.             |
+| `identifiers`  | array[string] | yes      | Table identifiers.                                                   |
+| `dryRun`       | boolean       | no       | Preview recommendations without submitting jobs. Default is `false`. |
+| `limit`        | integer       | no       | Maximum number of recommendations or submissions to process.         |
 
-**Response:** `202 Accepted`
+**Response:** `200 OK`
 
 ```json
 {
-  "requestId": "recommender-018f2f50",
-  "state": "PENDING"
+  "code": 0,
+  "task": {
+    "taskId": "recommender-018f2f50",
+    "module": "recommender",
+    "status": "queued"
+  }
 }
 ```
 
@@ -373,7 +456,7 @@ The service validates identifiers, strategy name, and positive `limit` values. D
 recommendation details. Non-dry-run tasks submit jobs through the configured `JobSubmitter`, which may
 call Gravitino job APIs.
 
-#### GET /api/optimizer/v1/recommender/requests/{requestId}
+#### GET /api/optimizer/v1/recommender/tasks/{taskId}
 
 Returns one recommender task.
 
@@ -381,56 +464,68 @@ Returns one recommender task.
 
 ```json
 {
-  "requestId": "recommender-018f2f50",
-  "module": "RECOMMENDER",
-  "state": "SUCCEEDED",
-  "result": {
-    "dryRun": true,
-    "recommendations": [
-      {
-        "strategyName": "iceberg_compaction_default",
-        "identifier": "rest_catalog.db.t1",
-        "score": 100,
-        "jobTemplate": "builtin-iceberg-rewrite-data-files",
-        "jobOptions": {
-          "catalog_name": "rest_catalog",
-          "table_identifier": "db.t1"
-        },
-        "jobId": ""
-      }
-    ]
+  "code": 0,
+  "task": {
+    "taskId": "recommender-018f2f50",
+    "module": "recommender",
+    "status": "succeeded",
+    "result": {
+      "dryRun": true,
+      "recommendations": [
+        {
+          "strategyName": "iceberg_compaction_default",
+          "identifier": "rest_catalog.db.t1",
+          "score": 100,
+          "jobTemplate": "builtin-iceberg-rewrite-data-files",
+          "jobOptions": {
+            "catalog_name": "rest_catalog",
+            "table_identifier": "db.t1"
+          },
+          "jobId": ""
+        }
+      ]
+    },
+    "audit": {
+      "createTime": "2026-06-30T10:10:00Z",
+      "creator": "anonymous"
+    }
   }
 }
 ```
 
 **Behavior:**
 
-Returns submitted job IDs when the configured submitter creates Gravitino jobs.
+The `jobId` field carries the submitted Gravitino job ID when the configured submitter creates a job,
+so the optimizer task result links directly to the job run tracked by the job framework.
 
-#### GET /api/optimizer/v1/recommender/requests
+#### GET /api/optimizer/v1/recommender/tasks
 
 Lists recommender tasks.
 
 **Request query parameters:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `state` | string | no | Filter by task state. |
-| `fromTime` | string | no | Include tasks created at or after this ISO-8601 time. |
-| `toTime` | string | no | Include tasks created before or at this ISO-8601 time. |
-| `limit` | integer | no | Maximum records to return. |
-| `pageToken` | string | no | Pagination token for later persistent stores. |
+| Field       | Type    | Required | Description                                            |
+| ----------- | ------- | -------- | ------------------------------------------------------ |
+| `status`    | string  | no       | Filter by task status.                                 |
+| `fromTime`  | string  | no       | Include tasks created at or after this ISO-8601 time.  |
+| `toTime`    | string  | no       | Include tasks created before or at this ISO-8601 time. |
+| `limit`     | integer | no       | Maximum records to return.                             |
+| `pageToken` | string  | no       | Pagination token for later persistent stores.          |
 
 **Response:** `200 OK`
 
 ```json
 {
-  "requests": [
+  "code": 0,
+  "tasks": [
     {
-      "requestId": "recommender-018f2f50",
-      "module": "RECOMMENDER",
-      "state": "SUCCEEDED",
-      "createdAt": "2026-06-30T10:10:00Z"
+      "taskId": "recommender-018f2f50",
+      "module": "recommender",
+      "status": "succeeded",
+      "audit": {
+        "createTime": "2026-06-30T10:10:00Z",
+        "creator": "anonymous"
+      }
     }
   ],
   "nextPageToken": ""
@@ -442,7 +537,7 @@ Lists recommender tasks.
 The service returns recommender task summaries sorted by creation time. The MVP may only return tasks
 that are still retained by the in-memory task store.
 
-#### POST /api/optimizer/v1/recommender/requests/{requestId}/cancel
+#### POST /api/optimizer/v1/recommender/tasks/{taskId}
 
 Requests best-effort cancellation for one recommender task.
 
@@ -450,36 +545,44 @@ Requests best-effort cancellation for one recommender task.
 
 ```json
 {
-  "requestId": "recommender-018f2f50",
-  "state": "CANCELED"
+  "code": 0,
+  "task": {
+    "taskId": "recommender-018f2f50",
+    "module": "recommender",
+    "status": "cancelling"
+  }
 }
 ```
 
 **Behavior:**
 
-Queued tasks can be canceled before execution. Running recommendation tasks are canceled only when
-the worker or provider observes cancellation. Jobs already submitted through Gravitino are not
+A `queued` task moves directly to `canceled`; a `started` task moves through `cancelling` when the
+worker or provider observes cancellation. Jobs already submitted through Gravitino are not
 automatically canceled by canceling the optimizer task.
 
-#### POST /api/optimizer/v1/monitor/requests
+#### POST /api/optimizer/v1/monitor/tasks
 
-Creates an asynchronous monitor task.
+Submits an asynchronous monitor task.
 
 **Request:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `identifiers` | array[string] | yes | Table or job identifiers to evaluate. |
-| `actionTime` | integer | yes | Action timestamp in epoch seconds. |
-| `rangeSeconds` | integer | no | Evaluation window. Default is the current CLI default, 86400 seconds. |
-| `partitionPath` | array[object] | no | Partition path. Allowed only when exactly one table identifier is provided. |
+| Field           | Type          | Required | Description                                                                 |
+| --------------- | ------------- | -------- | --------------------------------------------------------------------------- |
+| `identifiers`   | array[string] | yes      | Table or job identifiers to evaluate.                                       |
+| `actionTime`    | integer       | yes      | Action timestamp in epoch seconds.                                          |
+| `rangeSeconds`  | integer       | no       | Evaluation window. Default is the current CLI default, 86400 seconds.       |
+| `partitionPath` | array[object] | no       | Partition path. Allowed only when exactly one table identifier is provided. |
 
-**Response:** `202 Accepted`
+**Response:** `200 OK`
 
 ```json
 {
-  "requestId": "monitor-018f2f51",
-  "state": "PENDING"
+  "code": 0,
+  "task": {
+    "taskId": "monitor-018f2f51",
+    "module": "monitor",
+    "status": "queued"
+  }
 }
 ```
 
@@ -489,7 +592,7 @@ The service evaluates monitor rules with the configured metrics provider, evalua
 relation provider, and callbacks. The task result includes the evaluation records currently printed by
 the CLI.
 
-#### GET /api/optimizer/v1/monitor/requests/{requestId}
+#### GET /api/optimizer/v1/monitor/tasks/{taskId}
 
 Returns one monitor task.
 
@@ -497,46 +600,57 @@ Returns one monitor task.
 
 ```json
 {
-  "requestId": "monitor-018f2f51",
-  "module": "MONITOR",
-  "state": "SUCCEEDED",
-  "result": {
-    "evaluations": [
-      {
-        "identifier": "rest_catalog.db.t1",
-        "scope": "table",
-        "evaluator": "gravitino-metrics-evaluator",
-        "passed": true
-      }
-    ]
+  "code": 0,
+  "task": {
+    "taskId": "monitor-018f2f51",
+    "module": "monitor",
+    "status": "succeeded",
+    "result": {
+      "evaluations": [
+        {
+          "identifier": "rest_catalog.db.t1",
+          "scope": "table",
+          "evaluator": "gravitino-metrics-evaluator",
+          "passed": true
+        }
+      ]
+    },
+    "audit": {
+      "createTime": "2026-06-30T10:20:00Z",
+      "creator": "anonymous"
+    }
   }
 }
 ```
 
-#### GET /api/optimizer/v1/monitor/requests
+#### GET /api/optimizer/v1/monitor/tasks
 
 Lists monitor tasks.
 
 **Request query parameters:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `state` | string | no | Filter by task state. |
-| `fromTime` | string | no | Include tasks created at or after this ISO-8601 time. |
-| `toTime` | string | no | Include tasks created before or at this ISO-8601 time. |
-| `limit` | integer | no | Maximum records to return. |
-| `pageToken` | string | no | Pagination token for later persistent stores. |
+| Field       | Type    | Required | Description                                            |
+| ----------- | ------- | -------- | ------------------------------------------------------ |
+| `status`    | string  | no       | Filter by task status.                                 |
+| `fromTime`  | string  | no       | Include tasks created at or after this ISO-8601 time.  |
+| `toTime`    | string  | no       | Include tasks created before or at this ISO-8601 time. |
+| `limit`     | integer | no       | Maximum records to return.                             |
+| `pageToken` | string  | no       | Pagination token for later persistent stores.          |
 
 **Response:** `200 OK`
 
 ```json
 {
-  "requests": [
+  "code": 0,
+  "tasks": [
     {
-      "requestId": "monitor-018f2f51",
-      "module": "MONITOR",
-      "state": "SUCCEEDED",
-      "createdAt": "2026-06-30T10:20:00Z"
+      "taskId": "monitor-018f2f51",
+      "module": "monitor",
+      "status": "succeeded",
+      "audit": {
+        "createTime": "2026-06-30T10:20:00Z",
+        "creator": "anonymous"
+      }
     }
   ],
   "nextPageToken": ""
@@ -548,7 +662,7 @@ Lists monitor tasks.
 The service returns monitor task summaries sorted by creation time. The MVP may only return tasks
 that are still retained by the in-memory task store.
 
-#### POST /api/optimizer/v1/monitor/requests/{requestId}/cancel
+#### POST /api/optimizer/v1/monitor/tasks/{taskId}
 
 Requests best-effort cancellation for one monitor task.
 
@@ -556,32 +670,39 @@ Requests best-effort cancellation for one monitor task.
 
 ```json
 {
-  "requestId": "monitor-018f2f51",
-  "state": "CANCELED"
+  "code": 0,
+  "task": {
+    "taskId": "monitor-018f2f51",
+    "module": "monitor",
+    "status": "cancelling"
+  }
 }
 ```
 
 **Behavior:**
 
-Queued tasks can be canceled before execution. Running monitor tasks are canceled only when the
+A `queued` task moves directly to `canceled`; a `started` task moves through `cancelling` when the
 worker or provider observes cancellation. Monitor callbacks that have already been invoked are not
 rolled back.
 
 #### GET /api/optimizer/v1/metrics/tables
 
-Queries table or partition metrics.
+Queries table or partition metrics. Unlike the module tasks, metrics queries are synchronous because
+they read existing metrics and are expected to be short, so they return the result directly instead of
+a task record.
 
 **Request query parameters:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `identifiers` | string | yes | Comma-separated table identifiers. |
-| `partitionPath` | string | no | Partition path JSON array. Requires exactly one identifier. |
+| Field           | Type   | Required | Description                                                 |
+| --------------- | ------ | -------- | ----------------------------------------------------------- |
+| `identifiers`   | string | yes      | Comma-separated table identifiers.                          |
+| `partitionPath` | string | no       | Partition path JSON array. Requires exactly one identifier. |
 
 **Response:** `200 OK`
 
 ```json
 {
+  "code": 0,
   "metrics": [
     {
       "identifier": "rest_catalog.db.t1",
@@ -600,8 +721,8 @@ Queries table or partition metrics.
 
 **Behavior:**
 
-This is a synchronous query endpoint because it reads existing metrics and is expected to be short.
-Large result pagination can be added with the same `limit` and `pageToken` pattern.
+Large result pagination can be added with the same `limit` and `pageToken` pattern used by the task
+list APIs.
 
 #### GET /api/optimizer/v1/metrics/jobs
 
@@ -609,14 +730,15 @@ Queries job metrics.
 
 **Request query parameters:**
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `identifiers` | string | yes | Comma-separated job identifiers. |
+| Field         | Type   | Required | Description                      |
+| ------------- | ------ | -------- | -------------------------------- |
+| `identifiers` | string | yes      | Comma-separated job identifiers. |
 
 **Response:** `200 OK`
 
 ```json
 {
+  "code": 0,
   "metrics": [
     {
       "identifier": "job_1",
@@ -635,7 +757,8 @@ Queries job metrics.
 
 #### GET /api/optimizer/v1/health
 
-Returns service health.
+Returns service health. This is an operational endpoint and is the one response that is not wrapped in
+the `code` envelope, so external liveness probes can consume it directly.
 
 **Response:** `200 OK`
 
@@ -656,37 +779,37 @@ Returns service health.
 The service reads the same `conf/gravitino-optimizer.conf` file as the CLI, plus service-side keys
 that control the HTTP endpoint and the task runtime described in the Reliability section:
 
-| Key | Default | Description |
-| --- | --- | --- |
-| `gravitino.optimizer.server.host` | `0.0.0.0` | Bind address for the Optimizer Service HTTP server. |
-| `gravitino.optimizer.server.port` | `8091` | Listen port for the Optimizer Service HTTP server. |
-| `gravitino.optimizer.server.workerPoolSize` | `4` | Worker threads per module for asynchronous task execution. |
-| `gravitino.optimizer.server.queueCapacity` | `100` | Maximum queued tasks per module before new submissions are rejected. |
-| `gravitino.optimizer.server.taskTimeoutMs` | `600000` | Per-task execution timeout after which the task is marked `FAILED`. |
-| `gravitino.optimizer.server.taskRetentionMs` | `3600000` | How long terminal task records are retained by the in-memory store. |
+| Key                                          | Default   | Description                                                          |
+| -------------------------------------------- | --------- | -------------------------------------------------------------------- |
+| `gravitino.optimizer.server.host`            | `0.0.0.0` | Bind address for the Optimizer Service HTTP server.                  |
+| `gravitino.optimizer.server.port`            | `8091`    | Listen port for the Optimizer Service HTTP server.                   |
+| `gravitino.optimizer.server.workerPoolSize`  | `4`       | Worker threads per module for asynchronous task execution.           |
+| `gravitino.optimizer.server.queueCapacity`   | `100`     | Maximum queued tasks per module before new submissions are rejected. |
+| `gravitino.optimizer.server.taskTimeoutMs`   | `600000`  | Per-task execution timeout after which the task is marked `failed`.  |
+| `gravitino.optimizer.server.taskRetentionMs` | `3600000` | How long terminal task records are retained by the in-memory store.  |
 
 ### CLI Service Mode
 
 Add optimizer CLI service configuration keys:
 
-| Key | Default | Description |
-| --- | --- | --- |
-| `gravitino.optimizer.service.enabled` | `false` | Enables CLI remote execution for supported commands. |
-| `gravitino.optimizer.service.url` | none | Base URL of the Optimizer Service, for example `http://localhost:8091`. |
-| `gravitino.optimizer.service.requestTimeoutMs` | `30000` | HTTP request timeout for CLI service calls. |
-| `gravitino.optimizer.service.pollIntervalMs` | `1000` | Poll interval when the CLI waits for async task completion. |
-| `gravitino.optimizer.service.waitForCompletion` | `true` | Whether CLI commands wait and print final results by default. |
+| Key                                             | Default | Description                                                             |
+| ----------------------------------------------- | ------- | ----------------------------------------------------------------------- |
+| `gravitino.optimizer.service.enabled`           | `false` | Enables CLI remote execution for supported commands.                    |
+| `gravitino.optimizer.service.url`               | none    | Base URL of the Optimizer Service, for example `http://localhost:8091`. |
+| `gravitino.optimizer.service.requestTimeoutMs`  | `30000` | HTTP request timeout for CLI service calls.                             |
+| `gravitino.optimizer.service.pollIntervalMs`    | `1000`  | Poll interval when the CLI waits for async task completion.             |
+| `gravitino.optimizer.service.waitForCompletion` | `true`  | Whether CLI commands wait and print final results by default.           |
 
 The existing CLI commands remain the primary user interface:
 
-| CLI command | Service mode behavior |
-| --- | --- |
-| `update-statistics` | Calls `POST /api/optimizer/v1/updater/requests` with `updateType=STATISTICS`. |
-| `append-metrics` | Calls `POST /api/optimizer/v1/updater/requests` with `updateType=METRICS`. |
-| `submit-strategy-jobs` | Calls `POST /api/optimizer/v1/recommender/requests`. |
-| `monitor-metrics` | Calls `POST /api/optimizer/v1/monitor/requests`. |
-| `list-table-metrics` | Calls `GET /api/optimizer/v1/metrics/tables`. |
-| `list-job-metrics` | Calls `GET /api/optimizer/v1/metrics/jobs`. |
+| CLI command               | Service mode behavior                                                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `update-statistics`       | Calls `POST /api/optimizer/v1/updater/tasks` with `updateType=STATISTICS`.                                              |
+| `append-metrics`          | Calls `POST /api/optimizer/v1/updater/tasks` with `updateType=METRICS`.                                                 |
+| `submit-strategy-jobs`    | Calls `POST /api/optimizer/v1/recommender/tasks`.                                                                       |
+| `monitor-metrics`         | Calls `POST /api/optimizer/v1/monitor/tasks`.                                                                           |
+| `list-table-metrics`      | Calls `GET /api/optimizer/v1/metrics/tables`.                                                                           |
+| `list-job-metrics`        | Calls `GET /api/optimizer/v1/metrics/jobs`.                                                                             |
 | `submit-update-stats-job` | Initially remains local CLI submission to the Gravitino job framework. A later phase may add an optimizer task wrapper. |
 
 If service mode is disabled, commands use the current local execution path. If service mode is
@@ -712,11 +835,10 @@ The service mode user flow is:
      --limit 10
    ```
 
-4. The CLI validates arguments, detects service mode, submits a REST request, and prints the request
-   ID.
+4. The CLI validates arguments, detects service mode, submits a REST request, and prints the task ID.
 5. If `waitForCompletion` is enabled, the CLI polls the task status endpoint and prints the final
    result using output compatible with the existing command.
-6. Automation can call the REST API directly, store the request ID, and query the result later.
+6. Automation can call the REST API directly, store the task ID, and query the result later.
 
 ### Implementation Process
 
@@ -729,10 +851,10 @@ CLI or REST client
 REST resource validates request
       |
       v
-TaskRuntime creates task record in PENDING state
+TaskRuntime creates task record in queued status
       |
       v
-Worker picks task and marks RUNNING
+Worker picks task and marks it started
       |
       v
 Module invokes existing optimizer class
@@ -740,7 +862,7 @@ Module invokes existing optimizer class
       +--> Updater / Recommender / Monitor
       |
       v
-TaskRuntime stores SUCCEEDED, FAILED, or CANCELED result
+TaskRuntime stores succeeded, failed, or canceled result
       |
       v
 Client queries task result
@@ -757,7 +879,7 @@ This design is backward compatible for existing CLI users:
 1. Service mode is disabled by default.
 2. Existing command names and options remain valid.
 3. Existing local output should remain the default when service mode is disabled.
-4. Service mode may print the request ID in addition to existing summary lines. This is additive.
+4. Service mode may print the task ID in addition to existing summary lines. This is additive.
 5. `submit-update-stats-job` keeps the existing local submission path until a service wrapper is
    implemented.
 
@@ -780,15 +902,15 @@ Authentication and authorization can be phased:
 
 The service should provide:
 
-| Area | Requirement |
-| --- | --- |
-| Queue control | Per-module queue size and worker count. |
-| Timeout | Per-task execution timeout and HTTP client timeout. |
-| Cancellation | Best-effort cancellation for queued and cooperative running tasks. |
-| Shutdown | Graceful shutdown that stops accepting requests and drains or cancels queued work. |
-| Logs | Request lifecycle logs with request ID, module, state transition, and duration. |
-| Metrics | Task counts by module/state, latency, queue depth, worker utilization, and failure counts. |
-| Health | Health endpoint with module initialization status. |
+| Area          | Requirement                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| Queue control | Per-module queue size and worker count.                                                     |
+| Timeout       | Per-task execution timeout and HTTP client timeout.                                         |
+| Cancellation  | Best-effort cancellation for queued and cooperative running tasks.                          |
+| Shutdown      | Graceful shutdown that stops accepting requests and drains or cancels queued work.          |
+| Logs          | Task lifecycle logs with task ID, module, status transition, and duration.                  |
+| Metrics       | Task counts by module/status, latency, queue depth, worker utilization, and failure counts. |
+| Health        | Health endpoint with module initialization status.                                          |
 
 ### Rollout Plan
 
