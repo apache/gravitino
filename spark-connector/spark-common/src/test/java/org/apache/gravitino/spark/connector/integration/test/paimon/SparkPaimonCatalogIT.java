@@ -150,6 +150,32 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
     Assertions.assertEquals("name=b;name=c", String.join(";", partitions));
   }
 
+  @Test
+  void testPaimonCreateTagProcedure() {
+    String tableName = "test_paimon_create_tag";
+    dropTableIfExists(tableName);
+    sql(getCreatePaimonSimpleTableString(tableName));
+
+    sql(String.format("INSERT INTO %s VALUES(1, 'a', 'beijing')", tableName));
+
+    String fullTableName =
+        String.format("%s.%s.%s", getCatalogName(), getDefaultDatabase(), tableName);
+    long snapshotId =
+        getSparkSession()
+            .sql(String.format("SELECT snapshot_id FROM `%s$snapshots`", tableName))
+            .first()
+            .getLong(0);
+
+    sql(
+        String.format(
+            "CALL %s.system.create_tag(table => '%s', tag => 'test_tag', snapshot => %d)",
+            getCatalogName(), fullTableName, snapshotId));
+
+    List<String> tags = getQueryData(String.format("SHOW TAGS FROM %s", fullTableName));
+    Assertions.assertEquals(1, tags.size());
+    Assertions.assertEquals("test_tag", tags.get(0));
+  }
+
   private String getCreatePaimonSimpleTableString(String tableName) {
     return String.format(
         "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING COMMENT '') USING paimon",
