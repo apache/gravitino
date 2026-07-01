@@ -32,6 +32,7 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
@@ -80,6 +81,27 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
         context.catalogName(),
         namespace,
         createViewRequest.name(),
+        context.userName(),
+        GravitinoEnv.getInstance().internalOwnerDispatcher());
+
+    return response;
+  }
+
+  @Override
+  public LoadViewResponse registerView(
+      IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
+    // First, register the view in the underlying catalog
+    LoadViewResponse response = dispatcher.registerView(context, namespace, registerViewRequest);
+
+    // Then import it into Gravitino so Gravitino is aware of the view
+    importView(context.catalogName(), namespace, registerViewRequest.name());
+
+    // Set ownership for the newly registered view.
+    IcebergOwnershipUtils.setViewOwner(
+        metalake,
+        context.catalogName(),
+        namespace,
+        registerViewRequest.name(),
         context.userName(),
         GravitinoEnv.getInstance().internalOwnerDispatcher());
 
