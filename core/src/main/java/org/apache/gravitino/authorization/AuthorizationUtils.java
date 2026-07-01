@@ -64,7 +64,15 @@ public class AuthorizationUtils {
   private static final String FILESET_SCHEMA_LOCATION = "location";
   private static final String HIVE_LOCATION = "location";
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
+  static final String USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
+      "User with external id %s does not exist in the metalake %s";
+  static final String USER_WITH_EXTERNAL_ID_ALREADY_EXISTS_MSG =
+      "User with external id %s already exists in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
+  static final String GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
+      "Group with external id %s does not exist in the metalake %s";
+  static final String GROUP_WITH_EXTERNAL_ID_ALREADY_EXISTS_MSG =
+      "Group with external id %s already exists in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
   /**

@@ -51,6 +51,7 @@ public class GroupDTO implements Group {
    * @param name The name of the Group DTO.
    * @param roles The roles of the Group DTO.
    * @param audit The audit information of the Group DTO.
+   * @param externalId The external id of the Group DTO.
    */
   protected GroupDTO(String name, List<String> roles, AuditDTO audit, String externalId) {
     this.name = name;

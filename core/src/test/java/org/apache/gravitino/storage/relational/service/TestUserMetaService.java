@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -1258,6 +1259,63 @@ class TestUserMetaService extends TestJDBCBackend {
                 m.batchGetAuthSubjectsForUser(
                     metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup")));
     assertTrue(none.isEmpty());
+  }
+
+  @TestTemplate
+  void testExternalIdEnableDisablePaginationAndDuplicateExternalId() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    UserMetaService userMetaService = UserMetaService.getInstance();
+    String externalId = "ext-user-meta-1";
+    UserEntity user =
+        UserEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("scim_user")
+            .withNamespace(AuthorizationUtils.ofUserNamespace(metalakeName))
+            .withExternalId(externalId)
+            .withEnabled(true)
+            .withAuditInfo(auditInfo)
+            .build();
+    userMetaService.insertUser(user, false);
+
+    UserEntity lookedUp = userMetaService.getUserByExternalId(metalakeName, externalId);
+    Assertions.assertEquals(user.name(), lookedUp.name());
+    Assertions.assertEquals(externalId, lookedUp.externalId());
+    Assertions.assertTrue(lookedUp.enabled());
+
+    UserEntity disabled = userMetaService.updateUserEnabled(metalakeName, user.name(), false);
+    Assertions.assertFalse(disabled.enabled());
+
+    UserEntity enabled = userMetaService.updateUserEnabled(metalakeName, user.name(), true);
+    Assertions.assertTrue(enabled.enabled());
+
+    Assertions.assertEquals(1, userMetaService.countUsersByMetalake(metalakeName));
+
+    PagedResult<UserEntity> page =
+        userMetaService.listUsersByMetalakePaginated(metalakeName, 0, 10);
+    Assertions.assertEquals(1, page.totalCount());
+    Assertions.assertEquals(1, page.items().size());
+    Assertions.assertEquals(user.name(), page.items().get(0).name());
+
+    UserEntity duplicateExternalIdUser =
+        UserEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("another_user")
+            .withNamespace(AuthorizationUtils.ofUserNamespace(metalakeName))
+            .withExternalId(externalId)
+            .withAuditInfo(auditInfo)
+            .build();
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () -> userMetaService.insertUser(duplicateExternalIdUser, false));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getUserByExternalId(metalakeName, "missing-external-id"));
   }
 
   private Integer countUsers(Long metalakeId) {

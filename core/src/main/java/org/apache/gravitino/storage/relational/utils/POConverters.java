@@ -957,7 +957,7 @@ public class POConverters {
           .withUserId(userEntity.id())
           .withUserName(userEntity.name())
           .withExternalId(userEntity.externalId())
-          .withEnabled(userEntity.enabled())
+          .withEnabled(userEntity.enabled() ? Boolean.TRUE : Boolean.FALSE)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -987,7 +987,7 @@ public class POConverters {
           .withMetalakeId(oldUserPO.getMetalakeId())
           .withExternalId(
               newUser.externalId() != null ? newUser.externalId() : oldUserPO.getExternalId())
-          .withEnabled(newUser.enabled())
+          .withEnabled(oldUserPO.getEnabled() != null ? oldUserPO.getEnabled() : Boolean.TRUE)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUser.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -1018,7 +1018,7 @@ public class POConverters {
               .withName(userPO.getUserName())
               .withNamespace(namespace)
               .withExternalId(userPO.getExternalId())
-              .withEnabled(userPO.getEnabled() == null || userPO.getEnabled())
+              .withEnabled(userPO.getEnabled() != null ? userPO.getEnabled() : Boolean.TRUE)
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1048,7 +1048,7 @@ public class POConverters {
               .withName(userPO.getUserName())
               .withNamespace(namespace)
               .withExternalId(userPO.getExternalId())
-              .withEnabled(userPO.getEnabled() == null || userPO.getEnabled())
+              .withEnabled(userPO.getEnabled() != null ? userPO.getEnabled() : Boolean.TRUE)
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (StringUtils.isNotBlank(userPO.getRoleNames())) {

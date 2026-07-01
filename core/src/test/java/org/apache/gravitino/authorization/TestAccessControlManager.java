@@ -49,7 +49,9 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -478,16 +480,92 @@ public class TestAccessControlManager {
     Assertions.assertFalse(disabled.enabled());
     Assertions.assertEquals(Lists.newArrayList("scim_role"), disabled.roles());
 
+    accessControlManager.createRole(
+        METALAKE,
+        "scim_role2",
+        props,
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
+    accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("scim_role2"), userName);
+    User afterGrantWhileDisabled = accessControlManager.getUser(METALAKE, userName);
+    Assertions.assertFalse(afterGrantWhileDisabled.enabled());
+    List<String> rolesAfterGrant = Lists.newArrayList(afterGrantWhileDisabled.roles());
+    Collections.sort(rolesAfterGrant);
+    Assertions.assertEquals(Lists.newArrayList("scim_role", "scim_role2"), rolesAfterGrant);
+
     User lookedUp = accessControlManager.getUserByExternalId(METALAKE, externalId);
     Assertions.assertEquals(userName, lookedUp.name());
     Assertions.assertFalse(lookedUp.enabled());
 
     User enabled = accessControlManager.enableUser(METALAKE, userName);
     Assertions.assertTrue(enabled.enabled());
-    Assertions.assertEquals(Lists.newArrayList("scim_role"), enabled.roles());
+    List<String> rolesAfterEnable = Lists.newArrayList(enabled.roles());
+    Collections.sort(rolesAfterEnable);
+    Assertions.assertEquals(Lists.newArrayList("scim_role", "scim_role2"), rolesAfterEnable);
 
-    accessControlManager.revokeRolesFromUser(METALAKE, Lists.newArrayList("scim_role"), userName);
+    accessControlManager.revokeRolesFromUser(
+        METALAKE, Lists.newArrayList("scim_role", "scim_role2"), userName);
+    accessControlManager.deleteRole(METALAKE, "scim_role2");
     accessControlManager.deleteRole(METALAKE, "scim_role");
+    accessControlManager.removeUser(METALAKE, userName);
+  }
+
+  @Test
+  public void testGetUserByExternalIdNotFoundUsesExternalIdMessage() {
+    NoSuchUserException exception =
+        Assertions.assertThrows(
+            NoSuchUserException.class,
+            () -> accessControlManager.getUserByExternalId(METALAKE, "missing-external-id"));
+    Assertions.assertTrue(exception.getMessage().contains("external id"));
+    Assertions.assertTrue(exception.getMessage().contains("missing-external-id"));
+  }
+
+  @Test
+  public void testGetGroupByExternalIdNotFoundUsesExternalIdMessage() {
+    NoSuchGroupException exception =
+        Assertions.assertThrows(
+            NoSuchGroupException.class,
+            () -> accessControlManager.getGroupByExternalId(METALAKE, "missing-external-id"));
+    Assertions.assertTrue(exception.getMessage().contains("external id"));
+    Assertions.assertTrue(exception.getMessage().contains("missing-external-id"));
+  }
+
+  @Test
+  public void testDuplicateExternalIdOnAddUser() {
+    accessControlManager.addUser(METALAKE, "dup_user_1", "dup-ext-id");
+    UserAlreadyExistsException exception =
+        Assertions.assertThrows(
+            UserAlreadyExistsException.class,
+            () -> accessControlManager.addUser(METALAKE, "dup_user_2", "dup-ext-id"));
+    Assertions.assertTrue(exception.getMessage().contains("external id"));
+    Assertions.assertTrue(exception.getMessage().contains("dup-ext-id"));
+    accessControlManager.removeUser(METALAKE, "dup_user_1");
+  }
+
+  @Test
+  public void testDuplicateExternalIdOnAddGroup() {
+    accessControlManager.addGroup(METALAKE, "dup_group_1", "dup-group-ext-id");
+    GroupAlreadyExistsException exception =
+        Assertions.assertThrows(
+            GroupAlreadyExistsException.class,
+            () -> accessControlManager.addGroup(METALAKE, "dup_group_2", "dup-group-ext-id"));
+    Assertions.assertTrue(exception.getMessage().contains("external id"));
+    Assertions.assertTrue(exception.getMessage().contains("dup-group-ext-id"));
+    accessControlManager.removeGroup(METALAKE, "dup_group_1");
+  }
+
+  @Test
+  public void testGetUserAfterDisableUsesFreshEnabledState() {
+    String userName = "cache_stale_user";
+    accessControlManager.addUser(METALAKE, userName);
+    accessControlManager.getUser(METALAKE, userName);
+    accessControlManager.disableUser(METALAKE, userName);
+    User fromGet = accessControlManager.getUser(METALAKE, userName);
+    Assertions.assertFalse(fromGet.enabled());
+    accessControlManager.enableUser(METALAKE, userName);
+    User fromGetAfterEnable = accessControlManager.getUser(METALAKE, userName);
+    Assertions.assertTrue(fromGetAfterEnable.enabled());
     accessControlManager.removeUser(METALAKE, userName);
   }
 

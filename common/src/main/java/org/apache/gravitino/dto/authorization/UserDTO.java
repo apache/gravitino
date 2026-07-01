@@ -54,6 +54,8 @@ public class UserDTO implements User {
    * @param name The name of the User DTO.
    * @param roles The roles of the User DTO.
    * @param audit The audit information of the User DTO.
+   * @param externalId The external id of the User DTO.
+   * @param enabled Whether the User DTO is enabled.
    */
   protected UserDTO(
       String name, List<String> roles, AuditDTO audit, String externalId, boolean enabled) {

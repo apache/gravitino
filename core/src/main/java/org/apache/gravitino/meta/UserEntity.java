@@ -55,7 +55,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
       Field.optional("external_id", String.class, "The external id of the user entity.");
 
   public static final Field ENABLED =
-      Field.optional("enabled", Boolean.class, "Whether the user entity is enabled.");
+      Field.required("enabled", Boolean.class, "Whether the user entity is enabled.");
 
   private Long id;
   private String name;
@@ -64,7 +64,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   private List<Long> roleIds;
   private Namespace namespace;
   private String externalId;
-  private boolean enabled = true;
+  private Boolean enabled = Boolean.TRUE;
 
   private UserEntity() {}
 
@@ -154,7 +154,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
 
   @Override
   public boolean enabled() {
-    return enabled;
+    return enabled != null && enabled;
   }
 
   /**
@@ -186,7 +186,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(externalId, that.externalId)
-        && enabled == that.enabled
+        && Objects.equals(enabled, that.enabled)
         && CollectionUtils.isEqualCollection(roleNames, that.roleNames)
         && CollectionUtils.isEqualCollection(roleIds, that.roleIds);
   }
@@ -296,11 +296,25 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     }
 
     /**
+     * Sets whether the user entity is enabled.
+     *
+     * @param enabled Whether the user entity is enabled.
+     * @return The builder instance.
+     */
+    public Builder withEnabled(Boolean enabled) {
+      userEntity.enabled = enabled;
+      return this;
+    }
+
+    /**
      * Builds the user entity.
      *
      * @return The built user entity.
      */
     public UserEntity build() {
+      if (userEntity.enabled == null) {
+        userEntity.enabled = Boolean.TRUE;
+      }
       userEntity.validate();
       return userEntity;
     }
