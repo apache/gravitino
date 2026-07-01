@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.doris;
 
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
@@ -28,6 +30,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
   public static final String REPLICATION_FACTOR = "replication_num";
+  public static final String REPLICATION_ALLOCATION = "replication_allocation";
   public static final int DEFAULT_REPLICATION_FACTOR = 1;
   public static final int DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE = 3;
 
@@ -42,6 +45,12 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
                     + " the default value will be used",
                 false /* immutable */,
                 DEFAULT_REPLICATION_FACTOR, /* default value */
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                REPLICATION_ALLOCATION,
+                "The replication allocation policy for the table.",
+                false /* immutable */,
+                null /* default value */,
                 false /* hidden */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
