@@ -111,8 +111,17 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     if (enablePaimonSupport) {
       gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
     }
-    if (enableIcebergSupport || enableIcebergRestAccess) {
+    if (enableIcebergSupport) {
+      // Gravitino wrapper extensions include GravitinoIcebergSparkSessionExtensions (which
+      // intercepts Iceberg DDL and routes it through GravitinoIcebergCatalog) plus the native
+      // IcebergSparkSessionExtensions.
       gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
+    } else if (enableIcebergRestAccess) {
+      // With native REST catalogs (org.apache.iceberg.spark.SparkCatalog), only load the native
+      // Iceberg extensions.  GravitinoIcebergSparkSessionExtensions must NOT be loaded here
+      // because its IcebergExtendedDataSourceV2Strategy unconditionally casts the catalog to
+      // GravitinoIcebergCatalog and throws UnsupportedOperationException for any other type.
+      gravitinoDriverExtensions.add(ICEBERG_SPARK_EXTENSIONS);
     }
     if (enableIcebergRestAccess) {
       icebergRestRegistrar = new IcebergRestCatalogRegistrar(conf);
