@@ -1077,7 +1077,7 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDupGroupExtId() throws IOException {
+  void testDupExtId() throws IOException {
     createAndInsertMakeLake(metalakeName);
     GroupMetaService svc = GroupMetaService.getInstance();
     svc.insertGroup(groupWithExtId("g1", "ext-1"), false);

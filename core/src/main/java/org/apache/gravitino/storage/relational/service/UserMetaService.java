@@ -321,11 +321,7 @@ public class UserMetaService {
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getUserByExternalId")
-  public UserEntity getUserByExternalId(String metalakeName, String externalId) {
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+  private UserPO getUserPOByMetalakeIdAndExternalId(Long metalakeId, String externalId) {
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
@@ -337,7 +333,15 @@ public class UserMetaService {
           Entity.EntityType.USER.name().toLowerCase(),
           externalId);
     }
+    return userPO;
+  }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getUserByExternalId")
+  public UserEntity getUserByExternalId(String metalakeName, String externalId) {
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    UserPO userPO = getUserPOByMetalakeIdAndExternalId(metalakeId, externalId);
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
     return POConverters.fromUserPO(
         userPO, rolePOs, AuthorizationUtils.ofUserNamespace(metalakeName));
@@ -346,9 +350,9 @@ public class UserMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateUserEnabled")
-  public UserEntity updateUserEnabled(String metalakeName, String userName, boolean enabled) {
+  public UserEntity updateUserEnabled(String metalakeName, String externalId, boolean enabled) {
     Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-    UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, userName);
+    UserPO oldUserPO = getUserPOByMetalakeIdAndExternalId(metalakeId, externalId);
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -359,7 +363,7 @@ public class UserMetaService {
             SessionUtils.doWithoutCommit(
                 UserMetaMapper.class, mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
 
-    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, userName);
+    UserPO userPO = getUserPOByMetalakeIdAndExternalId(metalakeId, externalId);
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
     return POConverters.fromUserPO(
         userPO, rolePOs, AuthorizationUtils.ofUserNamespace(metalakeName));

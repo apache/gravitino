@@ -457,7 +457,7 @@ public class TestAccessControlManager {
   }
 
   @Test
-  public void testUserExternalIdEnableDisableAndLookup() {
+  public void testUserExtIdEnabled() {
     String userName = "scim_user";
     String externalId = "ext-scim-user-1";
 
@@ -475,7 +475,7 @@ public class TestAccessControlManager {
                 "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
     accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("scim_role"), userName);
 
-    User disabled = accessControlManager.disableUser(METALAKE, userName);
+    User disabled = accessControlManager.disableUser(METALAKE, externalId);
     Assertions.assertFalse(disabled.enabled());
     Assertions.assertEquals(Lists.newArrayList("scim_role"), disabled.roles());
 
@@ -497,7 +497,7 @@ public class TestAccessControlManager {
     Assertions.assertEquals(userName, lookedUp.name());
     Assertions.assertFalse(lookedUp.enabled());
 
-    User enabled = accessControlManager.enableUser(METALAKE, userName);
+    User enabled = accessControlManager.enableUser(METALAKE, externalId);
     Assertions.assertTrue(enabled.enabled());
     List<String> rolesAfterEnable = Lists.newArrayList(enabled.roles());
     Collections.sort(rolesAfterEnable);
@@ -511,7 +511,7 @@ public class TestAccessControlManager {
   }
 
   @Test
-  public void testExtIdNotFound() {
+  public void testMissingExtId() {
     NoSuchUserException userEx =
         Assertions.assertThrows(
             NoSuchUserException.class,
@@ -541,15 +541,16 @@ public class TestAccessControlManager {
 
   @Test
   public void testDisableCache() {
-    accessControlManager.addUser(METALAKE, "cache_user");
-    accessControlManager.getUser(METALAKE, "cache_user");
-    accessControlManager.disableUser(METALAKE, "cache_user");
-    Assertions.assertFalse(accessControlManager.getUser(METALAKE, "cache_user").enabled());
+    String externalId = "ext-cache-user";
+    accessControlManager.addUser(METALAKE, "cache_user", externalId);
+    accessControlManager.getUserByExternalId(METALAKE, externalId);
+    accessControlManager.disableUser(METALAKE, externalId);
+    Assertions.assertFalse(accessControlManager.getUserByExternalId(METALAKE, externalId).enabled());
     accessControlManager.removeUser(METALAKE, "cache_user");
   }
 
   @Test
-  public void testGroupExternalId() {
+  public void testGroupExtId() {
     String groupName = "scim_group";
     String externalId = "ext-scim-group-1";
     Group added = accessControlManager.addGroup(METALAKE, groupName, externalId);

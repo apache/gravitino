@@ -139,25 +139,31 @@ class UserGroupManager {
     }
   }
 
-  User enableUser(String metalake, String user) throws NoSuchUserException {
+  User enableUser(String metalake, String externalId) throws NoSuchUserException {
     try {
-      User updatedUser = UserMetaService.getInstance().updateUserEnabled(metalake, user, true);
-      invalidateUserEntityCache(metalake, user);
+      User updatedUser =
+          UserMetaService.getInstance().updateUserEnabled(metalake, externalId, true);
+      invalidateUserEntityCache(metalake, updatedUser.name());
       return updatedUser;
     } catch (NoSuchEntityException e) {
-      LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
-      throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
+      LOG.warn(
+          "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchUserException(
+          AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
     }
   }
 
-  User disableUser(String metalake, String user) throws NoSuchUserException {
+  User disableUser(String metalake, String externalId) throws NoSuchUserException {
     try {
-      User updatedUser = UserMetaService.getInstance().updateUserEnabled(metalake, user, false);
-      invalidateUserEntityCache(metalake, user);
+      User updatedUser =
+          UserMetaService.getInstance().updateUserEnabled(metalake, externalId, false);
+      invalidateUserEntityCache(metalake, updatedUser.name());
       return updatedUser;
     } catch (NoSuchEntityException e) {
-      LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
-      throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
+      LOG.warn(
+          "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchUserException(
+          AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
     }
   }
 

@@ -1277,12 +1277,12 @@ class TestUserMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     UserMetaService svc = UserMetaService.getInstance();
     svc.insertUser(userWithExtId("u1", "ext-1"), false);
-    Assertions.assertFalse(svc.updateUserEnabled(metalakeName, "u1", false).enabled());
-    Assertions.assertTrue(svc.updateUserEnabled(metalakeName, "u1", true).enabled());
+    Assertions.assertFalse(svc.updateUserEnabled(metalakeName, "ext-1", false).enabled());
+    Assertions.assertTrue(svc.updateUserEnabled(metalakeName, "ext-1", true).enabled());
   }
 
   @TestTemplate
-  void testDupUserExtId() throws IOException {
+  void testDupExtId() throws IOException {
     createAndInsertMakeLake(metalakeName);
     UserMetaService svc = UserMetaService.getInstance();
     svc.insertUser(userWithExtId("u1", "ext-1"), false);

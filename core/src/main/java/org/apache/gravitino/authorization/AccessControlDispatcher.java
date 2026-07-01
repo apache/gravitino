@@ -106,23 +106,24 @@ public interface AccessControlDispatcher {
    * Enables a User without removing role bindings.
    *
    * @param metalake The Metalake of the User.
-   * @param user The name of the User.
+   * @param externalId The external identifier of the User.
    * @return The updated User instance.
-   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchUserException If the User with the given external id does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
-  User enableUser(String metalake, String user) throws NoSuchUserException, NoSuchMetalakeException;
+  User enableUser(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
    * Disables a User without removing role bindings.
    *
    * @param metalake The Metalake of the User.
-   * @param user The name of the User.
+   * @param externalId The external identifier of the User.
    * @return The updated User instance.
-   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchUserException If the User with the given external id does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
-  User disableUser(String metalake, String user)
+  User disableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException;
 
   /**

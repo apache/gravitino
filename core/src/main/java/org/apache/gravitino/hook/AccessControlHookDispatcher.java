@@ -93,15 +93,15 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
-  public User enableUser(String metalake, String user)
+  public User enableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.enableUser(metalake, user);
+    return dispatcher.enableUser(metalake, externalId);
   }
 
   @Override
-  public User disableUser(String metalake, String user)
+  public User disableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.disableUser(metalake, user);
+    return dispatcher.disableUser(metalake, externalId);
   }
 
   @Override

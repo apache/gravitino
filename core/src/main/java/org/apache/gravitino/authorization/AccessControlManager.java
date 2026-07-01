@@ -100,21 +100,21 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
-  public User enableUser(String metalake, String user)
+  public User enableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
-        AuthorizationUtils.ofUser(metalake, user),
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
-        () -> userGroupManager.enableUser(metalake, user));
+        () -> userGroupManager.enableUser(metalake, externalId));
   }
 
   @Override
-  public User disableUser(String metalake, String user)
+  public User disableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
-        AuthorizationUtils.ofUser(metalake, user),
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
-        () -> userGroupManager.disableUser(metalake, user));
+        () -> userGroupManager.disableUser(metalake, externalId));
   }
 
   @Override
