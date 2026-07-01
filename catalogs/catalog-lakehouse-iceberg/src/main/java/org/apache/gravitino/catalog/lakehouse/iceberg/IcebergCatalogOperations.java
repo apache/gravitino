@@ -42,6 +42,11 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.credential.CatalogCredentialContext;
+import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -124,6 +129,7 @@ public class IcebergCatalogOperations
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
     resultConf.put("catalog_uuid", info.id().toString());
+    injectCredentialConfig(conf, info.name(), resultConf);
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
@@ -136,6 +142,22 @@ public class IcebergCatalogOperations
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
     this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
+  }
+
+  private static void injectCredentialConfig(
+      Map<String, String> conf, String catalogName, Map<String, String> resultConf) {
+    List<Credential> credentials = new ArrayList<>();
+    CatalogCredentialContext context =
+        new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
+    try (CatalogCredentialManager credentialManager =
+        new CatalogCredentialManager(catalogName, conf)) {
+      for (String credentialProvider : CredentialUtils.getCredentialProvidersByOrder(() -> conf)) {
+        credentialManager.getCredential(credentialProvider, context).ifPresent(credentials::add);
+      }
+    }
+
+    CredentialPropertyUtils.applyIcebergCredentials(
+        credentials.toArray(new Credential[0]), resultConf);
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
