@@ -10,7 +10,7 @@ jobs:
     env:
       CONNECTOR_DIR: ${{ github.workspace }}/trino-connector
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-java-toolchains
 

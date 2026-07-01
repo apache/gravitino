@@ -41,7 +41,7 @@ jobs:
     name: Cherry-pick to ${{ inputs.target-branch }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           # A PAT (or GitHub App token) is required so that the created PR

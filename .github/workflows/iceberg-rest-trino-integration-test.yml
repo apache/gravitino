@@ -18,7 +18,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
@@ -53,7 +53,7 @@ jobs:
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Installs the primary JDK plus JDK 24 and registers JDK 24 with the Gradle
       # toolchain, which the trino-iceberg-rest module requires.

@@ -34,7 +34,7 @@ jobs:
     outputs:
       mcp_or_authz_changes: ${{ steps.filter.outputs.mcp_or_authz_changes }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
@@ -52,7 +52,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.mcp_or_authz_changes == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-java-toolchains
         with:

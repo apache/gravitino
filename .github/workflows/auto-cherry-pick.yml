@@ -16,7 +16,7 @@ jobs:
       commit-message: ${{ steps.get-commit.outputs.commit-message }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
