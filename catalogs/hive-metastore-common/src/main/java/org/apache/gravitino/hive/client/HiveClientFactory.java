@@ -32,7 +32,7 @@ import java.util.Properties;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
-import org.apache.gravitino.hive.kerberos.KerberosClient;
+import org.apache.gravitino.hive.kerberos.HmsKerberosClient;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -50,7 +50,7 @@ public final class HiveClientFactory {
 
   private boolean enableKerberos;
   private boolean enableImpersonation = false;
-  private KerberosClient kerberosClient;
+  private HmsKerberosClient kerberosClient;
 
   private final Configuration hadoopConf;
   private final Properties properties;
@@ -242,7 +242,7 @@ public final class HiveClientFactory {
         return;
       }
 
-      kerberosClient = new KerberosClient(properties, hadoopConf, true, keytabPath);
+      kerberosClient = new HmsKerberosClient(properties, hadoopConf, true, keytabPath);
       kerberosClient.login();
 
     } catch (Exception e) {

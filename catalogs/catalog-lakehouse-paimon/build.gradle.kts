@@ -39,6 +39,9 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
+  implementation(project(":catalogs:hadoop-auth")) {
+    exclude("*")
+  }
 
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.paimon) {
