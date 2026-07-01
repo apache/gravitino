@@ -114,7 +114,7 @@ public class BaseIT {
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
 
   public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
-      "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
+      "https://jdbc.postgresql.org/download/postgresql-42.7.11.jar";
 
   public static final String DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/clickhouse-jdbc-0.7.1-all.jar";

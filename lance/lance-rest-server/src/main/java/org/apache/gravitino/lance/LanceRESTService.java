@@ -28,10 +28,12 @@ import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.service.LanceHealthCheckPathMatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
@@ -66,7 +68,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     LanceConfig lanceConfig = new LanceConfig(properties);
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
 
-    server = new JettyServer();
+    server = new LanceJettyServer();
     // Get MetricsSystem and EventBus from GravitinoEnv once at init time.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
@@ -94,9 +96,16 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     Servlet container = new ServletContainer(resourceConfig);
     server.addServlet(container, LANCE_SPEC);
     server.addFilter(
-        new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), LANCE_SPEC);
+        new HttpAuditFilter(
+            eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
+        LANCE_SPEC);
     server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
+
+    // Root-level aliases for health checks to improve compatibility with various monitoring
+    // systems that expect a /health endpoint.
+    server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
+    server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode",

@@ -48,6 +48,7 @@ import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.gravitino.spark.connector.authorization.AuthorizationTable;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -260,6 +261,15 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     } catch (NoSuchTableException e) {
       // Not a table in Gravitino; try as a view.
       return loadViewAsTable(ident);
+    } catch (ForbiddenException e) {
+      // Do not load the underlying Spark table here: that load bypasses Gravitino authorization,
+      // which the caller is precisely missing. Return a standalone table that carries the failure
+      // so RequiredPrivilegesCheck can aggregate and report it during analysis.
+      return AuthorizationTable.deny(
+          ident.name(),
+          String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+          Sets.newHashSet(Privilege.Name.SELECT_TABLE),
+          e);
     }
     Table sparkTable = loadSparkTable(ident);
     return createSparkTable(
@@ -491,7 +501,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       String database = getDatabase(ident);
       return gravitinoCatalogClient
           .asTableCatalog()
-          .loadTable(NameIdentifier.of(database, ident.name()));
+          .loadTable(
+              NameIdentifier.of(database, ident.name()),
+              Sets.newHashSet(Privilege.Name.SELECT_TABLE));
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
@@ -580,7 +592,26 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   protected Table loadTableForWriting(Identifier ident)
       throws NoSuchTableException, ForbiddenException {
-    org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTableForWriting(ident);
+    org.apache.gravitino.rel.Table gravitinoTable;
+    try {
+      gravitinoTable = loadGravitinoTableForWriting(ident);
+    } catch (ForbiddenException e) {
+      // Do not load the underlying Spark table here: that load bypasses Gravitino authorization,
+      // which the caller is precisely missing.
+      //
+      // Unlike the read path, a write command targets a single table, so there is nothing to
+      // aggregate across relations. Returning an empty-schema placeholder here would let Spark's
+      // ResolveOutputRelation reject the write with a column-arity error before
+      // RequiredPrivilegesCheck runs, surfacing the wrong failure and leaving the recorded denial
+      // on the thread to leak into later queries. Record the denial and surface the aggregated
+      // authorization failure immediately, which also clears the per-thread collector.
+      AuthorizationTable.deny(
+          ident.name(),
+          String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+          Sets.newHashSet(Privilege.Name.MODIFY_TABLE),
+          e);
+      throw AuthorizationTable.drainFailure().orElse(e);
+    }
     org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
     // Will create a catalog specific table
     return createSparkTable(
