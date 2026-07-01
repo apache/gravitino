@@ -50,6 +50,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,6 +80,16 @@ public class TestSchemaHookDispatcher {
     mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
     when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
     when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
+    when(mockCatalogWrapper.doWithCapabilityOps(any()))
+        .thenAnswer(
+            inv -> {
+              try {
+                Capability cap = mockCatalogWrapper.capabilities();
+                return ((ThrowableFunction<Capability, ?>) inv.getArgument(0)).apply(cap);
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+            });
     savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
     // Tests in this class that rely on the singleton catalogManager always go through
     // GravitinoEnv.getInstance().catalogManager(), but we cannot call the public accessor here

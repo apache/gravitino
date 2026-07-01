@@ -20,10 +20,11 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -35,10 +36,6 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 
-/**
- * Note on list operations: names returned by list methods (e.g. {@link #listViews(Namespace)}) are
- * assumed to already be in their canonical, legal form and are not re-normalized here.
- */
 public class ViewNormalizeDispatcher implements ViewDispatcher {
 
   private final CatalogManager catalogManager;
@@ -54,7 +51,8 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    return dispatcher.listViews(caseSensitiveNs);
+    NameIdentifier[] identifiers = dispatcher.listViews(caseSensitiveNs);
+    return normalizeCaseSensitive(identifiers);
   }
 
   @Override
@@ -90,9 +88,13 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
-    Capability capability = getCapability(ident, catalogManager);
-    return dispatcher.alterView(
-        normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
+    return withCapability(
+        ident,
+        catalogManager,
+        capability ->
+            dispatcher.alterView(
+                applyCaseSensitive(ident, Capability.Scope.VIEW, capability),
+                applyCapabilities(capability, changes)));
   }
 
   @Override
@@ -101,17 +103,27 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return applyCaseSensitive(namespace, Capability.Scope.VIEW, capabilities);
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        cap -> applyCaseSensitive(namespace, Capability.Scope.VIEW, cap));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier ident) {
-    Capability capabilities = getCapability(ident, catalogManager);
-    return applyCaseSensitive(ident, Capability.Scope.VIEW, capabilities);
+    return withCapability(
+        ident, catalogManager, cap -> applyCaseSensitive(ident, Capability.Scope.VIEW, cap));
+  }
+
+  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] idents) {
+    if (ArrayUtils.isEmpty(idents)) {
+      return idents;
+    }
+    return withCapability(
+        idents[0], catalogManager, cap -> applyCaseSensitive(idents, Capability.Scope.VIEW, cap));
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
-    Capability capability = getCapability(ident, catalogManager);
-    return applyCapabilities(ident, Capability.Scope.VIEW, capability);
+    return withCapability(
+        ident, catalogManager, cap -> applyCapabilities(ident, Capability.Scope.VIEW, cap));
   }
 }

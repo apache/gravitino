@@ -155,6 +155,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           "uri",
           "fs.defaultFS");
 
+  /**
+   * Thrown by {@link CatalogWrapper#doWithCapabilityOps} exclusively when the wrapper is already
+   * closed at the time of the call (i.e. before {@code fn} has had a chance to run). This lets
+   * {@link CapabilityHelpers#withCapability} distinguish a safe-to-retry "entry-closed" condition
+   * from an {@link IllegalStateException} thrown by {@code fn} itself mid-execution.
+   */
+  static class CatalogWrapperClosedException extends IllegalStateException {
+    CatalogWrapperClosedException(String message) {
+      super(message);
+    }
+  }
+
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
 
@@ -280,8 +292,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       return classLoader.withClassLoader(cl -> fn.apply(catalog));
     }
 
+    public synchronized <R> R doWithCapabilityOps(ThrowableFunction<Capability, R> fn)
+        throws Exception {
+      if (closed) {
+        throw new CatalogWrapperClosedException("CatalogWrapper is already closed");
+      }
+      return classLoader.withClassLoader(cl -> fn.apply(catalog.capability()));
+    }
+
     public Capability capabilities() throws Exception {
-      return classLoader.withClassLoader(cl -> catalog.capability());
+      return doWithCapabilityOps(capability -> capability);
     }
 
     public synchronized void close() {

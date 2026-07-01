@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import com.google.common.base.Preconditions;
 import java.util.Locale;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -62,18 +63,16 @@ public class GlueCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult caseSensitiveOnName(Scope scope) {
-    switch (scope) {
-      case SCHEMA:
-      case TABLE:
-        // Glue folds database/table names to lowercase on storage.
-        // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-databases.html
-        // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html
-        return CapabilityResult.unsupported(
-            "AWS Glue Data Catalog is case-insensitive for "
-                + scope.name().toLowerCase(Locale.ROOT)
-                + " names.");
-      default:
-        return CapabilityResult.SUPPORTED;
+    Preconditions.checkArgument(scope != null, "scope cannot be null");
+    if (scope == Scope.SCHEMA || scope == Scope.TABLE) {
+      // Glue folds database/table names to lowercase on storage.
+      // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-databases.html
+      // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html
+      return CapabilityResult.unsupported(
+          "AWS Glue Data Catalog is case-insensitive for "
+              + scope.name().toLowerCase(Locale.ROOT)
+              + " names.");
     }
+    return CapabilityResult.SUPPORTED;
   }
 }
