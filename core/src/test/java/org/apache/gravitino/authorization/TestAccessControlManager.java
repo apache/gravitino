@@ -461,7 +461,7 @@ public class TestAccessControlManager {
     String userName = "scim_user";
     String externalId = "ext-scim-user-1";
 
-    User added = accessControlManager.addUser(METALAKE, userName, externalId);
+    User added = accessControlManager.addUser(METALAKE, userName, externalId, true);
     Assertions.assertEquals(externalId, added.externalId());
     Assertions.assertTrue(added.enabled());
 
@@ -545,10 +545,10 @@ public class TestAccessControlManager {
 
   @Test
   public void testDupExtId() {
-    accessControlManager.addUser(METALAKE, "u1", "dup-ext");
+    accessControlManager.addUser(METALAKE, "u1", "dup-ext", true);
     Assertions.assertThrows(
         UserAlreadyExistsException.class,
-        () -> accessControlManager.addUser(METALAKE, "u2", "dup-ext"));
+        () -> accessControlManager.addUser(METALAKE, "u2", "dup-ext", true));
     accessControlManager.removeUser(METALAKE, "u1");
 
     accessControlManager.addGroup(METALAKE, "g1", "dup-ext");
@@ -561,7 +561,7 @@ public class TestAccessControlManager {
   @Test
   public void testDisableCache() {
     String externalId = "ext-cache-user";
-    accessControlManager.addUser(METALAKE, "cache_user", externalId);
+    accessControlManager.addUser(METALAKE, "cache_user", externalId, true);
     accessControlManager.getUserByExternalId(METALAKE, externalId);
     accessControlManager.disableUser(METALAKE, externalId);
     Assertions.assertFalse(

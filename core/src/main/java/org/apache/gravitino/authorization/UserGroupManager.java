@@ -67,10 +67,6 @@ class UserGroupManager {
     return addUser(metalake, name, null, true);
   }
 
-  User addUser(String metalake, String name, String externalId) throws UserAlreadyExistsException {
-    return addUser(metalake, name, externalId, true);
-  }
-
   User addUser(String metalake, String name, String externalId, boolean enabled)
       throws UserAlreadyExistsException {
     try {

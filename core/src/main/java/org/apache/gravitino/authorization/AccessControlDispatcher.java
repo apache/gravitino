@@ -52,20 +52,6 @@ public interface AccessControlDispatcher {
       throws UserAlreadyExistsException, NoSuchMetalakeException;
 
   /**
-   * Adds a new User with an external identifier.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user The name of the User.
-   * @param externalId The external identifier from an upstream identity system.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same name already exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  User addUser(String metalake, String user, String externalId)
-      throws UserAlreadyExistsException, NoSuchMetalakeException;
-
-  /**
    * Adds a new User with an external identifier and enabled state.
    *
    * @param metalake The Metalake of the User.
