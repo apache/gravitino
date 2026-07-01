@@ -18,7 +18,9 @@
 package org.apache.gravitino.server.authorization;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.times;
@@ -26,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.concurrent.Executor;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -34,7 +37,10 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -192,8 +198,6 @@ public class TestMetadataAuthzHelper {
     }
   }
 
-<<<<<<< HEAD
-=======
   /**
    * Builds three table identifiers under the same schema, where a parent (schema) level
    * SELECT_TABLE grant exists and the middle table additionally carries a table-level deny. The
@@ -555,7 +559,6 @@ public class TestMetadataAuthzHelper {
     }
   }
 
->>>>>>> d54358e1b ([#12622] improvement(server): apply the list authorization short-circuit to every list shape (#12623))
   private static void makeCompletableFutureUseCurrentThread() {
     try {
       Executor currentThread = Runnable::run;
