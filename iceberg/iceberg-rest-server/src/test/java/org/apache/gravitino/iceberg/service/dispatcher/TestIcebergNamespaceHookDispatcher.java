@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -248,6 +249,45 @@ public class TestIcebergNamespaceHookDispatcher {
     verify(mockInternalOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
     verify(mockSchemaDispatcher, never()).loadSchema(any());
+  }
+
+  @Test
+  public void testRegisterTableSkipsWhenGravitinoExists() throws Exception {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
+    when(mockRequest.name()).thenReturn("test_table");
+    doReturn(true).when(mockEntityStore).exists(any(), eq(Entity.EntityType.TABLE));
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
+        .thenReturn(mockResponse);
+
+    LoadTableResponse response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
+
+    Assertions.assertSame(mockResponse, response);
+    verify(mockInternalTableDispatcher, never()).loadTable(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRegisterTableImportsWhenGravitinoMissing() throws Exception {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
+    when(mockRequest.name()).thenReturn("test_table");
+    doReturn(false).when(mockEntityStore).exists(any(), eq(Entity.EntityType.TABLE));
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
+        .thenReturn(mockResponse);
+
+    LoadTableResponse response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
+
+    Assertions.assertSame(mockResponse, response);
+    verify(mockDispatcher).registerTable(mockContext, namespace, mockRequest);
+    verify(mockInternalTableDispatcher).loadTable(any());
+    verify(mockInternalOwnerDispatcher).setOwner(any(), any(), any(), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test

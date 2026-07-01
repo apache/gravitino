@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service;
 
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -627,7 +628,10 @@ public class TestCatalogWrapperForREST {
     BaseTable table = mock(BaseTable.class);
     TableOperations ops = mock(TableOperations.class);
     FileIO fileIO = mock(FileIO.class);
-    when(catalog.registerTable(any(TableIdentifier.class), anyString())).thenReturn(table);
+    TableIdentifier ident = TableIdentifier.of("db", "tbl");
+    when(catalog.registerTable(any(TableIdentifier.class), anyString(), anyBoolean()))
+        .thenReturn(table);
+    when(catalog.loadTable(ident)).thenReturn(table);
     when(table.operations()).thenReturn(ops);
     when(ops.current()).thenReturn(minimalTableMetadataForStagedCreateTest());
     when(table.io()).thenReturn(fileIO);
@@ -656,10 +660,49 @@ public class TestCatalogWrapperForREST {
 
     LoadTableResponse response = wrapper.registerTable(Namespace.of("db"), request, false);
 
+    verify(catalog).registerTable(ident, request.metadataLocation(), false);
+    verify(catalog).loadTable(ident);
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
     Assertions.assertEquals(
         "http://localhost:9000", response.config().get(IcebergConstants.ICEBERG_S3_ENDPOINT));
+  }
+
+  @Test
+  void testFederatedRegisterTableOverwrite() {
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    BaseTable table = mock(BaseTable.class);
+    TableOperations ops = mock(TableOperations.class);
+    FileIO fileIO = mock(FileIO.class);
+    TableIdentifier ident = TableIdentifier.of("db", "tbl");
+    when(catalog.registerTable(any(TableIdentifier.class), anyString(), anyBoolean()))
+        .thenReturn(table);
+    when(catalog.loadTable(ident)).thenReturn(table);
+    when(table.operations()).thenReturn(ops);
+    when(ops.current()).thenReturn(minimalTableMetadataForStagedCreateTest());
+    when(table.io()).thenReturn(fileIO);
+    when(fileIO.properties()).thenReturn(ImmutableMap.of());
+
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
+
+    RegisterTableRequest request =
+        ImmutableRegisterTableRequest.builder()
+            .name("tbl")
+            .metadataLocation("s3://bucket/warehouse/tbl/metadata/v2.metadata.json")
+            .overwrite(true)
+            .build();
+
+    wrapper.registerTable(Namespace.of("db"), request, false);
+
+    verify(catalog).registerTable(ident, request.metadataLocation(), true);
+    verify(catalog).loadTable(ident);
   }
 
   @Test

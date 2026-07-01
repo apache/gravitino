@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -183,6 +186,12 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       RegisterTableRequest registerTableRequest) {
     LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
 
+    if (hasTableEntityInStore(context, namespace, registerTableRequest.name())) {
+      // Gravitino already tracks this table: preserve table_id and existing role/owner/tag/policy
+      // bindings after the backend registerTable completes.
+      return response;
+    }
+
     // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
@@ -197,6 +206,25 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         GravitinoEnv.getInstance().internalOwnerDispatcher());
 
     return response;
+  }
+
+  private boolean hasTableEntityInStore(
+      IcebergRequestContext context, Namespace namespace, String tableName) {
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    if (entityStore == null) {
+      return false;
+    }
+    try {
+      return entityStore.exists(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake,
+              context.catalogName(),
+              TableIdentifier.of(namespace, tableName),
+              HierarchicalSchemaUtil.schemaSeparator()),
+          Entity.EntityType.TABLE);
+    } catch (IOException ioe) {
+      throw new RuntimeException("io exception when checking table entity existence", ioe);
+    }
   }
 
   private void importTable(String catalogName, Namespace namespace, String tableName) {
