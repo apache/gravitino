@@ -165,11 +165,18 @@ public class UserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String updateUserEnabled(@Param("userId") Long userId, @Param("enabled") boolean enabled) {
+  public String updateUserEnabled(
+      @Param("metalakeId") Long metalakeId,
+      @Param("externalId") String externalId,
+      @Param("enabled") boolean enabled) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET enabled = #{enabled}"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " SET enabled = #{enabled},"
+        + " updated_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE metalake_id = #{metalakeId}"
+        + " AND external_id = #{externalId}"
+        + " AND deleted_at = 0";
   }
 
   public String listUsersByRoleId(@Param("roleId") Long roleId) {

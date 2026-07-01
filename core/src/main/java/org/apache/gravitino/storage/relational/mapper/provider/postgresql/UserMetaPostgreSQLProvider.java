@@ -113,4 +113,18 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
+
+  @Override
+  public String updateUserEnabled(
+      @Param("metalakeId") Long metalakeId,
+      @Param("externalId") String externalId,
+      @Param("enabled") boolean enabled) {
+    return "UPDATE "
+        + USER_TABLE_NAME
+        + " SET enabled = #{enabled},"
+        + " updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE metalake_id = #{metalakeId}"
+        + " AND external_id = #{externalId}"
+        + " AND deleted_at = 0";
+  }
 }

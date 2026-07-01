@@ -352,20 +352,19 @@ public class UserMetaService {
       baseMetricName = "updateUserEnabled")
   public UserEntity updateUserEnabled(String metalakeName, String externalId, boolean enabled) {
     Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-    UserPO oldUserPO = getUserPOByMetalakeIdAndExternalId(metalakeId, externalId);
 
-    SessionUtils.doMultipleWithCommit(
-        () ->
-            SessionUtils.doWithoutCommit(
-                UserMetaMapper.class,
-                mapper -> mapper.updateUserEnabled(oldUserPO.getUserId(), enabled)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                UserMetaMapper.class, mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
+    SessionUtils.doWithCommit(
+        UserMetaMapper.class,
+        mapper -> {
+          Integer updated = mapper.updateUserEnabled(metalakeId, externalId, enabled);
+          if (updated == null || updated == 0) {
+            throw new NoSuchEntityException(
+                NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                Entity.EntityType.USER.name().toLowerCase(),
+                externalId);
+          }
+        });
 
-    UserPO userPO = getUserPOByMetalakeIdAndExternalId(metalakeId, externalId);
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
-    return POConverters.fromUserPO(
-        userPO, rolePOs, AuthorizationUtils.ofUserNamespace(metalakeName));
+    return getUserByExternalId(metalakeName, externalId);
   }
 }

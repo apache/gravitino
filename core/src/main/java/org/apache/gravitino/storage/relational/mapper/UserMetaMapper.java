@@ -105,7 +105,10 @@ public interface UserMetaMapper {
       @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId);
 
   @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "updateUserEnabled")
-  Integer updateUserEnabled(@Param("userId") Long userId, @Param("enabled") boolean enabled);
+  Integer updateUserEnabled(
+      @Param("metalakeId") Long metalakeId,
+      @Param("externalId") String externalId,
+      @Param("enabled") boolean enabled);
 
   /**
    * Single-round-trip auth prefetch for the JCasbin authorize hot path. Returns every version

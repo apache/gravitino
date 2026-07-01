@@ -525,6 +525,16 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testMissingExtEnable() {
+    Assertions.assertThrows(
+        NoSuchUserException.class,
+        () -> accessControlManager.disableUser(METALAKE, "missing-ext-id"));
+    Assertions.assertThrows(
+        NoSuchUserException.class,
+        () -> accessControlManager.enableUser(METALAKE, "missing-ext-id"));
+  }
+
+  @Test
   public void testDupExtId() {
     accessControlManager.addUser(METALAKE, "u1", "dup-ext");
     Assertions.assertThrows(
@@ -545,7 +555,8 @@ public class TestAccessControlManager {
     accessControlManager.addUser(METALAKE, "cache_user", externalId);
     accessControlManager.getUserByExternalId(METALAKE, externalId);
     accessControlManager.disableUser(METALAKE, externalId);
-    Assertions.assertFalse(accessControlManager.getUserByExternalId(METALAKE, externalId).enabled());
+    Assertions.assertFalse(
+        accessControlManager.getUserByExternalId(METALAKE, externalId).enabled());
     accessControlManager.removeUser(METALAKE, "cache_user");
   }
 

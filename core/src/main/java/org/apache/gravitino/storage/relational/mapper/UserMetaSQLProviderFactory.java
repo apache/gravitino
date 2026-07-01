@@ -121,7 +121,9 @@ public class UserMetaSQLProviderFactory {
   }
 
   public static String updateUserEnabled(
-      @Param("userId") Long userId, @Param("enabled") boolean enabled) {
-    return getProvider().updateUserEnabled(userId, enabled);
+      @Param("metalakeId") Long metalakeId,
+      @Param("externalId") String externalId,
+      @Param("enabled") boolean enabled) {
+    return getProvider().updateUserEnabled(metalakeId, externalId, enabled);
   }
 }

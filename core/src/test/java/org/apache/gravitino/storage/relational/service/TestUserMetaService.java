@@ -1282,6 +1282,46 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testMissingExtEnable() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    UserMetaService svc = UserMetaService.getInstance();
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> svc.updateUserEnabled(metalakeName, "missing-ext-id", false));
+  }
+
+  @TestTemplate
+  void testEnabledDb() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    UserMetaService svc = UserMetaService.getInstance();
+    UserEntity user = userWithExtId("u1", "ext-db");
+    svc.insertUser(user, false);
+
+    Assertions.assertTrue(queryEnabledByExtId("ext-db"));
+    long updatedAtBefore = queryUpdatedAtByExtId("ext-db");
+
+    svc.updateUserEnabled(metalakeName, "ext-db", false);
+    Assertions.assertFalse(queryEnabledByExtId("ext-db"));
+    long updatedAtAfterDisable = queryUpdatedAtByExtId("ext-db");
+    Assertions.assertTrue(updatedAtAfterDisable >= updatedAtBefore);
+
+    svc.updateUserEnabled(metalakeName, "ext-db", true);
+    Assertions.assertTrue(queryEnabledByExtId("ext-db"));
+    Assertions.assertTrue(queryUpdatedAtByExtId("ext-db") >= updatedAtAfterDisable);
+  }
+
+  @TestTemplate
+  void testEnabledDeleted() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    UserMetaService svc = UserMetaService.getInstance();
+    UserEntity user = userWithExtId("u1", "ext-del");
+    svc.insertUser(user, false);
+    Assertions.assertTrue(svc.deleteUser(user.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> svc.updateUserEnabled(metalakeName, "ext-del", false));
+  }
+
+  @TestTemplate
   void testDupExtId() throws IOException {
     createAndInsertMakeLake(metalakeName);
     UserMetaService svc = UserMetaService.getInstance();
@@ -1300,6 +1340,40 @@ class TestUserMetaService extends TestJDBCBackend {
         .withEnabled(true)
         .withAuditInfo(AUDIT_INFO)
         .build();
+  }
+
+  private boolean queryEnabledByExtId(String externalId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT enabled FROM user_meta WHERE external_id = '%s' AND deleted_at = 0",
+                    externalId))) {
+      Assertions.assertTrue(rs.next());
+      return rs.getBoolean(1);
+    } catch (SQLException e) {
+      throw new RuntimeException("Query user enabled failed", e);
+    }
+  }
+
+  private long queryUpdatedAtByExtId(String externalId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT updated_at FROM user_meta WHERE external_id = '%s' AND deleted_at = 0",
+                    externalId))) {
+      Assertions.assertTrue(rs.next());
+      return rs.getLong(1);
+    } catch (SQLException e) {
+      throw new RuntimeException("Query user updated_at failed", e);
+    }
   }
 
   private Integer countUsers(Long metalakeId) {
