@@ -190,6 +190,19 @@ The task runtime uses one state model across updater, recommender, and monitor t
 | `FAILED` | Execution failed and the task record contains a sanitized error summary. |
 | `CANCELED` | The request was canceled before completion or the worker observed cancellation. |
 
+`SUCCEEDED`, `FAILED`, and `CANCELED` are terminal states. The allowed transitions are:
+
+```text
+PENDING --> RUNNING --> SUCCEEDED
+   |           |
+   |           +------> FAILED
+   |           |
+   +-----------+------> CANCELED
+```
+
+A task in `PENDING` can move directly to `CANCELED` if it is canceled before a worker picks it up. A
+task in `RUNNING` reaches `CANCELED` only when the worker or provider observes cancellation.
+
 Each task record stores:
 
 | Field | Type | Description |
@@ -203,6 +216,20 @@ Each task record stores:
 | `requestHash` | string | Hash of normalized request payload for audit and troubleshooting. |
 | `result` | object | Module-specific result payload for successful tasks. |
 | `error` | object | Sanitized error code, message, and optional stack summary for failed tasks. |
+
+For a `FAILED` task, the `error` object has a stable shape so clients and automation can branch on it:
+
+```json
+{
+  "code": "INVALID_INPUT",
+  "message": "statisticsPayload and filePath cannot both be set",
+  "stackSummary": ""
+}
+```
+
+`code` is a machine-readable error category, `message` is a sanitized human-readable summary, and
+`stackSummary` is an optional truncated trace that never includes secrets from config files, job
+options, or provider exceptions.
 
 The MVP may use an in-memory task store. The storage API should be pluggable so a later
 implementation can add a DB-backed store without changing REST semantics.
@@ -624,9 +651,23 @@ Returns service health.
 }
 ```
 
+### Service Configuration
+
+The service reads the same `conf/gravitino-optimizer.conf` file as the CLI, plus service-side keys
+that control the HTTP endpoint and the task runtime described in the Reliability section:
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `gravitino.optimizer.server.host` | `0.0.0.0` | Bind address for the Optimizer Service HTTP server. |
+| `gravitino.optimizer.server.port` | `8091` | Listen port for the Optimizer Service HTTP server. |
+| `gravitino.optimizer.server.workerPoolSize` | `4` | Worker threads per module for asynchronous task execution. |
+| `gravitino.optimizer.server.queueCapacity` | `100` | Maximum queued tasks per module before new submissions are rejected. |
+| `gravitino.optimizer.server.taskTimeoutMs` | `600000` | Per-task execution timeout after which the task is marked `FAILED`. |
+| `gravitino.optimizer.server.taskRetentionMs` | `3600000` | How long terminal task records are retained by the in-memory store. |
+
 ### CLI Service Mode
 
-Add optimizer service configuration keys:
+Add optimizer CLI service configuration keys:
 
 | Key | Default | Description |
 | --- | --- | --- |
@@ -751,17 +792,17 @@ The service should provide:
 
 ### Rollout Plan
 
-#### Phase 1: Service Shell and Task Runtime
+#### Phase 1: Service Shell and Shared Runtime
 
 Create the service entry point, REST server, health endpoint, task runtime, in-memory task store, and
 common DTOs. Add unit tests for state transitions, cancellation, serialization, and request listing.
 
-#### Phase 2: Updater Service Mode
+#### Phase 2: Updater APIs and CLI Service Mode
 
 Implement updater REST APIs and CLI service mode for `update-statistics` and `append-metrics`.
 Validate parity with local execution using existing updater tests and new service-mode CLI tests.
 
-#### Phase 3: Recommender Service Mode
+#### Phase 3: Recommender APIs and CLI Service Mode
 
 Implement recommender REST APIs and CLI service mode for `submit-strategy-jobs`. Cover dry-run and
 real submission paths, including returned job IDs from the configured submitter.
@@ -776,7 +817,7 @@ Implement monitor task APIs and synchronous metrics query APIs. Add CLI service 
 Optionally add an asynchronous optimizer task wrapper for `submit-update-stats-job`. The actual Spark
 job submission and status remain owned by the Gravitino job framework.
 
-#### Phase 6: Hardening
+#### Phase 6: Hardening and Documentation
 
 Add persistent task storage, authentication integration, service metrics export, stronger graceful
 shutdown semantics, and optional multi-node deployment support.
@@ -826,7 +867,7 @@ shutdown semantics, and optional multi-node deployment support.
 - [ ] Add tests for monitor validation, partition path handling, evaluation results, and metrics query
       responses.
 
-### Phase 5: Built-In Job Wrapper
+### Phase 5: Built-In Update Stats Job Wrapper
 
 - [ ] Add optional service task API for `submit-update-stats-job` request wrapping.
 - [ ] Keep actual job creation in the existing Gravitino job framework.
