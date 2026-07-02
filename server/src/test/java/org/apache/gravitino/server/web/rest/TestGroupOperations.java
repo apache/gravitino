@@ -22,6 +22,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -124,7 +125,7 @@ public class TestGroupOperations extends BaseOperationsTest {
     GroupAddRequest req = new GroupAddRequest("group1");
     Group group = buildGroup("group1");
 
-    when(manager.addGroup(any(), any())).thenReturn(group);
+    when(manager.addGroup(any(), any(), nullable(String.class))).thenReturn(group);
 
     // Mock metalake with in-use property
     BaseMetalake metalake = mock(BaseMetalake.class);
@@ -181,7 +182,9 @@ public class TestGroupOperations extends BaseOperationsTest {
     when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
     when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
     when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
-    doThrow(new GroupAlreadyExistsException("mock error")).when(manager).addGroup(any(), any());
+    doThrow(new GroupAlreadyExistsException("mock error"))
+        .when(manager)
+        .addGroup(any(), any(), nullable(String.class));
     Response resp2 =
         target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -196,7 +199,9 @@ public class TestGroupOperations extends BaseOperationsTest {
         GroupAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
 
     // Test to throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).addGroup(any(), any());
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .addGroup(any(), any(), nullable(String.class));
     Response resp3 =
         target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)

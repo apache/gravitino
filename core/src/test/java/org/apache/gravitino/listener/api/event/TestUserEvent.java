@@ -91,7 +91,7 @@ public class TestUserEvent {
 
   @Test
   void testAddUserPreEvent() {
-    dispatcher.addUser(METALAKE, otherUserName);
+    dispatcher.addUser(METALAKE, otherUserName, null, true);
 
     // validate pre-event
     PreEvent preEvent = dummyEventListener.popPreEvent();
@@ -107,7 +107,7 @@ public class TestUserEvent {
 
   @Test
   void testAddUserEvent() {
-    dispatcher.addUser(METALAKE, userName);
+    dispatcher.addUser(METALAKE, userName, null, true);
 
     // validate post-event
     Event event = dummyEventListener.popPostEvent();
@@ -125,7 +125,8 @@ public class TestUserEvent {
   @Test
   void testAddUserFailureEvent() {
     Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class, () -> failureDispatcher.addUser(METALAKE, userName));
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.addUser(METALAKE, userName, null, true));
 
     // validate post-event
     Event event = dummyEventListener.popPostEvent();
@@ -474,8 +475,8 @@ public class TestUserEvent {
 
   private AccessControlEventDispatcher mockUserDispatcher() {
     AccessControlEventDispatcher dispatcher = mock(AccessControlEventDispatcher.class);
-    when(dispatcher.addUser(METALAKE, userName)).thenReturn(user);
-    when(dispatcher.addUser(METALAKE, otherUserName)).thenReturn(otherUser);
+    when(dispatcher.addUser(METALAKE, userName, null, true)).thenReturn(user);
+    when(dispatcher.addUser(METALAKE, otherUserName, null, true)).thenReturn(otherUser);
 
     when(dispatcher.removeUser(METALAKE, userName)).thenReturn(true);
     when(dispatcher.removeUser(METALAKE, inExistUserName)).thenReturn(false);

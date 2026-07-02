@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.authorization.Group;
@@ -32,6 +33,10 @@ public class GroupDTO implements Group {
 
   @JsonProperty("name")
   private String name;
+
+  @Nullable
+  @JsonProperty("externalId")
+  private String externalId;
 
   @JsonProperty("audit")
   private AuditDTO audit;
@@ -46,11 +51,13 @@ public class GroupDTO implements Group {
    * Creates a new instance of GroupDTO.
    *
    * @param name The name of the Group DTO.
+   * @param externalId The external id of the Group DTO.
    * @param roles The roles of the Group DTO.
    * @param audit The audit information of the Group DTO.
    */
-  protected GroupDTO(String name, List<String> roles, AuditDTO audit) {
+  protected GroupDTO(String name, String externalId, List<String> roles, AuditDTO audit) {
     this.name = name;
+    this.externalId = externalId;
     this.audit = audit;
     this.roles = roles;
   }
@@ -61,6 +68,11 @@ public class GroupDTO implements Group {
   @Override
   public String name() {
     return name;
+  }
+
+  @Override
+  public String externalId() {
+    return externalId;
   }
 
   /**
@@ -100,6 +112,9 @@ public class GroupDTO implements Group {
     /** The name of the group. */
     protected String name;
 
+    /** The external id of the group. */
+    protected String externalId;
+
     /** The roles of the group. */
     protected List<String> roles = Collections.emptyList();
 
@@ -114,6 +129,17 @@ public class GroupDTO implements Group {
      */
     public S withName(String name) {
       this.name = name;
+      return (S) this;
+    }
+
+    /**
+     * Sets the external id of the group.
+     *
+     * @param externalId The external id of the group.
+     * @return The builder instance.
+     */
+    public S withExternalId(String externalId) {
+      this.externalId = externalId;
       return (S) this;
     }
 
@@ -151,7 +177,7 @@ public class GroupDTO implements Group {
     public GroupDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new GroupDTO(name, roles, audit);
+      return new GroupDTO(name, externalId, roles, audit);
     }
   }
 }

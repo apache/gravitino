@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -32,6 +33,14 @@ public interface Group extends Auditable {
    * @return The name of the group.
    */
   String name();
+
+  /**
+   * The external identifier assigned by an upstream system, or null if not set.
+   *
+   * @return The external identifier, or null if not set.
+   */
+  @Nullable
+  String externalId();
 
   /**
    * The roles of the group.

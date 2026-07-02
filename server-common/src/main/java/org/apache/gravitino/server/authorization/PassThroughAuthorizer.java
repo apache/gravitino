@@ -89,7 +89,7 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
       try {
         dispatcher.getUser(metalake, PrincipalUtils.getCurrentUserName());
       } catch (NoSuchUserException e) {
-        dispatcher.addUser(metalake, PrincipalUtils.getCurrentUserName());
+        dispatcher.addUser(metalake, PrincipalUtils.getCurrentUserName(), null, true);
       }
     }
     return true;

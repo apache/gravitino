@@ -320,4 +320,61 @@ public class UserMetaService {
 
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
+
+  private UserPO getUserPOByMetalakeNameAndExternalId(String metalakeName, String externalId) {
+    UserPO userPO =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId));
+
+    if (userPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.USER.name().toLowerCase(),
+          externalId);
+    }
+    return userPO;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getUserByExternalId")
+  public UserEntity getUserByExternalId(String metalakeName, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
+    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    return POConverters.fromUserPO(
+        userPO, rolePOs, AuthorizationUtils.ofUserNamespace(metalakeName));
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateUserEnabled")
+  public UserEntity updateUserEnabled(String metalakeName, String externalId, boolean enabled) {
+    AuthorizationUtils.checkExternalId(externalId);
+    SessionUtils.doWithCommit(
+        UserMetaMapper.class,
+        mapper -> {
+          Integer updated = mapper.updateUserEnabled(metalakeName, externalId, enabled);
+          if (updated == null || updated == 0) {
+            throw new NoSuchEntityException(
+                NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                Entity.EntityType.USER.name().toLowerCase(),
+                externalId);
+          }
+        });
+
+    return getUserByExternalId(metalakeName, externalId);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteUserByExternalId")
+  public NameIdentifier deleteUserByExternalId(String metalakeName, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
+    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
+    NameIdentifier ident = AuthorizationUtils.ofUser(metalakeName, userPO.getUserName());
+    deleteUser(ident);
+    return ident;
+  }
 }

@@ -40,6 +40,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsExternalIdOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CacheFactory;
@@ -65,7 +66,10 @@ import org.slf4j.LoggerFactory;
  * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
  */
 public class RelationalEntityStore
-    implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {
+    implements EntityStore,
+        SupportsRelationOperations,
+        SupportsExternalIdOperations,
+        SupportsEntityChangeLog {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -179,6 +183,36 @@ public class RelationalEntityStore
           cache.put(entity);
           return entity;
         });
+  }
+
+  @Override
+  public SupportsExternalIdOperations externalIdOperations() {
+    return this;
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getByExternalId(
+      Namespace namespace, Entity.EntityType entityType, Class<E> type, String externalId)
+      throws NoSuchEntityException, IOException {
+    return backend.getByExternalId(namespace, entityType, externalId);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateEnabledByExternalId(
+      Namespace namespace, Entity.EntityType entityType, String externalId, boolean enabled)
+      throws NoSuchEntityException, IOException {
+    E updatedEntity = backend.updateEnabledByExternalId(namespace, entityType, externalId, enabled);
+    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+    return updatedEntity;
+  }
+
+  @Override
+  public boolean deleteByExternalId(
+      Namespace namespace, Entity.EntityType entityType, String externalId)
+      throws NoSuchEntityException, IOException {
+    NameIdentifier ident = backend.deleteByExternalId(namespace, entityType, externalId);
+    cache.invalidate(ident, entityType);
+    return true;
   }
 
   @Override
