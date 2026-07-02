@@ -38,7 +38,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -58,6 +57,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.function.Executable;
 
 class TestGroupMetaService extends TestJDBCBackend {
 
@@ -1066,38 +1066,43 @@ class TestGroupMetaService extends TestJDBCBackend {
 
   @TestTemplate
   void testGroupExtId() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    GroupMetaService svc = GroupMetaService.getInstance();
+    GroupMetaService svc = groupMetaService();
     svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
     GroupEntity found = svc.getGroupByExternalId(metalakeName, "ext-1");
     Assertions.assertEquals("g1", found.name());
     Assertions.assertEquals("ext-1", found.externalId());
-    Assertions.assertThrows(
+    assertThrowsExt(
         NoSuchEntityException.class,
         () -> svc.getGroupByExternalId(metalakeName, "missing-ext-id"));
   }
 
   @TestTemplate
   void testExtDup() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    GroupMetaService svc = GroupMetaService.getInstance();
+    GroupMetaService svc = groupMetaService();
     svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
-    Assertions.assertThrows(
+    assertThrowsExt(
         EntityAlreadyExistsException.class,
         () -> svc.insertGroup(groupWithExtId("g2", "ext-1"), false));
   }
 
   @TestTemplate
   void testGroupExtDel() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    GroupMetaService svc = GroupMetaService.getInstance();
+    GroupMetaService svc = groupMetaService();
     svc.insertGroup(groupWithExtId("g1", "ext-del-by"), false);
-    NameIdentifier ident = svc.deleteGroupByExternalId(metalakeName, "ext-del-by");
-    Assertions.assertEquals("g1", ident.name());
-    Assertions.assertThrows(
+    Assertions.assertEquals("g1", svc.deleteGroupByExternalId(metalakeName, "ext-del-by").name());
+    assertThrowsExt(
         NoSuchEntityException.class, () -> svc.getGroupByExternalId(metalakeName, "ext-del-by"));
-    Assertions.assertThrows(
+    assertThrowsExt(
         NoSuchEntityException.class, () -> svc.deleteGroupByExternalId(metalakeName, "ext-del-by"));
+  }
+
+  private GroupMetaService groupMetaService() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    return GroupMetaService.getInstance();
+  }
+
+  private void assertThrowsExt(Class<? extends Exception> type, Executable executable) {
+    Assertions.assertThrows(type, executable);
   }
 
   private GroupEntity groupWithExtId(String name, String externalId) {
