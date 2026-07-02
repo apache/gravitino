@@ -230,3 +230,121 @@ def load_model_tools(mcp: FastMCP):
         return await client.as_model_operation().load_model_version_by_alias(
             catalog_name, schema_name, model_name, alias
         )
+
+    @mcp.tool(tags={"model"})
+    # pylint: disable=too-many-positional-arguments
+    async def register_model(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        """
+        Register a new model within a schema.
+
+        Authorization is enforced by Gravitino: a principal without the
+        required grant receives an authorization denial.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            name (str): Name of the model to register.
+            comment (str): Human-readable description.
+            properties (dict): Model configuration properties.
+
+        Returns:
+            str: JSON-formatted string containing the registered model.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_model_operation().register_model(
+            catalog_name, schema_name, name, comment, properties
+        )
+
+    @mcp.tool(tags={"model"})
+    async def delete_model(
+        ctx: Context, catalog_name: str, schema_name: str, model_name: str
+    ) -> str:
+        """
+        Delete a model by its name.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            model_name (str): Name of the model to delete.
+
+        Returns:
+            str: JSON-formatted string indicating whether the model was deleted.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_model_operation().delete_model(
+            catalog_name, schema_name, model_name
+        )
+
+    # pylint: disable=too-many-positional-arguments
+    @mcp.tool(tags={"model"})
+    async def link_model_version(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        uri: str,
+        aliases: list,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        """
+        Link a new version to an existing model.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            model_name (str): Name of the model.
+            uri (str): URI of the model version artifact.
+            aliases (list): List of string aliases for this version.
+            comment (str): Human-readable description.
+            properties (dict): Model version configuration properties.
+
+        Returns:
+            str: JSON-formatted string containing the success response.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_model_operation().link_model_version(
+            catalog_name,
+            schema_name,
+            model_name,
+            uri,
+            aliases,
+            comment,
+            properties,
+        )
+
+    @mcp.tool(tags={"model"})
+    async def delete_model_version(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        version: int,
+    ) -> str:
+        """
+        Delete a specific version of a model.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            model_name (str): Name of the model.
+            version (int): Version number to delete.
+
+        Returns:
+            str: JSON-formatted string indicating whether the version was deleted.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_model_operation().delete_model_version(
+            catalog_name, schema_name, model_name, version
+        )

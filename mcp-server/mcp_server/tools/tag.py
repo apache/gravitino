@@ -120,7 +120,8 @@ def load_tag_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().list_of_tags()
 
-    # Disable the alter_tag tool by default as it can be destructive.
+    # alter_tag is destructive; it is exposed and access is enforced by Gravitino
+    # authorization rather than by hiding the tool.
     @mcp.tool(tags={"tag"})
     async def alter_tag(ctx: Context, name: str, updates: list) -> str:
         """
@@ -173,7 +174,8 @@ def load_tag_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().alter_tag(name, updates)
 
-    # Disable the delete_tag tool by default as it can be destructive.
+    # delete_tag is destructive; it is exposed and access is enforced by Gravitino
+    # authorization rather than by hiding the tool.
     @mcp.tool(tags={"tag"})
     async def delete_tag(ctx: Context, name: str) -> None:
         """
@@ -364,8 +366,3 @@ def load_tag_tool(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().list_metadata_by_tag(tag_name)
-
-    mcp.disable(
-        names={"create_tag", "alter_tag", "delete_tag"},
-        components={"tool"},
-    )

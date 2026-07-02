@@ -16,7 +16,10 @@
 # under the License.
 
 from mcp_server.client.fileset_operation import FilesetOperation
-from mcp_server.client.plain.utils import encode_path_segment
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    extract_content_from_response,
+)
 
 
 class PlainRESTClientFilesetOperation(FilesetOperation):
@@ -32,7 +35,7 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
             f"/catalogs/{encode_path_segment(catalog_name)}"
             f"/schemas/{encode_path_segment(schema_name)}/filesets"
         )
-        return response.json().get("identifiers", [])
+        return extract_content_from_response(response, "identifiers", [])
 
     async def load_fileset(
         self, catalog_name: str, schema_name: str, fileset_name: str
@@ -43,7 +46,7 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
             f"/schemas/{encode_path_segment(schema_name)}"
             f"/filesets/{encode_path_segment(fileset_name)}"
         )
-        return response.json().get("fileset", {})
+        return extract_content_from_response(response, "fileset", {})
 
     # pylint: disable=too-many-positional-arguments
     async def list_files_in_fileset(
@@ -61,4 +64,55 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
             f"/filesets/{encode_path_segment(fileset_name)}/files",
             params={"sub_path": sub_path, "location_name": location_name},
         )
-        return response.json().get("files", [])
+        return extract_content_from_response(response, "files", [])
+
+    async def create_fileset(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        fileset_type: str,
+        storage_location: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/filesets",
+            json={
+                "name": name,
+                "type": fileset_type,
+                "storageLocation": storage_location,
+                "comment": comment,
+                "properties": properties,
+            },
+        )
+        return extract_content_from_response(response, "fileset", {})
+
+    async def alter_fileset(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        fileset_name: str,
+        updates: list,
+    ) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/filesets/{encode_path_segment(fileset_name)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "fileset", {})
+
+    async def drop_fileset(
+        self, catalog_name: str, schema_name: str, fileset_name: str
+    ) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/filesets/{encode_path_segment(fileset_name)}"
+        )
+        return extract_content_from_response(response, "dropped", False)

@@ -32,3 +32,23 @@ class CatalogOperation(ABC):
             str: JSON-formatted string containing catalog information.
         """
         pass
+
+    @abstractmethod
+    # pylint: disable=too-many-positional-arguments
+    async def create_catalog(
+        self,
+        name: str,
+        catalog_type: str,
+        provider: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def alter_catalog(self, catalog_name: str, updates: list) -> str:
+        pass
+
+    @abstractmethod
+    async def drop_catalog(self, catalog_name: str) -> str:
+        pass

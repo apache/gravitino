@@ -75,3 +75,61 @@ class TestFilesetTool(unittest.TestCase):
                 )
 
         asyncio.run(_test_list_files_in_fileset(self.mcp))
+
+    def test_create_fileset(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_fileset",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "name": "fs",
+                        "fileset_type": "managed",
+                        "storage_location": "file:/tmp/fs",
+                        "comment": "c",
+                        "properties": {"k": "v"},
+                    },
+                )
+                self.assertEqual(
+                    "mock_fileset_created: cat.sch.fs", result.content[0].text
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_alter_fileset(self):
+        async def _test(mcp_server):
+            updates = [{"@type": "rename", "newName": "fs2"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_fileset",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "fileset_name": "fs",
+                        "updates": updates,
+                    },
+                )
+                self.assertEqual(
+                    f"mock_fileset_altered: cat.sch.fs with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_drop_fileset(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "drop_fileset",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "fileset_name": "fs",
+                    },
+                )
+                self.assertEqual(
+                    "mock_fileset_dropped: cat.sch.fs", result.content[0].text
+                )
+
+        asyncio.run(_test(self.mcp))

@@ -50,3 +50,53 @@ class PlainRESTClientTableOperation(TableOperation):
             f"/tables/{encode_path_segment(table_name)}"
         )
         return extract_content_from_response(response, "table", {})
+
+    # pylint: disable=too-many-positional-arguments
+    async def create_table(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        columns: list,
+        properties: dict,
+    ) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/tables",
+            json={
+                "name": name,
+                "comment": comment,
+                "columns": columns,
+                "properties": properties,
+            },
+        )
+        return extract_content_from_response(response, "table", {})
+
+    async def alter_table(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        updates: list,
+    ) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/tables/{encode_path_segment(table_name)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "table", {})
+
+    async def drop_table(
+        self, catalog_name: str, schema_name: str, table_name: str
+    ) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/tables/{encode_path_segment(table_name)}"
+        )
+        return extract_content_from_response(response, "dropped", False)
