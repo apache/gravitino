@@ -65,6 +65,18 @@ class OAuthProviderFactory {
       }
 
       const config = await response.json()
+      const authenticators = config['gravitino.authenticators'] || []
+
+      // Authenticator logic
+      if (authenticators.includes('org.apache.gravitino.idp.auth.BasicAuthenticator')) {
+        // If BasicAuthenticator is present, set provider type to 'basic' and do not initialize any OAuth provider
+        this.providerType = 'basic'
+        this.currentProvider = null
+
+        return null
+      }
+
+      // Oauth provider type detection logic
       let providerType = 'default'
       const provider = config['gravitino.authenticator.oauth.provider']
 
@@ -78,6 +90,7 @@ class OAuthProviderFactory {
       }
 
       const ProviderClass = PROVIDER_REGISTRY[providerType]
+      this.providerType = providerType
       this.currentProvider = new ProviderClass()
       await this.currentProvider.initialize(config)
 
@@ -95,6 +108,11 @@ class OAuthProviderFactory {
   async getAccessToken() {
     const provider = await this.getProvider()
 
+    // If provider is null (e.g., BasicAuthenticator), return access token from localStorage
+    if (!provider) {
+      return localStorage.getItem('accessToken')
+    }
+
     return await provider.getAccessToken()
   }
 
@@ -103,9 +121,9 @@ class OAuthProviderFactory {
    * @returns {Promise<string>}
    */
   async getProviderType() {
-    const provider = await this.getProvider()
+    await this.getProvider()
 
-    return provider.getType()
+    return this.providerType
   }
 }
 

@@ -93,6 +93,16 @@ const AuthProvider = ({ children }) => {
       if (authType === 'simple') {
         dispatch(initialVersion())
         goToMetalakeListPage()
+      } else if (authType === 'basic') {
+        const tokenToUse = localStorage.getItem('accessToken')
+
+        if (tokenToUse) {
+          dispatch(setAuthToken(tokenToUse))
+          dispatch(initialVersion())
+          goToMetalakeListPage()
+        } else {
+          router.push('/login')
+        }
       } else if (authType === 'oauth') {
         const tokenToUse = await oauthProviderFactory.getAccessToken()
 

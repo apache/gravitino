@@ -41,14 +41,21 @@ import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class AuthenticationFilter implements Filter {
-
-  private final List<Authenticator> filterAuthenticators;
-
   /**
    * The matcher used to identify health check paths that bypass authentication. Subclasses may
    * replace this with a server-specific matcher (e.g. {@code IcebergHealthCheckPathMatcher}).
    */
   protected HealthCheckPathMatcher healthCheckMatcher = new HealthCheckPathMatcher();
+
+  private final List<Authenticator> filterAuthenticators;
+
+  private static final String WEB_LOGIN_HEADER = "X-Gravitino-Web-Login";
+
+  // Skip HTTP challenge for Web UI login requests to avoid the browser's native Basic auth popup.
+  private boolean isWebLoginRequest(ServletRequest request) {
+    return request instanceof HttpServletRequest
+        && "true".equalsIgnoreCase(((HttpServletRequest) request).getHeader(WEB_LOGIN_HEADER));
+  }
 
   public AuthenticationFilter() {
     filterAuthenticators = null;
@@ -108,7 +115,7 @@ public class AuthenticationFilter implements Filter {
           });
     } catch (UnauthorizedException ue) {
       HttpServletResponse resp = (HttpServletResponse) response;
-      if (!ue.getChallenges().isEmpty()) {
+      if (!isWebLoginRequest(request) && !ue.getChallenges().isEmpty()) {
         // For some authentication, HTTP response can provide some challenge information
         // to let client to create correct authenticated request.
         // Refer to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate

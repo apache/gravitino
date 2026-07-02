@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, loginApi, basicLoginApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
@@ -91,6 +91,36 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
   return { token: access_token, expired: expires_in }
 })
 
+export const basicLoginAction = createAsyncThunk(
+  'auth/basicLoginAction',
+  async ({ username, password, router }, { dispatch }) => {
+    const basicToken = `Basic ${btoa(`${username}:${password}`)}`
+
+    const [err, res] = await to(basicLoginApi(basicToken))
+
+    if (err || !res) {
+      const message =
+        err?.response?.status === 401 ? 'Invalid username or password' : err?.response?.data?.err || err?.message
+
+      toast.error(message, {
+        id: `global_error_message_status_${err?.response?.status}`
+      })
+
+      throw new Error(message)
+    }
+
+    localStorage.setItem('accessToken', basicToken)
+    localStorage.setItem('isIdle', false)
+    localStorage.removeItem('expiredIn') // Basic auth does not have an expiration time
+
+    dispatch(setAuthToken(basicToken))
+    await dispatch(initialVersion())
+    router.push('/metalakes')
+
+    return { token: basicToken, expired: '' }
+  }
+)
+
 export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
   // Clear provider authentication data first
   try {
@@ -145,10 +175,10 @@ export const authSlice = createSlice({
   name: 'auth',
   initialState: {
     oauthUrl: null,
-    authType: null,
-    authToken: null,
-    authParams: null,
-    expiredIn: null,
+    authType: typeof window !== 'undefined' ? localStorage.getItem('authType') : null,
+    authToken: typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null,
+    authParams: typeof window !== 'undefined' ? localStorage.getItem('authParams') : null,
+    expiredIn: typeof window !== 'undefined' ? localStorage.getItem('expiredIn') : null,
     intervalId: null
   },
   reducers: {
@@ -173,6 +203,8 @@ export const authSlice = createSlice({
   },
   extraReducers: builder => {
     builder.addCase(getAuthConfigs.fulfilled, (state, action) => {
+      localStorage.setItem('authType', action.payload.authType)
+
       state.oauthUrl = action.payload.oauthUrl
       state.authType = action.payload.authType
     })
