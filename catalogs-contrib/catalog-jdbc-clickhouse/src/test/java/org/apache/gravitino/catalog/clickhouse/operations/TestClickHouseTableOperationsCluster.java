@@ -646,7 +646,10 @@ class TestClickHouseTableOperationsCluster {
                 null));
   }
 
-  /** Index with GRANULARITY that parses to 0 (e.g. "00") should be rejected, regardless of formatting. */
+  /**
+   * Index with GRANULARITY that parses to 0 (e.g. "00") should be rejected, regardless of
+   * formatting.
+   */
   @Test
   void testIndexZeroAfterParsingGranularityRejected() {
     JdbcColumn[] columns =

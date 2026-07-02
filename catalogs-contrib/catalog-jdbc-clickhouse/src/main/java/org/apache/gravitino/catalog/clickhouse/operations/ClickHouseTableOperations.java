@@ -531,6 +531,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static String resolveGranularity(Index index) {
     String granularity =
         index.properties().getOrDefault(INDEX_GRANULARITY_KEY, DEFAULT_INDEX_GRANULARITY);
+    Preconditions.checkArgument(
+        granularity != null && !granularity.isBlank(),
+        "Index %s granularity must not be null or blank",
+        index.name());
     try {
       long value = Long.parseLong(granularity);
       Preconditions.checkArgument(

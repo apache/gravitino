@@ -1216,8 +1216,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         sql.contains("GRANULARITY 5"),
         "Leading-zero granularity should be normalized, actual SQL: " + sql);
     Assertions.assertFalse(
-        sql.contains("GRANULARITY 005"),
-        "Raw leading-zero granularity must not appear in DDL");
+        sql.contains("GRANULARITY 005"), "Raw leading-zero granularity must not appear in DDL");
   }
 
   @Test
