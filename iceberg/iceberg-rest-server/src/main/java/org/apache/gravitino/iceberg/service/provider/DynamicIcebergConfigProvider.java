@@ -23,8 +23,9 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -38,14 +39,17 @@ import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.credential.JdbcCredential;
-import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.credential.CatalogCredentialContext;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * This provider proxy Gravitino lakehouse-iceberg catalogs.
@@ -104,36 +108,48 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    // Sensitive credentials (e.g. jdbc-password) are marked hidden in PropertiesMetadata and
-    // filtered out of catalog.properties(). We need two different strategies to recover them:
+    // Sensitive credentials are marked hidden in PropertiesMetadata and filtered out of
+    // catalog.properties(). We need two different strategies to recover them:
     //
     // Auxiliary mode: the catalog is a BaseCatalog running in the same JVM as the Gravitino
     // server. Call propertiesWithCredentialProviders() which returns the raw entity properties
-    // including all hidden fields.
+    // including all hidden fields, then generate credentials locally.
     //
     // Standalone mode: the catalog is a client-side object obtained via the Gravitino REST API.
-    // Call getCredentials() to retrieve vended credentials, then inject any JdbcCredential
-    // fields into the properties map so the JDBC backend can connect.
+    // Call supportsCredentials().getCredentials() to retrieve vended credentials.
     Map<String, String> catalogProperties;
     if (catalog instanceof BaseCatalog) {
       catalogProperties = ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders();
     } else {
       catalogProperties = new HashMap<>(catalog.properties());
-      if (catalog instanceof SupportsCredentials) {
-        Arrays.stream(((SupportsCredentials) catalog).getCredentials())
-            .filter(c -> c instanceof JdbcCredential)
-            .map(c -> (JdbcCredential) c)
-            .findFirst()
-            .ifPresent(
-                jdbc -> {
-                  catalogProperties.putIfAbsent(
-                      IcebergConstants.GRAVITINO_JDBC_USER, jdbc.jdbcUser());
-                  catalogProperties.putIfAbsent(
-                      IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
-                });
-      }
     }
+    CredentialPropertyUtils.applyIcebergCredentials(
+        getCatalogCredentials(catalog, catalogProperties), catalogProperties);
     return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));
+  }
+
+  private static Credential[] getCatalogCredentials(
+      Catalog catalog, Map<String, String> catalogProperties) {
+    if (catalog instanceof BaseCatalog) {
+      return getInternalCatalogCredentials((BaseCatalog<?>) catalog, catalogProperties);
+    }
+
+    return CredentialPropertyUtils.getCredentials(catalog);
+  }
+
+  private static Credential[] getInternalCatalogCredentials(
+      BaseCatalog<?> catalog, Map<String, String> catalogProperties) {
+    List<Credential> credentials = new ArrayList<>();
+    CatalogCredentialContext context =
+        new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
+    for (String credentialType :
+        CredentialUtils.getCredentialProvidersByOrder(() -> catalogProperties)) {
+      catalog
+          .catalogCredentialManager()
+          .getCredential(credentialType, context)
+          .ifPresent(credentials::add);
+    }
+    return credentials.toArray(new Credential[0]);
   }
 
   /**

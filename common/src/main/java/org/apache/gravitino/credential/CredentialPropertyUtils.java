@@ -122,7 +122,12 @@ public class CredentialPropertyUtils {
    */
   public static Credential[] getCredentials(Catalog catalog) {
     try {
-      return catalog.supportsCredentials().getCredentials();
+      SupportsCredentials supportsCredentials = catalog.supportsCredentials();
+      if (supportsCredentials == null) {
+        LOG.debug("Catalog returns null SupportsCredentials, skipping credential injection");
+        return new Credential[0];
+      }
+      return supportsCredentials.getCredentials();
     } catch (UnsupportedOperationException e) {
       LOG.debug("Catalog does not support credential vending, skipping injection", e);
       return new Credential[0];
