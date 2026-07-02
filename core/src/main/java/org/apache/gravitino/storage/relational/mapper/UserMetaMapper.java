@@ -110,12 +110,6 @@ public interface UserMetaMapper {
       @Param("externalId") String externalId,
       @Param("enabled") boolean enabled);
 
-  @UpdateProvider(
-      type = UserMetaSQLProviderFactory.class,
-      method = "softDeleteUserMetaByMetalakeNameAndExternalId")
-  Integer softDeleteUserMetaByMetalakeNameAndExternalId(
-      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId);
-
   /**
    * Single-round-trip auth prefetch for the JCasbin authorize hot path. Returns every version
    * sentinel the request needs:

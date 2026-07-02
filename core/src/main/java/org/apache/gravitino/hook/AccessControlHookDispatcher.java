@@ -138,6 +138,12 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public boolean removeGroupByExternalId(String metalake, String externalId)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    return dispatcher.removeGroupByExternalId(metalake, externalId);
+  }
+
+  @Override
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
     return dispatcher.getGroup(metalake, group);

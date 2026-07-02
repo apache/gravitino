@@ -53,6 +53,7 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -206,6 +207,15 @@ public class RelationalEntityStore
     NameIdentifier ident =
         UserMetaService.getInstance().deleteUserByExternalId(userNamespace.level(0), externalId);
     cache.invalidate(ident, Entity.EntityType.USER);
+    return true;
+  }
+
+  @Override
+  public boolean deleteGroupByExternalId(Namespace groupNamespace, String externalId)
+      throws NoSuchEntityException, IOException {
+    NameIdentifier ident =
+        GroupMetaService.getInstance().deleteGroupByExternalId(groupNamespace.level(0), externalId);
+    cache.invalidate(ident, Entity.EntityType.GROUP);
     return true;
   }
 

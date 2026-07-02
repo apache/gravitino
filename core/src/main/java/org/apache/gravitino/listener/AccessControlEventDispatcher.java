@@ -295,6 +295,13 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public boolean removeGroupByExternalId(String metalake, String externalId)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    return dispatcher.removeGroupByExternalId(metalake, externalId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();

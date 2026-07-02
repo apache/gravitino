@@ -134,17 +134,4 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " AND external_id = #{externalId}"
         + " AND deleted_at = 0";
   }
-
-  @Override
-  public String softDeleteUserMetaByMetalakeNameAndExternalId(
-      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
-    return "UPDATE "
-        + USER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE metalake_id = (SELECT metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND external_id = #{externalId}"
-        + " AND deleted_at = 0";
-  }
 }

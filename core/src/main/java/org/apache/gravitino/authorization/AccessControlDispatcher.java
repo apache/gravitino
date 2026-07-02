@@ -198,6 +198,19 @@ public interface AccessControlDispatcher {
   boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException;
 
   /**
+   * Removes a Group by external identifier.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param externalId The external identifier of the Group.
+   * @return True if the Group was removed, false otherwise.
+   * @throws NoSuchGroupException If the Group with the given external id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Group encounters storage issues.
+   */
+  boolean removeGroupByExternalId(String metalake, String externalId)
+      throws NoSuchGroupException, NoSuchMetalakeException;
+
+  /**
    * Gets a Group.
    *
    * @param metalake The Metalake of the Group.

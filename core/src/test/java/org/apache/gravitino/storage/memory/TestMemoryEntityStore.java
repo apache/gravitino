@@ -207,6 +207,14 @@ public class TestMemoryEntityStore {
     }
 
     @Override
+    public boolean deleteGroupByExternalId(Namespace groupNamespace, String externalId)
+        throws NoSuchEntityException, IOException {
+      GroupEntity group =
+          getByExternalId(groupNamespace, EntityType.GROUP, GroupEntity.class, externalId);
+      return delete(group.nameIdentifier(), EntityType.GROUP);
+    }
+
+    @Override
     public <E extends Entity & HasIdentifier> List<E> batchGet(
         List<NameIdentifier> idents, EntityType entityType, Class<E> e) {
       return idents.stream().map(ident -> (E) entityMap.get(ident)).toList();

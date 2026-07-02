@@ -322,7 +322,6 @@ public class UserMetaService {
   }
 
   private UserPO getUserPOByMetalakeNameAndExternalId(String metalakeName, String externalId) {
-    AuthorizationUtils.checkExternalId(externalId);
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
@@ -341,6 +340,7 @@ public class UserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getUserByExternalId")
   public UserEntity getUserByExternalId(String metalakeName, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
     UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
     return POConverters.fromUserPO(
@@ -371,34 +371,10 @@ public class UserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteUserByExternalId")
   public NameIdentifier deleteUserByExternalId(String metalakeName, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
     UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
     NameIdentifier ident = AuthorizationUtils.ofUser(metalakeName, userPO.getUserName());
-    Long userId = userPO.getUserId();
-
-    SessionUtils.doMultipleWithCommit(
-        () ->
-            SessionUtils.doWithoutCommit(
-                UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByOwnerIdAndType(
-                        userId, Entity.EntityType.USER.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                UserMetaMapper.class,
-                mapper -> {
-                  Integer updated =
-                      mapper.softDeleteUserMetaByMetalakeNameAndExternalId(
-                          metalakeName, externalId);
-                  if (updated == null || updated == 0) {
-                    throw new NoSuchEntityException(
-                        NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-                        Entity.EntityType.USER.name().toLowerCase(),
-                        externalId);
-                  }
-                }));
+    deleteUser(ident);
     return ident;
   }
 }

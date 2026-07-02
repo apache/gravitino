@@ -45,20 +45,6 @@ public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteUserMetaByMetalakeNameAndExternalId(
-      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
-    return "UPDATE "
-        + USER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = (SELECT metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND external_id = #{externalId}"
-        + " AND deleted_at = 0";
-  }
-
-  @Override
   public String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"

@@ -256,6 +256,26 @@ class UserGroupManager {
     }
   }
 
+  boolean removeGroupByExternalId(String metalake, String externalId) throws NoSuchGroupException {
+    AuthorizationUtils.checkExternalId(externalId);
+    try {
+      return store.deleteGroupByExternalId(
+          AuthorizationUtils.ofGroupNamespace(metalake), externalId);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "Group with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchGroupException(
+          AuthorizationUtils.GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Removing group with external id {} in the metalake {} failed due to storage issues",
+          externalId,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
   Group getGroup(String metalake, String group) {
     try {
       return store.get(

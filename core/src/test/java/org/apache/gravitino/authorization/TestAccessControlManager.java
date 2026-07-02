@@ -572,6 +572,21 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testGroupExtDel() {
+    String externalId = "ext-remove-group";
+    accessControlManager.addGroup(METALAKE, "remove_group", externalId);
+    Assertions.assertTrue(accessControlManager.removeGroupByExternalId(METALAKE, externalId));
+    Assertions.assertThrows(
+        NoSuchGroupException.class,
+        () -> accessControlManager.getGroupByExternalId(METALAKE, externalId));
+    Assertions.assertThrows(
+        NoSuchGroupException.class, () -> accessControlManager.getGroup(METALAKE, "remove_group"));
+    Assertions.assertThrows(
+        NoSuchGroupException.class,
+        () -> accessControlManager.removeGroupByExternalId(METALAKE, "missing-ext-id"));
+  }
+
+  @Test
   public void testExtCache() {
     String externalId = "ext-cache-user";
     accessControlManager.addUser(METALAKE, "cache_user", externalId, true);

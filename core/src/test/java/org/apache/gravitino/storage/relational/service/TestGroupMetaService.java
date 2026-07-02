@@ -38,6 +38,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -1084,6 +1085,19 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,
         () -> svc.insertGroup(groupWithExtId("g2", "ext-1"), false));
+  }
+
+  @TestTemplate
+  void testGroupExtDel() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    GroupMetaService svc = GroupMetaService.getInstance();
+    svc.insertGroup(groupWithExtId("g1", "ext-del-by"), false);
+    NameIdentifier ident = svc.deleteGroupByExternalId(metalakeName, "ext-del-by");
+    Assertions.assertEquals("g1", ident.name());
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> svc.getGroupByExternalId(metalakeName, "ext-del-by"));
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> svc.deleteGroupByExternalId(metalakeName, "ext-del-by"));
   }
 
   private GroupEntity groupWithExtId(String name, String externalId) {

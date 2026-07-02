@@ -87,20 +87,6 @@ public class UserMetaBaseSQLProvider {
         + " AND ut.deleted_at = 0";
   }
 
-  public String softDeleteUserMetaByMetalakeNameAndExternalId(
-      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
-    return "UPDATE "
-        + USER_TABLE_NAME
-        + " ut JOIN "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mt ON ut.metalake_id = mt.metalake_id AND mt.deleted_at = 0"
-        + " SET ut.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE mt.metalake_name = #{metalakeName}"
-        + " AND ut.external_id = #{externalId}"
-        + " AND ut.deleted_at = 0";
-  }
-
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME

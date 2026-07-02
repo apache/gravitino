@@ -126,9 +126,4 @@ public class UserMetaSQLProviderFactory {
       @Param("enabled") boolean enabled) {
     return getProvider().updateUserEnabled(metalakeName, externalId, enabled);
   }
-
-  public static String softDeleteUserMetaByMetalakeNameAndExternalId(
-      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
-    return getProvider().softDeleteUserMetaByMetalakeNameAndExternalId(metalakeName, externalId);
-  }
 }

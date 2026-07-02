@@ -215,6 +215,20 @@ public interface EntityStore extends Closeable {
   }
 
   /**
+   * Delete a group by external id within the group namespace.
+   *
+   * @param groupNamespace the group namespace of the metalake
+   * @param externalId the external id of the group
+   * @return true if the group was deleted
+   * @throws NoSuchEntityException if the group does not exist
+   * @throws IOException if the delete operation fails
+   */
+  default boolean deleteGroupByExternalId(Namespace groupNamespace, String externalId)
+      throws NoSuchEntityException, IOException {
+    throw new UnsupportedOperationException("Don't support delete group by external id");
+  }
+
+  /**
    * Batch get the entity from the underlying storage.
    *
    * @param idents the unique identifier of the entity

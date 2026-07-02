@@ -366,11 +366,7 @@ public class GroupMetaService {
     return groupDeletedCount[0] + groupRoleRelDeletedCount[0];
   }
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getGroupByExternalId")
-  public GroupEntity getGroupByExternalId(String metalakeName, String externalId) {
-    AuthorizationUtils.checkExternalId(externalId);
+  private GroupPO getGroupPOByMetalakeNameAndExternalId(String metalakeName, String externalId) {
     GroupPO groupPO =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class,
@@ -382,9 +378,28 @@ public class GroupMetaService {
           Entity.EntityType.GROUP.name().toLowerCase(),
           externalId);
     }
+    return groupPO;
+  }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getGroupByExternalId")
+  public GroupEntity getGroupByExternalId(String metalakeName, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
+    GroupPO groupPO = getGroupPOByMetalakeNameAndExternalId(metalakeName, externalId);
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
     return POConverters.fromGroupPO(
         groupPO, rolePOs, AuthorizationUtils.ofGroupNamespace(metalakeName));
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteGroupByExternalId")
+  public NameIdentifier deleteGroupByExternalId(String metalakeName, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
+    GroupPO groupPO = getGroupPOByMetalakeNameAndExternalId(metalakeName, externalId);
+    NameIdentifier ident = AuthorizationUtils.ofGroup(metalakeName, groupPO.getGroupName());
+    deleteGroup(ident);
+    return ident;
   }
 }
