@@ -28,6 +28,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -38,6 +39,8 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.GroupMetaService;
+import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -121,6 +124,17 @@ class UserGroupManager {
     return listUsersInternal(metalake, true /* allFields */);
   }
 
+  long countUsers(String metalake) {
+    return UserMetaService.getInstance().countUsersByMetalake(metalake);
+  }
+
+  PagedResult<User> listUsers(String metalake, int offset, int limit) {
+    PagedResult<UserEntity> result =
+        UserMetaService.getInstance().listUsersByMetalakePaginated(metalake, offset, limit);
+    return new PagedResult<>(
+        result.totalCount(), Arrays.asList(result.items().toArray(new User[0])));
+  }
+
   Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     try {
       GroupEntity groupEntity =
@@ -176,6 +190,17 @@ class UserGroupManager {
 
   Group[] listGroups(String metalake) {
     return listGroupInternal(metalake, true);
+  }
+
+  long countGroups(String metalake) {
+    return GroupMetaService.getInstance().countGroupsByMetalake(metalake);
+  }
+
+  PagedResult<Group> listGroups(String metalake, int offset, int limit) {
+    PagedResult<GroupEntity> result =
+        GroupMetaService.getInstance().listGroupsByMetalakePaginated(metalake, offset, limit);
+    return new PagedResult<>(
+        result.totalCount(), Arrays.asList(result.items().toArray(new Group[0])));
   }
 
   String[] listGroupNames(String metalake) {
