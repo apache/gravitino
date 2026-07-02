@@ -182,6 +182,41 @@ public class RelationalEntityStore
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> E getByExternalId(
+      Namespace namespace, Entity.EntityType entityType, Class<E> type, String externalId)
+      throws NoSuchEntityException, IOException {
+    return backend.getByExternalId(namespace, entityType, externalId);
+  }
+
+  @Override
+  public UserEntity updateUserEnabledByExternalId(
+      Namespace namespace, String externalId, boolean enabled)
+      throws NoSuchEntityException, IOException {
+    UserEntity updatedUser =
+        backend.updateEnabledByExternalId(namespace, Entity.EntityType.USER, externalId, enabled);
+    cache.invalidate(updatedUser.nameIdentifier(), Entity.EntityType.USER);
+    return updatedUser;
+  }
+
+  @Override
+  public boolean deleteUserByExternalId(Namespace namespace, String externalId)
+      throws NoSuchEntityException, IOException {
+    NameIdentifier ident =
+        backend.deleteByExternalId(namespace, Entity.EntityType.USER, externalId);
+    cache.invalidate(ident, Entity.EntityType.USER);
+    return true;
+  }
+
+  @Override
+  public boolean deleteGroupByExternalId(Namespace namespace, String externalId)
+      throws NoSuchEntityException, IOException {
+    NameIdentifier ident =
+        backend.deleteByExternalId(namespace, Entity.EntityType.GROUP, externalId);
+    cache.invalidate(ident, Entity.EntityType.GROUP);
+    return true;
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> idents, Entity.EntityType entityType, Class<E> clazz) {
     List<E> allEntities = new ArrayList<>();

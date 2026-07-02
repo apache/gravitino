@@ -28,6 +28,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -38,6 +39,8 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.GroupMetaService;
+import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,19 +64,28 @@ class UserGroupManager {
   }
 
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
+    return addUser(metalake, name, null, true);
+  }
+
+  User addUser(String metalake, String name, String externalId, boolean enabled)
+      throws UserAlreadyExistsException {
     try {
-      UserEntity userEntity =
+      UserEntity.Builder builder =
           UserEntity.builder()
               .withId(idGenerator.nextId())
               .withName(name)
               .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
               .withRoleNames(Lists.newArrayList())
+              .withEnabled(enabled)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                       .withCreateTime(Instant.now())
-                      .build())
-              .build();
+                      .build());
+      if (externalId != null) {
+        builder.withExternalId(externalId);
+      }
+      UserEntity userEntity = builder.build();
       store.put(userEntity, false /* overwritten */);
       return userEntity;
     } catch (EntityAlreadyExistsException e) {
@@ -97,6 +109,24 @@ class UserGroupManager {
     }
   }
 
+  boolean removeUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
+    try {
+      return store.deleteUserByExternalId(AuthorizationUtils.ofUserNamespace(metalake), externalId);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchUserException(
+          AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Removing user with external id {} in the metalake {} failed due to storage issues",
+          externalId,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
   User getUser(String metalake, String user) throws NoSuchUserException {
     try {
       return store.get(
@@ -106,6 +136,62 @@ class UserGroupManager {
       throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
     } catch (IOException ioe) {
       LOG.error("Getting user {} failed due to storage issues", user, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  User getUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
+    try {
+      return store.getByExternalId(
+          AuthorizationUtils.ofUserNamespace(metalake),
+          Entity.EntityType.USER,
+          UserEntity.class,
+          externalId);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchUserException(
+          AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Getting user with external id {} failed due to storage issues", externalId, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  User enableUser(String metalake, String externalId) throws NoSuchUserException {
+    try {
+      return store.updateUserEnabledByExternalId(
+          AuthorizationUtils.ofUserNamespace(metalake), externalId, true);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchUserException(
+          AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Enabling user with external id {} in the metalake {} failed due to storage issues",
+          externalId,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  User disableUser(String metalake, String externalId) throws NoSuchUserException {
+    try {
+      return store.updateUserEnabledByExternalId(
+          AuthorizationUtils.ofUserNamespace(metalake), externalId, false);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchUserException(
+          AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Disabling user with external id {} in the metalake {} failed due to storage issues",
+          externalId,
+          metalake,
+          ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -121,9 +207,25 @@ class UserGroupManager {
     return listUsersInternal(metalake, true /* allFields */);
   }
 
+  long countUsers(String metalake) {
+    return UserMetaService.getInstance().countUsersByMetalake(metalake);
+  }
+
+  PagedResult<User> listUsers(String metalake, int offset, int limit) {
+    PagedResult<UserEntity> result =
+        UserMetaService.getInstance().listUsersByMetalakePaginated(metalake, offset, limit);
+    return new PagedResult<>(
+        result.totalCount(), Arrays.asList(result.items().toArray(new User[0])));
+  }
+
   Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
+    return addGroup(metalake, group, null);
+  }
+
+  Group addGroup(String metalake, String group, String externalId)
+      throws GroupAlreadyExistsException {
     try {
-      GroupEntity groupEntity =
+      GroupEntity.Builder builder =
           GroupEntity.builder()
               .withId(idGenerator.nextId())
               .withName(group)
@@ -133,8 +235,11 @@ class UserGroupManager {
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                       .withCreateTime(Instant.now())
-                      .build())
-              .build();
+                      .build());
+      if (externalId != null) {
+        builder.withExternalId(externalId);
+      }
+      GroupEntity groupEntity = builder.build();
       store.put(groupEntity, false /* overwritten */);
       return groupEntity;
     } catch (EntityAlreadyExistsException e) {
@@ -161,6 +266,25 @@ class UserGroupManager {
     }
   }
 
+  boolean removeGroupByExternalId(String metalake, String externalId) throws NoSuchGroupException {
+    try {
+      return store.deleteGroupByExternalId(
+          AuthorizationUtils.ofGroupNamespace(metalake), externalId);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "Group with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchGroupException(
+          AuthorizationUtils.GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Removing group with external id {} in the metalake {} failed due to storage issues",
+          externalId,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
   Group getGroup(String metalake, String group) {
     try {
       return store.get(
@@ -174,8 +298,37 @@ class UserGroupManager {
     }
   }
 
+  Group getGroupByExternalId(String metalake, String externalId) {
+    try {
+      return store.getByExternalId(
+          AuthorizationUtils.ofGroupNamespace(metalake),
+          EntityType.GROUP,
+          GroupEntity.class,
+          externalId);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "Group with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchGroupException(
+          AuthorizationUtils.GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Getting group with external id {} failed due to storage issues", externalId, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
   Group[] listGroups(String metalake) {
     return listGroupInternal(metalake, true);
+  }
+
+  long countGroups(String metalake) {
+    return GroupMetaService.getInstance().countGroupsByMetalake(metalake);
+  }
+
+  PagedResult<Group> listGroups(String metalake, int offset, int limit) {
+    PagedResult<GroupEntity> result =
+        GroupMetaService.getInstance().listGroupsByMetalakePaginated(metalake, offset, limit);
+    return new PagedResult<>(
+        result.totalCount(), Arrays.asList(result.items().toArray(new Group[0])));
   }
 
   String[] listGroupNames(String metalake) {

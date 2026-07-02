@@ -94,6 +94,17 @@ public class UserMetaSQLProviderFactory {
     return getProvider().listExtendedUserPOsByMetalakeId(metalakeId);
   }
 
+  public static String countUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return getProvider().countUserMetasByMetalakeId(metalakeId);
+  }
+
+  public static String listExtendedUserPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return getProvider().listExtendedUserPOsByMetalakeIdPaginated(metalakeId, offset, limit);
+  }
+
   public static String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteUserMetasByLegacyTimeline(legacyTimeline, limit);
@@ -113,5 +124,17 @@ public class UserMetaSQLProviderFactory {
       @Param("userName") String userName,
       @Param("groupNames") List<String> groupNames) {
     return getProvider().batchGetAuthSubjectsForUser(metalakeName, userName, groupNames);
+  }
+
+  public static String selectUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return getProvider().selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId);
+  }
+
+  public static String updateUserEnabled(
+      @Param("metalakeName") String metalakeName,
+      @Param("externalId") String externalId,
+      @Param("enabled") boolean enabled) {
+    return getProvider().updateUserEnabled(metalakeName, externalId, enabled);
   }
 }

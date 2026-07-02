@@ -16,36 +16,45 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino;
 
+import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
-import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
-/** The interface of a Group. The Group is the entity which contains users. */
+/** A paginated query result containing the total count and a page of items. */
 @Evolving
-public interface Group extends Auditable {
+public final class PagedResult<T> {
+
+  private final long totalCount;
+  private final List<T> items;
 
   /**
-   * The name of the group.
+   * Creates a paginated result.
    *
-   * @return The name of the group.
+   * @param totalCount The total number of matching items.
+   * @param items The items in the current page.
    */
-  String name();
+  public PagedResult(long totalCount, List<T> items) {
+    this.totalCount = totalCount;
+    this.items = items != null ? items : Collections.emptyList();
+  }
 
   /**
-   * The external identifier from an upstream identity system, such as a SCIM provider.
+   * Returns the total number of matching items.
    *
-   * @return The external identifier, or null if not set.
+   * @return The total count.
    */
-  @Nullable
-  String externalId();
+  public long totalCount() {
+    return totalCount;
+  }
 
   /**
-   * The roles of the group.
+   * Returns the items in the current page.
    *
-   * @return The roles of the group.
+   * @return The page items.
    */
-  List<String> roles();
+  public List<T> items() {
+    return items;
+  }
 }

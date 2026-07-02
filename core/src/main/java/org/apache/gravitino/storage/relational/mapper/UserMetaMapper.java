@@ -65,6 +65,15 @@ public interface UserMetaMapper {
       method = "listExtendedUserPOsByMetalakeId")
   List<ExtendedUserPO> listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "countUserMetasByMetalakeId")
+  Long countUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "listExtendedUserPOsByMetalakeIdPaginated")
+  List<ExtendedUserPO> listExtendedUserPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId, @Param("offset") int offset, @Param("limit") int limit);
+
   @InsertProvider(
       type = UserMetaSQLProviderFactory.class,
       method = "insertUserMetaOnDuplicateKeyUpdate")
@@ -97,6 +106,18 @@ public interface UserMetaMapper {
   @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "getUserUpdatedAt")
   UserUpdatedAt getUserUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("userName") String userName);
+
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "selectUserMetaByMetalakeNameAndExternalId")
+  UserPO selectUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId);
+
+  @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "updateUserEnabled")
+  Integer updateUserEnabled(
+      @Param("metalakeName") String metalakeName,
+      @Param("externalId") String externalId,
+      @Param("enabled") boolean enabled);
 
   /**
    * Single-round-trip auth prefetch for the JCasbin authorize hot path. Returns every version

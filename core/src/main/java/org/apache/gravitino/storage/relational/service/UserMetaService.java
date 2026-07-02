@@ -35,6 +35,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
@@ -319,5 +320,101 @@ public class UserMetaService {
                         mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
+  }
+
+  private UserPO getUserPOByMetalakeNameAndExternalId(String metalakeName, String externalId) {
+    UserPO userPO =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId));
+
+    if (userPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.USER.name().toLowerCase(),
+          externalId);
+    }
+    return userPO;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getUserByExternalId")
+  public UserEntity getUserByExternalId(String metalakeName, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
+    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    return POConverters.fromUserPO(
+        userPO, rolePOs, AuthorizationUtils.ofUserNamespace(metalakeName));
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateUserEnabled")
+  public UserEntity updateUserEnabled(String metalakeName, String externalId, boolean enabled) {
+    AuthorizationUtils.checkExternalId(externalId);
+    SessionUtils.doWithCommit(
+        UserMetaMapper.class,
+        mapper -> {
+          Integer updated = mapper.updateUserEnabled(metalakeName, externalId, enabled);
+          if (updated == null || updated == 0) {
+            throw new NoSuchEntityException(
+                NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                Entity.EntityType.USER.name().toLowerCase(),
+                externalId);
+          }
+        });
+
+    return getUserByExternalId(metalakeName, externalId);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteUserByExternalId")
+  public NameIdentifier deleteUserByExternalId(String metalakeName, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
+    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
+    NameIdentifier ident = AuthorizationUtils.ofUser(metalakeName, userPO.getUserName());
+    deleteUser(ident);
+    return ident;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "countUsersByMetalake")
+  public long countUsersByMetalake(String metalakeName) {
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    Long count =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class, mapper -> mapper.countUserMetasByMetalakeId(metalakeId));
+    return count == null ? 0L : count;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listUsersByMetalakePaginated")
+  public PagedResult<UserEntity> listUsersByMetalakePaginated(
+      String metalakeName, int offset, int limit) {
+    Preconditions.checkArgument(offset >= 0, "offset must be >= 0");
+    Preconditions.checkArgument(limit >= 0, "limit must be >= 0");
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    long totalCount = countUsersByMetalake(metalakeName);
+    if (limit == 0 || offset >= totalCount) {
+      return new PagedResult<>(totalCount, Collections.emptyList());
+    }
+
+    List<ExtendedUserPO> userPOs =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.listExtendedUserPOsByMetalakeIdPaginated(metalakeId, offset, limit));
+    List<UserEntity> users =
+        userPOs.stream()
+            .map(
+                po ->
+                    POConverters.fromExtendedUserPO(
+                        po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+            .collect(Collectors.toList());
+    return new PagedResult<>(totalCount, users);
   }
 }

@@ -148,6 +148,71 @@ public class TestMemoryEntityStore {
     }
 
     @Override
+    public <E extends Entity & HasIdentifier> E getByExternalId(
+        Namespace namespace, EntityType entityType, Class<E> type, String externalId)
+        throws NoSuchEntityException, IOException {
+      for (Map.Entry<NameIdentifier, Entity> entry : entityMap.entrySet()) {
+        Entity entity = entry.getValue();
+        if (!entity.type().equals(entityType) || !entry.getKey().namespace().equals(namespace)) {
+          continue;
+        }
+
+        String entityExternalId = null;
+        if (entity instanceof UserEntity userEntity) {
+          entityExternalId = userEntity.externalId();
+        } else if (entity instanceof GroupEntity groupEntity) {
+          entityExternalId = groupEntity.externalId();
+        }
+
+        if (externalId.equals(entityExternalId)) {
+          return (E) entity;
+        }
+      }
+
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          entityType.name().toLowerCase(),
+          externalId);
+    }
+
+    @Override
+    public UserEntity updateUserEnabledByExternalId(
+        Namespace namespace, String externalId, boolean enabled)
+        throws NoSuchEntityException, IOException {
+      UserEntity user = getByExternalId(namespace, EntityType.USER, UserEntity.class, externalId);
+      return update(
+          user.nameIdentifier(),
+          UserEntity.class,
+          EntityType.USER,
+          userEntity ->
+              UserEntity.builder()
+                  .withId(userEntity.id())
+                  .withName(userEntity.name())
+                  .withExternalId(userEntity.externalId())
+                  .withEnabled(enabled)
+                  .withRoleNames(userEntity.roleNames())
+                  .withRoleIds(userEntity.roleIds())
+                  .withNamespace(userEntity.namespace())
+                  .withAuditInfo(userEntity.auditInfo())
+                  .build());
+    }
+
+    @Override
+    public boolean deleteUserByExternalId(Namespace namespace, String externalId)
+        throws NoSuchEntityException, IOException {
+      UserEntity user = getByExternalId(namespace, EntityType.USER, UserEntity.class, externalId);
+      return delete(user.nameIdentifier(), EntityType.USER);
+    }
+
+    @Override
+    public boolean deleteGroupByExternalId(Namespace namespace, String externalId)
+        throws NoSuchEntityException, IOException {
+      GroupEntity group =
+          getByExternalId(namespace, EntityType.GROUP, GroupEntity.class, externalId);
+      return delete(group.nameIdentifier(), EntityType.GROUP);
+    }
+
+    @Override
     public <E extends Entity & HasIdentifier> List<E> batchGet(
         List<NameIdentifier> idents, EntityType entityType, Class<E> e) {
       return idents.stream().map(ident -> (E) entityMap.get(ident)).toList();

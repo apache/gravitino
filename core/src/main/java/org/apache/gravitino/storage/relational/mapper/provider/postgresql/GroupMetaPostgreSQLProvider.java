@@ -48,13 +48,14 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String insertGroupMetaOnDuplicateKeyUpdate(GroupPO groupPO) {
     return "INSERT INTO "
         + GROUP_TABLE_NAME
-        + " (group_id, group_name,"
-        + " metalake_id, audit_info,"
+        + " (group_id, group_name, metalake_id, external_id,"
+        + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{groupMeta.groupId},"
         + " #{groupMeta.groupName},"
         + " #{groupMeta.metalakeId},"
+        + " #{groupMeta.externalId},"
         + " #{groupMeta.auditInfo},"
         + " #{groupMeta.currentVersion},"
         + " #{groupMeta.lastVersion},"
@@ -63,6 +64,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " ON CONFLICT(group_id) DO UPDATE SET"
         + " group_name = #{groupMeta.groupName},"
         + " metalake_id = #{groupMeta.metalakeId},"
+        + " external_id = #{groupMeta.externalId},"
         + " audit_info = #{groupMeta.auditInfo},"
         + " current_version = #{groupMeta.currentVersion},"
         + " last_version = #{groupMeta.lastVersion},"
@@ -73,6 +75,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
@@ -97,11 +100,48 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   }
 
   @Override
+  public String listExtendedGroupPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
+        + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
+        + " gt.audit_info as auditInfo,"
+        + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
+        + " gt.deleted_at as deletedAt,"
+        + " JSON_AGG(rot.role_name) as roleNames,"
+        + " JSON_AGG(rot.role_id) as roleIds"
+        + " FROM ("
+        + " SELECT group_id FROM "
+        + GROUP_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " ORDER BY group_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " ) paginated"
+        + " JOIN "
+        + GROUP_TABLE_NAME
+        + " gt ON gt.group_id = paginated.group_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.group_id = gt.group_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " GROUP BY gt.group_id"
+        + " ORDER BY gt.group_id ASC";
+  }
+
+  @Override
   public String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return "<script>"
         + "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
