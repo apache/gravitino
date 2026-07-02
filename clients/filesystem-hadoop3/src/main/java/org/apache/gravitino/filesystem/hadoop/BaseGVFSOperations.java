@@ -992,6 +992,11 @@ public abstract class BaseGVFSOperations implements Closeable {
       String locationName) {
     // Do not support credential vending, we do not need to add any credential properties.
     if (!(fileSystemProvider instanceof SupportsCredentialVending)) {
+      LOG.debug(
+          "File system provider {} does not support credential vending for fileset {}, "
+              + "skip adding credential properties.",
+          fileSystemProvider.getClass().getSimpleName(),
+          filesetIdentifier);
       return ImmutableMap.of();
     }
 
@@ -1011,6 +1016,14 @@ public abstract class BaseGVFSOperations implements Closeable {
         SupportsCredentialVending supportsCredentialVending =
             (SupportsCredentialVending) fileSystemProvider;
         mapBuilder.putAll(supportsCredentialVending.getFileSystemCredentialConf(credentials));
+      } else {
+        LOG.warn(
+            "Credential vending is enabled but no credential was returned for fileset {} "
+                + "(locationName={}). The underlying file system may fail with access denied. "
+                + "Check that the catalog has static credentials configured or a credential "
+                + "provider set via 'credential-providers'.",
+            filesetIdentifier,
+            locationName);
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
