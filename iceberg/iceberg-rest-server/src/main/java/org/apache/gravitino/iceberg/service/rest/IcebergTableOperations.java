@@ -182,13 +182,11 @@ public class IcebergTableOperations {
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
-            + "accessDelegation: {}, credential vending: {}, remote signing: {}",
+            + "accessDelegation: {}",
         catalogName,
         icebergNS,
         createTableRequest,
-        accessDelegation,
-        accessDelegationMode.requestVendedCredentials(),
-        accessDelegationMode.requestRemoteSigning());
+        accessDelegation);
     try {
       return Utils.doAs(
           httpRequest,
@@ -318,14 +316,11 @@ public class IcebergTableOperations {
     String tableName = RESTUtil.decodeString(table);
     IcebergAccessDelegation accessDelegationMode = parseAccessDelegation(accessDelegation);
     LOG.info(
-        "Load Iceberg table, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
-            + "credential vending: {}, remote signing: {}",
+        "Load Iceberg table, catalog: {}, namespace: {}, table: {}, accessDelegation: {}",
         catalogName,
         icebergNS,
         tableName,
-        accessDelegation,
-        accessDelegationMode.requestVendedCredentials(),
-        accessDelegationMode.requestRemoteSigning());
+        accessDelegation);
     try {
       return Utils.doAs(
           httpRequest,
@@ -676,16 +671,6 @@ public class IcebergTableOperations {
    */
   static IcebergAccessDelegation parseAccessDelegation(String accessDelegation) {
     return IcebergAccessDelegation.parse(accessDelegation);
-  }
-
-  /**
-   * Parses the {@code X-Iceberg-Access-Delegation} header value and returns whether the client is
-   * requesting credential vending. Package-private and static so that {@link
-   * IcebergNamespaceOperations#registerTable} can reuse the same parsing logic from the same
-   * package.
-   */
-  static boolean isCredentialVending(String accessDelegation) {
-    return parseAccessDelegation(accessDelegation).requestVendedCredentials();
   }
 
   private NameIdentifier[] toNameIdentifiers(

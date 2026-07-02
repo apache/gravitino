@@ -457,27 +457,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         .collect(ImmutableSet.toImmutableSet());
   }
 
-  /**
-   * Maps an HTTP method from a remote sign request to a credential privilege.
-   *
-   * @param method HTTP method from the remote sign request
-   * @return write privilege for mutating methods, otherwise read
-   */
-  public static CredentialPrivilege credentialPrivilegeForSignMethod(String method) {
-    if (StringUtils.isBlank(method)) {
-      return CredentialPrivilege.READ;
-    }
-    switch (method.toUpperCase(Locale.ROOT)) {
-      case "PUT":
-      case "POST":
-      case "DELETE":
-      case "PATCH":
-        return CredentialPrivilege.WRITE;
-      default:
-        return CredentialPrivilege.READ;
-    }
-  }
-
   private boolean isLocalOrHdfsTable(TableMetadata tableMetadata) {
     return isLocalOrHdfsLocation(tableMetadata.location());
   }

@@ -329,13 +329,11 @@ public class IcebergNamespaceOperations {
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Register Iceberg table, catalog: {}, namespace: {}, registerTableRequest: {}, "
-            + "accessDelegation: {}, credential vending: {}, remote signing: {}",
+            + "accessDelegation: {}",
         catalogName,
         icebergNS,
         registerTableRequest,
-        accessDelegation,
-        accessDelegationMode.requestVendedCredentials(),
-        accessDelegationMode.requestRemoteSigning());
+        accessDelegation);
     try {
       return Utils.doAs(
           httpRequest,

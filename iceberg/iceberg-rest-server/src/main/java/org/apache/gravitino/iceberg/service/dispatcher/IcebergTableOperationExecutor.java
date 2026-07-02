@@ -20,8 +20,10 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
@@ -29,7 +31,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
-import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
+import org.apache.gravitino.iceberg.service.IcebergAccessDelegation;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJob;
@@ -164,14 +166,15 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
-    CredentialPrivilege privilege = CredentialPrivilege.READ;
-    if (context.accessDelegation().requestVendedCredentials()) {
-      privilege = getCredentialPrivilege(context, tableIdentifier);
-    }
+    IcebergAccessDelegation accessDelegation = context.accessDelegation();
+    CredentialPrivilege vendedCredentialPrivilege =
+        accessDelegation.requestVendedCredentials()
+            ? getCredentialPrivilege(context, tableIdentifier)
+            : CredentialPrivilege.READ; // unused unless vended credentials are injected
 
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .loadTable(tableIdentifier, context.accessDelegation(), privilege);
+        .loadTable(tableIdentifier, accessDelegation, vendedCredentialPrivilege);
   }
 
   @Override
@@ -210,7 +213,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       TableIdentifier tableIdentifier,
       RemoteSignRequest remoteSignRequest) {
     CredentialPrivilege privilege =
-        CatalogWrapperForREST.credentialPrivilegeForSignMethod(remoteSignRequest.method());
+        getRemoteSignPrivilege(remoteSignRequest.method());
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .remoteSign(tableIdentifier, remoteSignRequest, privilege);
@@ -230,6 +233,21 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
             AuthorizationExpressionConstants.FILTER_MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
 
     return writable ? CredentialPrivilege.WRITE : CredentialPrivilege.READ;
+  }
+
+  private static CredentialPrivilege getRemoteSignPrivilege(String method) {
+    if (StringUtils.isBlank(method)) {
+      return CredentialPrivilege.READ;
+    }
+    switch (method.toUpperCase(Locale.ROOT)) {
+      case "PUT":
+      case "POST":
+      case "DELETE":
+      case "PATCH":
+        return CredentialPrivilege.WRITE;
+      default:
+        return CredentialPrivilege.READ;
+    }
   }
 
   @Override
