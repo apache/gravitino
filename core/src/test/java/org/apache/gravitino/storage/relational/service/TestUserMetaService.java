@@ -1285,16 +1285,15 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertTrue(svc.updateUserEnabled(metalakeName, "ext-1", true).enabled());
 
     svc.insertUser(userWithExtId("u2", "ext-db"), false);
-    long updatedAtBefore = userMetaByExtId("ext-db").updatedAt;
+    long updatedAtBefore = queryUpdatedAtByExtId("ext-db");
     svc.updateUserEnabled(metalakeName, "ext-db", false);
-    UserMetaRow afterDisable = userMetaByExtId("ext-db");
-    Assertions.assertFalse(afterDisable.enabled);
-    Assertions.assertTrue(afterDisable.updatedAt >= updatedAtBefore);
+    Assertions.assertFalse(queryEnabledByExtId("ext-db"));
+    long updatedAtAfterDisable = queryUpdatedAtByExtId("ext-db");
+    Assertions.assertTrue(updatedAtAfterDisable >= updatedAtBefore);
 
     svc.updateUserEnabled(metalakeName, "ext-db", true);
-    UserMetaRow afterEnable = userMetaByExtId("ext-db");
-    Assertions.assertTrue(afterEnable.enabled);
-    Assertions.assertTrue(afterEnable.updatedAt >= afterDisable.updatedAt);
+    Assertions.assertTrue(queryEnabledByExtId("ext-db"));
+    Assertions.assertTrue(queryUpdatedAtByExtId("ext-db") >= updatedAtAfterDisable);
   }
 
   @TestTemplate
@@ -1347,17 +1346,7 @@ class TestUserMetaService extends TestJDBCBackend {
         .build();
   }
 
-  private static final class UserMetaRow {
-    private final boolean enabled;
-    private final long updatedAt;
-
-    private UserMetaRow(boolean enabled, long updatedAt) {
-      this.enabled = enabled;
-      this.updatedAt = updatedAt;
-    }
-  }
-
-  private UserMetaRow userMetaByExtId(String externalId) {
+  private boolean queryEnabledByExtId(String externalId) {
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection();
@@ -1365,12 +1354,29 @@ class TestUserMetaService extends TestJDBCBackend {
         ResultSet rs =
             statement.executeQuery(
                 String.format(
-                    "SELECT enabled, updated_at FROM user_meta WHERE external_id = '%s' AND deleted_at = 0",
+                    "SELECT enabled FROM user_meta WHERE external_id = '%s' AND deleted_at = 0",
                     externalId))) {
       Assertions.assertTrue(rs.next());
-      return new UserMetaRow(rs.getBoolean(1), rs.getLong(2));
+      return rs.getBoolean(1);
     } catch (SQLException e) {
-      throw new RuntimeException("Query user_meta failed", e);
+      throw new RuntimeException("Query user enabled failed", e);
+    }
+  }
+
+  private long queryUpdatedAtByExtId(String externalId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT updated_at FROM user_meta WHERE external_id = '%s' AND deleted_at = 0",
+                    externalId))) {
+      Assertions.assertTrue(rs.next());
+      return rs.getLong(1);
+    } catch (SQLException e) {
+      throw new RuntimeException("Query user updated_at failed", e);
     }
   }
 
