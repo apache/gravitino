@@ -259,6 +259,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       classLoader.close();
     }
 
+    IsolatedClassLoader classLoader() {
+      return classLoader;
+    }
+
     private SupportsSchemas asSchemas() {
       return catalog.ops() instanceof SupportsSchemas ? (SupportsSchemas) catalog.ops() : null;
     }
