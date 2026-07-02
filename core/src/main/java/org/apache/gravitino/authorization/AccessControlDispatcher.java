@@ -79,6 +79,19 @@ public interface AccessControlDispatcher {
   boolean removeUser(String metalake, String user) throws NoSuchMetalakeException;
 
   /**
+   * Removes a User by external identifier.
+   *
+   * @param metalake The Metalake of the User.
+   * @param externalId The external identifier of the User.
+   * @return True if the User was removed, false otherwise.
+   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the User encounters storage issues.
+   */
+  boolean removeUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException;
+
+  /**
    * Gets a User.
    *
    * @param metalake The Metalake of the User.

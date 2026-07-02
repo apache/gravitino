@@ -53,17 +53,52 @@ public class UserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String selectUserMetaByMetalakeIdAndExternalId(
-      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId) {
-    return "SELECT user_id as userId, user_name as userName,"
-        + " metalake_id as metalakeId,"
-        + " external_id as externalId, enabled as enabled,"
-        + " audit_info as auditInfo, current_version as currentVersion,"
-        + " last_version as lastVersion, deleted_at as deletedAt"
+  public String selectUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.external_id as externalId, ut.enabled as enabled,"
+        + " ut.audit_info as auditInfo, ut.current_version as currentVersion,"
+        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt"
         + " FROM "
         + USER_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND external_id = #{externalId}"
-        + " AND deleted_at = 0";
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.external_id = #{externalId}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
+  public String updateUserEnabled(
+      @Param("metalakeName") String metalakeName,
+      @Param("externalId") String externalId,
+      @Param("enabled") boolean enabled) {
+    return "UPDATE "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id AND mt.deleted_at = 0"
+        + " SET ut.enabled = #{enabled},"
+        + " ut.updated_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.external_id = #{externalId}"
+        + " AND ut.deleted_at = 0";
+  }
+
+  public String softDeleteUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return "UPDATE "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id AND mt.deleted_at = 0"
+        + " SET ut.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.external_id = #{externalId}"
+        + " AND ut.deleted_at = 0";
   }
 
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
@@ -145,20 +180,6 @@ public class UserMetaBaseSQLProvider {
         + " AND audit_info = #{oldUserMeta.auditInfo}"
         + " AND current_version = #{oldUserMeta.currentVersion}"
         + " AND last_version = #{oldUserMeta.lastVersion}"
-        + " AND deleted_at = 0";
-  }
-
-  public String updateUserEnabled(
-      @Param("metalakeId") Long metalakeId,
-      @Param("externalId") String externalId,
-      @Param("enabled") boolean enabled) {
-    return "UPDATE "
-        + USER_TABLE_NAME
-        + " SET enabled = #{enabled},"
-        + " updated_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId}"
-        + " AND external_id = #{externalId}"
         + " AND deleted_at = 0";
   }
 

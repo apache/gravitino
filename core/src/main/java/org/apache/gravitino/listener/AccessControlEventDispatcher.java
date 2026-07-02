@@ -171,6 +171,13 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public boolean removeUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.removeUserByExternalId(metalake, externalId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();

@@ -105,7 +105,7 @@ public interface GroupMetaMapper {
 
   @SelectProvider(
       type = GroupMetaSQLProviderFactory.class,
-      method = "selectGroupMetaByMetalakeIdAndExternalId")
-  GroupPO selectGroupMetaByMetalakeIdAndExternalId(
-      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId);
+      method = "selectGroupMetaByMetalakeNameAndExternalId")
+  GroupPO selectGroupMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId);
 }

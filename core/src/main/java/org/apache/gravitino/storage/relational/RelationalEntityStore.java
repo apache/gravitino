@@ -53,6 +53,7 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -179,6 +180,33 @@ public class RelationalEntityStore
           cache.put(entity);
           return entity;
         });
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getByExternalId(
+      Namespace namespace, Entity.EntityType entityType, Class<E> type, String externalId)
+      throws NoSuchEntityException, IOException {
+    return backend.getByExternalId(namespace, entityType, externalId);
+  }
+
+  @Override
+  public UserEntity updateUserEnabledByExternalId(
+      Namespace userNamespace, String externalId, boolean enabled)
+      throws NoSuchEntityException, IOException {
+    UserEntity updatedUser =
+        UserMetaService.getInstance()
+            .updateUserEnabled(userNamespace.level(0), externalId, enabled);
+    cache.invalidate(updatedUser.nameIdentifier(), Entity.EntityType.USER);
+    return updatedUser;
+  }
+
+  @Override
+  public boolean deleteUserByExternalId(Namespace userNamespace, String externalId)
+      throws NoSuchEntityException, IOException {
+    NameIdentifier ident =
+        UserMetaService.getInstance().deleteUserByExternalId(userNamespace.level(0), externalId);
+    cache.invalidate(ident, Entity.EntityType.USER);
+    return true;
   }
 
   @Override

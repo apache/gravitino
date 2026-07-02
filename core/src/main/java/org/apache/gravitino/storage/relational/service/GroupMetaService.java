@@ -370,11 +370,10 @@ public class GroupMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getGroupByExternalId")
   public GroupEntity getGroupByExternalId(String metalakeName, String externalId) {
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
     GroupPO groupPO =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class,
-            mapper -> mapper.selectGroupMetaByMetalakeIdAndExternalId(metalakeId, externalId));
+            mapper -> mapper.selectGroupMetaByMetalakeNameAndExternalId(metalakeName, externalId));
 
     if (groupPO == null) {
       throw new NoSuchEntityException(

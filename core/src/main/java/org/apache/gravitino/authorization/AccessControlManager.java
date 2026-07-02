@@ -85,6 +85,15 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public boolean removeUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> userGroupManager.removeUserByExternalId(metalake, externalId));
+  }
+
+  @Override
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(

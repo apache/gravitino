@@ -100,15 +100,21 @@ public interface UserMetaMapper {
 
   @SelectProvider(
       type = UserMetaSQLProviderFactory.class,
-      method = "selectUserMetaByMetalakeIdAndExternalId")
-  UserPO selectUserMetaByMetalakeIdAndExternalId(
-      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId);
+      method = "selectUserMetaByMetalakeNameAndExternalId")
+  UserPO selectUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId);
 
   @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "updateUserEnabled")
   Integer updateUserEnabled(
-      @Param("metalakeId") Long metalakeId,
+      @Param("metalakeName") String metalakeName,
       @Param("externalId") String externalId,
       @Param("enabled") boolean enabled);
+
+  @UpdateProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "softDeleteUserMetaByMetalakeNameAndExternalId")
+  Integer softDeleteUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId);
 
   /**
    * Single-round-trip auth prefetch for the JCasbin authorize hot path. Returns every version

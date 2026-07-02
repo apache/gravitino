@@ -114,6 +114,21 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws IOException;
 
   /**
+   * Retrieves the entity associated with the namespace, entity type and external id.
+   *
+   * @param <E> The type of the entity returned.
+   * @param namespace The namespace of the entity.
+   * @param entityType The type of the entity.
+   * @param externalId The external id of the entity.
+   * @return The entity associated with the namespace, entity type and external id.
+   * @throws NoSuchEntityException If the entity does not exist.
+   * @throws IOException If an I/O exception occurs during retrieval.
+   */
+  <E extends Entity & HasIdentifier> E getByExternalId(
+      Namespace namespace, Entity.EntityType entityType, String externalId)
+      throws NoSuchEntityException, IOException;
+
+  /**
    * Batch retrieves the entities associated with the identifiers and the entity type.
    *
    * @param <E> The type of the entity returned.

@@ -40,6 +40,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -1319,6 +1320,19 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertTrue(svc.deleteUser(user.nameIdentifier()));
     Assertions.assertThrows(
         NoSuchEntityException.class, () -> svc.updateUserEnabled(metalakeName, "ext-del", false));
+  }
+
+  @TestTemplate
+  void testDeleteUserByExternalId() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    UserMetaService svc = UserMetaService.getInstance();
+    svc.insertUser(userWithExtId("u1", "ext-del-by"), false);
+    NameIdentifier ident = svc.deleteUserByExternalId(metalakeName, "ext-del-by");
+    Assertions.assertEquals("u1", ident.name());
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> svc.getUserByExternalId(metalakeName, "ext-del-by"));
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> svc.deleteUserByExternalId(metalakeName, "ext-del-by"));
   }
 
   @TestTemplate

@@ -321,11 +321,11 @@ public class UserMetaService {
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
 
-  private UserPO getUserPOByMetalakeIdAndExternalId(Long metalakeId, String externalId) {
+  private UserPO getUserPOByMetalakeNameAndExternalId(String metalakeName, String externalId) {
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeIdAndExternalId(metalakeId, externalId));
+            mapper -> mapper.selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId));
 
     if (userPO == null) {
       throw new NoSuchEntityException(
@@ -340,8 +340,7 @@ public class UserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getUserByExternalId")
   public UserEntity getUserByExternalId(String metalakeName, String externalId) {
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-    UserPO userPO = getUserPOByMetalakeIdAndExternalId(metalakeId, externalId);
+    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
     return POConverters.fromUserPO(
         userPO, rolePOs, AuthorizationUtils.ofUserNamespace(metalakeName));
@@ -351,12 +350,10 @@ public class UserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateUserEnabled")
   public UserEntity updateUserEnabled(String metalakeName, String externalId, boolean enabled) {
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-
     SessionUtils.doWithCommit(
         UserMetaMapper.class,
         mapper -> {
-          Integer updated = mapper.updateUserEnabled(metalakeId, externalId, enabled);
+          Integer updated = mapper.updateUserEnabled(metalakeName, externalId, enabled);
           if (updated == null || updated == 0) {
             throw new NoSuchEntityException(
                 NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -366,5 +363,40 @@ public class UserMetaService {
         });
 
     return getUserByExternalId(metalakeName, externalId);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteUserByExternalId")
+  public NameIdentifier deleteUserByExternalId(String metalakeName, String externalId) {
+    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
+    NameIdentifier ident = AuthorizationUtils.ofUser(metalakeName, userPO.getUserName());
+    Long userId = userPO.getUserId();
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByOwnerIdAndType(
+                        userId, Entity.EntityType.USER.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserMetaMapper.class,
+                mapper -> {
+                  Integer updated =
+                      mapper.softDeleteUserMetaByMetalakeNameAndExternalId(
+                          metalakeName, externalId);
+                  if (updated == null || updated == 0) {
+                    throw new NoSuchEntityException(
+                        NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                        Entity.EntityType.USER.name().toLowerCase(),
+                        externalId);
+                  }
+                }));
+    return ident;
   }
 }

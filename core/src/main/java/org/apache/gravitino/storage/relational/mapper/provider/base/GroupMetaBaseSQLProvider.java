@@ -89,17 +89,21 @@ public class GroupMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String selectGroupMetaByMetalakeIdAndExternalId(
-      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId) {
-    return "SELECT group_id as groupId, group_name as groupName,"
-        + " metalake_id as metalakeId,"
-        + " external_id as externalId,"
-        + " audit_info as auditInfo, current_version as currentVersion,"
-        + " last_version as lastVersion, deleted_at as deletedAt"
+  public String selectGroupMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
+        + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
+        + " gt.audit_info as auditInfo, gt.current_version as currentVersion,"
+        + " gt.last_version as lastVersion, gt.deleted_at as deletedAt"
         + " FROM "
         + GROUP_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND external_id = #{externalId}"
-        + " AND deleted_at = 0";
+        + " gt JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON gt.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND gt.external_id = #{externalId}"
+        + " AND gt.deleted_at = 0 AND mt.deleted_at = 0";
   }
 
   public String listExtendedGroupPOsByMetalakeIdAndNames(

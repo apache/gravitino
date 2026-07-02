@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.Param;
@@ -120,14 +121,29 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
 
   @Override
   public String updateUserEnabled(
-      @Param("metalakeId") Long metalakeId,
+      @Param("metalakeName") String metalakeName,
       @Param("externalId") String externalId,
       @Param("enabled") boolean enabled) {
     return "UPDATE "
         + USER_TABLE_NAME
         + " SET enabled = #{enabled},"
         + " updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE metalake_id = #{metalakeId}"
+        + " WHERE metalake_id = (SELECT metalake_id FROM "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
+        + " AND external_id = #{externalId}"
+        + " AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return "UPDATE "
+        + USER_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE metalake_id = (SELECT metalake_id FROM "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
         + " AND external_id = #{externalId}"
         + " AND deleted_at = 0";
   }

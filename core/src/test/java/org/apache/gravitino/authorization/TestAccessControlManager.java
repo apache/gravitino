@@ -559,13 +559,27 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testRemoveUserByExternalId() {
+    String externalId = "ext-remove-user";
+    accessControlManager.addUser(METALAKE, "remove_user", externalId, true);
+    Assertions.assertTrue(accessControlManager.removeUserByExternalId(METALAKE, externalId));
+    Assertions.assertThrows(
+        NoSuchUserException.class,
+        () -> accessControlManager.getUserByExternalId(METALAKE, externalId));
+    Assertions.assertThrows(
+        NoSuchUserException.class, () -> accessControlManager.getUser(METALAKE, "remove_user"));
+    Assertions.assertThrows(
+        NoSuchUserException.class,
+        () -> accessControlManager.removeUserByExternalId(METALAKE, "missing-ext-id"));
+  }
+
+  @Test
   public void testDisableCache() {
     String externalId = "ext-cache-user";
     accessControlManager.addUser(METALAKE, "cache_user", externalId, true);
-    accessControlManager.getUserByExternalId(METALAKE, externalId);
+    accessControlManager.getUser(METALAKE, "cache_user");
     accessControlManager.disableUser(METALAKE, externalId);
-    Assertions.assertFalse(
-        accessControlManager.getUserByExternalId(METALAKE, externalId).enabled());
+    Assertions.assertFalse(accessControlManager.getUser(METALAKE, "cache_user").enabled());
     accessControlManager.removeUser(METALAKE, "cache_user");
   }
 

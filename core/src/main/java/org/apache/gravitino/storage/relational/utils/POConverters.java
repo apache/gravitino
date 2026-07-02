@@ -987,7 +987,7 @@ public class POConverters {
           .withMetalakeId(oldUserPO.getMetalakeId())
           .withExternalId(
               newUser.externalId() != null ? newUser.externalId() : oldUserPO.getExternalId())
-          .withEnabled(oldUserPO.getEnabled() != null ? oldUserPO.getEnabled() : Boolean.TRUE)
+          .withEnabled(newUser.enabled() ? Boolean.TRUE : Boolean.FALSE)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUser.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)

@@ -111,8 +111,8 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().getGroupUpdatedAt(metalakeName, groupName);
   }
 
-  public static String selectGroupMetaByMetalakeIdAndExternalId(
-      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId) {
-    return getProvider().selectGroupMetaByMetalakeIdAndExternalId(metalakeId, externalId);
+  public static String selectGroupMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return getProvider().selectGroupMetaByMetalakeNameAndExternalId(metalakeName, externalId);
   }
 }

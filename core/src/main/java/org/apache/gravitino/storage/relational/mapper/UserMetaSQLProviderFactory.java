@@ -115,15 +115,20 @@ public class UserMetaSQLProviderFactory {
     return getProvider().batchGetAuthSubjectsForUser(metalakeName, userName, groupNames);
   }
 
-  public static String selectUserMetaByMetalakeIdAndExternalId(
-      @Param("metalakeId") Long metalakeId, @Param("externalId") String externalId) {
-    return getProvider().selectUserMetaByMetalakeIdAndExternalId(metalakeId, externalId);
+  public static String selectUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return getProvider().selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId);
   }
 
   public static String updateUserEnabled(
-      @Param("metalakeId") Long metalakeId,
+      @Param("metalakeName") String metalakeName,
       @Param("externalId") String externalId,
       @Param("enabled") boolean enabled) {
-    return getProvider().updateUserEnabled(metalakeId, externalId, enabled);
+    return getProvider().updateUserEnabled(metalakeName, externalId, enabled);
+  }
+
+  public static String softDeleteUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return getProvider().softDeleteUserMetaByMetalakeNameAndExternalId(metalakeName, externalId);
   }
 }

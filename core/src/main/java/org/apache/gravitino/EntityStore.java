@@ -27,6 +27,7 @@ import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
@@ -166,6 +167,52 @@ public interface EntityStore extends Closeable {
    */
   <E extends Entity & HasIdentifier> E get(NameIdentifier ident, EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException;
+
+  /**
+   * Get the entity from the underlying storage by external id within the namespace.
+   *
+   * @param namespace the namespace of the entity
+   * @param entityType the general type of the entity
+   * @param type the detailed type of the entity
+   * @param externalId the external id of the entity
+   * @param <E> the class of entity
+   * @return the entity retrieved from the underlying storage
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IOException if the retrieve operation fails
+   */
+  <E extends Entity & HasIdentifier> E getByExternalId(
+      Namespace namespace, EntityType entityType, Class<E> type, String externalId)
+      throws NoSuchEntityException, IOException;
+
+  /**
+   * Update the enabled state of a user by external id within the user namespace.
+   *
+   * @param userNamespace the user namespace of the metalake
+   * @param externalId the external id of the user
+   * @param enabled the expected enabled state
+   * @return the updated user entity
+   * @throws NoSuchEntityException if the user does not exist
+   * @throws IOException if the update operation fails
+   */
+  default UserEntity updateUserEnabledByExternalId(
+      Namespace userNamespace, String externalId, boolean enabled)
+      throws NoSuchEntityException, IOException {
+    throw new UnsupportedOperationException("Don't support update user enabled by external id");
+  }
+
+  /**
+   * Delete a user by external id within the user namespace.
+   *
+   * @param userNamespace the user namespace of the metalake
+   * @param externalId the external id of the user
+   * @return true if the user was deleted
+   * @throws NoSuchEntityException if the user does not exist
+   * @throws IOException if the delete operation fails
+   */
+  default boolean deleteUserByExternalId(Namespace userNamespace, String externalId)
+      throws NoSuchEntityException, IOException {
+    throw new UnsupportedOperationException("Don't support delete user by external id");
+  }
 
   /**
    * Batch get the entity from the underlying storage.
