@@ -54,6 +54,8 @@ class TestAuthorizationUtils {
     NameIdentifier user = AuthorizationUtils.ofUser(metalake, "user");
     NameIdentifier group = AuthorizationUtils.ofGroup(metalake, "group");
     NameIdentifier role = AuthorizationUtils.ofRole(metalake, "role");
+    NameIdentifier userExternalId = AuthorizationUtils.ofUserExternalId(metalake, "ext-1");
+    NameIdentifier groupExternalId = AuthorizationUtils.ofGroupExternalId(metalake, "ext-1");
 
     Assertions.assertEquals(AuthorizationUtils.ofUserNamespace(metalake), user.namespace());
     Assertions.assertEquals("user", user.name());
@@ -61,6 +63,33 @@ class TestAuthorizationUtils {
     Assertions.assertEquals("group", group.name());
     Assertions.assertEquals(AuthorizationUtils.ofRoleNamespace(metalake), role.namespace());
     Assertions.assertEquals("role", role.name());
+    Assertions.assertEquals(
+        AuthorizationUtils.ofUserNamespace(metalake), userExternalId.namespace());
+    Assertions.assertEquals("@externalId:ext-1", userExternalId.name());
+    Assertions.assertEquals(
+        AuthorizationUtils.ofGroupNamespace(metalake), groupExternalId.namespace());
+    Assertions.assertEquals("@externalId:ext-1", groupExternalId.name());
+    Assertions.assertNotEquals(user, userExternalId);
+    Assertions.assertNotEquals(group, groupExternalId);
+  }
+
+  @Test
+  void testCreateExternalIdNameIdentifierWithInvalidArgs() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> AuthorizationUtils.ofUserExternalId(metalake, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> AuthorizationUtils.ofUserExternalId(metalake, ""));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> AuthorizationUtils.ofGroupExternalId(metalake, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> AuthorizationUtils.ofGroupExternalId(metalake, ""));
+  }
+
+  @Test
+  void testExternalIdNameIdentifierDoesNotCollideWithName() {
+    NameIdentifier userByName = AuthorizationUtils.ofUser(metalake, "ext-1");
+    NameIdentifier userByExternalId = AuthorizationUtils.ofUserExternalId(metalake, "ext-1");
+    Assertions.assertNotEquals(userByName, userByExternalId);
   }
 
   @Test

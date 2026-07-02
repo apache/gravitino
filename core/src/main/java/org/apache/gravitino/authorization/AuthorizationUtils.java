@@ -71,6 +71,9 @@ public class AuthorizationUtils {
       "Group with external id %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
+  /** Prefix for external id lock paths to avoid colliding with user/group name paths. */
+  private static final String EXTERNAL_ID_NAME_PREFIX = "@externalId:";
+
   /**
    * Bidirectional map of deprecated privilege names to their new equivalents. This map is used for
    * backward compatibility when handling legacy privilege names.
@@ -147,6 +150,44 @@ public class AuthorizationUtils {
   public static NameIdentifier ofUser(String metalake, String user) {
     return NameIdentifier.of(
         metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
+  }
+
+  /**
+   * Creates a name identifier for locking or addressing a user by external id.
+   *
+   * <p>The path uses a reserved prefix in the leaf segment so it does not collide with {@link
+   * #ofUser(String, String)} when the external id equals a user name.
+   *
+   * @param metalake the metalake name
+   * @param externalId the external id of the user
+   * @return the name identifier of the user external id path
+   */
+  public static NameIdentifier ofUserExternalId(String metalake, String externalId) {
+    checkExternalId(externalId);
+    return NameIdentifier.of(
+        metalake,
+        Entity.SYSTEM_CATALOG_RESERVED_NAME,
+        Entity.USER_SCHEMA_NAME,
+        EXTERNAL_ID_NAME_PREFIX + externalId);
+  }
+
+  /**
+   * Creates a name identifier for locking or addressing a group by external id.
+   *
+   * <p>The path uses a reserved prefix in the leaf segment so it does not collide with {@link
+   * #ofGroup(String, String)} when the external id equals a group name.
+   *
+   * @param metalake the metalake name
+   * @param externalId the external id of the group
+   * @return the name identifier of the group external id path
+   */
+  public static NameIdentifier ofGroupExternalId(String metalake, String externalId) {
+    checkExternalId(externalId);
+    return NameIdentifier.of(
+        metalake,
+        Entity.SYSTEM_CATALOG_RESERVED_NAME,
+        Entity.GROUP_SCHEMA_NAME,
+        EXTERNAL_ID_NAME_PREFIX + externalId);
   }
 
   public static Namespace ofRoleNamespace(String metalake) {
