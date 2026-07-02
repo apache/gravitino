@@ -123,6 +123,20 @@ public class TestClickHouseDatabaseOperations {
     Assertions.assertEquals("DROP DATABASE `db_name` ON CLUSTER `ck_cluster`", sql);
   }
 
+  @Test
+  void testGenerateDropDatabaseSqlValidatesDatabaseName() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> newOps().buildDropSql("db`; DROP TABLE users; --", null));
+  }
+
+  @Test
+  void testGenerateDropDatabaseSqlValidatesClusterName() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> newOps().buildDropSql("db_name", "ck`; DROP TABLE users; --"));
+  }
+
   // ---------------------------------------------------------------------------
   // Comment metadata helpers
   // ---------------------------------------------------------------------------
