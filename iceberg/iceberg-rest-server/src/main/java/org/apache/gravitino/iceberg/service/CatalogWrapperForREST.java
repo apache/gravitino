@@ -39,6 +39,7 @@ import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
@@ -373,7 +374,19 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   /**
-   * Plan table scan and return scan tasks.
+   * Plan table scan without credential vending.
+   *
+   * @param tableIdentifier The table identifier.
+   * @param scanRequest The scan request parameters.
+   * @return PlanTableScanResponse with status=COMPLETED and file scan tasks.
+   */
+  public PlanTableScanResponse planTableScan(
+      TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest) {
+    return planTableScan(tableIdentifier, scanRequest, false, CredentialPrivilege.READ);
+  }
+
+  /**
+   * Plan table scan and optionally inject vended storage credentials.
    *
    * <p>This method performs server-side scan planning to optimize query performance by reducing
    * client-side metadata loading and enabling parallel task execution.
@@ -384,18 +397,27 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * different from asynchronous mode (SUBMITTED status) where a plan ID is returned for later
    * retrieval.
    *
+   * <p>When {@code requestCredentialVending} is true and the table is eligible (non-local,
+   * non-HDFS), storage credentials are injected directly into the response using the table already
+   * loaded for scan planning -- avoiding a redundant {@code loadTable} call.
+   *
    * <p>Referenced from Iceberg PR #13400 for scan planning implementation.
    *
    * @param tableIdentifier The table identifier.
    * @param scanRequest The scan request parameters including filters, projections, snapshot-id,
    *     etc.
+   * @param requestCredentialVending whether the client requested credential vending
+   * @param privilege the credential privilege level for vending
    * @return PlanTableScanResponse with status=COMPLETED and file scan tasks.
    * @throws IllegalArgumentException if scan request validation fails
    * @throws org.apache.gravitino.exceptions.NoSuchTableException if table doesn't exist
    * @throws RuntimeException for other scan planning failures
    */
   public PlanTableScanResponse planTableScan(
-      TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest) {
+      TableIdentifier tableIdentifier,
+      PlanTableScanRequest scanRequest,
+      boolean requestCredentialVending,
+      CredentialPrivilege privilege) {
 
     LOG.debug(
         "Planning scan for table: {}, snapshotId: {}, startSnapshotId: {}, endSnapshotId: {}, select: {}, caseSensitive: {}",
@@ -445,6 +467,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             e);
       }
 
+      if (requestCredentialVending && !isLocalOrHdfsLocation(table.location())) {
+        response = injectScanCredentials(tableIdentifier, table, response, privilege);
+      }
+
       // Cache the scan plan response
       scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
       return response;
@@ -460,6 +486,76 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       throw new RuntimeException(
           "Scan planning failed for table " + tableIdentifier + ": " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Inject vended credentials into a scan response using the already-loaded table, avoiding a
+   * redundant {@code loadTable} call. Follows the same eligibility logic as {@link
+   * #shouldGenerateCredential} and the same credential generation as {@link #getCredential}.
+   */
+  @SuppressWarnings("deprecation")
+  private PlanTableScanResponse injectScanCredentials(
+      TableIdentifier tableIdentifier,
+      Table table,
+      PlanTableScanResponse response,
+      CredentialPrivilege privilege) {
+    try {
+      validateCredentialLocation(table.location());
+      Credential credential = getCredentialFromTable(table, privilege);
+      Map<String, String> config =
+          new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+      config.putAll(
+          IcebergRESTUtils.buildRefreshProps(
+              catalogCredentialManager.catalogName(), tableIdentifier, config));
+      org.apache.iceberg.rest.credentials.Credential restCred =
+          IcebergRESTUtils.toRESTCredential(table.location(), config);
+      // TODO: Replace builder reconstruction when PlanTableScanResponse supports native
+      // credential fields in the Iceberg spec.
+      return PlanTableScanResponse.builder()
+          .withPlanStatus(response.planStatus())
+          .withPlanId(response.planId())
+          .withPlanTasks(response.planTasks())
+          .withFileScanTasks(response.fileScanTasks())
+          .withSpecsById(response.specsById())
+          .withErrorResponse(response.errorResponse())
+          .withCredentials(Collections.singletonList(restCred))
+          .build();
+    } catch (ServiceUnavailableException e) {
+      LOG.warn("Failed to generate scan credentials for table: {}", tableIdentifier, e);
+      return response;
+    }
+  }
+
+  /**
+   * Generate a credential using a {@link Table} object directly, extracting the same location and
+   * property values that {@link #getCredential(TableMetadata, CredentialPrivilege)} reads from
+   * {@link TableMetadata}.
+   */
+  private Credential getCredentialFromTable(Table table, CredentialPrivilege privilege) {
+    String location = table.location();
+    Map<String, String> properties = table.properties();
+    String[] paths =
+        Stream.of(
+                location,
+                properties.getOrDefault(TableProperties.WRITE_DATA_LOCATION, ""),
+                properties.getOrDefault(TableProperties.WRITE_METADATA_LOCATION, ""))
+            .filter(StringUtils::isNotBlank)
+            .toArray(String[]::new);
+
+    PathBasedCredentialContext context =
+        privilege == CredentialPrivilege.WRITE
+            ? new PathBasedCredentialContext(
+                PrincipalUtils.getCurrentUserName(),
+                ImmutableSet.copyOf(paths),
+                Collections.emptySet())
+            : new PathBasedCredentialContext(
+                PrincipalUtils.getCurrentUserName(),
+                Collections.emptySet(),
+                ImmutableSet.copyOf(paths));
+    return catalogCredentialManager
+        .getCredentialByPath(location, context)
+        .orElseThrow(
+            () -> new ServiceUnavailableException("Couldn't generate credential, %s", context));
   }
 
   /**
