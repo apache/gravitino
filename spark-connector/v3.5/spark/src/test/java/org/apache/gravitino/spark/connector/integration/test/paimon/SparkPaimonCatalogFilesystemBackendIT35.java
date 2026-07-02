@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.paimon;
 
+import java.util.List;
 import org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark35;
+import org.apache.spark.sql.Row;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -32,5 +34,29 @@ public class SparkPaimonCatalogFilesystemBackendIT35 extends SparkPaimonCatalogF
             .conf()
             .getConfString("spark.sql.catalog." + getCatalogName());
     Assertions.assertEquals(GravitinoPaimonCatalogSpark35.class.getName(), catalogClass);
+  }
+
+  @Test
+  void testPaimonCompactProcedure() {
+    String tableName = "test_paimon_compact";
+    dropTableIfExists(tableName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING COMMENT '') USING paimon",
+            tableName));
+
+    sql(String.format("INSERT INTO %s VALUES(1, 'a', 'beijing')", tableName));
+    sql(String.format("INSERT INTO %s VALUES(2, 'b', 'shanghai')", tableName));
+
+    String fullTableName =
+        String.format("%s.%s.%s", getCatalogName(), getDefaultDatabase(), tableName);
+
+    List<Row> result =
+        getSparkSession()
+            .sql(
+                String.format(
+                    "CALL %s.system.compact(table => '%s')", getCatalogName(), fullTableName))
+            .collectAsList();
+    Assertions.assertFalse(result.isEmpty());
   }
 }
