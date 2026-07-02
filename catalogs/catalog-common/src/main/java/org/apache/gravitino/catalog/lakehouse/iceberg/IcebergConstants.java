@@ -52,6 +52,7 @@ public class IcebergConstants {
   public static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
   public static final String ICEBERG_S3_TOKEN = "s3.session-token";
   public static final String ICEBERG_S3_PATH_STYLE_ACCESS = "s3.path-style-access";
+  public static final String ICEBERG_S3_REMOTE_SIGNING_ENABLED = "s3.remote-signing-enabled";
   public static final String AWS_S3_REGION = "client.region";
 
   public static final String ICEBERG_OSS_ENDPOINT = "oss.endpoint";

@@ -31,7 +31,6 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.rest.RESTCatalogProperties;
 import org.apache.iceberg.rest.requests.RemoteSignRequest;
 import org.apache.iceberg.rest.responses.ImmutableRemoteSignResponse;
@@ -77,7 +76,7 @@ public class S3RemoteRequestSigner implements RemoteRequestSigner {
   public Map<String, String> clientConfig(IcebergConfig icebergConfig, String signerEndpoint) {
     Map<String, String> config = new HashMap<>();
     config.put(RESTCatalogProperties.SIGNER_ENDPOINT, signerEndpoint);
-    config.put(S3FileIOProperties.REMOTE_SIGNING_ENABLED, "true");
+    config.put(IcebergConstants.ICEBERG_S3_REMOTE_SIGNING_ENABLED, "true");
     String region = icebergConfig.getRawString(IcebergConfig.S3_REGION.getKey());
     if (StringUtils.isNotBlank(region)) {
       config.put(IcebergConstants.AWS_S3_REGION, region);

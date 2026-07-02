@@ -36,6 +36,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
@@ -73,7 +74,6 @@ import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.UpdateRequirements;
-import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.metrics.CommitReport;
@@ -749,7 +749,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertFalse(
-        loadTableResponse.config().containsKey(S3FileIOProperties.REMOTE_SIGNING_ENABLED));
+        loadTableResponse.config().containsKey(IcebergConstants.ICEBERG_S3_REMOTE_SIGNING_ENABLED));
 
     String s3TableName = "create_with_remote_signing_s3";
     String s3Location = "s3://dummy-bucket/" + s3TableName;
@@ -757,7 +757,8 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     LoadTableResponse s3LoadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
-        "true", s3LoadTableResponse.config().get(S3FileIOProperties.REMOTE_SIGNING_ENABLED));
+        "true",
+        s3LoadTableResponse.config().get(IcebergConstants.ICEBERG_S3_REMOTE_SIGNING_ENABLED));
     Assertions.assertTrue(
         s3LoadTableResponse
             .config()
@@ -768,7 +769,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
-        "true", loadTableResponse.config().get(S3FileIOProperties.REMOTE_SIGNING_ENABLED));
+        "true", loadTableResponse.config().get(IcebergConstants.ICEBERG_S3_REMOTE_SIGNING_ENABLED));
   }
 
   private Response doCreateTableWithRemoteSigning(Namespace ns, String name, String location) {

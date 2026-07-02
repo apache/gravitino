@@ -41,8 +41,7 @@ public class IcebergRequestContext {
   private final String userName;
   private final String remoteHostName;
   private final Map<String, String> httpHeaders;
-  private final boolean requestCredentialVending;
-  private final boolean requestRemoteSigning;
+  private final IcebergAccessDelegation accessDelegation;
 
   /**
    * Constructs a new {@code IcebergRequestContext} instance.
@@ -52,18 +51,6 @@ public class IcebergRequestContext {
    */
   public IcebergRequestContext(HttpServletRequest httpRequest, String catalogName) {
     this(httpRequest, catalogName, IcebergAccessDelegation.none());
-  }
-
-  /**
-   * Constructs a new {@code IcebergRequestContext} instance.
-   *
-   * @param httpRequest The HttpServletRequest object containing request details.
-   * @param catalogName The name of the catalog to be accessed in the request.
-   * @param requestCredentialVending Whether the request is for credential vending.
-   */
-  public IcebergRequestContext(
-      HttpServletRequest httpRequest, String catalogName, boolean requestCredentialVending) {
-    this(httpRequest, catalogName, IcebergAccessDelegation.of(requestCredentialVending, false));
   }
 
   /**
@@ -82,8 +69,7 @@ public class IcebergRequestContext {
     this.httpHeaders = IcebergRESTUtils.getHttpHeaders(httpRequest);
     this.catalogName = catalogName;
     this.userName = PrincipalUtils.getCurrentUserName();
-    this.requestCredentialVending = accessDelegation.requestVendedCredentials();
-    this.requestRemoteSigning = accessDelegation.requestRemoteSigning();
+    this.accessDelegation = accessDelegation;
   }
 
   private static String resolveClientAddress(HttpServletRequest request) {
@@ -134,6 +120,15 @@ public class IcebergRequestContext {
   }
 
   /**
+   * Returns parsed {@code X-Iceberg-Access-Delegation} capabilities requested by the client.
+   *
+   * @return access delegation mode
+   */
+  public IcebergAccessDelegation accessDelegation() {
+    return accessDelegation;
+  }
+
+  /**
    * Checks whether this request opted into asynchronous table purge.
    *
    * <p>Async purge is opt-in. Standard Iceberg clients send no header and keep synchronous purge
@@ -149,24 +144,6 @@ public class IcebergRequestContext {
       }
     }
     return false;
-  }
-
-  /**
-   * Checks if the request is for credential vending.
-   *
-   * @return true if the request is for credential vending, false otherwise.
-   */
-  public boolean requestCredentialVending() {
-    return requestCredentialVending;
-  }
-
-  /**
-   * Checks if the request is for remote signing.
-   *
-   * @return true if the request is for remote signing, false otherwise.
-   */
-  public boolean requestRemoteSigning() {
-    return requestRemoteSigning;
   }
 
   /**

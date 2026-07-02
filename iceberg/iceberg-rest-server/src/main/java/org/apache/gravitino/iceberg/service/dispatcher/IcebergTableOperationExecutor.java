@@ -108,11 +108,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .createTable(
-            namespace,
-            createTableRequest,
-            context.requestCredentialVending(),
-            context.requestRemoteSigning());
+        .createTable(namespace, createTableRequest, context.accessDelegation());
   }
 
   @Override
@@ -169,17 +165,13 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     CredentialPrivilege privilege = CredentialPrivilege.READ;
-    if (context.requestCredentialVending()) {
+    if (context.accessDelegation().requestVendedCredentials()) {
       privilege = getCredentialPrivilege(context, tableIdentifier);
     }
 
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .loadTable(
-            tableIdentifier,
-            context.requestCredentialVending(),
-            context.requestRemoteSigning(),
-            privilege);
+        .loadTable(tableIdentifier, context.accessDelegation(), privilege);
   }
 
   @Override

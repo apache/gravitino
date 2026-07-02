@@ -104,36 +104,27 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
 
   @Override
   public LoadTableResponse createTable(
-      Namespace namespace,
-      CreateTableRequest request,
-      boolean requestCredential,
-      boolean requestRemoteSigning) {
-    return createTableInternal(namespace, request, requestCredential, requestRemoteSigning);
+      Namespace namespace, CreateTableRequest request, IcebergAccessDelegation accessDelegation) {
+    return createTableInternal(namespace, request, accessDelegation);
   }
 
   @Override
   public LoadTableResponse loadTable(
       TableIdentifier identifier,
-      boolean requestCredential,
-      boolean requestRemoteSigning,
+      IcebergAccessDelegation accessDelegation,
       CredentialPrivilege privilege) {
     LoadTableResponse response = loadTableInternal(identifier);
-    return maybeInjectDataAccessConfig(
-        identifier, response, requestCredential, requestRemoteSigning, privilege);
+    return maybeInjectDataAccessConfig(identifier, response, accessDelegation, privilege);
   }
 
   @Override
   public LoadTableResponse registerTable(
-      Namespace namespace,
-      RegisterTableRequest request,
-      boolean requestCredential,
-      boolean requestRemoteSigning) {
+      Namespace namespace, RegisterTableRequest request, IcebergAccessDelegation accessDelegation) {
     LoadTableResponse response = registerTableInternal(namespace, request);
     return maybeInjectDataAccessConfig(
         TableIdentifier.of(namespace, request.name()),
         response,
-        requestCredential,
-        requestRemoteSigning,
+        accessDelegation,
         CredentialPrivilege.WRITE);
   }
 
@@ -283,14 +274,11 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    * extracts client-facing FileIO/credential properties from {@code table.io()}.
    */
   private LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
-    return createTableInternal(namespace, request, false, false);
+    return createTableInternal(namespace, request, IcebergAccessDelegation.none());
   }
 
   private LoadTableResponse createTableInternal(
-      Namespace namespace,
-      CreateTableRequest request,
-      boolean requestCredential,
-      boolean requestRemoteSigning) {
+      Namespace namespace, CreateTableRequest request, IcebergAccessDelegation accessDelegation) {
     Catalog loadedCatalog = getCatalog();
 
     request.validate();
@@ -312,7 +300,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     if (table instanceof BaseTable) {
       LoadTableResponse response = buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
       return maybeInjectDataAccessConfig(
-          ident, response, requestCredential, requestRemoteSigning, CredentialPrivilege.WRITE);
+          ident, response, accessDelegation, CredentialPrivilege.WRITE);
     }
 
     throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");

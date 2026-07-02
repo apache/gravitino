@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
+import org.apache.gravitino.iceberg.service.IcebergAccessDelegation;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileFormat;
@@ -55,12 +56,8 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
 
   @Override
   public LoadTableResponse createTable(
-      Namespace namespace,
-      CreateTableRequest request,
-      boolean requestCredential,
-      boolean requestRemoteSigning) {
-    LoadTableResponse loadTableResponse =
-        super.createTable(namespace, request, requestCredential, requestRemoteSigning);
+      Namespace namespace, CreateTableRequest request, IcebergAccessDelegation accessDelegation) {
+    LoadTableResponse loadTableResponse = super.createTable(namespace, request, accessDelegation);
     if (shouldGeneratePlanTasksData(request)) {
       appendSampleData(namespace, request.name());
     }
@@ -69,10 +66,7 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
 
   @Override
   public LoadTableResponse registerTable(
-      Namespace namespace,
-      RegisterTableRequest request,
-      boolean requestCredential,
-      boolean requestRemoteSigning) {
+      Namespace namespace, RegisterTableRequest request, IcebergAccessDelegation accessDelegation) {
     if (request.name().contains("fail")) {
       throw new AlreadyExistsException("Already exits exception for test");
     }
@@ -106,8 +100,7 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
     return maybeInjectDataAccessConfig(
         TableIdentifier.of(namespace, request.name()),
         loadTableResponse,
-        requestCredential,
-        requestRemoteSigning,
+        accessDelegation,
         CredentialPrivilege.WRITE);
   }
 

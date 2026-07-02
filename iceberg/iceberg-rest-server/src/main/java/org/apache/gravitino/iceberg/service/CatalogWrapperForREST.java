@@ -123,21 +123,16 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    *
    * @param namespace Iceberg namespace
    * @param request create table request
-   * @param requestCredential whether to vend credentials
-   * @param requestRemoteSigning whether to enable remote signing
+   * @param accessDelegation client-requested access delegation capabilities
    * @return load table response for the created table
    */
   public LoadTableResponse createTable(
-      Namespace namespace,
-      CreateTableRequest request,
-      boolean requestCredential,
-      boolean requestRemoteSigning) {
+      Namespace namespace, CreateTableRequest request, IcebergAccessDelegation accessDelegation) {
     LoadTableResponse loadTableResponse = super.createTable(namespace, request);
     return maybeInjectDataAccessConfig(
         TableIdentifier.of(namespace, request.name()),
         loadTableResponse,
-        requestCredential,
-        requestRemoteSigning,
+        accessDelegation,
         CredentialPrivilege.WRITE);
   }
 
@@ -145,19 +140,16 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * Loads a table and optionally injects vended credentials or remote-signing configuration.
    *
    * @param identifier table identifier
-   * @param requestCredential whether to vend credentials
-   * @param requestRemoteSigning whether to enable remote signing
+   * @param accessDelegation client-requested access delegation capabilities
    * @param privilege credential privilege when vending credentials
    * @return load table response
    */
   public LoadTableResponse loadTable(
       TableIdentifier identifier,
-      boolean requestCredential,
-      boolean requestRemoteSigning,
+      IcebergAccessDelegation accessDelegation,
       CredentialPrivilege privilege) {
     LoadTableResponse loadTableResponse = super.loadTable(identifier);
-    return maybeInjectDataAccessConfig(
-        identifier, loadTableResponse, requestCredential, requestRemoteSigning, privilege);
+    return maybeInjectDataAccessConfig(identifier, loadTableResponse, accessDelegation, privilege);
   }
 
   /**
@@ -165,21 +157,16 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    *
    * @param namespace Iceberg namespace
    * @param request register table request
-   * @param requestCredential whether to vend credentials
-   * @param requestRemoteSigning whether to enable remote signing
+   * @param accessDelegation client-requested access delegation capabilities
    * @return load table response for the registered table
    */
   public LoadTableResponse registerTable(
-      Namespace namespace,
-      RegisterTableRequest request,
-      boolean requestCredential,
-      boolean requestRemoteSigning) {
+      Namespace namespace, RegisterTableRequest request, IcebergAccessDelegation accessDelegation) {
     LoadTableResponse loadTableResponse = super.registerTable(namespace, request);
     return maybeInjectDataAccessConfig(
         TableIdentifier.of(namespace, request.name()),
         loadTableResponse,
-        requestCredential,
-        requestRemoteSigning,
+        accessDelegation,
         CredentialPrivilege.WRITE);
   }
 
@@ -366,15 +353,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @VisibleForTesting
   protected boolean shouldGenerateCredential(
       LoadTableResponse loadTableResponse, boolean requestCredential) {
-    return shouldInjectDataAccess(loadTableResponse, requestCredential, false);
+    return shouldInjectDataAccess(
+        loadTableResponse, IcebergAccessDelegation.of(requestCredential, false));
   }
 
   @VisibleForTesting
   protected boolean shouldInjectDataAccess(
-      LoadTableResponse loadTableResponse,
-      boolean requestCredential,
-      boolean requestRemoteSigning) {
-    if (!requestCredential && !requestRemoteSigning) {
+      LoadTableResponse loadTableResponse, IcebergAccessDelegation accessDelegation) {
+    if (!accessDelegation.requestVendedCredentials() && !accessDelegation.requestRemoteSigning()) {
       return false;
     }
 
@@ -385,15 +371,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   protected LoadTableResponse maybeInjectDataAccessConfig(
       TableIdentifier tableIdentifier,
       LoadTableResponse loadTableResponse,
-      boolean requestCredential,
-      boolean requestRemoteSigning,
+      IcebergAccessDelegation accessDelegation,
       CredentialPrivilege privilege) {
-    if (!shouldInjectDataAccess(loadTableResponse, requestCredential, requestRemoteSigning)) {
+    if (!shouldInjectDataAccess(loadTableResponse, accessDelegation)) {
       return loadTableResponse;
     }
 
     LoadTableResponse response = loadTableResponse;
-    if (requestRemoteSigning) {
+    if (accessDelegation.requestRemoteSigning()) {
       RemoteSignSupport.Provider provider =
           RemoteSignSupport.Provider.fromLocation(loadTableResponse.tableMetadata().location());
       if (!remoteSignSupport().supports(provider)) {
@@ -402,7 +387,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       }
       response = injectRemoteSigningConfig(tableIdentifier, response);
     }
-    if (requestCredential) {
+    if (accessDelegation.requestVendedCredentials()) {
       response = injectCredentialConfig(tableIdentifier, response, privilege);
     }
     return response;

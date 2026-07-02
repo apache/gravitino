@@ -49,7 +49,6 @@ dependencies {
     exclude("*")
   }
   implementation(libs.bundles.iceberg)
-  implementation(libs.iceberg.aws)
   implementation(libs.aws.s3)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
