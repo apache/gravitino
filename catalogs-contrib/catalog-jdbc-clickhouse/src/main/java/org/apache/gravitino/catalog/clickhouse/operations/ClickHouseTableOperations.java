@@ -111,7 +111,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   protected List<Index> getIndexes(Connection connection, String databaseName, String tableName) {
     // cause clickhouse not impl getPrimaryKeys yet, ref:
     // https://github.com/ClickHouse/clickhouse-java/issues/1625
-    String sql = QUERY_INDEXES_SQL.formatted(databaseName, tableName);
+    String sql =
+        QUERY_INDEXES_SQL.formatted(
+            escapeSingleQuotes(databaseName), escapeSingleQuotes(tableName));
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
