@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -116,6 +117,17 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public PagedResult<User> listUsers(String metalake, int offset, int limit)
+      throws NoSuchMetalakeException {
+    return dispatcher.listUsers(metalake, offset, limit);
+  }
+
+  @Override
+  public long countUsers(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.countUsers(metalake);
+  }
+
+  @Override
   public String[] listUserNames(String metalake) throws NoSuchMetalakeException {
     return dispatcher.listUserNames(metalake);
   }
@@ -158,6 +170,16 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
     return dispatcher.listGroups(metalake);
+  }
+
+  @Override
+  public PagedResult<Group> listGroups(String metalake, int offset, int limit) {
+    return dispatcher.listGroups(metalake, offset, limit);
+  }
+
+  @Override
+  public long countGroups(String metalake) {
+    return dispatcher.countGroups(metalake);
   }
 
   @Override

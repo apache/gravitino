@@ -35,6 +35,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
@@ -401,5 +402,44 @@ public class GroupMetaService {
     NameIdentifier ident = AuthorizationUtils.ofGroup(metalakeName, groupPO.getGroupName());
     deleteGroup(ident);
     return ident;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "countGroupsByMetalake")
+  public long countGroupsByMetalake(String metalakeName) {
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    Long count =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class, mapper -> mapper.countGroupMetasByMetalakeId(metalakeId));
+    return count == null ? 0L : count;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listGroupsByMetalakePaginated")
+  public PagedResult<GroupEntity> listGroupsByMetalakePaginated(
+      String metalakeName, int offset, int limit) {
+    Preconditions.checkArgument(offset >= 0, "offset must be >= 0");
+    Preconditions.checkArgument(limit >= 0, "limit must be >= 0");
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    long totalCount = countGroupsByMetalake(metalakeName);
+    if (limit == 0 || offset >= totalCount) {
+      return new PagedResult<>(totalCount, Collections.emptyList());
+    }
+
+    List<ExtendedGroupPO> groupPOs =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class,
+            mapper -> mapper.listExtendedGroupPOsByMetalakeIdPaginated(metalakeId, offset, limit));
+    List<GroupEntity> groups =
+        groupPOs.stream()
+            .map(
+                po ->
+                    POConverters.fromExtendedGroupPO(
+                        po, AuthorizationUtils.ofGroupNamespace(metalakeName)))
+            .collect(Collectors.toList());
+    return new PagedResult<>(totalCount, groups);
   }
 }

@@ -102,6 +102,42 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   }
 
   @Override
+  public String listExtendedUserPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.external_id as externalId, ut.enabled as enabled,"
+        + " ut.audit_info as auditInfo,"
+        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
+        + " ut.deleted_at as deletedAt,"
+        + " JSON_AGG(rot.role_name) as roleNames,"
+        + " JSON_AGG(rot.role_id) as roleIds"
+        + " FROM ("
+        + " SELECT user_id FROM "
+        + USER_TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
+        + " ORDER BY user_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " ) paginated"
+        + " JOIN "
+        + USER_TABLE_NAME
+        + " ut ON ut.user_id = paginated.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.user_id = ut.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " GROUP BY ut.user_id"
+        + " ORDER BY ut.user_id ASC";
+  }
+
+  @Override
   public String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "

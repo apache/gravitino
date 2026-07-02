@@ -39,6 +39,7 @@ import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -1062,6 +1063,23 @@ class TestGroupMetaService extends TestJDBCBackend {
   private GroupUpdatedAt getGroupUpdatedAt(String groupName) {
     return SessionUtils.doWithCommitAndFetchResult(
         GroupMetaMapper.class, mapper -> mapper.getGroupUpdatedAt(metalakeName, groupName));
+  }
+
+  @TestTemplate
+  void testGroupPagination() throws IOException {
+    GroupMetaService svc = groupMetaService();
+    svc.insertGroup(groupWithExtId("g1", "ext-page-1"), false);
+
+    Assertions.assertEquals(1, svc.countGroupsByMetalake(metalakeName));
+
+    PagedResult<GroupEntity> page = svc.listGroupsByMetalakePaginated(metalakeName, 0, 10);
+    Assertions.assertEquals(1, page.totalCount());
+    Assertions.assertEquals(1, page.items().size());
+    Assertions.assertEquals("g1", page.items().get(0).name());
+
+    Assertions.assertTrue(svc.listGroupsByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
+    Assertions.assertTrue(
+        svc.listGroupsByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
   }
 
   @TestTemplate

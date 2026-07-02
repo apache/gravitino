@@ -67,6 +67,15 @@ public interface GroupMetaMapper {
       method = "listExtendedGroupPOsByMetalakeId")
   List<ExtendedGroupPO> listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "countGroupMetasByMetalakeId")
+  Long countGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "listExtendedGroupPOsByMetalakeIdPaginated")
+  List<ExtendedGroupPO> listExtendedGroupPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId, @Param("offset") int offset, @Param("limit") int limit);
+
   @InsertProvider(type = GroupMetaSQLProviderFactory.class, method = "insertGroupMeta")
   void insertGroupMeta(@Param("groupMeta") GroupPO groupPO);
 

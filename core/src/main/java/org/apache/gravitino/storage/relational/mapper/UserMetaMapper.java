@@ -65,6 +65,15 @@ public interface UserMetaMapper {
       method = "listExtendedUserPOsByMetalakeId")
   List<ExtendedUserPO> listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "countUserMetasByMetalakeId")
+  Long countUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "listExtendedUserPOsByMetalakeIdPaginated")
+  List<ExtendedUserPO> listExtendedUserPOsByMetalakeIdPaginated(
+      @Param("metalakeId") Long metalakeId, @Param("offset") int offset, @Param("limit") int limit);
+
   @InsertProvider(
       type = UserMetaSQLProviderFactory.class,
       method = "insertUserMetaOnDuplicateKeyUpdate")
