@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.doris.operation;
 
 import static org.apache.gravitino.catalog.doris.DorisCatalog.DORIS_TABLE_PROPERTIES_META;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -160,7 +161,8 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
     // set the property 'replication_num' to 1 explicitly.
-    if (!resultMap.containsKey(REPLICATION_FACTOR)) {
+    if (!resultMap.containsKey(REPLICATION_FACTOR)
+        && !resultMap.containsKey(REPLICATION_ALLOCATION)) {
       // Try to check the number of backend servers using `show backends`, this SQL is supported by
       // all versions of Doris
       String query = "show backends";

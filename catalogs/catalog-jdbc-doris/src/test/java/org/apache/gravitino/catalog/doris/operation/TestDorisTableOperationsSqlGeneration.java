@@ -18,7 +18,16 @@
  */
 package org.apache.gravitino.catalog.doris.operation;
 
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import javax.sql.DataSource;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -41,6 +50,10 @@ public class TestDorisTableOperationsSqlGeneration {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new DorisTypeConverter();
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+    }
+
+    public void setDataSource(DataSource dataSource) {
+      super.dataSource = dataSource;
     }
 
     public String createTableSql(
@@ -106,5 +119,46 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
+  }
+
+  @Test
+  public void testAppendNecessaryPropertiesAddsReplicationNumWhenBackendsAreNotEnough()
+      throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    ops.setDataSource(mockBackendDataSource(1));
+
+    Map<String, String> properties = ops.appendNecessaryProperties(Collections.emptyMap());
+
+    Assertions.assertEquals("1", properties.get(REPLICATION_FACTOR));
+  }
+
+  @Test
+  public void testAppendNecessaryPropertiesKeepsReplicationAllocation() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    ops.setDataSource(mockBackendDataSource(1));
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(REPLICATION_ALLOCATION, "tag.location.default: 1");
+
+    Map<String, String> result = ops.appendNecessaryProperties(properties);
+
+    Assertions.assertEquals("tag.location.default: 1", result.get(REPLICATION_ALLOCATION));
+    Assertions.assertFalse(result.containsKey(REPLICATION_FACTOR));
+  }
+
+  private static DataSource mockBackendDataSource(int aliveBackendCount) throws Exception {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    Statement statement = Mockito.mock(Statement.class);
+    ResultSet resultSet = Mockito.mock(ResultSet.class);
+
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.createStatement()).thenReturn(statement);
+    Mockito.when(statement.executeQuery("show backends")).thenReturn(resultSet);
+    int[] remainingAliveBackends = new int[] {aliveBackendCount};
+    Mockito.when(resultSet.next()).thenAnswer(invocation -> remainingAliveBackends[0]-- > 0);
+    Mockito.when(resultSet.getString("Alive")).thenReturn("true");
+
+    return dataSource;
   }
 }
