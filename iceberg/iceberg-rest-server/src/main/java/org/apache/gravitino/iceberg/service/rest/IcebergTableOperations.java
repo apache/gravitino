@@ -78,6 +78,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchPlanningResultResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -550,6 +551,117 @@ public class IcebergTableOperations {
           });
     } catch (Exception e) {
       LOG.error("Failed to plan table scan: {}", e.getMessage(), e);
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
+  }
+
+  /**
+   * Fetch the result of a previously submitted async scan plan.
+   *
+   * @param prefix The catalog prefix
+   * @param namespace The namespace
+   * @param table The table name
+   * @param planId The plan identifier returned by a prior {@code planTableScan} call
+   * @return Response containing the current plan status and, when complete, the scan tasks
+   */
+  @GET
+  @Path("{table}/plan/{planId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "fetch-planning-result." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "fetch-planning-result", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
+  public Response fetchPlanningResult(
+      @PathParam("prefix") @AuthorizationMetadata(type = EntityType.CATALOG) String prefix,
+      @Encoded() @PathParam("namespace") @AuthorizationMetadata(type = EntityType.SCHEMA)
+          String namespace,
+      @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
+      @PathParam("planId") String planId) {
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+    String tableName = RESTUtil.decodeString(table);
+    LOG.info(
+        "Fetch planning result, catalog: {}, namespace: {}, table: {}, planId: {}",
+        catalogName,
+        icebergNS,
+        tableName,
+        planId);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+
+            FetchPlanningResultResponse response =
+                tableOperationDispatcher.fetchPlanningResult(context, tableIdentifier, planId);
+
+            return IcebergRESTUtils.ok(response);
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to fetch planning result: {}", e.getMessage(), e);
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
+  }
+
+  /**
+   * Cancel a previously submitted async scan plan.
+   *
+   * @param prefix The catalog prefix
+   * @param namespace The namespace
+   * @param table The table name
+   * @param planId The plan identifier to cancel
+   * @return Response with 204 No Content on success
+   */
+  @DELETE
+  @Path("{table}/plan/{planId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "cancel-planning." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "cancel-planning", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
+  public Response cancelPlanning(
+      @PathParam("prefix") @AuthorizationMetadata(type = EntityType.CATALOG) String prefix,
+      @Encoded() @PathParam("namespace") @AuthorizationMetadata(type = EntityType.SCHEMA)
+          String namespace,
+      @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
+      @PathParam("planId") String planId) {
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+    String tableName = RESTUtil.decodeString(table);
+    LOG.info(
+        "Cancel planning, catalog: {}, namespace: {}, table: {}, planId: {}",
+        catalogName,
+        icebergNS,
+        tableName,
+        planId);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+
+            tableOperationDispatcher.cancelPlanning(context, tableIdentifier, planId);
+
+            return IcebergRESTUtils.noContent();
+          });
+    } catch (Exception e) {
+      LOG.error("Failed to cancel planning: {}", e.getMessage(), e);
       return IcebergExceptionMapper.toRESTResponse(e);
     }
   }

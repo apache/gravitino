@@ -40,10 +40,12 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchPlanIdException;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchPlanningResultResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -225,6 +227,32 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .planTableScan(tableIdentifier, scanRequest);
+  }
+
+  @Override
+  public FetchPlanningResultResponse fetchPlanningResult(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId) {
+    // Validate the table exists first (consistent with planTableScan behavior)
+    icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .getCatalog()
+        .loadTable(tableIdentifier);
+    throw new NoSuchPlanIdException(
+        "Plan %s not found for table %s. Synchronous planning does not retain plan IDs.",
+        planId, tableIdentifier);
+  }
+
+  @Override
+  public void cancelPlanning(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId) {
+    // Validate the table exists first (consistent with planTableScan behavior)
+    icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .getCatalog()
+        .loadTable(tableIdentifier);
+    throw new NoSuchPlanIdException(
+        "Plan %s not found for table %s. Synchronous planning does not retain plan IDs.",
+        planId, tableIdentifier);
   }
 
   @Override

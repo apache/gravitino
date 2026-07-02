@@ -40,12 +40,16 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.IcebergCancelPlanningFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergCancelPlanningPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchPlanningResultFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchPlanningResultPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
@@ -1114,5 +1118,81 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             Mockito.mock(IcebergRequestContext.class),
             NameIdentifier.of("metalake", "catalog", "schema"));
     Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testFetchPlanningResultNotFound(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "fetch_plan_table");
+
+    dummyEventListener.clearEvent();
+
+    // Synchronous planning does not retain plan IDs, so any plan ID should return 404
+    Response response = doFetchPlanningResult(namespace, "fetch_plan_table", "nonexistent-plan-id");
+    Assertions.assertEquals(404, response.getStatus());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergFetchPlanningResultPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergFetchPlanningResultFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCancelPlanningNotFound(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "cancel_plan_table");
+
+    dummyEventListener.clearEvent();
+
+    // Synchronous planning does not retain plan IDs, so any plan ID should return 404
+    Response response = doCancelPlanning(namespace, "cancel_plan_table", "nonexistent-plan-id");
+    Assertions.assertEquals(404, response.getStatus());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergCancelPlanningPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergCancelPlanningFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testFetchPlanningResultTableNotFound(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    dummyEventListener.clearEvent();
+
+    // Table does not exist — should return 404 (NoSuchTableException), same as planTableScan
+    Response response = doFetchPlanningResult(namespace, "missing_table", "nonexistent-plan-id");
+    Assertions.assertEquals(404, response.getStatus());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergFetchPlanningResultPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergFetchPlanningResultFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCancelPlanningTableNotFound(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    dummyEventListener.clearEvent();
+
+    // Table does not exist — should return 404 (NoSuchTableException), same as planTableScan
+    Response response = doCancelPlanning(namespace, "missing_table", "nonexistent-plan-id");
+    Assertions.assertEquals(404, response.getStatus());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergCancelPlanningPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergCancelPlanningFailureEvent);
+  }
+
+  private Response doFetchPlanningResult(Namespace ns, String tableName, String planId) {
+    return getTableClientBuilder(ns, Optional.of(tableName + "/plan/" + planId)).get();
+  }
+
+  private Response doCancelPlanning(Namespace ns, String tableName, String planId) {
+    return getTableClientBuilder(ns, Optional.of(tableName + "/plan/" + planId)).delete();
   }
 }
