@@ -26,7 +26,8 @@ WORKDIR /opt/gravitino
 
 COPY --chmod=775 packages/gravitino /opt/gravitino
 
-RUN chmod +x /opt/gravitino/docker/docker-entrypoint.sh \
+RUN chmod 775 /opt/gravitino \
+    && chmod +x /opt/gravitino/docker/docker-entrypoint.sh \
     && useradd -u 1000 -g 0 -M -s /sbin/nologin gravitino
 
 EXPOSE 8090

@@ -257,6 +257,17 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   }
 
   @Test
+  public void testGetScheme() throws IOException {
+    Assumptions.assumeTrue(getClass() == TestGvfsBase.class);
+    try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(conf)) {
+      // The default FileSystem#getScheme() throws UnsupportedOperationException, which breaks
+      // Hadoop / Spark commit protocols when writing to a gvfs:// path. GVFS must override it
+      // and return the GVFS scheme constant.
+      assertEquals(GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME, fs.getScheme());
+    }
+  }
+
+  @Test
   public void testRequestHeaders()
       throws NoSuchFieldException, IllegalAccessException, IOException {
     String envKey = "GRAVITINO_TEST_HEADER";

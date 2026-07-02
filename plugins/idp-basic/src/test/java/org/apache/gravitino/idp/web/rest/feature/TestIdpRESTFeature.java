@@ -27,72 +27,53 @@ import com.google.common.collect.Lists;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.idp.SystemExitTestHelper;
+import org.apache.gravitino.idp.SystemExitTestHelper.SystemExitException;
 import org.junit.jupiter.api.Test;
 
 class TestIdpRESTFeature {
 
   @Test
-  void testSimpleFails() {
-    Config config = newConfig(AuthenticatorType.SIMPLE.name().toLowerCase());
+  void testSimpleWithBasicFails() {
+    Config config = new Config(false) {};
+    config.set(
+        Configs.AUTHENTICATORS,
+        Lists.newArrayList(
+            AuthenticatorType.SIMPLE.name().toLowerCase(),
+            AuthenticatorType.BASIC.name().toLowerCase()));
 
     SystemExitException exception =
-        assertThrows(SystemExitException.class, () -> validateWithExitGuard(config));
+        assertThrows(
+            SystemExitException.class,
+            () ->
+                SystemExitTestHelper.runWithExitGuard(
+                    () -> IdpRESTFeature.validateConfiguration(config)));
 
     assertEquals(1, exception.status());
   }
 
   @Test
-  void testDefaultSimpleFails() {
+  void testExtensionWithoutBasicFails() {
     Config config = new Config(false) {};
+    config.set(
+        Configs.AUTHENTICATORS, Lists.newArrayList(AuthenticatorType.OAUTH.name().toLowerCase()));
 
-    assertThrows(SystemExitException.class, () -> validateWithExitGuard(config));
+    SystemExitException exception =
+        assertThrows(
+            SystemExitException.class,
+            () ->
+                SystemExitTestHelper.runWithExitGuard(
+                    () -> IdpRESTFeature.validateConfiguration(config)));
+
+    assertEquals(1, exception.status());
   }
 
   @Test
-  void testOAuthOk() {
-    Config config = newConfig(AuthenticatorType.OAUTH.name().toLowerCase());
+  void testBasicOk() {
+    Config config = new Config(false) {};
+    config.set(
+        Configs.AUTHENTICATORS, Lists.newArrayList(AuthenticatorType.BASIC.name().toLowerCase()));
 
     assertDoesNotThrow(() -> IdpRESTFeature.validateConfiguration(config));
-  }
-
-  private static Config newConfig(String... authenticators) {
-    Config config = new Config(false) {};
-    config.set(Configs.AUTHENTICATORS, Lists.newArrayList(authenticators));
-    return config;
-  }
-
-  @SuppressWarnings("removal")
-  private static void validateWithExitGuard(Config config) {
-    SecurityManager original = System.getSecurityManager();
-    System.setSecurityManager(
-        new SecurityManager() {
-          @Override
-          public void checkExit(int status) {
-            throw new SystemExitException(status);
-          }
-
-          @Override
-          public void checkPermission(java.security.Permission perm) {
-            // Allow test execution.
-          }
-        });
-    try {
-      IdpRESTFeature.validateConfiguration(config);
-    } finally {
-      System.setSecurityManager(original);
-    }
-  }
-
-  private static final class SystemExitException extends SecurityException {
-    private final int status;
-
-    private SystemExitException(int status) {
-      super("System.exit(" + status + ")");
-      this.status = status;
-    }
-
-    private int status() {
-      return status;
-    }
   }
 }

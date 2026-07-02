@@ -12,7 +12,21 @@ The Apache Gravitino Spark connector offers the capability to read and write Ice
 ## Preparation
 
 1. Set `spark.sql.gravitino.enableIcebergSupport` to `true` in Spark configuration.
-2. Download Iceberg Spark runtime jar to Spark classpath.
+2. Download the Iceberg Spark runtime JAR and the Gravitino Spark connector runtime JAR that match your Spark minor version and Scala version, and place them in the Spark classpath.
+
+Spark clients use a different Iceberg version than the Gravitino server (1.11.0). Use the table below to choose the correct JARs for your Spark version.
+
+| Spark version | Scala          | Iceberg version | Iceberg client runtime artifact                         | Gravitino connector runtime artifact                                              |
+|---------------|----------------|-----------------|---------------------------------------------------------|-----------------------------------------------------------------------------------|
+| 3.3           | 2.12 or 2.13   | 1.8.1           | `iceberg-spark-runtime-3.3_${scala-version}-1.8.1.jar`  | `gravitino-spark-connector-runtime-3.3_${scala-version}-${gravitino-version}.jar` |
+| 3.4           | 2.12 or 2.13   | 1.11.0          | `iceberg-spark-runtime-3.4_${scala-version}-1.11.0.jar` | `gravitino-spark-connector-runtime-3.4_${scala-version}-${gravitino-version}.jar` |
+| 3.5           | 2.12 or 2.13   | 1.11.0          | `iceberg-spark-runtime-3.5_${scala-version}-1.11.0.jar` | `gravitino-spark-connector-runtime-3.5_${scala-version}-${gravitino-version}.jar` |
+
+Replace `${scala-version}` with `2.12` or `2.13`, and `${gravitino-version}` with your Gravitino release version.
+
+:::caution
+Use only the JARs from the matching table row. Mixing Iceberg JARs from different versions on the client classpath is not compatible and may cause runtime errors.
+:::
 
 ## Capabilities
 

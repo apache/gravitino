@@ -197,6 +197,28 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public boolean invalidateRelationEntry(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
+    checkArguments(ident, type, relType);
+    EntityCacheRelationKey key = EntityCacheRelationKey.of(ident, type, relType);
+    return segmentedLock.withLock(
+        key,
+        () -> {
+          // Drop the cached relation result, its index entry, and the reverse-index bookkeeping
+          // for this relation key only. Do NOT cascade through the reverse index to other
+          // entities: the reverse index is shared (e.g. all roles bound to one metadata object),
+          // and a BFS cascade would evict their mappings. cacheData.invalidate is explicit so it
+          // bypasses the removal listener; reverseIndex.remove(key) then cleans up only this
+          // entry's own bookkeeping (entityToReverseIndexMap + reverseIndex references to it).
+          cacheData.invalidate(key);
+          reverseIndex.remove(key);
+          cacheIndex.remove(key.toString());
+          return true;
+        });
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
     return segmentedLock.withLock(

@@ -37,6 +37,11 @@ dependencies {
   implementation(project(":catalogs:hadoop-common")) {
     exclude(group = "*")
   }
+  // hadoop-common's Kerberos path lives in :catalogs:hadoop-auth; bundle it into the
+  // catalog runtime libs (the hadoop-common dependency above is non-transitive).
+  implementation(project(":catalogs:hadoop-auth")) {
+    exclude(group = "*")
+  }
 
   implementation(libs.caffeine)
   implementation(libs.cglib)

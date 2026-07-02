@@ -245,6 +245,7 @@
    Apache Commons Codec
    Apache Commons Collections
    Apache Commons Configuration
+   Apache Commons CSV
    Apache Commons Daemon
    Apache Commons DBCP
    Apache Jakarta Commons Digester
@@ -330,7 +331,6 @@
    Apache Kyuubi
    Apache Ranger
    Apache Ranger intg
-   Bouncy Castle
    Jackson JSON processor
    DataNucleus
    Modernizer Maven Plugin
@@ -385,6 +385,7 @@
    melix jmh-gradle-plugin
    Lance
    JCasbin
+   Aviator
    OGNL
    Google FlatBuffers
    IPAddress

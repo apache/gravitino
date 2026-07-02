@@ -26,6 +26,6 @@ public final class PasswordHasherFactory {
 
   /** Create the built-in password hasher. */
   public static PasswordHasher create() {
-    return new Argon2idPasswordHasher();
+    return new Sha3512PasswordHasher();
   }
 }

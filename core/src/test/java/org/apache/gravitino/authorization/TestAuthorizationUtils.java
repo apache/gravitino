@@ -240,8 +240,10 @@ class TestAuthorizationUtils {
     Mockito.when(catalogDispatcher.loadCatalog(Mockito.any())).thenReturn(catalog);
     Mockito.when(tableDispatcher.loadTable(Mockito.any())).thenReturn(table);
 
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalCatalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
 
@@ -276,8 +278,10 @@ class TestAuthorizationUtils {
 
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalCatalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaDispatcher, true);
 
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(

@@ -20,15 +20,24 @@
 package org.apache.iceberg.jdbc;
 
 import com.google.common.base.Preconditions;
+import java.sql.SQLException;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
+import org.apache.iceberg.MetastoreRegisterTableUtils;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // Use Iceberg package to reuse JdbcUtil related classes.
 public class JdbcCatalogWithMetadataLocationSupport extends JdbcCatalog
     implements SupportsMetadataLocation {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(JdbcCatalogWithMetadataLocationSupport.class);
+
   private String jdbcCatalogName;
   private JdbcClientPool jdbcConnections;
   private SchemaVersion jdbcSchemaVersion;
@@ -66,6 +75,48 @@ public class JdbcCatalogWithMetadataLocationSupport extends JdbcCatalog
   public boolean supportsViewsWithSchemaVersion() {
     // V0 doesn't support views, only V1 and later versions do
     return jdbcSchemaVersion != null && jdbcSchemaVersion != SchemaVersion.V0;
+  }
+
+  /**
+   * Registers a table from an existing metadata file, optionally overwriting an existing
+   * registration.
+   *
+   * @param identifier table identifier to register
+   * @param metadataFileLocation location of the metadata file to register
+   * @param overwrite whether to overwrite an existing table registration
+   * @return the registered table
+   */
+  @Override
+  public Table registerTable(
+      TableIdentifier identifier, String metadataFileLocation, boolean overwrite) {
+    return MetastoreRegisterTableUtils.registerTable(
+        this, identifier, metadataFileLocation, overwrite, this::overwriteMetadataLocation);
+  }
+
+  private void overwriteMetadataLocation(
+      TableIdentifier tableIdentifier, String oldMetadataLocation, String newMetadataLocation) {
+    try {
+      int updatedRecords =
+          JdbcUtil.updateTable(
+              jdbcSchemaVersion,
+              jdbcConnections,
+              jdbcCatalogName,
+              tableIdentifier,
+              newMetadataLocation,
+              oldMetadataLocation);
+
+      if (updatedRecords == 1) {
+        LOG.debug("Successfully committed to existing table: {}", tableIdentifier);
+      } else {
+        throw new CommitFailedException(
+            "Failed to update table %s from catalog %s", tableIdentifier, jdbcCatalogName);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new UncheckedInterruptedException(e, "Interrupted during commit");
+    } catch (SQLException e) {
+      throw new UncheckedSQLException(e, "Unknown failure");
+    }
   }
 
   private void loadFields() {

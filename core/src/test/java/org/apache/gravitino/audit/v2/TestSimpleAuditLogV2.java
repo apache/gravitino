@@ -31,6 +31,8 @@ import org.apache.gravitino.listener.api.event.ListSchemaEvent;
 import org.apache.gravitino.listener.api.event.ListTableEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -215,6 +217,61 @@ public class TestSimpleAuditLogV2 {
     ListTableEvent event = new ListTableEvent("henry", Namespace.of("m", "c", "s"));
     String[] fields = new SimpleAuditLogV2(event).toString().split("\t", -1);
     Assertions.assertEquals("", fields[7]);
+  }
+
+  // ---- server event tests ----
+
+  @Test
+  public void testHttpRequestFailureEventFormat() {
+    HttpRequestFailureEvent event =
+        new HttpRequestFailureEvent(
+            "alice", "203.0.113.5", "GET", "/api/metalakes", 401, EventSource.GRAVITINO_SERVER);
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(event);
+
+    Assertions.assertEquals("alice", log.user());
+    Assertions.assertEquals(OperationType.UNKNOWN, log.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, log.operationStatus());
+    Assertions.assertNull(log.identifier());
+    Assertions.assertEquals(EventSource.GRAVITINO_SERVER, log.eventSource());
+    Assertions.assertEquals("203.0.113.5", log.remoteAddress());
+
+    String[] fields = log.toString().split("\t", -1);
+    Assertions.assertEquals(8, fields.length);
+    Assertions.assertEquals("alice", fields[1]);
+    Assertions.assertEquals("UNKNOWN", fields[2]);
+    Assertions.assertEquals("null", fields[3]);
+    Assertions.assertEquals("FAILURE", fields[4]);
+    Assertions.assertEquals("GRAVITINO_SERVER", fields[5]);
+    Assertions.assertEquals("203.0.113.5", fields[6]);
+    // customInfo contains http.method, http.uri, http.status
+    Assertions.assertTrue(fields[7].contains("http.method=GET"), fields[7]);
+    Assertions.assertTrue(fields[7].contains("http.uri=/api/metalakes"), fields[7]);
+    Assertions.assertTrue(fields[7].contains("http.status=401"), fields[7]);
+  }
+
+  @Test
+  public void testAuthorizationDenialFailureEventFormat() {
+    NameIdentifier resource = NameIdentifier.of("metalake", "catalog");
+    AuthorizationDenialFailureEvent event =
+        new AuthorizationDenialFailureEvent("bob", resource, "listCatalogs", "CATALOG:LIST");
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(event);
+
+    Assertions.assertEquals("bob", log.user());
+    Assertions.assertEquals(OperationType.AUTHORIZATION_DENIAL, log.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, log.operationStatus());
+    Assertions.assertEquals("metalake.catalog", log.identifier());
+    Assertions.assertEquals(EventSource.GRAVITINO_SERVER, log.eventSource());
+
+    String[] fields = log.toString().split("\t", -1);
+    Assertions.assertEquals(8, fields.length);
+    Assertions.assertEquals("bob", fields[1]);
+    Assertions.assertEquals("AUTHORIZATION_DENIAL", fields[2]);
+    Assertions.assertEquals("metalake.catalog", fields[3]);
+    Assertions.assertEquals("FAILURE", fields[4]);
+    Assertions.assertEquals("GRAVITINO_SERVER", fields[5]);
+    // customInfo contains auth.method and auth.expression
+    Assertions.assertTrue(fields[7].contains("auth.method=listCatalogs"), fields[7]);
+    Assertions.assertTrue(fields[7].contains("auth.expression=CATALOG:LIST"), fields[7]);
   }
 
   // ---- stubs ----

@@ -78,10 +78,15 @@ spark35 = "3.5.3"
 kyuubi4spark = "1.11.0"
 kyuubi4authz = "1.10.2"
 trino = '435'
+# Trino version the iceberg-rest-trino-it module's in-process query runner is tested against.
+trino-iceberg-it = "478"
 scala-collection-compat = "2.7.0"
 scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
 testcontainers = "1.21.4"
+# docker-java version aligned with testcontainers 1.21.4; forced in iceberg-rest-trino-it to
+# override the newer versions Trino's test stack would otherwise pull in.
+docker-java = "3.4.2"
 jwt = "0.11.1"
 nimbus-jose-jwt = "10.9"
 jline = "3.21.0"
@@ -103,7 +108,6 @@ kafka = "3.4.0"
 curator = "2.12.0"
 awaitility = "4.2.1"
 servlet = "3.1.0"
-bouncycastle = "1.84"
 jodd = "3.5.2"
 flink = "1.18.0"
 flink18 = "1.18.0"
@@ -155,7 +159,7 @@ openlineage = "1.29.0"
 jcstress = "0.8.15"
 jmh-plugin = "0.7.3"
 jmh = "1.37"
-jcasbin = "1.81.0"
+jcasbin = "1.99.0"
 ognl = "3.4.7"
 concurrent-trees = "2.6.0"
 jakarta-validation = "2.0.2"
@@ -218,7 +222,6 @@ jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-fram
 jodd-core = { group = "org.jodd", name = "jodd-core", version.ref = "jodd" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 mockito-inline = { group = "org.mockito", name = "mockito-inline", version.ref = "mockito" }
-bcprov-jdk18on = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}

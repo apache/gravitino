@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
         id: filter
         with:
           filters: |
@@ -34,15 +34,58 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Helm
-        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310
 
       - uses: actions/setup-python@v5.3.0
         with:
           python-version: '3.x'
           check-latest: true
 
+      - name: Set up Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+
       - name: Set up chart-testing
-        uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f
+        run: |
+          set -euo pipefail
+
+          CT_VERSION=3.14.0
+          YAMLLINT_VERSION=1.33.0
+          YAMALE_VERSION=6.0.0
+
+          if [[ "$(uname -m)" == "aarch64" ]]; then
+            arch=arm64
+          else
+            arch=amd64
+          fi
+
+          cache_dir="${RUNNER_TOOL_CACHE}/ct/${CT_VERSION}/${arch}"
+          venv_dir="${cache_dir}/venv"
+
+          if [[ ! -d "${cache_dir}" ]]; then
+            mkdir -p "${cache_dir}"
+
+            archive="chart-testing_${CT_VERSION}_linux_${arch}.tar.gz"
+            release_url="https://github.com/helm/chart-testing/releases/download/v${CT_VERSION}"
+
+            curl --retry 5 --retry-delay 1 -sSLo ct.tar.gz "${release_url}/${archive}"
+            cosign verify-blob --certificate "${release_url}/${archive}.pem" --signature "${release_url}/${archive}.sig" \
+              --certificate-identity "https://github.com/helm/chart-testing/.github/workflows/release.yaml@refs/heads/main" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" ct.tar.gz
+
+            tar -xzf ct.tar.gz -C "${cache_dir}"
+            rm -f ct.tar.gz
+
+            python -m venv "${venv_dir}"
+            "${venv_dir}/bin/python" -m pip install --upgrade pip
+            "${venv_dir}/bin/python" -m pip install "yamllint==${YAMLLINT_VERSION}" "yamale==${YAMALE_VERSION}"
+          fi
+
+          echo "${cache_dir}" >> "${GITHUB_PATH}"
+          echo "CT_CONFIG_DIR=${cache_dir}/etc" >> "${GITHUB_ENV}"
+          echo "VIRTUAL_ENV=${venv_dir}" >> "${GITHUB_ENV}"
+          echo "${venv_dir}/bin" >> "${GITHUB_PATH}"
+
+          "${cache_dir}/ct" version
 
       - name: List changed
         id: list-changed
@@ -123,7 +166,7 @@ jobs:
           done
 
       - name: Set up kubectl
-        uses: azure/setup-kubectl@15650b3ad78fff148532a140b8a4c821796b2d7b
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d
 
       - name: Run chart-testing (install default,gravitino)
         if: steps.list-changed.outputs.changed == 'true'

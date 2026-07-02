@@ -20,10 +20,11 @@
 'use client'
 
 import Image from 'next/image'
+import { useSearchParams } from 'next/navigation'
 import { Roboto } from 'next/font/google'
-import { Card, Flex, Typography } from 'antd'
+import { Alert, Card, Flex, Typography } from 'antd'
 import { cn } from '@/lib/utils/tailwind'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 
 import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
@@ -35,7 +36,10 @@ const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const { Title } = Typography
 
-const LoginPage = () => {
+const LoginContent = () => {
+  const searchParams = useSearchParams()
+  const inactiveReason = searchParams.get('reason') === 'inactive'
+  const maxDurationReason = searchParams.get('reason') === 'max_duration'
   const [providerType, setProviderType] = useState(null)
   const dispatch = useAppDispatch()
 
@@ -70,9 +74,37 @@ const LoginPage = () => {
           </Title>
         </Flex>
 
+        {inactiveReason && (
+          <Alert
+            message='Your session has expired due to inactivity. Please sign in again.'
+            type='info'
+            showIcon
+            closable
+            className='mb-6'
+          />
+        )}
+
+        {maxDurationReason && (
+          <Alert
+            message='Your session has reached its maximum duration. Please sign in again.'
+            type='warning'
+            showIcon
+            closable
+            className='mb-6'
+          />
+        )}
+
         {useOidcLogin ? <OidcLogin /> : <DefaultLogin />}
       </Card>
     </Flex>
+  )
+}
+
+const LoginPage = () => {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }
 

@@ -127,6 +127,13 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public boolean invalidateRelationEntry(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
+    return false;
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean contains(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     return false;

@@ -162,6 +162,11 @@ tests:
           jwksUri: https://auth.example.com/.well-known/jwks.json
           tokenValidatorClass: org.apache.gravitino.server.authentication.JwksTokenValidator
           principalFields: preferred_username,email
+          principalMapper: regex
+          principalMapperRegexPattern: "^(.*)$"
+          groupsFields: groups
+          groupMapper: regex
+          groupMapperRegexPattern: "^(.*)$"
     asserts:
       - matchRegex:
           path: data["gravitino.conf"]
@@ -193,6 +198,21 @@ tests:
       - matchRegex:
           path: data["gravitino.conf"]
           pattern: "gravitino\\.authenticator\\.oauth\\.principalFields = preferred_username,email"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.principalMapper = regex"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.principalMapper\\.regex\\.pattern"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.groupsFields = groups"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.groupMapper = regex"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.groupMapper\\.regex\\.pattern"
 
   - it: does not render empty OAuth sub-properties when only some are set
     release:
@@ -216,6 +236,15 @@ tests:
       - notMatchRegex:
           path: data["gravitino.conf"]
           pattern: "gravitino\\.authenticator\\.oauth\\.serverUri"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.principalMapper = regex"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.groupsFields = groups"
+      - matchRegex:
+          path: data["gravitino.conf"]
+          pattern: "gravitino\\.authenticator\\.oauth\\.groupMapper = regex"
 
   - it: renders entity.maxConnections only when set
     release:

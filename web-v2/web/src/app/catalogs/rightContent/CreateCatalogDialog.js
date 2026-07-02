@@ -115,6 +115,11 @@ export default function CreateCatalogDialog({ ...props }) {
 
   const isHidden = prop => {
     const { parentField, hide, key } = prop
+
+    // In edit mode, hide props not present in the loaded catalog response
+    if (editCatalog && cacheData?.properties && !(key in cacheData.properties)) {
+      return true
+    }
     switch (parentField) {
       case 'catalog-backend':
         return catalogBackend && hide && hide.includes(catalogBackend)
