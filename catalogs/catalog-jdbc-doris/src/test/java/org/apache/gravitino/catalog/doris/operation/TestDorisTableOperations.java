@@ -376,11 +376,10 @@ public class TestDorisTableOperations extends TestDoris {
     TABLE_OPERATIONS.alterTable(
         databaseName,
         tableName,
-        TableChange.addIndex(
-            Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{"col_2"}, {"col_3"}}));
+        TableChange.addIndex(Index.IndexType.INVERTED, "k2_index", new String[][] {{"col_2"}}));
 
     Index[] newIndexes =
-        new Index[] {Indexes.primary("k2_index", new String[][] {{"col_2"}, {"col_3"}})};
+        new Index[] {Indexes.of(Index.IndexType.INVERTED, "k2_index", new String[][] {{"col_2"}})};
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
@@ -655,7 +654,8 @@ public class TestDorisTableOperations extends TestDoris {
 
     Distribution distribution =
         Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
-    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}})};
+    Index[] indexes =
+        new Index[] {Indexes.of(Index.IndexType.INVERTED, "uk_2", new String[][] {{"col_1"}})};
 
     // create table
     TABLE_OPERATIONS.create(
@@ -673,7 +673,7 @@ public class TestDorisTableOperations extends TestDoris {
     // exist.
     TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", true);
     String sql = DorisTableOperations.deleteIndexDefinition(null, deleteIndex);
-    Assertions.assertEquals("DROP INDEX uk_1", sql);
+    Assertions.assertEquals("DROP INDEX `uk_1`", sql);
 
     // The index existence check should only verify existence when ifExists is false, preventing
     // failures when dropping non-existent indexes.
@@ -686,7 +686,7 @@ public class TestDorisTableOperations extends TestDoris {
 
     TableChange.DeleteIndex deleteIndex3 = new TableChange.DeleteIndex("uk_2", false);
     sql = DorisTableOperations.deleteIndexDefinition(load, deleteIndex3);
-    Assertions.assertEquals("DROP INDEX uk_2", sql);
+    Assertions.assertEquals("DROP INDEX `uk_2`", sql);
   }
 
   @Test
