@@ -26,6 +26,15 @@ tests:
       - hasDocuments:
           count: 0
 
+  - it: does not render ingress when type is gateway
+    set:
+      ingress:
+        enabled: true
+        type: gateway
+    asserts:
+      - hasDocuments:
+          count: 0
+
   - it: renders networking v1 ingress for supported Kubernetes versions
     release:
       name: lance-rest
