@@ -44,7 +44,7 @@ public interface AccessControlDispatcher {
    *
    * @param metalake The Metalake of the User.
    * @param user The name of the User.
-   * @param externalId The external identifier from an upstream identity system, or null if unset.
+   * @param externalId The external identifier, or null if unset.
    * @param enabled Whether the User is enabled.
    * @return The added User instance.
    * @throws UserAlreadyExistsException If a User with the same name already exists.
@@ -151,7 +151,7 @@ public interface AccessControlDispatcher {
    *
    * @param metalake The Metalake of the Group.
    * @param group The name of the Group.
-   * @param externalId The external identifier from an upstream identity system, or null if unset.
+   * @param externalId The external identifier, or null if unset.
    * @return The Added Group instance.
    * @throws GroupAlreadyExistsException If a Group with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.

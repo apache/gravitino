@@ -463,31 +463,31 @@ public class TestAccessControlManager {
     accessControlManager.addUser(METALAKE, "disabled_user", "ext-disabled-user", false);
     accessControlManager.removeUser(METALAKE, "disabled_user");
 
-    String user = "scim_user";
-    String extId = "ext-scim-user-1";
+    String user = "ext_user";
+    String extId = "ext-user-1";
     User added = accessControlManager.addUser(METALAKE, user, extId, true);
     Assertions.assertEquals(extId, added.externalId());
     Assertions.assertTrue(added.enabled());
 
-    createCatalogRole("scim_role");
-    accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("scim_role"), user);
+    createCatalogRole("ext_role");
+    accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("ext_role"), user);
     User disabled = accessControlManager.disableUser(METALAKE, extId);
     Assertions.assertFalse(disabled.enabled());
-    Assertions.assertEquals(Lists.newArrayList("scim_role"), disabled.roles());
+    Assertions.assertEquals(Lists.newArrayList("ext_role"), disabled.roles());
 
-    createCatalogRole("scim_role2");
-    accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("scim_role2"), user);
-    assertSortedRoles(accessControlManager.getUser(METALAKE, user), "scim_role", "scim_role2");
+    createCatalogRole("ext_role2");
+    accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("ext_role2"), user);
+    assertSortedRoles(accessControlManager.getUser(METALAKE, user), "ext_role", "ext_role2");
     Assertions.assertFalse(accessControlManager.getUserByExternalId(METALAKE, extId).enabled());
 
     User enabled = accessControlManager.enableUser(METALAKE, extId);
-    assertSortedRoles(enabled, "scim_role", "scim_role2");
+    assertSortedRoles(enabled, "ext_role", "ext_role2");
     Assertions.assertTrue(enabled.enabled());
 
     accessControlManager.revokeRolesFromUser(
-        METALAKE, Lists.newArrayList("scim_role", "scim_role2"), user);
-    accessControlManager.deleteRole(METALAKE, "scim_role2");
-    accessControlManager.deleteRole(METALAKE, "scim_role");
+        METALAKE, Lists.newArrayList("ext_role", "ext_role2"), user);
+    accessControlManager.deleteRole(METALAKE, "ext_role2");
+    accessControlManager.deleteRole(METALAKE, "ext_role");
     accessControlManager.removeUser(METALAKE, user);
   }
 
@@ -565,8 +565,8 @@ public class TestAccessControlManager {
 
   @Test
   public void testGroupExtId() {
-    String group = "scim_group";
-    String extId = "ext-scim-group-1";
+    String group = "ext_group";
+    String extId = "ext-group-1";
     Group added = accessControlManager.addGroup(METALAKE, group, extId);
     Assertions.assertEquals(extId, added.externalId());
     Assertions.assertEquals(

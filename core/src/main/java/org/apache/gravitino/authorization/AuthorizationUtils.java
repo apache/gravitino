@@ -153,14 +153,19 @@ public class AuthorizationUtils {
   }
 
   /**
-   * Creates a name identifier for locking or addressing a user by external id.
+   * Creates a synthetic {@link NameIdentifier} used only as a {@link
+   * org.apache.gravitino.lock.TreeLockUtils} lock path for user operations keyed by external id.
    *
-   * <p>The path uses a reserved prefix in the leaf segment so it does not collide with {@link
-   * #ofUser(String, String)} when the external id equals a user name.
+   * <p>This is <strong>not</strong> the entity's storage identifier. User entities are stored and
+   * retrieved by Gravitino user name via {@link #ofUser(String, String)}. At lock time the user
+   * name may be unknown, so external-id operations need a dedicated lock path.
+   *
+   * <p>The leaf segment uses {@link #EXTERNAL_ID_NAME_PREFIX} so it does not collide with {@link
+   * #ofUser(String, String)} when an external id equals an existing user name.
    *
    * @param metalake the metalake name
    * @param externalId the external id of the user
-   * @return the name identifier of the user external id path
+   * @return a synthetic name identifier for tree locking only
    */
   public static NameIdentifier ofUserExternalId(String metalake, String externalId) {
     checkExternalId(externalId);
@@ -172,14 +177,19 @@ public class AuthorizationUtils {
   }
 
   /**
-   * Creates a name identifier for locking or addressing a group by external id.
+   * Creates a synthetic {@link NameIdentifier} used only as a {@link
+   * org.apache.gravitino.lock.TreeLockUtils} lock path for group operations keyed by external id.
    *
-   * <p>The path uses a reserved prefix in the leaf segment so it does not collide with {@link
-   * #ofGroup(String, String)} when the external id equals a group name.
+   * <p>This is <strong>not</strong> the entity's storage identifier. Group entities are stored and
+   * retrieved by Gravitino group name via {@link #ofGroup(String, String)}. At lock time the group
+   * name may be unknown, so external-id operations need a dedicated lock path.
+   *
+   * <p>The leaf segment uses {@link #EXTERNAL_ID_NAME_PREFIX} so it does not collide with {@link
+   * #ofGroup(String, String)} when an external id equals an existing group name.
    *
    * @param metalake the metalake name
    * @param externalId the external id of the group
-   * @return the name identifier of the group external id path
+   * @return a synthetic name identifier for tree locking only
    */
   public static NameIdentifier ofGroupExternalId(String metalake, String externalId) {
     checkExternalId(externalId);

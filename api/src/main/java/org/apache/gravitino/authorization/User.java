@@ -36,7 +36,7 @@ public interface User extends Auditable {
   String name();
 
   /**
-   * The external identifier from an upstream identity system, such as a SCIM provider.
+   * The external identifier assigned by an upstream system, or null if not set.
    *
    * @return The external identifier, or null if not set.
    */
