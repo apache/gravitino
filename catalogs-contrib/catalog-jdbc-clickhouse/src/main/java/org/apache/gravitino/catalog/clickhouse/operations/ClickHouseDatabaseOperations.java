@@ -68,8 +68,9 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   protected String generateDatabaseExistSql(String databaseName) {
-    // Escape single quotes to prevent SQL injection. ClickHouse does not support PreparedStatement
-    // for DDL-level system queries; single-quote doubling is the standard SQL escape.
+    // Escape single quotes to prevent SQL injection.
+    // JdbcDatabaseOperations#exist executes this query via Statement (no parameters), so we must
+    // escape values embedded in string literals.
     String escaped = escapeSingleQuotes(databaseName);
     return String.format("SELECT name FROM system.databases WHERE name = '%s'", escaped);
   }
