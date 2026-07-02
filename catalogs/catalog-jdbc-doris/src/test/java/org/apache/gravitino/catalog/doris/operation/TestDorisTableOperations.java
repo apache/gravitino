@@ -475,9 +475,9 @@ public class TestDorisTableOperations extends TestDoris {
             Types.IntervalDayType.get(),
             Types.IntervalYearType.get(),
             Types.UUIDType.get(),
+            Types.UnionType.of(Types.IntegerType.get()),
             Types.ListType.of(Types.DateType.get(), true),
             Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
-            Types.UnionType.of(Types.IntegerType.get()),
             Types.StructType.of(
                 Types.StructType.Field.notNullField("col_1", Types.IntegerType.get())));
 
@@ -718,6 +718,27 @@ public class TestDorisTableOperations extends TestDoris {
     Assertions.assertNull(
         TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
         "Non-datetime type should return 0 precision");
+
+    // DATETIME(N) format from SHOW CREATE TABLE — precision parsed from type string
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME(0)", 0, 0),
+        "DATETIME(0) should return 0 precision");
+
+    Assertions.assertEquals(
+        3,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME(3)", 0, 0),
+        "DATETIME(3) should return 3 precision");
+
+    Assertions.assertEquals(
+        6,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME(6)", 0, 0),
+        "DATETIME(6) should return 6 precision");
+
+    // Invalid DATETIME(N) — non-numeric precision
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME(x)", 0, 0),
+        "DATETIME(x) with invalid precision should return null");
   }
 
   @Test
@@ -738,5 +759,12 @@ public class TestDorisTableOperations extends TestDoris {
     Assertions.assertNull(
         operationsWithOldDriver.calculateDatetimePrecision("DATETIME", 26, 0),
         "DATETIME type should return null for unsupported driver version");
+
+    // DATETIME(N) should still work with old driver — precision comes from type string, not
+    // columnSize
+    Assertions.assertEquals(
+        3,
+        operationsWithOldDriver.calculateDatetimePrecision("DATETIME(3)", 0, 0),
+        "DATETIME(3) should return 3 even with unsupported driver version");
   }
 }

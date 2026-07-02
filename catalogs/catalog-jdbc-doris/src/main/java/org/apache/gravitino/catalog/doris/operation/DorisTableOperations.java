@@ -797,28 +797,36 @@ public class DorisTableOperations extends JdbcTableOperations {
   public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
     String upperTypeName = typeName.toUpperCase();
 
-    // Check driver version compatibility first
-    boolean isDatetimeType = "DATETIME".equals(upperTypeName);
-
-    if (isDatetimeType) {
-      String driverVersion = getMySQLDriverVersion();
-      if (driverVersion != null && !isMySQLDriverVersionSupported(driverVersion)) {
-        LOG.warn(
-            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision calculation. "
-                + "Returning null for {} type precision. Driver version: {}",
-            driverVersion,
-            upperTypeName,
-            driverVersion);
+    // Handle datetime(N) format from SHOW CREATE TABLE first — precision is parsed directly
+    // from the type string and does not depend on JDBC columnSize or driver version.
+    if (upperTypeName.startsWith("DATETIME(") && upperTypeName.endsWith(")")) {
+      try {
+        String precisionStr =
+            upperTypeName.substring("DATETIME(".length(), upperTypeName.length() - 1);
+        return Integer.parseInt(precisionStr);
+      } catch (NumberFormatException e) {
+        LOG.warn("Failed to parse datetime precision from type: {}", typeName, e);
         return null;
       }
     }
 
-    if (upperTypeName.equals("DATETIME")) {
+    // For plain DATETIME, precision is derived from columnSize which depends on the JDBC driver.
+    // Check driver version compatibility before using columnSize-based calculation.
+    if ("DATETIME".equals(upperTypeName)) {
+      String driverVersion = getMySQLDriverVersion();
+      if (driverVersion != null && !isMySQLDriverVersionSupported(driverVersion)) {
+        LOG.warn(
+            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision calculation. "
+                + "Returning null for DATETIME type precision.",
+            driverVersion);
+        return null;
+      }
       // DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
       return columnSize >= DATETIME_FORMAT_WITH_DOT.length()
           ? columnSize - DATETIME_FORMAT_WITH_DOT.length()
           : 0;
     }
+
     return null;
   }
 }
