@@ -88,6 +88,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public boolean removeUserByExternalId(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
+    AuthorizationUtils.checkExternalId(externalId);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
@@ -106,6 +107,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public User getUserByExternalId(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
+    AuthorizationUtils.checkExternalId(externalId);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.READ,
@@ -115,6 +117,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public User enableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
+    AuthorizationUtils.checkExternalId(externalId);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
@@ -124,6 +127,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public User disableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
+    AuthorizationUtils.checkExternalId(externalId);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
@@ -185,6 +189,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public Group getGroupByExternalId(String metalake, String externalId)
       throws NoSuchGroupException, NoSuchMetalakeException {
+    AuthorizationUtils.checkExternalId(externalId);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
         LockType.READ,
