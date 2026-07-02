@@ -129,11 +129,15 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, IcebergAccessDelegation accessDelegation) {
     LoadTableResponse loadTableResponse = super.createTable(namespace, request);
-    return maybeInjectDataAccessConfig(
-        TableIdentifier.of(namespace, request.name()),
-        loadTableResponse,
-        accessDelegation,
-        CredentialPrivilege.WRITE);
+    TableIdentifier tableIdentifier = TableIdentifier.of(namespace, request.name());
+    if (shouldGenerateCredential(loadTableResponse, accessDelegation)) {
+      loadTableResponse =
+          injectCredentialConfig(tableIdentifier, loadTableResponse, CredentialPrivilege.WRITE);
+    }
+    if (shouldGenerateRemoteSign(loadTableResponse, accessDelegation)) {
+      loadTableResponse = injectRemoteSigningConfig(tableIdentifier, loadTableResponse);
+    }
+    return loadTableResponse;
   }
 
   /**
@@ -149,7 +153,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       IcebergAccessDelegation accessDelegation,
       CredentialPrivilege privilege) {
     LoadTableResponse loadTableResponse = super.loadTable(identifier);
-    return maybeInjectDataAccessConfig(identifier, loadTableResponse, accessDelegation, privilege);
+    if (shouldGenerateCredential(loadTableResponse, accessDelegation)) {
+      loadTableResponse = injectCredentialConfig(identifier, loadTableResponse, privilege);
+    }
+    if (shouldGenerateRemoteSign(loadTableResponse, accessDelegation)) {
+      loadTableResponse = injectRemoteSigningConfig(identifier, loadTableResponse);
+    }
+    return loadTableResponse;
   }
 
   /**
@@ -163,11 +173,15 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, IcebergAccessDelegation accessDelegation) {
     LoadTableResponse loadTableResponse = super.registerTable(namespace, request);
-    return maybeInjectDataAccessConfig(
-        TableIdentifier.of(namespace, request.name()),
-        loadTableResponse,
-        accessDelegation,
-        CredentialPrivilege.WRITE);
+    TableIdentifier tableIdentifier = TableIdentifier.of(namespace, request.name());
+    if (shouldGenerateCredential(loadTableResponse, accessDelegation)) {
+      loadTableResponse =
+          injectCredentialConfig(tableIdentifier, loadTableResponse, CredentialPrivilege.WRITE);
+    }
+    if (shouldGenerateRemoteSign(loadTableResponse, accessDelegation)) {
+      loadTableResponse = injectRemoteSigningConfig(tableIdentifier, loadTableResponse);
+    }
+    return loadTableResponse;
   }
 
   /**
@@ -352,43 +366,44 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   @VisibleForTesting
   protected boolean shouldGenerateCredential(
-      LoadTableResponse loadTableResponse, boolean requestCredential) {
-    return shouldInjectDataAccess(
-        loadTableResponse, IcebergAccessDelegation.of(requestCredential, false));
+      LoadTableResponse loadTableResponse, IcebergAccessDelegation accessDelegation) {
+    if (!accessDelegation.requestVendedCredentials()) {
+      return false;
+    }
+    return supportsDataAccessInjection(loadTableResponse);
   }
 
   @VisibleForTesting
-  protected boolean shouldInjectDataAccess(
+  protected boolean shouldGenerateRemoteSign(
       LoadTableResponse loadTableResponse, IcebergAccessDelegation accessDelegation) {
-    if (!accessDelegation.requestVendedCredentials() && !accessDelegation.requestRemoteSigning()) {
+    if (!accessDelegation.requestRemoteSigning()) {
       return false;
     }
+    return supportsDataAccessInjection(loadTableResponse);
+  }
 
+  private boolean supportsDataAccessInjection(LoadTableResponse loadTableResponse) {
     validateCredentialLocation(loadTableResponse.tableMetadata().location());
     return !isLocalOrHdfsTable(loadTableResponse.tableMetadata());
   }
 
-  protected LoadTableResponse maybeInjectDataAccessConfig(
+  /**
+   * Injects vended credentials and/or remote-signing configuration into a load-table response.
+   *
+   * <p>Used by subclasses that build {@link LoadTableResponse} outside the standard catalog
+   * create/load/register paths (for example test wrappers).
+   */
+  protected LoadTableResponse injectDataAccessConfig(
       TableIdentifier tableIdentifier,
       LoadTableResponse loadTableResponse,
       IcebergAccessDelegation accessDelegation,
       CredentialPrivilege privilege) {
-    if (!shouldInjectDataAccess(loadTableResponse, accessDelegation)) {
-      return loadTableResponse;
-    }
-
     LoadTableResponse response = loadTableResponse;
-    if (accessDelegation.requestRemoteSigning()) {
-      RemoteSignSupport.Provider provider =
-          RemoteSignSupport.Provider.fromLocation(loadTableResponse.tableMetadata().location());
-      if (!remoteSignSupport().supports(provider)) {
-        throw new ForbiddenException(
-            "Remote signing is not supported for provider: %s", provider.providerName());
-      }
-      response = injectRemoteSigningConfig(tableIdentifier, response);
-    }
-    if (accessDelegation.requestVendedCredentials()) {
+    if (shouldGenerateCredential(response, accessDelegation)) {
       response = injectCredentialConfig(tableIdentifier, response, privilege);
+    }
+    if (shouldGenerateRemoteSign(response, accessDelegation)) {
+      response = injectRemoteSigningConfig(tableIdentifier, response);
     }
     return response;
   }
@@ -398,6 +413,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       TableIdentifier tableIdentifier, LoadTableResponse loadTableResponse) {
     RemoteSignSupport.Provider provider =
         RemoteSignSupport.Provider.fromLocation(loadTableResponse.tableMetadata().location());
+    if (!remoteSignSupport().supports(provider)) {
+      throw new ForbiddenException(
+          "Remote signing is not supported for provider: %s", provider.providerName());
+    }
     Map<String, String> remoteSignConfig =
         remoteSignSupport()
             .clientConfig(provider, remoteSignEndpoint(tableIdentifier), getIcebergConfig());

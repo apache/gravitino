@@ -93,11 +93,11 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
     // CatalogWrapperForREST.registerTable via super) because the in-memory test catalog
     // cannot natively perform registerTable. Above, we synthesized a mock LoadTableResponse
     // instead of delegating to super.registerTable; that means the parent class never sees
-    // this call and therefore never runs its vending logic. Calling maybeInjectDataAccessConfig
+    // this call and therefore never runs its vending logic. Calling injectDataAccessConfig
     // directly re-applies the exact same behavior to the mock response, so data-access tests
     // exercise the production code path end-to-end. Privilege must match the production wrapper
     // (WRITE).
-    return maybeInjectDataAccessConfig(
+    return injectDataAccessConfig(
         TableIdentifier.of(namespace, request.name()),
         loadTableResponse,
         accessDelegation,

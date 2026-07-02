@@ -567,7 +567,8 @@ public class TestCatalogWrapperForREST {
     CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
 
     LoadTableResponse response =
-        wrapper.loadTable(ident, IcebergAccessDelegation.none(), CredentialPrivilege.READ);
+        wrapper.loadTable(
+            ident, IcebergAccessDelegation.parse("vended-credentials"), CredentialPrivilege.READ);
 
     Assertions.assertEquals(
         "v1/irc1/namespaces/db/tables/tbl/credentials",
@@ -624,7 +625,8 @@ public class TestCatalogWrapperForREST {
     CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
 
     LoadTableResponse response =
-        wrapper.loadTable(ident, IcebergAccessDelegation.none(), CredentialPrivilege.READ);
+        wrapper.loadTable(
+            ident, IcebergAccessDelegation.parse("vended-credentials"), CredentialPrivilege.READ);
 
     Assertions.assertEquals(1, response.credentials().size());
     Credential credential = response.credentials().get(0);

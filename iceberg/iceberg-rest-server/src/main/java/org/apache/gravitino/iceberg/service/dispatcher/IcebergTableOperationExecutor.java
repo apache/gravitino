@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
-import java.net.http.HttpMethod;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -62,8 +61,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperationExecutor.class);
 
-  private static final Set<HttpMethod> WRITE_HTTP_METHODS =
-      Set.of(HttpMethod.PUT, HttpMethod.POST, HttpMethod.DELETE, HttpMethod.PATCH);
+  private static final Set<String> WRITE_HTTP_METHODS = Set.of("PUT", "POST", "DELETE", "PATCH");
 
   private final IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private final Optional<IcebergCleanupManager> cleanupManager;
@@ -217,8 +215,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       RemoteSignRequest remoteSignRequest) {
-    CredentialPrivilege privilege =
-        getRemoteSignPrivilege(remoteSignRequest.method());
+    CredentialPrivilege privilege = getRemoteSignPrivilege(remoteSignRequest.method());
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .remoteSign(tableIdentifier, remoteSignRequest, privilege);
@@ -241,15 +238,10 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   }
 
   private static CredentialPrivilege getRemoteSignPrivilege(String method) {
-    try {
-      HttpMethod httpMethod =
-          HttpMethod.valueOf(StringUtils.trimToEmpty(method).toUpperCase(Locale.ROOT));
-      return WRITE_HTTP_METHODS.contains(httpMethod)
-          ? CredentialPrivilege.WRITE
-          : CredentialPrivilege.READ;
-    } catch (IllegalArgumentException e) {
-      return CredentialPrivilege.READ;
-    }
+    String normalizedMethod = StringUtils.trimToEmpty(method).toUpperCase(Locale.ROOT);
+    return WRITE_HTTP_METHODS.contains(normalizedMethod)
+        ? CredentialPrivilege.WRITE
+        : CredentialPrivilege.READ;
   }
 
   @Override

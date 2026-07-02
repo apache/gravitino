@@ -64,7 +64,6 @@ import org.apache.iceberg.rest.ResourcePaths;
 import org.apache.iceberg.rest.auth.AuthManager;
 import org.apache.iceberg.rest.auth.AuthManagers;
 import org.apache.iceberg.rest.auth.AuthSession;
-import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.RemoteSignRequest;
@@ -79,9 +78,10 @@ import org.apache.iceberg.rest.responses.RemoteSignResponse;
  *
  * <p>Federation-specific behavior is expressed through polymorphic overrides instead of {@code
  * instanceof RESTCatalog} checks scattered across the base class. Table operations are routed to
- * federation-aware {@code *Internal} methods so client-facing FileIO and credential properties are
- * extracted from the remote catalog's {@code table.io()}. Credentials are vended by the remote
- * catalog, so this wrapper never injects Gravitino-generated credentials.
+ * federation-aware {@code *Internal} methods so client-facing FileIO properties are extracted from
+ * the remote catalog's {@code table.io()}. Vended credentials and remote-signing config are
+ * included only when requested via {@link IcebergAccessDelegation}; credentials are sourced from
+ * the remote catalog, not Gravitino-managed credential vending.
  *
  * <p>Portions of the table create and update handling are derived from Apache Iceberg's {@code
  * org.apache.iceberg.rest.CatalogHandlers}:
@@ -113,19 +113,14 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
       TableIdentifier identifier,
       IcebergAccessDelegation accessDelegation,
       CredentialPrivilege privilege) {
-    LoadTableResponse response = loadTableInternal(identifier);
-    return maybeInjectDataAccessConfig(identifier, response, accessDelegation, privilege);
+    // privilege is unused; the remote REST catalog vends its own credentials via FileIO.
+    return loadTableInternal(identifier, accessDelegation);
   }
 
   @Override
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, IcebergAccessDelegation accessDelegation) {
-    LoadTableResponse response = registerTableInternal(namespace, request);
-    return maybeInjectDataAccessConfig(
-        TableIdentifier.of(namespace, request.name()),
-        response,
-        accessDelegation,
-        CredentialPrivilege.WRITE);
+    return registerTableInternal(namespace, request, accessDelegation);
   }
 
   @Override
@@ -273,10 +268,6 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    * Federation-aware {@code createTable}: creates the table on the underlying (remote) catalog and
    * extracts client-facing FileIO/credential properties from {@code table.io()}.
    */
-  private LoadTableResponse createTableInternal(Namespace namespace, CreateTableRequest request) {
-    return createTableInternal(namespace, request, IcebergAccessDelegation.none());
-  }
-
   private LoadTableResponse createTableInternal(
       Namespace namespace, CreateTableRequest request, IcebergAccessDelegation accessDelegation) {
     Catalog loadedCatalog = getCatalog();
@@ -284,7 +275,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     request.validate();
 
     if (request.stageCreate()) {
-      return stageTableCreateInternal(namespace, request);
+      return stageTableCreateInternal(namespace, request, accessDelegation);
     }
 
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
@@ -298,16 +289,14 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
             .create();
 
     if (table instanceof BaseTable) {
-      LoadTableResponse response = buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
-      return maybeInjectDataAccessConfig(
-          ident, response, accessDelegation, CredentialPrivilege.WRITE);
+      return buildLoadTableResponseFromFileIo(ident, (BaseTable) table, accessDelegation);
     }
 
     throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
   }
 
   private LoadTableResponse stageTableCreateInternal(
-      Namespace namespace, CreateTableRequest request) {
+      Namespace namespace, CreateTableRequest request, IcebergAccessDelegation accessDelegation) {
     Catalog loadedCatalog = getCatalog();
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
     if (loadedCatalog.tableExists(ident)) {
@@ -334,19 +323,9 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     }
 
     Map<String, String> tableProperties = retrieveFileIOProperties(table.io());
-    Map<String, String> filteredCredentialProperties =
-        CredentialPropertyUtils.filterCredentialProperties(tableProperties);
     config.putAll(
         MapUtils.getFilteredMap(
             tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
-    config.putAll(filteredCredentialProperties);
-    config.putAll(
-        IcebergRESTUtils.buildRefreshProps(
-            catalogCredentialManager.catalogName(), ident, filteredCredentialProperties));
-
-    List<Credential> credentials =
-        IcebergRESTUtils.buildStorageCreds(
-            catalogCredentialManager.catalogName(), ident, table.io());
 
     TableMetadata metadata =
         TableMetadata.newTableMetadata(
@@ -356,27 +335,26 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
             table.location(),
             properties);
 
-    return LoadTableResponse.builder()
-        .withTableMetadata(metadata)
-        .addAllConfig(config)
-        .addAllCredentials(credentials)
-        .build();
+    LoadTableResponse response =
+        LoadTableResponse.builder().withTableMetadata(metadata).addAllConfig(config).build();
+    return applyAccessDelegationConfig(
+        ident, table.io(), response, tableProperties, accessDelegation);
   }
 
   /**
    * Federation-aware {@code registerTable}: registers the existing table metadata on the underlying
    * (remote) catalog via {@link CatalogHandlers#registerTable} and extracts client-facing FileIO
    * and credential properties from {@code table.io()}, mirroring {@link
-   * #loadTableInternal(TableIdentifier)}.
+   * #loadTableInternal(TableIdentifier, IcebergAccessDelegation)}.
    */
   private LoadTableResponse registerTableInternal(
-      Namespace namespace, RegisterTableRequest request) {
+      Namespace namespace, RegisterTableRequest request, IcebergAccessDelegation accessDelegation) {
     CatalogHandlers.registerTable(getCatalog(), namespace, request);
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
     Table table = getCatalog().loadTable(ident);
 
     if (table instanceof BaseTable) {
-      return buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
+      return buildLoadTableResponseFromFileIo(ident, (BaseTable) table, accessDelegation);
     }
 
     throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
@@ -436,11 +414,12 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    * Federation-aware {@code loadTable}: loads the table from the underlying (remote) catalog and
    * extracts client-facing FileIO/credential properties from {@code table.io()}.
    */
-  private LoadTableResponse loadTableInternal(TableIdentifier ident) {
+  private LoadTableResponse loadTableInternal(
+      TableIdentifier ident, IcebergAccessDelegation accessDelegation) {
     Table table = getCatalog().loadTable(ident);
 
     if (table instanceof BaseTable) {
-      return buildLoadTableResponseFromFileIo(ident, (BaseTable) table);
+      return buildLoadTableResponseFromFileIo(ident, (BaseTable) table, accessDelegation);
     } else if (table instanceof BaseMetadataTable) {
       // metadata tables are loaded on the client side, return NoSuchTableException for now
       throw new NoSuchTableException("Table does not exist: %s", ident.toString());
@@ -450,31 +429,65 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   }
 
   /**
-   * Builds a {@link LoadTableResponse} from a remote {@link BaseTable}, exposing the client-facing
-   * FileIO and credential properties extracted from {@code table.io()}, including the refreshable
-   * vended credentials and refresh properties for the remote storage.
+   * Builds a {@link LoadTableResponse} from a remote {@link BaseTable}, exposing client-facing
+   * FileIO properties extracted from {@code table.io()}. Vended credentials and remote-signing
+   * config are appended only when requested by {@code accessDelegation}.
    *
    * @param ident the table identifier, used to build the credential-refresh endpoint.
    * @param table the remote base table whose {@code io()} carries the storage credentials.
-   * @return the load-table response including FileIO-derived client config and vended credentials.
+   * @param accessDelegation client-requested access delegation capabilities.
+   * @return the load-table response with opt-in vended credentials and remote-signing config.
    */
   private LoadTableResponse buildLoadTableResponseFromFileIo(
-      TableIdentifier ident, BaseTable table) {
+      TableIdentifier ident, BaseTable table, IcebergAccessDelegation accessDelegation) {
     Map<String, String> properties = retrieveFileIOProperties(table.io());
+    LoadTableResponse response =
+        LoadTableResponse.builder()
+            .withTableMetadata(table.operations().current())
+            .addAllConfig(
+                MapUtils.getFilteredMap(
+                    properties, key -> catalogPropertiesToClientKeys.contains(key)))
+            .build();
+    return applyAccessDelegationConfig(ident, table.io(), response, properties, accessDelegation);
+  }
+
+  private LoadTableResponse applyAccessDelegationConfig(
+      TableIdentifier ident,
+      FileIO fileIO,
+      LoadTableResponse response,
+      Map<String, String> fileIoProperties,
+      IcebergAccessDelegation accessDelegation) {
+    if (shouldGenerateCredential(response, accessDelegation)) {
+      response = injectRemoteCatalogCredentialConfig(ident, fileIO, fileIoProperties, response);
+    }
+    if (shouldGenerateRemoteSign(response, accessDelegation)) {
+      return injectRemoteSigningConfig(ident, response);
+    }
+    return response;
+  }
+
+  /**
+   * Injects vended credentials extracted from the remote catalog's {@link FileIO} into a
+   * load-table response.
+   */
+  private LoadTableResponse injectRemoteCatalogCredentialConfig(
+      TableIdentifier ident,
+      FileIO fileIO,
+      Map<String, String> fileIoProperties,
+      LoadTableResponse loadTableResponse) {
     Map<String, String> filteredCredentialProperties =
-        CredentialPropertyUtils.filterCredentialProperties(properties);
+        CredentialPropertyUtils.filterCredentialProperties(fileIoProperties);
     return LoadTableResponse.builder()
-        .withTableMetadata(table.operations().current())
-        .addAllConfig(
-            MapUtils.getFilteredMap(properties, key -> catalogPropertiesToClientKeys.contains(key)))
-        // Keep only credential fields from FileIO properties before returning them to the client.
+        .withTableMetadata(loadTableResponse.tableMetadata())
+        .addAllConfig(loadTableResponse.config())
         .addAllConfig(filteredCredentialProperties)
         .addAllConfig(
             IcebergRESTUtils.buildRefreshProps(
                 catalogCredentialManager.catalogName(), ident, filteredCredentialProperties))
         .addAllCredentials(
             IcebergRESTUtils.buildStorageCreds(
-                catalogCredentialManager.catalogName(), ident, table.io()))
+                catalogCredentialManager.catalogName(), ident, fileIO))
+        .addAllCredentials(loadTableResponse.credentials())
         .build();
   }
 
