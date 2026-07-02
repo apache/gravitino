@@ -107,6 +107,7 @@ class UserGroupManager {
   }
 
   boolean removeUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
+    AuthorizationUtils.checkExternalId(externalId);
     try {
       return store.deleteUserByExternalId(AuthorizationUtils.ofUserNamespace(metalake), externalId);
     } catch (NoSuchEntityException e) {
@@ -138,6 +139,7 @@ class UserGroupManager {
   }
 
   User getUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
+    AuthorizationUtils.checkExternalId(externalId);
     try {
       return store.getByExternalId(
           AuthorizationUtils.ofUserNamespace(metalake),
@@ -156,6 +158,7 @@ class UserGroupManager {
   }
 
   User enableUser(String metalake, String externalId) throws NoSuchUserException {
+    AuthorizationUtils.checkExternalId(externalId);
     try {
       return store.updateUserEnabledByExternalId(
           AuthorizationUtils.ofUserNamespace(metalake), externalId, true);
@@ -175,6 +178,7 @@ class UserGroupManager {
   }
 
   User disableUser(String metalake, String externalId) throws NoSuchUserException {
+    AuthorizationUtils.checkExternalId(externalId);
     try {
       return store.updateUserEnabledByExternalId(
           AuthorizationUtils.ofUserNamespace(metalake), externalId, false);
@@ -266,6 +270,7 @@ class UserGroupManager {
   }
 
   Group getGroupByExternalId(String metalake, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
     try {
       return store.getByExternalId(
           AuthorizationUtils.ofGroupNamespace(metalake),

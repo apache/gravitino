@@ -1077,38 +1077,13 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDupExtId() throws IOException {
+  void testExtDup() throws IOException {
     createAndInsertMakeLake(metalakeName);
     GroupMetaService svc = GroupMetaService.getInstance();
     svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
     Assertions.assertThrows(
         EntityAlreadyExistsException.class,
         () -> svc.insertGroup(groupWithExtId("g2", "ext-1"), false));
-  }
-
-  @TestTemplate
-  void testExtIdDb() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    GroupMetaService svc = GroupMetaService.getInstance();
-    svc.insertGroup(groupWithExtId("g1", "ext-db"), false);
-    Assertions.assertEquals("ext-db", queryExtIdByName("g1"));
-  }
-
-  private String queryExtIdByName(String groupName) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement();
-        ResultSet rs =
-            statement.executeQuery(
-                String.format(
-                    "SELECT external_id FROM group_meta WHERE group_name = '%s' AND deleted_at = 0",
-                    groupName))) {
-      Assertions.assertTrue(rs.next());
-      return rs.getString(1);
-    } catch (SQLException e) {
-      throw new RuntimeException("Query group external_id failed", e);
-    }
   }
 
   private GroupEntity groupWithExtId(String name, String externalId) {

@@ -70,6 +70,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public User addUser(String metalake, String user, String externalId, boolean enabled)
       throws UserAlreadyExistsException, NoSuchMetalakeException {
+    AuthorizationUtils.checkExternalId(externalId);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
@@ -157,6 +158,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   @Override
   public Group addGroup(String metalake, String group, String externalId)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
+    AuthorizationUtils.checkExternalId(externalId);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
         LockType.WRITE,

@@ -1271,33 +1271,23 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals("ext-1", found.externalId());
     Assertions.assertThrows(
         NoSuchEntityException.class, () -> svc.getUserByExternalId(metalakeName, "missing-ext-id"));
-  }
-
-  @TestTemplate
-  void testUserEnabled() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    UserMetaService svc = UserMetaService.getInstance();
-    svc.insertUser(userWithExtId("u1", "ext-1"), false);
-    Assertions.assertFalse(svc.updateUserEnabled(metalakeName, "ext-1", false).enabled());
-    Assertions.assertTrue(svc.updateUserEnabled(metalakeName, "ext-1", true).enabled());
-  }
-
-  @TestTemplate
-  void testMissingExtEnable() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    UserMetaService svc = UserMetaService.getInstance();
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> svc.getUserByExternalId(metalakeName, null));
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> svc.updateUserEnabled(metalakeName, "missing-ext-id", false));
   }
 
   @TestTemplate
-  void testEnabledDb() throws IOException {
+  void testExtEnable() throws IOException {
     createAndInsertMakeLake(metalakeName);
     UserMetaService svc = UserMetaService.getInstance();
-    UserEntity user = userWithExtId("u1", "ext-db");
-    svc.insertUser(user, false);
+    svc.insertUser(userWithExtId("u1", "ext-1"), false);
+    Assertions.assertFalse(svc.updateUserEnabled(metalakeName, "ext-1", false).enabled());
+    Assertions.assertTrue(svc.updateUserEnabled(metalakeName, "ext-1", true).enabled());
 
+    UserEntity user = userWithExtId("u2", "ext-db");
+    svc.insertUser(user, false);
     Assertions.assertTrue(queryEnabledByExtId("ext-db"));
     long updatedAtBefore = queryUpdatedAtByExtId("ext-db");
 
@@ -1312,7 +1302,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testEnabledDeleted() throws IOException {
+  void testExtEnableDel() throws IOException {
     createAndInsertMakeLake(metalakeName);
     UserMetaService svc = UserMetaService.getInstance();
     UserEntity user = userWithExtId("u1", "ext-del");
@@ -1323,7 +1313,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDeleteUserByExternalId() throws IOException {
+  void testUserExtDel() throws IOException {
     createAndInsertMakeLake(metalakeName);
     UserMetaService svc = UserMetaService.getInstance();
     svc.insertUser(userWithExtId("u1", "ext-del-by"), false);
@@ -1336,7 +1326,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDupExtId() throws IOException {
+  void testExtDup() throws IOException {
     createAndInsertMakeLake(metalakeName);
     UserMetaService svc = UserMetaService.getInstance();
     svc.insertUser(userWithExtId("u1", "ext-1"), false);

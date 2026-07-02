@@ -166,6 +166,16 @@ public class AuthorizationUtils {
     checkUserNamespace(ident.namespace());
   }
 
+  /**
+   * Validates that the external id is not null or blank.
+   *
+   * @param externalId the external id to validate
+   */
+  public static void checkExternalId(String externalId) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(externalId), "External id must not be null or empty");
+  }
+
   public static void checkGroup(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Group identifier must not be null");
     checkGroupNamespace(ident.namespace());

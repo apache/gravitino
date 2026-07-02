@@ -322,6 +322,7 @@ public class UserMetaService {
   }
 
   private UserPO getUserPOByMetalakeNameAndExternalId(String metalakeName, String externalId) {
+    AuthorizationUtils.checkExternalId(externalId);
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
@@ -350,6 +351,7 @@ public class UserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateUserEnabled")
   public UserEntity updateUserEnabled(String metalakeName, String externalId, boolean enabled) {
+    AuthorizationUtils.checkExternalId(externalId);
     SessionUtils.doWithCommit(
         UserMetaMapper.class,
         mapper -> {
