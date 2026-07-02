@@ -44,8 +44,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
-import org.apache.gravitino.iceberg.service.sign.RemoteSignPathValidator;
-import org.apache.gravitino.iceberg.service.sign.S3RemoteRequestSigner;
+import org.apache.gravitino.iceberg.service.sign.RemoteSignSupport;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.MapUtils;
@@ -57,7 +56,6 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
-import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ForbiddenException;
@@ -65,7 +63,6 @@ import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
-import org.apache.iceberg.rest.RESTCatalogProperties;
 import org.apache.iceberg.rest.ResourcePaths;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
@@ -412,6 +409,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     LoadTableResponse response = loadTableResponse;
     if (requestRemoteSigning) {
+      RemoteSignSupport.Provider provider =
+          RemoteSignSupport.Provider.fromLocation(loadTableResponse.tableMetadata().location());
+      if (!remoteSignSupport().supports(provider)) {
+        throw new ForbiddenException(
+            "Remote signing is not supported for provider: %s", provider.providerName());
+      }
       response = injectRemoteSigningConfig(tableIdentifier, response);
     }
     if (requestCredential) {
@@ -423,15 +426,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @VisibleForTesting
   protected LoadTableResponse injectRemoteSigningConfig(
       TableIdentifier tableIdentifier, LoadTableResponse loadTableResponse) {
-    Map<String, String> remoteSignConfig = new HashMap<>();
-    remoteSignConfig.put(S3FileIOProperties.REMOTE_SIGNING_ENABLED, "true");
-    remoteSignConfig.put(
-        RESTCatalogProperties.SIGNER_ENDPOINT, remoteSignEndpoint(tableIdentifier));
-
-    String region = getIcebergConfig().getRawString(IcebergConfig.S3_REGION.getKey());
-    if (StringUtils.isNotBlank(region)) {
-      remoteSignConfig.put(IcebergConstants.AWS_S3_REGION, region);
-    }
+    RemoteSignSupport.Provider provider =
+        RemoteSignSupport.Provider.fromLocation(loadTableResponse.tableMetadata().location());
+    Map<String, String> remoteSignConfig =
+        remoteSignSupport()
+            .clientConfig(provider, remoteSignEndpoint(tableIdentifier), getIcebergConfig());
 
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
@@ -460,19 +459,17 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           "Remote signing is not supported for local or HDFS table locations");
     }
 
-    RemoteSignPathValidator.validateUriWithinPrefixes(
-        request.uri(), tableStoragePrefixes(tableMetadata));
+    RemoteSignSupport.Provider provider =
+        RemoteSignSupport.Provider.fromLocation(tableMetadata.location());
+    RemoteSignSupport.validateWithinPrefixes(
+        provider, request.uri(), tableStoragePrefixes(tableMetadata));
 
     Credential credential = getCredential(tableMetadata, privilege);
-    S3RemoteRequestSigner signer = createS3RemoteRequestSigner();
-    return signer.sign(request, credential);
+    return remoteSignSupport().sign(request, credential);
   }
 
-  private S3RemoteRequestSigner createS3RemoteRequestSigner() {
-    String endpoint = getIcebergConfig().get(IcebergConfig.S3_ENDPOINT);
-    boolean pathStyleAccess = getIcebergConfig().get(IcebergConfig.S3_PATH_STYLE_ACCESS);
-    return new S3RemoteRequestSigner(
-        endpoint, pathStyleAccess, S3RemoteRequestSigner.DEFAULT_SIGNATURE_DURATION);
+  private RemoteSignSupport remoteSignSupport() {
+    return new RemoteSignSupport(getIcebergConfig());
   }
 
   private String remoteSignEndpoint(TableIdentifier tableIdentifier) {

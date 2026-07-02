@@ -19,7 +19,6 @@
 package org.apache.gravitino.iceberg.service.sign;
 
 import java.net.URI;
-import java.time.Duration;
 import java.util.Collections;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.iceberg.rest.requests.ImmutableRemoteSignRequest;
@@ -31,7 +30,8 @@ class TestS3RemoteRequestSigner {
 
   @Test
   void testSignPutRequest() {
-    S3RemoteRequestSigner signer = new S3RemoteRequestSigner(null, false, Duration.ofMinutes(15));
+    S3RemoteRequestSigner signer =
+        new S3RemoteRequestSigner(null, false, RemoteSignSupport.DEFAULT_SIGNATURE_DURATION);
     RemoteSignResponse response =
         signer.sign(
             ImmutableRemoteSignRequest.builder()
@@ -50,7 +50,8 @@ class TestS3RemoteRequestSigner {
   @Test
   void testUnsupportedProvider() {
     S3RemoteRequestSigner signer =
-        new S3RemoteRequestSigner(null, false, S3RemoteRequestSigner.DEFAULT_SIGNATURE_DURATION);
+        new S3RemoteRequestSigner(
+            null, false, RemoteSignSupport.DEFAULT_SIGNATURE_DURATION);
     UnsupportedOperationException exception =
         Assertions.assertThrows(
             UnsupportedOperationException.class,

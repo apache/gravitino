@@ -20,15 +20,26 @@ package org.apache.gravitino.iceberg.service.sign;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.sign.RemoteSignSupport.Provider;
+import org.apache.iceberg.aws.s3.S3FileIOProperties;
+import org.apache.iceberg.rest.RESTCatalogProperties;
 import org.apache.iceberg.rest.requests.RemoteSignRequest;
 import org.apache.iceberg.rest.responses.ImmutableRemoteSignResponse;
 import org.apache.iceberg.rest.responses.RemoteSignResponse;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
+import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Configuration;
@@ -36,15 +47,9 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.PresignedDeleteObjectRequest;
-import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
-import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 
 /** Signs S3 HTTP requests for Iceberg REST remote-signing. */
-public class S3RemoteRequestSigner {
-
-  /** Default signature duration for pre-signed S3 URLs. */
-  public static final Duration DEFAULT_SIGNATURE_DURATION = Duration.ofHours(1);
+public class S3RemoteRequestSigner implements RemoteRequestSigner {
 
   private final String endpoint;
   private final boolean pathStyleAccess;
@@ -64,38 +69,81 @@ public class S3RemoteRequestSigner {
     this.signatureDuration = signatureDuration;
   }
 
-  /**
-   * Signs an S3 request described by the Iceberg REST {@link RemoteSignRequest}.
-   *
-   * @param request remote sign request from the Iceberg REST client
-   * @param credential Gravitino credential used to sign the request
-   * @return signed URI and headers for the client to call S3 directly
-   */
+  @Override
+  public Provider provider() {
+    return Provider.S3;
+  }
+
+  @Override
+  public Map<String, String> clientConfig(IcebergConfig icebergConfig, String signerEndpoint) {
+    Map<String, String> config = new HashMap<>();
+    config.put(RESTCatalogProperties.SIGNER_ENDPOINT, signerEndpoint);
+    config.put(S3FileIOProperties.REMOTE_SIGNING_ENABLED, "true");
+    String region = icebergConfig.getRawString(IcebergConfig.S3_REGION.getKey());
+    if (StringUtils.isNotBlank(region)) {
+      config.put(IcebergConstants.AWS_S3_REGION, region);
+    }
+    return config;
+  }
+
+  @Override
   public RemoteSignResponse sign(RemoteSignRequest request, Credential credential) {
-    String provider = request.provider() == null ? "s3" : request.provider();
-    if (!"s3".equalsIgnoreCase(provider)) {
+    Provider provider = Provider.fromRequest(request.provider(), request.uri());
+    if (provider != Provider.S3) {
       throw new UnsupportedOperationException(
-          "Remote signing is not supported for provider: " + provider);
+          "S3 signer cannot sign provider: " + provider.providerName());
     }
 
-    AwsCredentials awsCredentials = AwsSigningCredentials.toAwsCredentials(credential);
+    String location = RemoteSignSupport.normalize(provider, request.uri());
+    RemoteSignSupport.BucketKey bucketKey = RemoteSignSupport.parseBucketKey(provider, location);
+    AwsCredentials awsCredentials = toAwsCredentials(credential);
     Region region = Region.of(request.region());
-    S3Location location = S3Location.from(request.uri());
     String method = request.method().toUpperCase(Locale.ROOT);
 
     try (S3Presigner presigner = createPresigner(awsCredentials, region)) {
-      switch (method) {
-        case "PUT":
-          return signPut(presigner, location);
-        case "GET":
-        case "HEAD":
-          return signGet(presigner, location);
-        case "DELETE":
-          return signDelete(presigner, location);
-        default:
-          throw new UnsupportedOperationException(
-              "Remote signing is not supported for HTTP method: " + method);
+      return presign(presigner, method, bucketKey);
+    }
+  }
+
+  private RemoteSignResponse presign(
+      S3Presigner presigner, String method, RemoteSignSupport.BucketKey bucketKey) {
+    String bucket = bucketKey.bucket();
+    String key = bucketKey.key();
+    switch (method) {
+      case "PUT": {
+        var presigned =
+            presigner.presignPutObject(
+                builder ->
+                    builder
+                        .signatureDuration(signatureDuration)
+                        .putObjectRequest(
+                            PutObjectRequest.builder().bucket(bucket).key(key).build()));
+        return toResponse(presigned.url().toString(), presigned.signedHeaders());
       }
+      case "GET":
+      case "HEAD": {
+        var presigned =
+            presigner.presignGetObject(
+                builder ->
+                    builder
+                        .signatureDuration(signatureDuration)
+                        .getObjectRequest(
+                            GetObjectRequest.builder().bucket(bucket).key(key).build()));
+        return toResponse(presigned.url().toString(), presigned.signedHeaders());
+      }
+      case "DELETE": {
+        var presigned =
+            presigner.presignDeleteObject(
+                builder ->
+                    builder
+                        .signatureDuration(signatureDuration)
+                        .deleteObjectRequest(
+                            DeleteObjectRequest.builder().bucket(bucket).key(key).build()));
+        return toResponse(presigned.url().toString(), presigned.signedHeaders());
+      }
+      default:
+        throw new UnsupportedOperationException(
+            "Remote signing is not supported for HTTP method: " + method);
     }
   }
 
@@ -113,45 +161,6 @@ public class S3RemoteRequestSigner {
     return builder.build();
   }
 
-  private RemoteSignResponse signPut(S3Presigner presigner, S3Location location) {
-    PresignedPutObjectRequest presigned =
-        presigner.presignPutObject(
-            b ->
-                b.signatureDuration(signatureDuration)
-                    .putObjectRequest(
-                        PutObjectRequest.builder()
-                            .bucket(location.bucket())
-                            .key(location.key())
-                            .build()));
-    return toResponse(presigned.url().toString(), presigned.signedHeaders());
-  }
-
-  private RemoteSignResponse signGet(S3Presigner presigner, S3Location location) {
-    PresignedGetObjectRequest presigned =
-        presigner.presignGetObject(
-            b ->
-                b.signatureDuration(signatureDuration)
-                    .getObjectRequest(
-                        GetObjectRequest.builder()
-                            .bucket(location.bucket())
-                            .key(location.key())
-                            .build()));
-    return toResponse(presigned.url().toString(), presigned.signedHeaders());
-  }
-
-  private RemoteSignResponse signDelete(S3Presigner presigner, S3Location location) {
-    PresignedDeleteObjectRequest presigned =
-        presigner.presignDeleteObject(
-            b ->
-                b.signatureDuration(signatureDuration)
-                    .deleteObjectRequest(
-                        DeleteObjectRequest.builder()
-                            .bucket(location.bucket())
-                            .key(location.key())
-                            .build()));
-    return toResponse(presigned.url().toString(), presigned.signedHeaders());
-  }
-
   private static RemoteSignResponse toResponse(
       String uri, Map<String, List<String>> signedHeaders) {
     return ImmutableRemoteSignResponse.builder()
@@ -160,40 +169,27 @@ public class S3RemoteRequestSigner {
         .build();
   }
 
-  /** Parsed S3 bucket and object key. */
-  static final class S3Location {
-    private final String bucket;
-    private final String key;
-
-    private S3Location(String bucket, String key) {
-      this.bucket = bucket;
-      this.key = key;
+  private static AwsCredentials toAwsCredentials(Credential credential) {
+    if (credential instanceof S3SecretKeyCredential) {
+      S3SecretKeyCredential secretKeyCredential = (S3SecretKeyCredential) credential;
+      return AwsBasicCredentials.create(
+          secretKeyCredential.accessKeyId(), secretKeyCredential.secretAccessKey());
     }
-
-    String bucket() {
-      return bucket;
+    if (credential instanceof S3TokenCredential) {
+      S3TokenCredential tokenCredential = (S3TokenCredential) credential;
+      return AwsSessionCredentials.create(
+          tokenCredential.accessKeyId(),
+          tokenCredential.secretAccessKey(),
+          tokenCredential.sessionToken());
     }
-
-    String key() {
-      return key;
+    if (credential instanceof AwsIrsaCredential) {
+      AwsIrsaCredential irsaCredential = (AwsIrsaCredential) credential;
+      return AwsSessionCredentials.create(
+          irsaCredential.accessKeyId(),
+          irsaCredential.secretAccessKey(),
+          irsaCredential.sessionToken());
     }
-
-    static S3Location from(URI uri) {
-      String location = RemoteSignPathValidator.toStorageLocation(uri);
-      if (!location.startsWith("s3://")) {
-        throw new IllegalArgumentException("Expected s3 URI after normalization: " + location);
-      }
-      String withoutScheme = location.substring("s3://".length());
-      int slash = withoutScheme.indexOf('/');
-      if (slash < 0) {
-        throw new IllegalArgumentException("S3 object key is required: " + uri);
-      }
-      String bucket = withoutScheme.substring(0, slash);
-      String key = withoutScheme.substring(slash + 1);
-      if (StringUtils.isBlank(bucket) || StringUtils.isBlank(key)) {
-        throw new IllegalArgumentException("S3 bucket and key are required: " + uri);
-      }
-      return new S3Location(bucket, key);
-    }
+    throw new UnsupportedOperationException(
+        "Credential type does not support S3 remote signing: " + credential.credentialType());
   }
 }

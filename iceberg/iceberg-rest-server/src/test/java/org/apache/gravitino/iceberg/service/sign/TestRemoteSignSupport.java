@@ -20,43 +20,54 @@ package org.apache.gravitino.iceberg.service.sign;
 
 import com.google.common.collect.ImmutableSet;
 import java.net.URI;
+import java.util.Collections;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.rest.requests.ImmutableRemoteSignRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestRemoteSignPathValidator {
+class TestRemoteSignSupport {
 
   @Test
-  void testToStorageLocationFromS3Uri() {
+  void testNormalizeS3Uri() {
     Assertions.assertEquals(
         "s3://bucket/db/tbl/data/file.parquet",
-        RemoteSignPathValidator.toStorageLocation(
-            URI.create("s3://bucket/db/tbl/data/file.parquet")));
+        RemoteSignSupport.normalize(
+            RemoteSignSupport.Provider.S3, URI.create("s3://bucket/db/tbl/data/file.parquet")));
   }
 
   @Test
-  void testToStorageLocationFromVirtualHostedHttpsUri() {
-    Assertions.assertEquals(
-        "s3://bucket/db/tbl/metadata.json",
-        RemoteSignPathValidator.toStorageLocation(
-            URI.create("https://bucket.s3.us-east-1.amazonaws.com/db/tbl/metadata.json")));
-  }
-
-  @Test
-  void testValidateUriWithinPrefixesAllowsNestedObject() {
-    RemoteSignPathValidator.validateUriWithinPrefixes(
-        URI.create("s3://bucket/db/tbl/data/file.parquet"), ImmutableSet.of("s3://bucket/db/tbl"));
-  }
-
-  @Test
-  void testValidateUriWithinPrefixesRejectsOutsidePrefix() {
+  void testValidateWithinPrefixesRejectsOutsidePrefix() {
     ForbiddenException exception =
         Assertions.assertThrows(
             ForbiddenException.class,
             () ->
-                RemoteSignPathValidator.validateUriWithinPrefixes(
+                RemoteSignSupport.validateWithinPrefixes(
+                    RemoteSignSupport.Provider.S3,
                     URI.create("s3://other-bucket/db/tbl/data/file.parquet"),
                     ImmutableSet.of("s3://bucket/db/tbl")));
     Assertions.assertTrue(exception.getMessage().contains("outside allowed table locations"));
+  }
+
+  @Test
+  void testUnsupportedProvider() {
+    RemoteSignSupport support =
+        new RemoteSignSupport(
+            new org.apache.gravitino.iceberg.common.IcebergConfig(Collections.emptyMap()));
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                support.sign(
+                    ImmutableRemoteSignRequest.builder()
+                        .region("us-east-1")
+                        .method("PUT")
+                        .uri(URI.create("gs://bucket/object"))
+                        .provider("gcs")
+                        .headers(Collections.emptyMap())
+                        .build(),
+                    new S3SecretKeyCredential("access-key", "secret-key")));
+    Assertions.assertTrue(exception.getMessage().contains("gcs"));
   }
 }
