@@ -27,7 +27,6 @@ import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
@@ -169,66 +168,6 @@ public interface EntityStore extends Closeable {
       throws NoSuchEntityException, IOException;
 
   /**
-   * Get the entity from the underlying storage by external id within the namespace.
-   *
-   * @param namespace the namespace of the entity
-   * @param entityType the general type of the entity
-   * @param type the detailed type of the entity
-   * @param externalId the external id of the entity
-   * @param <E> the class of entity
-   * @return the entity retrieved from the underlying storage
-   * @throws NoSuchEntityException if the entity does not exist
-   * @throws IOException if the retrieve operation fails
-   */
-  <E extends Entity & HasIdentifier> E getByExternalId(
-      Namespace namespace, EntityType entityType, Class<E> type, String externalId)
-      throws NoSuchEntityException, IOException;
-
-  /**
-   * Update the enabled state of a user by external id within the user namespace.
-   *
-   * @param namespace the user namespace of the metalake
-   * @param externalId the external id of the user
-   * @param enabled the expected enabled state
-   * @return the updated user entity
-   * @throws NoSuchEntityException if the user does not exist
-   * @throws IOException if the update operation fails
-   */
-  default UserEntity updateUserEnabledByExternalId(
-      Namespace namespace, String externalId, boolean enabled)
-      throws NoSuchEntityException, IOException {
-    throw new UnsupportedOperationException("Don't support update user enabled by external id");
-  }
-
-  /**
-   * Delete a user by external id within the user namespace.
-   *
-   * @param namespace the user namespace of the metalake
-   * @param externalId the external id of the user
-   * @return true if the user was deleted
-   * @throws NoSuchEntityException if the user does not exist
-   * @throws IOException if the delete operation fails
-   */
-  default boolean deleteUserByExternalId(Namespace namespace, String externalId)
-      throws NoSuchEntityException, IOException {
-    throw new UnsupportedOperationException("Don't support delete user by external id");
-  }
-
-  /**
-   * Delete a group by external id within the group namespace.
-   *
-   * @param namespace the group namespace of the metalake
-   * @param externalId the external id of the group
-   * @return true if the group was deleted
-   * @throws NoSuchEntityException if the group does not exist
-   * @throws IOException if the delete operation fails
-   */
-  default boolean deleteGroupByExternalId(Namespace namespace, String externalId)
-      throws NoSuchEntityException, IOException {
-    throw new UnsupportedOperationException("Don't support delete group by external id");
-  }
-
-  /**
    * Batch get the entity from the underlying storage.
    *
    * @param idents the unique identifier of the entity
@@ -328,5 +267,15 @@ public interface EntityStore extends Closeable {
    */
   default SupportsRelationOperations relationOperations() {
     throw new UnsupportedOperationException("relation operations are not supported");
+  }
+
+  /**
+   * Get the extra external id operations that are supported by the entity store.
+   *
+   * @return the external id operations that are supported by the entity store
+   * @throws UnsupportedOperationException if the extra operations are not supported
+   */
+  default SupportsExternalIdOperations externalIdOperations() {
+    throw new UnsupportedOperationException("external id operations are not supported");
   }
 }

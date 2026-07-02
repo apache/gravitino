@@ -104,7 +104,10 @@ class UserGroupManager {
 
   boolean removeUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
     try {
-      return store.deleteUserByExternalId(AuthorizationUtils.ofUserNamespace(metalake), externalId);
+      return store
+          .externalIdOperations()
+          .deleteByExternalId(
+              AuthorizationUtils.ofUserNamespace(metalake), Entity.EntityType.USER, externalId);
     } catch (NoSuchEntityException e) {
       LOG.warn(
           "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
@@ -135,11 +138,13 @@ class UserGroupManager {
 
   User getUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
     try {
-      return store.getByExternalId(
-          AuthorizationUtils.ofUserNamespace(metalake),
-          Entity.EntityType.USER,
-          UserEntity.class,
-          externalId);
+      return store
+          .externalIdOperations()
+          .getByExternalId(
+              AuthorizationUtils.ofUserNamespace(metalake),
+              Entity.EntityType.USER,
+              UserEntity.class,
+              externalId);
     } catch (NoSuchEntityException e) {
       LOG.warn(
           "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
@@ -153,8 +158,13 @@ class UserGroupManager {
 
   User enableUser(String metalake, String externalId) throws NoSuchUserException {
     try {
-      return store.updateUserEnabledByExternalId(
-          AuthorizationUtils.ofUserNamespace(metalake), externalId, true);
+      return store
+          .externalIdOperations()
+          .updateEnabledByExternalId(
+              AuthorizationUtils.ofUserNamespace(metalake),
+              Entity.EntityType.USER,
+              externalId,
+              true);
     } catch (NoSuchEntityException e) {
       LOG.warn(
           "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
@@ -172,8 +182,13 @@ class UserGroupManager {
 
   User disableUser(String metalake, String externalId) throws NoSuchUserException {
     try {
-      return store.updateUserEnabledByExternalId(
-          AuthorizationUtils.ofUserNamespace(metalake), externalId, false);
+      return store
+          .externalIdOperations()
+          .updateEnabledByExternalId(
+              AuthorizationUtils.ofUserNamespace(metalake),
+              Entity.EntityType.USER,
+              externalId,
+              false);
     } catch (NoSuchEntityException e) {
       LOG.warn(
           "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
@@ -246,8 +261,10 @@ class UserGroupManager {
 
   boolean removeGroupByExternalId(String metalake, String externalId) throws NoSuchGroupException {
     try {
-      return store.deleteGroupByExternalId(
-          AuthorizationUtils.ofGroupNamespace(metalake), externalId);
+      return store
+          .externalIdOperations()
+          .deleteByExternalId(
+              AuthorizationUtils.ofGroupNamespace(metalake), EntityType.GROUP, externalId);
     } catch (NoSuchEntityException e) {
       LOG.warn(
           "Group with external id {} does not exist in the metalake {}", externalId, metalake, e);
@@ -278,11 +295,13 @@ class UserGroupManager {
 
   Group getGroupByExternalId(String metalake, String externalId) {
     try {
-      return store.getByExternalId(
-          AuthorizationUtils.ofGroupNamespace(metalake),
-          EntityType.GROUP,
-          GroupEntity.class,
-          externalId);
+      return store
+          .externalIdOperations()
+          .getByExternalId(
+              AuthorizationUtils.ofGroupNamespace(metalake),
+              EntityType.GROUP,
+              GroupEntity.class,
+              externalId);
     } catch (NoSuchEntityException e) {
       LOG.warn(
           "Group with external id {} does not exist in the metalake {}", externalId, metalake, e);
