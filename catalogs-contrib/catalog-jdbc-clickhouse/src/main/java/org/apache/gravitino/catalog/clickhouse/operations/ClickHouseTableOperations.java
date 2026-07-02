@@ -522,20 +522,30 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   /**
    * Resolves the GRANULARITY value for a data skipping index from its properties, falling back to
    * the ClickHouse default. The value is interpolated directly into DDL, so it must be a positive
-   * integer (≥ 1) to avoid generating malformed SQL.
+   * integer (&ge; 1) to avoid generating malformed SQL.
    *
    * @param index the index whose {@code granularity} property is read
    * @return the validated GRANULARITY value as a string
+   * @throws IllegalArgumentException if the value is not a positive integer
    */
   private static String resolveGranularity(Index index) {
     String granularity =
         index.properties().getOrDefault(INDEX_GRANULARITY_KEY, DEFAULT_INDEX_GRANULARITY);
-    Preconditions.checkArgument(
-        StringUtils.isNumeric(granularity) && Long.parseLong(granularity) >= 1,
-        "Index %s granularity must be a positive integer (>= 1), but got %s",
-        index.name(),
-        granularity);
-    return granularity;
+    try {
+      long value = Long.parseLong(granularity);
+      Preconditions.checkArgument(
+          value >= 1,
+          "Index %s granularity must be a positive integer (>= 1), but got %s",
+          index.name(),
+          granularity);
+      return String.valueOf(value);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Index %s granularity must be a positive integer (>= 1), but got '%s'",
+              index.name(), granularity),
+          e);
+    }
   }
 
   /**

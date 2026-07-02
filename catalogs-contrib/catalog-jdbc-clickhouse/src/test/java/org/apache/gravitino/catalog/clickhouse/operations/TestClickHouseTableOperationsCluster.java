@@ -646,9 +646,9 @@ class TestClickHouseTableOperationsCluster {
                 null));
   }
 
-  /** Index with leading-zero GRANULARITY (e.g. "00") should be rejected as it parses to 0. */
+  /** Index with GRANULARITY that parses to 0 (e.g. "00") should be rejected, regardless of formatting. */
   @Test
-  void testIndexLeadingZeroGranularityRejected() {
+  void testIndexZeroAfterParsingGranularityRejected() {
     JdbcColumn[] columns =
         new JdbcColumn[] {
           JdbcColumn.builder()
@@ -665,6 +665,41 @@ class TestClickHouseTableOperationsCluster {
               "idx_c1",
               new String[][] {{"c1"}},
               Map.of("granularity", "00"))
+        };
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "tbl",
+                columns,
+                "comment",
+                new HashMap<>(),
+                null,
+                Distributions.NONE,
+                indexes,
+                null));
+  }
+
+  /** Index with negative GRANULARITY (e.g. "-1") should be rejected. */
+  @Test
+  void testIndexNegativeGranularityRejected() {
+    JdbcColumn[] columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build()
+        };
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_MINMAX,
+              "idx_c1",
+              new String[][] {{"c1"}},
+              Map.of("granularity", "-1"))
         };
 
     Assertions.assertThrows(
