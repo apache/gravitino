@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.sign;
 
+import com.google.common.collect.ImmutableList;
 import java.net.URI;
 import java.time.Duration;
 import java.util.EnumMap;
@@ -45,11 +46,11 @@ public class RemoteSignSupport {
     ADLS("adls", "abfs", "abfss", "wasb", "wasbs");
 
     private final String providerName;
-    private final String[] schemes;
+    private final ImmutableList<String> schemes;
 
     Provider(String providerName, String... schemes) {
       this.providerName = providerName;
-      this.schemes = schemes;
+      this.schemes = ImmutableList.copyOf(schemes);
     }
 
     /**
@@ -293,7 +294,9 @@ public class RemoteSignSupport {
       throw new IllegalArgumentException("URI scheme is required: " + uri);
     }
     String canonicalScheme =
-        provider == Provider.GCS ? "gs" : provider == Provider.OSS ? "oss" : provider.providerName();
+        provider == Provider.GCS
+            ? "gs"
+            : provider == Provider.OSS ? "oss" : provider.providerName();
     if (!canonicalScheme.equalsIgnoreCase(scheme)) {
       if (provider == Provider.GCS && "https".equalsIgnoreCase(scheme)) {
         return normalizeGcsHttps(uri);

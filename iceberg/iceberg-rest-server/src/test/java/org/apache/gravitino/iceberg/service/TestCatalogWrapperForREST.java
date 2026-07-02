@@ -588,7 +588,7 @@ public class TestCatalogWrapperForREST {
                 "/tmp/warehouse"));
     CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
 
-    LoadTableResponse response = wrapper.loadTable(ident, false, CredentialPrivilege.READ);
+    LoadTableResponse response = wrapper.loadTable(ident, false, false, CredentialPrivilege.READ);
 
     Assertions.assertEquals(
         "v1/irc1/namespaces/db/tables/tbl/credentials",
@@ -644,7 +644,7 @@ public class TestCatalogWrapperForREST {
                 "/tmp/warehouse"));
     CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("irc1", config, catalog);
 
-    LoadTableResponse response = wrapper.loadTable(ident, false, CredentialPrivilege.READ);
+    LoadTableResponse response = wrapper.loadTable(ident, false, false, CredentialPrivilege.READ);
 
     Assertions.assertEquals(1, response.credentials().size());
     Credential credential = response.credentials().get(0);
@@ -777,7 +777,7 @@ public class TestCatalogWrapperForREST {
             .metadataLocation("s3://bucket/warehouse/tbl/metadata/v1.metadata.json")
             .build();
 
-    LoadTableResponse response = wrapper.registerTable(Namespace.of("db"), request, false);
+    LoadTableResponse response = wrapper.registerTable(Namespace.of("db"), request, false, false);
 
     verify(catalog).registerTable(ident, request.metadataLocation(), false);
     verify(catalog).loadTable(ident);
@@ -818,7 +818,7 @@ public class TestCatalogWrapperForREST {
             .overwrite(true)
             .build();
 
-    wrapper.registerTable(Namespace.of("db"), request, false);
+    wrapper.registerTable(Namespace.of("db"), request, false, false);
 
     verify(catalog).registerTable(ident, request.metadataLocation(), true);
     verify(catalog).loadTable(ident);
@@ -884,7 +884,7 @@ public class TestCatalogWrapperForREST {
             .stageCreate()
             .build();
 
-    LoadTableResponse response = wrapper.createTable(Namespace.of("db"), request, false);
+    LoadTableResponse response = wrapper.createTable(Namespace.of("db"), request, false, false);
 
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
@@ -929,7 +929,7 @@ public class TestCatalogWrapperForREST {
     CreateTableRequest request =
         CreateTableRequest.builder().withName("tbl").withSchema(schema).stageCreate().build();
 
-    LoadTableResponse response = wrapper.createTable(Namespace.of("db"), request, false);
+    LoadTableResponse response = wrapper.createTable(Namespace.of("db"), request, false, false);
 
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));

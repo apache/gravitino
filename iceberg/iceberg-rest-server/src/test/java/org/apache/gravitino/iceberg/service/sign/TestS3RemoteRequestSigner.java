@@ -50,8 +50,7 @@ class TestS3RemoteRequestSigner {
   @Test
   void testUnsupportedProvider() {
     S3RemoteRequestSigner signer =
-        new S3RemoteRequestSigner(
-            null, false, RemoteSignSupport.DEFAULT_SIGNATURE_DURATION);
+        new S3RemoteRequestSigner(null, false, RemoteSignSupport.DEFAULT_SIGNATURE_DURATION);
     UnsupportedOperationException exception =
         Assertions.assertThrows(
             UnsupportedOperationException.class,

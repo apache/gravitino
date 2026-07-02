@@ -104,23 +104,11 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
 
   @Override
   public LoadTableResponse createTable(
-      Namespace namespace, CreateTableRequest request, boolean requestCredential) {
-    return createTable(namespace, request, requestCredential, false);
-  }
-
-  @Override
-  public LoadTableResponse createTable(
       Namespace namespace,
       CreateTableRequest request,
       boolean requestCredential,
       boolean requestRemoteSigning) {
     return createTableInternal(namespace, request, requestCredential, requestRemoteSigning);
-  }
-
-  @Override
-  public LoadTableResponse loadTable(
-      TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
-    return loadTable(identifier, requestCredential, false, privilege);
   }
 
   @Override
@@ -132,12 +120,6 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     LoadTableResponse response = loadTableInternal(identifier);
     return maybeInjectDataAccessConfig(
         identifier, response, requestCredential, requestRemoteSigning, privilege);
-  }
-
-  @Override
-  public LoadTableResponse registerTable(
-      Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
-    return registerTable(namespace, request, requestCredential, false);
   }
 
   @Override

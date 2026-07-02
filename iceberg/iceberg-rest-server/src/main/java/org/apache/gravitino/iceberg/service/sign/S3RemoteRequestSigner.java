@@ -31,7 +31,6 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.service.sign.RemoteSignSupport.Provider;
 import org.apache.iceberg.aws.s3.S3FileIOProperties;
 import org.apache.iceberg.rest.RESTCatalogProperties;
 import org.apache.iceberg.rest.requests.RemoteSignRequest;
@@ -70,8 +69,8 @@ public class S3RemoteRequestSigner implements RemoteRequestSigner {
   }
 
   @Override
-  public Provider provider() {
-    return Provider.S3;
+  public RemoteSignSupport.Provider provider() {
+    return RemoteSignSupport.Provider.S3;
   }
 
   @Override
@@ -88,8 +87,9 @@ public class S3RemoteRequestSigner implements RemoteRequestSigner {
 
   @Override
   public RemoteSignResponse sign(RemoteSignRequest request, Credential credential) {
-    Provider provider = Provider.fromRequest(request.provider(), request.uri());
-    if (provider != Provider.S3) {
+    RemoteSignSupport.Provider provider =
+        RemoteSignSupport.Provider.fromRequest(request.provider(), request.uri());
+    if (provider != RemoteSignSupport.Provider.S3) {
       throw new UnsupportedOperationException(
           "S3 signer cannot sign provider: " + provider.providerName());
     }
@@ -110,37 +110,40 @@ public class S3RemoteRequestSigner implements RemoteRequestSigner {
     String bucket = bucketKey.bucket();
     String key = bucketKey.key();
     switch (method) {
-      case "PUT": {
-        var presigned =
-            presigner.presignPutObject(
-                builder ->
-                    builder
-                        .signatureDuration(signatureDuration)
-                        .putObjectRequest(
-                            PutObjectRequest.builder().bucket(bucket).key(key).build()));
-        return toResponse(presigned.url().toString(), presigned.signedHeaders());
-      }
+      case "PUT":
+        {
+          var presigned =
+              presigner.presignPutObject(
+                  builder ->
+                      builder
+                          .signatureDuration(signatureDuration)
+                          .putObjectRequest(
+                              PutObjectRequest.builder().bucket(bucket).key(key).build()));
+          return toResponse(presigned.url().toString(), presigned.signedHeaders());
+        }
       case "GET":
-      case "HEAD": {
-        var presigned =
-            presigner.presignGetObject(
-                builder ->
-                    builder
-                        .signatureDuration(signatureDuration)
-                        .getObjectRequest(
-                            GetObjectRequest.builder().bucket(bucket).key(key).build()));
-        return toResponse(presigned.url().toString(), presigned.signedHeaders());
-      }
-      case "DELETE": {
-        var presigned =
-            presigner.presignDeleteObject(
-                builder ->
-                    builder
-                        .signatureDuration(signatureDuration)
-                        .deleteObjectRequest(
-                            DeleteObjectRequest.builder().bucket(bucket).key(key).build()));
-        return toResponse(presigned.url().toString(), presigned.signedHeaders());
-      }
+      case "HEAD":
+        {
+          var presigned =
+              presigner.presignGetObject(
+                  builder ->
+                      builder
+                          .signatureDuration(signatureDuration)
+                          .getObjectRequest(
+                              GetObjectRequest.builder().bucket(bucket).key(key).build()));
+          return toResponse(presigned.url().toString(), presigned.signedHeaders());
+        }
+      case "DELETE":
+        {
+          var presigned =
+              presigner.presignDeleteObject(
+                  builder ->
+                      builder
+                          .signatureDuration(signatureDuration)
+                          .deleteObjectRequest(
+                              DeleteObjectRequest.builder().bucket(bucket).key(key).build()));
+          return toResponse(presigned.url().toString(), presigned.signedHeaders());
+        }
       default:
         throw new UnsupportedOperationException(
             "Remote signing is not supported for HTTP method: " + method);

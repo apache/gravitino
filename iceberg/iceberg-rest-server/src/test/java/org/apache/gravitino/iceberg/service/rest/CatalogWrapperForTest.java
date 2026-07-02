@@ -55,12 +55,6 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
 
   @Override
   public LoadTableResponse createTable(
-      Namespace namespace, CreateTableRequest request, boolean requestCredential) {
-    return createTable(namespace, request, requestCredential, false);
-  }
-
-  @Override
-  public LoadTableResponse createTable(
       Namespace namespace,
       CreateTableRequest request,
       boolean requestCredential,
@@ -71,12 +65,6 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
       appendSampleData(namespace, request.name());
     }
     return loadTableResponse;
-  }
-
-  @Override
-  public LoadTableResponse registerTable(
-      Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
-    return registerTable(namespace, request, requestCredential, false);
   }
 
   @Override

@@ -118,11 +118,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     this.scanPlanCache = loadScanPlanCache(config);
   }
 
-  public LoadTableResponse createTable(
-      Namespace namespace, CreateTableRequest request, boolean requestCredential) {
-    return createTable(namespace, request, requestCredential, false);
-  }
-
   /**
    * Creates a table and optionally injects vended credentials or remote-signing configuration.
    *
@@ -146,11 +141,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         CredentialPrivilege.WRITE);
   }
 
-  public LoadTableResponse loadTable(
-      TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
-    return loadTable(identifier, requestCredential, false, privilege);
-  }
-
   /**
    * Loads a table and optionally injects vended credentials or remote-signing configuration.
    *
@@ -168,11 +158,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     LoadTableResponse loadTableResponse = super.loadTable(identifier);
     return maybeInjectDataAccessConfig(
         identifier, loadTableResponse, requestCredential, requestRemoteSigning, privilege);
-  }
-
-  public LoadTableResponse registerTable(
-      Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
-    return registerTable(namespace, request, requestCredential, false);
   }
 
   /**
