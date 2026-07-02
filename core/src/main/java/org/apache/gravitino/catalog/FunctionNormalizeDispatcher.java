@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
@@ -93,13 +93,17 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return applyCaseSensitive(namespace, Capability.Scope.FUNCTION, capabilities);
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        cap -> applyCaseSensitive(namespace, Capability.Scope.FUNCTION, cap));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier functionIdent) {
-    Capability capabilities = getCapability(functionIdent, catalogManager);
-    return applyCaseSensitive(functionIdent, Capability.Scope.FUNCTION, capabilities);
+    return withCapability(
+        functionIdent,
+        catalogManager,
+        cap -> applyCaseSensitive(functionIdent, Capability.Scope.FUNCTION, cap));
   }
 
   private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] functionIdents) {
@@ -107,12 +111,16 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
       return functionIdents;
     }
 
-    Capability capabilities = getCapability(functionIdents[0], catalogManager);
-    return applyCaseSensitive(functionIdents, Capability.Scope.FUNCTION, capabilities);
+    return withCapability(
+        functionIdents[0],
+        catalogManager,
+        cap -> applyCaseSensitive(functionIdents, Capability.Scope.FUNCTION, cap));
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier functionIdent) {
-    Capability capability = getCapability(functionIdent, catalogManager);
-    return applyCapabilities(functionIdent, Capability.Scope.FUNCTION, capability);
+    return withCapability(
+        functionIdent,
+        catalogManager,
+        cap -> applyCapabilities(functionIdent, Capability.Scope.FUNCTION, cap));
   }
 }

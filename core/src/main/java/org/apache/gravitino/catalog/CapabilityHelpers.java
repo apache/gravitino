@@ -47,8 +47,37 @@ import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.utils.ThrowableFunction;
 
 public class CapabilityHelpers {
+
+  /**
+   * Executes {@code fn} with the {@link Capability} of the catalog identified by {@code ident},
+   * while holding the catalog's read lock. This prevents the catalog's {@link
+   * org.apache.gravitino.utils.IsolatedClassLoader} from being closed while capability methods are
+   * executing.
+   *
+   * <p>Callers should use this method instead of {@link #getCapability} whenever they need to
+   * invoke {@link Capability} methods so that the classloader lifecycle is properly bounded.
+   *
+   * @param ident any {@link NameIdentifier} that belongs to the target catalog
+   * @param catalogManager the catalog manager used to load the catalog
+   * @param fn function to execute with the catalog's {@link Capability}
+   * @param <R> return type
+   * @return the result of {@code fn}
+   */
+  public static <R> R withCapability(
+      NameIdentifier ident, CatalogManager catalogManager, ThrowableFunction<Capability, R> fn) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
+    try {
+      return c.doWithCapabilityOps(fn);
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to apply capabilities for catalog: " + catalogIdent, e);
+    }
+  }
 
   public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
@@ -129,8 +158,7 @@ public class CapabilityHelpers {
    */
   public static NameIdentifier applyCapabilities(
       NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
-    Capability capability = getCapability(ident, catalogManager);
-    return applyCapabilities(ident, scope, capability);
+    return withCapability(ident, catalogManager, cap -> applyCapabilities(ident, scope, cap));
   }
 
   public static NameIdentifier[] applyCaseSensitive(

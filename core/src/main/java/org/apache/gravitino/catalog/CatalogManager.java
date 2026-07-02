@@ -56,6 +56,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -127,6 +129,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
 
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private volatile boolean closed = false;
     private BaseCatalog catalog;
     private IsolatedClassLoader classLoader;
 
@@ -140,102 +144,182 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
 
     public <R> R doWithSchemaOps(ThrowableFunction<SupportsSchemas, R> fn) throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            if (asSchemas() == null) {
-              throw new UnsupportedOperationException("Catalog does not support schema operations");
-            }
-            return fn.apply(asSchemas());
-          });
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(
+            cl -> {
+              if (asSchemas() == null) {
+                throw new UnsupportedOperationException(
+                    "Catalog does not support schema operations");
+              }
+              return fn.apply(asSchemas());
+            });
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithTableOps(ThrowableFunction<TableCatalog, R> fn) throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            if (asTables() == null) {
-              throw new UnsupportedOperationException("Catalog does not support table operations");
-            }
-            return fn.apply(asTables());
-          });
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(
+            cl -> {
+              if (asTables() == null) {
+                throw new UnsupportedOperationException(
+                    "Catalog does not support table operations");
+              }
+              return fn.apply(asTables());
+            });
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithViewOps(ThrowableFunction<ViewCatalog, R> fn) throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            if (asViews() == null) {
-              throw new UnsupportedOperationException("Catalog does not support view operations");
-            }
-            return fn.apply(asViews());
-          });
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(
+            cl -> {
+              if (asViews() == null) {
+                throw new UnsupportedOperationException("Catalog does not support view operations");
+              }
+              return fn.apply(asViews());
+            });
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithFilesetOps(ThrowableFunction<FilesetCatalog, R> fn) throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            if (asFilesets() == null) {
-              throw new UnsupportedOperationException(
-                  "Catalog does not support fileset operations");
-            }
-            return fn.apply(asFilesets());
-          });
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(
+            cl -> {
+              if (asFilesets() == null) {
+                throw new UnsupportedOperationException(
+                    "Catalog does not support fileset operations");
+              }
+              return fn.apply(asFilesets());
+            });
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithFilesetFileOps(ThrowableFunction<FilesetFileOps, R> fn) throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            if (asFilesetFileOps() == null) {
-              throw new UnsupportedOperationException(
-                  "Catalog does not support fileset file operations");
-            }
-            return fn.apply(asFilesetFileOps());
-          });
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(
+            cl -> {
+              if (asFilesetFileOps() == null) {
+                throw new UnsupportedOperationException(
+                    "Catalog does not support fileset file operations");
+              }
+              return fn.apply(asFilesetFileOps());
+            });
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithCredentialOps(ThrowableFunction<BaseCatalog, R> fn) throws Exception {
-      return classLoader.withClassLoader(cl -> fn.apply(catalog));
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(cl -> fn.apply(catalog));
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithTopicOps(ThrowableFunction<TopicCatalog, R> fn) throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            if (asTopics() == null) {
-              throw new UnsupportedOperationException("Catalog does not support topic operations");
-            }
-            return fn.apply(asTopics());
-          });
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(
+            cl -> {
+              if (asTopics() == null) {
+                throw new UnsupportedOperationException(
+                    "Catalog does not support topic operations");
+              }
+              return fn.apply(asTopics());
+            });
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithModelOps(ThrowableFunction<ModelCatalog, R> fn) throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            if (asModels() == null) {
-              throw new UnsupportedOperationException("Catalog does not support model operations");
-            }
-            return fn.apply(asModels());
-          });
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(
+            cl -> {
+              if (asModels() == null) {
+                throw new UnsupportedOperationException(
+                    "Catalog does not support model operations");
+              }
+              return fn.apply(asModels());
+            });
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithCatalogOps(ThrowableFunction<CatalogOperations, R> fn) throws Exception {
-      return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(cl -> fn.apply(catalog.ops()));
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithPartitionOps(
         NameIdentifier tableIdent, ThrowableFunction<SupportsPartitions, R> fn) throws Exception {
-      return classLoader.withClassLoader(
-          cl -> {
-            Preconditions.checkArgument(
-                asTables() != null, "Catalog does not support table operations");
-            Table table = asTables().loadTable(tableIdent);
-            SupportsPartitions partitionOps = table.supportPartitions();
-            Preconditions.checkArgument(
-                partitionOps != null, "Table does not support partition operations");
-            return fn.apply(partitionOps);
-          });
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(
+            cl -> {
+              Preconditions.checkArgument(
+                  asTables() != null, "Catalog does not support table operations");
+              Table table = asTables().loadTable(tableIdent);
+              SupportsPartitions partitionOps = table.supportPartitions();
+              Preconditions.checkArgument(
+                  partitionOps != null, "Table does not support partition operations");
+              return fn.apply(partitionOps);
+            });
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public <R> R doWithPropertiesMeta(ThrowableFunction<HasPropertyMetadata, R> fn)
         throws Exception {
-      return classLoader.withClassLoader(cl -> fn.apply(catalog));
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(cl -> fn.apply(catalog));
+      } finally {
+        lock.readLock().unlock();
+      }
+    }
+
+    public <R> R doWithCapabilityOps(ThrowableFunction<Capability, R> fn) throws Exception {
+      lock.readLock().lock();
+      try {
+        checkNotClosed();
+        return classLoader.withClassLoader(cl -> fn.apply(catalog.capability()));
+      } finally {
+        lock.readLock().unlock();
+      }
     }
 
     public Capability capabilities() throws Exception {
@@ -243,20 +327,35 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
 
     public void close() {
+      lock.writeLock().lock();
       try {
-        classLoader.withClassLoader(
-            cl -> {
-              if (catalog != null) {
-                catalog.close();
-              }
-              catalog = null;
-              return null;
-            });
-      } catch (Exception e) {
-        LOG.warn("Failed to close catalog", e);
-      }
+        if (closed) {
+          return;
+        }
+        closed = true;
+        try {
+          classLoader.withClassLoader(
+              cl -> {
+                if (catalog != null) {
+                  catalog.close();
+                }
+                catalog = null;
+                return null;
+              });
+        } catch (Exception e) {
+          LOG.warn("Failed to close catalog", e);
+        }
 
-      classLoader.close();
+        classLoader.close();
+      } finally {
+        lock.writeLock().unlock();
+      }
+    }
+
+    private void checkNotClosed() {
+      if (closed) {
+        throw new IllegalStateException("CatalogWrapper is already closed");
+      }
     }
 
     private SupportsSchemas asSchemas() {
@@ -1032,13 +1131,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private boolean isManagedStorageCatalog(CatalogWrapper catalogWrapper) {
     try {
-      Capability capability = catalogWrapper.capabilities();
-      return capability.managedStorage(Capability.Scope.SCHEMA).supported()
-          && (capability.managedStorage(Capability.Scope.TABLE).supported()
-              || capability.managedStorage(Capability.Scope.FILESET).supported()
-              || capability.managedStorage(Capability.Scope.MODEL).supported());
+      return catalogWrapper.doWithCapabilityOps(
+          capability ->
+              capability.managedStorage(Capability.Scope.SCHEMA).supported()
+                  && (capability.managedStorage(Capability.Scope.TABLE).supported()
+                      || capability.managedStorage(Capability.Scope.FILESET).supported()
+                      || capability.managedStorage(Capability.Scope.MODEL).supported()));
     } catch (Exception e) {
-      // This should not be happened, because capabilities() will never throw an exception here.
       throw new RuntimeException(e);
     }
   }
