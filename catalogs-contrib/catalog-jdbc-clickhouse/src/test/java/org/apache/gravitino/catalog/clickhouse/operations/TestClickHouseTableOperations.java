@@ -1194,6 +1194,40 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertEquals("id", ((NamedReference) sortOrders[0].expression()).fieldName()[0]);
   }
 
+  @Test
+  void testParseSettingsFromCreateSql() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+
+    // Single setting
+    String sql1 =
+        "CREATE TABLE t1 (id Int32) ENGINE = MergeTree ORDER BY id SETTINGS index_granularity = 4096";
+    Map<String, String> settings1 = ops.parseSettings(sql1);
+    Assertions.assertEquals(1, settings1.size());
+    Assertions.assertEquals("4096", settings1.get("settings.index_granularity"));
+
+    // Multiple settings
+    String sql2 =
+        "CREATE TABLE t2 (id Int32) ENGINE = MergeTree ORDER BY id"
+            + " SETTINGS index_granularity = 4096, min_bytes_for_wide_part = 0";
+    Map<String, String> settings2 = ops.parseSettings(sql2);
+    Assertions.assertEquals(2, settings2.size());
+    Assertions.assertEquals("4096", settings2.get("settings.index_granularity"));
+    Assertions.assertEquals("0", settings2.get("settings.min_bytes_for_wide_part"));
+
+    // No SETTINGS clause
+    String sql3 = "CREATE TABLE t3 (id Int32) ENGINE = MergeTree ORDER BY id";
+    Map<String, String> settings3 = ops.parseSettings(sql3);
+    Assertions.assertTrue(settings3.isEmpty());
+
+    // SETTINGS with COMMENT after
+    String sql4 =
+        "CREATE TABLE t4 (id Int32) ENGINE = MergeTree ORDER BY id"
+            + " SETTINGS index_granularity = 8192 COMMENT 'test'";
+    Map<String, String> settings4 = ops.parseSettings(sql4);
+    Assertions.assertEquals(1, settings4.size());
+    Assertions.assertEquals("8192", settings4.get("settings.index_granularity"));
+  }
+
   private static final class TestableClickHouseTableOperations extends ClickHouseTableOperations {
     String buildCreateSql(
         String tableName,
@@ -1210,6 +1244,10 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
     SortOrder[] parseSortOrders(String createSql) {
       return parseSortOrdersFromCreateSql(createSql);
+    }
+
+    Map<String, String> parseSettings(String createSql) {
+      return parseSettingsFromCreateSql(createSql);
     }
   }
 
