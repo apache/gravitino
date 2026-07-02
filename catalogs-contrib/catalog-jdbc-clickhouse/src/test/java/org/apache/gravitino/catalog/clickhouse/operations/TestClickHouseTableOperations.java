@@ -1114,7 +1114,109 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
     Assertions.assertTrue(sql.contains("PARTITION BY `c1`"));
     Assertions.assertTrue(sql.contains("INDEX `idx_c2` `c2` TYPE minmax GRANULARITY 1"));
-    Assertions.assertTrue(sql.contains("INDEX `idx_c3` `c3` TYPE bloom_filter GRANULARITY 3"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_c3` `c3` TYPE bloom_filter GRANULARITY 1"));
+  }
+
+  @Test
+  void testGenerateCreateTableSqlWithCustomGranularity() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c2")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}),
+          Indexes.of(
+              IndexType.DATA_SKIPPING_MINMAX,
+              "idx_c2",
+              new String[][] {{"c2"}},
+              Map.of("granularity", "5")),
+          Indexes.of(
+              IndexType.DATA_SKIPPING_BLOOM_FILTER,
+              "idx_c3",
+              new String[][] {{"c2"}},
+              Map.of("granularity", "10")),
+        };
+
+    String sql =
+        ops.buildCreateSql(
+            "t_idx",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[] {Transforms.identity("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    Assertions.assertTrue(sql.contains("INDEX `idx_c2` `c2` TYPE minmax GRANULARITY 5"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_c3` `c2` TYPE bloom_filter GRANULARITY 10"));
+  }
+
+  @Test
+  void testGranularityNormalizedToCanonicalForm() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+        };
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}),
+          Indexes.of(
+              IndexType.DATA_SKIPPING_MINMAX,
+              "idx_c1",
+              new String[][] {{"c1"}},
+              Map.of("granularity", "005")),
+        };
+
+    String sql =
+        ops.buildCreateSql(
+            "t_norm",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[] {Transforms.identity("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    // "005" should be normalized to "5" after parsing
+    Assertions.assertTrue(
+        sql.contains("GRANULARITY 5"),
+        "Leading-zero granularity should be normalized, actual SQL: " + sql);
+    Assertions.assertFalse(
+        sql.contains("GRANULARITY 005"), "Raw leading-zero granularity must not appear in DDL");
   }
 
   @Test
@@ -1336,7 +1438,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                   IndexType.DATA_SKIPPING_BLOOM_FILTER, "idx_bf", new String[][] {{"c2"}})
             });
     Assertions.assertTrue(
-        bloomSql.contains("ADD INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 3"));
+        bloomSql.contains("ADD INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 1"));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
