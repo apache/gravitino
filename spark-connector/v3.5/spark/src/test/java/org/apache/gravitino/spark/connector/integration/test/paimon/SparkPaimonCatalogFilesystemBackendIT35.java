@@ -51,11 +51,11 @@ public class SparkPaimonCatalogFilesystemBackendIT35 extends SparkPaimonCatalogF
     String fullTableName =
         String.format("%s.%s.%s", getCatalogName(), getDefaultDatabase(), tableName);
 
-    sql(String.format("USE %s.%s", getCatalogName(), getDefaultDatabase()));
-
     List<Row> result =
         getSparkSession()
-            .sql(String.format("CALL system.compact(table => '%s')", fullTableName))
+            .sql(
+                String.format(
+                    "CALL %s.system.compact(table => '%s')", getCatalogName(), fullTableName))
             .collectAsList();
     Assertions.assertFalse(result.isEmpty());
   }
