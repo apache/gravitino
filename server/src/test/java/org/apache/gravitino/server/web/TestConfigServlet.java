@@ -30,6 +30,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Map;
+import java.util.Properties;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
@@ -99,6 +100,44 @@ public class TestConfigServlet {
     serverConfig.set(Configs.VISIBLE_CONFIGS, Lists.newArrayList(customConfig.getKey()));
     Map<String, Object> configs = fetchConfigs(serverConfig);
     Assertions.assertEquals("test", configs.get(customConfig.getKey()));
+  }
+
+  @Test
+  public void testConfigServletWithVisibleServiceAdminsFromProperties() throws Exception {
+    ServerConfig serverConfig = new ServerConfig(false);
+    Properties properties = new Properties();
+    properties.setProperty(Configs.VISIBLE_CONFIGS.getKey(), Configs.SERVICE_ADMINS.getKey());
+    properties.setProperty(Configs.SERVICE_ADMINS.getKey(), "admin1");
+    serverConfig.loadFromProperties(properties);
+
+    Map<String, Object> configs = fetchConfigs(serverConfig);
+    Assertions.assertEquals(
+        Lists.newArrayList("admin1"), configs.get(Configs.SERVICE_ADMINS.getKey()));
+  }
+
+  @Test
+  public void testConfigServletWithVisibleTypedConfigFromProperties() throws Exception {
+    ServerConfig serverConfig = new ServerConfig(false);
+    Properties properties = new Properties();
+    properties.setProperty(
+        Configs.VISIBLE_CONFIGS.getKey(), Configs.REST_API_EXTENSION_PACKAGES.getKey());
+    properties.setProperty(Configs.REST_API_EXTENSION_PACKAGES.getKey(), "pkg.one");
+    serverConfig.loadFromProperties(properties);
+
+    Map<String, Object> configs = fetchConfigs(serverConfig);
+    Assertions.assertEquals(
+        Lists.newArrayList("pkg.one"), configs.get(Configs.REST_API_EXTENSION_PACKAGES.getKey()));
+  }
+
+  @Test
+  public void testConfigServletWithVisibleServiceAdminsButNoValue() throws Exception {
+    ServerConfig serverConfig = new ServerConfig(false);
+    Properties properties = new Properties();
+    properties.setProperty(Configs.VISIBLE_CONFIGS.getKey(), Configs.SERVICE_ADMINS.getKey());
+    serverConfig.loadFromProperties(properties);
+
+    Map<String, Object> configs = fetchConfigs(serverConfig);
+    Assertions.assertFalse(configs.containsKey(Configs.SERVICE_ADMINS.getKey()));
   }
 
   @Test
