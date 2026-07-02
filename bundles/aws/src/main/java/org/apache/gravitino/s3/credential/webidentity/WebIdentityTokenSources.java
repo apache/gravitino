@@ -53,8 +53,6 @@ public final class WebIdentityTokenSources {
       type = WebIdentityTokenSourceConfig.DEFAULT_SOURCE;
     }
 
-
-
     List<String> available = new ArrayList<>();
     List<WebIdentityTokenSource> matched = new ArrayList<>();
     Map<String, WebIdentityTokenSource> sourcesByName = new HashMap<>();
