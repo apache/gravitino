@@ -48,10 +48,10 @@ public final class WebIdentityTokenSources {
    */
   static WebIdentityTokenSource create(
       Map<String, String> properties, Iterable<WebIdentityTokenSource> candidates) {
-    String type = properties.getOrDefault(WebIdentityTokenSourceConfig.SOURCE, "");
-    if (StringUtils.isBlank(type)) {
-      type = WebIdentityTokenSourceConfig.DEFAULT_SOURCE;
-    }
+    String type =
+        StringUtils.defaultIfBlank(
+            properties.get(WebIdentityTokenSourceConfig.SOURCE),
+            WebIdentityTokenSourceConfig.DEFAULT_SOURCE);
 
     List<String> available = new ArrayList<>();
     List<WebIdentityTokenSource> matched = new ArrayList<>();
