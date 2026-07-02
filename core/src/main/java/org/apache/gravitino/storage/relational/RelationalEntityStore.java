@@ -53,8 +53,6 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
-import org.apache.gravitino.storage.relational.service.GroupMetaService;
-import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -192,29 +190,28 @@ public class RelationalEntityStore
 
   @Override
   public UserEntity updateUserEnabledByExternalId(
-      Namespace userNamespace, String externalId, boolean enabled)
+      Namespace namespace, String externalId, boolean enabled)
       throws NoSuchEntityException, IOException {
     UserEntity updatedUser =
-        UserMetaService.getInstance()
-            .updateUserEnabled(userNamespace.level(0), externalId, enabled);
+        backend.updateEnabledByExternalId(namespace, Entity.EntityType.USER, externalId, enabled);
     cache.invalidate(updatedUser.nameIdentifier(), Entity.EntityType.USER);
     return updatedUser;
   }
 
   @Override
-  public boolean deleteUserByExternalId(Namespace userNamespace, String externalId)
+  public boolean deleteUserByExternalId(Namespace namespace, String externalId)
       throws NoSuchEntityException, IOException {
     NameIdentifier ident =
-        UserMetaService.getInstance().deleteUserByExternalId(userNamespace.level(0), externalId);
+        backend.deleteByExternalId(namespace, Entity.EntityType.USER, externalId);
     cache.invalidate(ident, Entity.EntityType.USER);
     return true;
   }
 
   @Override
-  public boolean deleteGroupByExternalId(Namespace groupNamespace, String externalId)
+  public boolean deleteGroupByExternalId(Namespace namespace, String externalId)
       throws NoSuchEntityException, IOException {
     NameIdentifier ident =
-        GroupMetaService.getInstance().deleteGroupByExternalId(groupNamespace.level(0), externalId);
+        backend.deleteByExternalId(namespace, Entity.EntityType.GROUP, externalId);
     cache.invalidate(ident, Entity.EntityType.GROUP);
     return true;
   }

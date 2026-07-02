@@ -177,10 +177,9 @@ public class TestMemoryEntityStore {
 
     @Override
     public UserEntity updateUserEnabledByExternalId(
-        Namespace userNamespace, String externalId, boolean enabled)
+        Namespace namespace, String externalId, boolean enabled)
         throws NoSuchEntityException, IOException {
-      UserEntity user =
-          getByExternalId(userNamespace, EntityType.USER, UserEntity.class, externalId);
+      UserEntity user = getByExternalId(namespace, EntityType.USER, UserEntity.class, externalId);
       return update(
           user.nameIdentifier(),
           UserEntity.class,
@@ -199,18 +198,17 @@ public class TestMemoryEntityStore {
     }
 
     @Override
-    public boolean deleteUserByExternalId(Namespace userNamespace, String externalId)
+    public boolean deleteUserByExternalId(Namespace namespace, String externalId)
         throws NoSuchEntityException, IOException {
-      UserEntity user =
-          getByExternalId(userNamespace, EntityType.USER, UserEntity.class, externalId);
+      UserEntity user = getByExternalId(namespace, EntityType.USER, UserEntity.class, externalId);
       return delete(user.nameIdentifier(), EntityType.USER);
     }
 
     @Override
-    public boolean deleteGroupByExternalId(Namespace groupNamespace, String externalId)
+    public boolean deleteGroupByExternalId(Namespace namespace, String externalId)
         throws NoSuchEntityException, IOException {
       GroupEntity group =
-          getByExternalId(groupNamespace, EntityType.GROUP, GroupEntity.class, externalId);
+          getByExternalId(namespace, EntityType.GROUP, GroupEntity.class, externalId);
       return delete(group.nameIdentifier(), EntityType.GROUP);
     }
 

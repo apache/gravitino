@@ -129,6 +129,36 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws NoSuchEntityException, IOException;
 
   /**
+   * Updates the enabled state of an entity by external id.
+   *
+   * @param <E> the type of the entity returned
+   * @param namespace the namespace of the entity
+   * @param entityType the type of the entity
+   * @param externalId the external id of the entity
+   * @param enabled the expected enabled state
+   * @return the updated entity
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IOException if the update operation fails
+   */
+  <E extends Entity & HasIdentifier> E updateEnabledByExternalId(
+      Namespace namespace, Entity.EntityType entityType, String externalId, boolean enabled)
+      throws NoSuchEntityException, IOException;
+
+  /**
+   * Deletes an entity by external id.
+   *
+   * @param namespace the namespace of the entity
+   * @param entityType the type of the entity
+   * @param externalId the external id of the entity
+   * @return the name identifier of the deleted entity
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IOException if the delete operation fails
+   */
+  NameIdentifier deleteByExternalId(
+      Namespace namespace, Entity.EntityType entityType, String externalId)
+      throws NoSuchEntityException, IOException;
+
+  /**
    * Batch retrieves the entities associated with the identifiers and the entity type.
    *
    * @param <E> The type of the entity returned.

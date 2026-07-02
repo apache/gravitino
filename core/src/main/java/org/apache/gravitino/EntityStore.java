@@ -187,7 +187,7 @@ public interface EntityStore extends Closeable {
   /**
    * Update the enabled state of a user by external id within the user namespace.
    *
-   * @param userNamespace the user namespace of the metalake
+   * @param namespace the user namespace of the metalake
    * @param externalId the external id of the user
    * @param enabled the expected enabled state
    * @return the updated user entity
@@ -195,7 +195,7 @@ public interface EntityStore extends Closeable {
    * @throws IOException if the update operation fails
    */
   default UserEntity updateUserEnabledByExternalId(
-      Namespace userNamespace, String externalId, boolean enabled)
+      Namespace namespace, String externalId, boolean enabled)
       throws NoSuchEntityException, IOException {
     throw new UnsupportedOperationException("Don't support update user enabled by external id");
   }
@@ -203,13 +203,13 @@ public interface EntityStore extends Closeable {
   /**
    * Delete a user by external id within the user namespace.
    *
-   * @param userNamespace the user namespace of the metalake
+   * @param namespace the user namespace of the metalake
    * @param externalId the external id of the user
    * @return true if the user was deleted
    * @throws NoSuchEntityException if the user does not exist
    * @throws IOException if the delete operation fails
    */
-  default boolean deleteUserByExternalId(Namespace userNamespace, String externalId)
+  default boolean deleteUserByExternalId(Namespace namespace, String externalId)
       throws NoSuchEntityException, IOException {
     throw new UnsupportedOperationException("Don't support delete user by external id");
   }
@@ -217,13 +217,13 @@ public interface EntityStore extends Closeable {
   /**
    * Delete a group by external id within the group namespace.
    *
-   * @param groupNamespace the group namespace of the metalake
+   * @param namespace the group namespace of the metalake
    * @param externalId the external id of the group
    * @return true if the group was deleted
    * @throws NoSuchEntityException if the group does not exist
    * @throws IOException if the delete operation fails
    */
-  default boolean deleteGroupByExternalId(Namespace groupNamespace, String externalId)
+  default boolean deleteGroupByExternalId(Namespace namespace, String externalId)
       throws NoSuchEntityException, IOException {
     throw new UnsupportedOperationException("Don't support delete group by external id");
   }
