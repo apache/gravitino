@@ -70,6 +70,12 @@ public class GCSFileSystemProvider implements FileSystemProvider, SupportsCreden
   }
 
   @Override
+  public boolean containsClientCredentials(Map<String, String> config) {
+    return SupportsCredentialVending.allNonBlank(
+        config, GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
+  }
+
+  @Override
   public String scheme() {
     return "gs";
   }

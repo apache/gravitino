@@ -268,6 +268,11 @@ class BaseGVFSOperations(ABC):
     def current_location_name(self):
         return self._current_location_name
 
+    @property
+    def enable_credential_vending(self):
+        """Whether credential vending is enabled for this filesystem."""
+        return self._enable_credential_vending
+
     @abstractmethod
     def ls(self, path, detail=True, **kwargs):
         """List the files and directories info of the path.
@@ -566,10 +571,18 @@ class BaseGVFSOperations(ABC):
             CallerContextHolder.set(caller_context)
 
         try:
-            # Get credentials with client-side caching to avoid redundant REST calls
-            credentials = self._get_credentials_with_cache(
-                fileset_ident, fileset, target_location_name
-            )
+            # Credentials are only fetched when credential vending is enabled. Client-provided
+            # credentials take precedence over server-side vended credentials, so skip vending when
+            # the client already configured its own storage credentials; otherwise the vended
+            # credentials would override the client's credentials.
+            credentials = None
+            if self._enable_credential_vending and not get_storage_handler_by_path(
+                actual_location
+            ).contains_client_credentials(fileset_props):
+                # Get credentials with client-side caching to avoid redundant REST calls
+                credentials = self._get_credentials_with_cache(
+                    fileset_ident, fileset, target_location_name
+                )
 
             # Get the filesystem using the new path-based caching approach
             # This matches how Java GVFS caches by (scheme, authority, config)

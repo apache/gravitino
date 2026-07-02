@@ -33,6 +33,10 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
+import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
+import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
+import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.credential.config.CredentialConfig;
@@ -224,6 +228,10 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
           .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
+          .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)
+          .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES)
           .build();
 
   @Override
