@@ -87,6 +87,23 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
 
   protected abstract boolean supportDropCascade();
 
+  /**
+   * Returns {@code true} if the catalog supports schema CREATE/DROP via the Gravitino API. Controls
+   * only the pure schema-lifecycle tests ({@code testCreateSchema}).
+   */
+  protected boolean supportsSchemaLifecycle() {
+    return true;
+  }
+
+  /**
+   * Returns {@code true} if get-schema tests can run. The base-class test creates the schema via
+   * the Gravitino API, so this still depends on {@link #supportsSchemaLifecycle()}. Subclasses that
+   * override {@code testGetSchemaWithoutCommentAndOption} directly should ignore this flag.
+   */
+  protected boolean supportsSchemaLifecycleAndGetSchema() {
+    return supportsSchemaLifecycle() && supportGetSchemaWithoutCommentAndOption();
+  }
+
   protected boolean supportsPrimaryKey() {
     return true;
   }
@@ -117,6 +134,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsSchemaLifecycle")
   public void testCreateSchema() {
     doWithCatalog(
         currentCatalog(),
@@ -134,7 +152,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportGetSchemaWithoutCommentAndOption")
+  @EnabledIf("supportsSchemaLifecycleAndGetSchema")
   public void testGetSchemaWithoutCommentAndOption() {
     doWithCatalog(
         currentCatalog(),
@@ -190,6 +208,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsSchemaLifecycle")
   public void testListSchema() {
     doWithCatalog(
         currentCatalog(),
