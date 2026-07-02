@@ -68,7 +68,8 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
     AccessControlDispatcher accessControlDispatcher =
         GravitinoEnv.getInstance().accessControlDispatcher();
     if (accessControlDispatcher != null) {
-      accessControlDispatcher.addUser(ident.name(), PrincipalUtils.getCurrentUserName());
+      accessControlDispatcher.addUser(
+          ident.name(), PrincipalUtils.getCurrentUserName(), null, true);
     }
 
     // Set the creator as owner of the metalake.

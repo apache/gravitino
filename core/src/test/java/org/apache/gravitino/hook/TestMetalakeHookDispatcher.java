@@ -19,6 +19,8 @@
 package org.apache.gravitino.hook;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -100,14 +102,14 @@ public class TestMetalakeHookDispatcher {
     // silently swallows it.
     doThrow(new UserAlreadyExistsException("User already exists"))
         .when(mockAccessControlDispatcher)
-        .addUser(any(), any());
+        .addUser(any(), any(), nullable(String.class), anyBoolean());
 
     UserAlreadyExistsException thrown =
         Assertions.assertThrows(
             UserAlreadyExistsException.class,
             () -> hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap()));
     Assertions.assertEquals("User already exists", thrown.getMessage());
-    verify(mockAccessControlDispatcher).addUser(any(), any());
+    verify(mockAccessControlDispatcher).addUser(any(), any(), nullable(String.class), anyBoolean());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
@@ -120,14 +122,14 @@ public class TestMetalakeHookDispatcher {
     // addUser failure (e.g. storage I/O) now propagates to the caller; setOwner is unreachable.
     doThrow(new RuntimeException("Add user failed"))
         .when(mockAccessControlDispatcher)
-        .addUser(any(), any());
+        .addUser(any(), any(), nullable(String.class), anyBoolean());
 
     RuntimeException thrown =
         Assertions.assertThrows(
             RuntimeException.class,
             () -> hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap()));
     Assertions.assertEquals("Add user failed", thrown.getMessage());
-    verify(mockAccessControlDispatcher).addUser(any(), any());
+    verify(mockAccessControlDispatcher).addUser(any(), any(), nullable(String.class), anyBoolean());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 }

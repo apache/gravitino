@@ -64,12 +64,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
-  public User addUser(String metalake, String user)
-      throws UserAlreadyExistsException, NoSuchMetalakeException {
-    return dispatcher.addUser(metalake, user);
-  }
-
-  @Override
   public User addUser(String metalake, String user, String externalId, boolean enabled)
       throws UserAlreadyExistsException, NoSuchMetalakeException {
     return dispatcher.addUser(metalake, user, externalId, enabled);
@@ -118,12 +112,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public String[] listUserNames(String metalake) throws NoSuchMetalakeException {
     return dispatcher.listUserNames(metalake);
-  }
-
-  @Override
-  public Group addGroup(String metalake, String group)
-      throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    return dispatcher.addGroup(metalake, group);
   }
 
   @Override

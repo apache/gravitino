@@ -204,23 +204,24 @@ public class TestAccessControlManager {
 
   @Test
   public void testAddUser() {
-    User user = accessControlManager.addUser(METALAKE, "testAdd");
+    User user = accessControlManager.addUser(METALAKE, "testAdd", null, true);
     Assertions.assertEquals("testAdd", user.name());
     Assertions.assertTrue(user.roles().isEmpty());
 
-    user = accessControlManager.addUser(METALAKE, "testAddWithOptionalField");
+    user = accessControlManager.addUser(METALAKE, "testAddWithOptionalField", null, true);
 
     Assertions.assertEquals("testAddWithOptionalField", user.name());
     Assertions.assertTrue(user.roles().isEmpty());
 
     // Test with UserAlreadyExistsException
     Assertions.assertThrows(
-        UserAlreadyExistsException.class, () -> accessControlManager.addUser(METALAKE, "testAdd"));
+        UserAlreadyExistsException.class,
+        () -> accessControlManager.addUser(METALAKE, "testAdd", null, true));
   }
 
   @Test
   public void testGetUser() {
-    accessControlManager.addUser(METALAKE, "testGet");
+    accessControlManager.addUser(METALAKE, "testGet", null, true);
 
     User user = accessControlManager.getUser(METALAKE, "testGet");
     Assertions.assertEquals("testGet", user.name());
@@ -234,7 +235,7 @@ public class TestAccessControlManager {
 
   @Test
   public void testRemoveUser() {
-    accessControlManager.addUser(METALAKE, "testRemove");
+    accessControlManager.addUser(METALAKE, "testRemove", null, true);
 
     // Test to remove user
     boolean removed = accessControlManager.removeUser(METALAKE, "testRemove");
@@ -247,8 +248,8 @@ public class TestAccessControlManager {
 
   @Test
   public void testListUsers() {
-    accessControlManager.addUser("metalake_list", "testList1");
-    accessControlManager.addUser("metalake_list", "testList2");
+    accessControlManager.addUser("metalake_list", "testList1", null, true);
+    accessControlManager.addUser("metalake_list", "testList2", null, true);
 
     // Test to list users
     String[] expectUsernames = new String[] {"testList1", "testList2"};
@@ -263,11 +264,11 @@ public class TestAccessControlManager {
 
   @Test
   public void testAddGroup() {
-    Group group = accessControlManager.addGroup(METALAKE, "testAdd");
+    Group group = accessControlManager.addGroup(METALAKE, "testAdd", null);
     Assertions.assertEquals("testAdd", group.name());
     Assertions.assertTrue(group.roles().isEmpty());
 
-    group = accessControlManager.addGroup(METALAKE, "testAddWithOptionalField");
+    group = accessControlManager.addGroup(METALAKE, "testAddWithOptionalField", null);
 
     Assertions.assertEquals("testAddWithOptionalField", group.name());
     Assertions.assertTrue(group.roles().isEmpty());
@@ -275,12 +276,12 @@ public class TestAccessControlManager {
     // Test with GroupAlreadyExistsException
     Assertions.assertThrows(
         GroupAlreadyExistsException.class,
-        () -> accessControlManager.addGroup(METALAKE, "testAdd"));
+        () -> accessControlManager.addGroup(METALAKE, "testAdd", null));
   }
 
   @Test
   public void testGetGroup() {
-    accessControlManager.addGroup(METALAKE, "testGet");
+    accessControlManager.addGroup(METALAKE, "testGet", null);
 
     Group group = accessControlManager.getGroup(METALAKE, "testGet");
     Assertions.assertEquals("testGet", group.name());
@@ -294,8 +295,8 @@ public class TestAccessControlManager {
 
   @Test
   public void testListGroupss() {
-    accessControlManager.addGroup("metalake_list", "testList1");
-    accessControlManager.addGroup("metalake_list", "testList2");
+    accessControlManager.addGroup("metalake_list", "testList1", null);
+    accessControlManager.addGroup("metalake_list", "testList2", null);
 
     // Test to list groups
     String[] expectGroupNames = new String[] {"testList1", "testList2"};
@@ -310,7 +311,7 @@ public class TestAccessControlManager {
 
   @Test
   public void testRemoveGroup() {
-    accessControlManager.addGroup(METALAKE, "testRemove");
+    accessControlManager.addGroup(METALAKE, "testRemove", null);
 
     // Test to remove group
     boolean removed = accessControlManager.removeGroup(METALAKE, "testRemove");

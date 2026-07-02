@@ -112,7 +112,7 @@ public class GroupOperations {
             return Utils.ok(
                 new GroupResponse(
                     DTOConverters.toDTO(
-                        accessControlManager.addGroup(metalake, request.getName()))));
+                        accessControlManager.addGroup(metalake, request.getName(), null))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(

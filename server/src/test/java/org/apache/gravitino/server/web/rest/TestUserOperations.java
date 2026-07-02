@@ -22,6 +22,8 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -123,7 +125,7 @@ public class TestUserOperations extends BaseOperationsTest {
     UserAddRequest req = new UserAddRequest("user1");
     User user = buildUser("user1");
 
-    when(manager.addUser(any(), any())).thenReturn(user);
+    when(manager.addUser(any(), any(), nullable(String.class), anyBoolean())).thenReturn(user);
 
     // Mock metalake with in-use property
     BaseMetalake metalake = mock(BaseMetalake.class);
@@ -180,7 +182,9 @@ public class TestUserOperations extends BaseOperationsTest {
     when(propertiesMetadata1.getOrDefault(any(), any())).thenReturn(true);
     when(metalake1.propertiesMetadata()).thenReturn(propertiesMetadata1);
     when(entityStore.get(any(), any(), any())).thenReturn(metalake1);
-    doThrow(new UserAlreadyExistsException("mock error")).when(manager).addUser(any(), any());
+    doThrow(new UserAlreadyExistsException("mock error"))
+        .when(manager)
+        .addUser(any(), any(), nullable(String.class), anyBoolean());
     Response resp2 =
         target("/metalakes/metalake1/users")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -195,7 +199,9 @@ public class TestUserOperations extends BaseOperationsTest {
         UserAlreadyExistsException.class.getSimpleName(), errorResponse1.getType());
 
     // Test to throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).addUser(any(), any());
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .addUser(any(), any(), nullable(String.class), anyBoolean());
     Response resp3 =
         target("/metalakes/metalake1/users")
             .request(MediaType.APPLICATION_JSON_TYPE)

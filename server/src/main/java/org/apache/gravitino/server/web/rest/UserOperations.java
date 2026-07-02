@@ -162,7 +162,7 @@ public class UserOperations {
             return Utils.ok(
                 new UserResponse(
                     DTOConverters.toDTO(
-                        accessControlManager.addUser(metalake, request.getName()))));
+                        accessControlManager.addUser(metalake, request.getName(), null, true))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(

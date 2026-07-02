@@ -60,10 +60,6 @@ class UserGroupManager {
     this.idGenerator = idGenerator;
   }
 
-  User addUser(String metalake, String name) throws UserAlreadyExistsException {
-    return addUser(metalake, name, null, true);
-  }
-
   User addUser(String metalake, String name, String externalId, boolean enabled)
       throws UserAlreadyExistsException {
     try {
@@ -202,10 +198,6 @@ class UserGroupManager {
 
   User[] listUsers(String metalake) {
     return listUsersInternal(metalake, true /* allFields */);
-  }
-
-  Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
-    return addGroup(metalake, group, null);
   }
 
   Group addGroup(String metalake, String group, String externalId)

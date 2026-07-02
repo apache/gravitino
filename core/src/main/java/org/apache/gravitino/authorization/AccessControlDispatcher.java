@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -43,27 +44,14 @@ public interface AccessControlDispatcher {
    *
    * @param metalake The Metalake of the User.
    * @param user The name of the User.
-   * @return The added User instance.
-   * @throws UserAlreadyExistsException If a User with the same name already exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the User encounters storage issues.
-   */
-  User addUser(String metalake, String user)
-      throws UserAlreadyExistsException, NoSuchMetalakeException;
-
-  /**
-   * Adds a new User with an external identifier and enabled state.
-   *
-   * @param metalake The Metalake of the User.
-   * @param user The name of the User.
-   * @param externalId The external identifier from an upstream identity system.
+   * @param externalId The external identifier from an upstream identity system, or null if unset.
    * @param enabled Whether the User is enabled.
    * @return The added User instance.
    * @throws UserAlreadyExistsException If a User with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If adding the User encounters storage issues.
    */
-  User addUser(String metalake, String user, String externalId, boolean enabled)
+  User addUser(String metalake, String user, @Nullable String externalId, boolean enabled)
       throws UserAlreadyExistsException, NoSuchMetalakeException;
 
   /**
@@ -163,26 +151,13 @@ public interface AccessControlDispatcher {
    *
    * @param metalake The Metalake of the Group.
    * @param group The name of the Group.
+   * @param externalId The external identifier from an upstream identity system, or null if unset.
    * @return The Added Group instance.
    * @throws GroupAlreadyExistsException If a Group with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If adding the Group encounters storage issues.
    */
-  Group addGroup(String metalake, String group)
-      throws GroupAlreadyExistsException, NoSuchMetalakeException;
-
-  /**
-   * Adds a new Group with an external identifier.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param group The name of the Group.
-   * @param externalId The external identifier from an upstream identity system.
-   * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same name already exists.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If adding the Group encounters storage issues.
-   */
-  Group addGroup(String metalake, String group, String externalId)
+  Group addGroup(String metalake, String group, @Nullable String externalId)
       throws GroupAlreadyExistsException, NoSuchMetalakeException;
 
   /**

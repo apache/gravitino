@@ -129,13 +129,17 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
-  public User addUser(String metalake, String user)
+  public User addUser(String metalake, String user, String externalId, boolean enabled)
       throws UserAlreadyExistsException, NoSuchMetalakeException {
+    if (externalId != null) {
+      return dispatcher.addUser(metalake, user, externalId, enabled);
+    }
+
     String initiator = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(new AddUserPreEvent(initiator, metalake, user));
     try {
-      User userObject = dispatcher.addUser(metalake, user);
+      User userObject = dispatcher.addUser(metalake, user, null, enabled);
       eventBus.dispatchEvent(new AddUserEvent(initiator, metalake, new UserInfo(userObject)));
 
       return userObject;
@@ -143,13 +147,6 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       eventBus.dispatchEvent(new AddUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public User addUser(String metalake, String user, String externalId, boolean enabled)
-      throws UserAlreadyExistsException, NoSuchMetalakeException {
-    return dispatcher.addUser(metalake, user, externalId, enabled);
   }
 
   /** {@inheritDoc} */
@@ -253,13 +250,17 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
-  public Group addGroup(String metalake, String group)
+  public Group addGroup(String metalake, String group, String externalId)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
+    if (externalId != null) {
+      return dispatcher.addGroup(metalake, group, externalId);
+    }
+
     String initiator = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(new AddGroupPreEvent(initiator, metalake, group));
     try {
-      Group groupObject = dispatcher.addGroup(metalake, group);
+      Group groupObject = dispatcher.addGroup(metalake, group, null);
       eventBus.dispatchEvent(new AddGroupEvent(initiator, metalake, new GroupInfo(groupObject)));
 
       return groupObject;
@@ -267,13 +268,6 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       eventBus.dispatchEvent(new AddGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public Group addGroup(String metalake, String group, String externalId)
-      throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    return dispatcher.addGroup(metalake, group, externalId);
   }
 
   /** {@inheritDoc} */

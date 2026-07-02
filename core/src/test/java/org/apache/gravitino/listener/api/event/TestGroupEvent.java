@@ -90,7 +90,7 @@ public class TestGroupEvent {
 
   @Test
   void testAddGroupPreEvent() {
-    dispatcher.addGroup(METALAKE, groupName);
+    dispatcher.addGroup(METALAKE, groupName, null);
 
     // validate event
     PreEvent preEvent = dummyEventListener.popPreEvent();
@@ -106,7 +106,7 @@ public class TestGroupEvent {
 
   @Test
   void testAddGroupEvent() {
-    dispatcher.addGroup(METALAKE, groupName);
+    dispatcher.addGroup(METALAKE, groupName, null);
 
     // validate event
     Event event = dummyEventListener.popPostEvent();
@@ -124,7 +124,8 @@ public class TestGroupEvent {
   @Test
   void testAddGroupFailureEvent() {
     Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class, () -> failureDispatcher.addGroup(METALAKE, groupName));
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.addGroup(METALAKE, groupName, null));
 
     // validate event
     Event event = dummyEventListener.popPostEvent();
@@ -544,8 +545,8 @@ public class TestGroupEvent {
 
   private AccessControlEventDispatcher mockGroupDispatcher() {
     AccessControlEventDispatcher dispatcher = mock(AccessControlEventDispatcher.class);
-    when(dispatcher.addGroup(METALAKE, groupName)).thenReturn(group);
-    when(dispatcher.addGroup(METALAKE, otherGroupName)).thenReturn(otherGroup);
+    when(dispatcher.addGroup(METALAKE, groupName, null)).thenReturn(group);
+    when(dispatcher.addGroup(METALAKE, otherGroupName, null)).thenReturn(otherGroup);
 
     when(dispatcher.removeGroup(METALAKE, groupName)).thenReturn(true);
     when(dispatcher.removeGroup(METALAKE, inExistGroupName)).thenReturn(false);

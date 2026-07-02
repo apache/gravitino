@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.authorization.Group;
@@ -33,6 +34,7 @@ public class GroupDTO implements Group {
   @JsonProperty("name")
   private String name;
 
+  @Nullable
   @JsonProperty("externalId")
   private String externalId;
 
