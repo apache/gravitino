@@ -106,3 +106,30 @@ class ModelOperation(ABC):
             str: JSON-formatted string containing full model version metadata
         """
         pass
+
+    # pylint: disable=R0917
+    @abstractmethod
+    async def update_model_version_aliases(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        version: int,
+        aliases_to_add: list,
+        aliases_to_remove: list,
+    ) -> str:
+        """
+        Update the aliases of a specific version of a model.
+
+        Args:
+            catalog_name: Name of the catalog
+            schema_name: Name of the schema
+            model_name: Name of the model
+            version: Version identifier of the model
+            aliases_to_add: List of aliases to add to the model version
+            aliases_to_remove: List of aliases to remove from the model version
+
+        Returns:
+            str: JSON-formatted string containing the updated model version metadata
+        """
+        pass

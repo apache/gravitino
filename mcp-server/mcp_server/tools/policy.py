@@ -19,6 +19,149 @@ from fastmcp import Context, FastMCP
 
 
 def load_policy_tools(mcp: FastMCP):
+    # pylint: disable=R0917
+    # Write operation; access is enforced by Gravitino authorization.
+    @mcp.tool(tags={"policy"})
+    async def create_policy(
+        ctx: Context,
+        name: str,
+        policy_type: str,
+        comment: str,
+        content: dict,
+        enabled: bool = True,
+    ) -> str:
+        """
+        Create a new policy within the specified metalake.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            name (str): Name of the policy to be created.
+            policy_type (str): Type of the policy (e.g., "custom").
+            comment (str): Description or comment for the policy.
+            content (dict): Dictionary describing the policy content. For a "custom"
+                policy it contains "customRules", "properties" and
+                "supportedObjectTypes".
+            enabled (bool): Whether the policy is enabled. Defaults to True.
+
+        Example input for content:
+            {
+                "customRules": {
+                    "rule1": 123
+                },
+                "properties": {
+                    "key1": "value1"
+                },
+                "supportedObjectTypes": [
+                    "fileset",
+                    "schema",
+                    "topic",
+                    "table",
+                    "model",
+                    "catalog"
+                ]
+            }
+
+        Returns:
+            str: JSON-formatted string containing the created policy information.
+
+        Example Return Value:
+            {
+                "name": "my_policy1",
+                "comment": "This is a test policy",
+                "policyType": "custom",
+                "enabled": true,
+                "content": {
+                    "customRules": {
+                        "rule1": 123
+                    },
+                    "properties": {
+                        "key1": "value1"
+                    },
+                    "supportedObjectTypes": [
+                        "fileset",
+                        "schema",
+                        "topic",
+                        "table",
+                        "model",
+                        "catalog"
+                    ]
+                },
+                "inherited": null,
+                "audit": {
+                    "creator": "anonymous",
+                    "createTime": "2025-08-18T08:29:30.016501Z"
+                }
+            }
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().create_policy(
+            name, policy_type, comment, enabled, content
+        )
+
+    # Write operation; access is enforced by Gravitino authorization.
+    @mcp.tool(tags={"policy"})
+    async def alter_policy(ctx: Context, name: str, updates: list) -> str:
+        """
+        Alter an existing policy within the specified metalake.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            name (str): Name of the policy to be altered.
+            updates (list): List of update operations to be applied to the policy.
+
+        Example input for updates:
+            [
+                {
+                  "@type": "rename",
+                  "newName": "policy2"
+                },
+                {
+                  "@type": "updateComment",
+                  "newComment": "This is an updated policy"
+                },
+                {
+                  "@type": "updateContent",
+                  "policyType": "custom",
+                  "newContent": {
+                    "customRules": {
+                      "rule1": 456
+                    },
+                    "properties": {
+                      "key1": "value2"
+                    },
+                    "supportedObjectTypes": ["table"]
+                  }
+                }
+            ]
+
+        Returns:
+            str: JSON-formatted string containing the altered policy information.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().alter_policy(name, updates)
+
+    # Write operation; access is enforced by Gravitino authorization.
+    @mcp.tool(tags={"policy"})
+    async def delete_policy(ctx: Context, name: str) -> str:
+        """
+        Delete a policy by its name.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            name (str): Name of the policy to delete.
+
+        Returns:
+            str: A JSON string indicating whether the policy was deleted (true/false).
+
+        Raises:
+            Exception: If the deletion fails, an exception is raised with an error message.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().delete_policy(name)
+
     @mcp.tool(tags={"policy"})
     async def get_list_of_policies(
         ctx: Context,

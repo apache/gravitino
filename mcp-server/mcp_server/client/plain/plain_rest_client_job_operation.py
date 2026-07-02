@@ -59,6 +59,23 @@ class PlainRESTClientJobOperation(JobOperation):
         )
         return extract_content_from_response(response, "jobTemplates", [])
 
+    async def register_job_template(self, job_template: dict) -> None:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/templates",
+            json={"jobTemplate": job_template},
+        )
+        if response.status_code != 200:
+            raise GravitinoException(
+                f"Failed to register job template: {response.text}"
+            )
+        return None
+
+    async def delete_job_template(self, name: str) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/templates/{encode_path_segment(name)}"
+        )
+        return extract_content_from_response(response, "dropped", False)
+
     async def run_job(self, job_template_name: str, job_config: dict) -> str:
         response = await self.rest_client.post(
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/runs",

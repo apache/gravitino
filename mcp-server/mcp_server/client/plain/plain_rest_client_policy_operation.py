@@ -31,6 +31,44 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
+    # pylint: disable=R0917
+    async def create_policy(
+        self,
+        policy_name: str,
+        policy_type: str,
+        comment: str,
+        enabled: bool,
+        content: dict,
+    ) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/policies",
+            json={
+                "name": policy_name,
+                "policyType": policy_type,
+                "comment": comment,
+                "enabled": enabled,
+                "content": content,
+            },
+        )
+        return extract_content_from_response(response, "policy", {})
+
+    async def alter_policy(self, policy_name: str, updates: list) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/policies/{encode_path_segment(policy_name)}",
+            json={
+                "updates": updates,
+            },
+        )
+        return extract_content_from_response(response, "policy", {})
+
+    async def delete_policy(self, policy_name: str) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/policies/{encode_path_segment(policy_name)}"
+        )
+        return extract_content_from_response(response, "dropped", False)
+
     async def get_list_of_policies(self) -> str:
         response = await self.rest_client.get(
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}/policies?details=true"

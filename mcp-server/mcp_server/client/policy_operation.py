@@ -23,6 +23,59 @@ class PolicyOperation(ABC):
     Abstract base class for Gravitino policy operations.
     """
 
+    # pylint: disable=R0917
+    @abstractmethod
+    async def create_policy(
+        self,
+        policy_name: str,
+        policy_type: str,
+        comment: str,
+        enabled: bool,
+        content: dict,
+    ) -> str:
+        """
+        Create a new policy within the specified metalake.
+
+        Args:
+            policy_name: Name of the policy to be created
+            policy_type: Type of the policy (e.g., "custom")
+            comment: Description or comment for the policy
+            enabled: Whether the policy is enabled
+            content: Dictionary describing the policy content (e.g., customRules,
+                properties, supportedObjectTypes)
+
+        Returns:
+            str: JSON-formatted string containing the created policy information
+        """
+        pass
+
+    @abstractmethod
+    async def alter_policy(self, policy_name: str, updates: list) -> str:
+        """
+        Alter an existing policy within the specified metalake.
+
+        Args:
+            policy_name: Name of the policy to be altered
+            updates: List of update operations to be applied to the policy
+
+        Returns:
+            str: JSON-formatted string containing the altered policy information
+        """
+        pass
+
+    @abstractmethod
+    async def delete_policy(self, policy_name: str) -> str:
+        """
+        Delete a policy by its name.
+
+        Args:
+            policy_name: Name of the policy to delete
+
+        Returns:
+            str: JSON-formatted string indicating whether the policy was deleted
+        """
+        pass
+
     @abstractmethod
     async def get_list_of_policies(self) -> str:
         """
