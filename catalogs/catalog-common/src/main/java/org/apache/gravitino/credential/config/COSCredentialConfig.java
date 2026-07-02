@@ -38,14 +38,14 @@ public class COSCredentialConfig extends Config {
   public static final ConfigEntry<String> COS_REGION =
       new ConfigBuilder(COSProperties.GRAVITINO_COS_REGION)
           .doc("The region of the Tencent Cloud COS service")
-          .version(ConfigConstants.VERSION_1_4_0)
+          .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> COS_ACCESS_KEY_ID =
       new ConfigBuilder(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID)
           .doc("The static access key ID (Tencent Cloud SecretId) used to access COS data")
-          .version(ConfigConstants.VERSION_1_4_0)
+          .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -53,7 +53,7 @@ public class COSCredentialConfig extends Config {
   public static final ConfigEntry<String> COS_SECRET_ACCESS_KEY =
       new ConfigBuilder(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET)
           .doc("The static secret access key (Tencent Cloud SecretKey) used to access COS data")
-          .version(ConfigConstants.VERSION_1_4_0)
+          .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();

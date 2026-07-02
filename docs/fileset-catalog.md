@@ -12,7 +12,7 @@ Fileset catalog is a fileset catalog that using Hadoop Compatible File System (H
 the storage location of the fileset. It supports the local filesystem and HDFS. Since
 0.7.0-incubating, Gravitino supports [S3](fileset-catalog-with-s3.md), [GCS](fileset-catalog-with-gcs.md),
 [OSS](fileset-catalog-with-oss.md) and [Azure Blob Storage](fileset-catalog-with-adls.md) through Fileset catalog.
-Since 1.4.0, Gravitino also supports [Tencent Cloud COS](fileset-catalog-with-cos.md).
+Since 2.0.0, Gravitino also supports [Tencent Cloud COS](fileset-catalog-with-cos.md).
 
 The rest of this document will use HDFS or local file as an example to illustrate how to use the Fileset catalog.
 For S3, GCS, OSS, Azure Blob Storage and COS, the configuration is similar to HDFS,
