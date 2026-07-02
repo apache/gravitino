@@ -47,6 +47,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -412,6 +414,36 @@ public class IcebergRESTUtils {
   }
 
   /**
+   * Builds an {@link IcebergRequestContext} from the current HTTP request.
+   *
+   * @param httpServletRequest The HTTP servlet request.
+   * @param catalogName The Iceberg catalog name.
+   * @return A new {@link IcebergRequestContext}.
+   */
+  public static IcebergRequestContext getIcebergRequestContext(
+      HttpServletRequest httpServletRequest, String catalogName) {
+    return getIcebergRequestContext(httpServletRequest, catalogName, false);
+  }
+
+  /**
+   * Builds an {@link IcebergRequestContext} from the current HTTP request.
+   *
+   * @param httpServletRequest The HTTP servlet request.
+   * @param catalogName The Iceberg catalog name.
+   * @param requestCredentialVending Whether the request is for credential vending.
+   * @return A new {@link IcebergRequestContext}.
+   */
+  public static IcebergRequestContext getIcebergRequestContext(
+      HttpServletRequest httpServletRequest, String catalogName, boolean requestCredentialVending) {
+    return new IcebergRequestContext(
+        catalogName,
+        PrincipalUtils.getCurrentUserName(),
+        resolveClientAddress(httpServletRequest),
+        getHttpHeaders(httpServletRequest),
+        requestCredentialVending);
+  }
+
+  /**
    * Builds refresh credential endpoint properties for a table, with Iceberg REST path encoding.
    *
    * @param catalogName IRC catalog name used in the refresh path
@@ -428,6 +460,14 @@ public class IcebergRESTUtils {
         RESTUtil.encodeNamespace(tableIdentifier.namespace(), NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
         RESTUtil.encodeString(tableIdentifier.name()),
         credentialProperties);
+  }
+
+  private static String resolveClientAddress(HttpServletRequest request) {
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (StringUtils.isNotBlank(xForwardedFor)) {
+      return xForwardedFor.split(",")[0].trim();
+    }
+    return request.getRemoteHost();
   }
 
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
