@@ -40,6 +40,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -1098,6 +1099,30 @@ class TestGroupMetaService extends TestJDBCBackend {
     assertThrowsExt(
         NoSuchEntityException.class, () -> svc.getGroupByExternalId(groupExtIdent("ext-del-by")));
     assertThrowsExt(NoSuchEntityException.class, () -> svc.deleteGroup(group.nameIdentifier()));
+  }
+
+  @TestTemplate
+  void testGroupPagination() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    GroupMetaService svc = GroupMetaService.getInstance();
+    svc.insertGroup(
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "g1",
+            AUDIT_INFO),
+        false);
+
+    Assertions.assertEquals(1, svc.countGroupsByMetalake(metalakeName));
+
+    PagedResult<GroupEntity> page = svc.listGroupsByMetalakePaginated(metalakeName, 0, 10);
+    Assertions.assertEquals(1, page.totalCount());
+    Assertions.assertEquals(1, page.items().size());
+    Assertions.assertEquals("g1", page.items().get(0).name());
+
+    Assertions.assertTrue(svc.listGroupsByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
+    Assertions.assertTrue(
+        svc.listGroupsByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
   }
 
   private NameIdentifier groupExtIdent(String externalId) {

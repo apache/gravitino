@@ -42,6 +42,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -1260,6 +1261,23 @@ class TestUserMetaService extends TestJDBCBackend {
                 m.batchGetAuthSubjectsForUser(
                     metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup")));
     assertTrue(none.isEmpty());
+  }
+
+  @TestTemplate
+  void testUserPagination() throws IOException {
+    UserMetaService svc = userMetaService();
+    UserEntity user = userWithExtId("u1", "ext-page-1");
+    svc.insertUser(user, false);
+
+    Assertions.assertEquals(1, svc.countUsersByMetalake(metalakeName));
+
+    PagedResult<UserEntity> page = svc.listUsersByMetalakePaginated(metalakeName, 0, 10);
+    Assertions.assertEquals(1, page.totalCount());
+    Assertions.assertEquals(1, page.items().size());
+    Assertions.assertEquals(user.name(), page.items().get(0).name());
+
+    Assertions.assertTrue(svc.listUsersByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
+    Assertions.assertTrue(svc.listUsersByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
   }
 
   @TestTemplate
