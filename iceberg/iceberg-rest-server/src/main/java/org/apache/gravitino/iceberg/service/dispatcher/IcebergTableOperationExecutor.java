@@ -19,10 +19,12 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.net.http.HttpMethod;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -59,6 +61,9 @@ import org.slf4j.LoggerFactory;
 public class IcebergTableOperationExecutor implements IcebergTableOperationDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperationExecutor.class);
+
+  private static final Set<HttpMethod> WRITE_HTTP_METHODS =
+      Set.of(HttpMethod.PUT, HttpMethod.POST, HttpMethod.DELETE, HttpMethod.PATCH);
 
   private final IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private final Optional<IcebergCleanupManager> cleanupManager;
@@ -167,14 +172,14 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     IcebergAccessDelegation accessDelegation = context.accessDelegation();
-    CredentialPrivilege vendedCredentialPrivilege =
+    CredentialPrivilege privilege =
         accessDelegation.requestVendedCredentials()
             ? getCredentialPrivilege(context, tableIdentifier)
             : CredentialPrivilege.READ; // unused unless vended credentials are injected
 
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .loadTable(tableIdentifier, accessDelegation, vendedCredentialPrivilege);
+        .loadTable(tableIdentifier, accessDelegation, privilege);
   }
 
   @Override
@@ -236,17 +241,14 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   }
 
   private static CredentialPrivilege getRemoteSignPrivilege(String method) {
-    if (StringUtils.isBlank(method)) {
+    try {
+      HttpMethod httpMethod =
+          HttpMethod.valueOf(StringUtils.trimToEmpty(method).toUpperCase(Locale.ROOT));
+      return WRITE_HTTP_METHODS.contains(httpMethod)
+          ? CredentialPrivilege.WRITE
+          : CredentialPrivilege.READ;
+    } catch (IllegalArgumentException e) {
       return CredentialPrivilege.READ;
-    }
-    switch (method.toUpperCase(Locale.ROOT)) {
-      case "PUT":
-      case "POST":
-      case "DELETE":
-      case "PATCH":
-        return CredentialPrivilege.WRITE;
-      default:
-        return CredentialPrivilege.READ;
     }
   }
 
