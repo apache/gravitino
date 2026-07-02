@@ -48,6 +48,8 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
 import org.apache.iceberg.rest.requests.ImmutableCreateViewRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterViewRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
@@ -264,6 +266,100 @@ public class TestIcebergViewHookDispatcher {
     verify(mockInternalViewDispatcher, times(1)).loadView(any(NameIdentifier.class));
     verify(mockViewDispatcher, never()).loadView(any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRegisterViewImportsIntoEntityStore() throws Exception {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    RegisterViewRequest registerRequest =
+        ImmutableRegisterViewRequest.builder()
+            .name(VIEW_NAME)
+            .metadataLocation("/mock/metadata/v1.metadata.json")
+            .build();
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockExecutor.registerView(mockContext, namespace, registerRequest))
+        .thenReturn(mockResponse);
+
+    NameIdentifier expectedIdent = NameIdentifier.of(METALAKE, CATALOG, SCHEMA_NAME, VIEW_NAME);
+    when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(false);
+
+    LoadViewResponse response =
+        hookDispatcher.registerView(mockContext, namespace, registerRequest);
+
+    // Verify view was registered in underlying catalog
+    verify(mockExecutor, times(1)).registerView(mockContext, namespace, registerRequest);
+
+    // Verify view was imported into Gravitino
+    verify(mockInternalViewDispatcher, times(1)).loadView(eq(expectedIdent));
+    verify(mockViewDispatcher, never()).loadView(any());
+
+    // Verify ownership was set
+    verify(mockInternalOwnerDispatcher, times(1)).setOwner(any(), any(), eq(USER), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+
+    assertEquals(mockResponse, response);
+  }
+
+  @Test
+  public void testRegisterViewSkipsImportWhenEntityExists() throws Exception {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    RegisterViewRequest registerRequest =
+        ImmutableRegisterViewRequest.builder()
+            .name(VIEW_NAME)
+            .metadataLocation("/mock/metadata/v1.metadata.json")
+            .build();
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockExecutor.registerView(mockContext, namespace, registerRequest))
+        .thenReturn(mockResponse);
+
+    // Gravitino already tracks this view
+    NameIdentifier expectedIdent = NameIdentifier.of(METALAKE, CATALOG, SCHEMA_NAME, VIEW_NAME);
+    when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(true);
+
+    LoadViewResponse response =
+        hookDispatcher.registerView(mockContext, namespace, registerRequest);
+
+    // Verify view was registered in underlying catalog
+    verify(mockExecutor, times(1)).registerView(mockContext, namespace, registerRequest);
+
+    // Verify import and setOwner were both skipped since the entity already exists
+    verify(mockInternalViewDispatcher, never()).loadView(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+
+    assertEquals(mockResponse, response);
+  }
+
+  @Test
+  public void testRegisterViewThrowsWhenImportFails() throws Exception {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    RegisterViewRequest registerRequest =
+        ImmutableRegisterViewRequest.builder()
+            .name(VIEW_NAME)
+            .metadataLocation("/mock/metadata/v1.metadata.json")
+            .build();
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockExecutor.registerView(mockContext, namespace, registerRequest))
+        .thenReturn(mockResponse);
+
+    NameIdentifier expectedIdent = NameIdentifier.of(METALAKE, CATALOG, SCHEMA_NAME, VIEW_NAME);
+    when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(false);
+
+    // Import failure must propagate: registration's purpose is to register the entity in Gravitino
+    doThrow(new RuntimeException("Import failed"))
+        .when(mockInternalViewDispatcher)
+        .loadView(any(NameIdentifier.class));
+
+    RuntimeException thrown =
+        assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerView(mockContext, namespace, registerRequest));
+    assertEquals("Import failed", thrown.getMessage());
+    verify(mockExecutor, times(1)).registerView(mockContext, namespace, registerRequest);
+    // Ownership must not be set when import fails
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test

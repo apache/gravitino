@@ -44,6 +44,9 @@ import org.apache.gravitino.listener.api.event.IcebergListViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadViewPreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameViewPreEvent;
@@ -62,6 +65,8 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
 import org.apache.iceberg.rest.requests.ImmutableCreateViewRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterViewRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
@@ -99,6 +104,7 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     // create namespace before each view test
     resourceConfig.register(MockIcebergNamespaceOperations.class);
     resourceConfig.register(MockIcebergViewRenameOperations.class);
+    resourceConfig.register(MockIcebergViewRegisterOperations.class);
 
     // register a mock HttpServletRequest with user info
     resourceConfig.register(
@@ -194,6 +200,32 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
 
     verifyCreateViewFail(namespace, "create_foo1", 409);
     verifyCreateViewFail(namespace, "", 400);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testRegisterView(Namespace namespace) {
+    verifyRegisterViewFail(namespace, "register_foo1", 404);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRegisterViewPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergRegisterViewFailureEvent);
+
+    verifyCreateNamespaceSucc(namespace);
+
+    verifyRegisterViewSucc(namespace, "register_foo1");
+    PreEvent registerPreEvent = dummyEventListener.popPreEvent();
+    Event registerPostEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(registerPreEvent instanceof IcebergRegisterViewPreEvent);
+    Assertions.assertTrue(registerPostEvent instanceof IcebergRegisterViewEvent);
+    Assertions.assertEquals(OperationType.REGISTER_VIEW, registerPreEvent.operationType());
+    Assertions.assertEquals(OperationType.REGISTER_VIEW, registerPostEvent.operationType());
+    Assertions.assertNotNull(((IcebergRegisterViewEvent) registerPostEvent).registerViewRequest());
+
+    // Iceberg REST service throws AlreadyExistsException in test if view name contains 'fail'
+    verifyRegisterViewFail(namespace, "fail_register_foo1", 409);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRegisterViewPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergRegisterViewFailureEvent);
   }
 
   @ParameterizedTest
@@ -379,6 +411,28 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
 
   private Response doLoadView(Namespace ns, String name) {
     return getViewClientBuilder(ns, Optional.of(name)).get();
+  }
+
+  private Response doRegisterView(Namespace ns, String name) {
+    RegisterViewRequest registerViewRequest =
+        ImmutableRegisterViewRequest.builder()
+            .name(name)
+            .metadataLocation("/mock/metadata/v1.metadata.json")
+            .build();
+    return getRegisterViewClientBuilder(ns)
+        .post(Entity.entity(registerViewRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private void verifyRegisterViewSucc(Namespace ns, String name) {
+    Response response = doRegisterView(ns, name);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
+    Assertions.assertEquals(viewSchema.columns(), loadViewResponse.metadata().schema().columns());
+  }
+
+  private void verifyRegisterViewFail(Namespace ns, String name, int status) {
+    Response response = doRegisterView(ns, name);
+    Assertions.assertEquals(status, response.getStatus());
   }
 
   private void verifyLoadViewSucc(Namespace ns, String name) {

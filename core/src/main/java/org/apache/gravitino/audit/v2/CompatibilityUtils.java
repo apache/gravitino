@@ -102,6 +102,7 @@ public class CompatibilityUtils {
           .put(OperationType.VIEW_EXISTS, Operation.VIEW_EXISTS)
           .put(OperationType.RENAME_VIEW, Operation.RENAME_VIEW)
           .put(OperationType.LIST_VIEW, Operation.LIST_VIEW)
+          .put(OperationType.REGISTER_VIEW, Operation.REGISTER_VIEW)
           .put(OperationType.REGISTER_MODEL, Operation.REGISTER_MODEL)
           .put(OperationType.DELETE_MODEL, Operation.DELETE_MODEL)
           .put(OperationType.GET_MODEL, Operation.GET_MODEL)
