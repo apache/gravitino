@@ -160,12 +160,9 @@ public class FunctionOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FunctionRegisterRequest request) {
+    String functionName = request != null ? request.getName() : "unknown";
     LOG.info(
-        "Received register function request: {}.{}.{}.{}",
-        metalake,
-        catalog,
-        schema,
-        request.getName());
+        "Received register function request: {}.{}.{}.{}", metalake, catalog, schema, functionName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -194,7 +191,7 @@ public class FunctionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleFunctionException(
-          OperationType.REGISTER, request.getName(), schema, e);
+          OperationType.REGISTER, functionName, schema, e);
     }
   }
 

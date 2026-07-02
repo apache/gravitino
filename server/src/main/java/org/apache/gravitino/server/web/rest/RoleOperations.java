@@ -140,6 +140,7 @@ public class RoleOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       RoleCreateRequest request) {
+    String roleName = request != null ? request.getName() : "unknown";
     try {
 
       return Utils.doAs(
@@ -197,8 +198,7 @@ public class RoleOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleRoleException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      return ExceptionHandlers.handleRoleException(OperationType.CREATE, roleName, metalake, e);
     }
   }
 
