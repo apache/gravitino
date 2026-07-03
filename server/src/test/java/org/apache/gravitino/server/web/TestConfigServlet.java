@@ -107,12 +107,12 @@ public class TestConfigServlet {
     ServerConfig serverConfig = new ServerConfig(false);
     Properties properties = new Properties();
     properties.setProperty(Configs.VISIBLE_CONFIGS.getKey(), Configs.SERVICE_ADMINS.getKey());
-    properties.setProperty(Configs.SERVICE_ADMINS.getKey(), "admin1");
+    properties.setProperty(Configs.SERVICE_ADMINS.getKey(), "admin1,admin2");
     serverConfig.loadFromProperties(properties);
 
     Map<String, Object> configs = fetchConfigs(serverConfig);
     Assertions.assertEquals(
-        Lists.newArrayList("admin1"), configs.get(Configs.SERVICE_ADMINS.getKey()));
+        Lists.newArrayList("admin1", "admin2"), configs.get(Configs.SERVICE_ADMINS.getKey()));
   }
 
   @Test
