@@ -221,7 +221,7 @@ const transform = {
     const webLoginHeaderValue =
       typeof originConfig?.headers?.get === 'function'
         ? originConfig.headers.get('X-Gravitino-Web-Login')
-        : originConfig?.headers?.['X-Gravitino-Web-Login'] ?? originConfig?.headers?.['x-gravitino-web-login']
+        : (originConfig?.headers?.['X-Gravitino-Web-Login'] ?? originConfig?.headers?.['x-gravitino-web-login'])
 
     const isFailedWebUILoginRequest =
       response?.status === 401 &&

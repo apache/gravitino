@@ -63,16 +63,15 @@ function BasicLogin() {
 
   const onSubmit = async data => {
     try {
-      //Using .unwrap() to catch failed login errors
+      // Using .unwrap() to catch failed login errors
       await dispatch(basicLoginAction({ username: data.username, password: data.password, router })).unwrap()
-      await dispatch(setIntervalIdAction())
 
-      reset({ ...data })
+      // Clear the password after a successful login
+      reset({ username: data.username, password: '' })
     } catch (error) {
-      // Insert UI error here
       setError('password', {
         type: 'manual',
-        message: 'Invalid username or password'
+        message: error?.message || 'Login failed'
       })
     }
   }

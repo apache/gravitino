@@ -30,7 +30,6 @@ import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
 import BasicLogin from './components/BasicLogin'
 
-import { useAuth } from '@/lib/provider/session'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
@@ -40,7 +39,9 @@ const LoginPage = () => {
   const [providerType, setProviderType] = useState(null)
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken')
+    const authType = localStorage.getItem('authType')
+
+    const token = authType === 'basic' ? sessionStorage.getItem('accessToken') : localStorage.getItem('accessToken')
 
     if (token) {
       router.replace('/metalakes')

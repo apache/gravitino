@@ -139,7 +139,7 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
 
   localStorage.removeItem('authParams')
   sessionStorage.removeItem('authParams')
-  
+
   localStorage.removeItem('expiredIn')
   sessionStorage.removeItem('expiredIn')
 
@@ -190,8 +190,12 @@ export const authSlice = createSlice({
   initialState: {
     oauthUrl: null,
     authType: typeof window !== 'undefined' ? localStorage.getItem('authType') : null,
-    authToken: typeof window !== 'undefined' ? localStorage.getItem('authType') === 'basic'
-      ? sessionStorage.getItem('accessToken') : localStorage.getItem('accessToken') : null,
+    authToken:
+      typeof window !== 'undefined'
+        ? localStorage.getItem('authType') === 'basic'
+          ? sessionStorage.getItem('accessToken')
+          : localStorage.getItem('accessToken')
+        : null,
     authParams: typeof window !== 'undefined' ? localStorage.getItem('authParams') : null,
     expiredIn: typeof window !== 'undefined' ? localStorage.getItem('expiredIn') : null,
     intervalId: null

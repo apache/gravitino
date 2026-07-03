@@ -68,8 +68,8 @@ class OAuthProviderFactory {
       const authenticators = config['gravitino.authenticators'] || []
 
       // Authenticator logic
-      if (authenticators.includes('org.apache.gravitino.idp.auth.BasicAuthenticator')) {
-        // If BasicAuthenticator is present, set provider type to 'basic' and do not initialize any OAuth provider
+      if (authenticators.includes('basic')) {
+        // If basic authenticator is present, set provider type to 'basic' and do not initialize any OAuth provider
         this.providerType = 'basic'
         this.currentProvider = null
 
@@ -108,9 +108,9 @@ class OAuthProviderFactory {
   async getAccessToken() {
     const provider = await this.getProvider()
 
-    // If provider is null (e.g., BasicAuthenticator), return access token from localStorage
+    // If provider is null (e.g., BasicAuthenticator), return access token from sessionStorage
     if (!provider) {
-      return localStorage.getItem('accessToken')
+      return sessionStorage.getItem('accessToken')
     }
 
     return await provider.getAccessToken()

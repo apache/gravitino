@@ -101,7 +101,7 @@ const AuthProvider = ({ children }) => {
           dispatch(setAuthToken(tokenToUse))
           dispatch(initialVersion())
           goToMetalakeListPage()
-        } else {
+        } else if (!window.location.pathname.endsWith('/login')) {
           router.push('/login')
         }
       } else if (authType === 'oauth') {
