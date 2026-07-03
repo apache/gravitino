@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -78,6 +79,12 @@ import org.slf4j.LoggerFactory;
 
 public class LanceTableOperations extends ManagedTableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(LanceTableOperations.class);
+
+  /**
+   * Max attempts for the optimistic-locked repair-on-load {@code store.update}. Concurrent loads
+   * can repair the same table at once; the loser of the version CAS re-reads and retries.
+   */
+  private static final int REPAIR_UPDATE_MAX_ATTEMPTS = 5;
 
   public enum CreationMode {
     CREATE,
@@ -527,10 +534,8 @@ public class LanceTableOperations extends ManagedTableOperations {
   private Table repairTableMetadata(NameIdentifier ident, Column[] columns, long datasetVersion) {
     try {
       TableEntity tableEntity =
-          store.update(
+          updateTableWithCasRetry(
               ident,
-              TableEntity.class,
-              Entity.EntityType.TABLE,
               current -> {
                 if (!needsSchemaRefresh(current, datasetVersion)) {
                   return current;
@@ -547,13 +552,37 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
   }
 
+  /**
+   * Applies an idempotent update to the stored table, retrying when the optimistic-lock CAS is lost
+   * to a concurrent update. The repair-on-load path runs on every {@code loadTable}, so concurrent
+   * loads of the same table race on the version CAS; {@code store.update} surfaces the lost race as
+   * an {@link IOException}. Because the updater is idempotent, the loser re-reads the latest
+   * (already repaired) entity and retries instead of failing the whole load with a fatal error.
+   */
+  private TableEntity updateTableWithCasRetry(
+      NameIdentifier ident, Function<TableEntity, TableEntity> updater) throws IOException {
+    IOException lastConflict = null;
+    for (int attempt = 1; attempt <= REPAIR_UPDATE_MAX_ATTEMPTS; attempt++) {
+      try {
+        return store.update(ident, TableEntity.class, Entity.EntityType.TABLE, updater);
+      } catch (IOException e) {
+        lastConflict = e;
+        LOG.debug(
+            "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), retrying",
+            ident,
+            attempt,
+            REPAIR_UPDATE_MAX_ATTEMPTS,
+            e);
+      }
+    }
+    throw lastConflict;
+  }
+
   private Table recordCheckedEmptyVersion(NameIdentifier ident, long datasetVersion) {
     try {
       TableEntity tableEntity =
-          store.update(
+          updateTableWithCasRetry(
               ident,
-              TableEntity.class,
-              Entity.EntityType.TABLE,
               current -> {
                 if (!isDatasetVersionChanged(current.properties(), datasetVersion)) {
                   return current;
