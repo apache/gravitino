@@ -568,10 +568,11 @@ public class LanceTableOperations extends ManagedTableOperations {
       } catch (IOException e) {
         lastConflict = e;
         LOG.debug(
-            "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), retrying",
+            "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), {}",
             ident,
             attempt,
             REPAIR_UPDATE_MAX_ATTEMPTS,
+            attempt < REPAIR_UPDATE_MAX_ATTEMPTS ? "retrying" : "retries exhausted",
             e);
       }
     }

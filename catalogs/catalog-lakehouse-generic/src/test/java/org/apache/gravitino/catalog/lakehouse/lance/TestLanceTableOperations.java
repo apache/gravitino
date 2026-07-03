@@ -175,10 +175,9 @@ public class TestLanceTableOperations {
    * Reproduces the concurrent repair-on-load race seen in {@code LanceSparkRESTServiceIT}. When two
    * loads repair the same table at once, the optimistic-locked {@code store.update} of the slower
    * one matches zero rows and {@code TableMetaService} surfaces it as {@code IOException("Failed to
-   * update the entity")}. {@code repairTableMetadata} currently rethrows it as a fatal {@code
-   * RuntimeException} (HTTP 500) instead of tolerating the concurrent update. A correct fix should
-   * treat the lost race as benign and return a usable table, so this test asserts the desired
-   * behavior and currently fails against the buggy code.
+   * update the entity")}. Before the CAS retry, {@code repairTableMetadata} rethrew it as a fatal
+   * {@code RuntimeException} (HTTP 500) instead of tolerating the concurrent update. This test
+   * asserts that the lost race is benign and load returns a usable table.
    */
   @Test
   public void testLoadTableSurvivesConcurrentRepairVersionRace() throws Exception {
@@ -244,8 +243,8 @@ public class TestLanceTableOperations {
         .openDataset(location, Map.of("endpoint", "http://endpoint"));
 
     // A lost repair race must not fail the load: the bounded CAS retry recovers and returns the
-    // repaired table. Fails today because repairTableMetadata rethrows the first conflict as
-    // RuntimeException("Failed to repair table").
+    // repaired table instead of surfacing the first conflict as RuntimeException("Failed to repair
+    // table").
     Table loadedTable =
         Assertions.assertDoesNotThrow(
             () ->
