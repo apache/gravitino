@@ -114,4 +114,16 @@ public class UserMetaSQLProviderFactory {
       @Param("groupNames") List<String> groupNames) {
     return getProvider().batchGetAuthSubjectsForUser(metalakeName, userName, groupNames);
   }
+
+  public static String selectUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return getProvider().selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId);
+  }
+
+  public static String updateUserEnabled(
+      @Param("metalakeName") String metalakeName,
+      @Param("externalId") String externalId,
+      @Param("enabled") boolean enabled) {
+    return getProvider().updateUserEnabled(metalakeName, externalId, enabled);
+  }
 }

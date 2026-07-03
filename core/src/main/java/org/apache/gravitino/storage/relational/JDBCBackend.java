@@ -313,6 +313,49 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> E getByExternalId(
+      Namespace namespace, Entity.EntityType entityType, String externalId)
+      throws NoSuchEntityException, IOException {
+    String metalakeName = namespace.level(0);
+    switch (entityType) {
+      case USER:
+        return (E) UserMetaService.getInstance().getUserByExternalId(metalakeName, externalId);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for get by external id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateByExternalId(
+      Namespace namespace, Entity.EntityType entityType, String externalId, boolean enabled)
+      throws NoSuchEntityException, IOException {
+    String metalakeName = namespace.level(0);
+    switch (entityType) {
+      case USER:
+        return (E)
+            UserMetaService.getInstance().updateUserEnabled(metalakeName, externalId, enabled);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for update by external id operation", entityType);
+    }
+  }
+
+  @Override
+  public NameIdentifier deleteByExternalId(
+      Namespace namespace, Entity.EntityType entityType, String externalId)
+      throws NoSuchEntityException, IOException {
+    String metalakeName = namespace.level(0);
+    switch (entityType) {
+      case USER:
+        return UserMetaService.getInstance().deleteUserByExternalId(metalakeName, externalId);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for delete by external id operation", entityType);
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> identifiers, Entity.EntityType entityType) {
     if (identifiers == null || identifiers.isEmpty()) {

@@ -494,6 +494,8 @@ public class DTOConverters {
 
     return UserDTO.builder()
         .withName(user.name())
+        .withExternalId(user.externalId())
+        .withEnabled(user.enabled())
         .withRoles(user.roles())
         .withAudit(toDTO(user.auditInfo()))
         .build();

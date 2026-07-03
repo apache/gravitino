@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -33,6 +34,25 @@ public interface User extends Auditable {
    * @return The name of the user.
    */
   String name();
+
+  /**
+   * The external identifier assigned by an upstream system, or null if not set.
+   *
+   * @return The external identifier, or null if not set.
+   */
+  @Nullable
+  default String externalId() {
+    return null;
+  }
+
+  /**
+   * Whether the user is enabled.
+   *
+   * @return True if the user is enabled, false otherwise.
+   */
+  default boolean enabled() {
+    return true;
+  }
 
   /**
    * The roles of the user. A user can have multiple roles. Every role binds several privileges.

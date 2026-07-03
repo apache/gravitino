@@ -52,6 +52,21 @@ public interface AccessControlDispatcher {
       throws UserAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Adds a new User.
+   *
+   * @param metalake The Metalake of the User.
+   * @param user The name of the User.
+   * @param externalId The external identifier, or null if unset.
+   * @param enabled Whether the User is enabled.
+   * @return The added User instance.
+   * @throws UserAlreadyExistsException If a User with the same name already exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the User encounters storage issues.
+   */
+  User addUser(String metalake, String user, String externalId, boolean enabled)
+      throws UserAlreadyExistsException, NoSuchMetalakeException;
+
+  /**
    * Removes a User.
    *
    * @param metalake The Metalake of the User.
@@ -64,6 +79,19 @@ public interface AccessControlDispatcher {
   boolean removeUser(String metalake, String user) throws NoSuchMetalakeException;
 
   /**
+   * Removes a User by external identifier.
+   *
+   * @param metalake The Metalake of the User.
+   * @param externalId The external identifier of the User.
+   * @return True if the User was removed, false otherwise.
+   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the User encounters storage issues.
+   */
+  boolean removeUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException;
+
+  /**
    * Gets a User.
    *
    * @param metalake The Metalake of the User.
@@ -74,6 +102,43 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If getting the User encounters storage issues.
    */
   User getUser(String metalake, String user) throws NoSuchUserException, NoSuchMetalakeException;
+
+  /**
+   * Gets a User by external identifier.
+   *
+   * @param metalake The Metalake of the User.
+   * @param externalId The external identifier of the User.
+   * @return The getting User instance.
+   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the User encounters storage issues.
+   */
+  User getUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException;
+
+  /**
+   * Enables a User without removing role bindings.
+   *
+   * @param metalake The Metalake of the User.
+   * @param externalId The external identifier of the User.
+   * @return The updated User instance.
+   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  User enableUser(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException;
+
+  /**
+   * Disables a User without removing role bindings.
+   *
+   * @param metalake The Metalake of the User.
+   * @param externalId The external identifier of the User.
+   * @return The updated User instance.
+   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  User disableUser(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
    * Lists the users.
