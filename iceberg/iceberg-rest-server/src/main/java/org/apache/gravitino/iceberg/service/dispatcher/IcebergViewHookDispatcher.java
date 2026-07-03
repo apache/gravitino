@@ -254,8 +254,7 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     try {
       return store.exists(viewIdent, Entity.EntityType.VIEW);
     } catch (IOException e) {
-      LOG.warn("Failed to check view entity existence: {}", viewIdent, e);
-      return false;
+      throw new RuntimeException("Failed to check view entity existence in store: " + viewIdent, e);
     }
   }
 

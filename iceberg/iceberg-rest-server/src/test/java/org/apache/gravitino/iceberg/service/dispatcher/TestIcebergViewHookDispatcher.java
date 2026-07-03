@@ -363,6 +363,35 @@ public class TestIcebergViewHookDispatcher {
   }
 
   @Test
+  public void testRegisterViewThrowsWhenEntityStoreCheckFails() throws Exception {
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    RegisterViewRequest registerRequest =
+        ImmutableRegisterViewRequest.builder()
+            .name(VIEW_NAME)
+            .metadataLocation("/mock/metadata/v1.metadata.json")
+            .build();
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockExecutor.registerView(mockContext, namespace, registerRequest))
+        .thenReturn(mockResponse);
+
+    NameIdentifier expectedIdent = NameIdentifier.of(METALAKE, CATALOG, SCHEMA_NAME, VIEW_NAME);
+    doThrow(new IOException("Store unavailable"))
+        .when(mockEntityStore)
+        .exists(eq(expectedIdent), eq(Entity.EntityType.VIEW));
+
+    RuntimeException thrown =
+        assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerView(mockContext, namespace, registerRequest));
+    assertEquals(IOException.class, thrown.getCause().getClass());
+    verify(mockExecutor, times(1)).registerView(mockContext, namespace, registerRequest);
+    // Neither import nor ownership should run when the existence check fails
+    verify(mockInternalViewDispatcher, never()).loadView(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
   public void testDropViewRemovesFromEntityStore() throws Exception {
     TableIdentifier viewIdent = TableIdentifier.of(Namespace.of(SCHEMA_NAME), VIEW_NAME);
 
