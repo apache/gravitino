@@ -566,6 +566,13 @@ public class LanceTableOperations extends ManagedTableOperations {
       try {
         return store.update(ident, TableEntity.class, Entity.EntityType.TABLE, updater);
       } catch (IOException e) {
+        // Only retry when the update matched 0 rows (lost optimistic-lock CAS). Other IO failures
+        // (DB outage, serialization errors, etc.) should fail fast.
+        String message = e.getMessage();
+        if (message == null || !message.startsWith("Failed to update the entity:")) {
+          throw e;
+        }
+
         lastConflict = e;
         LOG.debug(
             "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), {}",
