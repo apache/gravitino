@@ -218,10 +218,15 @@ const transform = {
     const msg = response?.data?.error?.message ?? response?.data?.message ?? ''
     const err = error?.toString?.() ?? ''
 
+    const webLoginHeaderValue =
+      typeof originConfig?.headers?.get === 'function'
+        ? originConfig.headers.get('X-Gravitino-Web-Login')
+        : originConfig?.headers?.['X-Gravitino-Web-Login'] ?? originConfig?.headers?.['x-gravitino-web-login']
+
     const isFailedWebUILoginRequest =
       response?.status === 401 &&
       originConfig?.url === '/api/version' &&
-      originConfig?.headers?.['X-Gravitino-Web-Login'] === 'true'
+      String(webLoginHeaderValue).toLowerCase() === 'true'
 
     let errMessage = ''
 
