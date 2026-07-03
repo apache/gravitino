@@ -47,6 +47,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 public class AccessControlManager implements AccessControlDispatcher {
 
   private final UserGroupManager userGroupManager;
+  private final UserGroupExternalManager userGroupExternalManager;
   private final RoleManager roleManager;
   private final PermissionManager permissionManager;
   private final List<String> serviceAdmins;
@@ -54,6 +55,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.roleManager = new RoleManager(store, idGenerator);
     this.userGroupManager = new UserGroupManager(store, idGenerator);
+    this.userGroupExternalManager = new UserGroupExternalManager(store, idGenerator);
     this.permissionManager = new PermissionManager(store, roleManager);
     this.serviceAdmins = config.get(Configs.SERVICE_ADMINS);
   }
@@ -73,7 +75,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
-        () -> userGroupManager.addUser(metalake, user, externalId, enabled));
+        () -> userGroupExternalManager.addUser(metalake, user, externalId, enabled));
   }
 
   @Override
@@ -90,7 +92,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofUserExternalId(metalake, externalId),
         LockType.WRITE,
-        () -> userGroupManager.removeUserByExternalId(metalake, externalId));
+        () -> userGroupExternalManager.removeUserByExternalId(metalake, externalId));
   }
 
   @Override
@@ -108,7 +110,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofUserExternalId(metalake, externalId),
         LockType.READ,
-        () -> userGroupManager.getUserByExternalId(metalake, externalId));
+        () -> userGroupExternalManager.getUserByExternalId(metalake, externalId));
   }
 
   @Override
@@ -117,7 +119,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofUserExternalId(metalake, externalId),
         LockType.WRITE,
-        () -> userGroupManager.enableUser(metalake, externalId));
+        () -> userGroupExternalManager.enableUser(metalake, externalId));
   }
 
   @Override
@@ -126,7 +128,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofUserExternalId(metalake, externalId),
         LockType.WRITE,
-        () -> userGroupManager.disableUser(metalake, externalId));
+        () -> userGroupExternalManager.disableUser(metalake, externalId));
   }
 
   @Override
