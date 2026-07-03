@@ -109,9 +109,9 @@ export const basicLoginAction = createAsyncThunk(
       throw new Error(message)
     }
 
-    localStorage.setItem('accessToken', basicToken)
-    localStorage.setItem('isIdle', false)
-    localStorage.removeItem('expiredIn') // Basic auth does not have an expiration time
+    sessionStorage.setItem('accessToken', basicToken)
+    sessionStorage.setItem('isIdle', false)
+    sessionStorage.removeItem('expiredIn') // Basic auth does not have an expiration time
 
     dispatch(setAuthToken(basicToken))
     await dispatch(initialVersion())
@@ -135,10 +135,19 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
 
   // Clear legacy auth tokens
   localStorage.removeItem('accessToken')
+  sessionStorage.removeItem('accessToken')
+
   localStorage.removeItem('authParams')
+  sessionStorage.removeItem('authParams')
+  
   localStorage.removeItem('expiredIn')
+  sessionStorage.removeItem('expiredIn')
+
   localStorage.removeItem('isIdle')
+  sessionStorage.removeItem('isIdle')
+
   localStorage.removeItem('version')
+  sessionStorage.removeItem('version')
 
   dispatch(clearIntervalId())
   dispatch(setAuthToken(''))
@@ -148,6 +157,11 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
 })
 
 export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', async (expiredIn, { dispatch }) => {
+  // If the auth type is basic, we don't need to set an interval for token refresh
+  if (localStorage.getItem('authType') === 'basic') {
+    return { intervalId: null }
+  }
+
   const localExpiredIn = localStorage.getItem('expiredIn')
   const expired = (expiredIn ?? Number(localExpiredIn)) * (2 / 3) * 1000
   const defaultExpired = 299 * (2 / 3) * 1000
@@ -176,7 +190,8 @@ export const authSlice = createSlice({
   initialState: {
     oauthUrl: null,
     authType: typeof window !== 'undefined' ? localStorage.getItem('authType') : null,
-    authToken: typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null,
+    authToken: typeof window !== 'undefined' ? localStorage.getItem('authType') === 'basic'
+      ? sessionStorage.getItem('accessToken') : localStorage.getItem('accessToken') : null,
     authParams: typeof window !== 'undefined' ? localStorage.getItem('authParams') : null,
     expiredIn: typeof window !== 'undefined' ? localStorage.getItem('expiredIn') : null,
     intervalId: null

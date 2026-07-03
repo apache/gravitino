@@ -94,7 +94,8 @@ const AuthProvider = ({ children }) => {
         dispatch(initialVersion())
         goToMetalakeListPage()
       } else if (authType === 'basic') {
-        const tokenToUse = localStorage.getItem('accessToken')
+        // If the auth type is basic, check for the token in sessionStorage
+        const tokenToUse = sessionStorage.getItem('accessToken')
 
         if (tokenToUse) {
           dispatch(setAuthToken(tokenToUse))
