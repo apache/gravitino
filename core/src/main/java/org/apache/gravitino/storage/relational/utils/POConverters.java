@@ -1104,6 +1104,7 @@ public class POConverters {
               .withId(groupPO.getGroupId())
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
+              .withExternalId(groupPO.getExternalId())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1132,6 +1133,7 @@ public class POConverters {
               .withId(groupPO.getGroupId())
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
+              .withExternalId(groupPO.getExternalId())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
 
@@ -1237,6 +1239,7 @@ public class POConverters {
       return builder
           .withGroupId(groupEntity.id())
           .withGroupName(groupEntity.name())
+          .withExternalId(groupEntity.externalId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -1263,6 +1266,7 @@ public class POConverters {
       return GroupPO.builder()
           .withGroupId(oldGroupPO.getGroupId())
           .withGroupName(newGroup.name())
+          .withExternalId(newGroup.externalId())
           .withMetalakeId(oldGroupPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newGroup.auditInfo()))
           .withCurrentVersion(nextVersion)

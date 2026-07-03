@@ -514,6 +514,7 @@ public class DTOConverters {
 
     return GroupDTO.builder()
         .withName(group.name())
+        .withExternalId(group.externalId())
         .withRoles(group.roles())
         .withAudit(toDTO(group.auditInfo()))
         .build();

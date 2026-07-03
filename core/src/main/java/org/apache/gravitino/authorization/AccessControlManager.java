@@ -157,11 +157,29 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public Group addGroup(String metalake, String group, String externalId)
+      throws GroupAlreadyExistsException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> userGroupExternalManager.addGroup(metalake, group, externalId));
+  }
+
+  @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
         LockType.WRITE,
         () -> userGroupManager.removeGroup(metalake, group));
+  }
+
+  @Override
+  public boolean removeGroupByExternalId(String metalake, String externalId)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofGroupExternalId(metalake, externalId),
+        LockType.WRITE,
+        () -> userGroupExternalManager.removeGroupByExternalId(metalake, externalId));
   }
 
   @Override
@@ -171,6 +189,15 @@ public class AccessControlManager implements AccessControlDispatcher {
         AuthorizationUtils.ofGroup(metalake, group),
         LockType.READ,
         () -> userGroupManager.getGroup(metalake, group));
+  }
+
+  @Override
+  public Group getGroupByExternalId(String metalake, String externalId)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofGroupExternalId(metalake, externalId),
+        LockType.READ,
+        () -> userGroupExternalManager.getGroupByExternalId(metalake, externalId));
   }
 
   @Override

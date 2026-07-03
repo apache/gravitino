@@ -55,6 +55,7 @@ class TestAuthorizationUtils {
     NameIdentifier group = AuthorizationUtils.ofGroup(metalake, "group");
     NameIdentifier role = AuthorizationUtils.ofRole(metalake, "role");
     NameIdentifier userExt = AuthorizationUtils.ofUserExternalId(metalake, "ext-1");
+    NameIdentifier groupExt = AuthorizationUtils.ofGroupExternalId(metalake, "ext-1");
 
     Assertions.assertEquals(AuthorizationUtils.ofUserNamespace(metalake), user.namespace());
     Assertions.assertEquals("user", user.name());
@@ -65,10 +66,15 @@ class TestAuthorizationUtils {
     Assertions.assertEquals(
         AuthorizationUtils.ofUserExternalIdNamespace(metalake), userExt.namespace());
     Assertions.assertEquals("ext-1", userExt.name());
+    Assertions.assertEquals(AuthorizationUtils.ofGroupNamespace(metalake), groupExt.namespace());
+    Assertions.assertEquals("@externalId:ext-1", groupExt.name());
     Assertions.assertNotEquals(user, userExt);
+    Assertions.assertNotEquals(group, groupExt);
     Assertions.assertNotEquals(AuthorizationUtils.ofUser(metalake, "ext-1"), userExt);
     assertInvalidExternalId(() -> AuthorizationUtils.ofUserExternalId(metalake, null));
     assertInvalidExternalId(() -> AuthorizationUtils.ofUserExternalId(metalake, ""));
+    assertInvalidExternalId(() -> AuthorizationUtils.ofGroupExternalId(metalake, null));
+    assertInvalidExternalId(() -> AuthorizationUtils.ofGroupExternalId(metalake, ""));
   }
 
   private void assertInvalidExternalId(org.junit.jupiter.api.function.Executable executable) {

@@ -46,6 +46,7 @@ import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -67,7 +68,12 @@ public class AuthorizationUtils {
   static final String USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
       "User with external id %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
+  static final String GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
+      "Group with external id %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
+
+  /** Prefix for synthetic lock-path name segments keyed by external id within group namespace. */
+  static final String EXTERNAL_ID_NAME_PREFIX = "@externalId:";
 
   /**
    * Bidirectional map of deprecated privilege names to their new equivalents. This map is used for
@@ -163,6 +169,30 @@ public class AuthorizationUtils {
         externalId);
   }
 
+  /**
+   * Creates a synthetic {@link NameIdentifier} used only as a {@link
+   * org.apache.gravitino.lock.TreeLockUtils} lock path for group operations keyed by external id.
+   *
+   * <p>This is <strong>not</strong> the entity's storage identifier. Group entities are stored and
+   * retrieved by Gravitino group name via {@link #ofGroup(String, String)}. At lock time the group
+   * name may be unknown, so external-id operations need a dedicated lock path.
+   *
+   * <p>The leaf segment uses {@link #EXTERNAL_ID_NAME_PREFIX} so it does not collide with {@link
+   * #ofGroup(String, String)} when an external id equals an existing group name.
+   *
+   * @param metalake the metalake name
+   * @param externalId the external id of the group
+   * @return a synthetic name identifier for tree locking only
+   */
+  public static NameIdentifier ofGroupExternalId(String metalake, String externalId) {
+    checkExternalId(externalId);
+    return NameIdentifier.of(
+        metalake,
+        Entity.SYSTEM_CATALOG_RESERVED_NAME,
+        Entity.GROUP_SCHEMA_NAME,
+        EXTERNAL_ID_NAME_PREFIX + externalId);
+  }
+
   public static Namespace ofRoleNamespace(String metalake) {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
   }
@@ -198,6 +228,37 @@ public class AuthorizationUtils {
   public static void checkGroup(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Group identifier must not be null");
     checkGroupNamespace(ident.namespace());
+  }
+
+  /**
+   * Validates that the name identifier refers to a group external id lock path in a metalake.
+   *
+   * @param ident the external id name identifier to validate
+   */
+  public static void checkGroupExternalId(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "External id identifier must not be null");
+    checkGroupNamespace(ident.namespace());
+    if (!ident.name().startsWith(EXTERNAL_ID_NAME_PREFIX)) {
+      throw new IllegalNameIdentifierException(
+          "Invalid group external id identifier: %s", ident);
+    }
+    checkExternalId(ident.name().substring(EXTERNAL_ID_NAME_PREFIX.length()));
+  }
+
+  /**
+   * Extracts the external id value from a group external id lock-path identifier.
+   *
+   * @param ident the group external id lock-path identifier
+   * @return the external id value
+   */
+  public static String groupExternalIdFromIdent(NameIdentifier ident) {
+    checkGroupExternalId(ident);
+    return ident.name().substring(EXTERNAL_ID_NAME_PREFIX.length());
+  }
+
+  public static void checkExternalId(String externalId) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(externalId), "External id must not be null or empty");
   }
 
   public static void checkRole(NameIdentifier ident) {

@@ -498,6 +498,9 @@ public class TestAccessControlManager {
         NoSuchUserException.class,
         () -> accessControlManager.getUserByExternalId(METALAKE, "missing-ext-id"));
     assertMissingExt(
+        NoSuchGroupException.class,
+        () -> accessControlManager.getGroupByExternalId(METALAKE, "missing-ext-id"));
+    assertMissingExt(
         NoSuchUserException.class,
         () -> accessControlManager.disableUser(METALAKE, "missing-ext-id"));
     assertMissingExt(
@@ -512,6 +515,12 @@ public class TestAccessControlManager {
         UserAlreadyExistsException.class,
         () -> accessControlManager.addUser(METALAKE, "u2", "dup-ext", true));
     accessControlManager.removeUser(METALAKE, "u1");
+
+    accessControlManager.addGroup(METALAKE, "g1", "dup-ext");
+    assertThrowsExt(
+        GroupAlreadyExistsException.class,
+        () -> accessControlManager.addGroup(METALAKE, "g2", "dup-ext"));
+    accessControlManager.removeGroup(METALAKE, "g1");
   }
 
   @Test
@@ -527,6 +536,19 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testGroupExtDel() {
+    String extId = "ext-remove-group";
+    accessControlManager.addGroup(METALAKE, "remove_group", extId);
+    Assertions.assertTrue(accessControlManager.removeGroupByExternalId(METALAKE, extId));
+    assertMissingExt(
+        NoSuchGroupException.class,
+        () -> accessControlManager.getGroupByExternalId(METALAKE, extId));
+    Assertions.assertThrows(
+        NoSuchGroupException.class, () -> accessControlManager.getGroup(METALAKE, "remove_group"));
+    Assertions.assertFalse(accessControlManager.removeGroupByExternalId(METALAKE, "missing-ext-id"));
+  }
+
+  @Test
   public void testExtCache() {
     String extId = "ext-cache-user";
     accessControlManager.addUser(METALAKE, "cache_user", extId, true);
@@ -534,6 +556,17 @@ public class TestAccessControlManager {
     accessControlManager.disableUser(METALAKE, extId);
     Assertions.assertFalse(accessControlManager.getUser(METALAKE, "cache_user").enabled());
     accessControlManager.removeUser(METALAKE, "cache_user");
+  }
+
+  @Test
+  public void testGroupExtId() {
+    String group = "ext_group";
+    String extId = "ext-group-1";
+    Group added = accessControlManager.addGroup(METALAKE, group, extId);
+    Assertions.assertEquals(extId, added.externalId());
+    Assertions.assertEquals(
+        group, accessControlManager.getGroupByExternalId(METALAKE, extId).name());
+    accessControlManager.removeGroup(METALAKE, group);
   }
 
   private void createCatalogRole(String role) {
