@@ -245,16 +245,16 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     if (store == null) {
       return false;
     }
-    NameIdentifier viewIdent =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake,
-            catalogName,
-            TableIdentifier.of(namespace, viewName),
-            HierarchicalSchemaUtil.schemaSeparator());
     try {
+      NameIdentifier viewIdent =
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake,
+              catalogName,
+              TableIdentifier.of(namespace, viewName),
+              HierarchicalSchemaUtil.schemaSeparator());
       return store.exists(viewIdent, Entity.EntityType.VIEW);
     } catch (IOException e) {
-      throw new RuntimeException("Failed to check view entity existence in store: " + viewIdent, e);
+      throw new RuntimeException("Failed to check view entity existence in store", e);
     }
   }
 
