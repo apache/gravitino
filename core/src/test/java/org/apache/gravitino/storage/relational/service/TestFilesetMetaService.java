@@ -46,6 +46,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.OptimisticLockException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -429,7 +430,7 @@ public class TestFilesetMetaService extends TestJDBCBackend {
 
     Exception exception =
         Assertions.assertThrows(
-            IOException.class,
+            OptimisticLockException.class,
             () ->
                 FilesetMetaService.getInstance()
                     .updateFileset(
@@ -455,8 +456,7 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                           }
                           return updatedFilesetEntity;
                         }));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Failed to update the entity: " + filesetIdent));
+    Assertions.assertTrue(exception.getMessage().contains(filesetIdent.toString()));
 
     FilesetEntity persistedEntity =
         FilesetMetaService.getInstance().getFilesetByIdentifier(filesetIdent);

@@ -39,6 +39,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.OptimisticLockException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
@@ -409,7 +410,7 @@ public class ModelVersionMetaService {
     if (updateResult.get() > 0) {
       return newModelVersionEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + ident);
+      throw new OptimisticLockException("Concurrent modification detected for: %s", ident);
     }
   }
 

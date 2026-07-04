@@ -35,6 +35,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.OptimisticLockException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -181,7 +182,7 @@ public class ViewMetaService {
       return newEntity;
     } catch (RuntimeException re) {
       if (updateResult.get() == 0) {
-        throw new IOException("Failed to update the entity: " + ident);
+        throw new OptimisticLockException("Concurrent modification detected for: %s", ident);
       }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.VIEW, newEntity.nameIdentifier().toString());
