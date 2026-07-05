@@ -359,8 +359,8 @@ public class UserMetaService {
     String externalId = ident.name();
     Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
     UserPO oldUserPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
-    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, userNamespace);
+    UserEntity oldEntity =
+        POConverters.fromUserPO(oldUserPO, Collections.emptyList(), userNamespace);
     UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);
     Preconditions.checkArgument(
         Objects.equals(oldEntity.id(), newEntity.id()),

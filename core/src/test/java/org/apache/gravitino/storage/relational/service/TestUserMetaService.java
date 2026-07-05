@@ -1365,8 +1365,6 @@ class TestUserMetaService extends TestJDBCBackend {
             .withId(user.id())
             .withName(user.name())
             .withNamespace(user.namespace())
-            .withRoleNames(user.roleNames())
-            .withRoleIds(user.roleIds())
             .withExternalId(user.externalId())
             .withEnabled(enabled)
             .withAuditInfo(user.auditInfo())

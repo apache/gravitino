@@ -1017,7 +1017,7 @@ public class POConverters {
               .withName(userPO.getUserName())
               .withNamespace(namespace)
               .withExternalId(userPO.getExternalId())
-              .withEnabled(userPO.getEnabled() != null ? userPO.getEnabled() : Boolean.TRUE)
+              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1047,7 +1047,7 @@ public class POConverters {
               .withName(userPO.getUserName())
               .withNamespace(namespace)
               .withExternalId(userPO.getExternalId())
-              .withEnabled(userPO.getEnabled() != null ? userPO.getEnabled() : Boolean.TRUE)
+              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (StringUtils.isNotBlank(userPO.getRoleNames())) {
