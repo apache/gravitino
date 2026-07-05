@@ -41,6 +41,8 @@ from gravitino.api.rel.partitions.identity_partition import IdentityPartition
 from gravitino.api.rel.partitions.list_partition import ListPartition
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.range_partition import RangePartition
+from gravitino.api.rel.representation import Representation
+from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.table_change import (
     AddColumn,
@@ -55,6 +57,12 @@ from gravitino.api.rel.table_change import (
     UpdateColumnType,
 )
 from gravitino.api.rel.types.types import Types
+from gravitino.api.rel.view_change import (
+    RemoveProperty,
+    RenameView,
+    ReplaceView,
+    SetProperty,
+)
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
@@ -87,11 +95,17 @@ from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitio
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
+from gravitino.dto.rel.representation_dto import RepresentationDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
+from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.requests.table_update_request import (
     TableUpdateRequest,
     TableUpdateRequestBase,
+)
+from gravitino.dto.requests.view_update_request import (
+    ViewUpdateRequest,
+    ViewUpdateRequestBase,
 )
 from gravitino.exceptions.base import IllegalArgumentException
 
@@ -226,6 +240,19 @@ class DTOConverters:
             dto.auto_increment(),
             DTOConverters.from_function_arg(dto.default_value()),
         )
+
+    @from_dto.register
+    @staticmethod
+    def _(dto: SQLRepresentationDTO) -> SQLRepresentation:
+        """Converts a SQLRepresentationDTO to a SQLRepresentation.
+
+        Args:
+            dto (SQLRepresentationDTO): The SQLRepresentation DTO to be converted.
+
+        Returns:
+            SQLRepresentation: The SQLRepresentation.
+        """
+        return SQLRepresentation(_dialect=dto.dialect(), _sql=dto.sql())
 
     @from_dto.register
     @staticmethod
@@ -377,20 +404,23 @@ class DTOConverters:
 
     @overload
     @staticmethod
+    def from_dtos(
+        dtos: list[RepresentationDTO],
+    ) -> list[Representation]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
     def from_dtos(dtos: list[Partitioning]) -> list[Transform]: ...  # pragma: no cover
 
     @staticmethod
     def from_dtos(dtos):
-        """Converts list of `ColumnDTO`, `IndexDTO`, `SortOrderDTO`, or `Partitioning`
-        to the corresponding list of `Column`s, `Index`es, `SortOrder`s, or `Transform`s.
+        """Converts a list of DTOs to the corresponding API objects.
 
         Args:
-            dtos (list[ColumnDTO] | list[IndexDTO] | list[SortOrderDTO] | list[Partitioning]):
-                The DTOs to be converted.
+            dtos: The DTOs to be converted.
 
         Returns:
-            list[Column] | list[Index] | list[SortOrder] | list[Transform]:
-                The list of Columns, Indexes, SortOrders, or Transforms depends on the input DTOs.
+            The converted objects.
         """
         if not dtos:
             return []
@@ -559,6 +589,16 @@ class DTOConverters:
 
     @to_dto.register
     @staticmethod
+    def _(obj: RepresentationDTO) -> RepresentationDTO:
+        return obj
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: SQLRepresentation) -> SQLRepresentationDTO:
+        return SQLRepresentationDTO(_dialect=obj.dialect(), _sql=obj.sql())
+
+    @to_dto.register
+    @staticmethod
     def _(obj: Partitioning) -> Partitioning:
         return obj
 
@@ -645,6 +685,18 @@ class DTOConverters:
     @overload
     @staticmethod
     def to_dtos(dtos: list[SortOrderDTO]) -> list[SortOrderDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(
+        dtos: list[Representation],
+    ) -> list[RepresentationDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(
+        dtos: list[RepresentationDTO],
+    ) -> list[RepresentationDTO]: ...  # pragma: no cover
 
     @overload
     @staticmethod
@@ -797,6 +849,34 @@ class DTOConverters:
             return TableUpdateRequest.DeleteTableIndexRequest(
                 _name=delete_index.get_name(),
                 _if_exists=delete_index.is_if_exists(),
+            )
+
+        raise IllegalArgumentException(
+            f"Unknown change type: {change.__class__.__name__}"
+        )
+
+    @staticmethod
+    def to_view_update_request(change) -> ViewUpdateRequestBase:
+        if isinstance(change, RenameView):
+            return ViewUpdateRequest.RenameViewRequest(_new_name=change.new_name())
+
+        if isinstance(change, SetProperty):
+            return ViewUpdateRequest.SetViewPropertyRequest(
+                _property=change.property(), _value=change.value()
+            )
+
+        if isinstance(change, RemoveProperty):
+            return ViewUpdateRequest.RemoveViewPropertyRequest(
+                _property=change.property()
+            )
+
+        if isinstance(change, ReplaceView):
+            return ViewUpdateRequest.ReplaceViewRequest(
+                _columns=DTOConverters.to_dtos(change.columns()),
+                _representations=DTOConverters.to_dtos(change.representations()),
+                _default_catalog=change.default_catalog(),
+                _default_schema=change.default_schema(),
+                _comment=change.comment(),
             )
 
         raise IllegalArgumentException(
