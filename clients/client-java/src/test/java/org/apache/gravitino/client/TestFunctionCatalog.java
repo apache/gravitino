@@ -41,6 +41,7 @@ import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.FunctionListResponse;
 import org.apache.gravitino.dto.responses.FunctionResponse;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
@@ -148,6 +149,51 @@ public class TestFunctionCatalog extends TestBase {
     Assertions.assertThrows(
         RuntimeException.class,
         () -> catalog.asFunctionCatalog().listFunctions(func1.namespace()),
+        "internal error");
+  }
+
+  @Test
+  public void testListFunctionInfos() throws JsonProcessingException {
+    NameIdentifier func1 = NameIdentifier.of("schema1", "func1");
+    String functionPath =
+        withSlash(formatFunctionRequestPath(Namespace.of(metalakeName, catalogName, "schema1")));
+    FunctionDTO[] mockFunctions =
+        new FunctionDTO[] {
+          mockFunctionDTO("func1", FunctionType.SCALAR, "mock comment1", true),
+          mockFunctionDTO("func2", FunctionType.SCALAR, "mock comment2", true)
+        };
+
+    FunctionListResponse resp = new FunctionListResponse(mockFunctions);
+    buildMockResource(
+        Method.GET, functionPath, ImmutableMap.of("details", "true"), null, resp, SC_OK);
+
+    Function[] functions = catalog.asFunctionCatalog().listFunctionInfos(func1.namespace());
+    Assertions.assertEquals(2, functions.length);
+    assertFunction(mockFunctions[0], functions[0]);
+    assertFunction(mockFunctions[1], functions[1]);
+
+    // Throw schema not found exception
+    ErrorResponse errResp =
+        ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
+    buildMockResource(
+        Method.GET, functionPath, ImmutableMap.of("details", "true"), null, errResp, SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () -> catalog.asFunctionCatalog().listFunctionInfos(func1.namespace()),
+        "schema not found");
+
+    // Throw Runtime exception
+    ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
+    buildMockResource(
+        Method.GET,
+        functionPath,
+        ImmutableMap.of("details", "true"),
+        null,
+        errResp2,
+        SC_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> catalog.asFunctionCatalog().listFunctionInfos(func1.namespace()),
         "internal error");
   }
 
