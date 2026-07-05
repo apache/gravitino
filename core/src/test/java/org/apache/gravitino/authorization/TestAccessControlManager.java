@@ -523,9 +523,7 @@ public class TestAccessControlManager {
         NoSuchUserException.class, () -> accessControlManager.getUserByExternalId(METALAKE, extId));
     Assertions.assertThrows(
         NoSuchUserException.class, () -> accessControlManager.getUser(METALAKE, "remove_user"));
-    assertMissingExt(
-        NoSuchUserException.class,
-        () -> accessControlManager.removeUserByExternalId(METALAKE, "missing-ext-id"));
+    Assertions.assertFalse(accessControlManager.removeUserByExternalId(METALAKE, "missing-ext-id"));
   }
 
   @Test

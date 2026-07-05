@@ -83,19 +83,12 @@ class UserGroupExternalManager {
     }
   }
 
-  boolean removeUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
+  boolean removeUserByExternalId(String metalake, String externalId) {
     try {
-      boolean deleted =
-          store
-              .externalIdOperations()
-              .deleteByExternalId(
-                  AuthorizationUtils.ofUserExternalId(metalake, externalId),
-                  Entity.EntityType.USER);
-      if (!deleted) {
-        throw new NoSuchUserException(
-            AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
-      }
-      return true;
+      return store
+          .externalIdOperations()
+          .deleteByExternalId(
+              AuthorizationUtils.ofUserExternalId(metalake, externalId), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
           "Removing user with external id {} in the metalake {} failed due to storage issues",
