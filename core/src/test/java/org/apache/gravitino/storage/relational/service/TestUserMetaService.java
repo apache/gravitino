@@ -1357,7 +1357,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   private ExternalIdIdentifier userExtIdent(String externalId) {
-    return ExternalIdIdentifier.ofUser(metalakeName, externalId);
+    return ExternalIdIdentifier.of(AuthorizationUtils.ofUserNamespace(metalakeName), externalId);
   }
 
   private Function<UserEntity, UserEntity> enabledUpdater(boolean enabled) {

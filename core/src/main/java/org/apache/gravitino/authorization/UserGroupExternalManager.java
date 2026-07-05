@@ -135,7 +135,8 @@ class UserGroupExternalManager {
 
   private User updateEnabledByExternalId(String metalake, String externalId, boolean enabled)
       throws NoSuchUserException {
-    ExternalIdIdentifier ident = ExternalIdIdentifier.ofUser(metalake, externalId);
+    ExternalIdIdentifier ident =
+        ExternalIdIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake), externalId);
     try {
       return store
           .externalIdOperations()
@@ -143,7 +144,17 @@ class UserGroupExternalManager {
               ident,
               UserEntity.class,
               Entity.EntityType.USER,
-              user -> copyUserWithEnabled(user, enabled));
+              user ->
+                  UserEntity.builder()
+                      .withId(user.id())
+                      .withName(user.name())
+                      .withNamespace(user.namespace())
+                      .withRoleNames(user.roleNames())
+                      .withRoleIds(user.roleIds())
+                      .withExternalId(user.externalId())
+                      .withEnabled(enabled)
+                      .withAuditInfo(user.auditInfo())
+                      .build());
     } catch (NoSuchEntityException e) {
       LOG.warn(
           "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
@@ -158,18 +169,5 @@ class UserGroupExternalManager {
           ioe);
       throw new RuntimeException(ioe);
     }
-  }
-
-  private static UserEntity copyUserWithEnabled(UserEntity user, boolean enabled) {
-    return UserEntity.builder()
-        .withId(user.id())
-        .withName(user.name())
-        .withNamespace(user.namespace())
-        .withRoleNames(user.roleNames())
-        .withRoleIds(user.roleIds())
-        .withExternalId(user.externalId())
-        .withEnabled(enabled)
-        .withAuditInfo(user.auditInfo())
-        .build();
   }
 }

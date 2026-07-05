@@ -192,7 +192,7 @@ public class AuthorizationUtils {
    * @param ident the external id identifier to validate
    */
   public static void checkUserExternalId(ExternalIdIdentifier ident) {
-    NameIdentifier.check(ident != null, "External id identifier must not be null");
+    ExternalIdIdentifier.check(ident != null, "External id identifier must not be null");
     checkUserExternalId(ident.namespace(), ident.externalId());
   }
 

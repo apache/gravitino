@@ -354,7 +354,8 @@ public class UserMetaService {
   public <E extends Entity & HasIdentifier> UserEntity updateUserByExternalId(
       ExternalIdIdentifier ident, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkUserExternalId(ident);
-    UserPO oldUserPO = getUserPOByMetalakeNameAndExternalId(ident.metalake(), ident.externalId());
+    UserPO oldUserPO =
+        getUserPOByMetalakeNameAndExternalId(ident.namespace().level(0), ident.externalId());
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
     UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, ident.namespace());
     UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);

@@ -18,65 +18,99 @@
  */
 package org.apache.gravitino;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.Iterables;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 import java.util.Arrays;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 
 /**
- * An identifier for entities located by external id within a metalake namespace.
+ * An identifier for entities located by external id within a namespace.
  *
  * <p>This is distinct from {@link NameIdentifier}, which identifies entities by Gravitino name.
  */
 public class ExternalIdIdentifier {
 
-  private static final String SYSTEM_CATALOG_RESERVED_NAME = "system";
-  private static final String USER_SCHEMA_NAME = "user";
+  private static final Splitter DOT = Splitter.on('.');
 
   private final Namespace namespace;
+
   private final String externalId;
 
   /**
-   * Creates an {@link ExternalIdIdentifier} for a user in the given metalake.
+   * Create the {@link ExternalIdIdentifier} with the given levels of names.
    *
-   * @param metalake the metalake name
-   * @param externalId the external id of the user
-   * @return the external id identifier
+   * @param names The names of the identifier
+   * @return The created {@link ExternalIdIdentifier}
    */
-  public static ExternalIdIdentifier ofUser(String metalake, String externalId) {
+  public static ExternalIdIdentifier of(String... names) {
+    check(names != null, "Cannot create an ExternalIdIdentifier with null names");
+    check(names.length > 0, "Cannot create an ExternalIdIdentifier with no names");
+
     return new ExternalIdIdentifier(
-        Namespace.of(metalake, SYSTEM_CATALOG_RESERVED_NAME, USER_SCHEMA_NAME), externalId);
+        Namespace.of(Arrays.copyOf(names, names.length - 1)), names[names.length - 1]);
+  }
+
+  /**
+   * Create the {@link ExternalIdIdentifier} with the given {@link Namespace} and external id.
+   *
+   * @param namespace The namespace of the identifier
+   * @param externalId The external id of the identifier
+   * @return The created {@link ExternalIdIdentifier}
+   */
+  public static ExternalIdIdentifier of(Namespace namespace, String externalId) {
+    return new ExternalIdIdentifier(namespace, externalId);
+  }
+
+  /**
+   * Create a {@link ExternalIdIdentifier} from the given identifier string.
+   *
+   * @param identifier The identifier string
+   * @return The created {@link ExternalIdIdentifier}
+   */
+  public static ExternalIdIdentifier parse(String identifier) {
+    check(identifier != null && !identifier.isEmpty(), "Cannot parse a null or empty identifier");
+
+    Iterable<String> parts = DOT.split(identifier);
+    return ExternalIdIdentifier.of(Iterables.toArray(parts, String.class));
   }
 
   private ExternalIdIdentifier(Namespace namespace, String externalId) {
-    NameIdentifier.check(
-        externalId != null && !externalId.isEmpty(), "External id must not be null or empty");
+    check(namespace != null, "Cannot create an ExternalIdIdentifier with null namespace");
+    check(
+        externalId != null && !externalId.isEmpty(),
+        "Cannot create an ExternalIdIdentifier with null or empty external id");
+
     this.namespace = namespace;
     this.externalId = externalId;
   }
 
   /**
-   * Returns the namespace of this identifier.
+   * Check if the {@link ExternalIdIdentifier} has a namespace.
    *
-   * @return the namespace
+   * @return True if the {@link ExternalIdIdentifier} has a namespace, false otherwise.
+   */
+  public boolean hasNamespace() {
+    return !namespace.isEmpty();
+  }
+
+  /**
+   * Get the namespace of the {@link ExternalIdIdentifier}.
+   *
+   * @return The namespace of the {@link ExternalIdIdentifier}.
    */
   public Namespace namespace() {
     return namespace;
   }
 
   /**
-   * Returns the external id value.
+   * Get the external id of the {@link ExternalIdIdentifier}.
    *
-   * @return the external id
+   * @return The external id of the {@link ExternalIdIdentifier}.
    */
   public String externalId() {
     return externalId;
-  }
-
-  /**
-   * Returns the metalake name.
-   *
-   * @return the metalake name
-   */
-  public String metalake() {
-    return namespace.level(0);
   }
 
   @Override
@@ -84,8 +118,10 @@ public class ExternalIdIdentifier {
     if (!(other instanceof ExternalIdIdentifier)) {
       return false;
     }
-    ExternalIdIdentifier that = (ExternalIdIdentifier) other;
-    return namespace.equals(that.namespace) && externalId.equals(that.externalId);
+
+    ExternalIdIdentifier otherExternalIdIdentifier = (ExternalIdIdentifier) other;
+    return namespace.equals(otherExternalIdIdentifier.namespace)
+        && externalId.equals(otherExternalIdIdentifier.externalId);
   }
 
   @Override
@@ -95,6 +131,24 @@ public class ExternalIdIdentifier {
 
   @Override
   public String toString() {
-    return namespace + "." + externalId;
+    if (hasNamespace()) {
+      return namespace.toString() + "." + externalId;
+    } else {
+      return externalId;
+    }
+  }
+
+  /**
+   * Check the given condition is true. Throw an {@link IllegalNameIdentifierException} if it's not.
+   *
+   * @param condition The condition to check.
+   * @param message The message to throw.
+   * @param args The arguments to the message.
+   */
+  @FormatMethod
+  public static void check(boolean condition, @FormatString String message, Object... args) {
+    if (!condition) {
+      throw new IllegalNameIdentifierException(message, args);
+    }
   }
 }
