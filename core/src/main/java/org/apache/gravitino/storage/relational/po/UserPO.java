@@ -162,9 +162,7 @@ public class UserPO {
       Preconditions.checkArgument(userPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(userPO.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(userPO.deletedAt != null, "Deleted at is required");
-      if (userPO.enabled == null) {
-        userPO.enabled = Boolean.TRUE;
-      }
+      Preconditions.checkArgument(userPO.enabled != null, "Enabled is required");
     }
 
     public UserPO build() {
