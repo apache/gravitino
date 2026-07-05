@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Schema;
@@ -80,6 +81,7 @@ public class TestIcebergCatalogUtil {
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(
             IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog);
     Assertions.assertTrue(catalog instanceof JdbcCatalog);
 
     Assertions.assertThrowsExactly(

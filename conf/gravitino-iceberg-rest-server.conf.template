@@ -63,3 +63,33 @@ gravitino.iceberg-rest.warehouse = /tmp
 # gravitino.iceberg-rest.s3-secret-access-key = xxx
 # gravitino.iceberg-rest.s3-endpoint = http://192.168.215.4:9010
 # gravitino.iceberg-rest.s3-region = xxx
+
+# THE CONFIGURATION EXAMPLE FOR JDBC CATALOG BACKEND WITH KERBEROS-SECURED HDFS WAREHOUSE
+# JDBC username/password authenticates the metadata store; Kerberos authenticates HDFS access.
+
+# gravitino.iceberg-rest.catalog-backend = jdbc
+# gravitino.iceberg-rest.jdbc-driver = org.postgresql.Driver
+# gravitino.iceberg-rest.uri = jdbc:postgresql://127.0.0.1:5432/iceberg
+# gravitino.iceberg-rest.jdbc-user = iceberg
+# gravitino.iceberg-rest.jdbc-password = secret
+# gravitino.iceberg-rest.jdbc-initialize = true
+# gravitino.iceberg-rest.warehouse = hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc
+# gravitino.iceberg-rest.authentication.type = kerberos
+# gravitino.iceberg-rest.authentication.kerberos.principal = iceberg@EXAMPLE.COM
+# gravitino.iceberg-rest.authentication.kerberos.keytab-uri = file:///etc/security/keytabs/iceberg.keytab
+# gravitino.iceberg-rest.hadoop.security.authentication = kerberos
+# gravitino.iceberg-rest.dfs.namenode.kerberos.principal = hdfs/host.example.com@EXAMPLE.COM
+
+# THE CONFIGURATION EXAMPLE FOR HIVE CATALOG BACKEND WITH KERBEROS
+# Kerberos applies to both Hive Metastore and HDFS warehouse access.
+
+# gravitino.iceberg-rest.catalog-backend = hive
+# gravitino.iceberg-rest.uri = thrift://127.0.0.1:9083
+# gravitino.iceberg-rest.warehouse = hdfs://127.0.0.1:9000/user/hive/warehouse-hive
+# gravitino.iceberg-rest.authentication.type = kerberos
+# gravitino.iceberg-rest.authentication.kerberos.principal = iceberg@EXAMPLE.COM
+# gravitino.iceberg-rest.authentication.kerberos.keytab-uri = file:///etc/security/keytabs/iceberg.keytab
+# gravitino.iceberg-rest.hive.metastore.sasl.enabled = true
+# gravitino.iceberg-rest.hive.metastore.kerberos.principal = hive/host.example.com@EXAMPLE.COM
+# gravitino.iceberg-rest.hadoop.security.authentication = kerberos
+# gravitino.iceberg-rest.dfs.namenode.kerberos.principal = hdfs/host.example.com@EXAMPLE.COM
