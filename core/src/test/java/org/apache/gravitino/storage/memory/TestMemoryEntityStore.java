@@ -37,7 +37,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
@@ -156,16 +155,21 @@ public class TestMemoryEntityStore {
 
     @Override
     public <E extends Entity & HasIdentifier> E getByExternalId(
-        Namespace namespace, EntityType entityType, Class<E> type, String externalId)
+        NameIdentifier ident, EntityType entityType, Class<E> type)
         throws NoSuchEntityException, IOException {
       if (entityType != EntityType.USER) {
         throw new UnsupportedOperationException(
             "Get by external id is not supported for entity type: " + entityType);
       }
 
+      AuthorizationUtils.checkUserExternalId(ident);
+      String externalId = ident.name();
+      Namespace userNamespace = AuthorizationUtils.ofUserNamespace(ident.namespace().level(0));
+
       for (Map.Entry<NameIdentifier, Entity> entry : entityMap.entrySet()) {
         Entity entity = entry.getValue();
-        if (!entity.type().equals(entityType) || !entry.getKey().namespace().equals(namespace)) {
+        if (!entity.type().equals(entityType)
+            || !entry.getKey().namespace().equals(userNamespace)) {
           continue;
         }
 
@@ -188,17 +192,17 @@ public class TestMemoryEntityStore {
     @Override
     @SuppressWarnings("unchecked")
     public <E extends Entity & HasIdentifier> E updateByExternalId(
-        ExternalIdIdentifier ident, Class<E> type, EntityType entityType, Function<E, E> updater)
+        NameIdentifier ident, EntityType entityType, Class<E> type, Function<E, E> updater)
         throws NoSuchEntityException, IOException {
-      E user = getByExternalId(ident.namespace(), entityType, type, ident.externalId());
+      E user = getByExternalId(ident, entityType, type);
       E updated = updater.apply(user);
       return update(user.nameIdentifier(), type, entityType, entity -> updated);
     }
 
     @Override
-    public boolean deleteByExternalId(Namespace namespace, EntityType entityType, String externalId)
+    public boolean deleteByExternalId(NameIdentifier ident, EntityType entityType)
         throws NoSuchEntityException, IOException {
-      UserEntity user = getByExternalId(namespace, entityType, UserEntity.class, externalId);
+      UserEntity user = getByExternalId(ident, entityType, UserEntity.class);
       return delete(user.nameIdentifier(), entityType);
     }
 

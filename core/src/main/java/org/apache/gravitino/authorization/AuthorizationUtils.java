@@ -31,7 +31,6 @@ import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -187,25 +186,13 @@ public class AuthorizationUtils {
   }
 
   /**
-   * Validates that the external id identifier refers to a user in a metalake.
+   * Validates that the name identifier refers to a user external id in a metalake.
    *
-   * @param ident the external id identifier to validate
+   * @param ident the external id name identifier to validate
    */
-  public static void checkUserExternalId(ExternalIdIdentifier ident) {
-    ExternalIdIdentifier.check(ident != null, "External id identifier must not be null");
-    checkUserExternalId(ident.namespace(), ident.externalId());
-  }
-
-  /**
-   * Validates the namespace and external id for user lookup by external id.
-   *
-   * @param namespace the user namespace
-   * @param externalId the external id of the user
-   */
-  public static void checkUserExternalId(Namespace namespace, String externalId) {
-    checkUserNamespace(namespace);
-    NameIdentifier.check(
-        externalId != null && !externalId.isEmpty(), "External id must not be null or empty");
+  public static void checkUserExternalId(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "External id identifier must not be null");
+    checkUserExternalIdNamespace(ident.namespace());
   }
 
   public static void checkGroup(NameIdentifier ident) {
@@ -222,6 +209,13 @@ public class AuthorizationUtils {
     Namespace.check(
         namespace != null && namespace.length() == 3,
         "User namespace must have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkUserExternalIdNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "User external id namespace must have 3 levels, the input namespace is %s",
         namespace);
   }
 

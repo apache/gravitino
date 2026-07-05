@@ -35,7 +35,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -315,11 +314,11 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> E getByExternalId(
-      Namespace namespace, Entity.EntityType entityType, String externalId)
+      NameIdentifier ident, Entity.EntityType entityType)
       throws NoSuchEntityException, IOException {
     switch (entityType) {
       case USER:
-        return (E) UserMetaService.getInstance().getUserByExternalId(namespace, externalId);
+        return (E) UserMetaService.getInstance().getUserByExternalId(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get by external id operation", entityType);
@@ -328,7 +327,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> E updateByExternalId(
-      ExternalIdIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws NoSuchEntityException, IOException {
     switch (entityType) {
       case USER:
@@ -336,19 +335,6 @@ public class JDBCBackend implements RelationalBackend {
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update by external id operation", entityType);
-    }
-  }
-
-  @Override
-  public NameIdentifier deleteByExternalId(
-      Namespace namespace, Entity.EntityType entityType, String externalId)
-      throws NoSuchEntityException, IOException {
-    switch (entityType) {
-      case USER:
-        return UserMetaService.getInstance().deleteUserByExternalId(namespace, externalId);
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for delete by external id operation", entityType);
     }
   }
 

@@ -31,25 +31,24 @@ public interface SupportsExternalIdOperations {
   /**
    * Get the entity from the underlying storage by external id.
    *
-   * @param namespace the namespace of the entity
+   * @param ident the external id name identifier
    * @param entityType the general type of the entity
    * @param type the detailed type of the entity
-   * @param externalId the external id of the entity
    * @param <E> the class of entity
    * @return the entity retrieved from the underlying storage
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the retrieve operation fails
    */
   <E extends Entity & HasIdentifier> E getByExternalId(
-      Namespace namespace, Entity.EntityType entityType, Class<E> type, String externalId)
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
       throws NoSuchEntityException, IOException;
 
   /**
    * Update an entity by external id.
    *
-   * @param ident the external id identifier
-   * @param type the detailed type of the entity
+   * @param ident the external id name identifier
    * @param entityType the general type of the entity
+   * @param type the detailed type of the entity
    * @param updater the updater function to update the entity
    * @param <E> the class of entity
    * @return the updated entity
@@ -57,22 +56,18 @@ public interface SupportsExternalIdOperations {
    * @throws IOException if the update operation fails
    */
   <E extends Entity & HasIdentifier> E updateByExternalId(
-      ExternalIdIdentifier ident,
-      Class<E> type,
-      Entity.EntityType entityType,
-      Function<E, E> updater)
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
       throws NoSuchEntityException, IOException;
 
   /**
    * Delete an entity by external id.
    *
-   * @param namespace the namespace of the entity
+   * @param ident the external id name identifier
    * @param entityType the general type of the entity
-   * @param externalId the external id of the entity
    * @return true if the entity was deleted
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the delete operation fails
    */
-  boolean deleteByExternalId(Namespace namespace, Entity.EntityType entityType, String externalId)
+  boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType)
       throws NoSuchEntityException, IOException;
 }

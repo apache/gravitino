@@ -24,7 +24,6 @@ import java.time.Instant;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
@@ -86,15 +85,17 @@ class UserGroupExternalManager {
 
   boolean removeUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
     try {
-      return store
-          .externalIdOperations()
-          .deleteByExternalId(
-              AuthorizationUtils.ofUserNamespace(metalake), Entity.EntityType.USER, externalId);
-    } catch (NoSuchEntityException e) {
-      LOG.warn(
-          "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
-      throw new NoSuchUserException(
-          AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+      boolean deleted =
+          store
+              .externalIdOperations()
+              .deleteByExternalId(
+                  AuthorizationUtils.ofUserExternalId(metalake, externalId),
+                  Entity.EntityType.USER);
+      if (!deleted) {
+        throw new NoSuchUserException(
+            AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+      }
+      return true;
     } catch (IOException ioe) {
       LOG.error(
           "Removing user with external id {} in the metalake {} failed due to storage issues",
@@ -110,10 +111,9 @@ class UserGroupExternalManager {
       return store
           .externalIdOperations()
           .getByExternalId(
-              AuthorizationUtils.ofUserNamespace(metalake),
+              AuthorizationUtils.ofUserExternalId(metalake, externalId),
               Entity.EntityType.USER,
-              UserEntity.class,
-              externalId);
+              UserEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn(
           "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
@@ -135,15 +135,13 @@ class UserGroupExternalManager {
 
   private User updateEnabledByExternalId(String metalake, String externalId, boolean enabled)
       throws NoSuchUserException {
-    ExternalIdIdentifier ident =
-        ExternalIdIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake), externalId);
     try {
       return store
           .externalIdOperations()
           .updateByExternalId(
-              ident,
-              UserEntity.class,
+              AuthorizationUtils.ofUserExternalId(metalake, externalId),
               Entity.EntityType.USER,
+              UserEntity.class,
               user ->
                   UserEntity.builder()
                       .withId(user.id())

@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -340,24 +339,28 @@ public class UserMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getUserByExternalId")
-  public UserEntity getUserByExternalId(Namespace namespace, String externalId) {
-    AuthorizationUtils.checkUserExternalId(namespace, externalId);
-    String metalake = namespace.level(0);
+  public UserEntity getUserByExternalId(NameIdentifier ident) {
+    AuthorizationUtils.checkUserExternalId(ident);
+    String metalake = ident.namespace().level(0);
+    String externalId = ident.name();
+    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
     UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
-    return POConverters.fromUserPO(userPO, rolePOs, namespace);
+    return POConverters.fromUserPO(userPO, rolePOs, userNamespace);
   }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateUserByExternalId")
   public <E extends Entity & HasIdentifier> UserEntity updateUserByExternalId(
-      ExternalIdIdentifier ident, Function<E, E> updater) throws IOException {
+      NameIdentifier ident, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkUserExternalId(ident);
-    UserPO oldUserPO =
-        getUserPOByMetalakeNameAndExternalId(ident.namespace().level(0), ident.externalId());
+    String metalake = ident.namespace().level(0);
+    String externalId = ident.name();
+    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
+    UserPO oldUserPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
-    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, ident.namespace());
+    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, userNamespace);
     UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);
     Preconditions.checkArgument(
         Objects.equals(oldEntity.id(), newEntity.id()),
@@ -383,17 +386,5 @@ public class UserMetaService {
       throw re;
     }
     return newEntity;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteUserByExternalId")
-  public NameIdentifier deleteUserByExternalId(Namespace namespace, String externalId) {
-    AuthorizationUtils.checkUserExternalId(namespace, externalId);
-    String metalake = namespace.level(0);
-    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
-    NameIdentifier nameIdent = AuthorizationUtils.ofUser(metalake, userPO.getUserName());
-    deleteUser(nameIdent);
-    return nameIdent;
   }
 }

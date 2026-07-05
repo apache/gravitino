@@ -40,7 +40,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.ExternalIdIdentifier;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -1266,14 +1266,13 @@ class TestUserMetaService extends TestJDBCBackend {
   void testUserExtId() throws IOException {
     UserMetaService svc = userMetaService();
     svc.insertUser(userWithExtId("u1", "ext-1"), false);
-    UserEntity found = svc.getUserByExternalId(userNamespace(), "ext-1");
+    UserEntity found = svc.getUserByExternalId(userExtIdent("ext-1"));
     Assertions.assertEquals("u1", found.name());
     Assertions.assertEquals("ext-1", found.externalId());
     assertThrowsExt(
-        NoSuchEntityException.class,
-        () -> svc.getUserByExternalId(userNamespace(), "missing-ext-id"));
+        NoSuchEntityException.class, () -> svc.getUserByExternalId(userExtIdent("missing-ext-id")));
     assertThrowsExt(
-        IllegalArgumentException.class, () -> svc.getUserByExternalId(userNamespace(), null));
+        IllegalArgumentException.class, () -> svc.getUserByExternalId(userExtIdent("")));
     assertThrowsExt(
         NoSuchEntityException.class,
         () -> svc.updateUserByExternalId(userExtIdent("missing-ext-id"), enabledUpdater(false)));
@@ -1315,12 +1314,12 @@ class TestUserMetaService extends TestJDBCBackend {
   void testUserExtDel() throws IOException {
     UserMetaService svc = userMetaService();
     svc.insertUser(userWithExtId("u1", "ext-del-by"), false);
-    Assertions.assertEquals("u1", svc.deleteUserByExternalId(userNamespace(), "ext-del-by").name());
+    UserEntity user = svc.getUserByExternalId(userExtIdent("ext-del-by"));
+    Assertions.assertEquals("u1", user.name());
+    Assertions.assertTrue(svc.deleteUser(user.nameIdentifier()));
     assertThrowsExt(
-        NoSuchEntityException.class, () -> svc.getUserByExternalId(userNamespace(), "ext-del-by"));
-    assertThrowsExt(
-        NoSuchEntityException.class,
-        () -> svc.deleteUserByExternalId(userNamespace(), "ext-del-by"));
+        NoSuchEntityException.class, () -> svc.getUserByExternalId(userExtIdent("ext-del-by")));
+    assertThrowsExt(NoSuchEntityException.class, () -> svc.deleteUser(user.nameIdentifier()));
   }
 
   @TestTemplate
@@ -1356,8 +1355,8 @@ class TestUserMetaService extends TestJDBCBackend {
     return AuthorizationUtils.ofUserNamespace(metalakeName);
   }
 
-  private ExternalIdIdentifier userExtIdent(String externalId) {
-    return ExternalIdIdentifier.of(AuthorizationUtils.ofUserNamespace(metalakeName), externalId);
+  private NameIdentifier userExtIdent(String externalId) {
+    return AuthorizationUtils.ofUserExternalId(metalakeName, externalId);
   }
 
   private Function<UserEntity, UserEntity> enabledUpdater(boolean enabled) {

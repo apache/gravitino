@@ -36,7 +36,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -193,17 +192,14 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> E getByExternalId(
-      Namespace namespace, Entity.EntityType entityType, Class<E> type, String externalId)
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
       throws NoSuchEntityException, IOException {
-    return backend.getByExternalId(namespace, entityType, externalId);
+    return backend.getByExternalId(ident, entityType);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E updateByExternalId(
-      ExternalIdIdentifier ident,
-      Class<E> type,
-      Entity.EntityType entityType,
-      Function<E, E> updater)
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
       throws NoSuchEntityException, IOException {
     E updatedEntity = backend.updateByExternalId(ident, entityType, updater);
     cache.invalidate(updatedEntity.nameIdentifier(), entityType);
@@ -211,12 +207,20 @@ public class RelationalEntityStore
   }
 
   @Override
-  public boolean deleteByExternalId(
-      Namespace namespace, Entity.EntityType entityType, String externalId)
+  public boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType)
       throws NoSuchEntityException, IOException {
-    NameIdentifier nameIdent = backend.deleteByExternalId(namespace, entityType, externalId);
-    cache.invalidate(nameIdent, entityType);
-    return true;
+    NameIdentifier nameIdent = null;
+    try {
+      HasIdentifier entity = backend.getByExternalId(ident, entityType);
+      nameIdent = entity.nameIdentifier();
+      return backend.delete(nameIdent, entityType, false);
+    } catch (NoSuchEntityException e) {
+      return false;
+    } finally {
+      if (nameIdent != null) {
+        cache.invalidate(nameIdent, entityType);
+      }
+    }
   }
 
   @Override
