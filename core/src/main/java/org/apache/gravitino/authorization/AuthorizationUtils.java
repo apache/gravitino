@@ -31,6 +31,7 @@ import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -68,9 +69,6 @@ public class AuthorizationUtils {
       "User with external id %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
-
-  /** Prefix for external id lock paths to avoid colliding with user/group name paths. */
-  private static final String EXTERNAL_ID_NAME_PREFIX = "@externalId:";
 
   /**
    * Bidirectional map of deprecated privilege names to their new equivalents. This map is used for
@@ -154,24 +152,16 @@ public class AuthorizationUtils {
    * Creates a synthetic {@link NameIdentifier} used only as a {@link
    * org.apache.gravitino.lock.TreeLockUtils} lock path for user operations keyed by external id.
    *
-   * <p>This is <strong>not</strong> the entity's storage identifier. User entities are stored and
-   * retrieved by Gravitino user name via {@link #ofUser(String, String)}. At lock time the user
-   * name may be unknown, so external-id operations need a dedicated lock path.
-   *
-   * <p>The leaf segment uses {@link #EXTERNAL_ID_NAME_PREFIX} so it does not collide with {@link
-   * #ofUser(String, String)} when an external id equals an existing user name.
-   *
    * @param metalake the metalake name
    * @param externalId the external id of the user
    * @return a synthetic name identifier for tree locking only
    */
   public static NameIdentifier ofUserExternalId(String metalake, String externalId) {
-    checkExternalId(externalId);
     return NameIdentifier.of(
         metalake,
         Entity.SYSTEM_CATALOG_RESERVED_NAME,
-        Entity.USER_SCHEMA_NAME,
-        EXTERNAL_ID_NAME_PREFIX + externalId);
+        Entity.USER_EXTERNAL_ID_SCHEMA_NAME,
+        externalId);
   }
 
   public static Namespace ofRoleNamespace(String metalake) {
@@ -186,19 +176,36 @@ public class AuthorizationUtils {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME);
   }
 
+  public static Namespace ofUserExternalIdNamespace(String metalake) {
+    return Namespace.of(
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_EXTERNAL_ID_SCHEMA_NAME);
+  }
+
   public static void checkUser(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "User identifier must not be null");
     checkUserNamespace(ident.namespace());
   }
 
   /**
-   * Validates that the external id is not null or blank.
+   * Validates that the external id identifier refers to a user in a metalake.
    *
-   * @param externalId the external id to validate
+   * @param ident the external id identifier to validate
    */
-  public static void checkExternalId(String externalId) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(externalId), "External id must not be null or empty");
+  public static void checkUserExternalId(ExternalIdIdentifier ident) {
+    NameIdentifier.check(ident != null, "External id identifier must not be null");
+    checkUserExternalId(ident.namespace(), ident.externalId());
+  }
+
+  /**
+   * Validates the namespace and external id for user lookup by external id.
+   *
+   * @param namespace the user namespace
+   * @param externalId the external id of the user
+   */
+  public static void checkUserExternalId(Namespace namespace, String externalId) {
+    checkUserNamespace(namespace);
+    NameIdentifier.check(
+        externalId != null && !externalId.isEmpty(), "External id must not be null or empty");
   }
 
   public static void checkGroup(NameIdentifier ident) {

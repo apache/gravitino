@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import java.io.IOException;
+import java.util.function.Function;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 
 /**
@@ -28,7 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 public interface SupportsExternalIdOperations {
 
   /**
-   * Get the entity from the underlying storage by external id within the namespace.
+   * Get the entity from the underlying storage by external id.
    *
    * @param namespace the namespace of the entity
    * @param entityType the general type of the entity
@@ -44,23 +45,26 @@ public interface SupportsExternalIdOperations {
       throws NoSuchEntityException, IOException;
 
   /**
-   * Update the enabled state of an entity by external id within the namespace.
+   * Update an entity by external id.
    *
-   * @param namespace the namespace of the entity
+   * @param ident the external id identifier
+   * @param type the detailed type of the entity
    * @param entityType the general type of the entity
-   * @param externalId the external id of the entity
-   * @param enabled the expected enabled state
+   * @param updater the updater function to update the entity
    * @param <E> the class of entity
    * @return the updated entity
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the update operation fails
    */
   <E extends Entity & HasIdentifier> E updateByExternalId(
-      Namespace namespace, Entity.EntityType entityType, String externalId, boolean enabled)
+      ExternalIdIdentifier ident,
+      Class<E> type,
+      Entity.EntityType entityType,
+      Function<E, E> updater)
       throws NoSuchEntityException, IOException;
 
   /**
-   * Delete an entity by external id within the namespace.
+   * Delete an entity by external id.
    *
    * @param namespace the namespace of the entity
    * @param entityType the general type of the entity

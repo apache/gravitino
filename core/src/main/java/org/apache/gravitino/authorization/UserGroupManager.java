@@ -60,14 +60,6 @@ class UserGroupManager {
     this.idGenerator = idGenerator;
   }
 
-  EntityStore store() {
-    return store;
-  }
-
-  IdGenerator idGenerator() {
-    return idGenerator;
-  }
-
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
     try {
       UserEntity userEntity =

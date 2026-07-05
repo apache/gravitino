@@ -120,10 +120,8 @@ public class UserMetaSQLProviderFactory {
     return getProvider().selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId);
   }
 
-  public static String updateUserEnabled(
-      @Param("metalakeName") String metalakeName,
-      @Param("externalId") String externalId,
-      @Param("enabled") boolean enabled) {
-    return getProvider().updateUserEnabled(metalakeName, externalId, enabled);
+  public static String updateUserMetaByExternalId(
+      @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO) {
+    return getProvider().updateUserMetaByExternalId(newUserPO, oldUserPO);
   }
 }

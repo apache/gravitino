@@ -62,8 +62,9 @@ class TestAuthorizationUtils {
     Assertions.assertEquals("group", group.name());
     Assertions.assertEquals(AuthorizationUtils.ofRoleNamespace(metalake), role.namespace());
     Assertions.assertEquals("role", role.name());
-    Assertions.assertEquals(AuthorizationUtils.ofUserNamespace(metalake), userExt.namespace());
-    Assertions.assertEquals("@externalId:ext-1", userExt.name());
+    Assertions.assertEquals(
+        AuthorizationUtils.ofUserExternalIdNamespace(metalake), userExt.namespace());
+    Assertions.assertEquals("ext-1", userExt.name());
     Assertions.assertNotEquals(user, userExt);
     Assertions.assertNotEquals(AuthorizationUtils.ofUser(metalake, "ext-1"), userExt);
     assertInvalidExternalId(() -> AuthorizationUtils.ofUserExternalId(metalake, null));
@@ -71,7 +72,7 @@ class TestAuthorizationUtils {
   }
 
   private void assertInvalidExternalId(org.junit.jupiter.api.function.Executable executable) {
-    Assertions.assertThrows(IllegalArgumentException.class, executable);
+    Assertions.assertThrows(IllegalNameIdentifierException.class, executable);
   }
 
   @Test

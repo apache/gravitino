@@ -26,6 +26,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -114,13 +115,13 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws IOException;
 
   /**
-   * Retrieves the entity associated with the namespace, entity type and external id.
+   * Retrieves the entity associated with the namespace and external id.
    *
    * @param <E> The type of the entity returned.
    * @param namespace The namespace of the entity.
    * @param entityType The type of the entity.
    * @param externalId The external id of the entity.
-   * @return The entity associated with the namespace, entity type and external id.
+   * @return The entity associated with the namespace and external id.
    * @throws NoSuchEntityException If the entity does not exist.
    * @throws IOException If an I/O exception occurs during retrieval.
    */
@@ -129,27 +130,27 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws NoSuchEntityException, IOException;
 
   /**
-   * Updates the enabled state of an entity by external id.
+   * Updates an entity by external id.
    *
    * @param <E> the type of the entity returned
-   * @param namespace the namespace of the entity
+   * @param ident the external id identifier
    * @param entityType the type of the entity
-   * @param externalId the external id of the entity
-   * @param enabled the expected enabled state
+   * @param updater a {@link Function} that takes the current entity instance and returns the
+   *     updated instance
    * @return the updated entity
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the update operation fails
    */
   <E extends Entity & HasIdentifier> E updateByExternalId(
-      Namespace namespace, Entity.EntityType entityType, String externalId, boolean enabled)
+      ExternalIdIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws NoSuchEntityException, IOException;
 
   /**
    * Deletes an entity by external id.
    *
-   * @param namespace the namespace of the entity
-   * @param entityType the type of the entity
-   * @param externalId the external id of the entity
+   * @param namespace The namespace of the entity.
+   * @param entityType The type of the entity.
+   * @param externalId The external id of the entity.
    * @return the name identifier of the deleted entity
    * @throws NoSuchEntityException if the entity does not exist
    * @throws IOException if the delete operation fails

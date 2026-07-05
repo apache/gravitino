@@ -41,6 +41,9 @@ public interface Entity extends Serializable {
   /** The user schema name in the system catalog. */
   String USER_SCHEMA_NAME = "user";
 
+  /** The lock-only schema name for user operations keyed by external id. */
+  String USER_EXTERNAL_ID_SCHEMA_NAME = "user-external-id";
+
   /** The group schema name in the system catalog. */
   String GROUP_SCHEMA_NAME = "group";
 

@@ -35,6 +35,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -316,10 +317,9 @@ public class JDBCBackend implements RelationalBackend {
   public <E extends Entity & HasIdentifier> E getByExternalId(
       Namespace namespace, Entity.EntityType entityType, String externalId)
       throws NoSuchEntityException, IOException {
-    String metalakeName = namespace.level(0);
     switch (entityType) {
       case USER:
-        return (E) UserMetaService.getInstance().getUserByExternalId(metalakeName, externalId);
+        return (E) UserMetaService.getInstance().getUserByExternalId(namespace, externalId);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get by external id operation", entityType);
@@ -328,13 +328,11 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> E updateByExternalId(
-      Namespace namespace, Entity.EntityType entityType, String externalId, boolean enabled)
+      ExternalIdIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws NoSuchEntityException, IOException {
-    String metalakeName = namespace.level(0);
     switch (entityType) {
       case USER:
-        return (E)
-            UserMetaService.getInstance().updateUserEnabled(metalakeName, externalId, enabled);
+        return (E) UserMetaService.getInstance().updateUserByExternalId(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update by external id operation", entityType);
@@ -345,10 +343,9 @@ public class JDBCBackend implements RelationalBackend {
   public NameIdentifier deleteByExternalId(
       Namespace namespace, Entity.EntityType entityType, String externalId)
       throws NoSuchEntityException, IOException {
-    String metalakeName = namespace.level(0);
     switch (entityType) {
       case USER:
-        return UserMetaService.getInstance().deleteUserByExternalId(metalakeName, externalId);
+        return UserMetaService.getInstance().deleteUserByExternalId(namespace, externalId);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete by external id operation", entityType);

@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -339,42 +340,59 @@ public class UserMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getUserByExternalId")
-  public UserEntity getUserByExternalId(String metalakeName, String externalId) {
-    AuthorizationUtils.checkExternalId(externalId);
-    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
+  public UserEntity getUserByExternalId(Namespace namespace, String externalId) {
+    AuthorizationUtils.checkUserExternalId(namespace, externalId);
+    String metalake = namespace.level(0);
+    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
-    return POConverters.fromUserPO(
-        userPO, rolePOs, AuthorizationUtils.ofUserNamespace(metalakeName));
+    return POConverters.fromUserPO(userPO, rolePOs, namespace);
   }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "updateUserEnabled")
-  public UserEntity updateUserEnabled(String metalakeName, String externalId, boolean enabled) {
-    AuthorizationUtils.checkExternalId(externalId);
-    SessionUtils.doWithCommit(
-        UserMetaMapper.class,
-        mapper -> {
-          Integer updated = mapper.updateUserEnabled(metalakeName, externalId, enabled);
-          if (updated == null || updated == 0) {
-            throw new NoSuchEntityException(
-                NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-                Entity.EntityType.USER.name().toLowerCase(),
-                externalId);
-          }
-        });
+      baseMetricName = "updateUserByExternalId")
+  public <E extends Entity & HasIdentifier> UserEntity updateUserByExternalId(
+      ExternalIdIdentifier ident, Function<E, E> updater) throws IOException {
+    AuthorizationUtils.checkUserExternalId(ident);
+    UserPO oldUserPO = getUserPOByMetalakeNameAndExternalId(ident.metalake(), ident.externalId());
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
+    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, ident.namespace());
+    UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldEntity.id(), newEntity.id()),
+        "The updated user entity id: %s should be same with the user entity id before: %s",
+        newEntity.id(),
+        oldEntity.id());
 
-    return getUserByExternalId(metalakeName, externalId);
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper ->
+                      mapper.updateUserMetaByExternalId(
+                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+      throw re;
+    }
+    return newEntity;
   }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteUserByExternalId")
-  public NameIdentifier deleteUserByExternalId(String metalakeName, String externalId) {
-    AuthorizationUtils.checkExternalId(externalId);
-    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalakeName, externalId);
-    NameIdentifier ident = AuthorizationUtils.ofUser(metalakeName, userPO.getUserName());
-    deleteUser(ident);
-    return ident;
+  public NameIdentifier deleteUserByExternalId(Namespace namespace, String externalId) {
+    AuthorizationUtils.checkUserExternalId(namespace, externalId);
+    String metalake = namespace.level(0);
+    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
+    NameIdentifier nameIdent = AuthorizationUtils.ofUser(metalake, userPO.getUserName());
+    deleteUser(nameIdent);
+    return nameIdent;
   }
 }

@@ -36,6 +36,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.ExternalIdIdentifier;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -199,9 +200,12 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> E updateByExternalId(
-      Namespace namespace, Entity.EntityType entityType, String externalId, boolean enabled)
+      ExternalIdIdentifier ident,
+      Class<E> type,
+      Entity.EntityType entityType,
+      Function<E, E> updater)
       throws NoSuchEntityException, IOException {
-    E updatedEntity = backend.updateByExternalId(namespace, entityType, externalId, enabled);
+    E updatedEntity = backend.updateByExternalId(ident, entityType, updater);
     cache.invalidate(updatedEntity.nameIdentifier(), entityType);
     return updatedEntity;
   }
@@ -210,8 +214,8 @@ public class RelationalEntityStore
   public boolean deleteByExternalId(
       Namespace namespace, Entity.EntityType entityType, String externalId)
       throws NoSuchEntityException, IOException {
-    NameIdentifier ident = backend.deleteByExternalId(namespace, entityType, externalId);
-    cache.invalidate(ident, entityType);
+    NameIdentifier nameIdent = backend.deleteByExternalId(namespace, entityType, externalId);
+    cache.invalidate(nameIdent, entityType);
     return true;
   }
 
