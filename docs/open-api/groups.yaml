@@ -140,6 +140,109 @@ paths:
           $ref: "./openapi.yaml#/components/responses/RemoveResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/groups/add:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Add groups in bulk
+      operationId: bulkAddGroups
+      description: |
+        Validates the request body and authorization before processing any group.
+        If validation or authorization fails, including duplicated group names, no group is processed
+        and an error response is returned.
+        After validation succeeds, groups are processed independently. Successful group names are
+        returned in `succeeded`, and per-group business failures are returned in `failed`.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupNamesRequest"
+            examples:
+              GroupNamesRequest:
+                $ref: "#/components/examples/GroupNamesRequest"
+      responses:
+        "200":
+          description: Returns the bulk add result
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/BulkOperationResponse"
+              examples:
+                BulkOperationResponse:
+                  $ref: "#/components/examples/BulkOperationResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/groups/remove:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Remove groups in bulk
+      operationId: bulkRemoveGroups
+      description: |
+        Validates the request body and authorization before processing any group.
+        If validation or authorization fails, including duplicated group names, no group is processed
+        and an error response is returned.
+        After validation succeeds, groups are processed independently. Successful group names are
+        returned in `succeeded`, and per-group business failures are returned in `failed`.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupNamesRequest"
+            examples:
+              GroupNamesRequest:
+                $ref: "#/components/examples/GroupNamesRequest"
+      responses:
+        "200":
+          description: Returns the bulk remove result
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/BulkOperationResponse"
+              examples:
+                BulkOperationResponse:
+                  $ref: "#/components/examples/BulkOperationResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -180,6 +283,19 @@ components:
           type: string
           description: The name of the group
 
+    GroupNamesRequest:
+      type: object
+      required:
+        - groupNames
+      properties:
+        groupNames:
+          type: array
+          description: The names of groups to operate on
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+
   responses:
     GroupResponse:
       type: object
@@ -212,6 +328,21 @@ components:
     GroupAddRequest:
       value: {
         "name": "group1",
+      }
+
+    GroupNamesRequest:
+      value: {
+        "groupNames": [ "group1", "group2" ]
+      }
+
+    BulkOperationResponse:
+      value: {
+        "code": 0,
+        "succeeded": [ "group1" ],
+        "failed": [ {
+          "name": "group2",
+          "reason": "IllegalArgumentException: Group does not exist"
+        } ]
       }
 
     NameListResponse:

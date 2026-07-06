@@ -142,6 +142,109 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DeleteResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/roles/add:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Add roles in bulk
+      operationId: bulkAddRoles
+      description: |
+        Validates the request body and authorization before processing any role.
+        If validation or authorization fails, including duplicated role names, no role is processed
+        and an error response is returned.
+        After validation succeeds, roles are processed independently. Successful role names are
+        returned in `succeeded`, and per-role business failures are returned in `failed`.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkRoleCreateRequest"
+            examples:
+              BulkRoleCreateRequest:
+                $ref: "#/components/examples/BulkRoleCreateRequest"
+      responses:
+        "200":
+          description: Returns the bulk add result
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/BulkOperationResponse"
+              examples:
+                BulkOperationResponse:
+                  $ref: "#/components/examples/BulkOperationResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/roles/remove:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Remove roles in bulk
+      operationId: bulkRemoveRoles
+      description: |
+        Validates the request body and delete authorization for every role before processing any role.
+        If validation or authorization fails, including duplicated role names, no role is processed
+        and an error response is returned.
+        After validation succeeds, roles are processed independently. Successful role names are
+        returned in `succeeded`, and per-role business failures are returned in `failed`.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleNamesRequest"
+            examples:
+              RoleNamesRequest:
+                $ref: "#/components/examples/RoleNamesRequest"
+      responses:
+        "200":
+          description: Returns the bulk remove result
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/BulkOperationResponse"
+              examples:
+                BulkOperationResponse:
+                  $ref: "#/components/examples/BulkOperationResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -305,6 +408,31 @@ components:
           items:
             $ref: "#/components/schemas/SecurableObject"
 
+    BulkRoleCreateRequest:
+      type: object
+      required:
+        - roles
+      properties:
+        roles:
+          type: array
+          description: The roles to create. Role names must be unique.
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/RoleCreateRequest"
+
+    RoleNamesRequest:
+      type: object
+      required:
+        - roleNames
+      properties:
+        roleNames:
+          type: array
+          description: The names of roles to operate on
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+
   responses:
     RoleResponse:
       type: object
@@ -335,6 +463,41 @@ components:
             ]
           }
         ]
+      }
+
+    BulkRoleCreateRequest:
+      value: {
+        "roles": [ {
+          "name": "role1",
+          "properties": {"k1": "v1"},
+          "securableObjects": [
+            {
+              "fullName" : "catalog1.schema1.table1",
+              "type": "TABLE",
+              "privileges": [
+                {
+                  "name": "SELECT_TABLE",
+                  "condition": "ALLOW"
+                }
+              ]
+            }
+          ]
+        } ]
+      }
+
+    RoleNamesRequest:
+      value: {
+        "roleNames": [ "role1", "role2" ]
+      }
+
+    BulkOperationResponse:
+      value: {
+        "code": 0,
+        "succeeded": [ "role1" ],
+        "failed": [ {
+          "name": "role2",
+          "reason": "IllegalArgumentException: Role does not exist"
+        } ]
       }
 
     RoleResponse:

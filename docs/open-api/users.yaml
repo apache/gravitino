@@ -140,6 +140,109 @@ paths:
           $ref: "./openapi.yaml#/components/responses/RemoveResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/users/add:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Add users in bulk
+      operationId: bulkAddUsers
+      description: |
+        Validates the request body and authorization before processing any user.
+        If validation or authorization fails, including duplicated user names, no user is processed
+        and an error response is returned.
+        After validation succeeds, users are processed independently. Successful user names are
+        returned in `succeeded`, and per-user business failures are returned in `failed`.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserNamesRequest"
+            examples:
+              UserNamesRequest:
+                $ref: "#/components/examples/UserNamesRequest"
+      responses:
+        "200":
+          description: Returns the bulk add result
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/BulkOperationResponse"
+              examples:
+                BulkOperationResponse:
+                  $ref: "#/components/examples/BulkOperationResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/users/remove:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Remove users in bulk
+      operationId: bulkRemoveUsers
+      description: |
+        Validates the request body and authorization before processing any user.
+        If validation or authorization fails, including duplicated user names, no user is processed
+        and an error response is returned.
+        After validation succeeds, users are processed independently. Successful user names are
+        returned in `succeeded`, and per-user business failures are returned in `failed`.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserNamesRequest"
+            examples:
+              UserNamesRequest:
+                $ref: "#/components/examples/UserNamesRequest"
+      responses:
+        "200":
+          description: Returns the bulk remove result
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/BulkOperationResponse"
+              examples:
+                BulkOperationResponse:
+                  $ref: "#/components/examples/BulkOperationResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -180,6 +283,19 @@ components:
           type: string
           description: The name of the user
 
+    UserNamesRequest:
+      type: object
+      required:
+        - userNames
+      properties:
+        userNames:
+          type: array
+          description: The names of users to operate on
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+
   responses:
     UserResponse:
       type: object
@@ -212,6 +328,21 @@ components:
     UserAddRequest:
       value: {
         "name": "user1",
+      }
+
+    UserNamesRequest:
+      value: {
+        "userNames": [ "user1", "user2" ]
+      }
+
+    BulkOperationResponse:
+      value: {
+        "code": 0,
+        "succeeded": [ "user1" ],
+        "failed": [ {
+          "name": "user2",
+          "reason": "UserAlreadyExistsException: User already exists"
+        } ]
       }
 
     NameListResponse:
