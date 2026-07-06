@@ -100,6 +100,11 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
         LOGGER.warn("Failed to close KerberosClient", e);
       }
     }
+    try {
+      super.close();
+    } catch (Exception e) {
+      LOGGER.warn("Failed to close JdbcCatalog", e);
+    }
   }
 
   @Override
