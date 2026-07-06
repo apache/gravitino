@@ -1203,7 +1203,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         "CREATE TABLE t1 (id Int32) ENGINE = MergeTree ORDER BY id SETTINGS index_granularity = 4096";
     Map<String, String> settings1 = ops.parseSettings(sql1);
     Assertions.assertEquals(1, settings1.size());
-    Assertions.assertEquals("4096", settings1.get("settings.index_granularity"));
+    Assertions.assertEquals(
+        "4096", settings1.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
 
     // Multiple settings
     String sql2 =
@@ -1211,8 +1212,10 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             + " SETTINGS index_granularity = 4096, min_bytes_for_wide_part = 0";
     Map<String, String> settings2 = ops.parseSettings(sql2);
     Assertions.assertEquals(2, settings2.size());
-    Assertions.assertEquals("4096", settings2.get("settings.index_granularity"));
-    Assertions.assertEquals("0", settings2.get("settings.min_bytes_for_wide_part"));
+    Assertions.assertEquals(
+        "4096", settings2.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        "0", settings2.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
 
     // No SETTINGS clause
     String sql3 = "CREATE TABLE t3 (id Int32) ENGINE = MergeTree ORDER BY id";
@@ -1225,7 +1228,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             + " SETTINGS index_granularity = 8192 COMMENT 'test'";
     Map<String, String> settings4 = ops.parseSettings(sql4);
     Assertions.assertEquals(1, settings4.size());
-    Assertions.assertEquals("8192", settings4.get("settings.index_granularity"));
+    Assertions.assertEquals(
+        "8192", settings4.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
   }
 
   private static final class TestableClickHouseTableOperations extends ClickHouseTableOperations {
