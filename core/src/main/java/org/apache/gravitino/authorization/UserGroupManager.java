@@ -52,10 +52,10 @@ class UserGroupManager {
   private static final Logger LOG = LoggerFactory.getLogger(UserGroupManager.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
-  private final EntityStore store;
-  private final IdGenerator idGenerator;
+  protected final EntityStore store;
+  protected final IdGenerator idGenerator;
 
-  UserGroupManager(EntityStore store, IdGenerator idGenerator) {
+  protected UserGroupManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
   }

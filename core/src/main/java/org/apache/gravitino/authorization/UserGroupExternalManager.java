@@ -35,12 +35,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Manages user operations keyed by external id within a metalake. */
-class UserGroupExternalManager {
+class UserGroupExternalManager extends UserGroupManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserGroupExternalManager.class);
-
-  private final EntityStore store;
-  private final IdGenerator idGenerator;
 
   /**
    * Creates a {@link UserGroupExternalManager} instance.
@@ -49,8 +46,7 @@ class UserGroupExternalManager {
    * @param idGenerator the id generator
    */
   UserGroupExternalManager(EntityStore store, IdGenerator idGenerator) {
-    this.store = store;
-    this.idGenerator = idGenerator;
+    super(store, idGenerator);
   }
 
   User addUser(String metalake, String name, String externalId, boolean enabled)
