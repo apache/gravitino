@@ -340,6 +340,20 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreatePolicyWithNullRequestBodyDoesNotExposeNpe() {
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    ErrorResponse error = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotEquals(NullPointerException.class.getSimpleName(), error.getType());
+  }
+
+  @Test
   public void testCreatePolicyWithIcebergCompactionType() {
     PolicyContent content =
         PolicyContents.icebergDataCompaction(

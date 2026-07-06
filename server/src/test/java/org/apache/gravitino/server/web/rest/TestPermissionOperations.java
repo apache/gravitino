@@ -253,6 +253,20 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testGrantRolesToUserWithNullRequestBodyDoesNotExposeNpe() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/users/user/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    ErrorResponse error = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotEquals(NullPointerException.class.getSimpleName(), error.getType());
+  }
+
+  @Test
   public void testGrantRolesToGroup() throws IOException {
     GroupEntity groupEntity =
         GroupEntity.builder()

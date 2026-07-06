@@ -234,6 +234,21 @@ public class TestMetalakeOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateMetalakeWithNullRequestBodyDoesNotExposeNpe() {
+    // createMetalake guards against a null request body explicitly, returning a clean
+    // 400 IllegalArgumentException rather than masking the failure with a NullPointerException.
+    Response resp =
+        target("/metalakes")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse error = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotEquals(NullPointerException.class.getSimpleName(), error.getType());
+  }
+
+  @Test
   public void testCreateMetalakeWithNullRequest() {
     // Test with null request body - should not throw NPE
     Response resp =

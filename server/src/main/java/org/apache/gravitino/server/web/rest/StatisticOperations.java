@@ -214,6 +214,7 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsDropRequest request) {
+    String names = request != null ? StringUtils.join(request.getNames(), ",") : "unknown";
     try {
       LOG.info(
           "Received drop statistics request for object full name: {} type: {} in the metalake {}",
@@ -241,8 +242,7 @@ public class StatisticOperations {
             return Utils.ok(new DropResponse(dropped));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleStatisticException(
-          OperationType.DROP, StringUtils.join(request.getNames(), ","), fullName, e);
+      return ExceptionHandlers.handleStatisticException(OperationType.DROP, names, fullName, e);
     }
   }
 

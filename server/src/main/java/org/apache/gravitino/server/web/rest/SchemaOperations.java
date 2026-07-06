@@ -141,7 +141,8 @@ public class SchemaOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.CREATE_SCHEMA)
           SchemaCreateRequest request) {
-    LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
+    String schemaName = request != null ? request.getName() : "unknown";
+    LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, schemaName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -157,8 +158,7 @@ public class SchemaOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleSchemaException(
-          OperationType.CREATE, request.getName(), catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.CREATE, schemaName, catalog, e);
     }
   }
 

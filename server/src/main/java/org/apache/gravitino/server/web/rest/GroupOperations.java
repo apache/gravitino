@@ -103,6 +103,7 @@ public class GroupOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       GroupAddRequest request) {
+    String groupName = request != null ? request.getName() : "unknown";
     try {
       return Utils.doAs(
           httpRequest,
@@ -115,8 +116,7 @@ public class GroupOperations {
                         accessControlManager.addGroup(metalake, request.getName()))));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(
-          OperationType.ADD, request.getName(), metalake, e);
+      return ExceptionHandlers.handleGroupException(OperationType.ADD, groupName, metalake, e);
     }
   }
 

@@ -153,6 +153,7 @@ public class UserOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       UserAddRequest request) {
+    String userName = request != null ? request.getName() : "unknown";
     try {
       return Utils.doAs(
           httpRequest,
@@ -165,8 +166,7 @@ public class UserOperations {
                         accessControlManager.addUser(metalake, request.getName()))));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(
-          OperationType.ADD, request.getName(), metalake, e);
+      return ExceptionHandlers.handleUserException(OperationType.ADD, userName, metalake, e);
     }
   }
 

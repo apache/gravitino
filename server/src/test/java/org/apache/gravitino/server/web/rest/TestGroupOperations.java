@@ -211,6 +211,19 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAddGroupWithNullRequestBodyDoesNotExposeNpe() {
+    Response resp =
+        target("/metalakes/metalake1/groups")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+    ErrorResponse error = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotEquals(NullPointerException.class.getSimpleName(), error.getType());
+  }
+
+  @Test
   public void testGetGroup() throws IOException {
     Group group = buildGroup("group1");
 
