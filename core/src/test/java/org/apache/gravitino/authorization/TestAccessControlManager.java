@@ -472,7 +472,7 @@ public class TestAccessControlManager {
     accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("ext_role"), user);
     User disabled = accessControlManager.disableUser(METALAKE, extId);
     Assertions.assertFalse(disabled.enabled());
-    assertSortedRoles(accessControlManager.getUser(METALAKE, user), "ext_role");
+    assertSortedRoles(disabled, "ext_role");
 
     createCatalogRole("ext_role2");
     accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("ext_role2"), user);
@@ -481,7 +481,7 @@ public class TestAccessControlManager {
 
     User enabled = accessControlManager.enableUser(METALAKE, extId);
     Assertions.assertTrue(enabled.enabled());
-    assertSortedRoles(accessControlManager.getUser(METALAKE, user), "ext_role", "ext_role2");
+    assertSortedRoles(enabled, "ext_role", "ext_role2");
 
     accessControlManager.revokeRolesFromUser(
         METALAKE, Lists.newArrayList("ext_role", "ext_role2"), user);
