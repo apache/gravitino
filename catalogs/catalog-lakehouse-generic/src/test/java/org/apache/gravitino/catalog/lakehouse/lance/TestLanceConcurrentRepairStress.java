@@ -58,6 +58,7 @@ import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.lance.Dataset;
 import org.mockito.Mockito;
@@ -83,11 +84,14 @@ public class TestLanceConcurrentRepairStress {
   private static final NameIdentifier IDENT = NameIdentifier.of("schema", "table");
 
   @Test
+  @Timeout(60)
   public void testConcurrentRepairLoadsSurviveCasContention() throws Exception {
     // The reported race is "two loads repair the same table at once". Also drive a small herd to
-    // confirm the bounded CAS retry stays robust beyond the minimal two-load case.
-    runStress(2, 3000);
-    runStress(8, 2000);
+    // confirm the bounded CAS retry stays robust beyond the minimal two-load case. Iterations are
+    // kept modest (and the retry backoff is neutralized in runStress) so this stays a fast,
+    // non-flaky unit test rather than a soak test — the pre-fix bug already fails on iteration 0.
+    runStress(2, 500);
+    runStress(8, 300);
   }
 
   private void runStress(int concurrency, int iterations) throws Exception {
@@ -123,6 +127,9 @@ public class TestLanceConcurrentRepairStress {
                     "http://endpoint"));
         CasEntityStore store = new CasEntityStore(stale);
         LanceTableOperations ops = spy(new LanceTableOperations(store, schemaOps, idGenerator));
+        // Neutralize the inter-retry backoff: this test validates the CAS re-read/retry recovery,
+        // not the sleep duration, and real sleeps would make it slow and timing-flaky.
+        Mockito.doNothing().when(ops).backoffBeforeRetry(Mockito.any());
         Dataset dataset = mock(Dataset.class);
         when(dataset.version()).thenReturn(8L);
         when(dataset.getSchema()).thenReturn(datasetSchema);
