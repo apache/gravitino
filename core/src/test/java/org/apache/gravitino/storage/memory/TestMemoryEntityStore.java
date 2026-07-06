@@ -201,9 +201,13 @@ public class TestMemoryEntityStore {
 
     @Override
     public boolean deleteByExternalId(NameIdentifier ident, EntityType entityType)
-        throws NoSuchEntityException, IOException {
-      UserEntity user = getByExternalId(ident, entityType, UserEntity.class);
-      return delete(user.nameIdentifier(), entityType);
+        throws IOException {
+      try {
+        UserEntity user = getByExternalId(ident, entityType, UserEntity.class);
+        return delete(user.nameIdentifier(), entityType);
+      } catch (NoSuchEntityException e) {
+        return false;
+      }
     }
 
     @Override

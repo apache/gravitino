@@ -82,7 +82,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
 
   @Override
   public boolean removeUserByExternalId(String metalake, String externalId)
-      throws NoSuchUserException, NoSuchMetalakeException {
+      throws NoSuchMetalakeException {
     return dispatcher.removeUserByExternalId(metalake, externalId);
   }
 

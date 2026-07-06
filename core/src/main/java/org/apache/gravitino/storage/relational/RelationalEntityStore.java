@@ -208,13 +208,15 @@ public class RelationalEntityStore
 
   @Override
   public boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType)
-      throws NoSuchEntityException, IOException {
+      throws IOException {
     NameIdentifier nameIdent = null;
     try {
       HasIdentifier entity = backend.getByExternalId(ident, entityType);
       nameIdent = entity.nameIdentifier();
       return backend.delete(nameIdent, entityType, false);
     } catch (NoSuchEntityException e) {
+      LOGGER.warn(
+          "The entity to be deleted by external id does not exist in the store: {}", ident, e);
       return false;
     } finally {
       if (nameIdent != null) {

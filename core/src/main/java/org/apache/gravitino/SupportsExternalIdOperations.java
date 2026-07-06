@@ -64,10 +64,8 @@ public interface SupportsExternalIdOperations {
    *
    * @param ident the external id name identifier
    * @param entityType the general type of the entity
-   * @return true if the entity was deleted
-   * @throws NoSuchEntityException if the entity does not exist
+   * @return true if the entity exists and is deleted successfully, false otherwise
    * @throws IOException if the delete operation fails
    */
-  boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType)
-      throws NoSuchEntityException, IOException;
+  boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType) throws IOException;
 }
