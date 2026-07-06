@@ -31,6 +31,7 @@ then
 fi
 
 cd ${playground_dir}
+source ./compose-env.sh
 
 # create log dir
 LOG_DIR=../build/trino-ci-container-log
@@ -39,10 +40,14 @@ mkdir -p $LOG_DIR
 LOG_PATH=$LOG_DIR/trino-ci-docker-compose.log
 echo "The docker compose log is: $LOG_PATH"
 
-docker compose up -d
+docker compose -f "$COMPOSE_FILE" up -d
+
+# Count actual created services (excludes services scaled to 0 replicas,
+# e.g. trino-worker when TRINO_WORKER_NUM is unset).
+EXPECTED_SERVICE_COUNT=$(docker compose -f "$COMPOSE_FILE" ps --services | wc -l)
 
 # Stream logs directly to the log file (no console output).
-nohup docker compose logs -f -t | tee -a "$LOG_PATH" &
+nohup docker compose -f "$COMPOSE_FILE" logs -f -t | tee -a "$LOG_PATH" &
 LOG_FOLLOW_PID=$!
 cleanup_log_follow() {
   if [ -n "$LOG_FOLLOW_PID" ] && kill -0 "$LOG_FOLLOW_PID" 2>/dev/null; then
@@ -55,12 +60,12 @@ max_attempts=300
 attempts=0
 
 while true; do
-    docker compose exec -T trino trino --execute "SELECT 1" >/dev/null 2>&1 && {
+    docker compose -f "$COMPOSE_FILE" exec -T trino trino --execute "SELECT 1" >/dev/null 2>&1 && {
         break;
     }
 
-    num_container=$(docker ps --format '{{.Names}}' | grep trino-ci | wc -l)
-    if [ "$num_container" -lt 4 ]; then
+    num_container=$(docker compose -f "$COMPOSE_FILE" ps -q | wc -l)
+    if [ "$num_container" -lt "$EXPECTED_SERVICE_COUNT" ]; then
         echo "ERROR: Trino-ci containers start failed."
         exit 0
     fi
@@ -74,28 +79,30 @@ while true; do
     sleep 1
 done
 
-# Wait for HDFS to be fully ready
-echo "Waiting for HDFS to be fully ready..."
-hdfs_attempts=0
-hdfs_max_attempts=60
+if docker compose -f "$COMPOSE_FILE" ps --services | grep -q "^hive$"; then
+  # Wait for HDFS to be fully ready
+  echo "Waiting for HDFS to be fully ready..."
+  hdfs_attempts=0
+  hdfs_max_attempts=60
 
-while true; do
-    # Check if HDFS DataNode is ready by testing file creation
-    docker compose exec -T hive hdfs dfs -test -d / >/dev/null 2>&1 && \
-    docker compose exec -T hive hdfs dfsadmin -report 2>/dev/null | grep -q "Live datanodes" && {
-        echo "HDFS is ready."
-        # Give HDFS a bit more time to stabilize
-        sleep 5
-        break;
-    }
+  while true; do
+      # Check if HDFS DataNode is ready by testing file creation
+      docker compose -f "$COMPOSE_FILE" exec -T hive hdfs dfs -test -d / >/dev/null 2>&1 && \
+      docker compose -f "$COMPOSE_FILE" exec -T hive hdfs dfsadmin -report 2>/dev/null | grep -q "Live datanodes" && {
+          echo "HDFS is ready."
+          # Give HDFS a bit more time to stabilize
+          sleep 5
+          break;
+      }
 
-    if [ "$hdfs_attempts" -ge "$hdfs_max_attempts" ]; then
-        echo "WARNING: HDFS did not become fully ready within $hdfs_max_attempts seconds, but continuing..."
-        break
-    fi
+      if [ "$hdfs_attempts" -ge "$hdfs_max_attempts" ]; then
+          echo "WARNING: HDFS did not become fully ready within $hdfs_max_attempts seconds, but continuing..."
+          break
+      fi
 
-    ((hdfs_attempts++))
-    sleep 1
-done
+      ((hdfs_attempts++))
+      sleep 1
+  done
+fi
 
 echo "All docker compose service is now available."
