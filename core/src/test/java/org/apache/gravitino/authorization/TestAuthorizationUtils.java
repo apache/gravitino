@@ -66,8 +66,9 @@ class TestAuthorizationUtils {
     Assertions.assertEquals(
         AuthorizationUtils.ofUserExternalIdNamespace(metalake), userExt.namespace());
     Assertions.assertEquals("ext-1", userExt.name());
-    Assertions.assertEquals(AuthorizationUtils.ofGroupNamespace(metalake), groupExt.namespace());
-    Assertions.assertEquals("@externalId:ext-1", groupExt.name());
+    Assertions.assertEquals(
+        AuthorizationUtils.ofGroupExternalIdNamespace(metalake), groupExt.namespace());
+    Assertions.assertEquals("ext-1", groupExt.name());
     Assertions.assertNotEquals(user, userExt);
     Assertions.assertNotEquals(group, groupExt);
     Assertions.assertNotEquals(AuthorizationUtils.ofUser(metalake, "ext-1"), userExt);
@@ -139,11 +140,13 @@ class TestAuthorizationUtils {
     NameIdentifier user = AuthorizationUtils.ofUser(metalake, "user");
     NameIdentifier userExternalId = AuthorizationUtils.ofUserExternalId(metalake, "ext-1");
     NameIdentifier group = AuthorizationUtils.ofGroup(metalake, "group");
+    NameIdentifier groupExternalId = AuthorizationUtils.ofGroupExternalId(metalake, "ext-1");
     NameIdentifier role = AuthorizationUtils.ofRole(metalake, "role");
 
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkUser(user));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkUserExternalId(userExternalId));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkGroup(group));
+    Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkGroupExternalId(groupExternalId));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkRole(role));
 
     Assertions.assertThrows(
@@ -152,6 +155,8 @@ class TestAuthorizationUtils {
         IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkUserExternalId(null));
     Assertions.assertThrows(
         IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkGroup(null));
+    Assertions.assertThrows(
+        IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkGroupExternalId(null));
     Assertions.assertThrows(
         IllegalNameIdentifierException.class, () -> AuthorizationUtils.checkRole(null));
     Assertions.assertThrows(
@@ -165,6 +170,9 @@ class TestAuthorizationUtils {
         () -> AuthorizationUtils.checkGroup(NameIdentifier.of("")));
     Assertions.assertThrows(
         IllegalNameIdentifierException.class,
+        () -> AuthorizationUtils.checkGroupExternalId(NameIdentifier.of("")));
+    Assertions.assertThrows(
+        IllegalNameIdentifierException.class,
         () -> AuthorizationUtils.checkRole(NameIdentifier.of("")));
   }
 
@@ -173,12 +181,15 @@ class TestAuthorizationUtils {
     Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
     Namespace userExternalIdNamespace = AuthorizationUtils.ofUserExternalIdNamespace(metalake);
     Namespace groupNamespace = AuthorizationUtils.ofGroupNamespace(metalake);
+    Namespace groupExternalIdNamespace = AuthorizationUtils.ofGroupExternalIdNamespace(metalake);
     Namespace roleNamespace = AuthorizationUtils.ofRoleNamespace(metalake);
 
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkUserNamespace(userNamespace));
     Assertions.assertDoesNotThrow(
         () -> AuthorizationUtils.checkUserExternalIdNamespace(userExternalIdNamespace));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkGroupNamespace(groupNamespace));
+    Assertions.assertDoesNotThrow(
+        () -> AuthorizationUtils.checkGroupExternalIdNamespace(groupExternalIdNamespace));
     Assertions.assertDoesNotThrow(() -> AuthorizationUtils.checkRoleNamespace(roleNamespace));
 
     Assertions.assertThrows(
@@ -188,6 +199,9 @@ class TestAuthorizationUtils {
         () -> AuthorizationUtils.checkUserExternalIdNamespace(null));
     Assertions.assertThrows(
         IllegalNamespaceException.class, () -> AuthorizationUtils.checkGroupNamespace(null));
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () -> AuthorizationUtils.checkGroupExternalIdNamespace(null));
     Assertions.assertThrows(
         IllegalNamespaceException.class, () -> AuthorizationUtils.checkRoleNamespace(null));
     Assertions.assertThrows(
@@ -199,6 +213,9 @@ class TestAuthorizationUtils {
     Assertions.assertThrows(
         IllegalNamespaceException.class,
         () -> AuthorizationUtils.checkGroupNamespace(Namespace.of("a")));
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () -> AuthorizationUtils.checkGroupExternalIdNamespace(Namespace.of("a", "b")));
     Assertions.assertThrows(
         IllegalNamespaceException.class,
         () -> AuthorizationUtils.checkRoleNamespace(Namespace.of("a", "b", "c", "d")));

@@ -170,7 +170,7 @@ public class TestMemoryEntityStore {
         entityNamespace = AuthorizationUtils.ofUserNamespace(ident.namespace().level(0));
       } else {
         AuthorizationUtils.checkGroupExternalId(ident);
-        externalId = AuthorizationUtils.groupExternalIdFromIdent(ident);
+        externalId = ident.name();
         entityNamespace = AuthorizationUtils.ofGroupNamespace(ident.namespace().level(0));
       }
 

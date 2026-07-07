@@ -387,7 +387,7 @@ public class GroupMetaService {
   public GroupEntity getGroupByExternalId(NameIdentifier ident) {
     AuthorizationUtils.checkGroupExternalId(ident);
     String metalake = ident.namespace().level(0);
-    String externalId = AuthorizationUtils.groupExternalIdFromIdent(ident);
+    String externalId = ident.name();
     GroupPO groupPO = getGroupPOByMetalakeNameAndExternalId(metalake, externalId);
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
     return POConverters.fromGroupPO(

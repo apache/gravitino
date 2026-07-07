@@ -494,6 +494,8 @@ public class TestAccessControlManager {
   public void testMissingExt() {
     assertInvalidExt(() -> accessControlManager.getUserByExternalId(METALAKE, null));
     assertInvalidExt(() -> accessControlManager.getUserByExternalId(METALAKE, ""));
+    assertInvalidExt(() -> accessControlManager.getGroupByExternalId(METALAKE, null));
+    assertInvalidExt(() -> accessControlManager.getGroupByExternalId(METALAKE, ""));
     assertMissingExt(
         NoSuchUserException.class,
         () -> accessControlManager.getUserByExternalId(METALAKE, "missing-ext-id"));

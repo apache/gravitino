@@ -183,7 +183,8 @@ public interface AccessControlDispatcher {
    * @param group The name of the Group.
    * @param externalId The external identifier, or null if unset.
    * @return The Added Group instance.
-   * @throws GroupAlreadyExistsException If a Group with the same name already exists.
+   * @throws GroupAlreadyExistsException If a Group with the same name or external id already
+   *     exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If adding the Group encounters storage issues.
    */

@@ -35,9 +35,14 @@ public interface Group extends Auditable {
   String name();
 
   /**
-   * The external identifier assigned by an upstream system, or null if not set.
+   * The stable identifier assigned by an upstream identity system (for example, SCIM, LDAP, or
+   * IAM), or null if not set.
    *
-   * @return The external identifier, or null if not set.
+   * <p>Gravitino {@link Group#name() group names} may differ from upstream ids or be unknown at
+   * sync time. External id lets integrators look up and delete groups without relying on the
+   * Gravitino group name.
+   *
+   * @return The upstream external identifier, or null if not set.
    */
   @Nullable
   default String externalId() {
