@@ -19,6 +19,7 @@
 package org.apache.gravitino.integration.test.container;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
@@ -159,7 +160,7 @@ public class TrinoITContainers implements AutoCloseable {
   }
 
   public Map<String, String> getServiceUrls() {
-    return servicesUri;
+    return Collections.unmodifiableMap(new HashMap<>(servicesUri));
   }
 
   @Override
