@@ -64,6 +64,8 @@ public class AuthorizationUtils {
   private static final String FILESET_SCHEMA_LOCATION = "location";
   private static final String HIVE_LOCATION = "location";
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
+  static final String USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
+      "User with external id %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
@@ -145,6 +147,22 @@ public class AuthorizationUtils {
         metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, user);
   }
 
+  /**
+   * Creates a synthetic {@link NameIdentifier} used only as a {@link
+   * org.apache.gravitino.lock.TreeLockUtils} lock path for user operations keyed by external id.
+   *
+   * @param metalake the metalake name
+   * @param externalId the external id of the user
+   * @return a synthetic name identifier for tree locking only
+   */
+  public static NameIdentifier ofUserExternalId(String metalake, String externalId) {
+    return NameIdentifier.of(
+        metalake,
+        Entity.SYSTEM_CATALOG_RESERVED_NAME,
+        Entity.USER_EXTERNAL_ID_SCHEMA_NAME,
+        externalId);
+  }
+
   public static Namespace ofRoleNamespace(String metalake) {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
   }
@@ -157,9 +175,24 @@ public class AuthorizationUtils {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME);
   }
 
+  public static Namespace ofUserExternalIdNamespace(String metalake) {
+    return Namespace.of(
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_EXTERNAL_ID_SCHEMA_NAME);
+  }
+
   public static void checkUser(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "User identifier must not be null");
     checkUserNamespace(ident.namespace());
+  }
+
+  /**
+   * Validates that the name identifier refers to a user external id in a metalake.
+   *
+   * @param ident the external id name identifier to validate
+   */
+  public static void checkUserExternalId(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "External id identifier must not be null");
+    checkUserExternalIdNamespace(ident.namespace());
   }
 
   public static void checkGroup(NameIdentifier ident) {
@@ -176,6 +209,13 @@ public class AuthorizationUtils {
     Namespace.check(
         namespace != null && namespace.length() == 3,
         "User namespace must have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkUserExternalIdNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "User external id namespace must have 3 levels, the input namespace is %s",
         namespace);
   }
 

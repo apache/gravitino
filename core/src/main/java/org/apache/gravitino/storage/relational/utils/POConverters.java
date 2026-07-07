@@ -956,6 +956,8 @@ public class POConverters {
       return builder
           .withUserId(userEntity.id())
           .withUserName(userEntity.name())
+          .withExternalId(userEntity.externalId())
+          .withEnabled(userEntity.enabled())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -983,6 +985,8 @@ public class POConverters {
           .withUserId(oldUserPO.getUserId())
           .withUserName(newUser.name())
           .withMetalakeId(oldUserPO.getMetalakeId())
+          .withExternalId(newUser.externalId())
+          .withEnabled(newUser.enabled())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUser.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -1012,6 +1016,8 @@ public class POConverters {
               .withId(userPO.getUserId())
               .withName(userPO.getUserName())
               .withNamespace(namespace)
+              .withExternalId(userPO.getExternalId())
+              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1040,6 +1046,8 @@ public class POConverters {
               .withId(userPO.getUserId())
               .withName(userPO.getUserName())
               .withNamespace(namespace)
+              .withExternalId(userPO.getExternalId())
+              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (StringUtils.isNotBlank(userPO.getRoleNames())) {

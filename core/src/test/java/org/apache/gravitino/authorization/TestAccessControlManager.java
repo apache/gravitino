@@ -49,7 +49,9 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -80,6 +82,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.mockito.Mockito;
 
 public class TestAccessControlManager {
@@ -452,6 +455,114 @@ public class TestAccessControlManager {
 
     accessControlManager.deleteRole("metalake_list", "testList1");
     accessControlManager.deleteRole("metalake_list", "testList2");
+  }
+
+  @Test
+  public void testUserExtId() {
+    accessControlManager.addUser(METALAKE, "disabled_user", "ext-disabled-user", false);
+    accessControlManager.removeUser(METALAKE, "disabled_user");
+
+    String user = "ext_user";
+    String extId = "ext-user-1";
+    User added = accessControlManager.addUser(METALAKE, user, extId, true);
+    Assertions.assertEquals(extId, added.externalId());
+    Assertions.assertTrue(added.enabled());
+
+    createCatalogRole("ext_role");
+    accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("ext_role"), user);
+    User disabled = accessControlManager.disableUser(METALAKE, extId);
+    Assertions.assertFalse(disabled.enabled());
+    assertSortedRoles(disabled, "ext_role");
+
+    createCatalogRole("ext_role2");
+    accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("ext_role2"), user);
+    assertSortedRoles(accessControlManager.getUser(METALAKE, user), "ext_role", "ext_role2");
+    Assertions.assertFalse(accessControlManager.getUserByExternalId(METALAKE, extId).enabled());
+
+    User enabled = accessControlManager.enableUser(METALAKE, extId);
+    Assertions.assertTrue(enabled.enabled());
+    assertSortedRoles(enabled, "ext_role", "ext_role2");
+
+    accessControlManager.revokeRolesFromUser(
+        METALAKE, Lists.newArrayList("ext_role", "ext_role2"), user);
+    accessControlManager.deleteRole(METALAKE, "ext_role2");
+    accessControlManager.deleteRole(METALAKE, "ext_role");
+    accessControlManager.removeUser(METALAKE, user);
+  }
+
+  @Test
+  public void testMissingExt() {
+    assertInvalidExt(() -> accessControlManager.getUserByExternalId(METALAKE, null));
+    assertInvalidExt(() -> accessControlManager.getUserByExternalId(METALAKE, ""));
+    assertMissingExt(
+        NoSuchUserException.class,
+        () -> accessControlManager.getUserByExternalId(METALAKE, "missing-ext-id"));
+    assertMissingExt(
+        NoSuchUserException.class,
+        () -> accessControlManager.disableUser(METALAKE, "missing-ext-id"));
+    assertMissingExt(
+        NoSuchUserException.class,
+        () -> accessControlManager.enableUser(METALAKE, "missing-ext-id"));
+  }
+
+  @Test
+  public void testExtDup() {
+    accessControlManager.addUser(METALAKE, "u1", "dup-ext", true);
+    assertThrowsExt(
+        UserAlreadyExistsException.class,
+        () -> accessControlManager.addUser(METALAKE, "u2", "dup-ext", true));
+    accessControlManager.removeUser(METALAKE, "u1");
+  }
+
+  @Test
+  public void testUserExtDel() {
+    String extId = "ext-remove-user";
+    accessControlManager.addUser(METALAKE, "remove_user", extId, true);
+    Assertions.assertTrue(accessControlManager.removeUserByExternalId(METALAKE, extId));
+    assertMissingExt(
+        NoSuchUserException.class, () -> accessControlManager.getUserByExternalId(METALAKE, extId));
+    Assertions.assertThrows(
+        NoSuchUserException.class, () -> accessControlManager.getUser(METALAKE, "remove_user"));
+    Assertions.assertFalse(accessControlManager.removeUserByExternalId(METALAKE, "missing-ext-id"));
+  }
+
+  @Test
+  public void testExtCache() {
+    String extId = "ext-cache-user";
+    accessControlManager.addUser(METALAKE, "cache_user", extId, true);
+    accessControlManager.getUser(METALAKE, "cache_user");
+    accessControlManager.disableUser(METALAKE, extId);
+    Assertions.assertFalse(accessControlManager.getUser(METALAKE, "cache_user").enabled());
+    accessControlManager.removeUser(METALAKE, "cache_user");
+  }
+
+  private void createCatalogRole(String role) {
+    accessControlManager.createRole(
+        METALAKE,
+        role,
+        ImmutableMap.of("k1", "v1"),
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
+  }
+
+  private void assertSortedRoles(User user, String... expectedRoles) {
+    List<String> roles = Lists.newArrayList(user.roles());
+    Collections.sort(roles);
+    Assertions.assertEquals(Lists.newArrayList(expectedRoles), roles);
+  }
+
+  private void assertThrowsExt(Class<? extends Exception> type, Executable executable) {
+    Assertions.assertThrows(type, executable);
+  }
+
+  private void assertInvalidExt(Executable executable) {
+    Assertions.assertThrows(IllegalArgumentException.class, executable);
+  }
+
+  private void assertMissingExt(Class<? extends Exception> type, Executable executable) {
+    Exception ex = Assertions.assertThrows(type, executable);
+    Assertions.assertTrue(ex.getMessage().contains("external id"));
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
