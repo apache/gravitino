@@ -22,15 +22,13 @@ package org.apache.gravitino.iceberg.service.rest;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
-import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 
 public class MockIcebergNamespaceOperations extends IcebergNamespaceOperations {
 
   @Inject
   public MockIcebergNamespaceOperations(
-      IcebergNamespaceOperationDispatcher namespaceOperationDispatcher,
-      IcebergViewOperationDispatcher viewOperationDispatcher) {
-    super(namespaceOperationDispatcher, viewOperationDispatcher);
+      IcebergNamespaceOperationDispatcher namespaceOperationDispatcher) {
+    super(namespaceOperationDispatcher);
   }
 
   // HTTP request is null in Jersey test, create a mock request

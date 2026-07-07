@@ -23,7 +23,6 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
-import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
@@ -45,17 +44,6 @@ public interface IcebergViewOperationDispatcher {
    */
   LoadViewResponse createView(
       IcebergRequestContext context, Namespace namespace, CreateViewRequest createViewRequest);
-
-  /**
-   * Registers an Iceberg view using an existing metadata file.
-   *
-   * @param context Iceberg REST request context information.
-   * @param namespace The namespace within which the view should be registered.
-   * @param registerViewRequest The request object containing the details for registering the view.
-   * @return A {@link LoadViewResponse} object containing the result of the operation.
-   */
-  LoadViewResponse registerView(
-      IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest);
 
   /**
    * Updates an Iceberg view.

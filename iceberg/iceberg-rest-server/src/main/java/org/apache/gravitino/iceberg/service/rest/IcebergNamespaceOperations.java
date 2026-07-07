@@ -52,7 +52,6 @@ import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
-import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -86,16 +85,13 @@ public class IcebergNamespaceOperations {
 
   private ObjectMapper icebergObjectMapper;
   private IcebergNamespaceOperationDispatcher namespaceOperationDispatcher;
-  private IcebergViewOperationDispatcher viewOperationDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergNamespaceOperations(
-      IcebergNamespaceOperationDispatcher namespaceOperationDispatcher,
-      IcebergViewOperationDispatcher viewOperationDispatcher) {
+      IcebergNamespaceOperationDispatcher namespaceOperationDispatcher) {
     this.namespaceOperationDispatcher = namespaceOperationDispatcher;
-    this.viewOperationDispatcher = viewOperationDispatcher;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
   }
 
@@ -383,7 +379,7 @@ public class IcebergNamespaceOperations {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
             LoadViewResponse loadViewResponse =
-                viewOperationDispatcher.registerView(context, icebergNS, registerViewRequest);
+                namespaceOperationDispatcher.registerView(context, icebergNS, registerViewRequest);
             return IcebergRESTUtils.ok(loadViewResponse);
           });
     } catch (Exception e) {

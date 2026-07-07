@@ -29,7 +29,6 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
-import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
@@ -67,19 +66,6 @@ public class TestIcebergViewOperationExecutor {
 
     Assertions.assertEquals(mockResponse, result);
     verify(mockCatalogWrapper).createView(namespace, mockRequest);
-  }
-
-  @Test
-  public void testRegisterView() {
-    Namespace namespace = Namespace.of("test_ns");
-    RegisterViewRequest mockRequest = mock(RegisterViewRequest.class);
-    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
-    when(mockCatalogWrapper.registerView(namespace, mockRequest)).thenReturn(mockResponse);
-
-    LoadViewResponse result = executor.registerView(mockContext, namespace, mockRequest);
-
-    Assertions.assertEquals(mockResponse, result);
-    verify(mockCatalogWrapper).registerView(namespace, mockRequest);
   }
 
   @Test

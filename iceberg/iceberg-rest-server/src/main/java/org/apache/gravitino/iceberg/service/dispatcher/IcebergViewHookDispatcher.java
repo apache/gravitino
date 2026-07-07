@@ -32,7 +32,6 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
-import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
@@ -81,35 +80,6 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
         context.catalogName(),
         namespace,
         createViewRequest.name(),
-        context.userName(),
-        GravitinoEnv.getInstance().internalOwnerDispatcher());
-
-    return response;
-  }
-
-  @Override
-  public LoadViewResponse registerView(
-      IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
-    // First, register the view in the underlying catalog
-    LoadViewResponse response = dispatcher.registerView(context, namespace, registerViewRequest);
-
-    if (hasViewEntityInStore(context.catalogName(), namespace, registerViewRequest.name())) {
-      // Gravitino already tracks this view: preserve view_id and existing role/owner/tag/policy
-      // bindings after the backend registerView completes.
-      return response;
-    }
-
-    // Import is intentionally NOT wrapped in try-catch: if it fails the view exists in Iceberg
-    // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
-    // entity is registered. Surface the failure so the caller can react.
-    importViewForRegister(context.catalogName(), namespace, registerViewRequest.name());
-
-    // Set ownership for the newly registered view.
-    IcebergOwnershipUtils.setViewOwner(
-        metalake,
-        context.catalogName(),
-        namespace,
-        registerViewRequest.name(),
         context.userName(),
         GravitinoEnv.getInstance().internalOwnerDispatcher());
 
@@ -201,61 +171,6 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // stale entity on the source or miss importing a re-created destination.
     bestEffortReconcileViewEntity(context, renameViewRequest.source());
     bestEffortReconcileViewEntity(context, renameViewRequest.destination());
-  }
-
-  /**
-   * Import a view into Gravitino's metadata catalog for the register-view operation.
-   *
-   * <p>Unlike {@link #importView}, this method is NOT best-effort: if the import fails, the
-   * exception propagates to the caller. Registration's purpose is to register the entity in
-   * Gravitino, so a silent failure would mislead callers into thinking the entity is registered.
-   *
-   * @param catalogName The name of the Gravitino catalog.
-   * @param namespace The Iceberg namespace containing the view.
-   * @param viewName The name of the view.
-   */
-  private void importViewForRegister(String catalogName, Namespace namespace, String viewName) {
-    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
-    if (viewDispatcher != null) {
-      viewDispatcher.loadView(
-          IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake,
-              catalogName,
-              TableIdentifier.of(namespace, viewName),
-              HierarchicalSchemaUtil.schemaSeparator()));
-      LOG.info(
-          "Successfully imported view into Gravitino: {}.{}.{}.{}",
-          metalake,
-          catalogName,
-          namespace,
-          viewName);
-    }
-  }
-
-  /**
-   * Checks whether the view entity is already tracked in Gravitino's EntityStore.
-   *
-   * @param catalogName The name of the Gravitino catalog.
-   * @param namespace The Iceberg namespace containing the view.
-   * @param viewName The name of the view.
-   * @return {@code true} if the view entity exists in the store, {@code false} otherwise.
-   */
-  private boolean hasViewEntityInStore(String catalogName, Namespace namespace, String viewName) {
-    EntityStore store = GravitinoEnv.getInstance().entityStore();
-    if (store == null) {
-      return false;
-    }
-    try {
-      NameIdentifier viewIdent =
-          IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake,
-              catalogName,
-              TableIdentifier.of(namespace, viewName),
-              HierarchicalSchemaUtil.schemaSeparator());
-      return store.exists(viewIdent, Entity.EntityType.VIEW);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to check view entity existence in store", e);
-    }
   }
 
   /**
