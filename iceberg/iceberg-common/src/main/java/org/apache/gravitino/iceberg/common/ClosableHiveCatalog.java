@@ -281,10 +281,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
               .loginMode(KerberosAuthUtils.LoginMode.CURRENT_USER)
               .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
               .build();
-      // catalog_uuid always exists for Gravitino managed catalogs, `0` is just a fallback value.
-      String catalogUUID = properties().getOrDefault("catalog_uuid", "0");
-      File keytabFile =
-          new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, catalogUUID));
+      File keytabFile = new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, name()));
       KerberosAuthUtils.saveKeytabFromUri(
           kerberosConfig.getKeytab(),
           keytabFile,
