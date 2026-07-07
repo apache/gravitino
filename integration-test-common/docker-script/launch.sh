@@ -67,7 +67,7 @@ while true; do
     num_container=$(docker compose -f "$COMPOSE_FILE" ps -q | wc -l)
     if [ "$num_container" -lt "$EXPECTED_SERVICE_COUNT" ]; then
         echo "ERROR: Trino-ci containers start failed."
-        exit 0
+        exit 1
     fi
 
     if [ "$attempts" -ge "$max_attempts" ]; then
