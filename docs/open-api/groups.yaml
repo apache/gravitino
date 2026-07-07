@@ -217,8 +217,8 @@ components:
   examples:
     GroupAddRequest:
       value: {
-        "name": "group1",
-        "externalId": "ext-group-1"
+        "name": "group",
+        "externalId": "ext-group"
       }
 
     NameListResponse:

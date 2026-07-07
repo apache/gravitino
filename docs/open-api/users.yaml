@@ -225,8 +225,8 @@ components:
   examples:
     UserAddRequest:
       value: {
-        "name": "user1",
-        "externalId": "ext-user-1",
+        "name": "user",
+        "externalId": "ext-user",
         "enabled": true
       }
 

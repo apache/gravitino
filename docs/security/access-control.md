@@ -587,13 +587,13 @@ with the legacy name-only path. When `externalId` is provided, `enabled` default
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "user1"
+  "name": "user"
 }' http://localhost:8090/api/metalakes/test/users
 
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "user1",
-  "externalId": "ext-user-1",
+  "name": "user",
+  "externalId": "ext-user",
   "enabled": true
 }' http://localhost:8090/api/metalakes/test/users
 ```
@@ -604,10 +604,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 User user =
-    client.addUser("user1");
+    client.addUser("user");
 
 User externalUser =
-    client.addUser("user1", "ext-user-1", true);
+    client.addUser("user", "ext-user", true);
 ```
 
 </TabItem>
@@ -703,13 +703,13 @@ legacy name-only path.
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "group1"
+  "name": "group"
 }' http://localhost:8090/api/metalakes/test/groups
 
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "group1",
-  "externalId": "ext-group-1"
+  "name": "group",
+  "externalId": "ext-group"
 }' http://localhost:8090/api/metalakes/test/groups
 ```
 
@@ -719,10 +719,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 Group group =
-    client.addGroup("group1");
+    client.addGroup("group");
 
 Group externalGroup =
-    client.addGroup("group1", "ext-group-1");
+    client.addGroup("group", "ext-group");
 ```
 
 </TabItem>
