@@ -18,14 +18,9 @@
  */
 package org.apache.gravitino.iceberg.integration.test;
 
-import java.io.File;
-import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -46,7 +41,6 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final String HDFS_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
-  private static final String HDFS_CLIENT_KEYTAB = "/client.keytab";
 
   private static String tempDir;
 
@@ -56,44 +50,7 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
 
   @Override
   void initEnv() {
-    containerSuite.startKerberosHiveContainer();
-    try {
-      File baseDir = new File(System.getProperty("java.io.tmpdir"));
-      File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
-      file.deleteOnExit();
-      tempDir = file.getAbsolutePath();
-
-      HiveContainer kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
-      kerberosHiveContainer
-          .getContainer()
-          .copyFileFromContainer("/etc/admin.keytab", tempDir + HDFS_CLIENT_KEYTAB);
-
-      String tmpKrb5Path = tempDir + "/krb5.conf_tmp";
-      String krb5Path = tempDir + "/krb5.conf";
-      kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
-
-      String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
-      String content = FileUtils.readFileToString(new File(tmpKrb5Path), StandardCharsets.UTF_8);
-      content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
-      content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
-      FileUtils.write(new File(krb5Path), content, StandardCharsets.UTF_8);
-
-      LOG.info("Kerberos kdc config:\n{}, path: {}", content, krb5Path);
-      System.setProperty("java.security.krb5.conf", krb5Path);
-      System.setProperty("sun.security.krb5.debug", "true");
-      System.setProperty("java.security.krb5.realm", "HADOOPKRB");
-      System.setProperty("java.security.krb5.kdc", ip);
-
-      refreshKerberosConfig();
-      resetDefaultRealm();
-
-      containerSuite
-          .getKerberosHiveContainer()
-          .executeInContainer("hadoop", "fs", "-chown", "-R", "cli", "/user/hive/");
-
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    tempDir = IcebergRestKerberosTestEnv.init(containerSuite);
   }
 
   @Override
@@ -104,7 +61,8 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
     configMap.put(
         "gravitino.iceberg-rest.authentication.kerberos.principal", HDFS_CLIENT_PRINCIPAL);
     configMap.put(
-        "gravitino.iceberg-rest.authentication.kerberos.keytab-uri", tempDir + HDFS_CLIENT_KEYTAB);
+        "gravitino.iceberg-rest.authentication.kerberos.keytab-uri",
+        tempDir + IcebergRestKerberosTestEnv.CLIENT_KEYTAB);
     configMap.put("gravitino.iceberg-rest.hadoop.security.authentication", "kerberos");
     configMap.put(
         "gravitino.iceberg-rest.dfs.namenode.kerberos.principal",
@@ -144,31 +102,5 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
             : System.getProperty(ITUtils.TEST_MODE);
 
     return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
-  }
-
-  private static void refreshKerberosConfig() {
-    Class<?> classRef;
-    try {
-      if (System.getProperty("java.vendor").contains("IBM")) {
-        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
-      } else {
-        classRef = Class.forName("sun.security.krb5.Config");
-      }
-
-      Method refreshMethod = classRef.getMethod("refresh");
-      refreshMethod.invoke(null);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private void resetDefaultRealm() {
-    try {
-      String kerberosNameClass = "org.apache.hadoop.security.authentication.util.KerberosName";
-      Class<?> cl = Class.forName(kerberosNameClass);
-      cl.getMethod("resetDefaultRealm").invoke(null);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
   }
 }

@@ -128,13 +128,11 @@ public class IcebergCatalogUtil {
     try {
       if (authenticationConfig.isSimpleAuth()) {
         jdbcCatalog.setConf(hdfsConfiguration);
-        jdbcCatalog.setHadoopConf(hdfsConfiguration);
         jdbcCatalog.initialize(icebergCatalogName, properties);
       } else if (authenticationConfig.isKerberosAuth()) {
         hdfsConfiguration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
         hdfsConfiguration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
         jdbcCatalog.setConf(hdfsConfiguration);
-        jdbcCatalog.setHadoopConf(hdfsConfiguration);
         jdbcCatalog.initialize(icebergCatalogName, properties);
       } else {
         throw new UnsupportedOperationException(

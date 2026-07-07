@@ -34,7 +34,6 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
-import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -82,7 +81,6 @@ public class TestIcebergCatalogUtil {
         IcebergCatalogUtil.loadCatalogBackend(
             IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
     Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog);
-    Assertions.assertTrue(catalog instanceof JdbcCatalog);
 
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,

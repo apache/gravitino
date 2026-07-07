@@ -19,13 +19,13 @@
 
 package org.apache.gravitino.iceberg.common;
 
-import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
@@ -48,9 +48,9 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ClosableJdbcCatalog.class);
 
-  private KerberosClient kerberosClient;
+  @Nullable private Configuration hadoopConf;
 
-  private Configuration hadoopConf;
+  private KerberosClient kerberosClient;
 
   public ClosableJdbcCatalog() {
     super();
@@ -61,6 +61,12 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
       Function<Map<String, String>, JdbcClientPool> clientPoolBuilder,
       boolean initializeCatalogTables) {
     super(ioBuilder, clientPoolBuilder, initializeCatalogTables);
+  }
+
+  @Override
+  public void setConf(Object conf) {
+    super.setConf(conf);
+    this.hadoopConf = (Configuration) conf;
   }
 
   /**
@@ -77,18 +83,17 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
 
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isKerberosAuth()) {
-      this.kerberosClient = initKerberosClient();
+      try {
+        this.kerberosClient = initKerberosClient();
+      } catch (RuntimeException e) {
+        try {
+          close();
+        } catch (Exception closeException) {
+          e.addSuppressed(closeException);
+        }
+        throw e;
+      }
     }
-  }
-
-  /** Returns the Hadoop configuration used for Kerberos login and HDFS access. */
-  public Configuration getHadoopConf() {
-    return hadoopConf;
-  }
-
-  /** Sets the Hadoop configuration used for Kerberos login and HDFS access. */
-  public void setHadoopConf(Configuration hadoopConf) {
-    this.hadoopConf = hadoopConf;
   }
 
   @Override
@@ -144,12 +149,9 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
 
   private KerberosClient initKerberosClient() {
     try {
-      Configuration conf =
-          Preconditions.checkNotNull(
-              hadoopConf, "Hadoop configuration must be set before Kerberos initialization");
       KerberosConfig kerberosConfig = new KerberosConfig(this.properties());
-      KerberosClient client =
-          KerberosClient.builder(kerberosConfig.getPrincipalName(), conf)
+      KerberosClient kerberosClient =
+          KerberosClient.builder(kerberosConfig.getPrincipalName(), this.hadoopConf)
               .loginMode(KerberosAuthUtils.LoginMode.CURRENT_USER)
               .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
               .build();
@@ -158,9 +160,13 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
       File keytabFile =
           new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, catalogUUID));
       KerberosAuthUtils.saveKeytabFromUri(
-          kerberosConfig.getKeytab(), keytabFile, kerberosConfig.getFetchTimeoutSec(), false, conf);
-      client.login(keytabFile.getAbsolutePath());
-      return client;
+          kerberosConfig.getKeytab(),
+          keytabFile,
+          kerberosConfig.getFetchTimeoutSec(),
+          false,
+          this.hadoopConf);
+      kerberosClient.login(keytabFile.getAbsolutePath());
+      return kerberosClient;
     } catch (IOException e) {
       throw new RuntimeException("Failed to login with kerberos", e);
     }

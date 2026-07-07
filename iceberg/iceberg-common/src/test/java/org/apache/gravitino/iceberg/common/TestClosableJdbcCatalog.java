@@ -40,7 +40,7 @@ public class TestClosableJdbcCatalog {
   void testSimpleAuthInitializeWithoutKerberos() {
     ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
     Configuration conf = new HdfsConfiguration();
-    catalog.setHadoopConf(conf);
+    catalog.setConf(conf);
     catalog.initialize("test", newJdbcCatalogProperties());
 
     Assertions.assertDoesNotThrow(catalog::close);
@@ -54,18 +54,14 @@ public class TestClosableJdbcCatalog {
     properties.put(KerberosConfig.PRINCIPAL_KEY, "cli@HADOOPKRB");
     properties.put(KerberosConfig.KET_TAB_URI_KEY, "/tmp/missing.keytab");
 
-    NullPointerException exception =
-        Assertions.assertThrows(
-            NullPointerException.class, () -> catalog.initialize("test", properties));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Hadoop configuration must be set before Kerberos"));
+    Assertions.assertThrows(RuntimeException.class, () -> catalog.initialize("test", properties));
   }
 
   @Test
   void testKerberosInitializeFailsWithInvalidKeytab() {
     ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
     Configuration conf = new HdfsConfiguration();
-    catalog.setHadoopConf(conf);
+    catalog.setConf(conf);
 
     Map<String, String> properties = newJdbcCatalogProperties();
     properties.put(AuthenticationConfig.AUTH_TYPE_KEY, "kerberos");

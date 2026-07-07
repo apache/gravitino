@@ -79,17 +79,5 @@ gravitino.iceberg-rest.warehouse = /tmp
 # gravitino.iceberg-rest.authentication.kerberos.keytab-uri = file:///etc/security/keytabs/iceberg.keytab
 # gravitino.iceberg-rest.hadoop.security.authentication = kerberos
 # gravitino.iceberg-rest.dfs.namenode.kerberos.principal = hdfs/host.example.com@EXAMPLE.COM
-
-# THE CONFIGURATION EXAMPLE FOR HIVE CATALOG BACKEND WITH KERBEROS
-# Kerberos applies to both Hive Metastore and HDFS warehouse access.
-
-# gravitino.iceberg-rest.catalog-backend = hive
-# gravitino.iceberg-rest.uri = thrift://127.0.0.1:9083
-# gravitino.iceberg-rest.warehouse = hdfs://127.0.0.1:9000/user/hive/warehouse-hive
-# gravitino.iceberg-rest.authentication.type = kerberos
-# gravitino.iceberg-rest.authentication.kerberos.principal = iceberg@EXAMPLE.COM
-# gravitino.iceberg-rest.authentication.kerberos.keytab-uri = file:///etc/security/keytabs/iceberg.keytab
-# gravitino.iceberg-rest.hive.metastore.sasl.enabled = true
-# gravitino.iceberg-rest.hive.metastore.kerberos.principal = hive/host.example.com@EXAMPLE.COM
-# gravitino.iceberg-rest.hadoop.security.authentication = kerberos
-# gravitino.iceberg-rest.dfs.namenode.kerberos.principal = hdfs/host.example.com@EXAMPLE.COM
+#
+# For Hive catalog Kerberos configuration, see docs/iceberg-rest-service.md (Backend Authentication).
