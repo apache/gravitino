@@ -64,3 +64,11 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+
+networks:
+  default:
+    name: trino-net
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.20.31.16/28

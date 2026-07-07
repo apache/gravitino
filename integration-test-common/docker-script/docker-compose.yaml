@@ -141,6 +141,7 @@ services:
 
 networks:
   default:
+    name: trino-net
     driver: bridge
     ipam:
       config:
