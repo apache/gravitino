@@ -45,6 +45,22 @@ The connector provides read access and write access to data and metadata stored 
 - [DROP SCHEMA](https://trino.io/docs/current/sql/drop-schema.html)
 - [COMMENT](https://trino.io/docs/current/sql/comment.html)
 
+### View Management
+
+- [CREATE VIEW](https://trino.io/docs/current/sql/create-view.html)
+- [CREATE OR REPLACE VIEW](https://trino.io/docs/current/sql/create-view.html)
+- [SHOW CREATE VIEW](https://trino.io/docs/current/sql/show-create-view.html)
+- [DROP VIEW](https://trino.io/docs/current/sql/drop-view.html)
+- [ALTER VIEW ... RENAME TO](https://trino.io/docs/current/sql/alter-view.html)
+
+View management is only supported for catalogs backed by Hive, Iceberg or Paimon; other catalogs
+(e.g. Glue, JDBC, Memory) do not support view operations. A view stored by Gravitino may carry SQL
+representations for multiple engines (Hive, Spark, Flink, Trino); the Trino connector only reads and
+writes the Trino dialect representation. A view that has no Trino SQL representation is silently
+invisible to Trino (it does not appear in `SHOW TABLES`/`information_schema` and cannot be loaded),
+rather than causing an error. View owner is not supported; views are always shown with `SECURITY
+INVOKER` (Gravitino does not track an owner, so `SECURITY DEFINER` cannot be represented).
+
 ### Transactions
 
 - [START TRANSACTION](https://trino.io/docs/current/sql/start-transaction.html)

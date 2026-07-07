@@ -121,6 +121,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
     try {
       Map<String, String> params = Maps.newHashMap(safeProperties);
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
+      if (Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())) {
+        params.put(HiveView.TRINO_VIEW_MARKER_KEY, "true");
+      }
       String viewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
 
       HiveTable hiveTable =
@@ -219,6 +222,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
           updatedColumns = copyColumns(replace.getColumns());
           updatedComment = replace.getComment();
           updatedViewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
+          if (Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())) {
+            updatedProperties.put(HiveView.TRINO_VIEW_MARKER_KEY, "true");
+          }
         } else {
           throw new IllegalArgumentException(
               "Unsupported view change type: " + change.getClass().getSimpleName());
@@ -368,15 +374,20 @@ class HiveViewCatalogOperations implements ViewCatalog {
     String detectedDialect = HiveView.detectDialect(representationSql, params);
     switch (detectedDialect.toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
+      case Dialects.TRINO:
       case Dialects.FLINK:
       case Dialects.SPARK:
         break;
       default:
-        // TODO(design-docs/gravitino-logical-view-management.md): support loading trino HMS views.
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but found '%s' for view %s",
-                Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, detectedDialect, ident));
+                "Hive catalog currently supports only '%s', '%s', '%s' and '%s' view dialects, but found '%s' for view %s",
+                Dialects.HIVE,
+                Dialects.TRINO,
+                Dialects.FLINK,
+                Dialects.SPARK,
+                detectedDialect,
+                ident));
     }
 
     SQLRepresentation rep =
@@ -431,6 +442,22 @@ class HiveViewCatalogOperations implements ViewCatalog {
             defaultSchema,
             ident);
         return selected;
+      case Dialects.TRINO:
+        // HMS has no field to persist a Trino view's default catalog/schema, so any value
+        // supplied here is accepted but not stored; it is not required to be null. Unqualified
+        // identifiers in the view body will therefore fail to resolve on reload unless the view
+        // was defined with fully-qualified references.
+        if (defaultCatalog != null || defaultSchema != null) {
+          LOG.warn(
+              "View {} has a non-null defaultCatalog={}/defaultSchema={}, but the Hive catalog "
+                  + "cannot persist them for the '{}' dialect; unqualified identifiers in the "
+                  + "view body may fail to resolve on reload",
+              ident,
+              defaultCatalog,
+              defaultSchema,
+              selected.dialect());
+        }
+        return selected;
       case Dialects.FLINK:
         Preconditions.checkArgument(
             defaultCatalog == null && defaultSchema == null,
@@ -457,27 +484,35 @@ class HiveViewCatalogOperations implements ViewCatalog {
             HiveView.SPARK_VERSION_KEY);
         return selected;
       default:
-        // TODO(design-docs/gravitino-logical-view-management.md): support creating trino HMS views.
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
-                Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, selected.dialect(), ident));
+                "Hive catalog currently supports only '%s', '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
+                Dialects.HIVE,
+                Dialects.TRINO,
+                Dialects.FLINK,
+                Dialects.SPARK,
+                selected.dialect(),
+                ident));
     }
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
     switch (representation.dialect().toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
+      case Dialects.TRINO:
       case Dialects.FLINK:
       case Dialects.SPARK:
         return representation.sql();
       default:
-        // TODO(design-docs/gravitino-logical-view-management.md): support serializing trino HMS
-        // view definitions.
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
-                Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, representation.dialect(), ident));
+                "Hive catalog currently supports only '%s', '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
+                Dialects.HIVE,
+                Dialects.TRINO,
+                Dialects.FLINK,
+                Dialects.SPARK,
+                representation.dialect(),
+                ident));
     }
   }
 

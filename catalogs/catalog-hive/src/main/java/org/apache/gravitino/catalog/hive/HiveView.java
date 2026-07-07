@@ -54,7 +54,7 @@ public class HiveView implements View {
 
   static final String SPARK_VERSION_KEY = "spark.sql.create.version";
   static final String FLINK_PROPERTY_PREFIX = "flink.";
-  private static final String TRINO_VIEW_MARKER_KEY = "presto_view";
+  static final String TRINO_VIEW_MARKER_KEY = "presto_view";
   private static final String TRINO_VIEW_PREFIX = "/* Presto View:";
 
   private String name;

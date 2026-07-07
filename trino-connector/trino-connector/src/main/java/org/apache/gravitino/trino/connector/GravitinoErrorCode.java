@@ -78,7 +78,11 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
   /** Duplicated catalogs. */
   GRAVITINO_DUPLICATED_CATALOGS(24, EXTERNAL),
   /** Expression error. */
-  GRAVITINO_EXPRESSION_ERROR(25, EXTERNAL);
+  GRAVITINO_EXPRESSION_ERROR(25, EXTERNAL),
+  /** View not exists. */
+  GRAVITINO_VIEW_NOT_EXISTS(26, EXTERNAL),
+  /** View already exists. */
+  GRAVITINO_VIEW_ALREADY_EXISTS(27, EXTERNAL);
 
   // suppress ImmutableEnumChecker because ErrorCode is outside the project.
   @SuppressWarnings("ImmutableEnumChecker")

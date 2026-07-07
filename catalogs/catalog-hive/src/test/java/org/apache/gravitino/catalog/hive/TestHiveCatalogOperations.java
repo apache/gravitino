@@ -215,7 +215,7 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testCreateViewRejectsTrinoDialect() throws Exception {
+  void testCreateViewAcceptsTrinoDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
 
@@ -223,6 +223,9 @@ class TestHiveCatalogOperations {
     HiveClient hiveClient = mock(HiveClient.class);
     HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
     when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing().when(hiveClient).createTable(hiveTableCaptor.capture());
     when(clientPool.run(any()))
         .thenAnswer(
             invocation -> {
@@ -231,21 +234,26 @@ class TestHiveCatalogOperations {
             });
     op.clientPool = clientPool;
 
-    UnsupportedOperationException exception =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                op.createView(
-                    NameIdentifier.of("db", "v_trino"),
-                    null,
-                    new Column[0],
-                    new SQLRepresentation[] {
-                      SQLRepresentation.builder().withDialect("trino").withSql("SELECT 1").build()
-                    },
-                    null,
-                    null,
-                    Maps.newHashMap()));
-    Assertions.assertTrue(exception.getMessage().contains("supports only"));
+    // No presto_view marker is supplied here; createView must derive it automatically from the
+    // "trino" dialect on the supplied SQLRepresentation.
+    View view =
+        op.createView(
+            NameIdentifier.of("db", "v_trino"),
+            null,
+            new Column[0],
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("trino").withSql("SELECT 1").build()
+            },
+            null,
+            null,
+            Maps.newHashMap());
+
+    Assertions.assertNotNull(view);
+    Assertions.assertEquals(1, view.representations().length);
+    SQLRepresentation rep = (SQLRepresentation) view.representations()[0];
+    Assertions.assertEquals("trino", rep.dialect());
+    Assertions.assertEquals("SELECT 1", rep.sql());
+    Assertions.assertEquals("true", hiveTableCaptor.getValue().properties().get("presto_view"));
   }
 
   @Test
@@ -481,7 +489,7 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testLoadViewRejectsTrinoDialect() throws Exception {
+  void testLoadViewAcceptsTrinoDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
 
@@ -511,11 +519,11 @@ class TestHiveCatalogOperations {
             });
     op.clientPool = clientPool;
 
-    UnsupportedOperationException exception =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () -> op.loadView(NameIdentifier.of("db", "v_trino")));
-    Assertions.assertTrue(exception.getMessage().contains("supports only"));
+    View loaded = op.loadView(NameIdentifier.of("db", "v_trino"));
+
+    SQLRepresentation representation = (SQLRepresentation) loaded.representations()[0];
+    Assertions.assertEquals("trino", representation.dialect());
+    Assertions.assertEquals("SELECT 1", representation.sql());
   }
 
   @Test
@@ -590,12 +598,15 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testAlterViewReplaceRejectsTrinoDialect() throws Exception {
+  void testAlterViewReplaceAcceptsTrinoDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
 
     CachedClientPool clientPool = mock(CachedClientPool.class);
     HiveClient hiveClient = mock(HiveClient.class);
+    // alterView's ReplaceView branch derives the presto_view marker automatically from the new
+    // "trino" dialect representation, so it is (re-)set here even though the pre-existing table
+    // already carries it.
     HiveTable currentTable =
         HiveTable.builder()
             .withName("v_hive")
@@ -604,10 +615,19 @@ class TestHiveCatalogOperations {
             .withColumns(new Column[0])
             .withProperties(
                 Maps.newHashMap(
-                    ImmutableMap.of(HiveConstants.TABLE_TYPE, TableType.VIRTUAL_VIEW.name())))
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
             .withViewOriginalText("SELECT 1")
             .build();
     when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
     when(clientPool.run(any()))
         .thenAnswer(
             invocation -> {
@@ -616,24 +636,22 @@ class TestHiveCatalogOperations {
             });
     op.clientPool = clientPool;
 
-    UnsupportedOperationException exception =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () ->
-                op.alterView(
-                    NameIdentifier.of("db", "v_hive"),
-                    ViewChange.replaceView(
-                        new Column[0],
-                        new SQLRepresentation[] {
-                          SQLRepresentation.builder()
-                              .withDialect("trino")
-                              .withSql("SELECT 2")
-                              .build()
-                        },
-                        null,
-                        null,
-                        null)));
-    Assertions.assertTrue(exception.getMessage().contains("supports only"));
+    View updated =
+        op.alterView(
+            NameIdentifier.of("db", "v_hive"),
+            ViewChange.replaceView(
+                new Column[0],
+                new SQLRepresentation[] {
+                  SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+                },
+                null,
+                null,
+                null));
+
+    Assertions.assertEquals("SELECT 2", hiveTableCaptor.getValue().viewOriginalText());
+    SQLRepresentation representation = (SQLRepresentation) updated.representations()[0];
+    Assertions.assertEquals("trino", representation.dialect());
+    Assertions.assertEquals("SELECT 2", representation.sql());
   }
 
   @Test

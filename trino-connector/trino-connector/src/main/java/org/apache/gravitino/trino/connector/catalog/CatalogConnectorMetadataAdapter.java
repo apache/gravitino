@@ -21,8 +21,12 @@ package org.apache.gravitino.trino.connector.catalog;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
+import io.trino.spi.connector.ConnectorViewDefinition;
+import io.trino.spi.connector.ConnectorViewDefinition.ViewColumn;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.session.PropertyMetadata;
+import io.trino.spi.type.Type;
+import io.trino.spi.type.TypeManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,7 +38,9 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.metadata.GravitinoView;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
+import org.apache.gravitino.trino.connector.util.json.JsonCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,6 +152,78 @@ public class CatalogConnectorMetadataAdapter {
     }
 
     return new GravitinoTable(schemaName, tableName, columns, comment, properties);
+  }
+
+  /**
+   * Transform Gravitino view metadata to Trino ConnectorViewDefinition. Owner is not supported by
+   * Gravitino views, so the resulting definition always has an empty owner; since Trino requires an
+   * owner for run-as-definer views, {@code runAsInvoker} is always {@code true}.
+   *
+   * @param view the Gravitino view
+   * @return the Trino ConnectorViewDefinition
+   */
+  public ConnectorViewDefinition getViewDefinition(GravitinoView view) {
+    List<ViewColumn> columns =
+        view.getColumns().stream()
+            .map(
+                column ->
+                    new ViewColumn(
+                        column.getName(),
+                        dataTypeTransformer.getTrinoType(column.getType()).getTypeId(),
+                        Optional.ofNullable(column.getComment())))
+            .collect(Collectors.toList());
+
+    return new ConnectorViewDefinition(
+        view.getSql(),
+        Optional.ofNullable(view.getDefaultCatalog()),
+        Optional.ofNullable(view.getDefaultSchema()),
+        columns,
+        Optional.ofNullable(view.getComment()),
+        Optional.empty(),
+        true,
+        List.of());
+  }
+
+  /**
+   * Transform Trino ConnectorViewDefinition to Gravitino view metadata. The {@code viewProperties}
+   * are merged as-is into the resulting view's generic properties.
+   *
+   * @param viewName the schema-qualified view name
+   * @param definition the Trino ConnectorViewDefinition
+   * @param viewProperties the Trino view properties
+   * @return the Gravitino view metadata
+   */
+  public GravitinoView createView(
+      SchemaTableName viewName,
+      ConnectorViewDefinition definition,
+      Map<String, Object> viewProperties) {
+    TypeManager typeManager = JsonCodec.getTypeManager(getClass().getClassLoader());
+    List<GravitinoColumn> columns = new ArrayList<>();
+    List<ViewColumn> viewColumns = definition.getColumns();
+    for (int i = 0; i < viewColumns.size(); i++) {
+      ViewColumn column = viewColumns.get(i);
+      Type trinoType = typeManager.getType(column.getType());
+      columns.add(
+          new GravitinoColumn(
+              column.getName(),
+              dataTypeTransformer.getGravitinoType(trinoType),
+              i,
+              column.getComment().orElse(null),
+              true,
+              false,
+              Map.of()));
+    }
+
+    Map<String, String> properties = toGravitinoTableProperties(viewProperties);
+    return new GravitinoView(
+        viewName.getSchemaName(),
+        viewName.getTableName(),
+        columns,
+        definition.getComment().orElse(null),
+        properties,
+        definition.getOriginalSql(),
+        definition.getCatalog().orElse(null),
+        definition.getSchema().orElse(null));
   }
 
   /**
