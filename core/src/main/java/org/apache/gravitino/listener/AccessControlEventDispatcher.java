@@ -271,6 +271,13 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public Group addGroup(String metalake, String group, String externalId)
+      throws GroupAlreadyExistsException, NoSuchMetalakeException {
+    return dispatcher.addGroup(metalake, group, externalId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
@@ -284,6 +291,13 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       eventBus.dispatchEvent(new RemoveGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean removeGroupByExternalId(String metalake, String externalId)
+      throws NoSuchMetalakeException {
+    return dispatcher.removeGroupByExternalId(metalake, externalId);
   }
 
   /** {@inheritDoc} */
@@ -302,6 +316,13 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       eventBus.dispatchEvent(new GetGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Group getGroupByExternalId(String metalake, String externalId)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    return dispatcher.getGroupByExternalId(metalake, externalId);
   }
 
   /** {@inheritDoc} */

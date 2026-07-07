@@ -67,6 +67,8 @@ public class AuthorizationUtils {
   static final String USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
       "User with external id %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
+  static final String GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
+      "Group with external id %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
   /**
@@ -163,6 +165,26 @@ public class AuthorizationUtils {
         externalId);
   }
 
+  /**
+   * Creates a synthetic {@link NameIdentifier} used only as a {@link
+   * org.apache.gravitino.lock.TreeLockUtils} lock path for group operations keyed by external id.
+   *
+   * <p>This is <strong>not</strong> the entity's storage identifier. Group entities are stored and
+   * retrieved by Gravitino group name via {@link #ofGroup(String, String)}. At lock time the group
+   * name may be unknown, so external-id operations need a dedicated lock path.
+   *
+   * @param metalake the metalake name
+   * @param externalId the external id of the group
+   * @return a synthetic name identifier for tree locking only
+   */
+  public static NameIdentifier ofGroupExternalId(String metalake, String externalId) {
+    return NameIdentifier.of(
+        metalake,
+        Entity.SYSTEM_CATALOG_RESERVED_NAME,
+        Entity.GROUP_EXTERNAL_ID_SCHEMA_NAME,
+        externalId);
+  }
+
   public static Namespace ofRoleNamespace(String metalake) {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
   }
@@ -178,6 +200,11 @@ public class AuthorizationUtils {
   public static Namespace ofUserExternalIdNamespace(String metalake) {
     return Namespace.of(
         metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_EXTERNAL_ID_SCHEMA_NAME);
+  }
+
+  public static Namespace ofGroupExternalIdNamespace(String metalake) {
+    return Namespace.of(
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_EXTERNAL_ID_SCHEMA_NAME);
   }
 
   public static void checkUser(NameIdentifier ident) {
@@ -200,6 +227,16 @@ public class AuthorizationUtils {
     checkGroupNamespace(ident.namespace());
   }
 
+  /**
+   * Validates that the name identifier refers to a group external id in a metalake.
+   *
+   * @param ident the external id name identifier to validate
+   */
+  public static void checkGroupExternalId(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "External id identifier must not be null");
+    checkGroupExternalIdNamespace(ident.namespace());
+  }
+
   public static void checkRole(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Role identifier must not be null");
     checkRoleNamespace(ident.namespace());
@@ -216,6 +253,13 @@ public class AuthorizationUtils {
     Namespace.check(
         namespace != null && namespace.length() == 3,
         "User external id namespace must have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkGroupExternalIdNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "Group external id namespace must have 3 levels, the input namespace is %s",
         namespace);
   }
 

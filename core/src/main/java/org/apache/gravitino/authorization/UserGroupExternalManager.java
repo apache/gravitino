@@ -24,17 +24,20 @@ import java.time.Instant;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Manages user operations keyed by external id within a metalake. */
+/** Manages user and group operations keyed by external id within a metalake. */
 class UserGroupExternalManager extends UserGroupManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserGroupExternalManager.class);
@@ -154,6 +157,70 @@ class UserGroupExternalManager extends UserGroupManager {
           externalId,
           metalake,
           ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  Group addGroup(String metalake, String group, String externalId)
+      throws GroupAlreadyExistsException {
+    try {
+      GroupEntity groupEntity =
+          GroupEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(group)
+              .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
+              .withRoleNames(Lists.newArrayList())
+              .withExternalId(externalId)
+              .withAuditInfo(
+                  AuditInfo.builder()
+                      .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                      .withCreateTime(Instant.now())
+                      .build())
+              .build();
+      store.put(groupEntity, false /* overwritten */);
+      return groupEntity;
+    } catch (EntityAlreadyExistsException e) {
+      LOG.warn("Group {} in the metalake {} already exists", group, metalake, e);
+      throw new GroupAlreadyExistsException(
+          "Group %s in the metalake %s already exists", group, metalake);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Adding group {} failed in the metalake {} due to storage issues", group, metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  boolean removeGroupByExternalId(String metalake, String externalId) {
+    try {
+      return store
+          .externalIdOperations()
+          .deleteByExternalId(
+              AuthorizationUtils.ofGroupExternalId(metalake, externalId), Entity.EntityType.GROUP);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Removing group with external id {} in the metalake {} failed due to storage issues",
+          externalId,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  Group getGroupByExternalId(String metalake, String externalId) throws NoSuchGroupException {
+    try {
+      return store
+          .externalIdOperations()
+          .getByExternalId(
+              AuthorizationUtils.ofGroupExternalId(metalake, externalId),
+              Entity.EntityType.GROUP,
+              GroupEntity.class);
+    } catch (NoSuchEntityException e) {
+      LOG.warn(
+          "Group with external id {} does not exist in the metalake {}", externalId, metalake, e);
+      throw new NoSuchGroupException(
+          AuthorizationUtils.GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Getting group with external id {} failed due to storage issues", externalId, ioe);
       throw new RuntimeException(ioe);
     }
   }

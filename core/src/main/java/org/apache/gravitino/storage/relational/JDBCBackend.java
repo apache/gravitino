@@ -319,6 +319,8 @@ public class JDBCBackend implements RelationalBackend {
     switch (entityType) {
       case USER:
         return (E) UserMetaService.getInstance().getUserByExternalId(ident);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().getGroupByExternalId(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get by external id operation", entityType);
@@ -334,7 +336,7 @@ public class JDBCBackend implements RelationalBackend {
         return (E) UserMetaService.getInstance().updateUserByExternalId(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for update by external id operation", entityType);
+            "Unsupported entity type: %s for update enabled by external id operation", entityType);
     }
   }
 

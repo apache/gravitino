@@ -177,6 +177,21 @@ public interface AccessControlDispatcher {
       throws GroupAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Adds a new Group.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param group The name of the Group.
+   * @param externalId The external identifier, or null if unset.
+   * @return The Added Group instance.
+   * @throws GroupAlreadyExistsException If a Group with the same name or external id already
+   *     exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Group encounters storage issues.
+   */
+  Group addGroup(String metalake, String group, String externalId)
+      throws GroupAlreadyExistsException, NoSuchMetalakeException;
+
+  /**
    * Removes a Group.
    *
    * @param metalake The Metalake of the Group.
@@ -189,6 +204,20 @@ public interface AccessControlDispatcher {
   boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException;
 
   /**
+   * Removes a Group by external identifier.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param externalId The external identifier of the Group.
+   * @return True if the Group was successfully removed, false only when there's no such group,
+   *     otherwise it will throw an exception.
+   * @throws IllegalArgumentException If externalId is null or blank.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Group encounters storage issues.
+   */
+  boolean removeGroupByExternalId(String metalake, String externalId)
+      throws NoSuchMetalakeException;
+
+  /**
    * Gets a Group.
    *
    * @param metalake The Metalake of the Group.
@@ -199,6 +228,20 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If getting the Group encounters storage issues.
    */
   Group getGroup(String metalake, String group)
+      throws NoSuchGroupException, NoSuchMetalakeException;
+
+  /**
+   * Gets a Group by external identifier.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param externalId The external identifier of the Group.
+   * @return The getting Group instance.
+   * @throws IllegalArgumentException If externalId is null or blank.
+   * @throws NoSuchGroupException If the Group with the given external id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the Group encounters storage issues.
+   */
+  Group getGroupByExternalId(String metalake, String externalId)
       throws NoSuchGroupException, NoSuchMetalakeException;
 
   /**
