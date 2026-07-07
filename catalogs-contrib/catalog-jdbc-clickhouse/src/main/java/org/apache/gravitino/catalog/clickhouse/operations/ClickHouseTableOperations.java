@@ -480,12 +480,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case DATA_SKIPPING_MINMAX:
+          // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
+          // no field for it.
           // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           sqlBuilder
               .append(" ")
               .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "minmax", 1));
           break;
         case DATA_SKIPPING_BLOOM_FILTER:
+          // The GRANULARITY value is always 3 here currently.
           // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           sqlBuilder
               .append(" ")
@@ -857,14 +860,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String fieldStr = getIndexFieldStr(addIndex.getFieldNames());
     switch (addIndex.getType()) {
       case DATA_SKIPPING_MINMAX:
-        return "ADD INDEX " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "minmax", 1);
+        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "minmax", 1);
 
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD INDEX "
-            + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "bloom_filter", 3);
+        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "bloom_filter", 3);
 
       case DATA_SKIPPING_SET:
-        return "ADD INDEX " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "set", 1);
+        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "set", 1);
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(

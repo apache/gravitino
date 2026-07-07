@@ -122,7 +122,8 @@ public interface Index {
     /** IVF_HNSW_PQ */
     IVF_HNSW_PQ,
 
-    // The following index types are data skipping indexes in ClickHouse.
+    // The following index types are data skipping indexes in ClickHouse, ngrambf_v1 and tokenbf_v1
+    // Will be supported later.
     /** minmax data skipping index */
     DATA_SKIPPING_MINMAX,
 
