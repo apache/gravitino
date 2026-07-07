@@ -26,6 +26,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
@@ -46,6 +47,11 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
 
   void initEnv() {
     tempDir = IcebergRestKerberosTestEnv.init(containerSuite);
+  }
+
+  @AfterAll
+  void resetKerberosEnv() {
+    IcebergRestKerberosTestEnv.reset();
   }
 
   @Override

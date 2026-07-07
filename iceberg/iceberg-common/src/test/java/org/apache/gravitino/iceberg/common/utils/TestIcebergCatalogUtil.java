@@ -26,6 +26,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Catalog;
@@ -87,6 +88,27 @@ public class TestIcebergCatalogUtil {
         () -> {
           IcebergCatalogUtil.loadCatalogBackend("other");
         });
+  }
+
+  @Test
+  void testJdbcBadAuth() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, warehouse.toString());
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
+    properties.put(AuthenticationConfig.AUTH_TYPE_KEY, "oauth");
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                IcebergCatalogUtil.loadCatalogBackend(
+                    IcebergCatalogBackend.JDBC, new IcebergConfig(properties)));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Unsupported authentication method: oauth"));
   }
 
   @Test

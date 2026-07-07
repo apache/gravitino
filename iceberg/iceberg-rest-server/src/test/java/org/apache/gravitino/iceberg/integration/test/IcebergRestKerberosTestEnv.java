@@ -22,6 +22,8 @@ import java.io.File;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -33,10 +35,22 @@ public final class IcebergRestKerberosTestEnv {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRestKerberosTestEnv.class);
 
+  private static final String KRB5_CONF_PROPERTY = "java.security.krb5.conf";
+  private static final String KRB5_DEBUG_PROPERTY = "sun.security.krb5.debug";
+  private static final String KRB5_REALM_PROPERTY = "java.security.krb5.realm";
+  private static final String KRB5_KDC_PROPERTY = "java.security.krb5.kdc";
+
+  private static final String[] MANAGED_SYSTEM_PROPERTIES = {
+    KRB5_CONF_PROPERTY, KRB5_DEBUG_PROPERTY, KRB5_REALM_PROPERTY, KRB5_KDC_PROPERTY
+  };
+
   /** Local path suffix for the copied client keytab under the temp directory. */
   public static final String CLIENT_KEYTAB = "/client.keytab";
 
   private static final String KEYTAB_CONTAINER_PATH = "/etc/admin.keytab";
+
+  private static Map<String, String> savedSystemProperties;
+  private static int initRefCount;
 
   private IcebergRestKerberosTestEnv() {}
 
@@ -47,6 +61,11 @@ public final class IcebergRestKerberosTestEnv {
    * @return temp directory containing krb5.conf and client keytab
    */
   public static String init(ContainerSuite containerSuite) {
+    if (initRefCount == 0) {
+      savedSystemProperties = saveSystemProperties(MANAGED_SYSTEM_PROPERTIES);
+    }
+    initRefCount++;
+
     containerSuite.startKerberosHiveContainer();
     try {
       File baseDir = new File(System.getProperty("java.io.tmpdir"));
@@ -70,10 +89,14 @@ public final class IcebergRestKerberosTestEnv {
       FileUtils.write(new File(krb5Path), content, StandardCharsets.UTF_8);
 
       LOG.info("Kerberos kdc config:\n{}, path: {}", content, krb5Path);
-      System.setProperty("java.security.krb5.conf", krb5Path);
-      System.setProperty("sun.security.krb5.debug", "true");
-      System.setProperty("java.security.krb5.realm", "HADOOPKRB");
-      System.setProperty("java.security.krb5.kdc", ip);
+      System.setProperty(KRB5_CONF_PROPERTY, krb5Path);
+      if (Boolean.getBoolean(KRB5_DEBUG_PROPERTY)) {
+        System.setProperty(KRB5_DEBUG_PROPERTY, "true");
+      } else {
+        System.clearProperty(KRB5_DEBUG_PROPERTY);
+      }
+      System.setProperty(KRB5_REALM_PROPERTY, "HADOOPKRB");
+      System.setProperty(KRB5_KDC_PROPERTY, ip);
 
       refreshKerberosConfig();
       resetDefaultRealm();
@@ -83,7 +106,30 @@ public final class IcebergRestKerberosTestEnv {
 
       return tempDir;
     } catch (Exception e) {
+      reset();
       throw new RuntimeException(e);
+    }
+  }
+
+  /** Restores JVM Kerberos system properties changed by {@link #init(ContainerSuite)}. */
+  public static void reset() {
+    if (initRefCount == 0) {
+      return;
+    }
+    initRefCount--;
+    if (initRefCount > 0) {
+      return;
+    }
+
+    if (savedSystemProperties != null) {
+      restoreSystemProperties(savedSystemProperties);
+      savedSystemProperties = null;
+      try {
+        refreshKerberosConfig();
+        resetDefaultRealm();
+      } catch (RuntimeException e) {
+        LOG.warn("Failed to refresh Kerberos configuration after test cleanup", e);
+      }
     }
   }
 
@@ -113,5 +159,24 @@ public final class IcebergRestKerberosTestEnv {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private static Map<String, String> saveSystemProperties(String... keys) {
+    Map<String, String> saved = new HashMap<>();
+    for (String key : keys) {
+      saved.put(key, System.getProperty(key));
+    }
+    return saved;
+  }
+
+  private static void restoreSystemProperties(Map<String, String> saved) {
+    saved.forEach(
+        (key, value) -> {
+          if (value == null) {
+            System.clearProperty(key);
+          } else {
+            System.setProperty(key, value);
+          }
+        });
   }
 }

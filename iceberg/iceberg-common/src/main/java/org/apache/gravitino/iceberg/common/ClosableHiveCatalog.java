@@ -124,8 +124,14 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   @Override
   public <R> R doKerberosOperations(Executable<R> executable) throws Throwable {
-    Map<String, String> properties = this.properties();
-    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(this.properties());
+    if (!authenticationConfig.isKerberosAuth()) {
+      return executable.execute();
+    }
+    if (kerberosClient == null) {
+      throw new IllegalStateException(
+          "Kerberos is configured but KerberosClient is not initialized");
+    }
 
     final String finalPrincipalName;
     String proxyKerberosPrincipalName = PrincipalUtils.getCurrentPrincipal().getName();

@@ -74,6 +74,31 @@ public class TestClosableJdbcCatalog {
     Assertions.assertTrue(exception.getMessage().contains("Failed to login with kerberos"));
   }
 
+  @Test
+  void testSimpleKerberosOps() throws Throwable {
+    ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
+    catalog.setConf(new HdfsConfiguration());
+    catalog.initialize("test", newJdbcCatalogProperties());
+
+    Assertions.assertEquals("ok", catalog.doKerberosOperations(() -> "ok"));
+  }
+
+  @Test
+  void testKerberosOpsNoClient() {
+    ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
+    Configuration conf = new HdfsConfiguration();
+    catalog.setConf(conf);
+
+    Map<String, String> properties = newJdbcCatalogProperties();
+    properties.put(AuthenticationConfig.AUTH_TYPE_KEY, "kerberos");
+    properties.put(KerberosConfig.PRINCIPAL_KEY, "cli@HADOOPKRB");
+    properties.put(KerberosConfig.KET_TAB_URI_KEY, "/tmp/missing.keytab");
+
+    Assertions.assertThrows(RuntimeException.class, () -> catalog.initialize("test", properties));
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> catalog.doKerberosOperations(() -> "ok"));
+  }
+
   private Map<String, String> newJdbcCatalogProperties() {
     Map<String, String> properties = new HashMap<>();
     properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
