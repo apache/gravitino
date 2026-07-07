@@ -1097,8 +1097,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertTrue(svc.deleteGroup(group.nameIdentifier()));
     assertThrowsExt(
         NoSuchEntityException.class, () -> svc.getGroupByExternalId(groupExtIdent("ext-del-by")));
-    assertThrowsExt(
-        NoSuchEntityException.class, () -> svc.deleteGroup(group.nameIdentifier()));
+    assertThrowsExt(NoSuchEntityException.class, () -> svc.deleteGroup(group.nameIdentifier()));
   }
 
   private NameIdentifier groupExtIdent(String externalId) {

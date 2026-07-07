@@ -162,6 +162,7 @@ public class AuthorizationUtils {
    * @return a synthetic name identifier for tree locking only
    */
   public static NameIdentifier ofUserExternalId(String metalake, String externalId) {
+    checkExternalId(externalId);
     return NameIdentifier.of(
         metalake,
         Entity.SYSTEM_CATALOG_RESERVED_NAME,
@@ -239,8 +240,7 @@ public class AuthorizationUtils {
     NameIdentifier.check(ident != null, "External id identifier must not be null");
     checkGroupNamespace(ident.namespace());
     if (!ident.name().startsWith(EXTERNAL_ID_NAME_PREFIX)) {
-      throw new IllegalNameIdentifierException(
-          "Invalid group external id identifier: %s", ident);
+      throw new IllegalNameIdentifierException("Invalid group external id identifier: %s", ident);
     }
     checkExternalId(ident.name().substring(EXTERNAL_ID_NAME_PREFIX.length()));
   }

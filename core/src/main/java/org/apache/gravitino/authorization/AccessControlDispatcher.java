@@ -213,7 +213,8 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
-  boolean removeGroupByExternalId(String metalake, String externalId) throws NoSuchMetalakeException;
+  boolean removeGroupByExternalId(String metalake, String externalId)
+      throws NoSuchMetalakeException;
 
   /**
    * Gets a Group.

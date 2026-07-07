@@ -545,7 +545,8 @@ public class TestAccessControlManager {
         () -> accessControlManager.getGroupByExternalId(METALAKE, extId));
     Assertions.assertThrows(
         NoSuchGroupException.class, () -> accessControlManager.getGroup(METALAKE, "remove_group"));
-    Assertions.assertFalse(accessControlManager.removeGroupByExternalId(METALAKE, "missing-ext-id"));
+    Assertions.assertFalse(
+        accessControlManager.removeGroupByExternalId(METALAKE, "missing-ext-id"));
   }
 
   @Test
