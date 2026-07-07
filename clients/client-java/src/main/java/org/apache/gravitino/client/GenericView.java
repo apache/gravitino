@@ -25,6 +25,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.rel.ViewDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.rel.Column;
@@ -36,13 +37,14 @@ import org.apache.gravitino.tag.Tag;
 /** Represents a generic view. */
 class GenericView implements View, SupportsTags {
 
-  private final View view;
+  private final ViewDTO viewDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
 
-  GenericView(View view, RESTClient restClient, Namespace viewNs) {
-    this.view = view;
-    List<String> viewFullName = Lists.newArrayList(viewNs.level(1), viewNs.level(2), view.name());
+  GenericView(ViewDTO viewDTO, RESTClient restClient, Namespace viewNs) {
+    this.viewDTO = viewDTO;
+    List<String> viewFullName =
+        Lists.newArrayList(viewNs.level(1), viewNs.level(2), viewDTO.name());
     MetadataObject viewObject = MetadataObjects.of(viewFullName, MetadataObject.Type.VIEW);
     this.objectTagOperations =
         new MetadataObjectTagOperations(viewNs.level(0), viewObject, restClient);
@@ -50,42 +52,42 @@ class GenericView implements View, SupportsTags {
 
   @Override
   public Audit auditInfo() {
-    return view.auditInfo();
+    return viewDTO.auditInfo();
   }
 
   @Override
   public String name() {
-    return view.name();
+    return viewDTO.name();
   }
 
   @Override
   public String comment() {
-    return view.comment();
+    return viewDTO.comment();
   }
 
   @Override
   public Column[] columns() {
-    return view.columns();
+    return viewDTO.columns();
   }
 
   @Override
   public Representation[] representations() {
-    return view.representations();
+    return viewDTO.representations();
   }
 
   @Override
   public String defaultCatalog() {
-    return view.defaultCatalog();
+    return viewDTO.defaultCatalog();
   }
 
   @Override
   public String defaultSchema() {
-    return view.defaultSchema();
+    return viewDTO.defaultSchema();
   }
 
   @Override
   public Map<String, String> properties() {
-    return view.properties();
+    return viewDTO.properties();
   }
 
   @Override
@@ -124,16 +126,16 @@ class GenericView implements View, SupportsTags {
     }
 
     GenericView that = (GenericView) obj;
-    return view.equals(that.view);
+    return viewDTO.equals(that.viewDTO);
   }
 
   @Override
   public int hashCode() {
-    return view.hashCode();
+    return viewDTO.hashCode();
   }
 
   @Override
   public String toString() {
-    return "GenericView{" + "view=" + view.toString() + '}';
+    return "GenericView{" + "viewDTO=" + viewDTO.toString() + '}';
   }
 }

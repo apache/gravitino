@@ -24,6 +24,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.function.FunctionDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.function.Function;
@@ -35,14 +36,14 @@ import org.apache.gravitino.tag.Tag;
 /** Represents a generic function. */
 class GenericFunction implements Function, SupportsTags {
 
-  private final Function function;
+  private final FunctionDTO functionDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
 
-  GenericFunction(Function function, RESTClient restClient, Namespace functionNs) {
-    this.function = function;
+  GenericFunction(FunctionDTO functionDTO, RESTClient restClient, Namespace functionNs) {
+    this.functionDTO = functionDTO;
     List<String> functionFullName =
-        Lists.newArrayList(functionNs.level(1), functionNs.level(2), function.name());
+        Lists.newArrayList(functionNs.level(1), functionNs.level(2), functionDTO.name());
     MetadataObject functionObject =
         MetadataObjects.of(functionFullName, MetadataObject.Type.FUNCTION);
     this.objectTagOperations =
@@ -51,32 +52,32 @@ class GenericFunction implements Function, SupportsTags {
 
   @Override
   public Audit auditInfo() {
-    return function.auditInfo();
+    return functionDTO.auditInfo();
   }
 
   @Override
   public String name() {
-    return function.name();
+    return functionDTO.name();
   }
 
   @Override
   public FunctionType functionType() {
-    return function.functionType();
+    return functionDTO.functionType();
   }
 
   @Override
   public boolean deterministic() {
-    return function.deterministic();
+    return functionDTO.deterministic();
   }
 
   @Override
   public String comment() {
-    return function.comment();
+    return functionDTO.comment();
   }
 
   @Override
   public FunctionDefinition[] definitions() {
-    return function.definitions();
+    return functionDTO.definitions();
   }
 
   @Override
@@ -115,16 +116,16 @@ class GenericFunction implements Function, SupportsTags {
     }
 
     GenericFunction that = (GenericFunction) obj;
-    return function.equals(that.function);
+    return functionDTO.equals(that.functionDTO);
   }
 
   @Override
   public int hashCode() {
-    return function.hashCode();
+    return functionDTO.hashCode();
   }
 
   @Override
   public String toString() {
-    return "GenericFunction{" + "function=" + function.toString() + '}';
+    return "GenericFunction{" + "functionDTO=" + functionDTO.toString() + '}';
   }
 }
