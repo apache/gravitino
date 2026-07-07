@@ -158,7 +158,6 @@ public class AuthorizationUtils {
    * @return a synthetic name identifier for tree locking only
    */
   public static NameIdentifier ofUserExternalId(String metalake, String externalId) {
-    checkExternalId(externalId);
     return NameIdentifier.of(
         metalake,
         Entity.SYSTEM_CATALOG_RESERVED_NAME,
@@ -179,7 +178,6 @@ public class AuthorizationUtils {
    * @return a synthetic name identifier for tree locking only
    */
   public static NameIdentifier ofGroupExternalId(String metalake, String externalId) {
-    checkExternalId(externalId);
     return NameIdentifier.of(
         metalake,
         Entity.SYSTEM_CATALOG_RESERVED_NAME,
@@ -237,11 +235,6 @@ public class AuthorizationUtils {
   public static void checkGroupExternalId(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "External id identifier must not be null");
     checkGroupExternalIdNamespace(ident.namespace());
-  }
-
-  public static void checkExternalId(String externalId) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(externalId), "External id must not be null or empty");
   }
 
   public static void checkRole(NameIdentifier ident) {

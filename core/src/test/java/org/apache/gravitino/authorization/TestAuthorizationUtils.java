@@ -79,7 +79,7 @@ class TestAuthorizationUtils {
   }
 
   private void assertInvalidExternalId(org.junit.jupiter.api.function.Executable executable) {
-    Assertions.assertThrows(IllegalArgumentException.class, executable);
+    Assertions.assertThrows(IllegalNameIdentifierException.class, executable);
   }
 
   @Test
