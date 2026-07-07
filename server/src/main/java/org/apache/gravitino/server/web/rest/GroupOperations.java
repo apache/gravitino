@@ -31,6 +31,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -109,6 +110,13 @@ public class GroupOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
+            if (StringUtils.isNotBlank(request.getExternalId())) {
+              return Utils.ok(
+                  new GroupResponse(
+                      DTOConverters.toDTO(
+                          accessControlManager.addGroup(
+                              metalake, request.getName(), request.getExternalId()))));
+            }
             return Utils.ok(
                 new GroupResponse(
                     DTOConverters.toDTO(

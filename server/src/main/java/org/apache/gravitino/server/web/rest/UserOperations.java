@@ -31,6 +31,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -159,10 +160,17 @@ public class UserOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
-            return Utils.ok(
-                new UserResponse(
-                    DTOConverters.toDTO(
-                        accessControlManager.addUser(metalake, request.getName()))));
+            User addedUser;
+            if (StringUtils.isNotBlank(request.getExternalId())) {
+              boolean enabled =
+                  request.getEnabled() != null ? request.getEnabled().booleanValue() : true;
+              addedUser =
+                  accessControlManager.addUser(
+                      metalake, request.getName(), request.getExternalId(), enabled);
+            } else {
+              addedUser = accessControlManager.addUser(metalake, request.getName());
+            }
+            return Utils.ok(new UserResponse(DTOConverters.toDTO(addedUser)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(

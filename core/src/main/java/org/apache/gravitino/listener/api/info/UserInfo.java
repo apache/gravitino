@@ -27,6 +27,8 @@ import org.apache.gravitino.authorization.User;
 @DeveloperApi
 public class UserInfo {
   private final String name;
+  private final String externalId;
+  private final boolean enabled;
   private List<String> roles;
 
   /**
@@ -36,6 +38,8 @@ public class UserInfo {
    */
   public UserInfo(User user) {
     this.name = user.name();
+    this.externalId = user.externalId();
+    this.enabled = user.enabled();
     this.roles = user.roles();
   }
 
@@ -46,6 +50,24 @@ public class UserInfo {
    */
   public String name() {
     return name;
+  }
+
+  /**
+   * Returns the external identifier of the user.
+   *
+   * @return the external identifier of the user
+   */
+  public String externalId() {
+    return externalId;
+  }
+
+  /**
+   * Returns whether the user is enabled.
+   *
+   * @return whether the user is enabled
+   */
+  public boolean enabled() {
+    return enabled;
   }
 
   /**
