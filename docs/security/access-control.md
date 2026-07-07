@@ -570,6 +570,145 @@ Restart the Gravitino server for the configuration changes to take effect.
 
 The following sections demonstrate how to perform common access control operations using both the REST API (Shell) and Java client.
 
+### Bulk Access Control Operations
+
+Bulk access control operations help administrators reduce repeated client-side API calls when managing many users, groups, or roles in the same metalake. They are useful for scenarios such as onboarding or offboarding a team, synchronizing users and groups from an external identity provider, bootstrapping roles for a new environment, or cleaning up multiple obsolete principals.
+
+The bulk APIs validate the request body and authorization before processing any item. If the request is invalid, for example when the name list is empty or contains duplicated names, Gravitino rejects the request and doesn't process any item. After validation succeeds, Gravitino processes each item independently and returns successful names in `succeeded` and per-item business failures in `failed`.
+
+Use the following APIs to add and remove users, groups, and roles in bulk:
+
+| API | Required privilege | Request body |
+|-----|--------------------|--------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add` | `OWNER` of the metalake or `MANAGE_USERS` | `userNames` |
+| `POST /api/bulk/metalakes/{metalake}/users/remove` | `OWNER` of the metalake or `MANAGE_USERS` | `userNames` |
+| `POST /api/bulk/metalakes/{metalake}/groups/add` | `OWNER` of the metalake or `MANAGE_GROUPS` | `groupNames` |
+| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS` | `groupNames` |
+| `POST /api/bulk/metalakes/{metalake}/roles/add` | `OWNER` of the metalake or `CREATE_ROLE` | `roles` |
+| `POST /api/bulk/metalakes/{metalake}/roles/remove` | `OWNER` of the metalake or `OWNER` of each role | `roleNames` |
+
+:::info
+The bulk APIs require authorization to be enabled. For more information, see [Authorization](#authorization).
+:::
+
+#### Add Users in Bulk
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "userNames": ["user1", "user2"]
+}' http://localhost:8090/api/bulk/metalakes/test/users/add
+```
+
+</TabItem>
+</Tabs>
+
+#### Remove Users in Bulk
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "userNames": ["user1", "user2"]
+}' http://localhost:8090/api/bulk/metalakes/test/users/remove
+```
+
+</TabItem>
+</Tabs>
+
+#### Add Groups in Bulk
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "groupNames": ["group1", "group2"]
+}' http://localhost:8090/api/bulk/metalakes/test/groups/add
+```
+
+</TabItem>
+</Tabs>
+
+#### Remove Groups in Bulk
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "groupNames": ["group1", "group2"]
+}' http://localhost:8090/api/bulk/metalakes/test/groups/remove
+```
+
+</TabItem>
+</Tabs>
+
+#### Add Roles in Bulk
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "roles": [
+    {
+      "name": "role1",
+      "properties": {},
+      "securableObjects": []
+    },
+    {
+      "name": "role2",
+      "properties": {},
+      "securableObjects": []
+    }
+  ]
+}' http://localhost:8090/api/bulk/metalakes/test/roles/add
+```
+
+</TabItem>
+</Tabs>
+
+#### Remove Roles in Bulk
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "roleNames": ["role1", "role2"]
+}' http://localhost:8090/api/bulk/metalakes/test/roles/remove
+```
+
+</TabItem>
+</Tabs>
+
+#### Bulk Operation Response
+
+The response includes the names that were processed successfully and the failures for individual items:
+
+```json
+{
+  "code": 0,
+  "succeeded": ["user1"],
+  "failed": [
+    {
+      "name": "user2",
+      "reason": "IllegalArgumentException: User does not exist"
+    }
+  ]
+}
+```
+
 ## User Operations
 
 ### Add a User
