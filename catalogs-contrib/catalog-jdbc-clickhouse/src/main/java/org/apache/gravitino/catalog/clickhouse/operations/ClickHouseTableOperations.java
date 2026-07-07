@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.clickhouse.operations;
 
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
@@ -479,23 +480,21 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case DATA_SKIPPING_MINMAX:
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
-          // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
-          // no field for it.
           // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
-          sqlBuilder.append(
-              " INDEX %s %s TYPE minmax GRANULARITY 1"
-                  .formatted(quoteIdentifier(index.name()), fieldStr));
+          sqlBuilder
+              .append(" ")
+              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "minmax", 1));
           break;
         case DATA_SKIPPING_BLOOM_FILTER:
-          // The GRANULARITY value is always 3 here currently.
           // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
-          sqlBuilder.append(
-              " INDEX %s %s TYPE bloom_filter GRANULARITY 3"
-                  .formatted(quoteIdentifier(index.name()), fieldStr));
+          sqlBuilder
+              .append(" ")
+              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "bloom_filter", 3));
+          break;
+        case DATA_SKIPPING_SET:
+          sqlBuilder
+              .append(" ")
+              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "set", 1));
           break;
         default:
           throw new IllegalArgumentException(
@@ -858,12 +857,14 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String fieldStr = getIndexFieldStr(addIndex.getFieldNames());
     switch (addIndex.getType()) {
       case DATA_SKIPPING_MINMAX:
-        return "ADD INDEX %s %s TYPE minmax GRANULARITY 1"
-            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+        return "ADD INDEX " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "minmax", 1);
 
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY 3"
-            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+        return "ADD INDEX "
+            + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "bloom_filter", 3);
+
+      case DATA_SKIPPING_SET:
+        return "ADD INDEX " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "set", 1);
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
@@ -1300,9 +1301,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_MINMAX;
       case DATA_SKIPPING_BLOOM_FILTER:
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
+      case DATA_SKIPPING_SET:
+        return Index.IndexType.DATA_SKIPPING_SET;
       default:
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
     }
+  }
+
+  private String buildDataSkippingIndexDdl(
+      String indexName, String fieldStr, String typeName, int granularity) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(indexName), "Data skipping index name must not be blank");
+    return "INDEX %s %s TYPE %s GRANULARITY %d"
+        .formatted(quoteIdentifier(indexName), fieldStr, typeName, granularity);
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
