@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -160,16 +161,14 @@ public class UserOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
-            User addedUser;
-            if (StringUtils.isNotBlank(request.getExternalId())) {
-              boolean enabled =
-                  request.getEnabled() != null ? request.getEnabled().booleanValue() : true;
-              addedUser =
-                  accessControlManager.addUser(
-                      metalake, request.getName(), request.getExternalId(), enabled);
-            } else {
-              addedUser = accessControlManager.addUser(metalake, request.getName());
-            }
+            User addedUser =
+                StringUtils.isNotBlank(request.getExternalId())
+                    ? accessControlManager.addUser(
+                        metalake,
+                        request.getName(),
+                        request.getExternalId(),
+                        Optional.ofNullable(request.getEnabled()).orElse(true))
+                    : accessControlManager.addUser(metalake, request.getName());
             return Utils.ok(new UserResponse(DTOConverters.toDTO(addedUser)));
           });
     } catch (Exception e) {

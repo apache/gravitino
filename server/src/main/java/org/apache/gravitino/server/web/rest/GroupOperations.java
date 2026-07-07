@@ -38,6 +38,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
@@ -110,17 +111,12 @@ public class GroupOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
-            if (StringUtils.isNotBlank(request.getExternalId())) {
-              return Utils.ok(
-                  new GroupResponse(
-                      DTOConverters.toDTO(
-                          accessControlManager.addGroup(
-                              metalake, request.getName(), request.getExternalId()))));
-            }
-            return Utils.ok(
-                new GroupResponse(
-                    DTOConverters.toDTO(
-                        accessControlManager.addGroup(metalake, request.getName()))));
+            Group addedGroup =
+                StringUtils.isNotBlank(request.getExternalId())
+                    ? accessControlManager.addGroup(
+                        metalake, request.getName(), request.getExternalId())
+                    : accessControlManager.addGroup(metalake, request.getName());
+            return Utils.ok(new GroupResponse(DTOConverters.toDTO(addedGroup)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(
