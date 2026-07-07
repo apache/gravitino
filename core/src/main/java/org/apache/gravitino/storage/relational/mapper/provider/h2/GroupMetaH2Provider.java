@@ -31,6 +31,7 @@ public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
   public String listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
@@ -72,6 +73,7 @@ public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
     return "<script>"
         + "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
