@@ -189,6 +189,12 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       RegisterTableRequest registerTableRequest) {
     LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
 
+    if (hasTableEntityInStore(context, namespace, registerTableRequest.name())) {
+      // Gravitino already tracks this table: preserve table_id and existing role/owner/tag/policy
+      // bindings after the backend registerTable completes.
+      return response;
+    }
+
     // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
     // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
     // entity is registered. Surface the failure so the caller can react.
@@ -210,7 +216,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
     LoadViewResponse response = dispatcher.registerView(context, namespace, registerViewRequest);
 
-    if (hasViewEntityInStore(context.catalogName(), namespace, registerViewRequest.name())) {
+    if (hasViewEntityInStore(context, namespace, registerViewRequest.name())) {
       // Gravitino already tracks this view: preserve view_id and existing role/owner/tag/policy
       // bindings after the backend registerView completes.
       return response;
@@ -244,21 +250,41 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     }
   }
 
-  private boolean hasViewEntityInStore(String catalogName, Namespace namespace, String viewName) {
-    EntityStore store = GravitinoEnv.getInstance().entityStore();
-    if (store == null) {
+  private boolean hasViewEntityInStore(
+      IcebergRequestContext context, Namespace namespace, String viewName) {
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    if (entityStore == null) {
       return false;
     }
     try {
-      NameIdentifier viewIdent =
+      return entityStore.exists(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake,
-              catalogName,
+              context.catalogName(),
               TableIdentifier.of(namespace, viewName),
-              HierarchicalSchemaUtil.schemaSeparator());
-      return store.exists(viewIdent, Entity.EntityType.VIEW);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to check view entity existence in store", e);
+              HierarchicalSchemaUtil.schemaSeparator()),
+          Entity.EntityType.VIEW);
+    } catch (IOException ioe) {
+      throw new RuntimeException("io exception when checking view entity existence", ioe);
+    }
+  }
+
+  private boolean hasTableEntityInStore(
+      IcebergRequestContext context, Namespace namespace, String tableName) {
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    if (entityStore == null) {
+      return false;
+    }
+    try {
+      return entityStore.exists(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake,
+              context.catalogName(),
+              TableIdentifier.of(namespace, tableName),
+              HierarchicalSchemaUtil.schemaSeparator()),
+          Entity.EntityType.TABLE);
+    } catch (IOException ioe) {
+      throw new RuntimeException("io exception when checking table entity existence", ioe);
     }
   }
 

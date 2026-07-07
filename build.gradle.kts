@@ -357,6 +357,7 @@ subprojects {
     ":api",
     ":common",
     ":catalogs:catalog-common",
+    ":catalogs:hadoop-auth",
     ":catalogs:hadoop-common",
     ":maintenance:jobs",
     ":maintenance:optimizer-api",
@@ -1180,6 +1181,7 @@ tasks {
         !it.name.startsWith("optimizer") &&
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
+        it.name != "hadoop-auth" &&
         it.name != "hadoop-common" &&
         it.name != "web" &&
         it.name != "web-v2" &&

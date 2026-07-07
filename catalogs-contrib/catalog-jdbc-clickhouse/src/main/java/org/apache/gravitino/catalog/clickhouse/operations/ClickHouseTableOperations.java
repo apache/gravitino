@@ -111,7 +111,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   protected List<Index> getIndexes(Connection connection, String databaseName, String tableName) {
     // cause clickhouse not impl getPrimaryKeys yet, ref:
     // https://github.com/ClickHouse/clickhouse-java/issues/1625
-    String sql = QUERY_INDEXES_SQL.formatted(databaseName, tableName);
+    String sql =
+        QUERY_INDEXES_SQL.formatted(
+            escapeSingleQuotes(databaseName), escapeSingleQuotes(tableName));
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
@@ -817,10 +819,28 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return "";
     }
 
+    // Check if the table is on a cluster, so that ALTER TABLE includes ON CLUSTER
+    lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+    Map<String, String> props = lazyLoadTable.properties();
+    String clusterName = props == null ? null : props.get(ClusterConstants.CLUSTER_NAME);
+    boolean onCluster =
+        props != null
+            && Boolean.parseBoolean(props.getOrDefault(ClusterConstants.ON_CLUSTER, "false"));
+
     // Return the generated SQL statement
-    String result =
-        "ALTER TABLE %s \n%s;"
-            .formatted(quoteIdentifier(tableName), String.join(",\n", nonEmptySQLs));
+    String result;
+    if (onCluster && StringUtils.isNotBlank(clusterName)) {
+      result =
+          "ALTER TABLE %s ON CLUSTER %s \n%s;"
+              .formatted(
+                  quoteIdentifier(tableName),
+                  quoteIdentifier(clusterName),
+                  String.join(",\n", nonEmptySQLs));
+    } else {
+      result =
+          "ALTER TABLE %s \n%s;"
+              .formatted(quoteIdentifier(tableName), String.join(",\n", nonEmptySQLs));
+    }
     LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
     return result;
   }

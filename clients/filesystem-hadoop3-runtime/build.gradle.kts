@@ -30,6 +30,7 @@ dependencies {
   implementation(project(":bundles:aws"))
   implementation(project(":bundles:azure"))
   implementation(project(":bundles:gcp"))
+  implementation(project(":bundles:tencent"))
   implementation(project(":clients:filesystem-hadoop3")) {
     exclude(group = "org.slf4j")
   }

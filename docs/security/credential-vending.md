@@ -14,14 +14,14 @@ Gravitino credential vending is used to generate temporary or static credentials
 - Supports Gravitino Iceberg REST server.
 - Supports Gravitino server with the following catalog types:
 
-  | Catalog type    | Supported credential types                                      | Since version    |
-  |-----------------|-----------------------------------------------------------------|------------------|
-  | Hadoop (Fileset)| S3, OSS, GCS, ADLS                                             | 0.7.0-incubating |
-  | Hive            | S3, OSS, GCS, ADLS                                             | 1.3.0            |
-  | Iceberg         | S3, OSS, GCS, ADLS                                             | 1.3.0            |
-  | Glue            | S3                                                              | 1.3.0            |
-  | JDBC            | JDBC user/password (`jdbc-user-password`)                       | 1.3.0            |
-  | Paimon          | S3, OSS, JDBC user/password (`jdbc-user-password`)             | 1.3.0            |
+  | Catalog type    | Supported credential types                         | Since version    |
+  |-----------------|----------------------------------------------------|------------------|
+  | Hadoop (Fileset)| S3, OSS, GCS, ADLS                                 | 0.7.0-incubating |
+  | Hive            | S3, OSS, GCS, ADLS                                 | 1.3.0            |
+  | Iceberg         | S3, OSS, GCS, ADLS                                 | 1.3.0            |
+  | Glue            | S3                                                 | 1.3.0            |
+  | JDBC            | JDBC user/password (`jdbc-user-password`)          | 1.3.0            |
+  | Paimon          | S3, OSS, JDBC user/password (`jdbc-user-password`) | 1.3.0            |
 - Supports pluggable credentials with build-in credentials:
   - S3: `S3TokenCredential`, `S3SecretKeyCredential`, `AwsIrsaCredential`
   - GCS: `GCSTokenCredential`
