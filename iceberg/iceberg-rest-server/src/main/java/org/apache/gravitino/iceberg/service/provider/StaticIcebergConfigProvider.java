@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.service.provider;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -56,10 +57,22 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
                     catalogName -> catalogName,
                     catalogName ->
                         new IcebergConfig(
-                            MapUtils.getPrefixMap(
-                                properties, String.format("catalog.%s.", catalogName)))));
+                            withDefaultCatalogBackendName(
+                                catalogName,
+                                MapUtils.getPrefixMap(
+                                    properties, String.format("catalog.%s.", catalogName))))));
+    Map<String, String> defaultCatalogConfig = new HashMap<>(properties);
+    defaultCatalogConfig.putIfAbsent(
+        IcebergConstants.CATALOG_BACKEND_NAME, IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
     this.catalogConfigs.put(
-        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(properties));
+        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(defaultCatalogConfig));
+  }
+
+  private static Map<String, String> withDefaultCatalogBackendName(
+      String catalogName, Map<String, String> catalogProperties) {
+    Map<String, String> catalogConfig = new HashMap<>(catalogProperties);
+    catalogConfig.putIfAbsent(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
+    return catalogConfig;
   }
 
   @Override

@@ -36,6 +36,7 @@ import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosKeytabCatalogId;
 import org.apache.gravitino.iceberg.common.utils.CaffeineSchedulerExtractorUtils;
 import org.apache.gravitino.iceberg.common.utils.IcebergHiveCachedClientPool;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -281,10 +282,9 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
               .loginMode(KerberosAuthUtils.LoginMode.CURRENT_USER)
               .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
               .build();
-      // catalog_uuid always exists for Gravitino managed catalogs, `0` is just a fallback value.
-      String catalogUUID = properties().getOrDefault("catalog_uuid", "0");
+      String keytabCatalogId = KerberosKeytabCatalogId.resolve(properties(), name());
       File keytabFile =
-          new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, catalogUUID));
+          new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, keytabCatalogId));
       KerberosAuthUtils.saveKeytabFromUri(
           kerberosConfig.getKeytab(),
           keytabFile,

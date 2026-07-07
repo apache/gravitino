@@ -112,4 +112,21 @@ public class TestStaticIcebergConfigProvider {
     Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);
     Assertions.assertEquals(Optional.empty(), config);
   }
+
+  @Test
+  public void testInjectCatalogBackendNameWhenMissing() {
+    String hiveCatalogName = "hive_proxy";
+    Map<String, String> config = Maps.newHashMap();
+    config.put("catalog.hive_proxy.catalog-backend", "hive");
+    config.put("catalog.hive_proxy.uri", "thrift://127.0.0.1:9083");
+    config.put("catalog.hive_proxy.warehouse", "/tmp/usr/hive/warehouse");
+
+    StaticIcebergConfigProvider provider = new StaticIcebergConfigProvider();
+    provider.initialize(config);
+
+    IcebergConfig hiveIcebergConfig = provider.catalogConfigs.get(hiveCatalogName);
+    Assertions.assertEquals(
+        hiveCatalogName, hiveIcebergConfig.get(IcebergConfig.CATALOG_BACKEND_NAME));
+    Assertions.assertEquals(hiveCatalogName, hiveIcebergConfig.getCatalogBackendName());
+  }
 }
