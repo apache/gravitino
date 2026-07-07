@@ -589,7 +589,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     columns.add(
         JdbcColumn.builder()
             .withName("c_dt64")
-            .withType(Types.ExternalType.of("DateTime64(3)"))
+            .withType(Types.TimestampType.withoutTimeZone(3))
             .withNullable(false)
             .build());
     columns.add(
@@ -647,7 +647,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertEquals(
         Types.TimestampType.withoutTimeZone(0), loaded.columns()[14].dataType());
     Assertions.assertEquals(
-        Types.ExternalType.of("DateTime64(3)"), loaded.columns()[15].dataType());
+        Types.TimestampType.withoutTimeZone(3), loaded.columns()[15].dataType());
     Assertions.assertEquals(Types.BooleanType.get(), loaded.columns()[16].dataType());
     Assertions.assertEquals(Types.UUIDType.get(), loaded.columns()[17].dataType());
     Assertions.assertEquals(Types.ExternalType.of("IPv4"), loaded.columns()[18].dataType());

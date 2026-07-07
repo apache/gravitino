@@ -166,6 +166,7 @@ public class TestUserRoleRelMapper {
             .withUserId(1L)
             .withUserName("user1")
             .withMetalakeId(1L)
+            .withEnabled(true)
             .withAuditInfo(auditInfo.toString())
             .withCurrentVersion(1L)
             .withLastVersion(0L)

@@ -76,7 +76,10 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
-    String typeName = TypeUtils.stripNullable(typeBean.getTypeName());
+    // ClickHouse allows LowCardinality wrapping Nullable: LowCardinality(Nullable(String)).
+    // Nullable(LowCardinality(X)) is invalid in ClickHouse and not handled here.
+    String typeName = TypeUtils.stripLowCardinality(typeBean.getTypeName());
+    typeName = TypeUtils.stripNullable(typeName);
 
     Integer dateTimePrecision = TypeUtils.extractDateTimePrecision(typeName);
     if (dateTimePrecision != null) {
@@ -126,6 +129,11 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
               String.format("Decimal scale %s is out of range [0, %s]", scale, precision));
         }
 
+        // ClickHouse supports Decimal up to precision 76 (Decimal128=38, Decimal256=76),
+        // but Gravitino core DecimalType enforces precision <= 38. Use ExternalType for larger.
+        if (precision > 38) {
+          return Types.ExternalType.of(String.format("%s(%s,%s)", DECIMAL, precision, scale));
+        }
         return Types.DecimalType.of(precision, scale);
       case STRING:
         return Types.StringType.get();
@@ -141,6 +149,10 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
         return Types.BooleanType.get();
       case UUID:
         return Types.UUIDType.get();
+      case IPV4:
+        return Types.ExternalType.of(IPV4);
+      case IPV6:
+        return Types.ExternalType.of(IPV6);
       default:
         return Types.ExternalType.of(typeBean.getTypeName());
     }
@@ -164,9 +176,12 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       return STRING;
     } else if (type instanceof Types.DateType) {
       return DATE;
-    } else if (type instanceof Types.TimestampType) {
-      // Gravitino timestamp type maps to ClickHouse DateTime with precision 0, and
-      // Use the external type to handle DateTime64
+    } else if (type instanceof Types.TimestampType timestampType) {
+      // Gravitino timestamp type maps to ClickHouse DateTime with precision 0.
+      // For precision > 0, use DateTime64(N).
+      if (timestampType.precision() > 0) {
+        return DATETIME64 + "(" + timestampType.precision() + ")";
+      }
       return DATETIME;
     } else if (type instanceof Types.TimeType) {
       return TIME;
