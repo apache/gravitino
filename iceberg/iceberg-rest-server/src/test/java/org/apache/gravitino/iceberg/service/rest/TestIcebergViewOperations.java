@@ -104,7 +104,6 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     // create namespace before each view test
     resourceConfig.register(MockIcebergNamespaceOperations.class);
     resourceConfig.register(MockIcebergViewRenameOperations.class);
-    resourceConfig.register(MockIcebergViewRegisterOperations.class);
 
     // register a mock HttpServletRequest with user info
     resourceConfig.register(

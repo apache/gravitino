@@ -27,7 +27,6 @@ import org.apache.gravitino.iceberg.service.rest.IcebergNamespaceOperations;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableRenameOperations;
 import org.apache.gravitino.iceberg.service.rest.IcebergViewOperations;
-import org.apache.gravitino.iceberg.service.rest.IcebergViewRegisterOperations;
 import org.apache.gravitino.iceberg.service.rest.IcebergViewRenameOperations;
 import org.glassfish.hk2.api.Filter;
 
@@ -46,8 +45,7 @@ public class IcebergRESTAuthInterceptionService extends BaseInterceptionService 
             IcebergTableRenameOperations.class.getName(),
             IcebergNamespaceOperations.class.getName(),
             IcebergViewOperations.class.getName(),
-            IcebergViewRenameOperations.class.getName(),
-            IcebergViewRegisterOperations.class.getName()));
+            IcebergViewRenameOperations.class.getName()));
   }
 
   @Override
