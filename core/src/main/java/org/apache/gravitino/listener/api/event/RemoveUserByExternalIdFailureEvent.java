@@ -17,54 +17,41 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.info;
+package org.apache.gravitino.listener.api.event;
 
-import java.util.List;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 
-/** Provides read-only access to group information for event listeners. */
+/** Represents an event triggered when removing a user by external id fails. */
 @DeveloperApi
-public class GroupInfo {
-  private final String name;
+public class RemoveUserByExternalIdFailureEvent extends UserFailureEvent {
   private final String externalId;
-  private List<String> roles;
 
   /**
-   * Constructs a new {@link GroupInfo} instance from the specified {@link Group} object.
+   * Creates a new {@link RemoveUserByExternalIdFailureEvent}.
    *
-   * @param group the {@link Group} object from which to create the {@link GroupInfo}.
+   * @param initiator The user who initiated the request.
+   * @param metalake The metalake name.
+   * @param exception The exception that caused the failure.
+   * @param externalId The external identifier of the user.
    */
-  public GroupInfo(Group group) {
-    this.name = group.name();
-    this.externalId = group.externalId();
-    this.roles = group.roles();
+  public RemoveUserByExternalIdFailureEvent(
+      String initiator, String metalake, Exception exception, String externalId) {
+    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, externalId), exception);
+    this.externalId = externalId;
   }
 
   /**
-   * Returns the name of the group.
+   * Returns the external identifier of the user.
    *
-   * @return The name of the group.
-   */
-  public String name() {
-    return name;
-  }
-
-  /**
-   * Returns the external identifier of the group.
-   *
-   * @return The external identifier of the group.
+   * @return The external identifier.
    */
   public String externalId() {
     return externalId;
   }
 
-  /**
-   * Returns the roles of the roles.
-   *
-   * @return The roles of the group.
-   */
-  public List<String> roles() {
-    return roles;
+  @Override
+  public OperationType operationType() {
+    return OperationType.REMOVE_USER_BY_EXTERNAL_ID;
   }
 }

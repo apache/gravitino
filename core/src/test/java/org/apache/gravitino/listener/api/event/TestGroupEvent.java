@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -48,6 +49,7 @@ public class TestGroupEvent {
 
   private static final String METALAKE = "demo_metalake";
   private static final String INEXIST_METALAKE = "inexist_metalake";
+  private static final String GROUP_EXT_ID = "ext-group-1";
   private AccessControlEventDispatcher dispatcher;
   private AccessControlEventDispatcher failureDispatcher;
   private DummyEventListener dummyEventListener;
@@ -55,6 +57,7 @@ public class TestGroupEvent {
   private String otherGroupName;
   private String inExistGroupName;
   private Group group;
+  private Group externalIdGroup;
   private Group otherGroup;
   private NameIdentifier identifier;
   private List<String> grantedRoles;
@@ -66,6 +69,7 @@ public class TestGroupEvent {
     this.otherGroupName = "group_admin";
     this.inExistGroupName = "group_not_exist";
     this.group = getMockGroup(groupName, ImmutableList.of("test", "engineer"));
+    this.externalIdGroup = getMockGroupWithExtId(groupName, GROUP_EXT_ID, group.roles());
     this.otherGroup = getMockGroup(otherGroupName, null);
     this.identifier = NameIdentifier.of(METALAKE);
     this.grantedRoles = ImmutableList.of("test", "engineer");
@@ -534,9 +538,70 @@ public class TestGroupEvent {
     Assertions.assertEquals(revokedRoles, revokeGroupRolesFailureEvent.roles());
   }
 
+  @Test
+  void testAddGroupWithExternalIdEvent() {
+    dispatcher.addGroup(METALAKE, groupName, GROUP_EXT_ID);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(AddGroupPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.ADD_GROUP, preEvent.operationType());
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AddGroupEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.ADD_GROUP, event.operationType());
+  }
+
+  @Test
+  void testGetGroupByExternalIdEvent() {
+    dispatcher.getGroupByExternalId(METALAKE, GROUP_EXT_ID);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetGroupByExternalIdPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(
+        AuthorizationUtils.ofGroupExternalId(METALAKE, GROUP_EXT_ID), preEvent.identifier());
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetGroupByExternalIdEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.GET_GROUP_BY_EXTERNAL_ID, event.operationType());
+  }
+
+  @Test
+  void testRemoveGroupByExternalIdEvent() {
+    dispatcher.removeGroupByExternalId(METALAKE, GROUP_EXT_ID);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(RemoveGroupByExternalIdPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.REMOVE_GROUP_BY_EXTERNAL_ID, preEvent.operationType());
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RemoveGroupByExternalIdEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.REMOVE_GROUP_BY_EXTERNAL_ID, event.operationType());
+  }
+
+  @Test
+  void testGetGroupByExternalIdFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.getGroupByExternalId(METALAKE, GROUP_EXT_ID));
+
+    dummyEventListener.popPreEvent();
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetGroupByExternalIdFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.GET_GROUP_BY_EXTERNAL_ID, event.operationType());
+  }
+
   private Group getMockGroup(String name, List<String> roles) {
     Group mockGroup = mock(Group.class);
     when(mockGroup.name()).thenReturn(name);
+    when(mockGroup.roles()).thenReturn(roles);
+
+    return mockGroup;
+  }
+
+  private Group getMockGroupWithExtId(String name, String externalId, List<String> roles) {
+    Group mockGroup = mock(Group.class);
+    when(mockGroup.name()).thenReturn(name);
+    when(mockGroup.externalId()).thenReturn(externalId);
     when(mockGroup.roles()).thenReturn(roles);
 
     return mockGroup;
@@ -546,14 +611,17 @@ public class TestGroupEvent {
     AccessControlEventDispatcher dispatcher = mock(AccessControlEventDispatcher.class);
     when(dispatcher.addGroup(METALAKE, groupName)).thenReturn(group);
     when(dispatcher.addGroup(METALAKE, otherGroupName)).thenReturn(otherGroup);
+    when(dispatcher.addGroup(METALAKE, groupName, GROUP_EXT_ID)).thenReturn(externalIdGroup);
 
     when(dispatcher.removeGroup(METALAKE, groupName)).thenReturn(true);
     when(dispatcher.removeGroup(METALAKE, inExistGroupName)).thenReturn(false);
+    when(dispatcher.removeGroupByExternalId(METALAKE, GROUP_EXT_ID)).thenReturn(true);
 
     when(dispatcher.listGroups(METALAKE)).thenReturn(new Group[] {group, otherGroup});
     when(dispatcher.listGroupNames(METALAKE)).thenReturn(new String[] {groupName, otherGroupName});
 
     when(dispatcher.getGroup(METALAKE, groupName)).thenReturn(group);
+    when(dispatcher.getGroupByExternalId(METALAKE, GROUP_EXT_ID)).thenReturn(externalIdGroup);
     when(dispatcher.getGroup(METALAKE, inExistGroupName))
         .thenThrow(new NoSuchGroupException("group not found"));
     when(dispatcher.getGroup(INEXIST_METALAKE, groupName))
