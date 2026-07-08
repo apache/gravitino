@@ -307,15 +307,52 @@ Initial score inputs:
 
 ### Cost
 
-Cost represents estimated maintenance effort, not cloud billing.
+Cost represents estimated maintenance effort, not cloud billing. The first version should calculate
+cost as an operational score and expose the inputs behind it.
 
-Initial cost inputs:
+Recommended first-version formula:
 
-- Estimated job runtime.
-- Estimated partitions selected.
-- Input file count.
-- Input file size.
-- Optional resource estimate if available.
+```text
+estimatedRuntimeMinutes = baseOverheadMinutes
+  + inputFileCount * fileScanCostMinutes
+  + inputSizeGiB * rewriteCostMinutesPerGiB
+  + selectedPartitionCount * partitionPlanningCostMinutes
+
+estimatedResourceCost = estimatedRuntimeMinutes * executorCostUnit
+
+riskPenalty = recentFailureCount * failurePenalty
+  + runningJobConflictCount * conflictPenalty
+
+costScore = normalize(estimatedResourceCost + riskPenalty)
+```
+
+Initial default inputs:
+
+- `inputFileCount`: number of files selected for maintenance.
+- `inputSizeGiB`: selected data size in GiB.
+- `selectedPartitionCount`: number of partitions selected for the job.
+- `recentFailureCount`: recent failed TMS jobs for the same table or policy.
+- `runningJobConflictCount`: running TMS jobs targeting the same table.
+
+Initial configurable weights:
+
+- `baseOverheadMinutes`: fixed startup and planning cost.
+- `fileScanCostMinutes`: per-file planning and scan overhead.
+- `rewriteCostMinutesPerGiB`: rewrite cost per GiB.
+- `partitionPlanningCostMinutes`: per-partition planning overhead.
+- `executorCostUnit`: optional multiplier for executor cost.
+- `failurePenalty`: penalty for recent failed jobs.
+- `conflictPenalty`: penalty for concurrent table maintenance.
+
+The UI should show both the human-readable estimate and the score used for sorting:
+
+- Estimated runtime: for example `18 min`.
+- Estimated resource cost: for example `18 executor-min`.
+- Cost score: normalized value for sorting.
+- Cost breakdown: file count, data size, partitions, risk penalties.
+
+If the backend does not expose enough data for the full formula, the UI should show partial
+estimates and mark missing inputs explicitly instead of inventing values.
 
 ### Benefit
 
