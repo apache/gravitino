@@ -1,6 +1,0 @@
-flowchart TD
-  WA["Write on node A"] --> C["DEL affected entity keys<br/>in Redis (after DB commit)"]
-  C --> S[("Redis: one shared copy<br/>D:{key} values + IDX prefix index")]
-  S --> RA["Node A reads"]
-  S --> RB["Node B reads"]
-  RB -.->|"sees the change right away"| S
