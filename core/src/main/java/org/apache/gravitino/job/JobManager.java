@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -60,7 +61,6 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.utils.DirectoryUtils;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -128,7 +128,7 @@ public class JobManager implements JobOperationDispatcher {
       }
     } else {
       try {
-        DirectoryUtils.ensureDirectory(stagingDir);
+        Files.createDirectories(stagingDir.toPath());
       } catch (IOException e) {
         throw new IllegalArgumentException(
             String.format("Failed to create staging directory %s", stagingDirPath), e);
@@ -432,7 +432,7 @@ public class JobManager implements JobOperationDispatcher {
             + String.format(JOB_STAGING_DIR, metalake, jobTemplateName, jobId);
     File jobStagingDir = new File(jobStagingPath);
     try {
-      DirectoryUtils.ensureDirectory(jobStagingDir);
+      Files.createDirectories(jobStagingDir.toPath());
     } catch (IOException e) {
       throw new RuntimeException(
           String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId),

@@ -24,13 +24,13 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
-import org.apache.gravitino.utils.DirectoryUtils;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -106,7 +106,7 @@ public final class KerberosAuthUtils {
 
     File parentFile = keytabFile.getParentFile();
     if (parentFile != null) {
-      DirectoryUtils.ensureDirectory(parentFile);
+      Files.createDirectories(parentFile.toPath());
     }
 
     FileFetcher.get().fetchFileFromUri(keytabUri, keytabFile, timeoutSec * 1000, hadoopConf);
