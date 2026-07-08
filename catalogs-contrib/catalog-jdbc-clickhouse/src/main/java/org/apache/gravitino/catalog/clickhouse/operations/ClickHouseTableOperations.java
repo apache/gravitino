@@ -1299,6 +1299,17 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return secondaryIndexes;
   }
 
+  /**
+   * Maps a ClickHouse data skipping index type string to the corresponding Gravitino {@link
+   * Index.IndexType}. Returns {@code DATA_SKIPPING_MINMAX} for blank/null input (ClickHouse
+   * default). Also handles the {@code set(N)} parameterized format that some ClickHouse versions
+   * may return from {@code system.data_skipping_indices}.
+   *
+   * @param rawType the index type string from ClickHouse metadata (e.g. "minmax", "bloom_filter",
+   *     "set", "set(0)")
+   * @return the corresponding Gravitino IndexType
+   * @throws IllegalArgumentException if the type is not supported
+   */
   @VisibleForTesting
   Index.IndexType getClickHouseIndexType(String rawType) {
     if (StringUtils.isBlank(rawType)) {
