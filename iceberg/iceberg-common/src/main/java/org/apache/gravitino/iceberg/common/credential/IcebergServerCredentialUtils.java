@@ -66,13 +66,18 @@ public final class IcebergServerCredentialUtils {
         GravitinoIcebergAwsCredentialsProvider.SOURCE,
         GravitinoIcebergAwsCredentialsProvider.SOURCE_LOCAL);
 
+    boolean hasRefreshableAwsCredential = false;
     for (Credential credential : credentials) {
       if (isExpiringS3Credential(credential)) {
-        configureRefreshableAwsProvider(effectiveProviderProperties, targetProperties);
+        hasRefreshableAwsCredential = true;
       } else {
         CredentialPropertyUtils.applyIcebergCredentials(
             new Credential[] {credential}, targetProperties);
       }
+    }
+
+    if (hasRefreshableAwsCredential) {
+      configureRefreshableAwsProvider(effectiveProviderProperties, targetProperties);
     }
   }
 

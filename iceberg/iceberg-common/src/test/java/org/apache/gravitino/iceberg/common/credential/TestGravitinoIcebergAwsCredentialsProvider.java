@@ -21,7 +21,9 @@ package org.apache.gravitino.iceberg.common.credential;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.credential.AwsIrsaCredential;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -63,6 +65,26 @@ public class TestGravitinoIcebergAwsCredentialsProvider {
         targetProperties.get(
             IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
                 + "custom-hidden-property"));
+    Assertions.assertFalse(targetProperties.containsKey("s3.access-key-id"));
+    Assertions.assertFalse(targetProperties.containsKey("s3.secret-access-key"));
+    Assertions.assertFalse(targetProperties.containsKey("s3.session-token"));
+  }
+
+  @Test
+  void testApplyCredentialsPrefersRefreshableProviderOverStaticS3Credentials() {
+    Credential[] credentials =
+        new Credential[] {
+          new AwsIrsaCredential("access-key", "secret-key", "session-token", 123),
+          new S3SecretKeyCredential("static-access-key", "static-secret-key")
+        };
+    Map<String, String> targetProperties = new HashMap<>();
+
+    IcebergServerCredentialUtils.applyCredentials(
+        "catalog", credentials, new HashMap<>(), targetProperties);
+
+    Assertions.assertEquals(
+        GravitinoIcebergAwsCredentialsProvider.class.getName(),
+        targetProperties.get(IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER));
     Assertions.assertFalse(targetProperties.containsKey("s3.access-key-id"));
     Assertions.assertFalse(targetProperties.containsKey("s3.secret-access-key"));
     Assertions.assertFalse(targetProperties.containsKey("s3.session-token"));
