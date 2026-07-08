@@ -346,6 +346,8 @@ public interface AuditLog {
 
     LIST_VIEW,
 
+    REGISTER_VIEW,
+
     REGISTER_MODEL,
 
     DELETE_MODEL,
