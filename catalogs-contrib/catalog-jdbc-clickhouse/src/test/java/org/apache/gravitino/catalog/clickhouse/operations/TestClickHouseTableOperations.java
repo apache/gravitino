@@ -1372,6 +1372,35 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  public void testGetClickHouseIndexType() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    // Exact matches
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType("minmax"));
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_BLOOM_FILTER, ops.getClickHouseIndexType("bloom_filter"));
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set"));
+
+    // set(N) variants — ClickHouse may return type with parameter in some versions
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(0)"));
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(100)"));
+
+    // Blank/null defaults to MINMAX
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(""));
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(null));
+
+    // Unsupported type
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.getClickHouseIndexType("unknown_type"));
+  }
+
+  @Test
   public void testAlterTableNullabilityValidationFails() {
     StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
     ops.initialize(

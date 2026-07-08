@@ -495,7 +495,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
               .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "bloom_filter", 3));
           break;
         case DATA_SKIPPING_SET:
-          // set(0) means unlimited max unique values; ClickHouse requires set(N) syntax.
+          // The max unique values (N) is always 0 (unlimited) here currently as we can't set it
+          // by Index: there is no field for it. ClickHouse requires set(N) syntax.
+          // TODO(yuqi) add a properties field to Index to support user defined max unique values.
           sqlBuilder
               .append(" ")
               .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "set(0)", 1));
@@ -867,7 +869,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "bloom_filter", 3);
 
       case DATA_SKIPPING_SET:
-        // set(0) means unlimited max unique values; ClickHouse requires set(N) syntax.
+        // The max unique values (N) is always 0 (unlimited) here currently as we can't set it
+        // by Index: there is no field for it. ClickHouse requires set(N) syntax.
+        // TODO(yuqi) add a properties field to Index to support user defined max unique values.
         return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "set(0)", 1);
 
       case PRIMARY_KEY:
@@ -1295,7 +1299,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return secondaryIndexes;
   }
 
-  private Index.IndexType getClickHouseIndexType(String rawType) {
+  @VisibleForTesting
+  Index.IndexType getClickHouseIndexType(String rawType) {
     if (StringUtils.isBlank(rawType)) {
       return Index.IndexType.DATA_SKIPPING_MINMAX;
     }
@@ -1308,6 +1313,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       case DATA_SKIPPING_SET:
         return Index.IndexType.DATA_SKIPPING_SET;
       default:
+        // ClickHouse may return "set(N)" with parameter in some versions;
+        // match on prefix to handle both "set" and "set(N)" formats.
+        if (rawType.startsWith(DATA_SKIPPING_SET + "(")) {
+          return Index.IndexType.DATA_SKIPPING_SET;
+        }
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
     }
   }
