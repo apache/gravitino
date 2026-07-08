@@ -84,6 +84,28 @@ public class TestClosableJdbcCatalog {
   }
 
   @Test
+  void testImpersonationEnableConfigValues() {
+    Map<String, String> properties = newJdbcCatalogProperties();
+    properties.put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, "true");
+    Assertions.assertTrue(new AuthenticationConfig(properties).isImpersonationEnabled());
+
+    properties.put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, "false");
+    Assertions.assertFalse(new AuthenticationConfig(properties).isImpersonationEnabled());
+  }
+
+  @Test
+  void testKerberosOpsWithImpersonationDisabled() throws Throwable {
+    ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
+    catalog.setConf(new HdfsConfiguration());
+
+    Map<String, String> properties = newJdbcCatalogProperties();
+    properties.put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, "false");
+    catalog.initialize("test", properties);
+
+    Assertions.assertEquals("ok", catalog.doKerberosOperations(() -> "ok"));
+  }
+
+  @Test
   void testKerberosOpsNoClient() {
     ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
     Configuration conf = new HdfsConfiguration();

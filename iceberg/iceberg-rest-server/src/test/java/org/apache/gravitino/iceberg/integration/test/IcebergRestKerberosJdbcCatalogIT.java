@@ -70,6 +70,7 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
         "gravitino.iceberg-rest.authentication.kerberos.keytab-uri",
         tempDir + IcebergRestKerberosTestEnv.CLIENT_KEYTAB);
     configMap.put("gravitino.iceberg-rest.hadoop.security.authentication", "kerberos");
+    configMap.put("gravitino.iceberg-rest.authentication.impersonation-enable", "false");
     configMap.put(
         "gravitino.iceberg-rest.dfs.namenode.kerberos.principal",
         "hdfs/_HOST@HADOOPKRB"
