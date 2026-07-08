@@ -171,16 +171,49 @@ def load_catalog_tools(mcp: FastMCP):
         )
 
     @mcp.tool(tags={"catalog"})
-    async def drop_catalog(ctx: Context, catalog_name: str) -> str:
+    async def drop_catalog(
+        ctx: Context, catalog_name: str, force: bool = False
+    ) -> str:
         """
         Drop a catalog by its name.
+
+        A catalog that is in use (enabled) cannot be dropped unless `force`
+        is true; disable it first via `set_catalog_in_use` or pass
+        `force=True`.
 
         Args:
             ctx (Context): The request context object.
             catalog_name (str): Name of the catalog to drop.
+            force (bool): Whether to drop the catalog even if it is in use
+                or non-empty. Defaults to False.
 
         Returns:
             str: JSON-formatted string indicating whether the catalog was dropped.
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_catalog_operation().drop_catalog(catalog_name)
+        return await client.as_catalog_operation().drop_catalog(
+            catalog_name, force
+        )
+
+    @mcp.tool(tags={"catalog"})
+    async def set_catalog_in_use(
+        ctx: Context, catalog_name: str, in_use: bool
+    ) -> str:
+        """
+        Enable or disable a catalog.
+
+        A disabled catalog rejects all operations except drop; a catalog must
+        be disabled (or force-dropped) before it can be dropped.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog to enable or disable.
+            in_use (bool): True to enable the catalog, False to disable it.
+
+        Returns:
+            str: JSON-formatted string containing the base response.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_catalog_operation().set_catalog_in_use(
+            catalog_name, in_use
+        )

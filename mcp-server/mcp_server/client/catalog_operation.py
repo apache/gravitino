@@ -50,5 +50,9 @@ class CatalogOperation(ABC):
         pass
 
     @abstractmethod
-    async def drop_catalog(self, catalog_name: str) -> str:
+    async def drop_catalog(self, catalog_name: str, force: bool) -> str:
+        pass
+
+    @abstractmethod
+    async def set_catalog_in_use(self, catalog_name: str, in_use: bool) -> str:
         pass

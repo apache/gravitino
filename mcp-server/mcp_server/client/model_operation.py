@@ -144,3 +144,43 @@ class ModelOperation(ABC):
         self, catalog_name: str, schema_name: str, model_name: str, version: int
     ) -> str:
         pass
+
+    @abstractmethod
+    async def delete_model_version_by_alias(
+        self, catalog_name: str, schema_name: str, model_name: str, alias: str
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def alter_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        updates: list,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    # pylint: disable=too-many-positional-arguments
+    async def alter_model_version(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        version: int,
+        updates: list,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    # pylint: disable=too-many-positional-arguments
+    async def alter_model_version_by_alias(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        alias: str,
+        updates: list,
+    ) -> str:
+        pass

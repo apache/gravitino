@@ -65,6 +65,7 @@ def _make_mock_client(response_json: dict):
     client.post = AsyncMock(return_value=response)
     client.put = AsyncMock(return_value=response)
     client.delete = AsyncMock(return_value=response)
+    client.patch = AsyncMock(return_value=response)
     return client
 
 
@@ -98,6 +99,20 @@ class TestCatalogOperationUrlEncoding(unittest.TestCase):
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)
 
+    def test_drop_catalog_passes_force_as_query_param(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientCatalogOperation(METALAKE, client)
+        result = asyncio.run(op.drop_catalog("catalog", True))
+        self.assertEqual("true", result)
+        self.assertTrue(_called_params(client.delete)["force"])
+
+    def test_set_catalog_in_use_sends_patch_with_in_use(self):
+        client = _make_mock_client({"code": 0})
+        op = PlainRESTClientCatalogOperation(METALAKE, client)
+        result = asyncio.run(op.set_catalog_in_use("catalog", False))
+        self.assertEqual('{"code": 0}', result)
+        self.assertEqual({"inUse": False}, client.patch.call_args[1]["json"])
+
 
 class TestSchemaOperationUrlEncoding(unittest.TestCase):
     def test_get_list_of_schemas_encodes_catalog_name(self):
@@ -115,6 +130,12 @@ class TestSchemaOperationUrlEncoding(unittest.TestCase):
         url = _called_url(client.get)
         self.assertIn(_ENCODED_QUERY_INJECTION, url)
         self.assertNotIn("?admin=true", url)
+
+    def test_drop_schema_passes_cascade_as_query_param(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientSchemaOperation(METALAKE, client)
+        asyncio.run(op.drop_schema("catalog", "schema", True))
+        self.assertTrue(_called_params(client.delete)["cascade"])
 
 
 class TestTableOperationUrlEncoding(unittest.TestCase):
@@ -134,6 +155,32 @@ class TestTableOperationUrlEncoding(unittest.TestCase):
         self.assertEqual(url.count(_ENCODED_SLASH), 2)
         self.assertIn(_ENCODED_QUERY_INJECTION, url)
         self.assertNotIn("?admin=true", url)
+
+    def test_create_table_omits_unset_optional_fields(self):
+        client = _make_mock_client({"table": {}})
+        op = PlainRESTClientTableOperation(METALAKE, client)
+        asyncio.run(op.create_table("catalog", "schema", "t", "", [], {}))
+        request = client.post.call_args[1]["json"]
+        self.assertNotIn("partitioning", request)
+        self.assertNotIn("distribution", request)
+        self.assertNotIn("sortOrders", request)
+        self.assertNotIn("indexes", request)
+
+    def test_create_table_includes_partitioning_when_set(self):
+        client = _make_mock_client({"table": {}})
+        op = PlainRESTClientTableOperation(METALAKE, client)
+        partitioning = [{"strategy": "identity", "fieldName": ["dt"]}]
+        asyncio.run(
+            op.create_table("catalog", "schema", "t", "", [], {}, partitioning)
+        )
+        request = client.post.call_args[1]["json"]
+        self.assertEqual(partitioning, request["partitioning"])
+
+    def test_drop_table_passes_purge_as_query_param(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientTableOperation(METALAKE, client)
+        asyncio.run(op.drop_table("catalog", "schema", "t", True))
+        self.assertTrue(_called_params(client.delete)["purge"])
 
 
 class TestModelOperationUrlEncoding(unittest.TestCase):
@@ -189,6 +236,47 @@ class TestModelOperationUrlEncoding(unittest.TestCase):
         )
         self.assertEqual("true", result)
 
+    def test_delete_model_version_by_alias_encodes_alias(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(
+            op.delete_model_version_by_alias(
+                "catalog", "schema", "model", _PATH_TRAVERSAL
+            )
+        )
+        self.assertEqual("true", result)
+        url = _called_url(client.delete)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_alter_model_encodes_model_name(self):
+        client = _make_mock_client({"model": {}})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        asyncio.run(op.alter_model("catalog", "schema", _QUERY_INJECTION, []))
+        url = _called_url(client.put)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_alter_model_version_reads_model_version_response(self):
+        client = _make_mock_client({"modelVersion": {"version": 1}})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        result = asyncio.run(
+            op.alter_model_version("catalog", "schema", "model", 1, [])
+        )
+        self.assertEqual('{"version": 1}', result)
+
+    def test_alter_model_version_by_alias_encodes_alias(self):
+        client = _make_mock_client({"modelVersion": {}})
+        op = PlainRESTClientModelOperation(METALAKE, client)
+        asyncio.run(
+            op.alter_model_version_by_alias(
+                "catalog", "schema", "model", _PATH_TRAVERSAL, []
+            )
+        )
+        url = _called_url(client.put)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
 
 class TestTopicOperationUrlEncoding(unittest.TestCase):
     def test_list_of_topics_encodes_path_traversal(self):
@@ -209,6 +297,28 @@ class TestTopicOperationUrlEncoding(unittest.TestCase):
 
 
 class TestFilesetOperationUrlEncoding(unittest.TestCase):
+    def test_create_fileset_omits_empty_storage_location(self):
+        client = _make_mock_client({"fileset": {}})
+        op = PlainRESTClientFilesetOperation(METALAKE, client)
+        asyncio.run(
+            op.create_fileset("catalog", "schema", "fs", "managed", "", "", {})
+        )
+        request = client.post.call_args[1]["json"]
+        self.assertNotIn("storageLocation", request)
+        self.assertNotIn("storageLocations", request)
+
+    def test_create_fileset_includes_storage_locations_when_set(self):
+        client = _make_mock_client({"fileset": {}})
+        op = PlainRESTClientFilesetOperation(METALAKE, client)
+        locations = {"loc1": "file:/tmp/fs1", "loc2": "file:/tmp/fs2"}
+        asyncio.run(
+            op.create_fileset(
+                "catalog", "schema", "fs", "managed", "", "", {}, locations
+            )
+        )
+        request = client.post.call_args[1]["json"]
+        self.assertEqual(locations, request["storageLocations"])
+
     def test_list_of_filesets_encodes_path_traversal(self):
         client = _make_mock_client({"identifiers": []})
         op = PlainRESTClientFilesetOperation(METALAKE, client)

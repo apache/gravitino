@@ -57,10 +57,13 @@ class PlainRESTClientSchemaOperation(SchemaOperation):
         )
         return extract_content_from_response(response, "schema", {})
 
-    async def drop_schema(self, catalog_name: str, schema_name: str) -> str:
+    async def drop_schema(
+        self, catalog_name: str, schema_name: str, cascade: bool
+    ) -> str:
         response = await self.rest_client.delete(
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/catalogs/{encode_path_segment(catalog_name)}"
-            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}",
+            params={"cascade": cascade},
         )
         return extract_content_from_response(response, "dropped", False)

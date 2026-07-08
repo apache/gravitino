@@ -66,6 +66,10 @@ class TableOperation(ABC):
         comment: str,
         columns: list,
         properties: dict,
+        partitioning: list = None,
+        distribution: dict = None,
+        sort_orders: list = None,
+        indexes: list = None,
     ) -> str:
         pass
 
@@ -81,6 +85,6 @@ class TableOperation(ABC):
 
     @abstractmethod
     async def drop_table(
-        self, catalog_name: str, schema_name: str, table_name: str
+        self, catalog_name: str, schema_name: str, table_name: str, purge: bool
     ) -> str:
         pass

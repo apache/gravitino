@@ -92,7 +92,33 @@ class TestFilesetTool(unittest.TestCase):
                     },
                 )
                 self.assertEqual(
-                    "mock_fileset_created: cat.sch.fs", result.content[0].text
+                    "mock_fileset_created: cat.sch.fs, storage_locations=None",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_create_fileset_with_multiple_locations(self):
+        async def _test(mcp_server):
+            locations = {"loc1": "file:/tmp/fs1", "loc2": "file:/tmp/fs2"}
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_fileset",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "name": "fs",
+                        "fileset_type": "managed",
+                        "storage_location": "",
+                        "comment": "c",
+                        "properties": {"k": "v"},
+                        "storage_locations": locations,
+                    },
+                )
+                self.assertEqual(
+                    "mock_fileset_created: cat.sch.fs, "
+                    f"storage_locations={locations}",
+                    result.content[0].text,
                 )
 
         asyncio.run(_test(self.mcp))

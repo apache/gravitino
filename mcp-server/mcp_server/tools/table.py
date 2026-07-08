@@ -268,6 +268,10 @@ def load_table_tools(mcp: FastMCP):
         comment: str,
         columns: list,
         properties: dict,
+        partitioning: list = None,
+        distribution: dict = None,
+        sort_orders: list = None,
+        indexes: list = None,
     ) -> str:
         """
         Create a new table within a schema.
@@ -290,13 +294,33 @@ def load_table_tools(mcp: FastMCP):
                   "autoIncrement": false
                 }
             properties (dict): Table configuration properties.
+            partitioning (list): Optional partitioning strategies. Example:
+                [{"strategy": "identity", "fieldName": ["dt"]}]
+            distribution (dict): Optional distribution (bucketing). Example:
+                {"strategy": "hash", "number": 4,
+                 "funcArgs": [{"type": "field", "fieldName": ["id"]}]}
+            sort_orders (list): Optional sort orders. Example:
+                [{"sortTerm": {"type": "field", "fieldName": ["id"]},
+                  "direction": "asc", "nullOrdering": "nulls_first"}]
+            indexes (list): Optional indexes. Example:
+                [{"indexType": "primary_key", "name": "pk",
+                  "fieldNames": [["id"]]}]
 
         Returns:
             str: JSON-formatted string containing the created table.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_table_operation().create_table(
-            catalog_name, schema_name, name, comment, columns, properties
+            catalog_name,
+            schema_name,
+            name,
+            comment,
+            columns,
+            properties,
+            partitioning,
+            distribution,
+            sort_orders,
+            indexes,
         )
 
     @mcp.tool(tags={"table"})
@@ -332,7 +356,11 @@ def load_table_tools(mcp: FastMCP):
 
     @mcp.tool(tags={"table"})
     async def drop_table(
-        ctx: Context, catalog_name: str, schema_name: str, table_name: str
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        purge: bool = False,
     ) -> str:
         """
         Drop a table by its name.
@@ -342,11 +370,14 @@ def load_table_tools(mcp: FastMCP):
             catalog_name (str): Name of the catalog.
             schema_name (str): Name of the schema.
             table_name (str): Name of the table to drop.
+            purge (bool): Whether to purge the table data in addition to
+                removing the metadata. Defaults to False. Not all catalogs
+                support purging.
 
         Returns:
             str: JSON-formatted string indicating whether the table was dropped.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_table_operation().drop_table(
-            catalog_name, schema_name, table_name
+            catalog_name, schema_name, table_name, purge
         )

@@ -67,6 +67,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `create_catalog`                    | Create a new catalog.                                                          | `catalog`    | 1.4.0         |
 | `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`    | 1.4.0         |
 | `drop_catalog`                      | Drop a catalog.                                                                | `catalog`    | 1.4.0         |
+| `set_catalog_in_use`                | Enable or disable a catalog.                                                   | `catalog`    | 1.4.0         |
 | `get_list_of_schemas`               | Retrieve a list of schemas belonging to a specific catalog.                    | `schema`     | 1.0.0         |
 | `create_schema`                     | Create a new schema.                                                           | `schema`     | 1.4.0         |
 | `alter_schema`                      | Alter an existing schema.                                                      | `schema`     | 1.4.0         |
@@ -85,6 +86,10 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `delete_model`                      | Delete a model.                                                                | `model`      | 1.4.0         |
 | `link_model_version`                | Link a new version to a model.                                                 | `model`      | 1.4.0         |
 | `delete_model_version`              | Delete a model version.                                                        | `model`      | 1.4.0         |
+| `delete_model_version_by_alias`     | Delete a model version by one of its aliases.                                  | `model`      | 1.4.0         |
+| `alter_model`                       | Alter an existing model.                                                       | `model`      | 1.4.0         |
+| `alter_model_version`               | Alter a model version.                                                         | `model`      | 1.4.0         |
+| `alter_model_version_by_alias`      | Alter a model version by one of its aliases.                                   | `model`      | 1.4.0         |
 | `metadata_type_to_fullname_formats` | Retrieve the metadata type to fullname formats mapping.                        | `metadata`   | 1.0.0         |
 | `list_of_topics`                    | Retrieve a list of topics within a specific catalog and schema.                | `topic`      | 1.0.0         |
 | `load_topic`                        | Retrieve comprehensive metadata details for a specific topic.                  | `topic`      | 1.0.0         |

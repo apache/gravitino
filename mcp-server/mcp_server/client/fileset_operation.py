@@ -82,6 +82,7 @@ class FilesetOperation(ABC):
         pass
 
     @abstractmethod
+    # pylint: disable=too-many-positional-arguments
     async def create_fileset(
         self,
         catalog_name: str,
@@ -91,6 +92,7 @@ class FilesetOperation(ABC):
         storage_location: str,
         comment: str,
         properties: dict,
+        storage_locations: dict = None,
     ) -> str:
         pass
 

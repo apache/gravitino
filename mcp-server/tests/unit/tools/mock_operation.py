@@ -78,8 +78,11 @@ class MockCatalogOperation(CatalogOperation):
     async def alter_catalog(self, catalog_name, updates) -> str:
         return f"mock_catalog_altered: {catalog_name} with updates {updates}"
 
-    async def drop_catalog(self, catalog_name) -> str:
-        return f"mock_catalog_dropped: {catalog_name}"
+    async def drop_catalog(self, catalog_name, force) -> str:
+        return f"mock_catalog_dropped: {catalog_name}, force={force}"
+
+    async def set_catalog_in_use(self, catalog_name, in_use) -> str:
+        return f"mock_catalog_set_in_use: {catalog_name}, in_use={in_use}"
 
 
 class MockSchemaOperation(SchemaOperation):
@@ -94,8 +97,11 @@ class MockSchemaOperation(SchemaOperation):
     async def alter_schema(self, catalog_name, schema_name, updates) -> str:
         return f"mock_schema_altered: {catalog_name}.{schema_name} with updates {updates}"
 
-    async def drop_schema(self, catalog_name, schema_name) -> str:
-        return f"mock_schema_dropped: {catalog_name}.{schema_name}"
+    async def drop_schema(self, catalog_name, schema_name, cascade) -> str:
+        return (
+            f"mock_schema_dropped: {catalog_name}.{schema_name}, "
+            f"cascade={cascade}"
+        )
 
 
 class MockTableOperation(TableOperation):
@@ -111,9 +117,22 @@ class MockTableOperation(TableOperation):
 
     # pylint: disable=R0917
     async def create_table(
-        self, catalog_name, schema_name, name, comment, columns, properties
+        self,
+        catalog_name,
+        schema_name,
+        name,
+        comment,
+        columns,
+        properties,
+        partitioning=None,
+        distribution=None,
+        sort_orders=None,
+        indexes=None,
     ) -> str:
-        return f"mock_table_created: {catalog_name}.{schema_name}.{name}"
+        return (
+            f"mock_table_created: {catalog_name}.{schema_name}.{name}, "
+            f"partitioning={partitioning}"
+        )
 
     async def alter_table(
         self, catalog_name, schema_name, table_name, updates
@@ -123,8 +142,13 @@ class MockTableOperation(TableOperation):
             f"with updates {updates}"
         )
 
-    async def drop_table(self, catalog_name, schema_name, table_name) -> str:
-        return f"mock_table_dropped: {catalog_name}.{schema_name}.{table_name}"
+    async def drop_table(
+        self, catalog_name, schema_name, table_name, purge
+    ) -> str:
+        return (
+            f"mock_table_dropped: {catalog_name}.{schema_name}.{table_name}, "
+            f"purge={purge}"
+        )
 
 
 class MockFilesetOperation(FilesetOperation):
@@ -160,8 +184,12 @@ class MockFilesetOperation(FilesetOperation):
         storage_location,
         comment,
         properties,
+        storage_locations=None,
     ) -> str:
-        return f"mock_fileset_created: {catalog_name}.{schema_name}.{name}"
+        return (
+            f"mock_fileset_created: {catalog_name}.{schema_name}.{name}, "
+            f"storage_locations={storage_locations}"
+        )
 
     async def alter_fileset(
         self, catalog_name, schema_name, fileset_name, updates
@@ -269,6 +297,42 @@ class MockModelOperation(ModelOperation):
         return (
             f"mock_model_version_deleted: {catalog_name}.{schema_name}.{model_name} "
             f"version={version}"
+        )
+
+    async def delete_model_version_by_alias(
+        self, catalog_name, schema_name, model_name, alias
+    ) -> str:
+        return (
+            f"mock_model_version_deleted_by_alias: "
+            f"{catalog_name}.{schema_name}.{model_name} alias={alias}"
+        )
+
+    async def alter_model(
+        self, catalog_name, schema_name, model_name, updates
+    ) -> str:
+        return (
+            f"mock_model_altered: {catalog_name}.{schema_name}.{model_name} "
+            f"with updates {updates}"
+        )
+
+    # pylint: disable=R0917
+    async def alter_model_version(
+        self, catalog_name, schema_name, model_name, version, updates
+    ) -> str:
+        return (
+            f"mock_model_version_altered: "
+            f"{catalog_name}.{schema_name}.{model_name} version={version} "
+            f"with updates {updates}"
+        )
+
+    # pylint: disable=R0917
+    async def alter_model_version_by_alias(
+        self, catalog_name, schema_name, model_name, alias, updates
+    ) -> str:
+        return (
+            f"mock_model_version_altered_by_alias: "
+            f"{catalog_name}.{schema_name}.{model_name} alias={alias} "
+            f"with updates {updates}"
         )
 
 

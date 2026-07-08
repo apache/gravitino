@@ -118,20 +118,25 @@ def load_schema_tools(mcp: FastMCP):
 
     @mcp.tool(tags={"schema"})
     async def drop_schema(
-        ctx: Context, catalog_name: str, schema_name: str
+        ctx: Context, catalog_name: str, schema_name: str, cascade: bool = False
     ) -> str:
         """
         Drop a schema by its name.
+
+        A non-empty schema cannot be dropped unless `cascade` is true.
 
         Args:
             ctx (Context): The request context object.
             catalog_name (str): Name of the catalog containing the schema.
             schema_name (str): Name of the schema to drop.
+            cascade (bool): Whether to also drop all entities under the
+                schema. Defaults to False, in which case dropping a
+                non-empty schema fails.
 
         Returns:
             str: JSON-formatted string indicating whether the schema was dropped.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_schema_operation().drop_schema(
-            catalog_name, schema_name
+            catalog_name, schema_name, cascade
         )

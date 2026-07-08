@@ -49,5 +49,7 @@ class SchemaOperation(ABC):
         pass
 
     @abstractmethod
-    async def drop_schema(self, catalog_name: str, schema_name: str) -> str:
+    async def drop_schema(
+        self, catalog_name: str, schema_name: str, cascade: bool
+    ) -> str:
         pass

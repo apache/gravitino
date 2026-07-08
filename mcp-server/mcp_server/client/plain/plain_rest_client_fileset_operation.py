@@ -66,6 +66,7 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
         )
         return extract_content_from_response(response, "files", [])
 
+    # pylint: disable=too-many-positional-arguments
     async def create_fileset(
         self,
         catalog_name: str,
@@ -75,18 +76,23 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
         storage_location: str,
         comment: str,
         properties: dict,
+        storage_locations: dict = None,
     ) -> str:
+        request = {
+            "name": name,
+            "type": fileset_type,
+            "comment": comment,
+            "properties": properties,
+        }
+        if storage_location:
+            request["storageLocation"] = storage_location
+        if storage_locations:
+            request["storageLocations"] = storage_locations
         response = await self.rest_client.post(
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/catalogs/{encode_path_segment(catalog_name)}"
             f"/schemas/{encode_path_segment(schema_name)}/filesets",
-            json={
-                "name": name,
-                "type": fileset_type,
-                "storageLocation": storage_location,
-                "comment": comment,
-                "properties": properties,
-            },
+            json=request,
         )
         return extract_content_from_response(response, "fileset", {})
 

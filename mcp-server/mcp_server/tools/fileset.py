@@ -155,6 +155,7 @@ def load_fileset_tools(mcp: FastMCP):
         storage_location: str,
         comment: str,
         properties: dict,
+        storage_locations: dict = None,
     ) -> str:
         """
         Create a new fileset within a schema.
@@ -168,9 +169,15 @@ def load_fileset_tools(mcp: FastMCP):
             schema_name (str): Name of the schema.
             name (str): Name of the fileset to create.
             fileset_type (str): Fileset type, one of "managed" or "external".
-            storage_location (str): Storage location URI, e.g. "file:/tmp/fileset1".
+            storage_location (str): Default storage location URI, e.g.
+                "file:/tmp/fileset1". May be empty for a managed fileset,
+                in which case the location is derived from catalog/schema
+                properties.
             comment (str): Human-readable description.
             properties (dict): Fileset configuration properties.
+            storage_locations (dict): Optional named storage locations for a
+                multiple-location fileset, mapping location name to URI.
+                Example: {"loc1": "s3a://bucket/fs", "loc2": "file:/tmp/fs"}
 
         Returns:
             str: JSON-formatted string containing the created fileset.
@@ -184,6 +191,7 @@ def load_fileset_tools(mcp: FastMCP):
             storage_location,
             comment,
             properties,
+            storage_locations,
         )
 
     @mcp.tool(tags={"fileset"})

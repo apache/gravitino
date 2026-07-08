@@ -74,7 +74,33 @@ class TestTableTool(unittest.TestCase):
                     },
                 )
                 self.assertEqual(
-                    "mock_table_created: cat.sch.tbl", result.content[0].text
+                    "mock_table_created: cat.sch.tbl, partitioning=None",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_create_table_with_partitioning(self):
+        async def _test(mcp_server):
+            columns = [{"name": "id", "type": "integer", "nullable": False}]
+            partitioning = [{"strategy": "identity", "fieldName": ["dt"]}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_table",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "name": "tbl",
+                        "comment": "c",
+                        "columns": columns,
+                        "properties": {"k": "v"},
+                        "partitioning": partitioning,
+                    },
+                )
+                self.assertEqual(
+                    "mock_table_created: cat.sch.tbl, "
+                    f"partitioning={partitioning}",
+                    result.content[0].text,
                 )
 
         asyncio.run(_test(self.mcp))
@@ -111,7 +137,27 @@ class TestTableTool(unittest.TestCase):
                     },
                 )
                 self.assertEqual(
-                    "mock_table_dropped: cat.sch.tbl", result.content[0].text
+                    "mock_table_dropped: cat.sch.tbl, purge=False",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_drop_table_purge(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "drop_table",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "table_name": "tbl",
+                        "purge": True,
+                    },
+                )
+                self.assertEqual(
+                    "mock_table_dropped: cat.sch.tbl, purge=True",
+                    result.content[0].text,
                 )
 
         asyncio.run(_test(self.mcp))

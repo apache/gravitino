@@ -348,3 +348,128 @@ def load_model_tools(mcp: FastMCP):
         return await client.as_model_operation().delete_model_version(
             catalog_name, schema_name, model_name, version
         )
+
+    @mcp.tool(tags={"model"})
+    async def delete_model_version_by_alias(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        alias: str,
+    ) -> str:
+        """
+        Delete a model version by one of its aliases.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            model_name (str): Name of the model.
+            alias (str): Alias of the version to delete, e.g. "latest".
+
+        Returns:
+            str: JSON-formatted string indicating whether the version was deleted.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_model_operation().delete_model_version_by_alias(
+            catalog_name, schema_name, model_name, alias
+        )
+
+    @mcp.tool(tags={"model"})
+    async def alter_model(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        updates: list,
+    ) -> str:
+        """
+        Alter an existing model.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            model_name (str): Name of the model to alter.
+            updates (list): List of update operations. Example:
+                [
+                  {"@type": "rename", "newName": "new_model"},
+                  {"@type": "updateComment", "newComment": "updated"},
+                  {"@type": "setProperty", "property": "k", "value": "v"},
+                  {"@type": "removeProperty", "property": "k"}
+                ]
+
+        Returns:
+            str: JSON-formatted string containing the altered model.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_model_operation().alter_model(
+            catalog_name, schema_name, model_name, updates
+        )
+
+    # pylint: disable=too-many-positional-arguments
+    @mcp.tool(tags={"model"})
+    async def alter_model_version(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        version: int,
+        updates: list,
+    ) -> str:
+        """
+        Alter a specific version of a model.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            model_name (str): Name of the model.
+            version (int): Version number to alter.
+            updates (list): List of update operations. Example:
+                [
+                  {"@type": "updateComment", "newComment": "updated"},
+                  {"@type": "setProperty", "property": "k", "value": "v"},
+                  {"@type": "removeProperty", "property": "k"},
+                  {"@type": "updateUri", "newUri": "s3://bucket/model-v2"},
+                  {"@type": "updateAliases", "aliasesToAdd": ["prod"],
+                   "aliasesToRemove": ["staging"]}
+                ]
+
+        Returns:
+            str: JSON-formatted string containing the altered model version.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_model_operation().alter_model_version(
+            catalog_name, schema_name, model_name, version, updates
+        )
+
+    # pylint: disable=too-many-positional-arguments
+    @mcp.tool(tags={"model"})
+    async def alter_model_version_by_alias(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        alias: str,
+        updates: list,
+    ) -> str:
+        """
+        Alter a model version identified by one of its aliases.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            model_name (str): Name of the model.
+            alias (str): Alias of the version to alter, e.g. "latest".
+            updates (list): List of update operations; same format as
+                `alter_model_version`.
+
+        Returns:
+            str: JSON-formatted string containing the altered model version.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_model_operation().alter_model_version_by_alias(
+            catalog_name, schema_name, model_name, alias, updates
+        )
