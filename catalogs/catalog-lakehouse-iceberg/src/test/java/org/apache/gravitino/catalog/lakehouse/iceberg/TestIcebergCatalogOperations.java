@@ -34,6 +34,8 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.iceberg.common.credential.GravitinoIcebergAwsCredentialsProvider;
+import org.apache.gravitino.iceberg.common.credential.IcebergServerCredentialUtils;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
@@ -104,7 +106,7 @@ public class TestIcebergCatalogOperations {
   }
 
   @Test
-  public void testInitializeInjectsCredentialProviderConfig() {
+  public void testInitializeConfiguresRefreshableCredentialProvider() {
     Map<String, String> conf = new HashMap<>();
     conf.put(IcebergConstants.CATALOG_BACKEND, "memory");
     conf.put(CredentialConstants.CREDENTIAL_PROVIDERS, TestIcebergCredentialProvider.TYPE);
@@ -135,12 +137,22 @@ public class TestIcebergCatalogOperations {
         catalogOperations.icebergCatalogWrapper.getIcebergConfig().getIcebergCatalogProperties();
 
     Assertions.assertEquals(
-        "test-access-key", icebergCatalogProperties.get(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+        GravitinoIcebergAwsCredentialsProvider.class.getName(),
+        icebergCatalogProperties.get(IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER));
     Assertions.assertEquals(
-        "test-secret-key",
-        icebergCatalogProperties.get(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+        CATALOG,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + GravitinoIcebergAwsCredentialsProvider.CATALOG_NAME));
     Assertions.assertEquals(
-        "test-session-token", icebergCatalogProperties.get(IcebergConstants.ICEBERG_S3_TOKEN));
-    Assertions.assertEquals("123", icebergCatalogProperties.get("s3.session-token-expires-at-ms"));
+        TestIcebergCredentialProvider.TYPE,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + CredentialConstants.CREDENTIAL_PROVIDERS));
+    Assertions.assertFalse(
+        icebergCatalogProperties.containsKey(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+    Assertions.assertFalse(
+        icebergCatalogProperties.containsKey(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+    Assertions.assertFalse(icebergCatalogProperties.containsKey(IcebergConstants.ICEBERG_S3_TOKEN));
   }
 }

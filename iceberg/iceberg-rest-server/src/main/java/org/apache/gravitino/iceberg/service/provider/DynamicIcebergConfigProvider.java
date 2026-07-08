@@ -42,9 +42,11 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.credential.CatalogCredentialContext;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
-import org.apache.gravitino.credential.CredentialUtils;
+import org.apache.gravitino.credential.config.CredentialConfig;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.credential.GravitinoIcebergAwsCredentialsProvider;
+import org.apache.gravitino.iceberg.common.credential.IcebergServerCredentialUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.utils.MapUtils;
@@ -123,9 +125,30 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     } else {
       catalogProperties = new HashMap<>(catalog.properties());
     }
-    CredentialPropertyUtils.applyIcebergCredentials(
-        getCatalogCredentials(catalog, catalogProperties), catalogProperties);
+    Credential[] credentials = getCatalogCredentials(catalog, catalogProperties);
+    Map<String, String> credentialProviderProperties =
+        IcebergServerCredentialUtils.hasRefreshableAwsCredential(credentials)
+            ? getCredentialProviderProperties(catalog, catalogProperties, catalogName)
+            : null;
+    IcebergServerCredentialUtils.applyCredentials(
+        catalogName, credentials, credentialProviderProperties, catalogProperties);
     return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));
+  }
+
+  private Map<String, String> getCredentialProviderProperties(
+      Catalog catalog, Map<String, String> catalogProperties, String catalogName) {
+    if (catalog instanceof BaseCatalog) {
+      return catalogProperties;
+    }
+
+    Map<String, String> providerProperties = new HashMap<>(properties);
+    providerProperties.put(
+        GravitinoIcebergAwsCredentialsProvider.SOURCE,
+        GravitinoIcebergAwsCredentialsProvider.SOURCE_REMOTE);
+    providerProperties.put(IcebergConstants.GRAVITINO_URI, getGravitinoUri());
+    providerProperties.put(IcebergConstants.GRAVITINO_METALAKE, gravitinoMetalake);
+    providerProperties.put(GravitinoIcebergAwsCredentialsProvider.CATALOG_NAME, catalogName);
+    return providerProperties;
   }
 
   private static Credential[] getCatalogCredentials(
@@ -143,7 +166,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     CatalogCredentialContext context =
         new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
     for (String credentialType :
-        CredentialUtils.getCredentialProvidersByOrder(() -> catalogProperties)) {
+        new CredentialConfig(catalogProperties).get(CredentialConfig.CREDENTIAL_PROVIDERS)) {
       catalog
           .catalogCredentialManager()
           .getCredential(credentialType, context)
@@ -166,21 +189,25 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         if (serverContext.isAuxMode()) {
           catalogFetcher = new InternalCatalogFetcher(gravitinoMetalake);
         } else {
-          String uri = properties.get(IcebergConstants.GRAVITINO_URI);
-          if (StringUtils.isBlank(uri)) {
-            JettyServerConfig config =
-                JettyServerConfig.fromConfig(
-                    GravitinoEnv.getInstance().config(),
-                    JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX);
-            uri = String.format("http://%s:%d", config.getHost(), config.getHttpPort());
-          }
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(uri), IcebergConstants.GRAVITINO_URI + " is blank");
-          catalogFetcher = new HttpCatalogFetcher(uri, gravitinoMetalake, properties);
+          catalogFetcher = new HttpCatalogFetcher(getGravitinoUri(), gravitinoMetalake, properties);
         }
       }
     }
     return catalogFetcher;
+  }
+
+  private String getGravitinoUri() {
+    String uri = properties.get(IcebergConstants.GRAVITINO_URI);
+    if (StringUtils.isBlank(uri)) {
+      JettyServerConfig config =
+          JettyServerConfig.fromConfig(
+              GravitinoEnv.getInstance().config(),
+              JettyServerConfig.GRAVITINO_SERVER_CONFIG_PREFIX);
+      uri = String.format("http://%s:%d", config.getHost(), config.getHttpPort());
+    }
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(uri), IcebergConstants.GRAVITINO_URI + " is blank");
+    return uri;
   }
 
   @Override

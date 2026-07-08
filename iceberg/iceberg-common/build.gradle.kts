@@ -44,6 +44,9 @@ dependencies {
   implementation(project(":common")) {
     exclude("*")
   }
+  implementation(project(":clients:client-java")) {
+    exclude("*")
+  }
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.kerby) {
@@ -55,6 +58,8 @@ dependencies {
     exclude("org.ow2.asm")
   }
   implementation(libs.asm)
+  implementation(libs.aws.auth)
+  implementation(libs.aws.utils)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.iceberg.aliyun)

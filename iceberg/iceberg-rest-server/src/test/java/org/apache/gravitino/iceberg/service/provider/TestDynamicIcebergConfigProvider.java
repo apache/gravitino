@@ -39,6 +39,8 @@ import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.credential.GravitinoIcebergAwsCredentialsProvider;
+import org.apache.gravitino.iceberg.common.credential.IcebergServerCredentialUtils;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -364,7 +366,7 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  public void testInjectsVendedStorageCredentialsIntoIcebergConfig() {
+  public void testConfiguresRefreshableVendedStorageCredentialsIntoIcebergConfig() {
     String metalakeName = "test_metalake";
     String catalogName = "credential_catalog";
 
@@ -402,11 +404,32 @@ public class TestDynamicIcebergConfigProvider {
     Assertions.assertTrue(icebergConfig.isPresent());
     Map<String, String> icebergCatalogProperties =
         icebergConfig.get().getIcebergCatalogProperties();
-    Assertions.assertEquals("test-access-key", icebergCatalogProperties.get("s3.access-key-id"));
     Assertions.assertEquals(
-        "test-secret-key", icebergCatalogProperties.get("s3.secret-access-key"));
-    Assertions.assertEquals("test-session-token", icebergCatalogProperties.get("s3.session-token"));
-    Assertions.assertEquals("123", icebergCatalogProperties.get("s3.session-token-expires-at-ms"));
+        GravitinoIcebergAwsCredentialsProvider.class.getName(),
+        icebergCatalogProperties.get(IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER));
+    Assertions.assertEquals(
+        GravitinoIcebergAwsCredentialsProvider.SOURCE_REMOTE,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + GravitinoIcebergAwsCredentialsProvider.SOURCE));
+    Assertions.assertEquals(
+        catalogName,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + GravitinoIcebergAwsCredentialsProvider.CATALOG_NAME));
+    Assertions.assertEquals(
+        "http://localhost:8090",
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + IcebergConstants.GRAVITINO_URI));
+    Assertions.assertEquals(
+        metalakeName,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + IcebergConstants.GRAVITINO_METALAKE));
+    Assertions.assertFalse(icebergCatalogProperties.containsKey("s3.access-key-id"));
+    Assertions.assertFalse(icebergCatalogProperties.containsKey("s3.secret-access-key"));
+    Assertions.assertFalse(icebergCatalogProperties.containsKey("s3.session-token"));
   }
 
   @Test

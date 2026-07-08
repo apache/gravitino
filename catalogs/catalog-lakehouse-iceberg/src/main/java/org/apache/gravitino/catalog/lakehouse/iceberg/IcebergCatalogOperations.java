@@ -45,8 +45,7 @@ import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.credential.CatalogCredentialContext;
 import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialPropertyUtils;
-import org.apache.gravitino.credential.CredentialUtils;
+import org.apache.gravitino.credential.config.CredentialConfig;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -59,6 +58,7 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
+import org.apache.gravitino.iceberg.common.credential.IcebergServerCredentialUtils;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
@@ -151,13 +151,14 @@ public class IcebergCatalogOperations
         new CatalogCredentialContext(PrincipalUtils.getCurrentUserName());
     try (CatalogCredentialManager credentialManager =
         new CatalogCredentialManager(catalogName, conf)) {
-      for (String credentialProvider : CredentialUtils.getCredentialProvidersByOrder(() -> conf)) {
+      for (String credentialProvider :
+          new CredentialConfig(conf).get(CredentialConfig.CREDENTIAL_PROVIDERS)) {
         credentialManager.getCredential(credentialProvider, context).ifPresent(credentials::add);
       }
     }
 
-    CredentialPropertyUtils.applyIcebergCredentials(
-        credentials.toArray(new Credential[0]), resultConf);
+    IcebergServerCredentialUtils.applyCredentials(
+        catalogName, credentials.toArray(new Credential[0]), conf, resultConf);
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
