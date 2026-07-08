@@ -55,6 +55,7 @@ components:
         - "uuid"
         - "fixed(16)"
         - "binary"
+        - "variant"
 
     UnionType:
       type: object

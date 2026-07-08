@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -97,6 +98,7 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -627,6 +629,97 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         org.apache.iceberg.types.Types.TimestampType.withoutZone(),
         icebergSchema.columns().get(1).type());
     Assertions.assertEquals("col_2_comment", icebergSchema.columns().get(1).doc());
+  }
+
+  @Test
+  void testV3TypeConversionViaIcebergClient() {
+    // REST-backend only. The Hive metastore in the current CI Hive image cannot store Iceberg V3
+    // column types, so a V3 table cannot be created through the Hive backend at all. That behavior
+    // is captured in testV3TypesRejectedByHiveMetastore. Once Hive gains V3 support (HIVE-29192 /
+    // HIVE-29287) and the CI Hive image is bumped, this test and the Hive test can be merged.
+    Assumptions.assumeTrue(
+        "rest".equalsIgnoreCase(TYPE),
+        "V3 types require a backend that does not validate against the Hive metastore");
+
+    // These types cannot be created through the native interface, so create them the way an engine
+    // like Spark 4 would, directly through the Iceberg catalog, then load through the native
+    // metadata interface.
+    //
+    // variant has native support and loads as VariantType. The other V3 net-new types are not
+    // modeled in Gravitino's unified type system yet and load as ExternalType; native support for
+    // them is pending and tracked in apache/gravitino#11929.
+    assertV3LoadsAsVariant("v3_variant");
+
+    // TODO(apache/gravitino#11929): expect native types once these gain unified-model support.
+    assertV3LoadsAsExternal(
+        "v3_timestamp_ns",
+        org.apache.iceberg.types.Types.TimestampNanoType.withoutZone(),
+        "TIMESTAMP_NANO");
+    assertV3LoadsAsExternal(
+        "v3_timestamptz_ns",
+        org.apache.iceberg.types.Types.TimestampNanoType.withZone(),
+        "TIMESTAMP_NANO");
+    assertV3LoadsAsExternal(
+        "v3_geometry", org.apache.iceberg.types.Types.GeometryType.crs84(), "GEOMETRY");
+    assertV3LoadsAsExternal(
+        "v3_geography", org.apache.iceberg.types.Types.GeographyType.crs84(), "GEOGRAPHY");
+    assertV3LoadsAsExternal(
+        "v3_unknown", org.apache.iceberg.types.Types.UnknownType.get(), "UNKNOWN");
+  }
+
+  @Test
+  void testV3TypesRejectedByHiveMetastore() {
+    // Hive-backend only. The Hive metastore in the current CI Hive image has no mapping for Iceberg
+    // V3 column types, so creating a V3 table through the Hive backend fails at metastore
+    // registration ("Invalid column type"). This captures that current behavior so it is not
+    // silently lost. When Hive gains V3 support (HIVE-29192 / HIVE-29287) and the CI Hive image is
+    // bumped, this create will start to succeed, this test will fail, and it can be merged with
+    // testV3TypeConversionViaIcebergClient. See apache/gravitino#11929.
+    Assumptions.assumeTrue(
+        "hive".equalsIgnoreCase(TYPE), "Only the Hive metastore backend rejects V3 column types");
+
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                createV3Table("v3_variant_hive", org.apache.iceberg.types.Types.VariantType.get()));
+    // Assert the failure is specifically the Hive metastore rejecting the V3 column type, not an
+    // unrelated wiring or connection error, so this test cannot pass for the wrong reason.
+    Assertions.assertTrue(
+        ExceptionUtils.getStackTrace(exception).contains("Invalid column type"),
+        "Expected a Hive metastore 'Invalid column type' rejection, but got: " + exception);
+  }
+
+  private NameIdentifier createV3Table(
+      String tableName, org.apache.iceberg.types.Type icebergType) {
+    NameIdentifier ident = NameIdentifier.of(schemaName, tableName);
+    org.apache.iceberg.Schema schema =
+        new org.apache.iceberg.Schema(
+            org.apache.iceberg.types.Types.NestedField.optional(1, "c", icebergType));
+    Map<String, String> props = Maps.newHashMap();
+    props.put("format-version", "3");
+    icebergCatalog.createTable(
+        IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident),
+        schema,
+        org.apache.iceberg.PartitionSpec.unpartitioned(),
+        props);
+    return ident;
+  }
+
+  private void assertV3LoadsAsVariant(String tableName) {
+    NameIdentifier ident =
+        createV3Table(tableName, org.apache.iceberg.types.Types.VariantType.get());
+    Column loaded = catalog.asTableCatalog().loadTable(ident).columns()[0];
+    Assertions.assertInstanceOf(Types.VariantType.class, loaded.dataType());
+  }
+
+  private void assertV3LoadsAsExternal(
+      String tableName, org.apache.iceberg.types.Type icebergType, String expectedCatalogString) {
+    NameIdentifier ident = createV3Table(tableName, icebergType);
+    Column loaded = catalog.asTableCatalog().loadTable(ident).columns()[0];
+    Assertions.assertInstanceOf(Types.ExternalType.class, loaded.dataType());
+    Assertions.assertEquals(
+        expectedCatalogString, ((Types.ExternalType) loaded.dataType()).catalogString());
   }
 
   @Test
