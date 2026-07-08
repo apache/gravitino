@@ -495,9 +495,10 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
               .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "bloom_filter", 3));
           break;
         case DATA_SKIPPING_SET:
+          // set(0) means unlimited max unique values; ClickHouse requires set(N) syntax.
           sqlBuilder
               .append(" ")
-              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "set", 1));
+              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "set(0)", 1));
           break;
         default:
           throw new IllegalArgumentException(
@@ -866,7 +867,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "bloom_filter", 3);
 
       case DATA_SKIPPING_SET:
-        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "set", 1);
+        // set(0) means unlimited max unique values; ClickHouse requires set(N) syntax.
+        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "set(0)", 1);
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(

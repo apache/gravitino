@@ -1116,7 +1116,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(sql.contains("PARTITION BY `c1`"));
     Assertions.assertTrue(sql.contains("INDEX `idx_c2` `c2` TYPE minmax GRANULARITY 1"));
     Assertions.assertTrue(sql.contains("INDEX `idx_c3` `c3` TYPE bloom_filter GRANULARITY 3"));
-    Assertions.assertTrue(sql.contains("INDEX `idx_c4` `c2` TYPE set GRANULARITY 1"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_c4` `c2` TYPE set(0) GRANULARITY 1"));
   }
 
   @Test
@@ -1347,7 +1347,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             new TableChange[] {
               TableChange.addIndex(IndexType.DATA_SKIPPING_SET, "idx_set", new String[][] {{"c2"}})
             });
-    Assertions.assertTrue(setSql.contains("ADD INDEX `idx_set` `c2` TYPE set GRANULARITY 1"));
+    Assertions.assertTrue(setSql.contains("ADD INDEX `idx_set` `c2` TYPE set(0) GRANULARITY 1"));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
