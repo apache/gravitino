@@ -37,6 +37,13 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Thread safety is guaranteed through {@link ConcurrentHashMap#compute} for all acquire/release
  * operations.
+ *
+ * <p><b>Concurrency note:</b> the classloader factory (JAR scanning in {@code acquire}) and {@link
+ * #doFinalCleanup} (thread interruption and reflective ThreadLocal cleanup in {@code release}) run
+ * inside {@code compute()}, which holds the per-key bin lock for the duration. This serializes
+ * create/drop of catalogs that map to the <em>same</em> key. Operations on different keys hash to
+ * different bins and proceed concurrently, so for the expected pool size (a handful of distinct
+ * configurations) the added latency is acceptable and keeps acquire/release/cleanup atomic.
  */
 public class ClassLoaderPool implements Closeable {
 

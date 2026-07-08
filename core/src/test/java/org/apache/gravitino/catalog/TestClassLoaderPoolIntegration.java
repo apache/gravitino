@@ -28,6 +28,8 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -157,15 +159,81 @@ public class TestClassLoaderPoolIntegration {
         "test catalog 2",
         props);
 
-    // Drop catalog1
+    // Drop catalog1 (shares the pooled ClassLoader with catalog2). Releasing catalog1 must not
+    // trigger the final-release cleanup while catalog2 still holds a reference.
     catalogManager.disableCatalog(NameIdentifier.of(METALAKE, "catalog1"));
     catalogManager.dropCatalog(NameIdentifier.of(METALAKE, "catalog1"));
 
-    // catalog2 should still be loadable
-    Catalog loaded =
+    // catalog2 must still be functionally usable after catalog1's drop. Note: with
+    // CATALOG_LOAD_ISOLATED=false the ClassLoader is an empty in-process loader, so this is an
+    // end-to-end smoke check that the shared wrapper is not broken by the drop. The real proof that
+    // the shared ClassLoader/driver is not prematurely cleaned up (which only matters with real
+    // provider jars) lives in the docker-tagged IcebergClassLoaderPoolIT.
+    NameIdentifier catalog2 = NameIdentifier.of(METALAKE, "catalog2");
+    Schema schema =
         Assertions.assertDoesNotThrow(
-            () -> catalogManager.loadCatalog(NameIdentifier.of(METALAKE, "catalog2")));
-    Assertions.assertNotNull(loaded);
+            () ->
+                catalogManager
+                    .loadCatalogAndWrap(catalog2)
+                    .doWithSchemaOps(
+                        schemaOps ->
+                            schemaOps.createSchema(
+                                NameIdentifier.of(METALAKE, "catalog2", "schema1"),
+                                "comment",
+                                ImmutableMap.of())));
+    Assertions.assertNotNull(schema);
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager
+                .loadCatalogAndWrap(catalog2)
+                .doWithSchemaOps(
+                    schemaOps -> schemaOps.listSchemas(Namespace.of(METALAKE, "catalog2"))));
+  }
+
+  @Test
+  public void testTestConnectionDoesNotBreakLiveCatalogSharingSameKey()
+      throws IllegalAccessException {
+    Map<String, String> props =
+        ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3");
+
+    // A live catalog holds a reference to the pooled ClassLoader for this key.
+    NameIdentifier liveIdent = NameIdentifier.of(METALAKE, "live_catalog");
+    catalogManager.createCatalog(
+        liveIdent, Catalog.Type.RELATIONAL, PROVIDER, "live catalog", props);
+
+    CatalogManager.CatalogWrapper liveWrapper =
+        catalogManager.getCatalogCache().getIfPresent(liveIdent);
+    Assertions.assertNotNull(liveWrapper);
+
+    ClassLoaderPool pool =
+        (ClassLoaderPool) FieldUtils.readField(catalogManager, "classLoaderPool", true);
+    Assertions.assertEquals(1, pool.size(), "one pooled entry for the shared key");
+
+    // testConnection creates a throwaway wrapper that acquires and then releases the same key
+    // synchronously (acquire on create, release in its finally). The release must only decrement
+    // the reference count, not run final cleanup, because the live catalog still shares the key.
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.testConnection(
+                NameIdentifier.of(METALAKE, "probe_catalog"),
+                Catalog.Type.RELATIONAL,
+                PROVIDER,
+                "probe",
+                props));
+
+    // Strong, non-racy check: testConnection's acquire+release is synchronous, so the pooled entry
+    // for the live catalog's key must survive (size stays 1). A refCount that wrongly hit 0 would
+    // have removed the entry (size 0) and destroyed the live catalog's ClassLoader.
+    Assertions.assertEquals(
+        1, pool.size(), "shared-key entry must survive testConnection's acquire/release");
+
+    // The live catalog must remain usable after testConnection's acquire/release cycle.
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager
+                .loadCatalogAndWrap(liveIdent)
+                .doWithSchemaOps(
+                    schemaOps -> schemaOps.listSchemas(Namespace.of(METALAKE, "live_catalog"))));
   }
 
   @Test

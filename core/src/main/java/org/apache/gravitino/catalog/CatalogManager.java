@@ -136,7 +136,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   // Static-state dimensions:
   //   - authentication.type/kerberos.principal/kerberos.keytab-uri: Hadoop UGI is per-ClassLoader
   //   - metastore.uris: HiveConf static configuration space
-  //   - jdbc-url: JDBC DriverManager global registry per ClassLoader
+  //   - jdbc-url: JDBC DriverManager global registry per ClassLoader (JDBC catalogs)
+  //   - uri: backend URI for Iceberg/Paimon/Hudi catalogs. Their JDBC backends register drivers
+  //     under this key (not "jdbc-url") in the per-ClassLoader DriverManager registry, so it must
+  //     be an isolation dimension — otherwise two MySQL-backed Iceberg catalogs on different
+  //     databases would share one ClassLoader and cross-contaminate the driver registry.
   //   - fs.defaultFS: Hadoop FileSystem.CACHE per ClassLoader
   static final Set<String> DEFAULT_ISOLATION_PROPERTY_KEYS =
       ImmutableSet.of(
@@ -147,6 +151,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           "authentication.kerberos.keytab-uri",
           "metastore.uris",
           "jdbc-url",
+          "uri",
           "fs.defaultFS");
 
   /** Wrapper class for a catalog instance and its class loader. */
@@ -156,6 +161,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     private IsolatedClassLoader classLoader;
     private ClassLoaderPool pool;
     private PooledClassLoaderEntry poolEntry;
+    private boolean closed = false;
 
     /** Non-pooled constructor: each catalog owns its ClassLoader exclusively. */
     CatalogWrapper(IsolatedClassLoader classLoader) {
@@ -278,6 +284,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
 
     public synchronized void close() {
+      if (closed) {
+        // Idempotent: a second close() must not re-run pool release or classloader cleanup.
+        return;
+      }
+      closed = true;
+
       try {
         classLoader.withClassLoader(
             cl -> {
@@ -289,16 +301,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             });
       } catch (Exception e) {
         LOG.warn("Failed to close catalog", e);
+      } finally {
+        // Release the pool reference (or clean up the dedicated ClassLoader) in a finally so a
+        // failure while closing the catalog cannot permanently leak the pooled ClassLoader
+        // reference (close() is idempotent, so a retry would otherwise skip this).
+        if (poolEntry != null) {
+          pool.release(poolEntry);
+          poolEntry = null;
+        } else if (pool == null) {
+          // Non-pooled path (e.g., sharing disabled or CATALOG_LOAD_ISOLATED=false)
+          ClassLoaderPool.cleanupClassLoader(classLoader);
+        }
       }
-
-      if (poolEntry != null) {
-        pool.release(poolEntry);
-        poolEntry = null;
-      } else if (pool == null) {
-        // Non-pooled path (e.g., sharing disabled or CATALOG_LOAD_ISOLATED=false)
-        ClassLoaderPool.cleanupClassLoader(classLoader);
-      }
-      // If pool != null but poolEntry == null, this is a repeated close — skip silently
     }
 
     private SupportsSchemas asSchemas() {
@@ -1216,16 +1230,35 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       CatalogWrapper wrapper, CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
     BaseCatalog<?> catalog = createBaseCatalog(wrapper.classLoader, entity);
     wrapper.catalog = catalog;
-    wrapper.classLoader.withClassLoader(
-        cl -> {
-          validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
-          // Preload properties() and capability() inside the IsolatedClassLoader so that
-          // AppClassLoader can read them later without needing the isolated context.
-          catalog.properties();
-          catalog.capability();
-          return null;
-        },
-        IllegalArgumentException.class);
+    try {
+      wrapper.classLoader.withClassLoader(
+          cl -> {
+            validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
+            // Preload properties() and capability() inside the IsolatedClassLoader so that
+            // AppClassLoader can read them later without needing the isolated context.
+            catalog.properties();
+            catalog.capability();
+            return null;
+          },
+          IllegalArgumentException.class);
+    } catch (RuntimeException e) {
+      // Close the partially-initialized catalog (which releases its authorizationPlugin and other
+      // resources) before the caller tears down or releases the ClassLoader. Otherwise a creation
+      // failure — e.g. invalid properties on a catalog that has an authorization-provider — leaks
+      // the plugin instance, since the caller's catch only releases the ClassLoader, not the
+      // catalog.
+      try {
+        wrapper.classLoader.withClassLoader(
+            cl -> {
+              catalog.close();
+              return null;
+            });
+      } catch (Exception closeEx) {
+        LOG.warn("Failed to close catalog after initialization failure", closeEx);
+      }
+      wrapper.catalog = null;
+      throw e;
+    }
     return wrapper;
   }
 
@@ -1237,29 +1270,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @return The resolved properties.
    */
   private Map<String, String> getResolvedProperties(CatalogEntity entity) {
-    Map<String, String> conf = entity.getProperties();
-    String provider = entity.getProvider();
-
-    if (!classLoaderSharingEnabled) {
-      IsolatedClassLoader classLoader = createClassLoader(provider, conf);
-      try {
-        BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
-        return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
-      } finally {
-        ClassLoaderPool.cleanupClassLoader(classLoader);
-      }
-    }
-
-    ClassLoaderKey key = buildClassLoaderKey(provider, conf);
-    PooledClassLoaderEntry poolEntry =
-        classLoaderPool.acquire(key, () -> createClassLoader(provider, conf));
-    try {
-      IsolatedClassLoader classLoader = poolEntry.classLoader();
-      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
-      return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
-    } finally {
-      classLoaderPool.release(poolEntry);
-    }
+    // Resolve properties through the cached wrapper (loadCatalogAndWrap), which reuses the
+    // pooled/dedicated ClassLoader and the CatalogWrapper cache. This avoids building and tearing
+    // down a throwaway BaseCatalog (and leaking its authorizationPlugin) on every listCatalogsInfo
+    // call, and keeps the classLoaderSharingEnabled branching in a single place
+    // (createCatalogWrapper).
+    CatalogWrapper catalogWrapper = loadCatalogAndWrap(entity.nameIdentifier());
+    return catalogWrapper.classLoader.withClassLoader(
+        cl -> catalogWrapper.catalog.properties(), RuntimeException.class);
   }
 
   private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
