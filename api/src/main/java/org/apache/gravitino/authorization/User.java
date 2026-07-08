@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -33,6 +34,30 @@ public interface User extends Auditable {
    * @return The name of the user.
    */
   String name();
+
+  /**
+   * The stable identifier assigned by an upstream identity system (for example, SCIM, LDAP, or
+   * IAM), or null if not set.
+   *
+   * <p>Gravitino {@link User#name() user names} may differ from upstream ids or be unknown at sync
+   * time. External id lets integrators look up, enable/disable, and delete users without relying on
+   * the Gravitino user name.
+   *
+   * @return The upstream external identifier, or null if not set.
+   */
+  @Nullable
+  default String externalId() {
+    return null;
+  }
+
+  /**
+   * Whether the user is enabled.
+   *
+   * @return True if the user is enabled, false otherwise.
+   */
+  default boolean enabled() {
+    return true;
+  }
 
   /**
    * The roles of the user. A user can have multiple roles. Every role binds several privileges.
