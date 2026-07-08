@@ -64,44 +64,44 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | Tool name                           | Description                                                                    | Tag          | Since version |
 |-------------------------------------|--------------------------------------------------------------------------------|--------------|---------------|
 | `get_list_of_catalogs`              | Retrieve a list of all catalogs in the system.                                 | `catalog`    | 1.0.0         |
-| `create_catalog`                    | Create a new catalog.                                                          | `catalog`    | 1.4.0         |
-| `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`    | 1.4.0         |
-| `drop_catalog`                      | Drop a catalog.                                                                | `catalog`    | 1.4.0         |
-| `set_catalog_in_use`                | Enable or disable a catalog.                                                   | `catalog`    | 1.4.0         |
+| `create_catalog`                    | Create a new catalog.                                                          | `catalog`    | 2.0.0         |
+| `alter_catalog`                     | Alter an existing catalog.                                                     | `catalog`    | 2.0.0         |
+| `drop_catalog`                      | Drop a catalog.                                                                | `catalog`    | 2.0.0         |
+| `set_catalog_in_use`                | Enable or disable a catalog.                                                   | `catalog`    | 2.0.0         |
 | `get_list_of_schemas`               | Retrieve a list of schemas belonging to a specific catalog.                    | `schema`     | 1.0.0         |
-| `create_schema`                     | Create a new schema.                                                           | `schema`     | 1.4.0         |
-| `alter_schema`                      | Alter an existing schema.                                                      | `schema`     | 1.4.0         |
-| `drop_schema`                       | Drop a schema.                                                                 | `schema`     | 1.4.0         |
+| `create_schema`                     | Create a new schema.                                                           | `schema`     | 2.0.0         |
+| `alter_schema`                      | Alter an existing schema.                                                      | `schema`     | 2.0.0         |
+| `drop_schema`                       | Drop a schema.                                                                 | `schema`     | 2.0.0         |
 | `get_list_of_tables`                | Retrieve a list of tables within a specific catalog and schema.                | `table`      | 1.0.0         |
 | `get_table_metadata_details`        | Retrieve comprehensive metadata details for a specific table.                  | `table`      | 1.0.0         |
-| `create_table`                      | Create a new table.                                                            | `table`      | 1.4.0         |
-| `alter_table`                       | Alter an existing table.                                                       | `table`      | 1.4.0         |
-| `drop_table`                        | Drop a table.                                                                  | `table`      | 1.4.0         |
+| `create_table`                      | Create a new table.                                                            | `table`      | 2.0.0         |
+| `alter_table`                       | Alter an existing table.                                                       | `table`      | 2.0.0         |
+| `drop_table`                        | Drop a table.                                                                  | `table`      | 2.0.0         |
 | `list_of_models`                    | Retrieve a list of models within a specific catalog and schema.                | `model`      | 1.0.0         |
 | `load_model`                        | Retrieve comprehensive metadata details for a specific model.                  | `model`      | 1.0.0         |
 | `list_model_versions`               | Retrieve a list of versions for a specific model.                              | `model`      | 1.0.0         |
 | `load_model_version`                | Retrieve comprehensive metadata details for a specific model version.          | `model`      | 1.0.0         |
 | `load_model_version_by_alias`       | Retrieve comprehensive metadata details for a specific model version by alias. | `model`      | 1.0.0         |
-| `register_model`                    | Register a new model.                                                          | `model`      | 1.4.0         |
-| `delete_model`                      | Delete a model.                                                                | `model`      | 1.4.0         |
-| `link_model_version`                | Link a new version to a model.                                                 | `model`      | 1.4.0         |
-| `delete_model_version`              | Delete a model version.                                                        | `model`      | 1.4.0         |
-| `delete_model_version_by_alias`     | Delete a model version by one of its aliases.                                  | `model`      | 1.4.0         |
-| `alter_model`                       | Alter an existing model.                                                       | `model`      | 1.4.0         |
-| `alter_model_version`               | Alter a model version.                                                         | `model`      | 1.4.0         |
-| `alter_model_version_by_alias`      | Alter a model version by one of its aliases.                                   | `model`      | 1.4.0         |
+| `register_model`                    | Register a new model.                                                          | `model`      | 2.0.0         |
+| `delete_model`                      | Delete a model.                                                                | `model`      | 2.0.0         |
+| `link_model_version`                | Link a new version to a model.                                                 | `model`      | 2.0.0         |
+| `delete_model_version`              | Delete a model version.                                                        | `model`      | 2.0.0         |
+| `delete_model_version_by_alias`     | Delete a model version by one of its aliases.                                  | `model`      | 2.0.0         |
+| `alter_model`                       | Alter an existing model.                                                       | `model`      | 2.0.0         |
+| `alter_model_version`               | Alter a model version.                                                         | `model`      | 2.0.0         |
+| `alter_model_version_by_alias`      | Alter a model version by one of its aliases.                                   | `model`      | 2.0.0         |
 | `metadata_type_to_fullname_formats` | Retrieve the metadata type to fullname formats mapping.                        | `metadata`   | 1.0.0         |
 | `list_of_topics`                    | Retrieve a list of topics within a specific catalog and schema.                | `topic`      | 1.0.0         |
 | `load_topic`                        | Retrieve comprehensive metadata details for a specific topic.                  | `topic`      | 1.0.0         |
-| `create_topic`                      | Create a new topic.                                                            | `topic`      | 1.4.0         |
-| `alter_topic`                       | Alter an existing topic.                                                       | `topic`      | 1.4.0         |
-| `delete_topic`                      | Delete a topic.                                                                | `topic`      | 1.4.0         |
+| `create_topic`                      | Create a new topic.                                                            | `topic`      | 2.0.0         |
+| `alter_topic`                       | Alter an existing topic.                                                       | `topic`      | 2.0.0         |
+| `delete_topic`                      | Delete a topic.                                                                | `topic`      | 2.0.0         |
 | `list_of_filesets`                  | Retrieve a list of filesets within a specific catalog and schema.              | `fileset`    | 1.0.0         |
 | `load_fileset`                      | Retrieve comprehensive metadata details for a specific fileset.                | `fileset`    | 1.0.0         |
 | `list_files_in_fileset`             | Retrieve a list of files within a specific fileset.                            | `fileset`    | 1.0.0         |
-| `create_fileset`                    | Create a new fileset.                                                          | `fileset`    | 1.4.0         |
-| `alter_fileset`                     | Alter an existing fileset.                                                     | `fileset`    | 1.4.0         |
-| `drop_fileset`                      | Drop a fileset.                                                                | `fileset`    | 1.4.0         |
+| `create_fileset`                    | Create a new fileset.                                                          | `fileset`    | 2.0.0         |
+| `alter_fileset`                     | Alter an existing fileset.                                                     | `fileset`    | 2.0.0         |
+| `drop_fileset`                      | Drop a fileset.                                                                | `fileset`    | 2.0.0         |
 | `list_of_jobs`                      | Retrieve a list of jobs                                                        | `job`        | 1.0.0         |
 | `get_job_by_id`                     | Retrieve a job by its ID.                                                      | `job`        | 1.0.0         |
 | `list_of_job_templates`             | Retrieve a list of job templates.                                              | `job`        | 1.0.0         |
@@ -114,9 +114,9 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `list_metadata_by_tag`              | Retrieve a list of metadata items associated with a specific tag.              | `tag`        | 1.0.0         |
 | `associate_tag_with_metadata`       | Associate tags with a specific metadata item.                                  | `tag`        | 1.0.0         |
 | `disassociate_tag_from_metadata`    | Disassociate tags from a specific metadata item.                               | `tag`        | 1.0.0         |
-| `create_tag`                        | Create a new tag.                                                              | `tag`        | 1.4.0         |
-| `alter_tag`                         | Alter an existing tag.                                                         | `tag`        | 1.4.0         |
-| `delete_tag`                        | Delete a tag.                                                                  | `tag`        | 1.4.0         |
+| `create_tag`                        | Create a new tag.                                                              | `tag`        | 2.0.0         |
+| `alter_tag`                         | Alter an existing tag.                                                         | `tag`        | 2.0.0         |
+| `delete_tag`                        | Delete a tag.                                                                  | `tag`        | 2.0.0         |
 | `list_statistics_for_metadata`      | Retrieve a list of statistics associated with a specific metadata item.        | `statistics` | 1.0.0         |
 | `list_statistics_for_partition`     | Retrieve a list of statistics associated with a specific partition.            | `statistics` | 1.0.0         |
 | `get_list_of_policies`              | Retrieve a list of policies in the system.                                     | `policy`     | 1.0.0         |
