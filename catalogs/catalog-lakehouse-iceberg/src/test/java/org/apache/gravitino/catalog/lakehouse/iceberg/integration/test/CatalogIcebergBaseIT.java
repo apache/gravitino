@@ -97,6 +97,7 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -627,6 +628,139 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         org.apache.iceberg.types.Types.TimestampType.withoutZone(),
         icebergSchema.columns().get(1).type());
     Assertions.assertEquals("col_2_comment", icebergSchema.columns().get(1).doc());
+  }
+
+  @Test
+  void testScalarAndComplexTypeConversion() {
+    // Verifies UUID (V2) plus the remaining scalar and nested struct/list/map types round-trip
+    // across both the native metadata interface and the underlying Iceberg catalog (the IRC for the
+    // REST backend). See apache/gravitino#11927.
+    Types.StructType structType =
+        Types.StructType.of(
+            Types.StructType.Field.notNullField("f_int", Types.IntegerType.get()),
+            Types.StructType.Field.nullableField("f_str", Types.StringType.get(), "str field"));
+    Column[] columns =
+        new Column[] {
+          Column.of("boolean_col", Types.BooleanType.get()),
+          Column.of("long_col", Types.LongType.get()),
+          Column.of("float_col", Types.FloatType.get()),
+          Column.of("double_col", Types.DoubleType.get()),
+          Column.of("decimal_col", Types.DecimalType.of(10, 2)),
+          Column.of("fixed_col", Types.FixedType.of(8)),
+          Column.of("binary_col", Types.BinaryType.get()),
+          Column.of("uuid_col", Types.UUIDType.get(), "uuid comment"),
+          Column.of("struct_col", structType, "struct comment"),
+          Column.of("array_col", Types.ListType.nullable(Types.IntegerType.get()), "array comment"),
+          Column.of(
+              "map_col",
+              Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get()),
+              "map comment")
+        };
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, "scalar_complex_table");
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(tableIdentifier, columns, table_comment, createProperties());
+
+    // 1. native interface: load and assert the Iceberg -> Gravitino conversion is faithful.
+    Column[] loaded = tableCatalog.loadTable(tableIdentifier).columns();
+    Assertions.assertEquals(Types.BooleanType.get(), loaded[0].dataType());
+    Assertions.assertEquals(Types.LongType.get(), loaded[1].dataType());
+    Assertions.assertEquals(Types.FloatType.get(), loaded[2].dataType());
+    Assertions.assertEquals(Types.DoubleType.get(), loaded[3].dataType());
+    Assertions.assertEquals(Types.DecimalType.of(10, 2), loaded[4].dataType());
+    Assertions.assertEquals(Types.FixedType.of(8), loaded[5].dataType());
+    Assertions.assertEquals(Types.BinaryType.get(), loaded[6].dataType());
+    Assertions.assertEquals(Types.UUIDType.get(), loaded[7].dataType());
+    Assertions.assertEquals(structType, loaded[8].dataType());
+    Assertions.assertEquals(Types.ListType.nullable(Types.IntegerType.get()), loaded[9].dataType());
+    Assertions.assertEquals(
+        Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get()),
+        loaded[10].dataType());
+
+    // 2. underlying Iceberg catalog (IRC for the REST backend): assert the same shapes.
+    org.apache.iceberg.Schema icebergSchema =
+        icebergCatalog
+            .loadTable(IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier))
+            .schema();
+    Assertions.assertInstanceOf(
+        org.apache.iceberg.types.Types.UUIDType.class, icebergSchema.findField("uuid_col").type());
+    Assertions.assertTrue(icebergSchema.findField("struct_col").type().isStructType());
+    Assertions.assertTrue(icebergSchema.findField("array_col").type().isListType());
+    Assertions.assertTrue(icebergSchema.findField("map_col").type().isMapType());
+  }
+
+  @Test
+  void testV3TypeConversionViaIcebergClient() {
+    // REST-backend only. The Hive metastore in the current CI Hive image cannot store Iceberg V3
+    // column types, so a V3 table cannot be created through the Hive backend at all. That behavior
+    // is captured in testV3TypesRejectedByHiveMetastore. Once Hive gains V3 support (HIVE-29192 /
+    // HIVE-29287) and the CI Hive image is bumped, this test and the Hive test can be merged.
+    Assumptions.assumeTrue(
+        "rest".equalsIgnoreCase(TYPE),
+        "V3 types require a backend that does not validate against the Hive metastore");
+
+    // These types cannot be created through the native interface (fromGravitino has no mapping for
+    // them), so create them the way an engine like Spark 4 would, directly through the Iceberg
+    // catalog, then load through the native metadata interface. All six V3 net-new types load as
+    // ExternalType; whether they should gain faithful native support is tracked in
+    // apache/gravitino#11927.
+    assertV3LoadsAsExternal(
+        "v3_variant", org.apache.iceberg.types.Types.VariantType.get(), "variant");
+    assertV3LoadsAsExternal(
+        "v3_timestamp_ns",
+        org.apache.iceberg.types.Types.TimestampNanoType.withoutZone(),
+        "TIMESTAMP_NANO");
+    assertV3LoadsAsExternal(
+        "v3_timestamptz_ns",
+        org.apache.iceberg.types.Types.TimestampNanoType.withZone(),
+        "TIMESTAMP_NANO");
+    assertV3LoadsAsExternal(
+        "v3_geometry", org.apache.iceberg.types.Types.GeometryType.crs84(), "GEOMETRY");
+    assertV3LoadsAsExternal(
+        "v3_geography", org.apache.iceberg.types.Types.GeographyType.crs84(), "GEOGRAPHY");
+    assertV3LoadsAsExternal(
+        "v3_unknown", org.apache.iceberg.types.Types.UnknownType.get(), "UNKNOWN");
+  }
+
+  @Test
+  void testV3TypesRejectedByHiveMetastore() {
+    // Hive-backend only. The Hive metastore in the current CI Hive image has no mapping for Iceberg
+    // V3 column types, so creating a V3 table through the Hive backend fails at metastore
+    // registration ("Invalid column type"). This captures that current behavior so it is not
+    // silently lost. When Hive gains V3 support (HIVE-29192 / HIVE-29287) and the CI Hive image is
+    // bumped, this create will start to succeed, this test will fail, and it can be merged with
+    // testV3TypeConversionViaIcebergClient. See apache/gravitino#11927.
+    Assumptions.assumeTrue(
+        "hive".equalsIgnoreCase(TYPE), "Only the Hive metastore backend rejects V3 column types");
+
+    Assertions.assertThrows(
+        Exception.class,
+        () -> createV3Table("v3_variant_hive", org.apache.iceberg.types.Types.VariantType.get()));
+  }
+
+  private NameIdentifier createV3Table(
+      String tableName, org.apache.iceberg.types.Type icebergType) {
+    NameIdentifier ident = NameIdentifier.of(schemaName, tableName);
+    org.apache.iceberg.Schema schema =
+        new org.apache.iceberg.Schema(
+            org.apache.iceberg.types.Types.NestedField.optional(1, "c", icebergType));
+    Map<String, String> props = Maps.newHashMap();
+    props.put("format-version", "3");
+    icebergCatalog.createTable(
+        IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident),
+        schema,
+        org.apache.iceberg.PartitionSpec.unpartitioned(),
+        props);
+    return ident;
+  }
+
+  private void assertV3LoadsAsExternal(
+      String tableName, org.apache.iceberg.types.Type icebergType, String expectedCatalogString) {
+    NameIdentifier ident = createV3Table(tableName, icebergType);
+    Column loaded = catalog.asTableCatalog().loadTable(ident).columns()[0];
+    Assertions.assertInstanceOf(Types.ExternalType.class, loaded.dataType());
+    Assertions.assertEquals(
+        expectedCatalogString, ((Types.ExternalType) loaded.dataType()).catalogString());
   }
 
   @Test
