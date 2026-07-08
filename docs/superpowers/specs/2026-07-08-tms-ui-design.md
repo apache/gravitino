@@ -356,15 +356,78 @@ estimates and mark missing inputs explicitly instead of inventing values.
 
 ### Benefit
 
-Benefit represents expected table quality improvement.
+Benefit should represent expected query speed improvement, with table quality metrics used as
+leading indicators. The UI should distinguish estimated benefit before a job runs from actual
+benefit after the job finishes.
 
-Initial benefit inputs:
+Preferred actual benefit metrics, when query history is available:
 
-- Expected file count reduction.
-- Expected average file size improvement.
-- Expected file variance reduction.
-- Expected delete file cleanup.
-- Expected health score improvement.
+- Query duration improvement: compare `p50`, `p90`, and `p95` query duration before and after
+  maintenance for queries that scan the optimized table.
+- Planning time improvement: compare query planning or metadata load time before and after
+  maintenance.
+- Scan time improvement: compare table scan operator time before and after maintenance.
+- Query minutes saved: `(baselineDuration - postMaintenanceDuration) * queryCount`.
+- Speedup ratio: `baselineDuration / postMaintenanceDuration`.
+
+Actual benefit should use comparable query windows, for example seven days before and seven days
+after the maintenance job. The comparison should normalize or segment by query shape when possible:
+
+- Same table or partition.
+- Similar scanned bytes.
+- Similar filter pattern or query template.
+- Same execution engine, if engine information is available.
+
+Estimated benefit can be calculated before the job runs with a scan-cost proxy:
+
+```text
+fileOpenTimeSaved = (fileCountBefore - estimatedFileCountAfter) * fileOpenLatencyMs
+metadataTimeSaved = (manifestCountBefore - estimatedManifestCountAfter) * manifestReadLatencyMs
+deleteMergeTimeSaved = (deleteFileCountBefore - estimatedDeleteFileCountAfter) * deleteMergeCostMs
+skewTimeSaved = fileSizeVarianceReductionRatio * skewPenaltyMs
+
+estimatedTimeSavedPerQuery = fileOpenTimeSaved
+  + metadataTimeSaved
+  + deleteMergeTimeSaved
+  + skewTimeSaved
+
+estimatedQueryMinutesSavedPerDay = estimatedTimeSavedPerQuery
+  * dailyQueryCount
+  * affectedQueryRatio
+  / 60000
+
+estimatedSpeedupPercent = estimatedTimeSavedPerQuery / baselineQueryDurationMs * 100
+```
+
+Initial estimated benefit inputs:
+
+- `fileCountBefore` and `estimatedFileCountAfter`.
+- `manifestCountBefore` and `estimatedManifestCountAfter`, if available.
+- `deleteFileCountBefore` and `estimatedDeleteFileCountAfter`.
+- `fileSizeVarianceReductionRatio` or MSE reduction.
+- `dailyQueryCount` for the table.
+- `affectedQueryRatio`: share of queries expected to benefit from the optimized files or partitions.
+- `baselineQueryDurationMs`, from query history if available.
+
+Initial configurable weights:
+
+- `fileOpenLatencyMs`: per-file open overhead.
+- `manifestReadLatencyMs`: per-manifest metadata overhead.
+- `deleteMergeCostMs`: per-delete-file scan merge overhead.
+- `skewPenaltyMs`: estimated query tail-latency penalty from file size skew.
+
+The UI should show query-speed benefit in user-facing terms:
+
+- Estimated speedup: for example `+18%`.
+- Estimated query minutes saved per day.
+- Estimated p95 reduction, if baseline p95 is available.
+- Confidence: high when query history exists, medium when table metrics exist, low when inputs are
+  missing.
+- Explanation: file opens reduced, delete merge cost reduced, file size skew reduced, or metadata
+  planning reduced.
+
+If query history is unavailable, the UI should label the value as a table-metric estimate rather
+than an observed query speedup.
 
 ### Sorting
 
