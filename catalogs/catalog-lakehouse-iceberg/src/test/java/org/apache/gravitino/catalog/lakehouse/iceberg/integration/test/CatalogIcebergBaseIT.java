@@ -120,6 +120,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   private static final String VIEW_COMMENT = "view comment";
   private static final String SPARK_DIALECT = "spark";
   private static final String TRINO_DIALECT = "trino";
+  private static final int NANO_PRECISION = 9;
   private static final String provider = "lakehouse-iceberg";
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
@@ -646,20 +647,24 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     // like Spark 4 would, directly through the Iceberg catalog, then load through the native
     // metadata interface.
     //
-    // variant has native support and loads as VariantType. The other V3 net-new types are not
+    // variant has native support and loads as VariantType. The remaining V3 net-new types are not
     // modeled in Gravitino's unified type system yet and load as ExternalType; native support for
     // them is pending and tracked in apache/gravitino#11929.
     assertV3LoadsAsVariant("v3_variant");
 
-    // TODO(apache/gravitino#11929): expect native types once these gain unified-model support.
-    assertV3LoadsAsExternal(
+    // Native V3 support (apache/gravitino#11936): a raw-Iceberg (IRC-side) nanosecond column loads
+    // back through the native metadata API as timestamp(9), not ExternalType. Write-path mirror:
+    // testNanosecondTimestampTypeConversion.
+    assertV3LoadsAsTimestamp(
         "v3_timestamp_ns",
         org.apache.iceberg.types.Types.TimestampNanoType.withoutZone(),
-        "TIMESTAMP_NANO");
-    assertV3LoadsAsExternal(
+        Types.TimestampType.withoutTimeZone(NANO_PRECISION));
+    assertV3LoadsAsTimestamp(
         "v3_timestamptz_ns",
         org.apache.iceberg.types.Types.TimestampNanoType.withZone(),
-        "TIMESTAMP_NANO");
+        Types.TimestampType.withTimeZone(NANO_PRECISION));
+
+    // TODO(apache/gravitino#11929): expect native types once these gain unified-model support.
     assertV3LoadsAsExternal(
         "v3_geometry", org.apache.iceberg.types.Types.GeometryType.crs84(), "GEOMETRY");
     assertV3LoadsAsExternal(
@@ -832,6 +837,73 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     Assertions.assertInstanceOf(Types.ExternalType.class, loaded.dataType());
     Assertions.assertEquals(
         expectedCatalogString, ((Types.ExternalType) loaded.dataType()).catalogString());
+  }
+
+  private void assertV3LoadsAsTimestamp(
+      String tableName,
+      org.apache.iceberg.types.Type icebergType,
+      org.apache.gravitino.rel.types.Type expectedGravitinoType) {
+    NameIdentifier ident = createV3Table(tableName, icebergType);
+    Column loaded = catalog.asTableCatalog().loadTable(ident).columns()[0];
+    Assertions.assertEquals(expectedGravitinoType, loaded.dataType());
+  }
+
+  @Test
+  void testNanosecondTimestampTypeConversion() {
+    // Nanosecond columns need an Iceberg backend that can persist them. The REST path can; the
+    // Hive backend cannot yet -- Iceberg's HiveSchemaUtil has no nanosecond arm
+    // (apache/iceberg#11937) -- so this runs on REST only.
+    Assumptions.assumeTrue(
+        "rest".equalsIgnoreCase(TYPE),
+        "Nanosecond timestamps require an Iceberg backend that can persist them");
+
+    Column col1 =
+        Column.of(
+            "iceberg_column_1", Types.TimestampType.withTimeZone(NANO_PRECISION), "col_1_comment");
+    Column col2 =
+        Column.of(
+            "iceberg_column_2",
+            Types.TimestampType.withoutTimeZone(NANO_PRECISION),
+            "col_2_comment");
+
+    Column[] columns = new Column[] {col1, col2};
+
+    String timestampTableName = "timestamp_ns_table";
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, timestampTableName);
+
+    Map<String, String> properties = createProperties();
+    properties.put("format-version", "3");
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(tableIdentifier, columns, table_comment, properties);
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(NANO_PRECISION), createdTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(NANO_PRECISION), createdTable.columns()[1].dataType());
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals("iceberg_column_1", loadTable.columns()[0].name());
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(NANO_PRECISION), loadTable.columns()[0].dataType());
+    Assertions.assertEquals("col_1_comment", loadTable.columns()[0].comment());
+
+    Assertions.assertEquals("iceberg_column_2", loadTable.columns()[1].name());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(NANO_PRECISION), loadTable.columns()[1].dataType());
+    Assertions.assertEquals("col_2_comment", loadTable.columns()[1].comment());
+
+    // Confirm the write reached Iceberg as the nanosecond types, not just echoed by Gravitino.
+    org.apache.iceberg.Table table =
+        icebergCatalog.loadTable(
+            IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier));
+    org.apache.iceberg.Schema icebergSchema = table.schema();
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.TimestampNanoType.withZone(),
+        icebergSchema.columns().get(0).type());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.TimestampNanoType.withoutZone(),
+        icebergSchema.columns().get(1).type());
   }
 
   @Test
@@ -1678,20 +1750,16 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
       Column.of("time_col_9", Types.TimeType.of(9))
     };
 
-    // Test unsupported timestamptz precision (with timezone)
     Column[] unsupportedTimestamptzColumns = {
       Column.of("timestamptz_col_0", Types.TimestampType.withTimeZone(0)),
       Column.of("timestamptz_col_1", Types.TimestampType.withTimeZone(1)),
-      Column.of("timestamptz_col_3", Types.TimestampType.withTimeZone(3)),
-      Column.of("timestamptz_col_9", Types.TimestampType.withTimeZone(9))
+      Column.of("timestamptz_col_3", Types.TimestampType.withTimeZone(3))
     };
 
-    // Test unsupported timestamp precision (without timezone)
     Column[] unsupportedTimestampColumns = {
       Column.of("timestamp_col_0", Types.TimestampType.withoutTimeZone(0)),
       Column.of("timestamp_col_1", Types.TimestampType.withoutTimeZone(1)),
-      Column.of("timestamp_col_3", Types.TimestampType.withoutTimeZone(3)),
-      Column.of("timestamp_col_9", Types.TimestampType.withoutTimeZone(9))
+      Column.of("timestamp_col_3", Types.TimestampType.withoutTimeZone(3))
     };
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -1711,10 +1779,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                       Transforms.EMPTY_TRANSFORM,
                       Distributions.NONE,
                       new SortOrder[0]));
-      Assertions.assertTrue(
-          exception
-              .getMessage()
-              .contains("Iceberg only supports microsecond precision (6) for time type"));
+      Assertions.assertTrue(exception.getMessage().contains("Cannot convert time("));
     }
 
     // Test timestamptz precision validation (with timezone)
@@ -1732,10 +1797,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                       Transforms.EMPTY_TRANSFORM,
                       Distributions.NONE,
                       new SortOrder[0]));
-      Assertions.assertTrue(
-          exception
-              .getMessage()
-              .contains("Iceberg only supports microsecond precision (6) for timestamptz type"));
+      Assertions.assertTrue(exception.getMessage().contains("Cannot convert timestamptz("));
     }
 
     // Test timestamp precision validation (without timezone)
@@ -1753,10 +1815,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                       Transforms.EMPTY_TRANSFORM,
                       Distributions.NONE,
                       new SortOrder[0]));
-      Assertions.assertTrue(
-          exception
-              .getMessage()
-              .contains("Iceberg only supports microsecond precision (6) for timestamp type"));
+      Assertions.assertTrue(exception.getMessage().contains("Cannot convert timestamp("));
     }
   }
 

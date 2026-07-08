@@ -124,32 +124,44 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
           (org.apache.gravitino.rel.types.Types.TimeType) primitive;
       // Iceberg only supports microsecond precision (6) for time type up to version 1.9.x
       // See: https://iceberg.apache.org/docs/1.9.1/schemas/
-      if (!timeType.hasPrecisionSet() || timeType.precision() == 6) {
+      if (!timeType.hasPrecisionSet()
+          || timeType.precision() == FromIcebergType.PRECISION_MICROSECOND) {
         return Types.TimeType.get();
       } else {
         throw new IllegalArgumentException(
-            "Iceberg only supports microsecond precision (6) for time type, but got precision: "
-                + timeType.precision());
+            String.format(
+                "Cannot convert time(%d) to an Iceberg type. Expected precision %d (microsecond).",
+                timeType.precision(), FromIcebergType.PRECISION_MICROSECOND));
       }
     } else if (primitive instanceof org.apache.gravitino.rel.types.Types.TimestampType) {
       org.apache.gravitino.rel.types.Types.TimestampType timestampType =
           (org.apache.gravitino.rel.types.Types.TimestampType) primitive;
-      // Iceberg only supports microsecond precision (6) for timestamp/timestamptz types up to
-      // version 1.9.x
-      // See: https://iceberg.apache.org/docs/1.9.1/schemas/
-      if (!timestampType.hasPrecisionSet() || timestampType.precision() == 6) {
+      // Iceberg supports microsecond precision (6) for timestamp/timestamptz and, since format
+      // version 3, nanosecond precision (9) for timestamp_ns/timestamptz_ns. No other precision
+      // is representable. See: https://iceberg.apache.org/spec/#primitive-types
+      if (!timestampType.hasPrecisionSet()
+          || timestampType.precision() == FromIcebergType.PRECISION_MICROSECOND) {
         if (timestampType.hasTimeZone()) {
           return Types.TimestampType.withZone();
         } else {
           return Types.TimestampType.withoutZone();
         }
+      } else if (timestampType.precision() == FromIcebergType.PRECISION_NANOSECOND) {
+        if (timestampType.hasTimeZone()) {
+          return Types.TimestampNanoType.withZone();
+        } else {
+          return Types.TimestampNanoType.withoutZone();
+        }
       } else {
         String timestampTypeName = timestampType.hasTimeZone() ? "timestamptz" : "timestamp";
         throw new IllegalArgumentException(
-            "Iceberg only supports microsecond precision (6) for "
-                + timestampTypeName
-                + " type, but got precision: "
-                + timestampType.precision());
+            String.format(
+                "Cannot convert %s(%d) to an Iceberg type."
+                    + " Expected precision %d (microsecond) or %d (nanosecond).",
+                timestampTypeName,
+                timestampType.precision(),
+                FromIcebergType.PRECISION_MICROSECOND,
+                FromIcebergType.PRECISION_NANOSECOND));
       }
     } else if (primitive instanceof org.apache.gravitino.rel.types.Types.DecimalType) {
       return Types.DecimalType.of(
