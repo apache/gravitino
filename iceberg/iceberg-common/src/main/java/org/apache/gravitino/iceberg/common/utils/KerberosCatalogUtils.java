@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.authentication.kerberos;
+package org.apache.gravitino.iceberg.common.utils;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,6 +27,7 @@ import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
+import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;

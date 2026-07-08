@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.authentication.kerberos;
+package org.apache.gravitino.iceberg.common.utils;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -26,7 +26,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
-import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosCatalogUtils;
+import org.apache.gravitino.iceberg.common.utils.KerberosCatalogUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.jdbc.JdbcCatalog;
