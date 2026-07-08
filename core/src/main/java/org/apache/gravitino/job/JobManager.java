@@ -60,6 +60,7 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.DirectoryUtils;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -126,9 +127,11 @@ public class JobManager implements JobOperationDispatcher {
             String.format("Staging directory %s is not accessible", stagingDirPath));
       }
     } else {
-      if (!stagingDir.mkdirs()) {
+      try {
+        DirectoryUtils.ensureDirectory(stagingDir);
+      } catch (IOException e) {
         throw new IllegalArgumentException(
-            String.format("Failed to create staging directory %s", stagingDirPath));
+            String.format("Failed to create staging directory %s", stagingDirPath), e);
       }
     }
 
@@ -428,9 +431,12 @@ public class JobManager implements JobOperationDispatcher {
         stagingDir.getAbsolutePath()
             + String.format(JOB_STAGING_DIR, metalake, jobTemplateName, jobId);
     File jobStagingDir = new File(jobStagingPath);
-    if (!jobStagingDir.mkdirs()) {
+    try {
+      DirectoryUtils.ensureDirectory(jobStagingDir);
+    } catch (IOException e) {
       throw new RuntimeException(
-          String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId));
+          String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId),
+          e);
     }
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values, and

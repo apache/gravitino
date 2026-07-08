@@ -30,6 +30,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
+import org.apache.gravitino.utils.DirectoryUtils;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -104,9 +105,8 @@ public final class KerberosAuthUtils {
         "HDFS URIs are not supported for keytab files");
 
     File parentFile = keytabFile.getParentFile();
-    if (parentFile != null && !parentFile.exists() && !parentFile.mkdirs()) {
-      throw new IOException(
-          String.format("Failed to create keytab directory %s", parentFile.getAbsolutePath()));
+    if (parentFile != null) {
+      DirectoryUtils.ensureDirectory(parentFile);
     }
 
     FileFetcher.get().fetchFileFromUri(keytabUri, keytabFile, timeoutSec * 1000, hadoopConf);
