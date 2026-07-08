@@ -30,11 +30,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.junit.jupiter.api.condition.EnabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-@EnabledIf("isEmbedded")
 public class IcebergRestKerberosJdbcWithUserImpersonationCatalogIT
     extends IcebergRestKerberosJdbcCatalogIT {
 
@@ -91,6 +89,9 @@ public class IcebergRestKerberosJdbcWithUserImpersonationCatalogIT
       sparkConf.set(
           "spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation", "vended-credentials");
     }
+
+    IcebergRestKerberosTestEnv.configureSparkKerberos(
+        sparkConf, HDFS_CLIENT_PRINCIPAL, containerSuite.getKerberosHiveContainer().getHostName());
 
     sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }

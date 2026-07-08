@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.integration.test;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -27,6 +28,10 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.spark.SparkConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,12 +52,76 @@ public final class IcebergRestKerberosTestEnv {
   /** Local path suffix for the copied client keytab under the temp directory. */
   public static final String CLIENT_KEYTAB = "/client.keytab";
 
+  private static String tempDir;
+
+  /**
+   * Configures Spark to authenticate to Kerberos-protected HDFS.
+   *
+   * <p>In deploy mode the Iceberg REST server runs in a separate JVM, so Spark must perform its own
+   * Kerberos login to write data files to HDFS during DML tests.
+   *
+   * @param sparkConf Spark configuration to update
+   * @param clientPrincipal Kerberos principal for the Spark client
+   * @param hdfsHostName HDFS namenode host name used to build the namenode Kerberos principal
+   */
+  public static void configureSparkKerberos(
+      SparkConf sparkConf, String clientPrincipal, String hdfsHostName) {
+    if (tempDir == null) {
+      throw new IllegalStateException(
+          "Kerberos test environment is not initialized, call init() first");
+    }
+    String keytabPath = tempDir + CLIENT_KEYTAB;
+    String hdfsPrincipal = "hdfs/_HOST@HADOOPKRB".replace("_HOST", hdfsHostName);
+    try {
+      Configuration configuration = new Configuration();
+      configuration.set("hadoop.security.authentication", "kerberos");
+      configuration.set("dfs.namenode.kerberos.principal", hdfsPrincipal);
+      UserGroupInformation.setConfiguration(configuration);
+      if (!UserGroupInformation.isLoginKeytabBased()) {
+        UserGroupInformation.loginUserFromKeytab(clientPrincipal, keytabPath);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to login Spark client with Kerberos", e);
+    }
+
+    sparkConf
+        .set("spark.hadoop.security.authentication", "kerberos")
+        .set("spark.hadoop.dfs.namenode.kerberos.principal", hdfsPrincipal)
+        .set("spark.kerberos.keytab", keytabPath)
+        .set("spark.kerberos.principal", clientPrincipal);
+
+    String krb5Path = System.getProperty(KRB5_CONF_PROPERTY);
+    if (krb5Path != null) {
+      StringBuilder opts = new StringBuilder();
+      opts.append(String.format("-Djava.security.krb5.conf=%s", krb5Path));
+      String realm = System.getProperty(KRB5_REALM_PROPERTY);
+      if (realm != null) {
+        opts.append(String.format(" -Djava.security.krb5.realm=%s", realm));
+      }
+      String kdc = System.getProperty(KRB5_KDC_PROPERTY);
+      if (kdc != null) {
+        opts.append(String.format(" -Djava.security.krb5.kdc=%s", kdc));
+      }
+      sparkConf.set("spark.driver.extraJavaOptions", opts.toString());
+      sparkConf.set("spark.executor.extraJavaOptions", opts.toString());
+    }
+  }
+
   private static final String KEYTAB_CONTAINER_PATH = "/etc/admin.keytab";
 
   private static Map<String, String> savedSystemProperties;
   private static int initRefCount;
 
   private IcebergRestKerberosTestEnv() {}
+
+  /** Returns whether integration tests are running in deploy mode. */
+  public static boolean isDeployMode() {
+    String mode =
+        System.getProperty(ITUtils.TEST_MODE) == null
+            ? ITUtils.EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
+    return ITUtils.DEPLOY_TEST_MODE.equals(mode);
+  }
 
   /**
    * Starts the Kerberos Hive container and configures the JVM krb5 settings for tests.
@@ -104,6 +173,7 @@ public final class IcebergRestKerberosTestEnv {
       kerberosHiveContainer.executeInContainer(
           "hadoop", "fs", "-chown", "-R", "cli", "/user/hive/");
 
+      IcebergRestKerberosTestEnv.tempDir = tempDir;
       return tempDir;
     } catch (Exception e) {
       reset();
@@ -124,6 +194,7 @@ public final class IcebergRestKerberosTestEnv {
     if (savedSystemProperties != null) {
       restoreSystemProperties(savedSystemProperties);
       savedSystemProperties = null;
+      tempDir = null;
       try {
         refreshKerberosConfig();
         resetDefaultRealm();

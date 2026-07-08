@@ -20,28 +20,26 @@ package org.apache.gravitino.iceberg.integration.test;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.integration.test.util.ITUtils;
-import org.junit.jupiter.api.AfterAll;
+import org.apache.spark.SparkConf;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.jupiter.api.condition.DisabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-@EnabledIf("isEmbedded")
 public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  private static final String HDFS_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
+  protected static final String HDFS_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
 
   private static String tempDir;
 
@@ -54,8 +52,8 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
     tempDir = IcebergRestKerberosTestEnv.init(containerSuite);
   }
 
-  @AfterAll
-  void resetKerberosEnv() {
+  @Override
+  protected void afterIcebergRESTServerStopped() {
     IcebergRestKerberosTestEnv.reset();
   }
 
@@ -102,12 +100,34 @@ public class IcebergRestKerberosJdbcCatalogIT extends IcebergRESTServiceIT {
     return configMap;
   }
 
-  private static boolean isEmbedded() {
-    String mode =
-        System.getProperty(ITUtils.TEST_MODE) == null
-            ? ITUtils.EMBEDDED_TEST_MODE
-            : System.getProperty(ITUtils.TEST_MODE);
+  @Override
+  protected void customizeSparkConf(SparkConf sparkConf) {
+    IcebergRestKerberosTestEnv.configureSparkKerberos(
+        sparkConf, HDFS_CLIENT_PRINCIPAL, containerSuite.getKerberosHiveContainer().getHostName());
+  }
 
-    return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
+  // Spark writes data files to HDFS directly in these tests; keep them in embedded mode only.
+  @Test
+  @DisabledIf(
+      "org.apache.gravitino.iceberg.integration.test.IcebergRestKerberosTestEnv#isDeployMode")
+  @Override
+  void testDML() {
+    super.testDML();
+  }
+
+  @Test
+  @DisabledIf(
+      "org.apache.gravitino.iceberg.integration.test.IcebergRestKerberosTestEnv#isDeployMode")
+  @Override
+  void testRegisterTable() {
+    super.testRegisterTable();
+  }
+
+  @Test
+  @DisabledIf(
+      "org.apache.gravitino.iceberg.integration.test.IcebergRestKerberosTestEnv#isDeployMode")
+  @Override
+  void testSnapshot() {
+    super.testSnapshot();
   }
 }
