@@ -524,22 +524,31 @@ public class TestJobManager {
 
     JobTemplateEntity shellJobTemplate =
         newShellJobTemplateEntity("shell_job", "A shell job template");
-    when(jobManager.getJobTemplate(metalake, shellJobTemplate.name())).thenReturn(shellJobTemplate);
     when(jobExecutor.submitJob(any())).thenReturn("job_execution_id_for_test");
     doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
 
     // Use a fixed job ID so that both runs resolve to the same staging directory.
     IdGenerator fixedIdGenerator = Mockito.mock(IdGenerator.class);
     when(fixedIdGenerator.nextId()).thenReturn(12345L);
-    FieldUtils.writeField(jobManager, "idGenerator", fixedIdGenerator, true);
+    JobManager fixedIdJobManager =
+        Mockito.spy(new JobManager(config, entityStore, fixedIdGenerator, jobExecutor));
+    try {
+      // Stop the background schedulers to prevent interference with the test, like setUp does.
+      fixedIdJobManager.cleanUpExecutor.shutdownNow();
+      fixedIdJobManager.statusPullExecutor.shutdownNow();
+      when(fixedIdJobManager.getJobTemplate(metalake, shellJobTemplate.name()))
+          .thenReturn(shellJobTemplate);
 
-    JobEntity first = jobManager.runJob(metalake, "shell_job", Collections.emptyMap());
-    Assertions.assertEquals(12345L, first.id());
+      JobEntity first = fixedIdJobManager.runJob(metalake, "shell_job", Collections.emptyMap());
+      Assertions.assertEquals(12345L, first.id());
 
-    // The staging directory for job 12345 exists now; running the job again must not fail on
-    // directory creation.
-    JobEntity second = jobManager.runJob(metalake, "shell_job", Collections.emptyMap());
-    Assertions.assertEquals(12345L, second.id());
+      // The staging directory for job 12345 exists now; running the job again must not fail on
+      // directory creation.
+      JobEntity second = fixedIdJobManager.runJob(metalake, "shell_job", Collections.emptyMap());
+      Assertions.assertEquals(12345L, second.id());
+    } finally {
+      fixedIdJobManager.close();
+    }
   }
 
   @Test

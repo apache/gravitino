@@ -21,6 +21,7 @@ package org.apache.gravitino.utils;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 
 /** Utilities for working with local directories. */
@@ -37,15 +38,10 @@ public class DirectoryUtils {
    * created concurrently by another thread or process.
    *
    * @param dir the directory to create
-   * @throws IOException if the directory cannot be created, or if the path exists but is not a
-   *     directory
+   * @throws FileAlreadyExistsException if the path exists but is not a directory
+   * @throws IOException if the directory cannot be created
    */
   public static void ensureDirectory(File dir) throws IOException {
-    try {
-      Files.createDirectories(dir.toPath());
-    } catch (IOException e) {
-      throw new IOException(
-          String.format("Failed to create directory %s", dir.getAbsolutePath()), e);
-    }
+    Files.createDirectories(dir.toPath());
   }
 }
