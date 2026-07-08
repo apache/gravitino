@@ -67,6 +67,17 @@ public interface AccessControlDispatcher {
       throws UserAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Adds Users in bulk.
+   *
+   * @param metalake The Metalake of the Users.
+   * @param users The Users to add.
+   * @return The result of the bulk add operation.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Users encounters storage issues.
+   */
+  BulkOperationResult bulkAddUsers(String metalake, UserAdd[] users) throws NoSuchMetalakeException;
+
+  /**
    * Removes a User.
    *
    * @param metalake The Metalake of the User.
@@ -77,6 +88,18 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If removing the User encounters storage issues.
    */
   boolean removeUser(String metalake, String user) throws NoSuchMetalakeException;
+
+  /**
+   * Removes Users in bulk.
+   *
+   * @param metalake The Metalake of the Users.
+   * @param users The names of Users to remove.
+   * @return The result of the bulk remove operation.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Users encounters storage issues.
+   */
+  BulkOperationResult bulkRemoveUsers(String metalake, String[] users)
+      throws NoSuchMetalakeException;
 
   /**
    * Removes a User by external identifier.

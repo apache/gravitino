@@ -24,11 +24,13 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.BulkOperationResult;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -183,6 +185,13 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public BulkOperationResult bulkAddUsers(String metalake, UserAdd[] users)
+      throws NoSuchMetalakeException {
+    return dispatcher.bulkAddUsers(metalake, users);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
@@ -196,6 +205,13 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       eventBus.dispatchEvent(new RemoveUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public BulkOperationResult bulkRemoveUsers(String metalake, String[] users)
+      throws NoSuchMetalakeException {
+    return dispatcher.bulkRemoveUsers(metalake, users);
   }
 
   /** {@inheritDoc} */

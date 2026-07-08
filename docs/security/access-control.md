@@ -573,6 +573,81 @@ Restart the Gravitino server for the configuration changes to take effect.
 
 The following sections demonstrate how to perform common access control operations using both the REST API (Shell) and Java client.
 
+### Bulk User Operations
+
+Bulk user operations help administrators reduce repeated client-side API calls when managing many users in the same metalake. They are useful for scenarios such as onboarding or offboarding a team, synchronizing users from an external identity provider, or cleaning up multiple obsolete users.
+
+The bulk user APIs validate the request body and authorization before processing any user. If the request is invalid, for example when the user list is empty or contains duplicated names or external IDs, Gravitino rejects the request and doesn't process any user. After validation succeeds, Gravitino processes each user independently and returns successful names in `succeeded` and per-user business failures in `failed`.
+
+Use the following APIs to add and remove users in bulk:
+
+| API                                               | Required privilege                       | Request body |
+|---------------------------------------------------|------------------------------------------|--------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`    | `OWNER` of the metalake or `MANAGE_USERS` | `users`      |
+| `POST /api/bulk/metalakes/{metalake}/users/remove` | `OWNER` of the metalake                   | `usernames`  |
+
+:::info
+The bulk user APIs require authorization to be enabled. For more information, see [Authorization](#authorization).
+:::
+
+#### Add Users in Bulk
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "users": [
+    {
+      "name": "user1",
+      "externalId": "ext-user1",
+      "enabled": true
+    },
+    {
+      "name": "user2",
+      "externalId": "ext-user2",
+      "enabled": false
+    }
+  ]
+}' http://localhost:8090/api/bulk/metalakes/test/users/add
+```
+
+</TabItem>
+</Tabs>
+
+#### Remove Users in Bulk
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "usernames": ["user1", "user2"]
+}' http://localhost:8090/api/bulk/metalakes/test/users/remove
+```
+
+</TabItem>
+</Tabs>
+
+#### Bulk Operation Response
+
+The response includes the user names that were processed successfully and the failures for individual users:
+
+```json
+{
+  "code": 0,
+  "succeeded": ["user1"],
+  "failed": [
+    {
+      "name": "user2",
+      "reason": "IllegalArgumentException: User does not exist"
+    }
+  ]
+}
+```
+
 ## User Operations
 
 ### Add a User

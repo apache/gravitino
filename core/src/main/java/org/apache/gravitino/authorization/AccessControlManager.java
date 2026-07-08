@@ -79,11 +79,60 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public BulkOperationResult bulkAddUsers(String metalake, UserAdd[] users)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          BulkResultBuilder resultBuilder = new BulkResultBuilder();
+          for (UserAdd user : users) {
+            try {
+              User addedUser =
+                  user.externalId() != null
+                      ? userGroupExternalManager.addUser(
+                          metalake,
+                          user.name(),
+                          user.externalId(),
+                          user.enabled() == null || user.enabled())
+                      : userGroupManager.addUser(metalake, user.name());
+              resultBuilder.addSucceeded(addedUser.name());
+            } catch (Exception e) {
+              resultBuilder.addFailed(user.name(), failureReason(e));
+            }
+          }
+          return resultBuilder.build();
+        });
+  }
+
+  @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
         LockType.WRITE,
         () -> userGroupManager.removeUser(metalake, user));
+  }
+
+  @Override
+  public BulkOperationResult bulkRemoveUsers(String metalake, String[] users)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          BulkResultBuilder resultBuilder = new BulkResultBuilder();
+          for (String user : users) {
+            try {
+              if (!userGroupManager.removeUser(metalake, user)) {
+                throw new IllegalArgumentException("User does not exist");
+              }
+              resultBuilder.addSucceeded(user);
+            } catch (Exception e) {
+              resultBuilder.addFailed(user, failureReason(e));
+            }
+          }
+          return resultBuilder.build();
+        });
   }
 
   @Override
@@ -332,5 +381,31 @@ public class AccessControlManager implements AccessControlDispatcher {
         LockType.WRITE,
         () ->
             permissionManager.overridePrivilegesInRole(metalake, role, securableObjectsToOverride));
+  }
+
+  private static String failureReason(Exception e) {
+    String message = e.getMessage();
+    if (message == null || message.isBlank()) {
+      return e.getClass().getSimpleName();
+    }
+    return e.getClass().getSimpleName() + ": " + message;
+  }
+
+  private static class BulkResultBuilder {
+    private final List<String> succeeded = new java.util.ArrayList<>();
+    private final List<BulkOperationResult.Failure> failed = new java.util.ArrayList<>();
+
+    private void addSucceeded(String name) {
+      succeeded.add(name);
+    }
+
+    private void addFailed(String name, String reason) {
+      failed.add(new BulkOperationResult.Failure(name, reason));
+    }
+
+    private BulkOperationResult build() {
+      return new BulkOperationResult(
+          succeeded.toArray(new String[0]), failed.toArray(new BulkOperationResult.Failure[0]));
+    }
   }
 }

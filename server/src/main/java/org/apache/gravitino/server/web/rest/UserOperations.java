@@ -38,10 +38,16 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.BulkOperationResult;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.UserAdd;
+import org.apache.gravitino.dto.requests.BulkUserAddRequest;
 import org.apache.gravitino.dto.requests.UserAddRequest;
+import org.apache.gravitino.dto.requests.UsernamesRequest;
+import org.apache.gravitino.dto.responses.BulkOperationFailureDTO;
+import org.apache.gravitino.dto.responses.BulkOperationResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
@@ -59,7 +65,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @NameBindings.AccessControlInterfaces
-@Path("/metalakes/{metalake}/users")
+@Path("/")
 public class UserOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserOperations.class);
@@ -81,7 +87,7 @@ public class UserOperations {
   }
 
   @GET
-  @Path("{user}")
+  @Path("/metalakes/{metalake}/users/{user}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-user", absolute = true)
@@ -105,6 +111,7 @@ public class UserOperations {
   }
 
   @GET
+  @Path("/metalakes/{metalake}/users")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-user", absolute = true)
@@ -147,6 +154,7 @@ public class UserOperations {
   }
 
   @POST
+  @Path("/metalakes/{metalake}/users")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-user", absolute = true)
@@ -178,7 +186,7 @@ public class UserOperations {
   }
 
   @DELETE
-  @Path("{user}")
+  @Path("/metalakes/{metalake}/users/{user}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "remove-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-user", absolute = true)
@@ -215,5 +223,87 @@ public class UserOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.REMOVE, user, metalake, e);
     }
+  }
+
+  /**
+   * Adds users in bulk.
+   *
+   * @param metalake The metalake name.
+   * @param request The bulk user add request.
+   * @return The bulk operation result.
+   */
+  @POST
+  @Path("/bulk/metalakes/{metalake}/users/add")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "bulk-add-users." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "bulk-add-users", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_USERS")
+  public Response addUsers(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      BulkUserAddRequest request) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            MetalakeManager.checkMetalakeInUse(metalake);
+            return Utils.ok(
+                toBulkOperationResponse(
+                    accessControlManager.bulkAddUsers(metalake, toUserAdds(request.getUsers()))));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleUserException(OperationType.ADD, "", metalake, e);
+    }
+  }
+
+  /**
+   * Removes users in bulk.
+   *
+   * @param metalake The metalake name.
+   * @param request The bulk usernames request.
+   * @return The bulk operation result.
+   */
+  @POST
+  @Path("/bulk/metalakes/{metalake}/users/remove")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "bulk-remove-users." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "bulk-remove-users", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER")
+  public Response removeUsers(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      UsernamesRequest request) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            MetalakeManager.checkMetalakeInUse(metalake);
+            return Utils.ok(
+                toBulkOperationResponse(
+                    accessControlManager.bulkRemoveUsers(metalake, request.getUsernames())));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleUserException(OperationType.REMOVE, "", metalake, e);
+    }
+  }
+
+  private static UserAdd[] toUserAdds(UserAddRequest[] requests) {
+    UserAdd[] users = new UserAdd[requests.length];
+    for (int i = 0; i < requests.length; i++) {
+      users[i] =
+          new UserAdd(requests[i].getName(), requests[i].getExternalId(), requests[i].getEnabled());
+    }
+    return users;
+  }
+
+  private static BulkOperationResponse toBulkOperationResponse(BulkOperationResult result) {
+    BulkOperationResult.Failure[] failures = result.failed();
+    BulkOperationFailureDTO[] failureDTOs = new BulkOperationFailureDTO[failures.length];
+    for (int i = 0; i < failures.length; i++) {
+      failureDTOs[i] = new BulkOperationFailureDTO(failures[i].name(), failures[i].reason());
+    }
+    return new BulkOperationResponse(result.succeeded(), failureDTOs);
   }
 }

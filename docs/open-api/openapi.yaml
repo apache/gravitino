@@ -188,6 +188,12 @@ paths:
   /metalakes/{metalake}/users/{user}:
     $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1users~1%7Buser%7D"
 
+  /bulk/metalakes/{metalake}/users/add:
+    $ref: "./users.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1users~1add"
+
+  /bulk/metalakes/{metalake}/users/remove:
+    $ref: "./users.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1users~1remove"
+
   /metalakes/{metalake}/groups:
     $ref: "./groups.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1groups"
 
@@ -319,6 +325,43 @@ components:
           type: array
           items:
             type: string
+
+    BulkOperationFailure:
+      type: object
+      required:
+        - name
+        - reason
+      properties:
+        name:
+          type: string
+          description: The entity name that failed to be processed
+        reason:
+          type: string
+          description: The failure reason
+
+    BulkOperationResponse:
+      type: object
+      required:
+        - code
+        - succeeded
+        - failed
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        succeeded:
+          type: array
+          description: The entity names that were processed successfully
+          items:
+            type: string
+        failed:
+          type: array
+          description: The entity names that failed to be processed
+          items:
+            $ref: "#/components/schemas/BulkOperationFailure"
 
   responses:
     EntityListResponse:
@@ -634,4 +677,3 @@ components:
     KerberosAuth:
       type: http
       scheme: negotiate
-

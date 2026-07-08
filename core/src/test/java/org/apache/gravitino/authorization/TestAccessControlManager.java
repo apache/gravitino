@@ -246,6 +246,45 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testBulkAddUsers() {
+    accessControlManager.addUser(METALAKE, "bulkAddUser2");
+
+    BulkOperationResult result =
+        accessControlManager.bulkAddUsers(
+            METALAKE,
+            new UserAdd[] {
+              new UserAdd("bulkAddUser1", "bulk-add-user-1", false),
+              new UserAdd("bulkAddUser2", null, null)
+            });
+
+    Assertions.assertArrayEquals(new String[] {"bulkAddUser1"}, result.succeeded());
+    Assertions.assertEquals(1, result.failed().length);
+    Assertions.assertEquals("bulkAddUser2", result.failed()[0].name());
+    Assertions.assertTrue(result.failed()[0].reason().contains("UserAlreadyExistsException"));
+
+    User user = accessControlManager.getUser(METALAKE, "bulkAddUser1");
+    Assertions.assertEquals("bulk-add-user-1", user.externalId());
+    Assertions.assertFalse(user.enabled());
+
+    accessControlManager.removeUser(METALAKE, "bulkAddUser1");
+    accessControlManager.removeUser(METALAKE, "bulkAddUser2");
+  }
+
+  @Test
+  public void testBulkRemoveUsers() {
+    accessControlManager.addUser(METALAKE, "bulkRemoveUser1");
+
+    BulkOperationResult result =
+        accessControlManager.bulkRemoveUsers(
+            METALAKE, new String[] {"bulkRemoveUser1", "bulkRemoveUser2"});
+
+    Assertions.assertArrayEquals(new String[] {"bulkRemoveUser1"}, result.succeeded());
+    Assertions.assertEquals(1, result.failed().length);
+    Assertions.assertEquals("bulkRemoveUser2", result.failed()[0].name());
+    Assertions.assertTrue(result.failed()[0].reason().contains("IllegalArgumentException"));
+  }
+
+  @Test
   public void testListUsers() {
     accessControlManager.addUser("metalake_list", "testList1");
     accessControlManager.addUser("metalake_list", "testList2");

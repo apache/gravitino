@@ -26,6 +26,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.BulkOperationResult;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
@@ -34,6 +35,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -76,8 +78,20 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public BulkOperationResult bulkAddUsers(String metalake, UserAdd[] users)
+      throws NoSuchMetalakeException {
+    return dispatcher.bulkAddUsers(metalake, users);
+  }
+
+  @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     return dispatcher.removeUser(metalake, user);
+  }
+
+  @Override
+  public BulkOperationResult bulkRemoveUsers(String metalake, String[] users)
+      throws NoSuchMetalakeException {
+    return dispatcher.bulkRemoveUsers(metalake, users);
   }
 
   @Override
