@@ -33,6 +33,7 @@ log4j = "2.25.4"
 arrow = "18.3.0"
 lance = "6.0.0"
 lance-namespace = "0.7.5"
+lance-namespace-impls = "0.4.1"
 delta-kernel = "3.3.0"
 jetty = "9.4.58.v20250814"
 jersey = "2.41"
@@ -205,6 +206,7 @@ log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j
 arrow-vector = { group = "org.apache.arrow", name = "arrow-vector", version.ref = "arrow" }
 lance = { group = "org.lance", name = "lance-core", version.ref = "lance" }
 lance-namespace-core = { group = "org.lance", name = "lance-namespace-core", version.ref = "lance-namespace" }
+lance-namespace-hive2 = { group = "org.lance", name = "lance-namespace-hive2", version.ref = "lance-namespace-impls" }
 delta-kernel = { group = "io.delta", name = "delta-kernel-api", version.ref = "delta-kernel" }
 delta-kernel-defaults = { group = "io.delta", name = "delta-kernel-defaults", version.ref = "delta-kernel" }
 jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
