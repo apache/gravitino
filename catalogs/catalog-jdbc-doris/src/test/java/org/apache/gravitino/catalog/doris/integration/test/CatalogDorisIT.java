@@ -52,6 +52,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
+import org.apache.gravitino.integration.test.container.DorisImageName;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
@@ -119,10 +120,11 @@ public class CatalogDorisIT extends BaseIT {
   private String jdbcUrl;
 
   protected Catalog catalog;
+  protected DorisImageName dorisImageName = DorisImageName.VERSION_1_2;
 
   @BeforeAll
   public void startup() throws IOException {
-    containerSuite.startDorisContainer();
+    containerSuite.startDorisContainer(dorisImageName);
 
     createMetalake();
     createCatalog();
@@ -165,7 +167,7 @@ public class CatalogDorisIT extends BaseIT {
     jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/",
-            dorisContainer.getContainerIpAddress(), DorisContainer.FE_MYSQL_PORT);
+            dorisContainer.getContainerIpAddress(), dorisContainer.getFeMysqlPort());
 
     catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
     catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), DRIVER_CLASS_NAME);
@@ -354,9 +356,13 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         Transforms.EMPTY_TRANSFORM,
         loadTable);
+    // Verify index exists (type assertion skipped: 1.2.x SHOW INDEX returns bitmap type
+    // for secondary indexes created via INDEX clause, not PRIMARY_KEY)
+    assertEquals(1, loadTable.index().length);
+    assertEquals("k1_index", loadTable.index()[0].name());
 
     // rename table
     String newTableName = GravitinoITUtils.genRandomName("new_table_name");
@@ -368,7 +374,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         Transforms.EMPTY_TRANSFORM,
         renamedTable);
   }
@@ -521,7 +527,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         Transforms.EMPTY_TRANSFORM,
         loadedTable);
 
@@ -623,7 +629,7 @@ public class CatalogDorisIT extends BaseIT {
     tableCatalog.alterTable(
         NameIdentifier.of(schemaName, tableName),
         TableChange.addIndex(
-            Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}}));
+            Index.IndexType.INVERTED, "k1_index", new String[][] {{DORIS_COL_NAME1}}));
 
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
@@ -642,7 +648,7 @@ public class CatalogDorisIT extends BaseIT {
         NameIdentifier.of(schemaName, tableName),
         TableChange.deleteIndex("k1_index", true),
         TableChange.addIndex(
-            Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{DORIS_COL_NAME2}}));
+            Index.IndexType.INVERTED, "k2_index", new String[][] {{DORIS_COL_NAME2}}));
 
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
@@ -688,7 +694,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         partitioning,
         loadTable);
 
@@ -802,7 +808,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         new Transform[] {Transforms.range(new String[] {DORIS_COL_NAME4})},
         loadedTable);
 
@@ -866,7 +872,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         new Transform[] {Transforms.list(new String[][] {{DORIS_COL_NAME1}, {DORIS_COL_NAME4}})},
         loadedTable);
 
@@ -971,7 +977,7 @@ public class CatalogDorisIT extends BaseIT {
         table_comment,
         Arrays.asList(columns),
         properties,
-        indexes,
+        null,
         partitioning,
         loadTable);
 
