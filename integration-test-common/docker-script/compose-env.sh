@@ -1,4 +1,3 @@
-#!/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -16,22 +15,17 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
 #
-cd "$(dirname "$0")"
 
-LOG_DIR=../build/trino-ci-container-log
-if [ -d $LOG_DIR ]; then
-  if [ -n "$(docker ps -aq -f name=trino-ci-hive)" ]; then
-    docker cp trino-ci-hive:/usr/local/hadoop/logs $LOG_DIR/hdfs
-    docker cp trino-ci-hive:/tmp/root $LOG_DIR/hive
-  fi
-  if [ -n "$(docker ps -aq -f name=trino-ci-trino)" ]; then
-    docker cp trino-ci-trino:/tmp/trino.log $LOG_DIR/trino.log
-  fi
+TEST_CONTAINERS=${TEST_CONTAINERS:-default}
+
+if [ "$TEST_CONTAINERS" = "default" ]; then
+  COMPOSE_FILE=docker-compose.yaml
+else
+  COMPOSE_FILE=docker-compose-trino-${TEST_CONTAINERS}.yaml
 fi
 
-export GRAVITINO_TRINO_CONNECTOR_DIR=/dev/null
-for compose_file in docker-compose*.yaml; do
-  docker compose -f "$compose_file" down --remove-orphans
-done
+if [ ! -f "$COMPOSE_FILE" ]; then
+  echo "ERROR: Unsupported TEST_CONTAINERS value: $TEST_CONTAINERS (expected compose file $COMPOSE_FILE not found)."
+  exit 1
+fi
