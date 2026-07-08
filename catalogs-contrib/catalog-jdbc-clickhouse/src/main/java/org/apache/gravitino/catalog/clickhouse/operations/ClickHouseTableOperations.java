@@ -330,6 +330,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return engine;
     }
 
+    if (engine == ENGINE.GRAPHITEMERGETREE) {
+      String config = properties.get(TableConstants.GRAPHITE_CONFIG);
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(config),
+          "GraphiteMergeTree requires '%s' property referencing a <graphite_rollup> config element",
+          TableConstants.GRAPHITE_CONFIG);
+      // Escape single quotes to prevent SQL injection
+      String escapedConfig = config.replace("'", "''");
+      sqlBuilder.append("\n ENGINE = GraphiteMergeTree('%s')".formatted(escapedConfig));
+      return engine;
+    }
+
     sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
     return engine;
   }

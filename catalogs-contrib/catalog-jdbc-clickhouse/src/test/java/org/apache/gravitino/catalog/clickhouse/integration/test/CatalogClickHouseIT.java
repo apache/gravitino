@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.integration.test;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
@@ -2435,5 +2436,70 @@ public class CatalogClickHouseIT extends BaseIT {
     // ClickHouse 24.8 always includes default SETTINGS (index_granularity = 8192) in
     // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
     Assertions.assertEquals(1, settingsCount);
+  }
+
+  /**
+   * Verifies round-trip for new ClickHouse types (Int128/256, UInt128/256, Enum8/16, Date32) via
+   * SQL CREATE TABLE + Gravitino loadTable. BFloat16 is excluded because it requires ClickHouse
+   * 24.12+ (the Gravitino CI image is 24.8.14). The BFloat16 converter mapping is verified in
+   * {@link org.apache.gravitino.catalog.clickhouse.converter.TestClickHouseTypeConverter}.
+   */
+  @Test
+  void testCreateTableWithNewTypeMappings() {
+    String tableName = GravitinoITUtils.genRandomName("test_new_types");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s ("
+                + "c_int128 Int128, c_int256 Int256, "
+                + "c_uint128 UInt128, c_uint256 UInt256, "
+                + "c_enum8 Enum8('a'=1,'b'=2), "
+                + "c_enum16 Enum16('x'=1,'y'=2), "
+                + "c_date32 Date32"
+                + ") ORDER BY c_int128",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Assertions.assertEquals(Types.ExternalType.of("Int128"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("Int256"), loadedTable.columns()[1].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("UInt128"), loadedTable.columns()[2].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("UInt256"), loadedTable.columns()[3].dataType());
+    // Enum types use instanceof check (not exact value match) because the ClickHouse JDBC driver
+    // may normalize the enum definition format (e.g., spacing around '=' and ',').
+    Assertions.assertTrue(loadedTable.columns()[4].dataType() instanceof Types.ExternalType);
+    Assertions.assertTrue(loadedTable.columns()[5].dataType() instanceof Types.ExternalType);
+    Assertions.assertEquals(Types.ExternalType.of("Date32"), loadedTable.columns()[6].dataType());
+  }
+
+  /**
+   * Tests that GraphiteMergeTree engine creation fails when graphite.config property is missing.
+   * Note: Positive path test (successful creation with valid config) is not included because it
+   * requires a pre-configured graphite_rollup element on the ClickHouse server side, which is not
+   * available in the standard test container.
+   */
+  @Test
+  void testGraphiteMergeTreeEngineCreation() {
+    String tableName = GravitinoITUtils.genRandomName("test_graphite");
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "pk", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("val", Types.StringType.get(), "data", true, false, DEFAULT_VALUE_NOT_SET)
+        };
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GRAVITINO_ENGINE_KEY, ENGINE.GRAPHITEMERGETREE.getValue());
+    // GraphiteMergeTree requires graphite.config property
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    NameIdentifier.of(schemaName, tableName),
+                    columns,
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    getSortOrders("id"),
+                    Indexes.EMPTY_INDEXES));
   }
 }

@@ -67,6 +67,15 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
           "",
           false);
 
+  // The following is for ClickHouse GraphiteMergeTree engine
+  public static final PropertyEntry<String> GRAPHITE_CONFIG_PROPERTY_ENTRY =
+      stringOptionalPropertyEntry(
+          TableConstants.GRAPHITE_CONFIG,
+          "The graphite_rollup config element name for GraphiteMergeTree engine",
+          false,
+          "",
+          false);
+
   // The following three are for ClickHouse Distributed engine
   public static final PropertyEntry<String> CLUSTER_REMOTE_DATABASE_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
@@ -107,6 +116,8 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
     // For all tables with different engines
     map.put(COMMENT_PROPERTY_ENTRY.getName(), COMMENT_PROPERTY_ENTRY);
     map.put(ENGINE_PROPERTY_ENTRY.getName(), ENGINE_PROPERTY_ENTRY);
+    // For ClickHouse GraphiteMergeTree engine
+    map.put(GRAPHITE_CONFIG_PROPERTY_ENTRY.getName(), GRAPHITE_CONFIG_PROPERTY_ENTRY);
     // For ClickHouse Distributed engine
     map.put(ON_CLUSTER_PROPERTY_ENTRY.getName(), ON_CLUSTER_PROPERTY_ENTRY);
     map.put(CLUSTER_NAME_PROPERTY_ENTRY.getName(), CLUSTER_NAME_PROPERTY_ENTRY);
@@ -127,7 +138,7 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
     AGGREGATINGMERGETREE("AggregatingMergeTree", true, true),
     COLLAPSINGMERGETREE("CollapsingMergeTree", true, true),
     VERSIONEDCOLLAPSINGMERGETREE("VersionedCollapsingMergeTree", true, true),
-    GRAPHITEMERGETREE("GraphiteMergeTree"),
+    GRAPHITEMERGETREE("GraphiteMergeTree", true, true),
 
     // Log
     TINYLOG("TinyLog"),
