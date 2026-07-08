@@ -459,6 +459,25 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
+  public void testFromIcebergV3Types() {
+    assertExternalType(Types.VariantType.get(), "variant");
+    assertExternalType(Types.UnknownType.get(), "UNKNOWN");
+    assertExternalType(Types.GeometryType.crs84(), "GEOMETRY");
+    assertExternalType(Types.GeographyType.crs84(), "GEOGRAPHY");
+    assertExternalType(Types.TimestampNanoType.withoutZone(), "TIMESTAMP_NANO");
+    assertExternalType(Types.TimestampNanoType.withZone(), "TIMESTAMP_NANO");
+  }
+
+  private void assertExternalType(Type icebergType, String expectedCatalogString) {
+    org.apache.gravitino.rel.types.Type gravitinoType = CONVERTER.toGravitino(icebergType);
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.ExternalType.class, gravitinoType);
+    Assertions.assertEquals(
+        expectedCatalogString,
+        ((org.apache.gravitino.rel.types.Types.ExternalType) gravitinoType).catalogString());
+  }
+
+  @Test
   public void testFromNestedField() {
     String colName = RandomStringUtils.secure().nextAlphabetic(10);
     String doc = RandomStringUtils.secure().nextAlphabetic(20);

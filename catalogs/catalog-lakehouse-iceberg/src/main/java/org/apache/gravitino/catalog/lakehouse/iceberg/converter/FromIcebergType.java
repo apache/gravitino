@@ -77,6 +77,11 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
   }
 
   @Override
+  public Type variant(Types.VariantType variant) {
+    return org.apache.gravitino.rel.types.Types.ExternalType.of("variant");
+  }
+
+  @Override
   public Type primitive(org.apache.iceberg.types.Type.PrimitiveType primitive) {
     switch (primitive.typeId()) {
       case BOOLEAN:
