@@ -1,0 +1,7 @@
+flowchart TD
+  W["Entity ALTER/DROP in metalake M<br/>structural + user/group/role/tag/policy"] -->|same txn| L[("entity_change_log<br/>metalake, entity_type, full_name, ALTER/DROP")]
+  L --> P["EntityChangeLogPoller<br/>one shared poller per node"]
+  P --> C1["CatalogChangeLogListener<br/>&rarr; catalog cache"]
+  P --> C2["JcasbinChangeListener<br/>&rarr; id-mapping cache"]
+  P --> C3["EntityCacheListener (new)<br/>&rarr; cache.invalidate(ident, type)"]
+  R["Relation change<br/>grant / owner / tag / policy"] -.->|not cached, no row| N["(nothing to propagate)"]

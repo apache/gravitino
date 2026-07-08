@@ -1,0 +1,3 @@
+flowchart LR
+  P1["Phase 1<br/>caffeine LOCAL<br/>remove relation caching + entity-store change-log listener<br/>+ emit ALTER/DROP for user/group/role/tag/policy<br/>&rarr; multi-node works, no schema change"] --> P2["Phase 2<br/>redis SHARED<br/>one shared copy behind the same SPI<br/>&rarr; strong consistency"]
+  P2 --> P3["Phase 3 (future, if metrics show need)<br/>precise relation caching<br/>per relation type"]

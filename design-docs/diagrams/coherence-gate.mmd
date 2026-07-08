@@ -1,0 +1,5 @@
+flowchart TD
+  W["Entity write in metalake M"] --> INV["cache.invalidate(ident, type)<br/>local effect"]
+  INV --> Q{"coherence() ?"}
+  Q -->|"LOCAL_PER_NODE (caffeine)"| CL["append entity_change_log row (same txn)<br/>&rarr; other nodes' pollers invalidate"]
+  Q -->|"SHARED (redis)"| RD["DEL the one shared copy after commit<br/>&rarr; every node sees it, nothing to propagate"]

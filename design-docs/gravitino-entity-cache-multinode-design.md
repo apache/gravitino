@@ -32,7 +32,7 @@ Gravitino has two caches:
 
 Because of this, the only safe way to run more than one node today is to turn the entity store cache off (`gravitino.cache.enabled=false`). That is bad for read-heavy catalogs, especially Iceberg.
 
-This document makes the entity store cache correct when running more than one node.
+This document proposes a design to make the entity store cache correct when running more than one node. It is a design proposal; no behavior has changed yet.
 
 ## Goals and Non-Goals
 
@@ -175,11 +175,12 @@ The broadcast / pub-sub-invalidation systems (Impala's `statestored`, Redis clie
 
 1. Hive — *Synchronized Metastore Cache*: <https://cwiki.apache.org/confluence/display/Hive/Synchronized+Metastore+Cache> (and HIVE-18661: <https://issues.apache.org/jira/browse/HIVE-18661>)
 2. Hive — `CachedStore.java` / `DbNotificationListener.java`: <https://github.com/apache/hive/blob/master/standalone-metastore/metastore-server/src/main/java/org/apache/hadoop/hive/metastore/cache/CachedStore.java>
-3. Confluent Schema Registry docs: <https://docs.confluent.io/platform/current/schema-registry/index.html>
-4. Apache Atlas — *Notifications*: <https://atlas.apache.org/2.0.0/Notifications.html>
-5. DataHub — *MetadataChangeProposal & MetadataChangeLog Events*: <https://docs.datahub.com/docs/advanced/mcp-mcl>
-6. Netflix TechBlog — *Metacat: Making Big Data Discoverable and Meaningful at Netflix*: <https://netflixtechblog.com/metacat-making-big-data-discoverable-and-meaningful-at-netflix-56fb36a53520>
-7. Trino — *Metastores* docs: <https://trino.io/docs/current/object-storage/metastores.html> (stale-read note: <https://github.com/trinodb/trino/issues/10512>)
+3. Apache Ranger — *FAQ* (plugins cache policies locally and poll Ranger Admin at intervals): <https://ranger.apache.org/faq.html>; default `pollIntervalMs = 30000` in the plugin config: <https://github.com/apache/ranger/blob/master/hive-agent/conf/ranger-hive-security.xml>
+4. Confluent Schema Registry docs: <https://docs.confluent.io/platform/current/schema-registry/index.html>
+5. Apache Impala — *Metadata Management* (catalogd broadcasts via statestored; local-catalog mode fetches on demand and caches): <https://impala.apache.org/docs/build/html/topics/impala_metadata.html>
+6. Redis — *Client-side caching* / `CLIENT TRACKING` (RESP3 push invalidation): <https://redis.io/docs/latest/develop/reference/client-side-caching/>
+7. CockroachDB — *Table Descriptor Lease* RFC (at most two leased versions; ~5m lease): <https://github.com/cockroachdb/cockroach/blob/master/docs/RFCS/20151009_table_descriptor_lease.md> (and *Online Schema Changes*: <https://www.cockroachlabs.com/docs/stable/online-schema-changes>)
+8. Trino — *Metastores* docs: <https://trino.io/docs/current/object-storage/metastores.html> (stale-read note: <https://github.com/trinodb/trino/issues/10512>)
 
 ---
 
