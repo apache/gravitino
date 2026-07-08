@@ -135,12 +135,13 @@ public class ClickHouseContainer extends BaseContainer {
   }
 
   public String getJdbcUrl() {
-    return format("jdbc:clickhouse://%s:%d", getContainerIpAddress(), CLICKHOUSE_PORT);
+    return format("jdbc:clickhouse://localhost:%d", container.getMappedPort(CLICKHOUSE_PORT));
   }
 
   public String getJdbcUrl(TestDatabaseName testDatabaseName) {
     return format(
-        "jdbc:clickhouse://%s:%d/%s", getContainerIpAddress(), CLICKHOUSE_PORT, testDatabaseName);
+        "jdbc:clickhouse://localhost:%d/%s",
+        container.getMappedPort(CLICKHOUSE_PORT), testDatabaseName);
   }
 
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
