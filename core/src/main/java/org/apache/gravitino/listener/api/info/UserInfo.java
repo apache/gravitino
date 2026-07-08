@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.info;
 
 import java.util.List;
+import java.util.Optional;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.User;
 
@@ -27,7 +28,7 @@ import org.apache.gravitino.authorization.User;
 @DeveloperApi
 public class UserInfo {
   private final String name;
-  private final String externalId;
+  private final Optional<String> externalId;
   private final boolean enabled;
   private List<String> roles;
 
@@ -38,7 +39,7 @@ public class UserInfo {
    */
   public UserInfo(User user) {
     this.name = user.name();
-    this.externalId = user.externalId();
+    this.externalId = Optional.ofNullable(user.externalId());
     this.enabled = user.enabled();
     this.roles = user.roles();
   }
@@ -55,9 +56,9 @@ public class UserInfo {
   /**
    * Returns the external identifier of the user.
    *
-   * @return the external identifier of the user
+   * @return the external identifier of the user, or empty if not set
    */
-  public String externalId() {
+  public Optional<String> externalId() {
     return externalId;
   }
 

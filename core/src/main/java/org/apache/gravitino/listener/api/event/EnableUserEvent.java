@@ -36,7 +36,16 @@ public class EnableUserEvent extends UserEvent {
    * @param updatedUserInfo The updated user information.
    */
   public EnableUserEvent(String initiator, String metalake, UserInfo updatedUserInfo) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, updatedUserInfo.externalId()));
+    super(
+        initiator,
+        AuthorizationUtils.ofUserExternalId(
+            metalake,
+            updatedUserInfo
+                .externalId()
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "User external id is required for EnableUserEvent"))));
     this.updatedUserInfo = updatedUserInfo;
   }
 

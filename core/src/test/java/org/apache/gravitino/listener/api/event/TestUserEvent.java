@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.User;
@@ -90,6 +91,7 @@ public class TestUserEvent {
     UserInfo info = new UserInfo(mockUser);
 
     Assertions.assertEquals("mock_user", info.name());
+    Assertions.assertEquals(Optional.empty(), info.externalId());
     Assertions.assertEquals(ImmutableList.of("admin"), info.roles());
   }
 
@@ -597,6 +599,7 @@ public class TestUserEvent {
 
   private void validateUserInfo(UserInfo userInfo, User expectedUser) {
     Assertions.assertEquals(userInfo.name(), expectedUser.name());
+    Assertions.assertEquals(Optional.ofNullable(expectedUser.externalId()), userInfo.externalId());
     Assertions.assertEquals(userInfo.roles(), expectedUser.roles());
   }
 }

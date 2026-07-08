@@ -29,7 +29,16 @@ public class GetGroupByExternalIdEvent extends GroupEvent {
   private final GroupInfo loadedGroupInfo;
 
   public GetGroupByExternalIdEvent(String initiator, String metalake, GroupInfo loadedGroupInfo) {
-    super(initiator, AuthorizationUtils.ofGroupExternalId(metalake, loadedGroupInfo.externalId()));
+    super(
+        initiator,
+        AuthorizationUtils.ofGroupExternalId(
+            metalake,
+            loadedGroupInfo
+                .externalId()
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "Group external id is required for GetGroupByExternalIdEvent"))));
     this.loadedGroupInfo = loadedGroupInfo;
   }
 

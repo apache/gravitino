@@ -36,7 +36,16 @@ public class DisableUserEvent extends UserEvent {
    * @param updatedUserInfo The updated user information.
    */
   public DisableUserEvent(String initiator, String metalake, UserInfo updatedUserInfo) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, updatedUserInfo.externalId()));
+    super(
+        initiator,
+        AuthorizationUtils.ofUserExternalId(
+            metalake,
+            updatedUserInfo
+                .externalId()
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "User external id is required for DisableUserEvent"))));
     this.updatedUserInfo = updatedUserInfo;
   }
 

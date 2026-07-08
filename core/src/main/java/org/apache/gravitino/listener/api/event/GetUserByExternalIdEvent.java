@@ -36,7 +36,16 @@ public class GetUserByExternalIdEvent extends UserEvent {
    * @param loadedUserInfo The retrieved user information.
    */
   public GetUserByExternalIdEvent(String initiator, String metalake, UserInfo loadedUserInfo) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, loadedUserInfo.externalId()));
+    super(
+        initiator,
+        AuthorizationUtils.ofUserExternalId(
+            metalake,
+            loadedUserInfo
+                .externalId()
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "User external id is required for GetUserByExternalIdEvent"))));
     this.loadedUserInfo = loadedUserInfo;
   }
 

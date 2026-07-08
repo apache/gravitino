@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -643,6 +644,7 @@ public class TestGroupEvent {
 
   private void validateGroup(GroupInfo groupInfo, Group group) {
     Assertions.assertEquals(group.name(), groupInfo.name());
+    Assertions.assertEquals(Optional.ofNullable(group.externalId()), groupInfo.externalId());
     Assertions.assertEquals(group.roles(), groupInfo.roles());
   }
 }
