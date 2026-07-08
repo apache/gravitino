@@ -22,7 +22,6 @@ package org.apache.gravitino.iceberg.common;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.Closeable;
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.PrivilegedExceptionAction;
@@ -31,14 +30,12 @@ import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import lombok.Getter;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
-import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosCatalogUtils;
 import org.apache.gravitino.iceberg.common.utils.CaffeineSchedulerExtractorUtils;
 import org.apache.gravitino.iceberg.common.utils.IcebergHiveCachedClientPool;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -83,7 +80,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isKerberosAuth()) {
-      this.kerberosClient = initKerberosClient();
+      this.kerberosClient = KerberosCatalogUtils.initKerberosClient(properties, getConf(), name());
     }
 
     try {
@@ -95,13 +92,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
 
   @Override
   public void close() throws IOException {
-    if (kerberosClient != null) {
-      try {
-        kerberosClient.close();
-      } catch (Exception e) {
-        LOGGER.warn("Failed to close KerberosClient", e);
-      }
-    }
+    KerberosCatalogUtils.closeKerberosClient(kerberosClient, LOGGER);
 
     // Do clean up work here. We need a mechanism to close the HiveCatalog; however, HiveCatalog
     // doesn't implement the Closeable interface.
@@ -133,21 +124,10 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
           "Kerberos is configured but KerberosClient is not initialized");
     }
 
-    final String finalPrincipalName;
-    String proxyKerberosPrincipalName = PrincipalUtils.getCurrentPrincipal().getName();
-
-    if (!proxyKerberosPrincipalName.contains("@")) {
-      finalPrincipalName =
-          String.format("%s@%s", proxyKerberosPrincipalName, kerberosClient.getRealm());
-    } else {
-      finalPrincipalName = proxyKerberosPrincipalName;
-    }
-
+    String finalPrincipalName = KerberosCatalogUtils.resolveProxyPrincipal(kerberosClient);
     UserGroupInformation realUser =
-        authenticationConfig.isImpersonationEnabled()
-            ? UserGroupInformation.createProxyUser(
-                finalPrincipalName, kerberosClient.getLoginUser())
-            : kerberosClient.getLoginUser();
+        KerberosCatalogUtils.createRealUser(
+            authenticationConfig, kerberosClient, finalPrincipalName);
     try {
       ClientPool<IMetaStoreClient, TException> newClientPool =
           (ClientPool<IMetaStoreClient, TException>) FieldUtils.readField(this, "clients", true);
@@ -172,18 +152,7 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
       throw new RuntimeException(
           "Failed to get delegation token for principal: " + finalPrincipalName, e);
     }
-    return realUser.doAs(
-        (PrivilegedExceptionAction<R>)
-            () -> {
-              try {
-                return executable.execute();
-              } catch (Throwable e) {
-                if (RuntimeException.class.isAssignableFrom(e.getClass())) {
-                  throw (RuntimeException) e;
-                }
-                throw new RuntimeException("Failed to invoke method", e);
-              }
-            });
+    return KerberosCatalogUtils.executeAs(realUser, executable);
   }
 
   private ClientPool<IMetaStoreClient, TException> resetIcebergHiveClientPool()
@@ -276,28 +245,6 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable, Suppo
       LOGGER.warn("Could not find 'clients' field in HiveCatalog, skipping cleanup", e);
     } catch (Exception e) {
       LOGGER.warn("Failed to close HiveCatalog internal client pool", e);
-    }
-  }
-
-  private KerberosClient initKerberosClient() {
-    try {
-      KerberosConfig kerberosConfig = new KerberosConfig(this.properties());
-      KerberosClient kerberosClient =
-          KerberosClient.builder(kerberosConfig.getPrincipalName(), this.getConf())
-              .loginMode(KerberosAuthUtils.LoginMode.CURRENT_USER)
-              .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
-              .build();
-      File keytabFile = new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, name()));
-      KerberosAuthUtils.saveKeytabFromUri(
-          kerberosConfig.getKeytab(),
-          keytabFile,
-          kerberosConfig.getFetchTimeoutSec(),
-          false,
-          this.getConf());
-      kerberosClient.login(keytabFile.getAbsolutePath());
-      return kerberosClient;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to login with kerberos", e);
     }
   }
 }

@@ -20,20 +20,14 @@
 package org.apache.gravitino.iceberg.common;
 
 import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nullable;
-import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
-import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
-import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosCatalogUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.jdbc.JdbcClientPool;
@@ -84,7 +78,8 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isKerberosAuth()) {
       try {
-        this.kerberosClient = initKerberosClient();
+        this.kerberosClient =
+            KerberosCatalogUtils.initKerberosClient(properties, hadoopConf, name());
       } catch (RuntimeException e) {
         try {
           close();
@@ -98,13 +93,7 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
 
   @Override
   public void close() {
-    if (kerberosClient != null) {
-      try {
-        kerberosClient.close();
-      } catch (Exception e) {
-        LOGGER.warn("Failed to close KerberosClient", e);
-      }
-    }
+    KerberosCatalogUtils.closeKerberosClient(kerberosClient, LOGGER);
     try {
       super.close();
     } catch (Exception e) {
@@ -114,64 +103,6 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
 
   @Override
   public <R> R doKerberosOperations(Executable<R> executable) throws Throwable {
-    AuthenticationConfig authenticationConfig = new AuthenticationConfig(this.properties());
-    if (!authenticationConfig.isKerberosAuth()) {
-      return executable.execute();
-    }
-    if (kerberosClient == null) {
-      throw new IllegalStateException(
-          "Kerberos is configured but KerberosClient is not initialized");
-    }
-
-    final String finalPrincipalName;
-    String proxyKerberosPrincipalName = PrincipalUtils.getCurrentPrincipal().getName();
-
-    if (!proxyKerberosPrincipalName.contains("@")) {
-      finalPrincipalName =
-          String.format("%s@%s", proxyKerberosPrincipalName, kerberosClient.getRealm());
-    } else {
-      finalPrincipalName = proxyKerberosPrincipalName;
-    }
-
-    UserGroupInformation realUser =
-        authenticationConfig.isImpersonationEnabled()
-            ? UserGroupInformation.createProxyUser(
-                finalPrincipalName, kerberosClient.getLoginUser())
-            : kerberosClient.getLoginUser();
-
-    return realUser.doAs(
-        (PrivilegedExceptionAction<R>)
-            () -> {
-              try {
-                return executable.execute();
-              } catch (Throwable e) {
-                if (RuntimeException.class.isAssignableFrom(e.getClass())) {
-                  throw (RuntimeException) e;
-                }
-                throw new RuntimeException("Failed to invoke method", e);
-              }
-            });
-  }
-
-  private KerberosClient initKerberosClient() {
-    try {
-      KerberosConfig kerberosConfig = new KerberosConfig(this.properties());
-      KerberosClient kerberosClient =
-          KerberosClient.builder(kerberosConfig.getPrincipalName(), this.hadoopConf)
-              .loginMode(KerberosAuthUtils.LoginMode.CURRENT_USER)
-              .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
-              .build();
-      File keytabFile = new File(String.format(KerberosConfig.GRAVITINO_KEYTAB_FORMAT, name()));
-      KerberosAuthUtils.saveKeytabFromUri(
-          kerberosConfig.getKeytab(),
-          keytabFile,
-          kerberosConfig.getFetchTimeoutSec(),
-          false,
-          this.hadoopConf);
-      kerberosClient.login(keytabFile.getAbsolutePath());
-      return kerberosClient;
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to login with kerberos", e);
-    }
+    return KerberosCatalogUtils.doKerberosOperations(this.properties(), kerberosClient, executable);
   }
 }

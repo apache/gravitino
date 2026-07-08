@@ -37,7 +37,7 @@ public class TestClosableJdbcCatalog {
   @TempDir private Path warehouse;
 
   @Test
-  void testSimpleAuthInitializeWithoutKerberos() {
+  void testSimpleInit() {
     ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
     Configuration conf = new HdfsConfiguration();
     catalog.setConf(conf);
@@ -47,7 +47,7 @@ public class TestClosableJdbcCatalog {
   }
 
   @Test
-  void testKerberosInitializeRequiresHadoopConf() {
+  void testKerberosInitNoConf() {
     ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
     Map<String, String> properties = newJdbcCatalogProperties();
     properties.put(AuthenticationConfig.AUTH_TYPE_KEY, "kerberos");
@@ -58,7 +58,7 @@ public class TestClosableJdbcCatalog {
   }
 
   @Test
-  void testKerberosInitializeFailsWithInvalidKeytab() {
+  void testKerberosInitBadKeytab() {
     ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
     Configuration conf = new HdfsConfiguration();
     catalog.setConf(conf);
@@ -75,7 +75,7 @@ public class TestClosableJdbcCatalog {
   }
 
   @Test
-  void testSimpleKerberosOps() throws Throwable {
+  void testSimpleOps() throws Throwable {
     ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
     catalog.setConf(new HdfsConfiguration());
     catalog.initialize("test", newJdbcCatalogProperties());
@@ -84,7 +84,7 @@ public class TestClosableJdbcCatalog {
   }
 
   @Test
-  void testImpersonationEnableConfigValues() {
+  void testImpersonationConfig() {
     Map<String, String> properties = newJdbcCatalogProperties();
     properties.put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, "true");
     Assertions.assertTrue(new AuthenticationConfig(properties).isImpersonationEnabled());
@@ -94,7 +94,7 @@ public class TestClosableJdbcCatalog {
   }
 
   @Test
-  void testKerberosOpsWithImpersonationDisabled() throws Throwable {
+  void testOpsNoImpersonation() throws Throwable {
     ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
     catalog.setConf(new HdfsConfiguration());
 
@@ -106,7 +106,7 @@ public class TestClosableJdbcCatalog {
   }
 
   @Test
-  void testKerberosOpsNoClient() {
+  void testOpsNoClient() {
     ClosableJdbcCatalog catalog = new ClosableJdbcCatalog();
     Configuration conf = new HdfsConfiguration();
     catalog.setConf(conf);
