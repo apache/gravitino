@@ -28,7 +28,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.container.DorisContainer;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
 import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
@@ -86,7 +85,7 @@ public class CatalogsPageDorisTest extends BaseWebIT {
         String.format(
             "jdbc:mysql://%s:%d/",
             containerSuite.getDorisContainer().getContainerIpAddress(),
-            DorisContainer.FE_MYSQL_PORT);
+            containerSuite.getDorisContainer().getFeMysqlPort());
     LOG.info("Doris jdbc url: {}", dorisJdbcConnectionUri);
 
     metalakePage = new MetalakePage(driver);
