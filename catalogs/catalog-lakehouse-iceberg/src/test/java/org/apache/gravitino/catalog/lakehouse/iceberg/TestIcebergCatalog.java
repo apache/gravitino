@@ -120,7 +120,7 @@ public class TestIcebergCatalog {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-    // A populated `warehouse` opts creation into a backend resolve.
+    // A REST backend with a populated `warehouse` opts creation into a backend resolve.
     IcebergCatalog withWarehouse =
         icebergCatalogWith(
             auditInfo,
@@ -135,12 +135,22 @@ public class TestIcebergCatalog {
             auditInfo, ImmutableMap.of(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "rest"));
     Assertions.assertFalse(withoutWarehouse.shouldValidateConnectionForCreate());
 
+    // Non-REST backends treat `warehouse` as a storage location and keep their lazy behavior, so a
+    // configured `warehouse` must not force a create-time resolve.
+    IcebergCatalog jdbcWithWarehouse =
+        icebergCatalogWith(
+            auditInfo,
+            ImmutableMap.of(
+                IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "jdbc",
+                IcebergCatalogPropertiesMetadata.WAREHOUSE, "file:///tmp/iceberg-jdbc"));
+    Assertions.assertFalse(jdbcWithWarehouse.shouldValidateConnectionForCreate());
+
     // A blank `warehouse` is treated as omitted.
     IcebergCatalog blankWarehouse =
         icebergCatalogWith(
             auditInfo,
             ImmutableMap.of(
-                IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "hive",
+                IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "rest",
                 IcebergCatalogPropertiesMetadata.WAREHOUSE, "   "));
     Assertions.assertFalse(blankWarehouse.shouldValidateConnectionForCreate());
   }
