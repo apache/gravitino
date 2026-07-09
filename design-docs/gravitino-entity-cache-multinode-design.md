@@ -39,7 +39,7 @@ This document proposes a design to make the entity store cache correct when runn
 **Goals**
 
 - Make the entity store cache correct with more than one node, so `gravitino.cache.enabled=true` is safe.
-- Keep the cache **pluggable**: one SPI, chosen by `gravitino.cache.impl`. Ship `caffeine` as the default (no extra dependency) and `redis` as an option the user turns on by config.
+- Keep the cache **pluggable**: one SPI, chosen by `gravitino.cache.impl`. Ship `caffeine` as the default (no extra dependency) and `redis` as an option the user turns on by config. The current caffeine implementation is rather complex for any users to make any an new implementation, so we need to simplify it. 
 - Keep single-node behavior and the write path (the optimistic version lock) unchanged.
 
 **Non-Goals**
