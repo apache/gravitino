@@ -70,7 +70,7 @@ public class TestIcebergCatalogOperations {
             "Couldn't find Iceberg configuration for catalog %s", "s3://warehouse/");
 
     RuntimeException translated =
-        IcebergCatalogOperations.translateInitializationFailure(config, cause);
+        IcebergCatalogOperations.translateWarehouseNotAvailableError(config, cause);
 
     Assertions.assertInstanceOf(IllegalArgumentException.class, translated);
     Assertions.assertSame(cause, translated.getCause());
@@ -89,7 +89,8 @@ public class TestIcebergCatalogOperations {
                 IcebergConstants.WAREHOUSE, "s3://warehouse/"));
     RuntimeException unrelated = new RuntimeException("connection refused");
     Assertions.assertSame(
-        unrelated, IcebergCatalogOperations.translateInitializationFailure(restConfig, unrelated));
+        unrelated,
+        IcebergCatalogOperations.translateWarehouseNotAvailableError(restConfig, unrelated));
 
     // Non-REST backends never get the hint, even for a warehouse-resolution cause.
     IcebergConfig hiveConfig =
@@ -101,14 +102,14 @@ public class TestIcebergCatalogOperations {
         new NoSuchWarehouseException("Couldn't find Iceberg configuration for catalog %s", "x");
     Assertions.assertSame(
         noSuchWarehouse,
-        IcebergCatalogOperations.translateInitializationFailure(hiveConfig, noSuchWarehouse));
+        IcebergCatalogOperations.translateWarehouseNotAvailableError(hiveConfig, noSuchWarehouse));
 
     // REST without a configured warehouse: nothing to hint about.
     IcebergConfig noWarehouseConfig =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "rest"));
     Assertions.assertSame(
         noSuchWarehouse,
-        IcebergCatalogOperations.translateInitializationFailure(
+        IcebergCatalogOperations.translateWarehouseNotAvailableError(
             noWarehouseConfig, noSuchWarehouse));
   }
 

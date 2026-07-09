@@ -70,17 +70,18 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
 
   @Override
   public boolean shouldValidateConnectionForCreate() {
-    return shouldValidateConnectionForCreate(entity().getProperties());
+    Map<String, String> properties = entity().getProperties();
+    return properties != null
+        && shouldValidateConnectionForCreate(
+            properties.get(IcebergConstants.CATALOG_BACKEND),
+            properties.get(IcebergConstants.WAREHOUSE));
   }
 
   // REST resolves `warehouse` as a server-side catalog selector, so validate it at create; hive and
   // jdbc use it as a storage location and need no create-time connection.
-  static boolean shouldValidateConnectionForCreate(Map<String, String> properties) {
-    return properties != null
-        && IcebergCatalogBackend.REST
-            .name()
-            .equalsIgnoreCase(properties.get(IcebergConstants.CATALOG_BACKEND))
-        && StringUtils.isNotBlank(properties.get(IcebergConstants.WAREHOUSE));
+  static boolean shouldValidateConnectionForCreate(String backend, String warehouse) {
+    return IcebergCatalogBackend.REST.name().equalsIgnoreCase(backend)
+        && StringUtils.isNotBlank(warehouse);
   }
 
   @Override

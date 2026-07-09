@@ -22,6 +22,7 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -140,32 +141,18 @@ public class IcebergCatalogOperations
           new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
       this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
     } catch (RuntimeException e) {
-      // Loading the backend catalog contacts it; the REST backend resolves `warehouse` via
-      // GET /v1/config during initialization. Translate an unresolvable `warehouse` into an
-      // actionable invalid-argument error.
-      throw translateInitializationFailure(icebergConfig, e);
+      throw translateWarehouseNotAvailableError(icebergConfig, e);
     }
   }
 
-  /**
-   * Translates a backend-initialization failure into an actionable error.
-   *
-   * <p>On the REST backend the {@code warehouse} property selects a catalog by name on the remote
-   * Iceberg REST server and is not a storage location. When the server is reachable but cannot
-   * resolve the configured value, that is a user/configuration error, so it is surfaced as an
-   * {@link IllegalArgumentException} with a hint. Any other failure is returned unchanged.
-   *
-   * @param config the resolved Iceberg configuration for this catalog.
-   * @param cause the failure raised while loading the backend catalog.
-   * @return the exception to throw.
-   */
+  // A reachable REST server rejecting the `warehouse` selector is a user error, not a backend
+  // outage, so surface it as IllegalArgumentException (400) with a hint. See issue #11943.
   @VisibleForTesting
-  static RuntimeException translateInitializationFailure(
+  static RuntimeException translateWarehouseNotAvailableError(
       IcebergConfig config, RuntimeException cause) {
     String backend = config.get(IcebergConfig.CATALOG_BACKEND);
     String warehouse = config.get(IcebergConfig.CATALOG_WAREHOUSE);
-    if (backend != null
-        && IcebergCatalogBackend.REST.name().equalsIgnoreCase(backend)
+    if (IcebergCatalogBackend.REST.name().equalsIgnoreCase(backend)
         && StringUtils.isNotBlank(warehouse)
         && isWarehouseResolutionFailure(cause)) {
       return new IllegalArgumentException(
@@ -180,21 +167,9 @@ public class IcebergCatalogOperations
     return cause;
   }
 
-  /**
-   * Returns whether {@code cause} (or any exception in its cause chain) indicates the Iceberg REST
-   * server could not resolve the requested {@code warehouse} selector.
-   *
-   * @param cause the exception to inspect.
-   * @return {@code true} if the failure is a warehouse-resolution error.
-   */
   private static boolean isWarehouseResolutionFailure(Throwable cause) {
-    Throwable current = cause;
-    for (int depth = 0; current != null && depth < 32; current = current.getCause(), depth++) {
-      if (current instanceof NoSuchWarehouseException) {
-        return true;
-      }
-    }
-    return false;
+    return Throwables.getCausalChain(cause).stream()
+        .anyMatch(NoSuchWarehouseException.class::isInstance);
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */

@@ -1139,10 +1139,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           wrapper.catalog.properties();
           wrapper.catalog.capability();
 
-          // On the create path (propsToValidate != null), catalogs that opt in are eagerly
-          // initialized so that a configuration the backend cannot resolve (e.g. an Iceberg REST
-          // `warehouse` selector) is rejected at create time with an actionable error, instead of
-          // surfacing later as a cryptic failure on the first metadata operation.
           if (propsToValidate != null && wrapper.catalog.shouldValidateConnectionForCreate()) {
             wrapper.catalog.ops();
           }

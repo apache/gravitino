@@ -22,7 +22,6 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.CATA
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.SCHEMA_PROPERTIES_META;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.TABLE_PROPERTIES_META;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Map;
@@ -117,21 +116,14 @@ public class TestIcebergCatalog {
 
   @Test
   public void testShouldValidateConnectionForCreate() {
-    String backend = IcebergCatalogPropertiesMetadata.CATALOG_BACKEND;
-    String warehouse = IcebergCatalogPropertiesMetadata.WAREHOUSE;
-
     Assertions.assertTrue(
-        IcebergCatalog.shouldValidateConnectionForCreate(
-            ImmutableMap.of(backend, "rest", warehouse, "s3://warehouse/")));
+        IcebergCatalog.shouldValidateConnectionForCreate("rest", "s3://warehouse/"));
+    Assertions.assertFalse(IcebergCatalog.shouldValidateConnectionForCreate("rest", null));
     Assertions.assertFalse(
-        IcebergCatalog.shouldValidateConnectionForCreate(ImmutableMap.of(backend, "rest")));
+        IcebergCatalog.shouldValidateConnectionForCreate("jdbc", "file:///tmp/iceberg-jdbc"));
+    Assertions.assertFalse(IcebergCatalog.shouldValidateConnectionForCreate("rest", "   "));
     Assertions.assertFalse(
-        IcebergCatalog.shouldValidateConnectionForCreate(
-            ImmutableMap.of(backend, "jdbc", warehouse, "file:///tmp/iceberg-jdbc")));
-    Assertions.assertFalse(
-        IcebergCatalog.shouldValidateConnectionForCreate(
-            ImmutableMap.of(backend, "rest", warehouse, "   ")));
-    Assertions.assertFalse(IcebergCatalog.shouldValidateConnectionForCreate(null));
+        IcebergCatalog.shouldValidateConnectionForCreate(null, "s3://warehouse/"));
   }
 
   @Test

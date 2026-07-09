@@ -212,10 +212,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
-   * Whether catalog creation should eagerly initialize this catalog so a backend misconfiguration
-   * fails at create time rather than on first use. Default {@code false}; opt-in.
+   * Whether catalog creation should validate the backend connection.
    *
-   * @return {@code true} to validate the backend connection during catalog creation
+   * @return {@code true} to validate during creation; {@code false} (default) to skip
    */
   public boolean shouldValidateConnectionForCreate() {
     return false;

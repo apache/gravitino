@@ -74,17 +74,7 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
             HiveContainer.HDFS_DEFAULTFS_PORT);
   }
 
-  /**
-   * Regression guard for issue #11943. On the REST backend, {@code warehouse} is a catalog selector
-   * (forwarded to the remote Iceberg REST server as {@code ?warehouse=}), not a storage location. A
-   * value the REST server cannot resolve to a catalog must fail when the catalog is created —
-   * validated as the property is taken in — instead of succeeding and then producing a confusing
-   * {@code NoSuchWarehouseException} on first use.
-   *
-   * <p>The happy path (REST backend with {@code warehouse} omitted, resolving to the default
-   * catalog) is exercised by the inherited {@link CatalogIcebergBaseIT} suite, which creates its
-   * catalog without a {@code warehouse} property on the REST backend.
-   */
+  // Checks an Iceberg REST warehouse misconfiguration is caught on create. See issue #11943.
   @Test
   void testCreateRestCatalogWithUnresolvableWarehouseFailsAtCreate() {
     String badCatalogName = GravitinoITUtils.genRandomName("iceberg_rest_bad_warehouse");
@@ -119,12 +109,7 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
         "catalog must not be created when its warehouse cannot be resolved at create time");
   }
 
-  /**
-   * Companion to {@link #testCreateRestCatalogWithUnresolvableWarehouseFailsAtCreate}: a {@code
-   * warehouse} value that <em>does</em> name a catalog the REST server serves must still succeed at
-   * create time and be usable, since validation resolves the value against the server rather than
-   * rejecting it by shape.
-   */
+  // A warehouse the REST server serves must still create and be usable. See issue #11943.
   @Test
   void testCreateRestCatalogWithValidWarehouseSucceeds() {
     String catalogName = GravitinoITUtils.genRandomName("iceberg_rest_named_warehouse");
