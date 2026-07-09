@@ -178,6 +178,21 @@ public class TestCatalogConnectorMetadataView {
   }
 
   @Test
+  public void testCreateViewThrowsWhenUnderlyingCatalogUnsupported() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.viewExists(any())).thenReturn(false);
+    when(viewCatalog.createView(any(), any(), any(), any(), any(), any(), any()))
+        .thenThrow(new UnsupportedOperationException("createView is not supported"));
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    GravitinoView view = createGravitinoView("db", "v1", "select 1");
+    TrinoException exception =
+        assertThrows(TrinoException.class, () -> metadata.createView(view, false));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
+  }
+
+  @Test
   public void testCreateViewCreatesWhenNotExists() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.viewExists(any())).thenReturn(false);
@@ -194,6 +209,8 @@ public class TestCatalogConnectorMetadataView {
   public void testCreateViewThrowsWhenExistsAndNotReplace() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.viewExists(any())).thenReturn(true);
+    View existingView = createView(Dialects.TRINO, "select 1");
+    when(viewCatalog.loadView(any())).thenReturn(existingView);
 
     CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
     GravitinoView view = createGravitinoView("db", "v1", "select 1");
@@ -207,6 +224,8 @@ public class TestCatalogConnectorMetadataView {
   public void testCreateViewReplacesWhenExistsAndReplace() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.viewExists(any())).thenReturn(true);
+    View existingView = createView(Dialects.TRINO, "select 1");
+    when(viewCatalog.loadView(any())).thenReturn(existingView);
 
     CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
     GravitinoView view = createGravitinoView("db", "v1", "select 1");
@@ -214,6 +233,22 @@ public class TestCatalogConnectorMetadataView {
 
     verify(viewCatalog, times(1))
         .alterView(eq(NameIdentifier.of("db", "v1")), any(ViewChange.ReplaceView.class));
+  }
+
+  @Test
+  public void testCreateViewThrowsWhenExistsWithoutTrinoRepresentationAndReplace() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.viewExists(any())).thenReturn(true);
+    View existingView = createView(Dialects.HIVE, "select 1");
+    when(viewCatalog.loadView(any())).thenReturn(existingView);
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    GravitinoView view = createGravitinoView("db", "v1", "select 1");
+    TrinoException exception =
+        assertThrows(TrinoException.class, () -> metadata.createView(view, true));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS.toErrorCode(), exception.getErrorCode());
+    verify(viewCatalog, never()).alterView(any(), any(ViewChange.ReplaceView.class));
   }
 
   @Test
@@ -246,6 +281,21 @@ public class TestCatalogConnectorMetadataView {
 
     CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
     assertThrows(TrinoException.class, () -> metadata.dropView("db", "v1"));
+  }
+
+  @Test
+  public void testDropViewThrowsWhenUnderlyingCatalogUnsupported() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    View view = createView(Dialects.TRINO, "select 1");
+    when(viewCatalog.loadView(any())).thenReturn(view);
+    when(viewCatalog.dropView(any()))
+        .thenThrow(new UnsupportedOperationException("dropView is not supported"));
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    TrinoException exception =
+        assertThrows(TrinoException.class, () -> metadata.dropView("db", "v1"));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
   }
 
   @Test
@@ -309,6 +359,23 @@ public class TestCatalogConnectorMetadataView {
     metadata.renameView(oldName, newName);
     verify(viewCatalog, times(1))
         .alterView(eq(NameIdentifier.of("db", "v1")), any(ViewChange.RenameView.class));
+  }
+
+  @Test
+  public void testRenameViewThrowsWhenUnderlyingCatalogUnsupported() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    View view = createView(Dialects.TRINO, "select 1");
+    when(viewCatalog.loadView(any())).thenReturn(view);
+    when(viewCatalog.alterView(any(), any(ViewChange.RenameView.class)))
+        .thenThrow(new UnsupportedOperationException("alterView is not supported"));
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+
+    SchemaTableName oldName = new SchemaTableName("db", "v1");
+    SchemaTableName newName = new SchemaTableName("db", "v2");
+    TrinoException exception =
+        assertThrows(TrinoException.class, () -> metadata.renameView(oldName, newName));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
   }
 
   @Test

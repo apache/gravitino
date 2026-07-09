@@ -170,8 +170,6 @@ public class CatalogConnectorMetadata {
     try {
       NameIdentifier[] tables = tableCatalog.listTables(Namespace.of(schemaName));
       return Arrays.stream(tables).map(NameIdentifier::name).toList();
-    } catch (UnsupportedOperationException e) {
-      return List.of();
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
@@ -502,10 +500,20 @@ public class CatalogConnectorMetadata {
       if (gravitinoView.getSql() == null) {
         // The view exists but has no Trino dialect SQL representation, so it is not visible to
         // Trino.
+        LOG.debug(
+            "View {}.{} in catalog {} has no Trino dialect SQL representation, hiding it from"
+                + " Trino",
+            schemaName,
+            viewName,
+            catalogName);
         return Optional.empty();
       }
       return Optional.of(gravitinoView);
-    } catch (NoSuchViewException | UnsupportedOperationException e) {
+    } catch (NoSuchViewException e) {
+      return Optional.empty();
+    } catch (UnsupportedOperationException e) {
+      LOG.debug(
+          "Catalog {} does not support loading view {}.{}", catalogName, schemaName, viewName, e);
       return Optional.empty();
     }
   }
@@ -543,6 +551,8 @@ public class CatalogConnectorMetadata {
           .filter(viewName -> getViewIfPresent(schemaName, viewName).isPresent())
           .toList();
     } catch (UnsupportedOperationException e) {
+      LOG.debug(
+          "Catalog {} does not support listing views for schema {}", catalogName, schemaName, e);
       return List.of();
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
@@ -552,6 +562,10 @@ public class CatalogConnectorMetadata {
 
   /**
    * Creates or replaces a view in the catalog.
+   *
+   * <p>Only views with a Trino dialect SQL representation are considered visible to Trino; if an
+   * entity with the same name already exists but has no Trino representation (e.g. a view created
+   * by another engine), it is never silently replaced.
    *
    * @param view the Gravitino view, with the Trino dialect SQL definition set
    * @param replace whether to replace the view if it already exists
@@ -567,7 +581,12 @@ public class CatalogConnectorMetadata {
     };
     try {
       boolean exists = viewCatalog.viewExists(identifier);
-      if (exists && replace) {
+      if (exists && !getViewIfPresent(view.getSchemaName(), view.getName()).isPresent()) {
+        // An entity with this name already exists but is not visible to Trino (e.g. a view
+        // created by another engine), so it must not be treated as replaceable.
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists");
+      } else if (exists && replace) {
         viewCatalog.alterView(
             identifier,
             ViewChange.replaceView(
@@ -598,6 +617,11 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchViewException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_VIEW_NOT_EXISTS, "View does not exist", e);
+    } catch (UnsupportedOperationException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "Catalog does not support this view operation",
+          e);
     }
   }
 
@@ -620,7 +644,15 @@ public class CatalogConnectorMetadata {
     // dropping it, so views created by other engines without a Trino representation are never
     // silently dropped.
     getView(schemaName, viewName);
-    boolean dropped = viewCatalog.dropView(NameIdentifier.of(schemaName, viewName));
+    boolean dropped;
+    try {
+      dropped = viewCatalog.dropView(NameIdentifier.of(schemaName, viewName));
+    } catch (UnsupportedOperationException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "Catalog does not support this view operation",
+          e);
+    }
     if (!dropped) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
@@ -659,6 +691,11 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchViewException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_VIEW_NOT_EXISTS, "View does not exist", e);
+    } catch (UnsupportedOperationException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "Catalog does not support this view operation",
+          e);
     }
   }
 }
