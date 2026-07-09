@@ -23,9 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
@@ -278,5 +280,45 @@ public class CatalogDoris3xIT extends BaseIT {
     assertEquals(Index.IndexType.INVERTED, t.index()[0].type());
     assertEquals("idx_data", t.index()[0].name());
     assertEquals(colName2, t.index()[0].fieldNames()[0][0]);
+  }
+
+  @Test
+  void testExternalTypeRoundTrip() {
+    // Verify ExternalType columns survive the create → Doris 3.0 → load round-trip.
+    //
+    // Only "json" is tested here because the MySQL JDBC driver returns TYPE_NAME = "UNKNOWN"
+    // for Doris-specific types (ipv4, ipv6, variant, bitmap, hll, largeint) that have no
+    // standard JDBC type mapping. The toGravitino() fallback produces ExternalType("unknown")
+    // for those, so they cannot round-trip through the standard JDBC metadata path.
+    // The DDL generation (fromGravitino) and type parsing (toGravitino) for all these types
+    // are covered by unit tests in TestDorisTypeConverter.
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid = NameIdentifier.of(schemaName, "t_external_types");
+
+    Column[] columns =
+        ArrayUtils.addAll(
+            basicColumns(), Column.of("json_col", Types.ExternalType.of("json"), "json column"));
+
+    tc.createTable(
+        tid,
+        columns,
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    Table t = tc.loadTable(tid);
+    assertEquals(3, t.columns().length);
+
+    assertEquals(Types.ExternalType.of("json"), findColumn(t, "json_col").dataType());
+  }
+
+  private Column findColumn(Table table, String columnName) {
+    return Arrays.stream(table.columns())
+        .filter(c -> c.name().equals(columnName))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("Column not found: " + columnName));
   }
 }
