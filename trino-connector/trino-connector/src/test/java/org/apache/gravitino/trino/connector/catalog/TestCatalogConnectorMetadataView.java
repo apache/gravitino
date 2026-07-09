@@ -85,6 +85,15 @@ public class TestCatalogConnectorMetadataView {
   }
 
   @Test
+  public void testGetViewIfPresentReturnsEmptyWhenViewOperationUnsupported() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.loadView(any())).thenThrow(new UnsupportedOperationException("unsupported"));
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    assertTrue(metadata.getViewIfPresent("db", "v1").isEmpty());
+  }
+
+  @Test
   public void testGetViewIfPresentReturnsEmptyWhenNoTrinoRepresentation() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     View view = createView(Dialects.HIVE, "select 1");
@@ -122,15 +131,43 @@ public class TestCatalogConnectorMetadataView {
   }
 
   @Test
-  public void testListViewsReturnsNames() {
+  public void testListViewsReturnsEmptyWhenViewOperationUnsupported() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.listViews(any(Namespace.class)))
+        .thenThrow(new UnsupportedOperationException("unsupported"));
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    assertTrue(metadata.listViews("db").isEmpty());
+  }
+
+  @Test
+  public void testListViewsReturnsNames() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    View view = createView(Dialects.TRINO, "select 1");
+    when(viewCatalog.listViews(any(Namespace.class)))
         .thenReturn(new NameIdentifier[] {NameIdentifier.of("db", "v1")});
+    when(viewCatalog.loadView(NameIdentifier.of("db", "v1"))).thenReturn(view);
 
     CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
     List<String> views = metadata.listViews("db");
     assertEquals(1, views.size());
     assertEquals("v1", views.get(0));
+  }
+
+  @Test
+  public void testListViewsFiltersViewsWithoutTrinoRepresentation() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    View trinoView = createView(Dialects.TRINO, "select 1");
+    View hiveView = createView(Dialects.HIVE, "select 2");
+    when(viewCatalog.listViews(any(Namespace.class)))
+        .thenReturn(
+            new NameIdentifier[] {NameIdentifier.of("db", "v1"), NameIdentifier.of("db", "v2")});
+    when(viewCatalog.loadView(NameIdentifier.of("db", "v1"))).thenReturn(trinoView);
+    when(viewCatalog.loadView(NameIdentifier.of("db", "v2"))).thenReturn(hiveView);
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+
+    assertEquals(List.of("v1"), metadata.listViews("db"));
   }
 
   @Test
@@ -182,7 +219,10 @@ public class TestCatalogConnectorMetadataView {
   @Test
   public void testDropViewThrowsWhenUnsupported() {
     CatalogConnectorMetadata metadata = createMetadataWithoutViewCatalog();
-    assertThrows(TrinoException.class, () -> metadata.dropView("db", "v1"));
+    TrinoException exception =
+        assertThrows(TrinoException.class, () -> metadata.dropView("db", "v1"));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
   }
 
   @Test
@@ -227,7 +267,10 @@ public class TestCatalogConnectorMetadataView {
     CatalogConnectorMetadata metadata = createMetadataWithoutViewCatalog();
     SchemaTableName oldName = new SchemaTableName("db", "v1");
     SchemaTableName newName = new SchemaTableName("db", "v2");
-    assertThrows(TrinoException.class, () -> metadata.renameView(oldName, newName));
+    TrinoException exception =
+        assertThrows(TrinoException.class, () -> metadata.renameView(oldName, newName));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
   }
 
   @Test

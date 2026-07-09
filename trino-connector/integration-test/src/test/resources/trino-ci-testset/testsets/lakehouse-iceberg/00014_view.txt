@@ -11,7 +11,7 @@ CREATE VIEW
 
 "2","bob"
 
-"CREATE VIEW gt_iceberg.gt_view_db.v01 SECURITY INVOKER AS
+"CREATE VIEW gt_iceberg%.gt_view_db.v01 SECURITY INVOKER AS
 SELECT
   id
 , name
@@ -33,7 +33,7 @@ DROP VIEW
 
 "t01"
 
-<QUERY_FAILED> View 'gt_iceberg.gt_view_db.nonexistent_view' does not exist
+<QUERY_FAILED> View '%.gt_view_db.nonexistent_view' does not exist
 
 DROP TABLE
 

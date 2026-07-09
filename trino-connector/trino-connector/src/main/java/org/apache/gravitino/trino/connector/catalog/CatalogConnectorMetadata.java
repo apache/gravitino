@@ -170,6 +170,8 @@ public class CatalogConnectorMetadata {
     try {
       NameIdentifier[] tables = tableCatalog.listTables(Namespace.of(schemaName));
       return Arrays.stream(tables).map(NameIdentifier::name).toList();
+    } catch (UnsupportedOperationException e) {
+      return List.of();
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
@@ -503,7 +505,7 @@ public class CatalogConnectorMetadata {
         return Optional.empty();
       }
       return Optional.of(gravitinoView);
-    } catch (NoSuchViewException e) {
+    } catch (NoSuchViewException | UnsupportedOperationException e) {
       return Optional.empty();
     }
   }
@@ -536,7 +538,12 @@ public class CatalogConnectorMetadata {
     }
     try {
       NameIdentifier[] views = viewCatalog.listViews(Namespace.of(schemaName));
-      return Arrays.stream(views).map(NameIdentifier::name).toList();
+      return Arrays.stream(views)
+          .map(NameIdentifier::name)
+          .filter(viewName -> getViewIfPresent(schemaName, viewName).isPresent())
+          .toList();
+    } catch (UnsupportedOperationException e) {
+      return List.of();
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
@@ -605,6 +612,10 @@ public class CatalogConnectorMetadata {
    * @param viewName the name of the view
    */
   public void dropView(String schemaName, String viewName) {
+    if (!supportsViews()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION, "Catalog does not support views");
+    }
     // Ensures the view is visible to Trino (exists and has a Trino dialect representation) before
     // dropping it, so views created by other engines without a Trino representation are never
     // silently dropped.
@@ -628,6 +639,10 @@ public class CatalogConnectorMetadata {
    * @param newViewName the new name of the view
    */
   public void renameView(SchemaTableName oldViewName, SchemaTableName newViewName) {
+    if (!supportsViews()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION, "Catalog does not support views");
+    }
     if (!oldViewName.getSchemaName().equals(newViewName.getSchemaName())) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION, "Cannot rename view across schemas");

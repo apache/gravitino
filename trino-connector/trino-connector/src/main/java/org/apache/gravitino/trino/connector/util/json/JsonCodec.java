@@ -45,7 +45,6 @@ import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.type.StandardTypes;
 import io.trino.spi.type.Type;
-import io.trino.spi.type.TypeId;
 import io.trino.spi.type.TypeManager;
 import io.trino.spi.type.TypeSignature;
 import java.lang.reflect.Field;
@@ -271,8 +270,9 @@ public class JsonCodec {
   }
 
   /**
-   * Gets the singleton {@link TypeManager} instance, used to resolve a {@link TypeId} (an opaque,
-   * serializable type identifier) back into a full Trino {@link Type}.
+   * Gets the singleton {@link TypeManager} instance, used to resolve a {@link
+   * io.trino.spi.type.TypeId} (an opaque, serializable type identifier) back into a full Trino
+   * {@link Type}.
    *
    * @param classLoader the class loader to use for loading Trino internal classes
    * @return the {@link TypeManager} instance
