@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -27,11 +28,34 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
 public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
+
+  // A named (non-default) catalog registered on the embedded Iceberg REST service so a `warehouse`
+  // selector that resolves to a real catalog can be exercised at create time.
+  private static final String NAMED_CATALOG = "it_named_catalog";
+
+  @Override
+  @BeforeAll
+  public void startup() throws Exception {
+    // Register the named catalog before the server (and its Iceberg REST service) starts, so the
+    // REST service serves `NAMED_CATALOG` in addition to its default catalog. Must run before
+    // super.startup() launches the embedded server.
+    String namedWarehouse = System.getProperty("java.io.tmpdir") + "/" + NAMED_CATALOG + "-wh";
+    String prefix =
+        "gravitino." + IcebergConstants.GRAVITINO_ICEBERG_REST_SERVICE_NAME + ".catalog.";
+    registerCustomConfigs(
+        ImmutableMap.of(
+            prefix + NAMED_CATALOG + "." + IcebergConstants.CATALOG_BACKEND,
+            "memory",
+            prefix + NAMED_CATALOG + "." + IcebergConstants.WAREHOUSE,
+            namedWarehouse));
+    super.startup();
+  }
 
   @Override
   protected void initIcebergCatalogProperties() {
@@ -93,5 +117,33 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
     Assertions.assertFalse(
         metalake.catalogExists(badCatalogName),
         "catalog must not be created when its warehouse cannot be resolved at create time");
+  }
+
+  /**
+   * Companion to {@link #testCreateRestCatalogWithUnresolvableWarehouseFailsAtCreate}: a {@code
+   * warehouse} value that <em>does</em> name a catalog the REST server serves must still succeed at
+   * create time and be usable, since validation resolves the value against the server rather than
+   * rejecting it by shape.
+   */
+  @Test
+  void testCreateRestCatalogWithValidWarehouseSucceeds() {
+    String catalogName = GravitinoITUtils.genRandomName("iceberg_rest_named_warehouse");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), "rest");
+    properties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
+    // A valid selector: NAMED_CATALOG is a catalog the embedded REST server serves.
+    properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), NAMED_CATALOG);
+
+    Catalog created =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties);
+    try {
+      Assertions.assertTrue(metalake.catalogExists(catalogName));
+      // Resolvable end-to-end: listing schemas against the selected catalog succeeds.
+      Assertions.assertDoesNotThrow(() -> created.asSchemas().listSchemas());
+    } finally {
+      metalake.disableCatalog(catalogName);
+      metalake.dropCatalog(catalogName);
+    }
   }
 }
