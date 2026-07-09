@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.integration.test;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.BeforeAll;
@@ -32,22 +33,18 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
-    extends IcebergRestKerberosHiveCatalogIT {
+public class IcebergRestKerberosJdbcWithUserImpersonationCatalogIT
+    extends IcebergRestKerberosJdbcCatalogIT {
 
   private static final String NORMAL_USER = "normal";
 
-  public IcebergRestKerberosHiveWithUserImpersonationCatalogIT() {
-    super();
-  }
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   @BeforeAll
   void prepareSQLContext() {
-
     // Change the ownership of /user/hive to normal user for user impersonation test. If we do not
-    // change the ownership, the normal user will not have the permission to create table in Hive
-    // as the /user/hive is owned by user `cli`, please see what's done in `initEnv` method in
-    // superclass.
+    // change the ownership, the normal user will not have the permission to create table on HDFS
+    // warehouse as the /user/hive is owned by user `cli`.
     containerSuite
         .getKerberosHiveContainer()
         .executeInContainer("hadoop", "fs", "-chown", "-R", NORMAL_USER, "/user/hive/");
@@ -94,9 +91,7 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
     }
 
     IcebergRestKerberosTestEnv.configureSparkKerberos(
-        sparkConf,
-        HIVE_METASTORE_CLIENT_PRINCIPAL,
-        containerSuite.getKerberosHiveContainer().getHostName());
+        sparkConf, HDFS_CLIENT_PRINCIPAL, containerSuite.getKerberosHiveContainer().getHostName());
 
     sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }
@@ -109,7 +104,7 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
       parentNamespace = "iceberg_rest.nested.table_test";
       separator = ".";
     } else {
-      parentNamespace = "iceberg_rest_with_kerberos_impersonation_table_test";
+      parentNamespace = "iceberg_rest_with_kerberos_jdbc_impersonation_table_test";
       separator = "_";
     }
 
