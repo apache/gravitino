@@ -42,6 +42,16 @@ public final class AuthConstants {
   /** The HTTP header used to pass the authentication token. */
   public static final String HTTP_CHALLENGE_HEADER = "WWW-Authenticate";
 
+  /**
+   * The HTTP header a caller uses to declare the active role(s) for a request (role assumption).
+   *
+   * <p>When present, authorization is narrowed so that only the declared roles are considered for
+   * allow decisions. The value is a single role name, a comma-separated list of role names, or one
+   * of the reserved keywords {@code ALL} / {@code NONE}. An absent header is equivalent to {@code
+   * ALL} (today's behavior). See {@link ActiveRoleParser} for the accepted grammar.
+   */
+  public static final String X_GRAVITINO_ACTIVE_ROLES_HEADER = "X-Gravitino-Active-Roles";
+
   /** The default username used for anonymous access. */
   public static final String ANONYMOUS_USER = "anonymous";
 
