@@ -434,6 +434,7 @@ If you doesn't specify distribution expressions, the table distribution will be 
 | `Fixed`           | `Fixed`                     |
 | `Binary`          | `Binary`                    |
 | `UUID`            | `UUID`                      |
+| `Variant`         | `Variant`                   |
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
