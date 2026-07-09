@@ -71,7 +71,7 @@ public class TestDoris extends TestJdbc {
     String jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/",
-            dorisContainer.getContainerIpAddress(), DorisContainer.FE_MYSQL_PORT);
+            dorisContainer.getContainerIpAddress(), dorisContainer.getFeMysqlPort());
 
     catalogProperties.put(JdbcConfig.JDBC_URL.getKey(), jdbcUrl);
     catalogProperties.put(JdbcConfig.JDBC_DRIVER.getKey(), DRIVER_CLASS_NAME);

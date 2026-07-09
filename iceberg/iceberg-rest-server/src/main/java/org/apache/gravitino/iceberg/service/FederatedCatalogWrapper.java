@@ -296,13 +296,15 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
 
   /**
    * Federation-aware {@code registerTable}: registers the existing table metadata on the underlying
-   * (remote) catalog and extracts client-facing FileIO/credential properties from {@code
-   * table.io()}, mirroring {@link #loadTableInternal(TableIdentifier)}.
+   * (remote) catalog via {@link CatalogHandlers#registerTable} and extracts client-facing FileIO
+   * and credential properties from {@code table.io()}, mirroring {@link
+   * #loadTableInternal(TableIdentifier)}.
    */
   private LoadTableResponse registerTableInternal(
       Namespace namespace, RegisterTableRequest request) {
+    CatalogHandlers.registerTable(getCatalog(), namespace, request);
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    Table table = getCatalog().registerTable(ident, request.metadataLocation());
+    Table table = getCatalog().loadTable(ident);
 
     if (table instanceof BaseTable) {
       return buildLoadTableResponseFromFileIo(ident, (BaseTable) table);

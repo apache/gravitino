@@ -29,6 +29,9 @@ dependencies {
   implementation(libs.cglib)
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
+  implementation(project(":catalogs:hadoop-auth")) {
+    exclude("*")
+  }
   implementation(libs.guava)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)

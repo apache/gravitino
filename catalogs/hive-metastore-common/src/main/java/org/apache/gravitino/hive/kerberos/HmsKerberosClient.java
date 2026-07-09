@@ -23,20 +23,15 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_METASTORE_TOK
 import static org.apache.gravitino.hive.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Splitter;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
+import java.util.concurrent.ScheduledExecutorService;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.hive.client.HiveClient;
-import org.apache.gravitino.utils.FileFetcher;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
@@ -45,11 +40,16 @@ import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Kerberos client for Hive Metastore. */
-public class KerberosClient implements java.io.Closeable {
-  private static final Logger LOG = LoggerFactory.getLogger(KerberosClient.class);
+/**
+ * Kerberos client for Hive Metastore.
+ *
+ * <p>This class keeps HMS-specific behavior on top of the shared Hadoop Kerberos helpers, including
+ * proxy user creation, delegation-token retrieval, Hive client wiring, and local keytab lifecycle.
+ */
+public class HmsKerberosClient implements Closeable {
+  private static final Logger LOG = LoggerFactory.getLogger(HmsKerberosClient.class);
 
-  private ScheduledThreadPoolExecutor checkTgtExecutor;
+  private ScheduledExecutorService checkTgtRefreshExecutor;
   private final Properties conf;
   private final Configuration hadoopConf;
   private final boolean refreshCredentials;
@@ -57,7 +57,7 @@ public class KerberosClient implements java.io.Closeable {
   private final String keytabFilePath;
   private HiveClient hiveClient = null;
 
-  public KerberosClient(
+  public HmsKerberosClient(
       Properties properties,
       Configuration hadoopConf,
       boolean refreshCredentials,
@@ -85,10 +85,7 @@ public class KerberosClient implements java.io.Closeable {
 
       String tokenSignature = conf.getProperty(HIVE_METASTORE_TOKEN_SIGNATURE, "");
       String principal = conf.getProperty(PRINCIPAL_KEY, "");
-      List<String> principalComponents = Splitter.on('@').splitToList(principal);
-      Preconditions.checkArgument(
-          principalComponents.size() == 2, "The principal has the wrong format");
-      String kerberosRealm = principalComponents.get(1);
+      String kerberosRealm = KerberosAuthUtils.checkPrincipalAndGetRealm(principal);
 
       UserGroupInformation proxyUser;
       final String finalPrincipalName;
@@ -124,37 +121,19 @@ public class KerberosClient implements java.io.Closeable {
   public UserGroupInformation login() throws Exception {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
-    // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
-    List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
-    Preconditions.checkArgument(
-        principalComponents.size() == 2, "The principal has the wrong format");
 
     // Login
-    UserGroupInformation.setConfiguration(hadoopConf);
-    UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
-    UserGroupInformation loginUgi = UserGroupInformation.getLoginUser();
+    UserGroupInformation loginUgi =
+        KerberosAuthUtils.login(
+            catalogPrincipal, keytabFilePath, hadoopConf, KerberosAuthUtils.LoginMode.LOGIN_USER);
     realLoginUgi = loginUgi;
 
     // Refresh the cache if it's out of date.
     if (refreshCredentials) {
-      if (checkTgtExecutor == null) {
-        checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
-      }
+      shutdownTicketRefresh();
       int checkInterval = kerberosConfig.getCheckIntervalSec();
-      checkTgtExecutor.scheduleAtFixedRate(
-          () -> {
-            try {
-              loginUgi.checkTGTAndReloginFromKeytab();
-            } catch (Exception e) {
-              LOG.error("Fail to refresh ugi token: ", e);
-            }
-          },
-          checkInterval,
-          checkInterval,
-          TimeUnit.SECONDS);
+      checkTgtRefreshExecutor = KerberosAuthUtils.startTicketRefresh(loginUgi, checkInterval, LOG);
     }
 
     return loginUgi;
@@ -164,35 +143,30 @@ public class KerberosClient implements java.io.Closeable {
     KerberosConfig kerberosConfig = new KerberosConfig(conf, hadoopConf);
 
     String keyTabUri = kerberosConfig.getKeytab();
-    Preconditions.checkArgument(StringUtils.isNotBlank(keyTabUri), "Keytab uri can't be blank");
-    Preconditions.checkArgument(
-        !keyTabUri.trim().startsWith("hdfs"), "HDFS URIs are not supported for keytab files");
 
-    File keytabsDir = new File("keytabs");
-    if (!keytabsDir.exists()) {
-      keytabsDir.mkdir();
-    }
     File keytabFile = new File(path);
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
-    FileFetcher.get()
-        .fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout * 1000, hadoopConf);
+    KerberosAuthUtils.fetchKeytabFromUri(
+        keyTabUri, keytabFile, fetchKeytabFileTimeout, false /* allowHdfsKeytabUri */, hadoopConf);
     return keytabFile;
-  }
-
-  private static ThreadFactory getThreadFactory(String factoryName) {
-    return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(factoryName + "-%d").build();
   }
 
   @Override
   public void close() {
     try {
-      if (checkTgtExecutor != null) {
-        checkTgtExecutor.shutdown();
-      }
+      shutdownTicketRefresh();
 
       Files.deleteIfExists(Paths.get(keytabFilePath));
     } catch (IOException e) {
       LOG.warn("Failed to delete keytab file: {}", keytabFilePath, e);
+    }
+  }
+
+  private void shutdownTicketRefresh() {
+    if (checkTgtRefreshExecutor != null) {
+      // Graceful shutdown: let any in-flight relogin finish before the thread is torn down.
+      checkTgtRefreshExecutor.shutdown();
+      checkTgtRefreshExecutor = null;
     }
   }
 
@@ -209,7 +183,7 @@ public class KerberosClient implements java.io.Closeable {
    * @throws IllegalStateException if {@link #login()} has not been called yet.
    */
   public UserGroupInformation getRealLoginUgi() {
-    Preconditions.checkState(realLoginUgi != null, "KerberosClient.login() has not been called");
+    Preconditions.checkState(realLoginUgi != null, "HmsKerberosClient.login() has not been called");
     return realLoginUgi;
   }
 }

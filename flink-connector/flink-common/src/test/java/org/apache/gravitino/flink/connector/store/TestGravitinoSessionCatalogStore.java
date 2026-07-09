@@ -69,6 +69,16 @@ public class TestGravitinoSessionCatalogStore {
         new GravitinoSessionCatalogStore(gravitinoCatalogStore, memoryCatalogStore);
   }
 
+  @Test
+  void testKnownGravitinoCatalogTypesAreGravitinoManaged() {
+    Assertions.assertTrue(isGravitinoManagedCatalogType("gravitino-hive"));
+    Assertions.assertTrue(isGravitinoManagedCatalogType("gravitino-jdbc-mysql"));
+    Assertions.assertTrue(isGravitinoManagedCatalogType("gravitino-jdbc-postgresql"));
+    Assertions.assertFalse(isGravitinoManagedCatalogType("gravitino-jdbc-custom"));
+    Assertions.assertFalse(isGravitinoManagedCatalogType("jdbc-mysql"));
+    Assertions.assertFalse(isGravitinoManagedCatalogType(null));
+  }
+
   // -------------------------------------------------------------------------
   // storeCatalog
   // -------------------------------------------------------------------------

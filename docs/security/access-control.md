@@ -160,6 +160,8 @@ A user represents an individual identity in Gravitino. Users can be:
 - Granted one or more roles
 - Given different operating privileges based on their assigned roles
 - Made owners of securable objects
+- Correlated with an external identity provider through an optional `externalId`
+- Enabled or disabled through the optional `enabled` flag (`true` by default when creating with `externalId`)
 
 ### Group
 
@@ -167,6 +169,7 @@ A group is a collection of users that simplifies permission management by allowi
 - Grant permissions to multiple users at once
 - Manage access control for teams or departments
 - Assign roles that all group members will inherit
+- Correlated with an external identity provider through an optional `externalId`
 
 All users in a group inherit the roles and privileges granted to that group.
 
@@ -574,7 +577,9 @@ The following sections demonstrate how to perform common access control operatio
 
 ### Add a User
 
-Add a user to your metalake before using authorization features.
+Add a user to your metalake before using authorization features. The request body requires `name` and
+optionally accepts `externalId` and `enabled`. When `externalId` is omitted, Gravitino creates the user
+with the legacy name-only path. When `externalId` is provided, `enabled` defaults to `true` if omitted.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -582,7 +587,14 @@ Add a user to your metalake before using authorization features.
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "user1"
+  "name": "user"
+}' http://localhost:8090/api/metalakes/test/users
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "user",
+  "externalId": "ext-user",
+  "enabled": true
 }' http://localhost:8090/api/metalakes/test/users
 ```
 
@@ -592,7 +604,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 User user =
-    client.addUser("user1");
+    client.addUser("user");
+
+User externalUser =
+    client.addUser("user", "ext-user", true);
 ```
 
 </TabItem>
@@ -628,7 +643,7 @@ User[] users = client.listUsers();
 
 ### Get a User
 
-Get a user by its name.
+Get a user by its name. The response includes `externalId` and `enabled` when they are set on the user.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -678,7 +693,9 @@ boolean removed =
 
 ### Add a Group
 
-Add the group to your metalake before you use the authorization.
+Add the group to your metalake before you use the authorization. The request body requires `name` and
+optionally accepts `externalId`. When `externalId` is omitted, Gravitino creates the group with the
+legacy name-only path.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -686,7 +703,13 @@ Add the group to your metalake before you use the authorization.
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "group1"
+  "name": "group"
+}' http://localhost:8090/api/metalakes/test/groups
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "group",
+  "externalId": "ext-group"
 }' http://localhost:8090/api/metalakes/test/groups
 ```
 
@@ -696,7 +719,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 Group group =
-    client.addGroup("group1");
+    client.addGroup("group");
+
+Group externalGroup =
+    client.addGroup("group", "ext-group");
 ```
 
 </TabItem>
@@ -733,7 +759,7 @@ User[] users = client.listGroups();
 
 ### Get a Group
 
-Get a group by its name.
+Get a group by its name. The response includes `externalId` when it is set on the group.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

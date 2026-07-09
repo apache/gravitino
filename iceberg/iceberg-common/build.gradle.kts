@@ -32,6 +32,9 @@ dependencies {
 
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
+  implementation(project(":catalogs:hadoop-auth")) {
+    exclude("*")
+  }
   implementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }

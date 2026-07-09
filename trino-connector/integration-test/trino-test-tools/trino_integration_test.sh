@@ -60,6 +60,8 @@ fi
 # --trino_version is forwarded to Gradle and also used for patch selection.
 auto_patch=false
 trino_version=""
+test_set=""
+has_test_containers=false
 args=""
 for arg in "$@"; do
     case "$arg" in
@@ -70,12 +72,29 @@ for arg in "$@"; do
             trino_version="${arg#*=}"
             args="$args $arg"
             ;;
+        --test_set=*)
+            test_set="${arg#*=}"
+            args="$args $arg"
+            ;;
+        --test_containers=*)
+            has_test_containers=true
+            args="$args $arg"
+            ;;
         *)
             args="$args $arg"
             ;;
     esac
 done
 args="${args# }"
+
+# Auto-map a testset to its dedicated docker compose container subset, unless
+# --test_containers was already given explicitly on the command line.
+declare -A TESTSET_CONTAINERS_MAP=(
+    ["jdbc-mysql"]="mysql"
+)
+if [ "$has_test_containers" = false ] && [ -n "${TESTSET_CONTAINERS_MAP[$test_set]:-}" ]; then
+    args="$args --test_containers=${TESTSET_CONTAINERS_MAP[$test_set]}"
+fi
 
 TESTSETS_DIR="$GRAVITINO_ROOT_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets"
 

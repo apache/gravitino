@@ -116,6 +116,7 @@ class SerdesUtilsBase:
                 Types.IntervalDayType.get(),
                 Types.StringType.get(),
                 Types.UUIDType.get(),
+                Types.VariantType.get(),
             )
         }
     )

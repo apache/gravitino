@@ -56,6 +56,16 @@ import org.apache.gravitino.utils.NamespaceUtil;
 
 /** The service class for table metadata. It provides the basic database operations for table. */
 public class TableMetaService {
+
+  /**
+   * Message prefix of the {@link java.io.IOException} thrown by {@link #updateTable} when the
+   * optimistic-lock CAS matches zero rows (the stored version advanced under a concurrent update).
+   * Exposed so callers that retry the lost race (e.g. the Lance repair-on-load path) can recognize
+   * the conflict without re-declaring the literal.
+   */
+  public static final String UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX =
+      "Failed to update the entity: ";
+
   private static final TableMetaService INSTANCE = new TableMetaService();
   private BasePOStorageOps<TablePO, TableMetaMapper> ops;
 
@@ -236,7 +246,7 @@ public class TableMetaService {
     if (updateResult.get() > 0) {
       return newTableEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + identifier);
+      throw new IOException(UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + identifier);
     }
   }
 

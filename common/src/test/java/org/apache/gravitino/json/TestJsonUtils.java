@@ -119,6 +119,13 @@ public class TestJsonUtils {
     expected = "\"decimal(10,2)\"";
     Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
 
+    type = Types.VariantType.get();
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected = "\"variant\"";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+    Assertions.assertEquals(
+        Types.VariantType.get(), JsonUtils.objectMapper().readValue(jsonValue, Type.class));
+
     type =
         Types.StructType.of(
             Types.StructType.Field.nullableField("name", Types.StringType.get(), "name field"),

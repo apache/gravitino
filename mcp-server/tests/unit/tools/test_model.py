@@ -140,3 +140,165 @@ class TestModelTool(unittest.TestCase):
                 )
 
         asyncio.run(_test_update_model_version_aliases(self.mcp))
+
+    def test_register_model(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "register_model",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "name": "m",
+                        "comment": "c",
+                        "properties": {"k": "v"},
+                    },
+                )
+                self.assertEqual(
+                    "mock_model_registered: cat.sch.m", result.content[0].text
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_delete_model(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "delete_model",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "model_name": "m",
+                    },
+                )
+                self.assertEqual(
+                    "mock_model_deleted: cat.sch.m", result.content[0].text
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_link_model_version(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "link_model_version",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "model_name": "m",
+                        "uri": "s3://bucket/model",
+                        "aliases": ["latest"],
+                        "comment": "c",
+                        "properties": {"k": "v"},
+                    },
+                )
+                self.assertEqual(
+                    "mock_model_version_linked: cat.sch.m "
+                    "uri=s3://bucket/model aliases=['latest']",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_delete_model_version(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "delete_model_version",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "model_name": "m",
+                        "version": 1,
+                    },
+                )
+                self.assertEqual(
+                    "mock_model_version_deleted: cat.sch.m version=1",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_delete_model_version_by_alias(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "delete_model_version_by_alias",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "model_name": "m",
+                        "alias": "latest",
+                    },
+                )
+                self.assertEqual(
+                    "mock_model_version_deleted_by_alias: cat.sch.m "
+                    "alias=latest",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_alter_model(self):
+        async def _test(mcp_server):
+            updates = [{"@type": "rename", "newName": "m2"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_model",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "model_name": "m",
+                        "updates": updates,
+                    },
+                )
+                self.assertEqual(
+                    f"mock_model_altered: cat.sch.m with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_alter_model_version(self):
+        async def _test(mcp_server):
+            updates = [{"@type": "updateComment", "newComment": "c2"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_model_version",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "model_name": "m",
+                        "version": 1,
+                        "updates": updates,
+                    },
+                )
+                self.assertEqual(
+                    "mock_model_version_altered: cat.sch.m version=1 "
+                    f"with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_alter_model_version_by_alias(self):
+        async def _test(mcp_server):
+            updates = [{"@type": "updateUri", "newUri": "s3://bucket/m2"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_model_version_by_alias",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "model_name": "m",
+                        "alias": "latest",
+                        "updates": updates,
+                    },
+                )
+                self.assertEqual(
+                    "mock_model_version_altered_by_alias: cat.sch.m "
+                    f"alias=latest with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))

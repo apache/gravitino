@@ -107,6 +107,84 @@ class ModelOperation(ABC):
         """
         pass
 
+    @abstractmethod
+    # pylint: disable=too-many-positional-arguments
+    async def register_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def delete_model(
+        self, catalog_name: str, schema_name: str, model_name: str
+    ) -> str:
+        pass
+
+    @abstractmethod
+    # pylint: disable=too-many-positional-arguments
+    async def link_model_version(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        uri: str,
+        aliases: list,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def delete_model_version(
+        self, catalog_name: str, schema_name: str, model_name: str, version: int
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def delete_model_version_by_alias(
+        self, catalog_name: str, schema_name: str, model_name: str, alias: str
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def alter_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        updates: list,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    # pylint: disable=too-many-positional-arguments
+    async def alter_model_version(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        version: int,
+        updates: list,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    # pylint: disable=too-many-positional-arguments
+    async def alter_model_version_by_alias(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        alias: str,
+        updates: list,
+    ) -> str:
+        pass
+
     # pylint: disable=R0917
     @abstractmethod
     async def update_model_version_aliases(

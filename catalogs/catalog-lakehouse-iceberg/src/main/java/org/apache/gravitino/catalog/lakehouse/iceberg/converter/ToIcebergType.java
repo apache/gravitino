@@ -162,6 +162,8 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
       return Types.BinaryType.get();
     } else if (primitive instanceof org.apache.gravitino.rel.types.Types.UUIDType) {
       return Types.UUIDType.get();
+    } else if (primitive instanceof org.apache.gravitino.rel.types.Types.VariantType) {
+      return Types.VariantType.get();
     }
     throw new UnsupportedOperationException("Not a supported type: " + primitive.toString());
   }

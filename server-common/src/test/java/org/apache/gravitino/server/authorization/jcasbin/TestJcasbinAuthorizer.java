@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization.jcasbin;
 
+import static org.apache.gravitino.authorization.Privilege.Name.SELECT_TABLE;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -37,6 +38,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -458,6 +460,69 @@ public class TestJcasbinAuthorizer {
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
     assertFalse(doAuthorize(currentPrincipal));
+  }
+
+  @Test
+  public void testHasDenyPolicy() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    // With no roles assigned, the user can hold no deny policy.
+    assertFalse(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal,
+            METALAKE,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()));
+
+    // Assign a role that DENIES USE_CATALOG at the catalog scope.
+    mockRoleInStore(DENY_ROLE_ID, "denyRole", ImmutableList.of(getDenySecurableObject()));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(DENY_ROLE_ID, "denyRole")));
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
+
+    // The deny on USE_CATALOG is detected. The match is scope-agnostic: the deny lives on a
+    // catalog, which is a parent scope for a schema/catalog list, so it must be reported and
+    // disable the short-circuit.
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal,
+            METALAKE,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()));
+
+    // A deny on USE_CATALOG must not be reported when querying a different privilege.
+    assertFalse(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal,
+            METALAKE,
+            ImmutableSet.of(SELECT_TABLE),
+            new AuthorizationRequestContext()));
+  }
+
+  @Test
+  public void testHasDenyPolicyDetectsGroupInheritedDeny() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    // The user holds no direct roles; the deny role is only reachable through group membership.
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+    mockRoleInStore(DENY_ROLE_ID, "denyRole", ImmutableList.of(getDenySecurableObject()));
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(GROUP_NAME, ImmutableList.of(DENY_ROLE_ID), ImmutableList.of("denyRole"));
+
+    // A deny inherited via a group must still be detected, otherwise the list short-circuit would
+    // over-expose objects that a group-level deny is meant to hide.
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            groupPrincipal,
+            METALAKE,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
   }
 
   @Test

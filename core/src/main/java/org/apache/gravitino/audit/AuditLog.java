@@ -346,6 +346,8 @@ public interface AuditLog {
 
     LIST_VIEW,
 
+    REGISTER_VIEW,
+
     REGISTER_MODEL,
 
     DELETE_MODEL,
@@ -376,7 +378,15 @@ public interface AuditLog {
 
     REMOVE_USER,
 
+    REMOVE_USER_BY_EXTERNAL_ID,
+
     GET_USER,
+
+    GET_USER_BY_EXTERNAL_ID,
+
+    ENABLE_USER,
+
+    DISABLE_USER,
 
     LIST_USERS,
 
@@ -390,7 +400,11 @@ public interface AuditLog {
 
     REMOVE_GROUP,
 
+    REMOVE_GROUP_BY_EXTERNAL_ID,
+
     GET_GROUP,
+
+    GET_GROUP_BY_EXTERNAL_ID,
 
     LIST_GROUPS,
 

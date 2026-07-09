@@ -39,8 +39,12 @@ import org.apache.spark.sql.errors.QueryCompilationErrors;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTable;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GravitinoJdbcCatalog extends BaseCatalog {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoJdbcCatalog.class);
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -66,6 +70,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     try {
       credentials = catalog.supportsCredentials().getCredentials();
     } catch (UnsupportedOperationException e) {
+      LOG.debug("Catalog {} does not support credential vending, skipping.", catalog.name(), e);
       return;
     }
     for (Credential credential : credentials) {
