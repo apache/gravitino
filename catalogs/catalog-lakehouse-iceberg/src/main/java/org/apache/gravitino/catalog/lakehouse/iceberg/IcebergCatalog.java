@@ -68,6 +68,24 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
     return (ViewCatalog) ops();
   }
 
+  /**
+   * Validate the backend connection at create time only when a {@code warehouse} is configured.
+   *
+   * <p>On the {@code rest} backend the {@code warehouse} property is a catalog selector forwarded
+   * to the remote Iceberg REST server (via {@code GET /v1/config?warehouse=...}), not a storage
+   * location. Resolving it at create time turns an unresolvable value (for example a
+   * storage-location-shaped URI mistakenly copied from a hive/jdbc example) into a fast, actionable
+   * failure. An omitted {@code warehouse} (the server's default REST catalog) needs no resolution,
+   * so creation is not forced to touch the backend in that case.
+   *
+   * @return {@code true} if a non-blank {@code warehouse} is configured, {@code false} otherwise.
+   */
+  @Override
+  public boolean shouldValidateConnectionForCreate() {
+    Map<String, String> properties = entity().getProperties();
+    return properties != null && StringUtils.isNotBlank(properties.get(IcebergConstants.WAREHOUSE));
+  }
+
   @Override
   public Capability newCapability() {
     return new IcebergCatalogCapability(HierarchicalSchemaUtil.schemaSeparator());

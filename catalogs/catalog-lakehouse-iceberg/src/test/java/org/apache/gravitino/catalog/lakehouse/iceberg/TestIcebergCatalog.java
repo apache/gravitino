@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.CATA
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.SCHEMA_PROPERTIES_META;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalog.TABLE_PROPERTIES_META;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Map;
@@ -112,6 +113,50 @@ public class TestIcebergCatalog {
     ListNamespacesResponse listNamespacesResponse =
         icebergCatalogWrapper.listNamespace(org.apache.iceberg.catalog.Namespace.empty());
     Assertions.assertTrue(listNamespacesResponse.namespaces().isEmpty());
+  }
+
+  @Test
+  public void testShouldValidateConnectionForCreate() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // A populated `warehouse` opts creation into a backend resolve.
+    IcebergCatalog withWarehouse =
+        icebergCatalogWith(
+            auditInfo,
+            ImmutableMap.of(
+                IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "rest",
+                IcebergCatalogPropertiesMetadata.WAREHOUSE, "s3://warehouse/"));
+    Assertions.assertTrue(withWarehouse.shouldValidateConnectionForCreate());
+
+    // An omitted `warehouse` (default REST catalog) must not force a backend resolve at create.
+    IcebergCatalog withoutWarehouse =
+        icebergCatalogWith(
+            auditInfo, ImmutableMap.of(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "rest"));
+    Assertions.assertFalse(withoutWarehouse.shouldValidateConnectionForCreate());
+
+    // A blank `warehouse` is treated as omitted.
+    IcebergCatalog blankWarehouse =
+        icebergCatalogWith(
+            auditInfo,
+            ImmutableMap.of(
+                IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "hive",
+                IcebergCatalogPropertiesMetadata.WAREHOUSE, "   "));
+    Assertions.assertFalse(blankWarehouse.shouldValidateConnectionForCreate());
+  }
+
+  private IcebergCatalog icebergCatalogWith(AuditInfo auditInfo, Map<String, String> properties) {
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(IcebergCatalog.Type.RELATIONAL)
+            .withProvider("iceberg")
+            .withProperties(properties)
+            .withAuditInfo(auditInfo)
+            .build();
+    return new IcebergCatalog().withCatalogConf(Maps.newHashMap()).withCatalogEntity(entity);
   }
 
   @Test

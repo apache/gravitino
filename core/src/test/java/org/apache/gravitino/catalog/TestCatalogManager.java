@@ -52,6 +52,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -386,6 +387,59 @@ public class TestCatalogManager {
             .contains("Properties or property prefixes are reserved and cannot be set"),
         exception4.getMessage());
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(failedIdent));
+  }
+
+  @Test
+  public void testCreateCatalogValidatesConnectionWhenOptedIn() {
+    // Opted in + backend resolves: creation succeeds.
+    NameIdentifier okIdent = NameIdentifier.of("metalake", "validate-ok");
+    Map<String, String> okProps = Maps.newHashMap();
+    okProps.put(PROPERTY_KEY1, "value1");
+    okProps.put(PROPERTY_KEY2, "value2");
+    okProps.put(PROPERTY_KEY5_PREFIX + "1", "value3");
+    okProps.put(TestCatalogOperations.VALIDATE_ON_CREATE, "true");
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                okIdent, Catalog.Type.RELATIONAL, provider, "comment", okProps));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(okIdent));
+
+    // Opted in + backend cannot be resolved: creation fails fast and leaves nothing behind.
+    NameIdentifier failIdent = NameIdentifier.of("metalake", "validate-fail");
+    Map<String, String> failProps = Maps.newHashMap();
+    failProps.put(PROPERTY_KEY1, "value1");
+    failProps.put(PROPERTY_KEY2, "value2");
+    failProps.put(PROPERTY_KEY5_PREFIX + "1", "value3");
+    failProps.put(TestCatalogOperations.VALIDATE_ON_CREATE, "true");
+    failProps.put(TestCatalogOperations.FAIL_INITIALIZE, "true");
+    Throwable failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    failIdent, Catalog.Type.RELATIONAL, provider, "comment", failProps));
+    Assertions.assertTrue(
+        failure.getMessage().contains("backend rejected catalog configuration"),
+        failure.getMessage());
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(failIdent));
+    // The stored entity was rolled back, so the identifier can be reused.
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                failIdent, Catalog.Type.RELATIONAL, provider, "comment", okProps));
+
+    // Not opted in: the connection is not validated at create time even if it would fail.
+    NameIdentifier skipIdent = NameIdentifier.of("metalake", "validate-skip");
+    Map<String, String> skipProps = Maps.newHashMap();
+    skipProps.put(PROPERTY_KEY1, "value1");
+    skipProps.put(PROPERTY_KEY2, "value2");
+    skipProps.put(PROPERTY_KEY5_PREFIX + "1", "value3");
+    skipProps.put(TestCatalogOperations.FAIL_INITIALIZE, "true");
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                skipIdent, Catalog.Type.RELATIONAL, provider, "comment", skipProps));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(skipIdent));
   }
 
   @Test

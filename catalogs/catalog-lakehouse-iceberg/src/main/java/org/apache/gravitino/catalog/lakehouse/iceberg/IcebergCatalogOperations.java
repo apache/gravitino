@@ -80,6 +80,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
+import org.apache.iceberg.exceptions.NoSuchWarehouseException;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
@@ -128,14 +129,72 @@ public class IcebergCatalogOperations
 
     IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
 
-    AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);
-    this.icebergCatalogWrapper =
-        authenticationConfig.isKerberosAuth() && rawWrapper.getCatalog() instanceof SupportsKerberos
-            ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
-            : rawWrapper;
-    this.icebergCatalogWrapperHelper =
-        new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
-    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
+    try {
+      AuthenticationConfig authenticationConfig = new AuthenticationConfig(resultConf);
+      this.icebergCatalogWrapper =
+          authenticationConfig.isKerberosAuth()
+                  && rawWrapper.getCatalog() instanceof SupportsKerberos
+              ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
+              : rawWrapper;
+      this.icebergCatalogWrapperHelper =
+          new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
+      this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
+    } catch (RuntimeException e) {
+      // Loading the backend catalog contacts it; the REST backend resolves `warehouse` via
+      // GET /v1/config during initialization. Translate an unresolvable `warehouse` into an
+      // actionable invalid-argument error.
+      throw translateInitializationFailure(icebergConfig, e);
+    }
+  }
+
+  /**
+   * Translates a backend-initialization failure into an actionable error.
+   *
+   * <p>On the REST backend the {@code warehouse} property selects a catalog by name on the remote
+   * Iceberg REST server and is not a storage location. When the server is reachable but cannot
+   * resolve the configured value, that is a user/configuration error, so it is surfaced as an
+   * {@link IllegalArgumentException} with a hint. Any other failure is returned unchanged.
+   *
+   * @param config the resolved Iceberg configuration for this catalog.
+   * @param cause the failure raised while loading the backend catalog.
+   * @return the exception to throw.
+   */
+  @VisibleForTesting
+  static RuntimeException translateInitializationFailure(
+      IcebergConfig config, RuntimeException cause) {
+    String backend = config.get(IcebergConfig.CATALOG_BACKEND);
+    String warehouse = config.get(IcebergConfig.CATALOG_WAREHOUSE);
+    if (backend != null
+        && IcebergCatalogBackend.REST.name().equalsIgnoreCase(backend)
+        && StringUtils.isNotBlank(warehouse)
+        && isWarehouseResolutionFailure(cause)) {
+      return new IllegalArgumentException(
+          String.format(
+              "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
+                  + "the REST backend 'warehouse' selects a catalog by name on the remote server "
+                  + "and is not a storage location; remove 'warehouse' to use the server's default "
+                  + "catalog, or set it to a catalog name/identifier that the server recognizes.",
+              warehouse),
+          cause);
+    }
+    return cause;
+  }
+
+  /**
+   * Returns whether {@code cause} (or any exception in its cause chain) indicates the Iceberg REST
+   * server could not resolve the requested {@code warehouse} selector.
+   *
+   * @param cause the exception to inspect.
+   * @return {@code true} if the failure is a warehouse-resolution error.
+   */
+  private static boolean isWarehouseResolutionFailure(Throwable cause) {
+    Throwable current = cause;
+    for (int depth = 0; current != null && depth < 32; current = current.getCause(), depth++) {
+      if (current instanceof NoSuchWarehouseException) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
