@@ -154,6 +154,11 @@ public class TestTypes {
     Assertions.assertSame(uuidType, Types.UUIDType.get());
     Assertions.assertEquals("uuid", uuidType.simpleString());
 
+    Types.VariantType variantType = Types.VariantType.get();
+    Assertions.assertEquals(Type.Name.VARIANT, variantType.name());
+    Assertions.assertSame(variantType, Types.VariantType.get());
+    Assertions.assertEquals("variant", variantType.simpleString());
+
     Types.FixedType fixedType = Types.FixedType.of(10);
     Assertions.assertEquals(Type.Name.FIXED, fixedType.name());
     Assertions.assertEquals(10, fixedType.length());

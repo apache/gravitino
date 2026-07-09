@@ -169,6 +169,7 @@ public class JsonUtils {
               Types.TimestampType.withoutTimeZone(),
               Types.StringType.get(),
               Types.UUIDType.get(),
+              Types.VariantType.get(),
               Types.BinaryType.get(),
               Types.IntervalYearType.get(),
               Types.IntervalDayType.get()),
@@ -679,6 +680,7 @@ public class JsonUtils {
       case INTERVAL_DAY:
       case INTERVAL_YEAR:
       case UUID:
+      case VARIANT:
       case FIXED:
       case BINARY:
       case NULL:

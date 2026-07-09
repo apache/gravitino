@@ -182,6 +182,12 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(instance.name(), Name.UUID)
         self.assertEqual(instance.simple_string(), "uuid")
 
+    def test_variant_type(self):
+        instance: Types.VariantType = Types.VariantType.get()
+        self.assertEqual(instance.name(), Name.VARIANT)
+        self.assertEqual(instance.simple_string(), "variant")
+        self.assertIs(instance, Types.VariantType.get())
+
     def test_fixed_type(self):
         instance: Types.FixedType = Types.FixedType.of(5)
         self.assertEqual(instance.name(), Name.FIXED)

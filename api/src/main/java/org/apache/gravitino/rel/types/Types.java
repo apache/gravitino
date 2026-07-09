@@ -655,6 +655,30 @@ public class Types {
     }
   }
 
+  /** The variant type in Gravitino, holding semi-structured data not described by the schema. */
+  public static class VariantType extends Type.PrimitiveType {
+    private static final VariantType INSTANCE = new VariantType();
+
+    /**
+     * @return The singleton instance of {@link VariantType}.
+     */
+    public static VariantType get() {
+      return INSTANCE;
+    }
+
+    private VariantType() {}
+
+    @Override
+    public Name name() {
+      return Name.VARIANT;
+    }
+
+    @Override
+    public String simpleString() {
+      return "variant";
+    }
+  }
+
   /**
    * Fixed-length byte array type, if you want to use variable-length byte array, use {@link
    * BinaryType} instead.

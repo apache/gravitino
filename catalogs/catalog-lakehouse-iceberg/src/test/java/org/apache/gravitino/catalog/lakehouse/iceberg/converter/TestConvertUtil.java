@@ -43,6 +43,17 @@ import org.junit.jupiter.api.Test;
 
 /** Test class for {@link ConvertUtil}. */
 public class TestConvertUtil extends TestBaseConvert {
+
+  @Test
+  public void testVariantType() {
+    Assertions.assertTrue(
+        CONVERTER.toGravitino(Types.VariantType.get())
+            instanceof org.apache.gravitino.rel.types.Types.VariantType);
+    Assertions.assertTrue(
+        CONVERTER.fromGravitino(org.apache.gravitino.rel.types.Types.VariantType.get())
+            instanceof Types.VariantType);
+  }
+
   @Test
   public void testToIcebergSchema() {
     Column[] columns = createColumns("col_1", "col_2", "col_3", "col_4");
