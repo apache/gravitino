@@ -55,6 +55,49 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
+  public void testUnknownType() {
+    // Iceberg V3 unknown <-> Gravitino NullType, in both directions.
+    Assertions.assertTrue(
+        CONVERTER.toGravitino(Types.UnknownType.get())
+            instanceof org.apache.gravitino.rel.types.Types.NullType);
+    Assertions.assertTrue(
+        CONVERTER.fromGravitino(org.apache.gravitino.rel.types.Types.NullType.get())
+            instanceof Types.UnknownType);
+  }
+
+  @Test
+  public void testUnknownColumnToIcebergSchema() {
+    // Write path: a nullable null-typed column becomes an optional Iceberg unknown field
+    // (exercises ConvertUtil.toIcebergSchema -> ToIcebergType.struct and the nullType dispatch).
+    Column nullableColumn =
+        IcebergColumn.builder()
+            .withName("c_unknown")
+            .withType(org.apache.gravitino.rel.types.Types.NullType.get())
+            .withNullable(true)
+            .withComment(TEST_COMMENT)
+            .build();
+    Schema schema = ConvertUtil.toIcebergSchema(new Column[] {nullableColumn});
+    Types.NestedField field = schema.findField("c_unknown");
+    Assertions.assertNotNull(field);
+    Assertions.assertTrue(field.isOptional());
+    Assertions.assertTrue(field.type() instanceof Types.UnknownType);
+
+    // A required null-typed column is rejected: Iceberg unknown must be optional.
+    Column requiredColumn =
+        IcebergColumn.builder()
+            .withName("c_unknown_required")
+            .withType(org.apache.gravitino.rel.types.Types.NullType.get())
+            .withNullable(false)
+            .withComment(TEST_COMMENT)
+            .build();
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ConvertUtil.toIcebergSchema(new Column[] {requiredColumn}));
+    Assertions.assertTrue(exception.getMessage().contains("must be optional"));
+  }
+
+  @Test
   public void testToIcebergSchema() {
     Column[] columns = createColumns("col_1", "col_2", "col_3", "col_4");
     String col5Name = "col_5";

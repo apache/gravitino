@@ -67,6 +67,14 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
 
       String doc = field.comment();
 
+      if (type instanceof Types.UnknownType && !field.nullable()) {
+        // Iceberg requires unknown (null) columns to be optional: they are not stored in data
+        // files and must default to null. Reject a required unknown column with a clear message.
+        throw new IllegalArgumentException(
+            String.format(
+                "Iceberg unknown/null type column '%s' must be optional (nullable)", field.name()));
+      }
+
       if (field.nullable()) {
         newFields.add(Types.NestedField.optional(id, field.name(), type, doc));
       } else {
@@ -166,5 +174,11 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
       return Types.VariantType.get();
     }
     throw new UnsupportedOperationException("Not a supported type: " + primitive.toString());
+  }
+
+  @Override
+  public Type nullType(org.apache.gravitino.rel.types.Types.NullType nullType) {
+    // Gravitino NullType maps to Iceberg's V3 unknown type (the null-only placeholder).
+    return Types.UnknownType.get();
   }
 }

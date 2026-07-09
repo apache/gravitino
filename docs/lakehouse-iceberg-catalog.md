@@ -435,6 +435,14 @@ If you doesn't specify distribution expressions, the table distribution will be 
 | `Binary`          | `Binary`                    |
 | `UUID`            | `UUID`                      |
 | `Variant`         | `Variant`                   |
+| `Null`            | `Unknown`                   |
+
+:::note
+Gravitino `Null` maps to Apache Iceberg's V3 `unknown` type — a null-only placeholder for a column
+whose type is not yet known. It requires table `format-version` 3, must be an optional (nullable)
+column, and can be promoted to a concrete type via schema evolution. This is the recommended way to
+represent an Iceberg `unknown` column in Gravitino.
+:::
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.

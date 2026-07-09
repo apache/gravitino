@@ -931,8 +931,21 @@ The following types that Gravitino supports:
 | Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                                                                                                     |
 | UUID                      | `Types.UUIDType.get()`                                                   | `uuid`                                                                                                                               | UUID type, indicates a universally unique identifier                                                                                                                       |
 | Variant                   | `Types.VariantType.get()`                                                | `variant`                                                                                                                            | Variant type, indicates semi-structured data whose shape is not fixed by the schema                                                                                        |
+| Null                      | `Types.NullType.get()`                                                   | `null`                                                                                                                               | Null type, indicates a column that holds only null values and whose concrete type is not yet known; it may be assigned a specific type later via schema evolution           |
 
 The related java doc is [here](pathname:///docs/2.0.0-SNAPSHOT/api/java/org/apache/gravitino/rel/types/Type.html).
+
+##### Null type
+
+The null type represents a column that holds only null values and whose concrete type is not yet
+known — it carries no usable data of its own, and the intent is that a more specific type is
+assigned later through schema evolution. This mirrors the "null"/"void" type in engines such as
+Spark, Flink, and Arrow, and maps to Apache Iceberg's V3 `unknown` type.
+
+Support is connector-specific and still expanding: it is mapped natively by the Iceberg, Spark,
+Flink, and Lance connectors, while connectors without an equivalent concept currently reject it.
+Because a null column holds no usable data, engines should not populate it; it is meant to be
+promoted to a concrete type before data is written.
 
 ##### External type
 

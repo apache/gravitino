@@ -120,6 +120,10 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
         Types.DecimalType decimal = (Types.DecimalType) primitive;
         return org.apache.gravitino.rel.types.Types.DecimalType.of(
             decimal.precision(), decimal.scale());
+      case UNKNOWN:
+        // Iceberg V3 unknown is the null-only placeholder type; map it to Gravitino's NullType,
+        // matching how Iceberg's own engine converters map unknown <-> the engine null type.
+        return org.apache.gravitino.rel.types.Types.NullType.get();
       default:
         return org.apache.gravitino.rel.types.Types.ExternalType.of(primitive.typeId().name());
     }
