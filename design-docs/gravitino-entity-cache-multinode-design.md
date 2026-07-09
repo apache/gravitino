@@ -252,9 +252,54 @@ The entity store cache becomes a third consumer of the poller, next to the catal
 
 ### Consistency
 
+The cache is never the source of truth. The write path always reads the DB under the optimistic version lock, so eventual consistency can **never** cause a lost update or corrupt data. Its only observable effect is **bounded read staleness on non-writing nodes**: for up to one poll interval, a node other than the writer may serve an older value.
+
 - **Other nodes:** eventual — an entity key is dropped within one poll interval of the change.
 - **Writing node:** unchanged — it still clears its own cache on the write path, so it reads its own writes right away. Its own row is replayed later, which does nothing (clearing an already-clear key is a no-op).
 - **Write path:** unchanged — it reads the DB with the optimistic version check.
+
+The rest of this section works through every way that staleness window can be observed, and how each is handled.
+
+#### Staleness scenarios and mitigations
+
+**1. Plain stale read (bounded, mostly tolerable).**
+
+| # | Scenario                                                       | Effect                                                                            | Possible mitigation                                                                                       |
+| - | -------------------------------------------------------------- |-----------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
+| 1 | Node A ALTERs a table (add column); B GETs it                  | B serves the old schema for up to one poll interval                               | Accept within the SLA window; a caller that needs an exact schema uses a consistent (cache-bypass) read   |
+| 2 | Node A DROPs a table; B GETs it                                | B still reports it as present (cache hit) until the next poll                     | Accept — any write to it on B is re-validated against the DB and rejected as not-found, so no corruption  |
+| 3 | RENAME (the old name behaves like a DROP); B GETs the old name | B keeps resolving the old name until the next poll; the new name misses → DB load | Same as DROP — bounded by the poll interval                                                               |
+| 4 | A property changes (e.g. Iceberg metadata-location); B GETs it | B returns the old location → a query on B may read an old snapshot/path           | Highest-value case: offer a consistent (cache-bypass) read for location-sensitive callers, or use `redis` |
+
+**2. Read-your-writes across nodes.**
+
+| # | Scenario                                                            | Effect                                                                                          | Possible mitigation                                                                                                                           |
+| - |---------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| 5 | Through a load balancer, ALTER on A then an immediate read on B     | Stale — violates session consistency; without sticky routing the change looks lost              | Sticky sessions at the LB, or a client-supplied last-seen version that bypasses the cache when the copy is older; `redis` removes it entirely |
+| 6 | CREATE (rather than ALTER/DROP)                                     | No problem — no negative caching and `list` skips the cache, so a new entity is visible at once | None needed                                                                                                                                   |
+
+**3. Cross-node read-modify-write.**
+
+| # | Scenario                                                                              | Effect                                                                                              | Possible mitigation                                                                                 |
+| - | ------------------------------------------------------------------------------------- |-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| 7 | B reads stale value A and submits an update carrying A's version as the expected one  | The optimistic lock rejects it on version mismatch — safe, but the user sees an unexpected conflict | Accept (correctness is preserved); reduce its frequency with the read-your-writes mitigations above |
+
+**4. Is the window actually bounded? — poller reliability (the real risk).** The "at most one poll interval" guarantee holds **only if the poller never drops a row**. If it does, the stale entry survives until the cache TTL, so this is the one place eventual consistency itself can break.
+
+| #  | Scenario                                                                                                  | Effect                                                    | Possible mitigation                                                                                                          |
+| -- |-----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| 8  | Commit-ordering gap / a skipped row                                                                       | The key is never invalidated; stale until the TTL         | Reuse the lag-safe, id-based polling already built for the change log (`#11736`); keep the cache TTL as a backstop           |
+| 9  | Poller thread dies / DB briefly unreachable                                                               | That node serves stale data until the TTL                 | TTL backstop + monitor poller liveness/lag and alert                                                                         |
+| 10 | Hierarchical DROP: only the container (schema) emits a row; children are cleared by a forward prefix scan | Correct as long as the prefix scan covers every child key | Cover with the hierarchical-drop test; confirm no child is written in a separate transaction that outlives the container row |
+
+**5. Idempotency (no issue).** Replaying ALTER then DROP, in any order or duplicated, is safe: invalidation is idempotent, so out-of-order or repeated replay has no effect.
+
+#### Summary: main risks, resolutions, and the staleness SLA
+
+- **Correctness is never at stake.** The DB plus the optimistic version lock stay authoritative; the worst a stale read can do is surface a bounded-old value (scenarios 1–4) or an unexpected conflict (scenario 7), never a lost update or corruption.
+- **Read-your-writes (scenarios 5, 7)** is the only user-visible rough edge on a single caffeine node. It is left to operators (sticky sessions) by default; teams that need it in-cluster take `redis`.
+- **Staleness SLA.** On non-writing nodes, a cached entity is at most **one poll interval** stale; the writing node is always read-your-writes. The poll interval is `gravitino.entityChangeLog.pollIntervalSecs` (**default 3s**, configurable — e.g. lower to 1s for a tighter bound at the cost of DB poll load). The cache TTL (minutes–hours) is only a backstop for the pathological missed-row case, never the primary consistency mechanism.
+- **Escapes for callers that cannot tolerate the window,** without changing the model: a consistent (cache-bypass) read for that specific call, or the `redis` (`SHARED`) implementation for cluster-wide strong consistency.
 
 ---
 
