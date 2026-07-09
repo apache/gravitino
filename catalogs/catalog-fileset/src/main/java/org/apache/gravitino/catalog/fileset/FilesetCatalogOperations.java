@@ -104,7 +104,6 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
-import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
 import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -987,7 +986,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       metricsSystem.unregister(catalogMetricsSource);
     }
 
-    ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
+    // Note: ClassLoader-scoped cleanup (Hadoop FileSystem.closeAll, the metrics scheduler,
+    // ThreadLocals, etc.) is intentionally NOT done here. Because catalogs may share an
+    // IsolatedClassLoader via the ClassLoaderPool, running that destructive cleanup when a single
+    // catalog closes would break sibling catalogs still sharing the ClassLoader. It is now done
+    // centrally by CatalogManager/ClassLoaderPool only when the last catalog releasing the shared
+    // ClassLoader brings its reference count to zero.
   }
 
   private void validateLocationHierarchy(

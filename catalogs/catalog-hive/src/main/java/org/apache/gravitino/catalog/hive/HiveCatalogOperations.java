@@ -89,7 +89,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -197,7 +196,13 @@ public class HiveCatalogOperations
       clientPool.close();
       clientPool = null;
     }
-    ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
+    // Note: ClassLoader-scoped cleanup (UGI/Kerberos, Hadoop FileSystem, ThreadLocals, etc.) is
+    // intentionally NOT done here. Since catalogs may share an IsolatedClassLoader via the
+    // ClassLoaderPool, running that destructive cleanup on close of a single catalog would break
+    // sibling catalogs still sharing the ClassLoader (e.g. tearing down the shared Hadoop/UGI state
+    // a live Hive catalog depends on). It is now performed centrally by CatalogManager/
+    // ClassLoaderPool only when the last catalog releasing the shared ClassLoader brings its
+    // reference count to zero.
   }
 
   /**
