@@ -212,19 +212,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
-   * Indicates whether this catalog should eagerly validate connectivity to its underlying backend
-   * when the catalog is created, so that a misconfiguration fails fast at create time instead of
-   * surfacing later as a cryptic error on the first metadata operation.
+   * Whether catalog creation should eagerly initialize this catalog so a backend misconfiguration
+   * fails at create time rather than on first use. Default {@code false}; opt-in.
    *
-   * <p>The default implementation returns {@code false}, meaning catalog creation does not touch
-   * the backend. Subclasses may override this to opt in when they can resolve their configuration
-   * against the backend at create time (for example, an Iceberg catalog resolving its {@code
-   * warehouse} selector against a remote REST server). When this returns {@code true}, the catalog
-   * manager eagerly initializes the catalog operations (which loads and may contact the backend)
-   * while creating the catalog, so an initialization failure rejects the create request.
-   *
-   * @return {@code true} if catalog creation should validate the backend connection, {@code false}
-   *     otherwise.
+   * @return {@code true} to validate the backend connection during catalog creation
    */
   public boolean shouldValidateConnectionForCreate() {
     return false;

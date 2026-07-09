@@ -117,56 +117,21 @@ public class TestIcebergCatalog {
 
   @Test
   public void testShouldValidateConnectionForCreate() {
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    String backend = IcebergCatalogPropertiesMetadata.CATALOG_BACKEND;
+    String warehouse = IcebergCatalogPropertiesMetadata.WAREHOUSE;
 
-    // A REST backend with a populated `warehouse` opts creation into a backend resolve.
-    IcebergCatalog withWarehouse =
-        icebergCatalogWith(
-            auditInfo,
-            ImmutableMap.of(
-                IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "rest",
-                IcebergCatalogPropertiesMetadata.WAREHOUSE, "s3://warehouse/"));
-    Assertions.assertTrue(withWarehouse.shouldValidateConnectionForCreate());
-
-    // An omitted `warehouse` (default REST catalog) must not force a backend resolve at create.
-    IcebergCatalog withoutWarehouse =
-        icebergCatalogWith(
-            auditInfo, ImmutableMap.of(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "rest"));
-    Assertions.assertFalse(withoutWarehouse.shouldValidateConnectionForCreate());
-
-    // Non-REST backends treat `warehouse` as a storage location and keep their lazy behavior, so a
-    // configured `warehouse` must not force a create-time resolve.
-    IcebergCatalog jdbcWithWarehouse =
-        icebergCatalogWith(
-            auditInfo,
-            ImmutableMap.of(
-                IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "jdbc",
-                IcebergCatalogPropertiesMetadata.WAREHOUSE, "file:///tmp/iceberg-jdbc"));
-    Assertions.assertFalse(jdbcWithWarehouse.shouldValidateConnectionForCreate());
-
-    // A blank `warehouse` is treated as omitted.
-    IcebergCatalog blankWarehouse =
-        icebergCatalogWith(
-            auditInfo,
-            ImmutableMap.of(
-                IcebergCatalogPropertiesMetadata.CATALOG_BACKEND, "rest",
-                IcebergCatalogPropertiesMetadata.WAREHOUSE, "   "));
-    Assertions.assertFalse(blankWarehouse.shouldValidateConnectionForCreate());
-  }
-
-  private IcebergCatalog icebergCatalogWith(AuditInfo auditInfo, Map<String, String> properties) {
-    CatalogEntity entity =
-        CatalogEntity.builder()
-            .withId(1L)
-            .withName("catalog")
-            .withNamespace(Namespace.of("metalake"))
-            .withType(IcebergCatalog.Type.RELATIONAL)
-            .withProvider("iceberg")
-            .withProperties(properties)
-            .withAuditInfo(auditInfo)
-            .build();
-    return new IcebergCatalog().withCatalogConf(Maps.newHashMap()).withCatalogEntity(entity);
+    Assertions.assertTrue(
+        IcebergCatalog.shouldValidateConnectionForCreate(
+            ImmutableMap.of(backend, "rest", warehouse, "s3://warehouse/")));
+    Assertions.assertFalse(
+        IcebergCatalog.shouldValidateConnectionForCreate(ImmutableMap.of(backend, "rest")));
+    Assertions.assertFalse(
+        IcebergCatalog.shouldValidateConnectionForCreate(
+            ImmutableMap.of(backend, "jdbc", warehouse, "file:///tmp/iceberg-jdbc")));
+    Assertions.assertFalse(
+        IcebergCatalog.shouldValidateConnectionForCreate(
+            ImmutableMap.of(backend, "rest", warehouse, "   ")));
+    Assertions.assertFalse(IcebergCatalog.shouldValidateConnectionForCreate(null));
   }
 
   @Test

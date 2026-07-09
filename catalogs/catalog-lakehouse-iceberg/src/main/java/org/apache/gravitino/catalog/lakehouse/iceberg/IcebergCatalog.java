@@ -68,30 +68,16 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
     return (ViewCatalog) ops();
   }
 
-  /**
-   * Validate the backend connection at create time only for a {@code rest} backend with a
-   * configured {@code warehouse}.
-   *
-   * <p>On the {@code rest} backend the {@code warehouse} property is a catalog selector forwarded
-   * to the remote Iceberg REST server (via {@code GET /v1/config?warehouse=...}), not a storage
-   * location. Resolving it at create time turns an unresolvable value (for example a
-   * storage-location-shaped URI mistakenly copied from a hive/jdbc example) into a fast, actionable
-   * failure. An omitted {@code warehouse} (the server's default REST catalog) needs no resolution.
-   *
-   * <p>The {@code hive} and {@code jdbc} backends treat {@code warehouse} as a storage location and
-   * retain their lazy behavior (creation does not touch the backend), so this returns {@code false}
-   * for them.
-   *
-   * @return {@code true} for a {@code rest} backend with a non-blank {@code warehouse}, {@code
-   *     false} otherwise.
-   */
   @Override
   public boolean shouldValidateConnectionForCreate() {
-    Map<String, String> properties = entity().getProperties();
-    if (properties == null) {
-      return false;
-    }
-    return IcebergCatalogBackend.REST
+    return shouldValidateConnectionForCreate(entity().getProperties());
+  }
+
+  // REST resolves `warehouse` as a server-side catalog selector, so validate it at create; hive and
+  // jdbc use it as a storage location and need no create-time connection.
+  static boolean shouldValidateConnectionForCreate(Map<String, String> properties) {
+    return properties != null
+        && IcebergCatalogBackend.REST
             .name()
             .equalsIgnoreCase(properties.get(IcebergConstants.CATALOG_BACKEND))
         && StringUtils.isNotBlank(properties.get(IcebergConstants.WAREHOUSE));
