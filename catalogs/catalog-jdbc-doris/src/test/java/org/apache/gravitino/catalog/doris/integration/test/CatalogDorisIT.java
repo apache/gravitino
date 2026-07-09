@@ -88,6 +88,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
+@Tag("doris-multi-version")
 public class CatalogDorisIT extends BaseIT {
 
   private static final String provider = "jdbc-doris";
