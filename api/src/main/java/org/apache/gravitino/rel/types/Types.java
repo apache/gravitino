@@ -19,8 +19,11 @@
 package org.apache.gravitino.rel.types;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.StringJoiner;
 
 /** The helper class for {@link Type}. */
@@ -676,6 +679,168 @@ public class Types {
     @Override
     public String simpleString() {
       return "variant";
+    }
+  }
+
+  /**
+   * The geometry type in Gravitino. A geometry column holds a geospatial shape (point, line, or
+   * polygon) encoded as WKB on a planar coordinate reference system (CRS). The CRS is carried as
+   * type metadata; Gravitino, as a catalog, does not interpret the shape values.
+   */
+  public static class GeometryType extends Type.PrimitiveType {
+
+    /** The default coordinate reference system, matching the Iceberg/Parquet default. */
+    public static final String DEFAULT_CRS = "OGC:CRS84";
+
+    /**
+     * @return A {@link GeometryType} with the default CRS ("OGC:CRS84").
+     */
+    public static GeometryType crs84() {
+      return new GeometryType(DEFAULT_CRS);
+    }
+
+    /**
+     * @param crs The coordinate reference system, e.g. "OGC:CRS84", "EPSG:4326" or "srid:3857".
+     * @return A {@link GeometryType} with the given CRS.
+     */
+    public static GeometryType of(String crs) {
+      return new GeometryType(crs);
+    }
+
+    private final String crs;
+
+    private GeometryType(String crs) {
+      Preconditions.checkArgument(crs != null && !crs.isEmpty(), "crs cannot be null or empty");
+      this.crs = crs;
+    }
+
+    /**
+     * @return The coordinate reference system of this geometry type.
+     */
+    public String crs() {
+      return crs;
+    }
+
+    @Override
+    public Name name() {
+      return Name.GEOMETRY;
+    }
+
+    @Override
+    public String simpleString() {
+      return DEFAULT_CRS.equalsIgnoreCase(crs) ? "geometry" : String.format("geometry(%s)", crs);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof GeometryType)) {
+        return false;
+      }
+      GeometryType that = (GeometryType) o;
+      return crs.equalsIgnoreCase(that.crs);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(crs.toLowerCase(Locale.ROOT));
+    }
+  }
+
+  /**
+   * The geography type in Gravitino. A geography column holds a geospatial shape (point, line, or
+   * polygon) encoded as WKB on a spheroidal coordinate reference system (CRS), with an
+   * edge-interpolation algorithm describing how edges between points are computed on the surface.
+   * Both are carried as type metadata; Gravitino, as a catalog, does not interpret the shape
+   * values.
+   */
+  public static class GeographyType extends Type.PrimitiveType {
+
+    /** The default coordinate reference system, matching the Iceberg/Parquet default. */
+    public static final String DEFAULT_CRS = "OGC:CRS84";
+
+    /** The default edge-interpolation algorithm, matching the Iceberg/Parquet default. */
+    public static final String DEFAULT_ALGORITHM = "spherical";
+
+    /** The edge-interpolation algorithms defined by the geography specification. */
+    private static final Set<String> VALID_ALGORITHMS =
+        ImmutableSet.of("spherical", "vincenty", "thomas", "andoyer", "karney");
+
+    /**
+     * @return A {@link GeographyType} with the default CRS ("OGC:CRS84") and algorithm
+     *     ("spherical").
+     */
+    public static GeographyType crs84() {
+      return new GeographyType(DEFAULT_CRS, DEFAULT_ALGORITHM);
+    }
+
+    /**
+     * @param crs The coordinate reference system, e.g. "OGC:CRS84" or "EPSG:4326".
+     * @param algorithm The edge-interpolation algorithm: one of "spherical", "vincenty", "thomas",
+     *     "andoyer" or "karney".
+     * @return A {@link GeographyType} with the given CRS and algorithm.
+     */
+    public static GeographyType of(String crs, String algorithm) {
+      return new GeographyType(crs, algorithm);
+    }
+
+    private final String crs;
+    private final String algorithm;
+
+    private GeographyType(String crs, String algorithm) {
+      Preconditions.checkArgument(crs != null && !crs.isEmpty(), "crs cannot be null or empty");
+      Preconditions.checkArgument(
+          algorithm != null && VALID_ALGORITHMS.contains(algorithm.toLowerCase(Locale.ROOT)),
+          "algorithm must be one of %s, but got: %s",
+          VALID_ALGORITHMS,
+          algorithm);
+      this.crs = crs;
+      this.algorithm = algorithm.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * @return The coordinate reference system of this geography type.
+     */
+    public String crs() {
+      return crs;
+    }
+
+    /**
+     * @return The edge-interpolation algorithm of this geography type.
+     */
+    public String algorithm() {
+      return algorithm;
+    }
+
+    @Override
+    public Name name() {
+      return Name.GEOGRAPHY;
+    }
+
+    @Override
+    public String simpleString() {
+      return DEFAULT_CRS.equalsIgnoreCase(crs) && DEFAULT_ALGORITHM.equals(algorithm)
+          ? "geography"
+          : String.format("geography(%s,%s)", crs, algorithm);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof GeographyType)) {
+        return false;
+      }
+      GeographyType that = (GeographyType) o;
+      return crs.equalsIgnoreCase(that.crs) && algorithm.equals(that.algorithm);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(crs.toLowerCase(Locale.ROOT), algorithm);
     }
   }
 

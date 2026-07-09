@@ -157,7 +157,7 @@ class SerdesUtils(SerdesUtilsBase):
             )
 
         if isinstance(type_data, str):
-            return cls.from_primitive_type_string(type_data.lower())
+            return cls.from_primitive_type_string(type_data.lower(), type_data)
 
         if isinstance(type_data, dict) and type_data.get(cls.TYPE):
             type_str = type_data[cls.TYPE]
@@ -177,10 +177,26 @@ class SerdesUtils(SerdesUtilsBase):
         return Types.UnparsedType.of(unparsed_type=json.dumps(type_data))
 
     @classmethod
-    def from_primitive_type_string(cls, type_string: str) -> Type:
+    def from_primitive_type_string(
+        cls, type_string: str, original_type_string: str = None
+    ) -> Type:
         type_instance = cls.TYPES.get(type_string)
         if type_instance is not None:
             return type_instance
+
+        # Match against the original (non-lowercased) string so the CRS keeps its case.
+        original = (
+            original_type_string if original_type_string is not None else type_string
+        )
+        geometry_matched = cls.GEOMETRY_PATTERN.match(original)
+        if geometry_matched:
+            return Types.GeometryType.of(geometry_matched.group(1))
+
+        geography_matched = cls.GEOGRAPHY_PATTERN.match(original)
+        if geography_matched:
+            return Types.GeographyType.of(
+                geography_matched.group(1), geography_matched.group(2)
+            )
 
         decimal_matched = cls.DECIMAL_PATTERN.match(type_string)
         if decimal_matched:

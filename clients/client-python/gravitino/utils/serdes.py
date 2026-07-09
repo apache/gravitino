@@ -92,6 +92,14 @@ class SerdesUtilsBase:
     TIMESTAMP_TZ_PATTERN: Final[Pattern[str]] = re.compile(
         r"timestamp_tz\(\s*(\d+)\s*\)"
     )
+    # The keyword folds case; group 1 is the CRS, an opaque identifier kept as-is.
+    GEOMETRY_PATTERN: Final[Pattern[str]] = re.compile(
+        r"geometry\(\s*(.+?)\s*\)", re.IGNORECASE
+    )
+    # Group 1 is the CRS (kept as-is); group 2 is the edge-interpolation algorithm.
+    GEOGRAPHY_PATTERN: Final[Pattern[str]] = re.compile(
+        r"geography\(\s*(.+?)\s*,\s*(.+?)\s*\)", re.IGNORECASE
+    )
     TYPES: Final[Mapping] = MappingProxyType(
         {
             type_instance.simple_string(): type_instance
@@ -117,6 +125,8 @@ class SerdesUtilsBase:
                 Types.StringType.get(),
                 Types.UUIDType.get(),
                 Types.VariantType.get(),
+                Types.GeometryType.crs84(),
+                Types.GeographyType.crs84(),
             )
         }
     )

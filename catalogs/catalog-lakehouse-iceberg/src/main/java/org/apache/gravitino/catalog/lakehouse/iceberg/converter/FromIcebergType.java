@@ -120,6 +120,14 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
         Types.DecimalType decimal = (Types.DecimalType) primitive;
         return org.apache.gravitino.rel.types.Types.DecimalType.of(
             decimal.precision(), decimal.scale());
+      case GEOMETRY:
+        return org.apache.gravitino.rel.types.Types.GeometryType.of(
+            ((Types.GeometryType) primitive).crs());
+      case GEOGRAPHY:
+        Types.GeographyType geography = (Types.GeographyType) primitive;
+        // EdgeAlgorithm.toString() is the lowercase spec name, which GeographyType requires.
+        return org.apache.gravitino.rel.types.Types.GeographyType.of(
+            geography.crs(), geography.algorithm().toString());
       default:
         return org.apache.gravitino.rel.types.Types.ExternalType.of(primitive.typeId().name());
     }
