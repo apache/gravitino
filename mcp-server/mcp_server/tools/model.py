@@ -329,6 +329,7 @@ def load_model_tools(mcp: FastMCP):
         catalog_name: str,
         schema_name: str,
         model_name: str,
+        version: int,
     ) -> str:
         """
         Delete a specific version of a model.
