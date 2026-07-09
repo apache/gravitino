@@ -21,10 +21,13 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 import static org.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.iceberg.TableProperties;
@@ -41,6 +44,22 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String FORMAT = IcebergConstants.FORMAT;
   public static final String FORMAT_VERSION = IcebergConstants.FORMAT_VERSION;
   public static final String DISTRIBUTION_MODE = TableProperties.WRITE_DISTRIBUTION_MODE;
+
+  /**
+   * The default Iceberg table format version Gravitino applies when {@link #FORMAT_VERSION} is not
+   * explicitly set. Gravitino owns this default rather than deferring to the Iceberg library's own
+   * version-dependent default, and stamps it onto the table at creation.
+   */
+  public static final int ICEBERG_DEFAULT_FORMAT_VERSION = 2;
+
+  /**
+   * The explicit Iceberg table format versions Gravitino accepts for {@link #FORMAT_VERSION}. An
+   * unset (empty) value is also allowed and defaults to {@link #ICEBERG_DEFAULT_FORMAT_VERSION}.
+   * Version 3 is required for V3 types such as {@code variant}; extend this set as Gravitino adopts
+   * newer Iceberg writer versions. Note this is a Gravitino policy: Iceberg 1.11.0 itself supports
+   * up to format version 4.
+   */
+  public static final Set<Integer> SUPPORTED_FORMAT_VERSIONS = ImmutableSet.of(2, 3);
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -65,8 +84,7 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(
                 IDENTIFIER_FIELDS, "The identifier field(s) for defining the table", false),
             stringReservedPropertyEntry(DISTRIBUTION_MODE, "Write distribution mode", false),
-            stringImmutablePropertyEntry(
-                FORMAT_VERSION, "The Iceberg table format version, ", false, null, false, false),
+            formatVersionPropertyEntry(),
             stringImmutablePropertyEntry(
                 PROVIDER,
                 "Iceberg provider for Iceberg table fileFormat, such as Parquet, Orc, Avro, or Iceberg",
@@ -80,5 +98,53 @@ public class IcebergTablePropertiesMetadata extends BasePropertiesMetadata {
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return PROPERTIES_METADATA;
+  }
+
+  /**
+   * Builds the property entry for {@link #FORMAT_VERSION}, an immutable property that accepts an
+   * unset value or one of {@link #SUPPORTED_FORMAT_VERSIONS} and defaults to {@link
+   * #ICEBERG_DEFAULT_FORMAT_VERSION}.
+   *
+   * @return the {@code format-version} property entry.
+   */
+  private static PropertyEntry<Integer> formatVersionPropertyEntry() {
+    return new PropertyEntry.Builder<Integer>()
+        .withName(FORMAT_VERSION)
+        .withDescription(
+            "The Iceberg table format version. Valid values are 2 and 3, and it defaults to 2 when "
+                + "unset. Version 3 is required for V3 types such as variant.")
+        .withRequired(false)
+        .withImmutable(true)
+        .withJavaType(Integer.class)
+        .withDefaultValue(ICEBERG_DEFAULT_FORMAT_VERSION)
+        .withDecoder(IcebergTablePropertiesMetadata::decodeFormatVersion)
+        .withEncoder(String::valueOf)
+        .withHidden(false)
+        .withReserved(false)
+        .build();
+  }
+
+  /**
+   * Decodes and validates a user-supplied {@link #FORMAT_VERSION} value. An unset (null or blank)
+   * value is allowed and resolves to {@link #ICEBERG_DEFAULT_FORMAT_VERSION}; otherwise the value
+   * must be an integer in {@link #SUPPORTED_FORMAT_VERSIONS}.
+   *
+   * @param value the raw property value.
+   * @return the parsed format version, or {@link #ICEBERG_DEFAULT_FORMAT_VERSION} when the value is
+   *     unset.
+   * @throws IllegalArgumentException if the value is neither blank nor a version in {@link
+   *     #SUPPORTED_FORMAT_VERSIONS}.
+   */
+  private static Integer decodeFormatVersion(String value) {
+    if (value == null || value.trim().isEmpty()) {
+      return ICEBERG_DEFAULT_FORMAT_VERSION;
+    }
+    int version = Integer.parseInt(value.trim());
+    Preconditions.checkArgument(
+        SUPPORTED_FORMAT_VERSIONS.contains(version),
+        "Unsupported Iceberg format-version: %s, supported versions are %s",
+        version,
+        SUPPORTED_FORMAT_VERSIONS);
+    return version;
   }
 }

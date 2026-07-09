@@ -77,6 +77,16 @@ public class IcebergTable extends BaseTable {
   private IcebergTable() {}
 
   public static Map<String, String> rebuildCreateProperties(Map<String, String> createProperties) {
+    // Gravitino owns the default Iceberg table format version: when it is not explicitly set, stamp
+    // ICEBERG_DEFAULT_FORMAT_VERSION rather than relying on the Iceberg library's version-dependent
+    // default or letting a blank value fail to parse downstream.
+    String formatVersion = createProperties.get(IcebergTablePropertiesMetadata.FORMAT_VERSION);
+    if (formatVersion == null || formatVersion.trim().isEmpty()) {
+      createProperties.put(
+          IcebergTablePropertiesMetadata.FORMAT_VERSION,
+          String.valueOf(IcebergTablePropertiesMetadata.ICEBERG_DEFAULT_FORMAT_VERSION));
+    }
+
     String provider = createProperties.get(PROP_PROVIDER);
     if (ICEBERG_PARQUET_FILE_FORMAT.equalsIgnoreCase(provider)) {
       createProperties.put(DEFAULT_FILE_FORMAT, ICEBERG_PARQUET_FILE_FORMAT);

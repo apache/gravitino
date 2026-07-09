@@ -451,19 +451,19 @@ Pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configurat
 **Immutable**: Fields that cannot be modified once set.
 :::
 
-| Configuration item        | Description                                                                           | Default value | Required | Reserved | Immutable | Since Version |
-|---------------------------|---------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
-| `location`                | Iceberg location for table storage.                                                   | (none)        | No       | No       | Yes       | 0.2.0         |
-| `provider`                | The storage provider for table storage.                                               | (none)        | No       | No       | Yes       | 0.2.0         |
-| `format`                  | The format of table storage.                                                          | (none)        | No       | No       | Yes       | 0.2.0         |
-| `format-version`          | The format version of table storage.                                                  | (none)        | No       | No       | Yes       | 0.2.0         |
-| `comment`                 | The table comment; use the `comment` field in table meta instead.                     | (none)        | No       | Yes      | No        | 0.2.0         |
-| `creator`                 | The table creator.                                                                    | (none)        | No       | Yes      | No        | 0.2.0         |
-| `current-snapshot-id`     | The snapshot represents the current state of the table.                               | (none)        | No       | Yes      | No        | 0.2.0         |
-| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                   | (none)        | No       | Yes      | No        | 0.2.0         |
-| `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.                      | (none)        | No       | Yes      | No        | 0.2.0         |
-| `identifier-fields`       | The identifier fields for defining the table.                                         | (none)        | No       | Yes      | No        | 0.2.0         |
-| `write.distribution-mode` | Defines distribution of write data; use `distribution` in table meta instead.         | (none)        | No       | Yes      | No        | 0.2.0         |
+| Configuration item        | Description                                                                                                                                                       | Default value | Required | Reserved | Immutable | Since Version |
+|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
+| `location`                | Iceberg location for table storage.                                                                                                                               | (none)        | No       | No       | Yes       | 0.2.0         |
+| `provider`                | The storage provider for table storage.                                                                                                                           | (none)        | No       | No       | Yes       | 0.2.0         |
+| `format`                  | The format of table storage.                                                                                                                                      | (none)        | No       | No       | Yes       | 0.2.0         |
+| `format-version`          | The Iceberg table format version. Valid values are `2` and `3`; version `3` is required for V3 types such as `variant`. Gravitino defaults it to `2` when unset. | `2`           | No       | No       | Yes       | 0.2.0         |
+| `comment`                 | The table comment; use the `comment` field in table meta instead.                                                                                                 | (none)        | No       | Yes      | No        | 0.2.0         |
+| `creator`                 | The table creator.                                                                                                                                                | (none)        | No       | Yes      | No        | 0.2.0         |
+| `current-snapshot-id`     | The snapshot represents the current state of the table.                                                                                                           | (none)        | No       | Yes      | No        | 0.2.0         |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                                                                                               | (none)        | No       | Yes      | No        | 0.2.0         |
+| `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.                                                                                                  | (none)        | No       | Yes      | No        | 0.2.0         |
+| `identifier-fields`       | The identifier fields for defining the table.                                                                                                                     | (none)        | No       | Yes      | No        | 0.2.0         |
+| `write.distribution-mode` | Defines distribution of write data; use `distribution` in table meta instead.                                                                                     | (none)        | No       | Yes      | No        | 0.2.0         |
 
 ### Table Indexes
 

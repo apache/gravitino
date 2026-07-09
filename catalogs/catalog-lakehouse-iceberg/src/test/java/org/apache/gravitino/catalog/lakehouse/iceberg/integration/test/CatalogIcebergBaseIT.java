@@ -51,6 +51,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTablePropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -688,6 +689,117 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     Assertions.assertTrue(
         ExceptionUtils.getStackTrace(exception).contains("Invalid column type"),
         "Expected a Hive metastore 'Invalid column type' rejection, but got: " + exception);
+  }
+
+  @Test
+  void testCreateVariantColumnViaGravitinoApi() {
+    // Write path: create a variant column *through the Gravitino relational API* and have it
+    // written
+    // to the REST (IRC) backend, then load it back. REST-backend only, for the same reason as
+    // testV3TypeConversionViaIcebergClient: the CI Hive metastore cannot store V3 column types.
+    Assumptions.assumeTrue(
+        "rest".equalsIgnoreCase(TYPE),
+        "Variant columns require a backend that does not validate against the Hive metastore");
+
+    NameIdentifier ident = NameIdentifier.of(schemaName, "t_variant_write");
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id"),
+          Column.of("payload", Types.VariantType.get(), "variant col")
+        };
+    Map<String, String> properties = Maps.newHashMap();
+    // Variant is a V3 type, so the table must be created at format-version 3.
+    properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table created =
+        tableCatalog.createTable(
+            ident,
+            columns,
+            "variant write",
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0]);
+    Assertions.assertInstanceOf(Types.VariantType.class, created.columns()[1].dataType());
+
+    // Load it back through the native metadata API to confirm the round-trip against the backend.
+    Table loaded = tableCatalog.loadTable(ident);
+    Assertions.assertInstanceOf(Types.VariantType.class, loaded.columns()[1].dataType());
+    Assertions.assertEquals(
+        "3", loaded.properties().get(IcebergTablePropertiesMetadata.FORMAT_VERSION));
+  }
+
+  @Test
+  void testCreateVariantColumnRequiresFormatVersion3() {
+    Assumptions.assumeTrue(
+        "rest".equalsIgnoreCase(TYPE),
+        "Variant columns require a backend that does not validate against the Hive metastore");
+
+    NameIdentifier ident = NameIdentifier.of(schemaName, "t_variant_default_v2");
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id"),
+          Column.of("payload", Types.VariantType.get(), "variant col")
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    // Without format-version=3 the table defaults to v2, which Iceberg rejects for variant columns.
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                tableCatalog.createTable(
+                    ident,
+                    columns,
+                    "variant default v2",
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0]));
+    Assertions.assertTrue(
+        ExceptionUtils.getStackTrace(exception).contains("variant is not supported until v3"),
+        "Expected a 'variant is not supported until v3' rejection, but got: " + exception);
+  }
+
+  @Test
+  void testCreateTableDefaultsToFormatVersion2() {
+    // Unset format-version: Gravitino stamps its default (version 2).
+    assertLoadedFormatVersion("t_fmt_default", Maps.newHashMap(), "2");
+  }
+
+  @Test
+  void testCreateTableWithExplicitFormatVersion2() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "2");
+    assertLoadedFormatVersion("t_fmt_v2", properties, "2");
+  }
+
+  @Test
+  void testCreateTableWithEmptyFormatVersionDefaultsToV2() {
+    // An explicit empty format-version is treated as unset and defers to the backend default.
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "");
+    assertLoadedFormatVersion("t_fmt_empty", properties, "2");
+  }
+
+  private void assertLoadedFormatVersion(
+      String tableName, Map<String, String> createProperties, String expectedVersion) {
+    NameIdentifier ident = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = new Column[] {Column.of("id", Types.IntegerType.get(), "id")};
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        ident,
+        columns,
+        "format-version round-trip",
+        createProperties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+    // Read the version back from the backend; loadTable reflects the actually-stored format
+    // version.
+    Table loaded = tableCatalog.loadTable(ident);
+    Assertions.assertEquals(
+        expectedVersion, loaded.properties().get(IcebergTablePropertiesMetadata.FORMAT_VERSION));
   }
 
   private NameIdentifier createV3Table(
