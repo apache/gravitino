@@ -44,4 +44,6 @@ class ViewResponse(BaseResponse):
         if self._view.audit_info() is None:
             raise IllegalArgumentException("view 'audit' must not be null")
         if not self._view.representations():
-            raise IllegalArgumentException("view 'representations' must not be null")
+            raise IllegalArgumentException(
+                "view 'representations' must not be null or empty"
+            )
