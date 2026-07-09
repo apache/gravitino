@@ -117,6 +117,27 @@ public class TestDorisUtils {
     assertTrue(transform.isPresent());
     assertEquals(Transforms.list(new String[][] {{"col1"}, {"col2"}}), transform.get());
 
+    // test range partition with space (Doris 3.0+ SHOW CREATE TABLE format)
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE (`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    assertTrue(transform.isPresent());
+    assertEquals(Transforms.range(new String[] {"col1"}), transform.get());
+
+    // test list partition with space (Doris 3.0+ SHOW CREATE TABLE format)
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` int(11) NOT NULL\n) ENGINE=OLAP\n PARTITION BY LIST (`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    assertTrue(transform.isPresent());
+    assertEquals(Transforms.list(new String[][] {{"col1"}}), transform.get());
+
+    // test multi-column list partition with space
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL,\n`col2` int(11) NOT NULL\n) ENGINE=OLAP\n PARTITION BY LIST (`col1`, `col2`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    assertTrue(transform.isPresent());
+    assertEquals(Transforms.list(new String[][] {{"col1"}, {"col2"}}), transform.get());
+
     // test non-partitioned table
     createTableSql =
         "CREATE TABLE `testTable` (\n`testColumn` STRING NOT NULL COMMENT 'test comment'\n) ENGINE=OLAP\nCOMMENT \"test comment\"";
