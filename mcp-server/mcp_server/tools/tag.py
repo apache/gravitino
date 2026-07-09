@@ -177,7 +177,7 @@ def load_tag_tool(mcp: FastMCP):
     # delete_tag is destructive; it is exposed and access is enforced by Gravitino
     # authorization rather than by hiding the tool.
     @mcp.tool(tags={"tag"})
-    async def delete_tag(ctx: Context, name: str) -> None:
+    async def delete_tag(ctx: Context, name: str) -> str:
         """
         Delete a tag by its name.
 
@@ -187,10 +187,7 @@ def load_tag_tool(mcp: FastMCP):
             name (str): Name of the tag to delete
 
         Returns:
-            None
-
-        Raises:
-            Exception: If the deletion fails, an exception is raised with an error message.
+            str: JSON-formatted string indicating whether the tag was deleted.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().delete_tag(name)

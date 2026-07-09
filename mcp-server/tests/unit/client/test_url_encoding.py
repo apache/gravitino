@@ -376,9 +376,10 @@ class TestTagOperationUrlEncoding(unittest.TestCase):
         self.assertNotIn("?admin=true", url)
 
     def test_delete_tag_encodes_tag_name(self):
-        client = _make_mock_client({})
+        client = _make_mock_client({"code": 0, "dropped": True})
         op = PlainRESTClientTagOperation(METALAKE, client)
-        asyncio.run(op.delete_tag(_PATH_TRAVERSAL))
+        result = asyncio.run(op.delete_tag(_PATH_TRAVERSAL))
+        self.assertEqual("true", result)
         url = _called_url(client.delete)
         self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
         self.assertNotIn("../../", url)

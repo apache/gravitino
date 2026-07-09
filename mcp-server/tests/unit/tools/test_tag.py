@@ -142,8 +142,7 @@ class TestTagTool(unittest.TestCase):
     def test_delete_tag(self):
         async def _test(mcp_server):
             async with Client(mcp_server) as client:
-                # delete_tag is declared -> None; assert the call completes
-                # without error rather than on a return payload.
-                await client.call_tool("delete_tag", {"name": "t1"})
+                result = await client.call_tool("delete_tag", {"name": "t1"})
+                self.assertEqual("mock_tag_deleted: t1", result.content[0].text)
 
         asyncio.run(_test(self.mcp))
