@@ -76,6 +76,13 @@ class PlainRESTClientJobOperation(JobOperation):
         )
         return extract_content_from_response(response, "dropped", False)
 
+    async def alter_job_template(self, name: str, updates: list) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/templates/{encode_path_segment(name)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "jobTemplate", {})
+
     async def run_job(self, job_template_name: str, job_config: dict) -> str:
         response = await self.rest_client.post(
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}/jobs/runs",

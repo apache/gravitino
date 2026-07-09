@@ -19,6 +19,7 @@ from mcp_server.client import PolicyOperation
 from mcp_server.client.plain.utils import (
     encode_path_segment,
     extract_content_from_response,
+    extract_response,
 )
 
 
@@ -68,6 +69,14 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
             f"/policies/{encode_path_segment(policy_name)}"
         )
         return extract_content_from_response(response, "dropped", False)
+
+    async def set_policy(self, policy_name: str, enable: bool) -> str:
+        response = await self.rest_client.patch(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/policies/{encode_path_segment(policy_name)}",
+            json={"enable": enable},
+        )
+        return extract_response(response)
 
     async def get_list_of_policies(self) -> str:
         response = await self.rest_client.get(

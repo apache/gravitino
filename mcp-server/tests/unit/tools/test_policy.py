@@ -147,6 +147,7 @@ class TestPolicyTool(unittest.TestCase):
             self.assertIn("create_policy", tool_names)
             self.assertIn("alter_policy", tool_names)
             self.assertIn("delete_policy", tool_names)
+            self.assertIn("set_policy", tool_names)
 
         asyncio.run(_test_write_policy_tools_enabled_by_default(self.mcp))
 
@@ -207,3 +208,18 @@ class TestPolicyTool(unittest.TestCase):
                 )
 
         asyncio.run(_test_delete_policy(self.mcp))
+
+    def test_set_policy(self):
+        async def _test_set_policy(mcp_server):
+            self.mcp.enable(names={"set_policy"}, components={"tool"})
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "set_policy",
+                    {"name": "mock_policy", "enable": False},
+                )
+                self.assertEqual(
+                    "mock_policy_set: mock_policy, enable=False",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test_set_policy(self.mcp))

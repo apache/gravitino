@@ -77,6 +77,20 @@ class PolicyOperation(ABC):
         pass
 
     @abstractmethod
+    async def set_policy(self, policy_name: str, enable: bool) -> str:
+        """
+        Enable or disable a policy by its name.
+
+        Args:
+            policy_name: Name of the policy to enable or disable
+            enable: True to enable the policy, False to disable it
+
+        Returns:
+            str: JSON-formatted string containing the server response
+        """
+        pass
+
+    @abstractmethod
     async def get_list_of_policies(self) -> str:
         """
         Retrieve the list of policies.

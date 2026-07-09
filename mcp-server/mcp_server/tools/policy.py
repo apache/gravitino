@@ -162,6 +162,27 @@ def load_policy_tools(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_policy_operation().delete_policy(name)
 
+    # Write operation; access is enforced by Gravitino authorization.
+    @mcp.tool(tags={"policy"})
+    async def set_policy(ctx: Context, name: str, enable: bool) -> str:
+        """
+        Enable or disable a policy by its name.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            name (str): Name of the policy to enable or disable.
+            enable (bool): True to enable the policy, False to disable it.
+
+        Returns:
+            str: A JSON string containing the server response.
+
+        Raises:
+            Exception: If the operation fails, an exception is raised with an error message.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().set_policy(name, enable)
+
     @mcp.tool(tags={"policy"})
     async def get_list_of_policies(
         ctx: Context,

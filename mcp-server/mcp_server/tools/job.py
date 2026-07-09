@@ -325,3 +325,32 @@ def load_job_tool(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().delete_job_template(name)
+
+    # Write operation; access is enforced by Gravitino authorization.
+    @mcp.tool(tags={"job"})
+    async def alter_job_template(
+        ctx: Context,
+        name: str,
+        updates: list,
+    ) -> str:
+        """
+        Alter an existing job template by its name.
+
+        Parameters:
+            ctx (Context): The context object containing Gravitino context.
+            name (str): The name of the job template to alter.
+            updates (list): List of update operations. Example:
+                [
+                  {"@type": "rename", "newName": "new_template"},
+                  {"@type": "updateComment", "newComment": "updated"},
+                  {"@type": "updateTemplate", "newTemplate": {...}}
+                ]
+
+        Returns:
+            str: A JSON string containing the altered job template.
+
+        Raises:
+            Exception: If the alteration fails, an exception is raised with an error message.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_job_operation().alter_job_template(name, updates)

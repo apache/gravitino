@@ -110,6 +110,7 @@ class TestJobTool(unittest.TestCase):
             self.assertIn("list_of_job_templates", tool_names)
             self.assertIn("register_job_template", tool_names)
             self.assertIn("delete_job_template", tool_names)
+            self.assertIn("alter_job_template", tool_names)
 
         asyncio.run(_test_write_job_template_tools_enabled_by_default(self.mcp))
 
@@ -148,3 +149,19 @@ class TestJobTool(unittest.TestCase):
                 )
 
         asyncio.run(_test_delete_job_template(self.mcp))
+
+    def test_alter_job_template(self):
+        async def _test_alter_job_template(mcp_server):
+            self.mcp.enable(names={"alter_job_template"}, components={"tool"})
+            updates = [{"@type": "rename", "newName": "shell_test2"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_job_template",
+                    {"name": "shell_test", "updates": updates},
+                )
+                self.assertEqual(
+                    f"mock_job_template_altered: shell_test with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test_alter_job_template(self.mcp))

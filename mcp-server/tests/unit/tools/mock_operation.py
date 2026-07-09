@@ -228,6 +228,9 @@ class MockPolicyOperation(PolicyOperation):
     async def delete_policy(self, policy_name: str) -> str:
         return f"mock_policy_deleted: {policy_name}"
 
+    async def set_policy(self, policy_name: str, enable: bool) -> str:
+        return f"mock_policy_set: {policy_name}, enable={enable}"
+
     async def associate_policy_with_metadata(
         self,
         metadata_full_name: str,
@@ -452,6 +455,9 @@ class MockJobOperation(JobOperation):
 
     async def delete_job_template(self, name: str) -> str:
         return f"mock_job_template_deleted: {name}"
+
+    async def alter_job_template(self, name: str, updates: list) -> str:
+        return f"mock_job_template_altered: {name} with updates {updates}"
 
     async def run_job(self, job_template_name: str, job_config: dict) -> str:
         return f"mock_job_run: {job_template_name} with parameters {job_config}"

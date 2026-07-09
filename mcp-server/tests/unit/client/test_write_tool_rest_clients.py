@@ -50,6 +50,7 @@ def _make_client(response_json: dict, status_code: int = 200):
     client.get = AsyncMock(return_value=response)
     client.post = AsyncMock(return_value=response)
     client.put = AsyncMock(return_value=response)
+    client.patch = AsyncMock(return_value=response)
     client.delete = AsyncMock(return_value=response)
     return client
 
@@ -93,6 +94,22 @@ class TestJobWriteRestClient(unittest.TestCase):
             "/api/metalakes/metalake/jobs/templates/shell_test",
             _called_url(client.delete),
         )
+
+    def test_alter_job_template_sends_updates_request(self):
+        client = _make_client({"code": 0, "jobTemplate": {"name": "shell2"}})
+        operation = PlainRESTClientJobOperation("metalake", client)
+        updates = [{"@type": "rename", "newName": "shell2"}]
+
+        result = asyncio.run(
+            operation.alter_job_template("shell_test", updates)
+        )
+
+        self.assertEqual(json.dumps({"name": "shell2"}), result)
+        self.assertEqual(
+            "/api/metalakes/metalake/jobs/templates/shell_test",
+            _called_url(client.put),
+        )
+        self.assertEqual({"updates": updates}, _called_json(client.put))
 
 
 class TestModelWriteRestClient(unittest.TestCase):
@@ -222,6 +239,19 @@ class TestPolicyWriteRestClient(unittest.TestCase):
         result = asyncio.run(operation.delete_policy("missing_policy"))
 
         self.assertEqual("false", result)
+
+    def test_set_policy_sends_enable_request(self):
+        client = _make_client({"code": 0})
+        operation = PlainRESTClientPolicyOperation("metalake", client)
+
+        result = asyncio.run(operation.set_policy("my_policy", False))
+
+        self.assertEqual(json.dumps({"code": 0}), result)
+        self.assertEqual(
+            "/api/metalakes/metalake/policies/my_policy",
+            _called_url(client.patch),
+        )
+        self.assertEqual({"enable": False}, _called_json(client.patch))
 
 
 class TestStatisticWriteRestClient(unittest.TestCase):
