@@ -1522,6 +1522,53 @@ public class TestJcasbinAuthorizer {
     assertFalse(loadedRoles.getIfPresent(testRoleId).isPresent());
   }
 
+  /**
+   * Reproduces the partial-policy-load stickiness bug. When a role's securable object transiently
+   * fails to resolve to a metadata id during a policy reload (e.g. right after the loadedRoles TTL
+   * evicts the role, while the catalog/entity resolution is momentarily unavailable), {@code
+   * loadPolicyByRoleEntity} silently {@code continue}s past that grant AND {@code
+   * versionCheckAndLoadRoles} still records the role in {@code loadedRoles} at the current version.
+   * The stale, privilege-less policy is then served on every subsequent request until the next
+   * eviction, so authorization does not self-heal once resolution recovers.
+   */
+  @Test
+  public void testTransientMetadataResolutionFailureDoesNotStickDenial() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    // Role grants USE_CATALOG on testCatalog; the user holds it directly.
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(allowRole);
+
+    // Baseline: the catalog id resolves, the policy loads, authorization succeeds.
+    assertTrue(doAuthorize(currentPrincipal), "baseline authorize should succeed");
+
+    // Simulate the TTL eviction that clears the role's policies + a metadataId cache eviction so
+    // the reload re-hits MetadataIdConverter.getID.
+    jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
+    getMetadataIdCache(jcasbinAuthorizer).invalidateAll();
+
+    // Transient resolution failure on reload: getID returns empty for the securable object.
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenReturn(Optional.empty());
+
+    // During the outage the grant cannot be evaluated -> denied (expected).
+    assertFalse(doAuthorize(currentPrincipal), "authorize denied while metadata id cannot resolve");
+
+    // Resolution recovers.
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenReturn(Optional.of(CATALOG_ID));
+    getMetadataIdCache(jcasbinAuthorizer).invalidateAll();
+
+    // The role was cached as fully loaded during the outage with an empty policy and its version
+    // has not changed, so the reload is skipped and the denial sticks. It should self-heal.
+    assertTrue(
+        doAuthorize(currentPrincipal), "authorize should recover once metadata id resolves again");
+  }
+
   @Test
   public void testOwnerCacheInvalidation() throws Exception {
     // Get the ownerRel cache via reflection

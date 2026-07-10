@@ -1202,8 +1202,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       if (cachedUpdatedAt.isPresent()) {
         clearRolePolicies(roleId);
       }
-      loadPolicyByRoleEntity(roleEntity, requestContext);
-      loadedRoles.put(roleId, dbUpdatedAt);
+      boolean fullyResolved = loadPolicyByRoleEntity(roleEntity, requestContext);
+      if (fullyResolved) {
+        loadedRoles.put(roleId, dbUpdatedAt);
+      } else {
+        // At least one securable object could not be resolved to a metadata id (for example a
+        // transient catalog/entity lookup miss). Caching the role now would pin an incomplete
+        // policy at this version until the next TTL eviction, silently under-granting for the
+        // whole window. Drop the partial policy and leave the role uncached so the next
+        // authorization reloads it and self-heals once resolution recovers.
+        clearRolePolicies(roleId);
+        loadedRoles.invalidate(roleId);
+      }
     }
   }
 
@@ -1224,16 +1234,24 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   //  Policy loading from role entity
   // ---------------------------------------------------------------------------
 
-  private void loadPolicyByRoleEntity(
+  /**
+   * Loads the role's securable-object privileges into the enforcers. Returns {@code true} only when
+   * every securable object was resolved to a metadata id; {@code false} when at least one could not
+   * be resolved, so the caller can avoid caching an incomplete policy as fully loaded.
+   */
+  private boolean loadPolicyByRoleEntity(
       RoleEntity roleEntity, AuthorizationRequestContext requestContext) {
     String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
     List<SecurableObject> securableObjects = roleEntity.securableObjects();
 
+    boolean fullyResolved = true;
     for (SecurableObject securableObject : securableObjects) {
       Optional<Long> metadataId =
           lookups.resolveMetadataId(securableObject, metalake, requestContext);
-      // A role may still reference a metadata object that has since been dropped; skip it.
+      // The object may have been dropped, or its id lookup transiently failed. Either way skip it
+      // for now and report the load as incomplete so the role is not cached as fully loaded.
       if (!metadataId.isPresent()) {
+        fullyResolved = false;
         continue;
       }
       for (Privilege privilege : securableObject.privileges()) {
@@ -1259,5 +1277,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             condition.name().toLowerCase(Locale.ROOT));
       }
     }
+    return fullyResolved;
   }
 }
