@@ -2297,13 +2297,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
     catalog
         .asTableCatalog()
-        .createTable(
-            ident,
-            cols,
-            "settings roundtrip",
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE);
+        .createTable(ident, cols, "settings roundtrip", properties, Distributions.NONE);
 
     // Verify Gravitino API round-trip
     Table loaded = catalog.asTableCatalog().loadTable(ident);
@@ -2360,13 +2354,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
     catalog
         .asTableCatalog()
-        .createTable(
-            ident,
-            cols,
-            "settings and comment roundtrip",
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE);
+        .createTable(ident, cols, "settings and comment roundtrip", properties, Distributions.NONE);
 
     // Verify Gravitino API round-trip
     Table loaded = catalog.asTableCatalog().loadTable(ident);
