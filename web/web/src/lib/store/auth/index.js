@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi, basicLoginApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
@@ -91,36 +91,6 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
   return { token: access_token, expired: expires_in }
 })
 
-export const basicLoginAction = createAsyncThunk(
-  'auth/basicLoginAction',
-  async ({ username, password, router }, { dispatch }) => {
-    const basicToken = `Basic ${btoa(`${username}:${password}`)}`
-
-    const [err, res] = await to(basicLoginApi(basicToken))
-
-    if (err || !res) {
-      const message =
-        err?.response?.status === 401 ? 'Invalid username or password' : err?.response?.data?.err || err?.message
-
-      toast.error(message, {
-        id: `global_error_message_status_${err?.response?.status}`
-      })
-
-      throw new Error(message)
-    }
-
-    sessionStorage.setItem('accessToken', basicToken)
-    sessionStorage.setItem('isIdle', false)
-    sessionStorage.removeItem('expiredIn') // Basic auth does not have an expiration time
-
-    dispatch(setAuthToken(basicToken))
-    await dispatch(initialVersion())
-    router.push('/metalakes')
-
-    return { token: basicToken, expired: '' }
-  }
-)
-
 export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
   // Clear provider authentication data first
   try {
@@ -135,19 +105,10 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
 
   // Clear legacy auth tokens
   localStorage.removeItem('accessToken')
-  sessionStorage.removeItem('accessToken')
-
   localStorage.removeItem('authParams')
-  sessionStorage.removeItem('authParams')
-
   localStorage.removeItem('expiredIn')
-  sessionStorage.removeItem('expiredIn')
-
   localStorage.removeItem('isIdle')
-  sessionStorage.removeItem('isIdle')
-
   localStorage.removeItem('version')
-  sessionStorage.removeItem('version')
 
   dispatch(clearIntervalId())
   dispatch(setAuthToken(''))
@@ -157,11 +118,6 @@ export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ route
 })
 
 export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', async (expiredIn, { dispatch }) => {
-  // If the auth type is basic, we don't need to set an interval for token refresh
-  if (localStorage.getItem('authType') === 'basic') {
-    return { intervalId: null }
-  }
-
   const localExpiredIn = localStorage.getItem('expiredIn')
   const expired = (expiredIn ?? Number(localExpiredIn)) * (2 / 3) * 1000
   const defaultExpired = 299 * (2 / 3) * 1000
@@ -189,15 +145,10 @@ export const authSlice = createSlice({
   name: 'auth',
   initialState: {
     oauthUrl: null,
-    authType: typeof window !== 'undefined' ? localStorage.getItem('authType') : null,
-    authToken:
-      typeof window !== 'undefined'
-        ? localStorage.getItem('authType') === 'basic'
-          ? sessionStorage.getItem('accessToken')
-          : localStorage.getItem('accessToken')
-        : null,
-    authParams: typeof window !== 'undefined' ? localStorage.getItem('authParams') : null,
-    expiredIn: typeof window !== 'undefined' ? localStorage.getItem('expiredIn') : null,
+    authType: null,
+    authToken: null,
+    authParams: null,
+    expiredIn: null,
     intervalId: null
   },
   reducers: {
@@ -222,8 +173,6 @@ export const authSlice = createSlice({
   },
   extraReducers: builder => {
     builder.addCase(getAuthConfigs.fulfilled, (state, action) => {
-      localStorage.setItem('authType', action.payload.authType)
-
       state.oauthUrl = action.payload.oauthUrl
       state.authType = action.payload.authType
     })

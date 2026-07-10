@@ -93,17 +93,6 @@ const AuthProvider = ({ children }) => {
       if (authType === 'simple') {
         dispatch(initialVersion())
         goToMetalakeListPage()
-      } else if (authType === 'basic') {
-        // If the auth type is basic, check for the token in sessionStorage
-        const tokenToUse = sessionStorage.getItem('accessToken')
-
-        if (tokenToUse) {
-          dispatch(setAuthToken(tokenToUse))
-          dispatch(initialVersion())
-          goToMetalakeListPage()
-        } else if (!window.location.pathname.endsWith('/login')) {
-          router.push('/login')
-        }
       } else if (authType === 'oauth') {
         const tokenToUse = await oauthProviderFactory.getAccessToken()
 

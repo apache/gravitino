@@ -20,7 +20,6 @@
 'use client'
 
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import { Roboto } from 'next/font/google'
 import { Box, Card, Grid, CardContent, Typography } from '@mui/material'
 import clsx from 'clsx'
@@ -28,25 +27,14 @@ import { useEffect, useState } from 'react'
 
 import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
-import BasicLogin from './components/BasicLogin'
+import { useAuth } from '@/lib/provider/session'
 
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const LoginPage = () => {
-  const router = useRouter()
   const [providerType, setProviderType] = useState(null)
-
-  useEffect(() => {
-    const authType = localStorage.getItem('authType')
-
-    const token = authType === 'basic' ? sessionStorage.getItem('accessToken') : localStorage.getItem('accessToken')
-
-    if (token) {
-      router.replace('/metalakes')
-    }
-  }, [router])
 
   useEffect(() => {
     const detectProviderType = async () => {
@@ -61,19 +49,7 @@ const LoginPage = () => {
     detectProviderType()
   }, [])
 
-  let loginComponent
-  switch (providerType) {
-    case 'oidc':
-      loginComponent = <OidcLogin />
-      break
-
-    case 'basic':
-      loginComponent = <BasicLogin />
-      break
-
-    default:
-      loginComponent = <DefaultLogin />
-  }
+  const useOidcLogin = providerType === 'oidc'
 
   return (
     <Grid container spacing={2} sx={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -92,7 +68,7 @@ const LoginPage = () => {
               </Typography>
             </Box>
 
-            {loginComponent}
+            {useOidcLogin ? <OidcLogin /> : <DefaultLogin />}
           </CardContent>
         </Card>
       </Box>
