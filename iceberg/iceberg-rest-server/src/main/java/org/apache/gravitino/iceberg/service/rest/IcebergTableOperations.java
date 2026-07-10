@@ -608,15 +608,7 @@ public class IcebergTableOperations {
    * @return true if the ETag matches (table unchanged), false otherwise
    */
   private static boolean etagMatches(String ifNoneMatch, EntityTag etag) {
-    if (StringUtils.isBlank(ifNoneMatch)) {
-      return false;
-    }
-    // Strip quotes if present to compare the raw value
-    String clientEtag = ifNoneMatch.trim();
-    if (clientEtag.startsWith("\"") && clientEtag.endsWith("\"")) {
-      clientEtag = clientEtag.substring(1, clientEtag.length() - 1);
-    }
-    return etag.getValue().equals(clientEtag);
+    return IcebergRESTUtils.etagMatches(ifNoneMatch, etag);
   }
 
   /**
