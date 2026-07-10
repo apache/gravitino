@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.catalog;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,7 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
 import org.apache.gravitino.rel.Dialects;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -587,11 +589,12 @@ public class CatalogConnectorMetadata {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists");
       } else if (exists && replace) {
+        View existingView = viewCatalog.loadView(identifier);
         viewCatalog.alterView(
             identifier,
             ViewChange.replaceView(
                 view.getRawColumns(),
-                representations,
+                mergeWithNonTrinoRepresentations(existingView.representations(), representations),
                 view.getDefaultCatalog(),
                 view.getDefaultSchema(),
                 view.getComment()));
@@ -697,5 +700,31 @@ public class CatalogConnectorMetadata {
           "Catalog does not support this view operation",
           e);
     }
+  }
+
+  /**
+   * Merges the Trino dialect representations into the non-Trino dialect representations of an
+   * existing view.
+   *
+   * <p>{@link ViewChange#replaceView} treats the supplied representations as a full replacement of
+   * the view body, so replacing a view from Trino without this merge would silently discard any
+   * representations created by other engines (e.g. Spark or Hive).
+   *
+   * @param existingRepresentations the representations currently stored on the view
+   * @param trinoRepresentations the new Trino dialect representations to apply
+   * @return the representations to pass to {@link ViewChange#replaceView}
+   */
+  private static Representation[] mergeWithNonTrinoRepresentations(
+      Representation[] existingRepresentations, SQLRepresentation[] trinoRepresentations) {
+    List<Representation> merged = new ArrayList<>();
+    for (Representation representation : existingRepresentations) {
+      if (representation instanceof SQLRepresentation
+          && Dialects.TRINO.equalsIgnoreCase(((SQLRepresentation) representation).dialect())) {
+        continue;
+      }
+      merged.add(representation);
+    }
+    merged.addAll(Arrays.asList(trinoRepresentations));
+    return merged.toArray(new Representation[0]);
   }
 }

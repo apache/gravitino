@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import com.google.common.base.Preconditions;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
@@ -163,6 +164,11 @@ public class CatalogConnectorMetadataAdapter {
    * @return the Trino ConnectorViewDefinition
    */
   public ConnectorViewDefinition getViewDefinition(GravitinoView view) {
+    Preconditions.checkArgument(
+        view.getSql() != null,
+        "View %s.%s has no Trino dialect SQL representation",
+        view.getSchemaName(),
+        view.getName());
     List<ViewColumn> columns =
         view.getColumns().stream()
             .map(

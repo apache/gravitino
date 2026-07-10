@@ -37,9 +37,9 @@ public class GravitinoView {
   private final String schemaName;
   private final String viewName;
   private final List<GravitinoColumn> columns;
-  private final String comment;
+  @Nullable private final String comment;
   private final Map<String, String> properties;
-  private final String sql;
+  @Nullable private final String sql;
   @Nullable private final String defaultCatalog;
   @Nullable private final String defaultSchema;
 
@@ -87,7 +87,7 @@ public class GravitinoView {
       String schemaName,
       String viewName,
       List<GravitinoColumn> columns,
-      String comment,
+      @Nullable String comment,
       Map<String, String> properties,
       String sql,
       @Nullable String defaultCatalog,
@@ -153,8 +153,9 @@ public class GravitinoView {
   /**
    * Retrieves the comment of the view.
    *
-   * @return the comment of the view
+   * @return the comment of the view, or {@code null} if not set
    */
+  @Nullable
   public String getComment() {
     return comment;
   }

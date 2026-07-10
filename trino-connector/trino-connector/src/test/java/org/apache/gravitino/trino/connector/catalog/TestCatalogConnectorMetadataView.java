@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +55,7 @@ import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoView;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 public class TestCatalogConnectorMetadataView {
 
@@ -233,6 +235,46 @@ public class TestCatalogConnectorMetadataView {
 
     verify(viewCatalog, times(1))
         .alterView(eq(NameIdentifier.of("db", "v1")), any(ViewChange.ReplaceView.class));
+  }
+
+  @Test
+  public void testCreateViewReplacePreservesNonTrinoRepresentations() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.viewExists(any())).thenReturn(true);
+    View existingView = mock(View.class);
+    when(existingView.columns()).thenReturn(new Column[0]);
+    Representation[] existingRepresentations = {
+      SQLRepresentation.builder().withDialect(Dialects.TRINO).withSql("select 1").build(),
+      SQLRepresentation.builder().withDialect(Dialects.HIVE).withSql("select 1 from t").build()
+    };
+    when(existingView.representations()).thenReturn(existingRepresentations);
+    when(existingView.sqlFor(Dialects.TRINO))
+        .thenReturn(Optional.of((SQLRepresentation) existingRepresentations[0]));
+    when(viewCatalog.loadView(any())).thenReturn(existingView);
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    GravitinoView view = createGravitinoView("db", "v1", "select 2");
+    metadata.createView(view, true);
+
+    ArgumentCaptor<ViewChange.ReplaceView> captor =
+        ArgumentCaptor.forClass(ViewChange.ReplaceView.class);
+    verify(viewCatalog, times(1)).alterView(eq(NameIdentifier.of("db", "v1")), captor.capture());
+    Representation[] newRepresentations = captor.getValue().getRepresentations();
+    assertEquals(2, newRepresentations.length);
+    assertTrue(
+        Arrays.stream(newRepresentations)
+            .anyMatch(
+                r ->
+                    r instanceof SQLRepresentation
+                        && Dialects.HIVE.equalsIgnoreCase(((SQLRepresentation) r).dialect())
+                        && "select 1 from t".equals(((SQLRepresentation) r).sql())));
+    assertTrue(
+        Arrays.stream(newRepresentations)
+            .anyMatch(
+                r ->
+                    r instanceof SQLRepresentation
+                        && Dialects.TRINO.equalsIgnoreCase(((SQLRepresentation) r).dialect())
+                        && "select 2".equals(((SQLRepresentation) r).sql())));
   }
 
   @Test
