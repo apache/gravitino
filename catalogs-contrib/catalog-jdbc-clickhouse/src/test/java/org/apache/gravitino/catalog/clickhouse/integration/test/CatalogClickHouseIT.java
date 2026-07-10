@@ -510,7 +510,9 @@ public class CatalogClickHouseIT extends BaseIT {
         new Index[] {
           Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"user_id"}}),
           Indexes.of(
-              Index.IndexType.DATA_SKIPPING_MINMAX, "idx_amount", new String[][] {{"amount"}})
+              Index.IndexType.DATA_SKIPPING_MINMAX, "idx_amount", new String[][] {{"amount"}}),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_SET, "idx_userid_set", new String[][] {{"user_id"}})
         };
 
     catalog
@@ -555,6 +557,13 @@ public class CatalogClickHouseIT extends BaseIT {
                 idx ->
                     idx.type() == Index.IndexType.DATA_SKIPPING_MINMAX
                         && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"amount"}})));
+    Assertions.assertTrue(
+        Arrays.stream(loadedIndexes)
+            .anyMatch(
+                idx ->
+                    idx.type() == Index.IndexType.DATA_SKIPPING_SET
+                        && idx.name().equals("idx_userid_set")
+                        && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"user_id"}})));
   }
 
   @Test
@@ -1335,7 +1344,8 @@ public class CatalogClickHouseIT extends BaseIT {
         };
     Index[] indexes =
         new Index[] {
-          Indexes.of(Index.IndexType.DATA_SKIPPING_MINMAX, "idx_note", new String[][] {{"note"}})
+          Indexes.of(Index.IndexType.DATA_SKIPPING_MINMAX, "idx_note", new String[][] {{"note"}}),
+          Indexes.of(Index.IndexType.DATA_SKIPPING_SET, "idx_note_set", new String[][] {{"note"}})
         };
     TableCatalog tableCatalog = catalog.asTableCatalog();
     tableCatalog.createTable(
@@ -1353,12 +1363,18 @@ public class CatalogClickHouseIT extends BaseIT {
     tableCatalog.alterTable(
         tableIdentifier,
         TableChange.updateColumnComment(new String[] {"score"}, "score column changed"));
-    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_note", false));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_note", false),
+        TableChange.deleteIndex("idx_note_set", false));
     Table loaded = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertTrue(loaded.columns()[1].nullable());
     Assertions.assertEquals("score column changed", loaded.columns()[1].comment());
     Assertions.assertFalse(
         Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_note")));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_note_set")));
 
     Assertions.assertDoesNotThrow(
         () ->
@@ -1417,7 +1433,8 @@ public class CatalogClickHouseIT extends BaseIT {
           Indexes.of(
               Index.IndexType.DATA_SKIPPING_BLOOM_FILTER,
               "idx_note_bloom",
-              new String[][] {{"note"}})
+              new String[][] {{"note"}}),
+          Indexes.of(Index.IndexType.DATA_SKIPPING_SET, "idx_score_set", new String[][] {{"score"}})
         };
     TableCatalog tableCatalog = catalog.asTableCatalog();
     tableCatalog.createTable(
@@ -1434,15 +1451,27 @@ public class CatalogClickHouseIT extends BaseIT {
         tableIdentifier,
         TableChange.addIndex(
             Index.IndexType.DATA_SKIPPING_MINMAX, "idx_new", new String[][] {{"score"}}));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_SET, "idx_new_set", new String[][] {{"note"}}));
     Table loaded = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertTrue(
         Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_new")));
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index())
+            .anyMatch(
+                index ->
+                    Objects.equals(index.name(), "idx_new_set")
+                        && index.type() == Index.IndexType.DATA_SKIPPING_SET));
 
     tableCatalog.alterTable(
         tableIdentifier,
         TableChange.deleteIndex("idx_score_minmax", false),
         TableChange.deleteIndex("idx_note_bloom", false),
-        TableChange.deleteIndex("idx_new", false));
+        TableChange.deleteIndex("idx_score_set", false),
+        TableChange.deleteIndex("idx_new", false),
+        TableChange.deleteIndex("idx_new_set", false));
     loaded = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertFalse(
         Arrays.stream(loaded.index())
@@ -1451,7 +1480,13 @@ public class CatalogClickHouseIT extends BaseIT {
         Arrays.stream(loaded.index())
             .anyMatch(index -> Objects.equals(index.name(), "idx_note_bloom")));
     Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_score_set")));
+    Assertions.assertFalse(
         Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_new")));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_new_set")));
 
     RuntimeException autoIncrementTrueException =
         Assertions.assertThrows(
