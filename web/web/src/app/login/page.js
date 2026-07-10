@@ -28,7 +28,6 @@ import { useEffect, useState } from 'react'
 import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
 import { useAuth } from '@/lib/provider/session'
-
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
