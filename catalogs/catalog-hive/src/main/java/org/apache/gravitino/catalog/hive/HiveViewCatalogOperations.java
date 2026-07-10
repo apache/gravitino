@@ -56,6 +56,8 @@ import org.slf4j.LoggerFactory;
 
 class HiveViewCatalogOperations implements ViewCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(HiveViewCatalogOperations.class);
+  private static final String SUPPORTED_VIEW_DIALECTS =
+      String.join(", ", Dialects.HIVE, Dialects.TRINO, Dialects.FLINK, Dialects.SPARK);
 
   private final Supplier<CachedClientPool> clientPoolSupplier;
   private final Supplier<String> catalogNameSupplier;
@@ -486,13 +488,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
       default:
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s', '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
-                Dialects.HIVE,
-                Dialects.TRINO,
-                Dialects.FLINK,
-                Dialects.SPARK,
-                selected.dialect(),
-                ident));
+                "Hive catalog currently supports only [%s] view dialects, but got '%s' for view %s",
+                SUPPORTED_VIEW_DIALECTS, selected.dialect(), ident));
     }
   }
 
