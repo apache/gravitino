@@ -120,7 +120,7 @@ public class IcebergNamespaceOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             ListNamespacesResponse response =
                 namespaceOperationDispatcher.listNamespaces(context, parentNamespace);
 
@@ -161,7 +161,7 @@ public class IcebergNamespaceOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             GetNamespaceResponse getNamespaceResponse =
                 namespaceOperationDispatcher.loadNamespace(context, icebergNS);
             return IcebergRESTUtils.ok(getNamespaceResponse);
@@ -193,7 +193,7 @@ public class IcebergNamespaceOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             boolean exists = namespaceOperationDispatcher.namespaceExists(context, icebergNS);
             if (exists) {
               return IcebergRESTUtils.noContent();
@@ -228,7 +228,7 @@ public class IcebergNamespaceOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             namespaceOperationDispatcher.dropNamespace(context, icebergNS);
             return IcebergRESTUtils.noContent();
           });
@@ -259,7 +259,7 @@ public class IcebergNamespaceOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             CreateNamespaceResponse createNamespaceResponse =
                 namespaceOperationDispatcher.createNamespace(context, createNamespaceRequest);
             return IcebergRESTUtils.ok(createNamespaceResponse);
@@ -295,7 +295,7 @@ public class IcebergNamespaceOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                IcebergRESTUtils.getIcebergRequestContext(httpServletRequest(), catalogName);
             UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse =
                 namespaceOperationDispatcher.updateNamespace(
                     context, icebergNS, updateNamespacePropertiesRequest);
@@ -340,7 +340,8 @@ public class IcebergNamespaceOperations {
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+                IcebergRESTUtils.getIcebergRequestContext(
+                    httpServletRequest(), catalogName, isCredentialVending);
             LoadTableResponse loadTableResponse =
                 namespaceOperationDispatcher.registerTable(
                     context, icebergNS, registerTableRequest);

@@ -45,6 +45,7 @@ dependencies {
     exclude("*")
   }
   implementation(project(":iceberg:iceberg-common"))
+  implementation(project(":iceberg:iceberg-listener"))
   implementation(project(":server-common")) {
     exclude("*")
   }
