@@ -61,7 +61,7 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   }
 
   @Override
-  public boolean shouldValidateConnectionForCreate() {
+  public boolean shouldValidateOnCreate() {
     Map<String, String> properties = entity().getProperties();
     return properties != null
         && Boolean.parseBoolean(properties.get(TestCatalogOperations.VALIDATE_ON_CREATE));

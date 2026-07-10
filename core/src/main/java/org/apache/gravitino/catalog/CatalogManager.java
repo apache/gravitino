@@ -1139,7 +1139,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           wrapper.catalog.properties();
           wrapper.catalog.capability();
 
-          if (propsToValidate != null && wrapper.catalog.shouldValidateConnectionForCreate()) {
+          if (propsToValidate != null && wrapper.catalog.shouldValidateOnCreate()) {
             wrapper.catalog.ops();
           }
           return null;

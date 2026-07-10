@@ -22,7 +22,6 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -140,36 +139,17 @@ public class IcebergCatalogOperations
       this.icebergCatalogWrapperHelper =
           new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
       this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
-    } catch (RuntimeException e) {
-      throw translateWarehouseNotAvailableError(icebergConfig, e);
-    }
-  }
-
-  // A reachable REST server rejecting the `warehouse` selector is a user error, not a backend
-  // outage, so surface it as IllegalArgumentException (400) with a hint. See issue #11943.
-  @VisibleForTesting
-  static RuntimeException translateWarehouseNotAvailableError(
-      IcebergConfig config, RuntimeException cause) {
-    String backend = config.get(IcebergConfig.CATALOG_BACKEND);
-    String warehouse = config.get(IcebergConfig.CATALOG_WAREHOUSE);
-    if (IcebergCatalogBackend.REST.name().equalsIgnoreCase(backend)
-        && StringUtils.isNotBlank(warehouse)
-        && isWarehouseResolutionFailure(cause)) {
-      return new IllegalArgumentException(
+    } catch (NoSuchWarehouseException e) {
+      // A reachable server rejecting the `warehouse` selector is a user error. See issue #11943.
+      throw new IllegalArgumentException(
           String.format(
               "The 'warehouse' value '%s' could not be resolved by the Iceberg REST server. On "
                   + "the REST backend 'warehouse' selects a catalog by name on the remote server "
                   + "and is not a storage location; remove 'warehouse' to use the server's default "
                   + "catalog, or set it to a catalog name/identifier that the server recognizes.",
-              warehouse),
-          cause);
+              icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE)),
+          e);
     }
-    return cause;
-  }
-
-  private static boolean isWarehouseResolutionFailure(Throwable cause) {
-    return Throwables.getCausalChain(cause).stream()
-        .anyMatch(NoSuchWarehouseException.class::isInstance);
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */

@@ -212,11 +212,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
-   * Whether catalog creation should validate the backend connection.
+   * Whether to validate this catalog against its backend at create time rather than on first use.
    *
-   * @return {@code true} to validate during creation; {@code false} (default) to skip
+   * @return {@code true} to validate at create; {@code false} (default) to defer
    */
-  public boolean shouldValidateConnectionForCreate() {
+  public boolean shouldValidateOnCreate() {
     return false;
   }
 

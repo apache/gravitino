@@ -115,15 +115,14 @@ public class TestIcebergCatalog {
   }
 
   @Test
-  public void testShouldValidateConnectionForCreate() {
+  public void testShouldValidateWarehouseProperty() {
     Assertions.assertTrue(
-        IcebergCatalog.shouldValidateConnectionForCreate("rest", "s3://warehouse/"));
-    Assertions.assertFalse(IcebergCatalog.shouldValidateConnectionForCreate("rest", null));
+        IcebergCatalog.shouldValidateWarehouseProperty("rest", "s3://warehouse/"));
+    Assertions.assertFalse(IcebergCatalog.shouldValidateWarehouseProperty("rest", null));
     Assertions.assertFalse(
-        IcebergCatalog.shouldValidateConnectionForCreate("jdbc", "file:///tmp/iceberg-jdbc"));
-    Assertions.assertFalse(IcebergCatalog.shouldValidateConnectionForCreate("rest", "   "));
-    Assertions.assertFalse(
-        IcebergCatalog.shouldValidateConnectionForCreate(null, "s3://warehouse/"));
+        IcebergCatalog.shouldValidateWarehouseProperty("jdbc", "file:///tmp/iceberg-jdbc"));
+    Assertions.assertFalse(IcebergCatalog.shouldValidateWarehouseProperty("rest", "   "));
+    Assertions.assertFalse(IcebergCatalog.shouldValidateWarehouseProperty(null, "s3://warehouse/"));
   }
 
   @Test
