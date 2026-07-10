@@ -383,13 +383,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
       default:
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s', '%s', '%s' and '%s' view dialects, but found '%s' for view %s",
-                Dialects.HIVE,
-                Dialects.TRINO,
-                Dialects.FLINK,
-                Dialects.SPARK,
-                detectedDialect,
-                ident));
+                "Hive catalog currently supports only [%s] view dialects, but found '%s' for view %s",
+                SUPPORTED_VIEW_DIALECTS, detectedDialect, ident));
     }
 
     SQLRepresentation rep =
@@ -503,13 +498,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
       default:
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s', '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
-                Dialects.HIVE,
-                Dialects.TRINO,
-                Dialects.FLINK,
-                Dialects.SPARK,
-                representation.dialect(),
-                ident));
+                "Hive catalog currently supports only [%s] view dialects, but got '%s' for view %s",
+                SUPPORTED_VIEW_DIALECTS, representation.dialect(), ident));
     }
   }
 
