@@ -110,12 +110,13 @@ Dropping relations leaves the entity keys. But not every entity key is truly one
 
 **Self-contained vs. derived.**
 
-| Entity                                                        | Copies a field from another entity?                          | Safe to cache on its own? |
-| ------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------- |
-| metalake, catalog, schema, table, topic, model, view, fileset | no — holds only its own data (columns, properties, comment…) | yes                       |
-| tag, policy                                                   | no — associations are relations, not stored on the entity    | yes                       |
-| user, group                                                   | yes — `roleNames` / `roleIds`, built from the user's roles   | no                        |
-| role                                                          | yes — `securableObjects`, built from metadata objects        | no                        |
+| Entity                                                 | Copies a field from another entity?                                                                                                                | Safe to cache on its own?                                            |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| metalake, catalog, schema, table, topic, view, fileset | no — holds only its own data (columns, properties, comment…)                                                                                       | yes                                                                  |
+| model, model version, function                         | no — but each holds a load-bearing pointer (the model version URI / latest version, or the function implementation) that goes stale on other nodes | no — left out for cross-node safety, see [Consistency](#consistency) |
+| tag, policy                                            | no — associations are relations, not stored on the entity                                                                                          | yes                                                                  |
+| user, group                                            | yes — `roleNames` / `roleIds`, built from the user's roles                                                                                         | no                                                                   |
+| role                                                   | yes — `securableObjects`, built from metadata objects                                                                                              | no                                                                   |
 
 **Why user / group / role are a problem.**
 
@@ -129,7 +130,7 @@ Dropping relations leaves the entity keys. But not every entity key is truly one
 
 So caching user, group, and role buys almost nothing (authorization does not depend on it) and costs a lot (the reverse-lookup problem comes back). tag and policy are safe to cache, but they are low-volume governance objects, not the read-heavy metadata the cache exists for.
 
-**Conclusion: cache only the basic metadata objects** — metalake, catalog, schema, table, topic, model, view, fileset. In code this is a small allowlist of entity types in the cache. Every cached entity is then self-contained and one-to-one, so cross-node invalidation stays precise with no reverse lookups. As a bonus, these entities already write ALTER/DROP rows to `entity_change_log`, so the writer side needs no change at all.
+**Conclusion: cache only the basic metadata objects** — metalake, catalog, schema, table, topic, view, fileset. In code this is a small allowlist of entity types in the cache. Model, model version, and function are left out on purpose: they are read rarely, and each one holds a load-bearing pointer (the model version URI or latest version, or the function implementation) that would return a wrong answer on another node if it went stale — the per-alter check under [Consistency](#consistency) explains why. Every cached entity is then self-contained and one-to-one, so cross-node invalidation stays precise with no reverse lookups. As a bonus, these entities already write ALTER/DROP rows to `entity_change_log`, so the writer side needs no change at all.
 
 The cache now holds only self-contained metadata objects. The next question is how to tell the other nodes to drop a key when it changes.
 
@@ -220,7 +221,7 @@ With only self-contained metadata objects cached, "entity X changed" names exact
 - `CatalogChangeLogListener` → clears `CatalogManager`'s catalog cache;
 - `JcasbinChangeListener` → clears jcasbin's **id-mapping cache** (`metadataIdCache`).
 
-Each row is `{metalake, entity_type, full_name, operate_type (ALTER | DROP), created_at}`. The structural MetaServices (metalake, catalog, schema, table, topic, model, view, fileset) already write a row on ALTER/DROP. We add the entity store cache as a **third consumer** of the same poller.
+Each row is `{metalake, entity_type, full_name, operate_type (ALTER | DROP), created_at}`. The structural MetaServices (metalake, catalog, schema, table, topic, view, fileset) already write a row on ALTER/DROP. We add the entity store cache as a **third consumer** of the same poller.
 
 ### Writer side
 
@@ -230,6 +231,7 @@ The cache now holds only metadata objects, and those **already write** an ALTER/
 | ----------------------------------------------------- | ------- | ----------------------- |
 | structural ALTER/DROP (table, schema, catalog, …)     | yes     | yes — already emitted   |
 | user / group / role / tag / policy ALTER/DROP         | no      | not needed (not cached) |
+| model / model version / function ALTER/DROP           | no      | not needed (not cached) |
 | relation change (grant, set owner, attach tag/policy) | no      | not needed (not cached) |
 
 The existing structural rows are written in the same transaction as the entity write, so nothing new is added here.
@@ -252,54 +254,68 @@ The entity store cache becomes a third consumer of the poller, next to the catal
 
 ### Consistency
 
-The cache is never the source of truth. The write path always reads the DB under the optimistic version lock, so eventual consistency can **never** cause a lost update or corrupt data. Its only observable effect is **bounded read staleness on non-writing nodes**: for up to one poll interval, a node other than the writer may serve an older value.
+The cache never holds the truth. Every write goes to the DB first, under the version lock, so a stale cache can **never** cause a lost update or a bad write. The only thing that can go wrong is that a read on **another node** returns an old value for a short time — at most one poll interval, until that node drops the key.
 
-- **Other nodes:** eventual — an entity key is dropped within one poll interval of the change.
-- **Writing node:** unchanged — it still clears its own cache on the write path, so it reads its own writes right away. Its own row is replayed later, which does nothing (clearing an already-clear key is a no-op).
-- **Write path:** unchanged — it reads the DB with the optimistic version check.
+So the real question is simple: when another node reads an old value, does it matter? We went through every alter and every drop, for every cached entity, one at a time. A stale read falls into one of two buckets:
 
-The rest of this section works through every way that staleness window can be observed, and how each is handled.
+- **The old value makes the next step fail with an error.** The user sees the error and tries again. This is safe.
+- **The old value is used silently and gives a wrong answer, with no error.** This is the dangerous kind.
 
-#### Staleness scenarios and mitigations
+We only need to worry about the second bucket.
 
-**1. Plain stale read (bounded, mostly tolerable).**
+#### Two groups of cached entities
 
-| # | Scenario                                                       | Effect                                                                            | Possible mitigation                                                                                       |
-| - | -------------------------------------------------------------- |-----------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| 1 | Node A ALTERs a table (add column); B GETs it                  | B serves the old schema for up to one poll interval                               | Accept within the SLA window; a caller that needs an exact schema uses a consistent (cache-bypass) read   |
-| 2 | Node A DROPs a table; B GETs it                                | B still reports it as present (cache hit) until the next poll                     | Accept — any write to it on B is re-validated against the DB and rejected as not-found, so no corruption  |
-| 3 | RENAME (the old name behaves like a DROP); B GETs the old name | B keeps resolving the old name until the next poll; the new name misses → DB load | Same as DROP — bounded by the poll interval                                                               |
-| 4 | A property changes (e.g. Iceberg metadata-location); B GETs it | B returns the old location → a query on B may read an old snapshot/path           | Highest-value case: offer a consistent (cache-bypass) read for location-sensitive callers, or use `redis` |
+The danger depends on where the real data comes from.
 
-**2. Read-your-writes across nodes.**
+**Group 1 — the data comes from the connector: table, view, topic, and schemas in external catalogs.** For these, Gravitino does not read the metadata from its own cache. On every load it asks the underlying system (Hive, Iceberg, JDBC, Kafka) for the current object, and uses the cached entity only for Gravitino's own id and audit fields. All nodes ask the same underlying system, so they all see the same thing. If the object was dropped or renamed, the connector call fails right away with a "not found" error. **This whole group is safe — nothing to do.**
 
-| # | Scenario                                                            | Effect                                                                                          | Possible mitigation                                                                                                                           |
-| - |---------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| 5 | Through a load balancer, ALTER on A then an immediate read on B     | Stale — violates session consistency; without sticky routing the change looks lost              | Sticky sessions at the LB, or a client-supplied last-seen version that bypasses the cache when the copy is older; `redis` removes it entirely |
-| 6 | CREATE (rather than ALTER/DROP)                                     | No problem — no negative caching and `list` skips the cache, so a new entity is visible at once | None needed                                                                                                                                   |
+**Group 2 — the data comes from Gravitino's own store: metalake, catalog, managed schema, fileset, model, model version, function.** Here the cached entity *is* the answer, so a stale read really can return an old value. We looked at each alter in this group.
 
-**3. Cross-node read-modify-write.**
+(Views follow the same rule as tables: their definition is read through the connector on every load, so they sit in Group 1 and are safe.)
 
-| # | Scenario                                                                              | Effect                                                                                              | Possible mitigation                                                                                 |
-| - | ------------------------------------------------------------------------------------- |-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| 7 | B reads stale value A and submits an update carrying A's version as the expected one  | The optimistic lock rejects it on version mismatch — safe, but the user sees an unexpected conflict | Accept (correctness is preserved); reduce its frequency with the read-your-writes mitigations above |
+#### Walking through the alters in Group 2
 
-**4. Is the window actually bounded? — poller reliability (the real risk).** The "at most one poll interval" guarantee holds **only if the poller never drops a row**. If it does, the stale entry survives until the cache TTL, so this is the one place eventual consistency itself can break.
+Most alters are safe:
 
-| #  | Scenario                                                                                                  | Effect                                                    | Possible mitigation                                                                                                          |
-| -- |-----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
-| 8  | Commit-ordering gap / a skipped row                                                                       | The key is never invalidated; stale until the TTL         | Reuse the lag-safe, id-based polling already built for the change log (`#11736`); keep the cache TTL as a backstop           |
-| 9  | Poller thread dies / DB briefly unreachable                                                               | That node serves stale data until the TTL                 | TTL backstop + monitor poller liveness/lag and alert                                                                         |
-| 10 | Hierarchical DROP: only the container (schema) emits a row; children are cleared by a forward prefix scan | Correct as long as the prefix scan covers every child key | Cover with the hierarchical-drop test; confirm no child is written in a separate transaction that outlives the container row |
+| Change                                             | What a stale read does                                                                                                                                | Safe? |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| rename (metalake, catalog, schema, fileset, model) | reading the old name returns a leftover copy, but any write to it goes to the DB and fails; the new name misses the cache and loads fresh from the DB | yes   |
+| update comment                                     | you see an old comment for a moment                                                                                                                   | yes   |
+| set / remove property (metalake, model, fileset)   | these properties do not change where the data lives                                                                                                   | yes   |
+| fileset storage location                           | **cannot be changed** — there is no alter for it, so it can never go stale                                                                            | yes   |
+| drop                                               | for Group 1 the connector call fails; for a fileset the file path is gone and access fails                                                            | yes   |
+| catalog changes                                    | already handled today by a separate cross-node signal (`CatalogChangeLogListener`), not by this cache                                                 | yes   |
 
-**5. Idempotency (no issue).** Replaying ALTER then DROP, in any order or duplicated, is safe: invalidation is idempotent, so out-of-order or repeated replay has no effect.
+Five cases are **not** safe — a stale read gives a wrong answer with no error. They are in the model area, functions, or the metalake on/off flag:
 
-#### Summary: main risks, resolutions, and the staleness SLA
+| Change                                                                | Why a stale read is wrong, with no error                                                                                                                                                            |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| model version — update / add / remove URI                             | the URI points to the model files. An old URI silently loads the **wrong model files**.                                                                                                             |
+| model version — update aliases                                        | an alias silently points to the **wrong version**.                                                                                                                                                  |
+| model — latest version (after a new version is added on another node) | "get the latest version" silently returns an **old version**.                                                                                                                                       |
+| function — add / update / remove implementation or definition         | the implementation is the code the function runs. An old copy silently runs the **wrong function code**.                                                                                            |
+| metalake — disable                                                    | a node with a stale copy still thinks the metalake is on and **lets operations run** on a metalake that was turned off. (Turning it back on is safe: a stale node only throws "in use" by mistake.) |
 
-- **Correctness is never at stake.** The DB plus the optimistic version lock stay authoritative; the worst a stale read can do is surface a bounded-old value (scenarios 1–4) or an unexpected conflict (scenario 7), never a lost update or corruption.
-- **Read-your-writes (scenarios 5, 7)** is the only user-visible rough edge on a single caffeine node. It is left to operators (sticky sessions) by default; teams that need it in-cluster take `redis`.
-- **Staleness SLA.** On non-writing nodes, a cached entity is at most **one poll interval** stale; the writing node is always read-your-writes. The poll interval is `gravitino.entityChangeLog.pollIntervalSecs` (**default 3s**, configurable — e.g. lower to 1s for a tighter bound at the cost of DB poll load). The cache TTL (minutes–hours) is only a backstop for the pathological missed-row case, never the primary consistency mechanism.
-- **Escapes for callers that cannot tolerate the window,** without changing the model: a consistent (cache-bypass) read for that specific call, or the `redis` (`SHARED`) implementation for cluster-wide strong consistency.
+#### What we do about it
+
+We keep the simple design and remove the danger at the source:
+
+- **Do not cache the model area (model, model version) or functions.** The cache exists for the read-heavy path, which today is tables; model and function reads are a small share of traffic, so reading them from the DB every time costs almost nothing. Leaving these areas out removes four of the five dangerous cases outright and keeps the rule simple (an entity type is either in or out — no half-cached entity with a version-checked pointer). These reads are then always fresh, on every node. If model or function traffic grows later, we can add them back with a proper freshness check.
+- **Read the metalake on/off flag straight from the DB, not the cache.** This is a cheap single-row read on the guard check only, and it removes the last dangerous case.
+
+After these two changes, everything left in the cache is safe: either its real data comes from the connector (Group 1), or a stale read can only fail with an error or show a harmless old comment (Group 2). We do **not** need a per-entity version check on the cache.
+
+If a deployment still wants every read fully up to date, it can switch to the `redis` shared cache, which keeps one copy for the whole cluster.
+
+#### The staleness promise (SLA)
+
+For everything that stays in the cache:
+
+- The node that made the change sees it right away.
+- Every other node sees it within **one poll interval**. This is set by `gravitino.entityChangeLog.pollIntervalSecs` (**default 3 seconds**; lower it, e.g. to 1 second, for a shorter delay at the cost of more frequent DB polls).
+- The cache's own TTL (minutes to hours) is only a safety net in case the poller ever misses a row; it is not the main mechanism.
+
+This "at most one poll interval" promise holds only if the poller never drops a row. So the poller must reuse the same gap-safe, id-based polling already built for the change log (see `#11736`), keep the TTL as a backstop, and be watched for lag.
 
 ---
 
@@ -377,19 +393,20 @@ Both are chosen through the same SPI, so a user picks by environment with a sing
 
 | Phase | Deliverable                                                                                                                                                           | Why                                             |
 | ----- |-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
-| 1     | cache only metadata objects (drop relation and user/group/role caching) + add the entity store `EntityChangeLogListener` (structural rows already exist) — `caffeine` | multi-node works, no schema change, no new emit |
+| 1     | cache only metadata objects (drop relation, user/group/role, model, and function caching) + add the entity store `EntityChangeLogListener` (structural rows already exist) — `caffeine` | multi-node works, no schema change, no new emit |
 | 2     | `redis` `SHARED` implementation behind the same SPI                                                                                                                   | strong consistency, reuse user's Redis          |
 | 3     | (later, if metrics show hot relation reads) add precise relation caching back, per relation type                                                                      | heavy tag/policy workloads                      |
 
 ## Test Plan
 
-| Area                  | Check                                                                                                                                                                        |
-| --------------------- |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Multi-node — caffeine | node A runs ALTER/DROP on table / schema / catalog; node B serves the fresh entity within one poll interval                                                                  |
-| Hierarchical drop     | dropping a schema drops the schema's cached child tables on the other node(s), and leaves a sibling schema alone (forward prefix scan)                                       |
-| Shared feed           | the entity store cache, the catalog cache, and the jcasbin id-mapping cache all act on the same structural rows; adding the entity store consumer does not change the others |
-| Not cached            | get user / group / role return correct data straight from the DB (they are not cached); authorization is unaffected                                                          |
-| Multi-node — redis    | node A ALTER/DROP; node B reads the fresh entity right away; a container drop removes child keys via `ZRANGEBYLEX`; no half-done drop is visible                             |
-| Redis stale-write     | a stale `v1` write after a committed `v2` + delete is rejected by the version guard; no node serves a value older than the last commit                                       |
-| Relation reads        | owner / role / tag / policy listings return correct results from the DB with no caching; tag/policy inheritance still resolves                                               |
-| Regression            | single-node behavior, the write path's version check, and `list` strong consistency are unchanged                                                                            |
+| Area                   | Check                                                                                                                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Multi-node — caffeine  | node A runs ALTER/DROP on table / schema / catalog; node B serves the fresh entity within one poll interval                                                                                                                                                   |
+| Hierarchical drop      | dropping a schema drops the schema's cached child tables on the other node(s), and leaves a sibling schema alone (forward prefix scan)                                                                                                                        |
+| Shared feed            | the entity store cache, the catalog cache, and the jcasbin id-mapping cache all act on the same structural rows; adding the entity store consumer does not change the others                                                                                  |
+| Not cached             | get user / group / role / model / model version / function return correct data straight from the DB (they are not cached); authorization is unaffected                                                                                                        |
+| Silent-staleness guard | after a URI/alias/version change (model) or an implementation change (function) on node A, node B never returns the old value (model and function reads are uncached); disabling a metalake on A blocks operations on B (the on/off flag is read from the DB) |
+| Multi-node — redis     | node A ALTER/DROP; node B reads the fresh entity right away; a container drop removes child keys via `ZRANGEBYLEX`; no half-done drop is visible                                                                                                              |
+| Redis stale-write      | a stale `v1` write after a committed `v2` + delete is rejected by the version guard; no node serves a value older than the last commit                                                                                                                        |
+| Relation reads         | owner / role / tag / policy listings return correct results from the DB with no caching; tag/policy inheritance still resolves                                                                                                                                |
+| Regression             | single-node behavior, the write path's version check, and `list` strong consistency are unchanged                                                                                                                                                             |
