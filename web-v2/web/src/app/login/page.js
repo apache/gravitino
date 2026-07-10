@@ -20,6 +20,7 @@
 'use client'
 
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import { Roboto } from 'next/font/google'
 import { Alert, Card, Flex, Typography } from 'antd'
@@ -28,36 +29,47 @@ import { useEffect, useState, Suspense } from 'react'
 
 import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
+import BasicLogin from './components/BasicLogin'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 import { resetMetalakeStore } from '@/lib/store/metalakes'
 import { useAppDispatch } from '@/lib/hooks/useStore'
+
+import { to } from '@/lib/utils'
+import { getAuthConfigs } from '@/lib/store/auth'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const { Title } = Typography
 
 const LoginContent = () => {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const inactiveReason = searchParams.get('reason') === 'inactive'
   const maxDurationReason = searchParams.get('reason') === 'max_duration'
+  const [authType, setAuthType] = useState(null)
   const [providerType, setProviderType] = useState(null)
   const dispatch = useAppDispatch()
 
   useEffect(() => {
-    const detectProviderType = async () => {
-      try {
-        const detectedType = await oauthProviderFactory.getProviderType()
-        setProviderType(detectedType)
-      } catch (error) {
-        setProviderType('default') // fallback to default provider
+    const detectLoginType = async () => {
+      const [, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
+      const detectedAuthType = resAuthConfigs?.payload?.authType
+
+      setAuthType(detectedAuthType)
+
+      if (detectedAuthType === 'oauth') {
+        try {
+          const detectedType = await oauthProviderFactory.getProviderType()
+          setProviderType(detectedType)
+        } catch (error) {
+          setProviderType('default')
+        }
       }
     }
 
     dispatch(resetMetalakeStore())
-    detectProviderType()
-  }, [])
-
-  const useOidcLogin = providerType === 'oidc'
+    detectLoginType()
+  }, [dispatch])
 
   return (
     <Flex justify='center' align='center' style={{ minHeight: 'calc(100vh - 7rem)' }}>
@@ -94,7 +106,13 @@ const LoginContent = () => {
           />
         )}
 
-        {useOidcLogin ? <OidcLogin /> : <DefaultLogin />}
+        {authType === null ? null : authType === 'basic' ? (
+          <BasicLogin router={router} />
+        ) : authType === 'oauth' && providerType === 'oidc' ? (
+          <OidcLogin />
+        ) : (
+          <DefaultLogin />
+        )}
       </Card>
     </Flex>
   )
