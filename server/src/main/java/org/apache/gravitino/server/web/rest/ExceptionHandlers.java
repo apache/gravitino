@@ -1095,6 +1095,14 @@ public class ExceptionHandlers {
 
       String errorMsg =
           getBaseErrorMsg(formattedObject, op.name(), formattedParent, getErrorMsg(e));
+
+      // A backend a catalog federates to being unreachable is a downstream-dependency failure, not
+      // an internal Gravitino error: surface it as 502 Bad Gateway so callers can tell a dependency
+      // outage from a server bug.
+      if (e instanceof ConnectionFailedException) {
+        return Utils.connectionFailed(errorMsg, e);
+      }
+
       LOG.error(errorMsg, e);
       return Utils.internalError(errorMsg, e);
     }

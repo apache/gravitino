@@ -86,6 +86,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -1139,12 +1140,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           wrapper.catalog.properties();
           wrapper.catalog.capability();
 
+          // Eagerly initialize opted-in catalogs so a misconfiguration fails at create rather than
+          // on first use. The backend translates failures into the caller-error vs
+          // dependency-unavailable taxonomy; both types are forwarded by the passthrough below.
           if (propsToValidate != null && wrapper.catalog.shouldValidateOnCreate()) {
             wrapper.catalog.ops();
           }
           return null;
         },
-        IllegalArgumentException.class);
+        IllegalArgumentException.class,
+        ConnectionFailedException.class);
 
     return wrapper;
   }

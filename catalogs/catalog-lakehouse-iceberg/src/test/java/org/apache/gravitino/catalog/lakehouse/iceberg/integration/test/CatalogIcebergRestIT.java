@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -129,6 +130,48 @@ public class CatalogIcebergRestIT extends CatalogIcebergBaseIT {
     } finally {
       metalake.disableCatalog(catalogName);
       metalake.dropCatalog(catalogName);
+    }
+  }
+
+  // An unreachable remote at create fails as a ConnectionFailedException and persists nothing.
+  @Test
+  void testCreateRestCatalogWithUnreachableServerAtCreate() {
+    String name = GravitinoITUtils.genRandomName("iceberg_rest_unreachable_server");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), "rest");
+    // Port 1 refuses connections fast, so create-time validation cannot reach the REST server.
+    properties.put(IcebergConfig.CATALOG_URI.getKey(), "http://127.0.0.1:1/iceberg/");
+    properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "some_warehouse");
+
+    Assertions.assertThrows(
+        ConnectionFailedException.class,
+        () ->
+            metalake.createCatalog(
+                name, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties));
+    Assertions.assertFalse(metalake.catalogExists(name));
+  }
+
+  // A catalog with valid config whose backend is unreachable: it is created (no warehouse, so no
+  // create-time validation), but querying the dead backend fails as a ConnectionFailedException.
+  @Test
+  void testOperationOnUnreachableRestCatalogFailsWithConnectionError() {
+    String name = GravitinoITUtils.genRandomName("iceberg_rest_unreachable_op");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), "rest");
+    // Port 1 refuses connections fast; no warehouse means create-time validation is skipped.
+    properties.put(IcebergConfig.CATALOG_URI.getKey(), "http://127.0.0.1:1/iceberg/");
+
+    Catalog created =
+        metalake.createCatalog(
+            name, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties);
+    try {
+      Assertions.assertTrue(metalake.catalogExists(name));
+      // Config is valid but the backend is down, so querying it is a dependency failure.
+      Assertions.assertThrows(
+          ConnectionFailedException.class, () -> created.asSchemas().listSchemas());
+    } finally {
+      metalake.disableCatalog(name);
+      metalake.dropCatalog(name);
     }
   }
 }

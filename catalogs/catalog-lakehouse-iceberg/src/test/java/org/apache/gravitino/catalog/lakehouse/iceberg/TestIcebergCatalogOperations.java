@@ -31,6 +31,9 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.RESTException;
+import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -55,6 +58,23 @@ public class TestIcebergCatalogOperations {
                     ImmutableMap.of()));
     Assertions.assertTrue(
         exception.getMessage().contains("Failed to run listNamespace on Iceberg catalog"));
+  }
+
+  @Test
+  public void testHandleRestExceptionTranslatesUnavailableToConnectionFailed() {
+    // Transport failure (server unreachable) is the base RESTException.
+    RESTException unreachable = new RESTException("Error occurred while processing GET request");
+    Assertions.assertInstanceOf(
+        ConnectionFailedException.class, IcebergCatalogOperations.handleRestException(unreachable));
+
+    // The server answered 503.
+    RESTException unavailable = new ServiceUnavailableException("Service Unavailable: %s", "down");
+    Assertions.assertInstanceOf(
+        ConnectionFailedException.class, IcebergCatalogOperations.handleRestException(unavailable));
+
+    // A subtype we don't translate yet is returned unchanged (surfaces as a runtime error).
+    RESTException badRequest = new BadRequestException("Malformed request: %s", "bad");
+    Assertions.assertSame(badRequest, IcebergCatalogOperations.handleRestException(badRequest));
   }
 
   @Test
