@@ -195,6 +195,9 @@ class TestTypeSerdes(unittest.TestCase):
             {"invalid_key": "value"},
             list(range(10)),
             True,
+            # A valid-looking prefix with trailing characters must not partially parse.
+            "geometry(EPSG:4326) trailing",
+            "geography(OGC:CRS84,spherical) trailing",
         ]
         for data in unparsed_data:
             result = TypeSerdes.deserialize(data=data)

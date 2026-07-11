@@ -187,14 +187,16 @@ class SerdesUtils(SerdesUtilsBase):
             return type_instance
 
         # Match against the original (non-lowercased) string so the CRS keeps its case.
+        # fullmatch (not match) so a trailing suffix can't partially parse, matching the
+        # Java side's Matcher.matches().
         original = (
             original_type_string if original_type_string is not None else type_string
         )
-        geometry_matched = cls.GEOMETRY_PATTERN.match(original)
+        geometry_matched = cls.GEOMETRY_PATTERN.fullmatch(original)
         if geometry_matched:
             return Types.GeometryType.of(geometry_matched.group(1))
 
-        geography_matched = cls.GEOGRAPHY_PATTERN.match(original)
+        geography_matched = cls.GEOGRAPHY_PATTERN.fullmatch(original)
         if geography_matched:
             return Types.GeographyType.of(
                 geography_matched.group(1), geography_matched.group(2)
