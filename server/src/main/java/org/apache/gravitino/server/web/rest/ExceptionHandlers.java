@@ -1100,6 +1100,8 @@ public class ExceptionHandlers {
       // an internal Gravitino error: surface it as 502 Bad Gateway so callers can tell a dependency
       // outage from a server bug.
       if (e instanceof ConnectionFailedException) {
+        // WARN, not ERROR: a dependency outage is not a Gravitino bug, but still trace it here.
+        LOG.warn(errorMsg, e);
         return Utils.connectionFailed(errorMsg, e);
       }
 
