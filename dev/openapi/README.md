@@ -63,7 +63,7 @@ non-blocking so the existing backlog surfaces as PR annotations without turning
 2. **Spectral** kitchen sink — `spectral:oas` + OWASP API-security +
    documentation completeness + Gravitino house rules.
 3. **Bundle** → single `openapi.json`/`openapi.yaml` artifact.
-4. **progenitor** Rust-client codegen smoke test (strictest consumer).
+4. **openapi-generator** client codegen smoke test (Rust + TypeScript).
 5. **oasdiff** breaking-change diff vs the PR base branch.
 
 **Nothing is suppressed to force a pass.** In particular, `spectral:oas`'s
@@ -82,7 +82,7 @@ Once the backlog is burned down:
   block merges.
 - Remove the `exit 0` guard from the Spectral step (and promote individual
   house/security/docs rules from `warn` to `error`).
-- Drop `continue-on-error` from the progenitor and oasdiff steps.
+- Drop `continue-on-error` from the codegen and oasdiff steps.
 
 ## Artifact
 

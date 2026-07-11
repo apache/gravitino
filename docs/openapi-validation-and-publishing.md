@@ -45,7 +45,7 @@ flowchart TD
     end
     trigger --> bundle["Bundle<br/>redocly bundle → openapi.json"]
     bundle --> artifact["Upload artifact<br/>gravitino-openapi-spec"]
-    bundle --> codegen["Codegen smoke<br/>progenitor (Rust)"]
+    bundle --> codegen["Codegen smoke<br/>openapi-generator (Rust + TS)"]
     trigger --> oasdiff["Breaking changes<br/>oasdiff vs base branch"]
 ```
 
@@ -103,13 +103,20 @@ rather than muting the offending rule. The fix belongs in the document.
 should consume instead of resolving the multi-file tree itself. This step always
 runs, independent of lint results.
 
-### 4. Codegen smoke test (progenitor)
+### 4. Codegen smoke test (openapi-generator)
 
-[progenitor](https://github.com/oxidecomputer/progenitor) generates a Rust client
-from the bundled spec. Its `typify` backend is stricter than most generators, so
-it catches issues broad tools tolerate (for example `default: null` or a bare
-`format` without a `type`). A failure to generate is the earliest, sharpest
-signal that the spec is not codegen-clean.
+[openapi-generator](https://github.com/OpenAPITools/openapi-generator) generates
+Rust and TypeScript clients from the bundled spec. It is the broad, multi-language
+generator used as the standard consumer signal, and it catches issues that pass
+linting but break typed codegen — for example `default: null`, a bare `format`
+without a `type`, or a wire variant missing from a `oneOf`. A failure to generate
+is the earliest, sharpest signal that the spec is not codegen-clean.
+
+[progenitor](https://github.com/oxidecomputer/progenitor) (Rust) was evaluated
+and not adopted: it is deliberately opinionated and, per its own README, "may
+fail for some OpenAPI documents". It does not support two patterns this spec uses
+by design — the `application/vnd.gravitino.v1+json` media type and `oneOf`
+responses on the list endpoints — so it would fail regardless of spec quality.
 
 ### 5. Breaking-change detection (oasdiff)
 
