@@ -2297,7 +2297,8 @@ public class CatalogClickHouseIT extends BaseIT {
 
     catalog
         .asTableCatalog()
-        .createTable(ident, cols, "settings roundtrip", properties, Distributions.NONE);
+        .createTable(
+            ident, cols, "settings roundtrip", properties, Distributions.NONE, getSortOrders("id"));
 
     // Verify Gravitino API round-trip
     Table loaded = catalog.asTableCatalog().loadTable(ident);
@@ -2354,7 +2355,13 @@ public class CatalogClickHouseIT extends BaseIT {
 
     catalog
         .asTableCatalog()
-        .createTable(ident, cols, "settings and comment roundtrip", properties, Distributions.NONE);
+        .createTable(
+            ident,
+            cols,
+            "settings and comment roundtrip",
+            properties,
+            Distributions.NONE,
+            getSortOrders("id"));
 
     // Verify Gravitino API round-trip
     Table loaded = catalog.asTableCatalog().loadTable(ident);
@@ -2379,23 +2386,6 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
-  void testLoadTableWithCommentBeforeSettings() {
-    // Verify that COMMENT ... SETTINGS ... order (if ClickHouse outputs it) is also parsed
-    String name = GravitinoITUtils.genRandomName("comment_before_settings");
-    clickhouseService.executeQuery(
-        String.format(
-            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id"
-                + " COMMENT 'test comment' SETTINGS index_granularity = 2048",
-            schemaName, name));
-
-    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
-    Map<String, String> props = loaded.properties();
-    Assertions.assertEquals(
-        "2048", props.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
-    Assertions.assertEquals("test comment", loaded.comment());
-  }
-
-  @Test
   void testLoadTableWithoutSettings() {
     String name = GravitinoITUtils.genRandomName("no_settings");
     clickhouseService.executeQuery(
@@ -2407,6 +2397,8 @@ public class CatalogClickHouseIT extends BaseIT {
         loaded.properties().keySet().stream()
             .filter(k -> k.startsWith(TableConstants.SETTINGS_PREFIX))
             .count();
-    Assertions.assertEquals(0, settingsCount);
+    // ClickHouse 24.8 always includes default SETTINGS (index_granularity = 8192) in
+    // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
+    Assertions.assertEquals(1, settingsCount);
   }
 }

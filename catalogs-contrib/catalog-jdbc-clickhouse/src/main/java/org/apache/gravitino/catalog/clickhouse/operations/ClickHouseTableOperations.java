@@ -193,6 +193,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     appendPartitionClause(partitioning, sqlBuilder, engine);
 
+    // Add setting clause before COMMENT; ClickHouse 24.8 rejects SETTINGS that follow COMMENT
+    // (all settings become UNKNOWN_SETTING when preceded by a COMMENT clause).
+    // This matches the order in SHOW CREATE TABLE output: SETTINGS ... COMMENT '...'.
+    appendTableProperties(notNullProperties, sqlBuilder);
+
     // Add table comment; embed cluster name so it can be recovered at DROP/ALTER time.
     // ClickHouse does not persist ON CLUSTER in SHOW CREATE TABLE (see ClickHouseClusterUtils).
     String storedComment =
@@ -203,9 +208,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     if (StringUtils.isNotEmpty(storedComment)) {
       sqlBuilder.append(" COMMENT '%s'".formatted(escapeSingleQuotes(storedComment)));
     }
-
-    // Add setting clause if specified, clickhouse only supports predefine settings
-    appendTableProperties(notNullProperties, sqlBuilder);
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
