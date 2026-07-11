@@ -157,12 +157,6 @@ jobs:
   #    pass linting but break typed codegen (e.g. default: null, a bare format,
   #    a wire variant missing from a oneOf). Warn-only for now.
   #
-  #    (progenitor was evaluated and dropped: by its own README it is
-  #    "opinionated" and "may fail for some OpenAPI documents", and it does not
-  #    support two patterns this spec uses deliberately — the
-  #    application/vnd.gravitino.v1+json media type and oneOf responses on the
-  #    list endpoints. openapi-generator handles both and its output compiles.)
-  #
   #    Intentionally NOT `needs: bundle` — jobs run on separate runners with no
   #    shared filesystem, so depending on the bundle job would only add a wait
   #    for an artifact hop. Bundling its own copy inline keeps this job fully

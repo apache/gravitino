@@ -112,12 +112,6 @@ linting but break typed codegen — for example `default: null`, a bare `format`
 without a `type`, or a wire variant missing from a `oneOf`. A failure to generate
 is the earliest, sharpest signal that the spec is not codegen-clean.
 
-[progenitor](https://github.com/oxidecomputer/progenitor) (Rust) was evaluated
-and not adopted: it is deliberately opinionated and, per its own README, "may
-fail for some OpenAPI documents". It does not support two patterns this spec uses
-by design — the `application/vnd.gravitino.v1+json` media type and `oneOf`
-responses on the list endpoints — so it would fail regardless of spec quality.
-
 ### 5. Breaking-change detection (oasdiff)
 
 On pull requests, [oasdiff](https://github.com/oasdiff/oasdiff) diffs the bundled
