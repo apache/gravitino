@@ -108,6 +108,8 @@ const LoginContent = () => {
 
         {authType === null ? null : authType === 'basic' ? (
           <BasicLogin />
+        ) : authType === 'simple' ? (
+          <DefaultLogin />
         ) : authType === 'oauth' && providerType === null ? null : authType === 'oauth' && providerType === 'oidc' ? (
           <OidcLogin />
         ) : authType === 'oauth' ? (
