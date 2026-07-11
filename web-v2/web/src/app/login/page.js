@@ -108,11 +108,11 @@ const LoginContent = () => {
 
         {authType === null ? null : authType === 'basic' ? (
           <BasicLogin router={router} />
-        ) : authType === 'oauth' && providerType === 'oidc' ? (
+        ) : authType === 'oauth' && providerType === null ? null : authType === 'oauth' && providerType === 'oidc' ? (
           <OidcLogin />
-        ) : (
+        ) : authType === 'oauth' ? (
           <DefaultLogin />
-        )}
+        ) : null}
       </Card>
     </Flex>
   )
