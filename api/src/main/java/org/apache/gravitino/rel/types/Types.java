@@ -689,7 +689,7 @@ public class Types {
    */
   public static class GeometryType extends Type.PrimitiveType {
 
-    /** The default coordinate reference system, matching the Iceberg/Parquet default. */
+    /** The default coordinate reference system, {@code OGC:CRS84} (WGS84 longitude/latitude). */
     public static final String DEFAULT_CRS = "OGC:CRS84";
 
     /**
@@ -758,10 +758,10 @@ public class Types {
    */
   public static class GeographyType extends Type.PrimitiveType {
 
-    /** The default coordinate reference system, matching the Iceberg/Parquet default. */
+    /** The default coordinate reference system, {@code OGC:CRS84} (WGS84 longitude/latitude). */
     public static final String DEFAULT_CRS = "OGC:CRS84";
 
-    /** The default edge-interpolation algorithm, matching the Iceberg/Parquet default. */
+    /** The default edge-interpolation algorithm, {@code spherical}. */
     public static final String DEFAULT_ALGORITHM = "spherical";
 
     /** The edge-interpolation algorithms defined by the geography specification. */
