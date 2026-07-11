@@ -48,24 +48,13 @@ class TestOwner(MetalakeTestMixin, IntegrationTestEnv):
 
     @classmethod
     def setUpClass(cls):
-        cls._get_gravitino_home()
-        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        cls._reset_conf({"gravitino.authorization.enable": "true"}, conf_path)
-        cls._append_conf({"gravitino.authorization.enable": "true"}, conf_path)
-        if cls.use_external_gravitino():
-            cls.restart_server()
-        else:
-            super().setUpClass()
-        cls.gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
+        cls.gravitino_admin_client = cls.set_up_authorization_test_env(
+            service_admins=None
+        )
 
     @classmethod
     def tearDownClass(cls):
-        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        cls._reset_conf({"gravitino.authorization.enable": "false"}, conf_path)
-        if cls.use_external_gravitino():
-            cls.restart_server()
-        else:
-            super().tearDownClass()
+        cls.tear_down_authorization_test_env(service_admins=None, append=False)
 
     def create_catalog(self, catalog_name) -> Catalog:
         return self.gravitino_client.create_catalog(

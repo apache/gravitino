@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import os
 from random import randint
 
 from gravitino import GravitinoAdminClient, GravitinoClient
@@ -35,33 +34,11 @@ class TestUser(MetalakeTestMixin, IntegrationTestEnv):
 
     @classmethod
     def setUpClass(cls):
-        cls._get_gravitino_home()
-        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        auth_confs = {
-            "gravitino.authorization.enable": "true",
-            "gravitino.authorization.serviceAdmins": "anonymous",
-        }
-        cls._reset_conf(auth_confs, conf_path)
-        cls._append_conf(auth_confs, conf_path)
-        if cls.use_external_gravitino():
-            cls.restart_server()
-        else:
-            super().setUpClass()
-        cls.gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
+        cls.gravitino_admin_client = cls.set_up_authorization_test_env()
 
     @classmethod
     def tearDownClass(cls):
-        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        reset_confs = {
-            "gravitino.authorization.enable": "false",
-            "gravitino.authorization.serviceAdmins": "anonymous",
-        }
-        cls._reset_conf(reset_confs, conf_path)
-        cls._append_conf(reset_confs, conf_path)
-        if cls.use_external_gravitino():
-            cls.restart_server()
-        else:
-            super().tearDownClass()
+        cls.tear_down_authorization_test_env()
 
     def test_add_user(self):
         user = self.gravitino_client.add_user("test_add_user")
