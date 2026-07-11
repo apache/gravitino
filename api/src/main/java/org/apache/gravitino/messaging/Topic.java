@@ -60,6 +60,19 @@ public interface Topic extends Auditable {
   }
 
   /**
+   * Named message schemas for this topic.
+   *
+   * <p>Keys are layout names. Conventional names are {@link DataLayouts#KEY} (record key) and
+   * {@link DataLayouts#VALUE} (record value). Additional names are allowed for vendor-specific
+   * roles. An empty map means no layouts are set.
+   *
+   * @return Named data layouts; never null.
+   */
+  default Map<String, DataLayout> dataLayouts() {
+    return Collections.emptyMap();
+  }
+
+  /**
    * @return the {@link SupportsTags} if the topic supports tag operations.
    * @throws UnsupportedOperationException if the topic does not support tag operations.
    */

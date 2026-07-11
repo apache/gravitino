@@ -31,6 +31,7 @@ public class TestTopic extends BaseTopic {
       TestTopic topic = new TestTopic();
       topic.name = name;
       topic.comment = comment;
+      topic.dataLayouts = dataLayouts;
       topic.properties = properties;
       topic.auditInfo = auditInfo;
       return topic;

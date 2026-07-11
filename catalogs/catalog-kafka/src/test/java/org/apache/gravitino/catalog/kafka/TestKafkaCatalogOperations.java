@@ -69,6 +69,9 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
+import org.apache.gravitino.messaging.SchemaDataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
@@ -572,6 +575,43 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                 kafkaCatalogOperations.alterTopic(
                     ident, TopicChange.setProperty(PARTITION_COUNT, "1")));
     Assertions.assertEquals("Cannot reduce partition count from 3 to 1", exception.getMessage());
+  }
+
+  @Test
+  public void testAlterTopicDataLayout() {
+    NameIdentifier ident =
+        NameIdentifier.of(
+            METALAKE_NAME, CATALOG_NAME, DEFAULT_SCHEMA_NAME, "test_alter_topic_layout");
+    Map<String, String> properties = ImmutableMap.of(PARTITION_COUNT, "1", REPLICATION_FACTOR, "1");
+    DataLayout layout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withTypeName("com.example.Order")
+            .withSchemaSubject("order-value")
+            .build();
+
+    Topic created =
+        kafkaCatalogOperations.createTopic(
+            ident, "comment", DataLayouts.ofValue(layout), properties);
+    Assertions.assertEquals(DataLayouts.ofValue(layout), created.dataLayouts());
+
+    DataLayout updated =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.AVRO)
+            .withSchemaSubject("order-value")
+            .withSchemaVersion("2")
+            .build();
+    Topic altered =
+        kafkaCatalogOperations.alterTopic(ident, TopicChange.updateValueDataLayout(updated));
+    Assertions.assertTrue(altered.dataLayouts().isEmpty());
+
+    Topic cleared =
+        kafkaCatalogOperations.alterTopic(ident, TopicChange.removeDataLayout(DataLayouts.VALUE));
+    Assertions.assertTrue(cleared.dataLayouts().isEmpty());
+
+    // Broker reload does not retain DataLayouts (entity store is responsible).
+    Topic reloaded = kafkaCatalogOperations.loadTopic(ident);
+    Assertions.assertTrue(reloaded.dataLayouts().isEmpty());
   }
 
   @Test

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.messaging;
 
+import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -57,6 +58,48 @@ public interface TopicChange {
    */
   static TopicChange removeProperty(String property) {
     return new TopicChange.RemoveProperty(property);
+  }
+
+  /**
+   * Creates a new topic change to set or replace a named {@link DataLayout}.
+   *
+   * <p>Conventional names are {@link DataLayouts#KEY} and {@link DataLayouts#VALUE}.
+   *
+   * @param name The layout name. Must not be blank.
+   * @param newDataLayout The new data layout. Must not be null.
+   * @return The topic change.
+   */
+  static TopicChange updateDataLayout(String name, DataLayout newDataLayout) {
+    return new TopicChange.UpdateDataLayout(name, newDataLayout);
+  }
+
+  /**
+   * Creates a new topic change to set or replace the {@link DataLayouts#VALUE} layout.
+   *
+   * @param newDataLayout The new value layout. Must not be null.
+   * @return The topic change.
+   */
+  static TopicChange updateValueDataLayout(DataLayout newDataLayout) {
+    return updateDataLayout(DataLayouts.VALUE, newDataLayout);
+  }
+
+  /**
+   * Creates a new topic change to remove a named {@link DataLayout}.
+   *
+   * @param name The layout name to remove. Must not be blank.
+   * @return The topic change.
+   */
+  static TopicChange removeDataLayout(String name) {
+    return new TopicChange.RemoveDataLayout(name);
+  }
+
+  /**
+   * Creates a new topic change to clear all named {@link DataLayout}s.
+   *
+   * @return The topic change.
+   */
+  static TopicChange removeDataLayouts() {
+    return new TopicChange.RemoveDataLayouts();
   }
 
   /** A topic change to update the topic comment. */
@@ -232,6 +275,115 @@ public interface TopicChange {
     @Override
     public String toString() {
       return "REMOVEPROPERTY " + property;
+    }
+  }
+
+  /** A topic change to update a named {@link DataLayout}. */
+  final class UpdateDataLayout implements TopicChange {
+    private final String name;
+    private final DataLayout newDataLayout;
+
+    private UpdateDataLayout(String name, DataLayout newDataLayout) {
+      Preconditions.checkArgument(
+          name != null && !name.trim().isEmpty(), "layout name must not be blank");
+      this.name = name;
+      this.newDataLayout = Objects.requireNonNull(newDataLayout, "newDataLayout");
+    }
+
+    /**
+     * @return The layout name being updated.
+     */
+    public String getName() {
+      return name;
+    }
+
+    /**
+     * @return The new data layout.
+     */
+    public DataLayout getNewDataLayout() {
+      return newDataLayout;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      UpdateDataLayout that = (UpdateDataLayout) o;
+      return Objects.equals(name, that.name) && Objects.equals(newDataLayout, that.newDataLayout);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name, newDataLayout);
+    }
+
+    @Override
+    public String toString() {
+      return "UPDATEDATALAYOUT " + name + " " + newDataLayout;
+    }
+  }
+
+  /** A topic change to remove a named {@link DataLayout}. */
+  final class RemoveDataLayout implements TopicChange {
+    private final String name;
+
+    private RemoveDataLayout(String name) {
+      Preconditions.checkArgument(
+          name != null && !name.trim().isEmpty(), "layout name must not be blank");
+      this.name = name;
+    }
+
+    /**
+     * @return The layout name being removed.
+     */
+    public String getName() {
+      return name;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof RemoveDataLayout)) {
+        return false;
+      }
+      RemoveDataLayout that = (RemoveDataLayout) o;
+      return Objects.equals(name, that.name);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name);
+    }
+
+    @Override
+    public String toString() {
+      return "REMOVEDATALAYOUT " + name;
+    }
+  }
+
+  /** A topic change to remove all named {@link DataLayout}s. */
+  final class RemoveDataLayouts implements TopicChange {
+    private RemoveDataLayouts() {}
+
+    @Override
+    public boolean equals(Object o) {
+      return o instanceof RemoveDataLayouts;
+    }
+
+    @Override
+    public int hashCode() {
+      return RemoveDataLayouts.class.hashCode();
+    }
+
+    @Override
+    public String toString() {
+      return "REMOVEDATALAYOUTS";
     }
   }
 }

@@ -46,6 +46,7 @@ import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkTemplateUpdateDTO;
 import org.apache.gravitino.dto.job.TemplateUpdateDTO;
+import org.apache.gravitino.dto.messaging.DataLayoutDTO;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FunctionUpdateRequest;
@@ -272,6 +273,15 @@ class DTOConverters {
     if (change instanceof TopicChange.UpdateTopicComment) {
       return new TopicUpdateRequest.UpdateTopicCommentRequest(
           ((TopicChange.UpdateTopicComment) change).getNewComment());
+    } else if (change instanceof TopicChange.UpdateDataLayout) {
+      return new TopicUpdateRequest.UpdateTopicDataLayoutRequest(
+          ((TopicChange.UpdateDataLayout) change).getName(),
+          DataLayoutDTO.fromDataLayout(((TopicChange.UpdateDataLayout) change).getNewDataLayout()));
+    } else if (change instanceof TopicChange.RemoveDataLayout) {
+      return new TopicUpdateRequest.RemoveTopicDataLayoutRequest(
+          ((TopicChange.RemoveDataLayout) change).getName());
+    } else if (change instanceof TopicChange.RemoveDataLayouts) {
+      return new TopicUpdateRequest.RemoveTopicDataLayoutsRequest();
     } else if (change instanceof TopicChange.SetProperty) {
       return new TopicUpdateRequest.SetTopicPropertyRequest(
           ((TopicChange.SetProperty) change).getProperty(),

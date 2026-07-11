@@ -68,9 +68,12 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
 
   @Override
   public Topic createTopic(
-      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      NameIdentifier ident,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    return dispatcher.createTopic(normalizeNameIdentifier(ident), comment, dataLayout, properties);
+    return dispatcher.createTopic(normalizeNameIdentifier(ident), comment, dataLayouts, properties);
   }
 
   @Override
