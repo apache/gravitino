@@ -177,7 +177,10 @@ jobs:
       - run: npm ci
       - name: Bundle spec (codegen input)
         run: npm run bundle
-      - uses: dtolnay/rust-toolchain@stable
+      # GitHub-hosted ubuntu runners ship Rust via rustup, so use it directly:
+      # ASF's action allowlist disallows dtolnay/rust-toolchain.
+      - name: Ensure Rust toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
       - name: Install progenitor CLI
         run: cargo install cargo-progenitor
       - name: Generate Rust client
