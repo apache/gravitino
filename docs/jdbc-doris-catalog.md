@@ -25,8 +25,8 @@ Gravitino saves some system information in schema and table comments, like
 ### Catalog Capabilities
 
 - Gravitino catalog corresponds to the Doris instance.
-- Supports metadata management of Doris (1.2.x).
-- Supports table index.
+- Supports metadata management of Doris (1.2.x, 3.0.x, 4.0.x).
+- Supports table index (PRIMARY_KEY, UNIQUE_KEY, INVERTED, BITMAP (legacy), ANN/VECTOR).
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
 ### Catalog Properties
@@ -115,34 +115,95 @@ Refer to
 
 #### Table Column Types
 
-| Gravitino Type   | Doris Type      |
-|------------------|-----------------|
-| `Boolean`        | `Boolean`       |
-| `Byte`           | `TinyInt`       |
-| `Short`          | `SmallInt`      |
-| `Integer`        | `Int`           |
-| `Long`           | `BigInt`        |
-| `Float`          | `Float`         |
-| `Double`         | `Double`        |
-| `Decimal`        | `Decimal`       |
-| `Date`           | `Date`          |
-| `Timestamp[(p)]` | `Datetime[(p)]` |
-| `VarChar`        | `VarChar`       |
-| `FixedChar`      | `Char`          |
-| `String`         | `String`        |
-
+| Gravitino Type             | Doris Type                   |
+|----------------------------|------------------------------|
+| `Boolean`                  | `Boolean`                    |
+| `Byte`                     | `TinyInt`                    |
+| `Short`                    | `SmallInt`                   |
+| `Integer`                  | `Int`                        |
+| `Long`                     | `BigInt`                     |
+| `Float`                    | `Float`                      |
+| `Double`                   | `Double`                     |
+| `Decimal`                  | `Decimal`                    |
+| `Date`                     | `Date` / `DateV2`            |
+| `Timestamp[(p)]`           | `Datetime[(p)]`              |
+| `VarChar`                  | `VarChar`                    |
+| `FixedChar`                | `Char`                       |
+| `String`                   | `String`                     |
+| `Binary`                   | `Binary` / `VarBinary`       |
+| `ExternalType("json")`     | `JSON`                       |
+| `ExternalType("variant")`  | `Variant`                    |
+| `ExternalType("ipv4")`     | `IPv4`                       |
+| `ExternalType("ipv6")`     | `IPv6`                       |
+| `ExternalType("largeint")` | `LargeInt`                   |
+| `ExternalType("bitmap")`   | `Bitmap`                     |
+| `ExternalType("hll")`      | `HLL`                        |
 
 Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 
 :::note
-Gravitino cannot load Doris `array`, `map` and `struct` type correctly, because Doris doesn't support these types in JDBC.
+Doris `array`, `map`, and `struct` types are loaded as `ExternalType` with the full type string preserved (e.g. `array<int(11)>`). They are not resolved into Gravitino native composite types (`ListType`, `MapType`, `StructType`). The type identifier in `ExternalType` is always lowercase (e.g. `"json"`, not `"JSON"`), matching Doris JDBC metadata behavior.
+:::
+
+:::tip Version Compatibility
+- `DateV2` type: Doris 1.2+ (required on 4.0.x where `disable_datev1=true`)
+- `Binary` / `VarBinary` type: Doris 4.0+ (not available on 3.x)
+- `Auto-Increment` column: Doris 2.1+
+- `INVERTED` index: Doris 3.0+
+- `ANN` / `VECTOR` index: Doris 4.0.6+
 :::
 
 
 ### Table Column Auto-Increment
 
-Unsupported for now.
+Auto-increment columns are supported on Doris 2.1+. Gravitino validates the Doris version at table creation time and rejects auto-increment columns on older versions.
+
+Doris enforces the following constraints (violations are rejected by the Doris server):
+
+- The table must use `UNIQUE KEY` or `DUPLICATE KEY` model.
+- The auto-increment column must be `BIGINT NOT NULL` with no `DEFAULT` value.
+- Each table can have at most one auto-increment column.
+
+:::note
+Gravitino currently supports creating `UNIQUE KEY` tables via the `UNIQUE_KEY` index type. To create a `DUPLICATE KEY` table, omit key indexes from the table definition — Doris defaults to the DUPLICATE model when no key is specified.
+:::
+
+<Tabs groupId='language' queryString>
+<TabItem value="json" label="JSON">
+
+```json
+{
+  "columns": [
+    {
+      "name": "id",
+      "type": "long",
+      "nullable": false,
+      "autoIncrement": true
+    }
+  ],
+  "indexes": [
+    {
+      "indexType": "unique_key",
+      "name": "id_key",
+      "fieldNames": [["id"]]
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Column column = Column.of("id", Types.LongType.get(), "", false, true, null);
+Index[] indexes = new Index[] {
+    Indexes.of(Index.IndexType.UNIQUE_KEY, "id_key", new String[][]{{"id"}}, Map.of())
+};
+```
+
+</TabItem>
+</Tabs>
 
 ### Table Properties
 
@@ -151,36 +212,79 @@ Unsupported for now.
 
 ### Table Indexes
 
-- Supports PRIMARY_KEY
+The Doris catalog supports the following index types. Each index applies to a single column.
 
-    Please be aware that the index can only apply to a single column.
+| Gravitino Index Type | Doris DDL | Doris Version |
+|---------------------|-----------|---------------|
+| `PRIMARY_KEY`       | `` INDEX `PRIMARY` (col) `` (in the INDEX clause, no USING) | 1.2+ |
+| `UNIQUE_KEY`        | `UNIQUE KEY(col)` (in the table model section, not INDEX clause) | 1.2+ |
+| `INVERTED`          | `INDEX name (col) USING INVERTED` | 3.0+ |
+| `BITMAP`            | `INDEX name (col)` (bare, no USING clause; write-only, see note below) | 1.2+ |
+| `VECTOR`            | `INDEX name (col) USING ANN` | 4.0.6+ |
 
-    <Tabs groupId='language' queryString>
-    <TabItem value="json" label="JSON">
+:::note
+- `PRIMARY_KEY` stays in the INDEX clause as a bare index (e.g. `` INDEX `PRIMARY` (`id`) ``), with no USING clause.
+- `UNIQUE_KEY` is emitted as a table model declaration (e.g. `` UNIQUE KEY(`id`) ``), outside the INDEX clause.
+- `BITMAP` is a write-only legacy type for backward compatibility with Doris 1.2.x. The write path generates a bare `INDEX` (no USING clause), but the read path maps it back to `INVERTED` because Doris 4.0.6 removed BITMAP from the grammar. Creating a BITMAP index and reading it back will show `INVERTED`.
+:::
 
-    ```json
+**Primary Key example:**
+
+<Tabs groupId='language' queryString>
+<TabItem value="json" label="JSON">
+
+```json
+{
+  "indexes": [
     {
-      "indexes": [
-        {
-          "indexType": "primary_key",
-          "name": "PRIMARY",
-          "fieldNames": [["id"]]
-        }
-      ]
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [["id"]]
     }
-    ```
+  ]
+}
+```
 
-    </TabItem>
-    <TabItem value="java" label="Java">
+</TabItem>
+<TabItem value="java" label="Java">
 
-    ```java
-    Index[] indexes = new Index[] {
-        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())
+```java
+Index[] indexes = new Index[] {
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}}, Map.of())
+};
+```
+
+</TabItem>
+</Tabs>
+
+**Inverted Index example (Doris 3.0+):**
+
+<Tabs groupId='language' queryString>
+<TabItem value="json" label="JSON">
+
+```json
+{
+  "indexes": [
+    {
+      "indexType": "inverted",
+      "name": "idx_name",
+      "fieldNames": [["name"]]
     }
-    ```
+  ]
+}
+```
 
-    </TabItem>
-    </Tabs>
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Index[] indexes = new Index[] {
+    Indexes.of(IndexType.INVERTED, "idx_name", new String[][]{{"name"}}, Map.of())
+};
+```
+
+</TabItem>
+</Tabs>
 
 ### Table Partitioning
 
