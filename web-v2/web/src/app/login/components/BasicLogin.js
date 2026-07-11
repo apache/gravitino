@@ -69,7 +69,7 @@ function BasicLogin() {
       // Clear the password after a successful login
       reset({ username: data.username, password: '' })
     } catch (error) {
-      setError('password', {
+      setError('username', {
         type: 'manual',
         message: error?.message || 'Login failed'
       })

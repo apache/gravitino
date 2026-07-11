@@ -273,6 +273,17 @@ const transform = {
       throw new Error(error)
     }
 
+    const webLoginHeaderValue =
+      typeof originConfig?.headers?.get === 'function'
+        ? originConfig.headers.get('X-Gravitino-Web-Login')
+        : (originConfig?.headers?.['X-Gravitino-Web-Login'] ?? originConfig?.headers?.['x-gravitino-web-login'])
+
+    const isFailedWebUILoginRequest = response?.status === 401 && String(webLoginHeaderValue).toLowerCase() === 'true'
+
+    if (isFailedWebUILoginRequest) {
+      return Promise.reject(error)
+    }
+
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
     if (response?.status === 401 && !originConfig?._retry && response?.config?.url !== githubApis.GET) {
