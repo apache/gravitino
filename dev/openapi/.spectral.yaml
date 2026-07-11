@@ -1,0 +1,57 @@
+# Spectral governance ruleset for the Gravitino OpenAPI spec.
+#
+# Redocly (redocly.yaml) enforces structural correctness. Spectral layers on
+# governance the built-ins don't cover: OWASP API-security, documentation
+# completeness, and Gravitino house conventions. The CI workflow runs this
+# warn-only ("kitchen sink") so findings surface as annotations without
+# blocking; rules are promoted to `error` as the backlog is burned down.
+
+extends:
+  - "spectral:oas"
+  - "@stoplight/spectral-owasp-ruleset"
+  - "@stoplight/spectral-documentation"
+
+rules:
+  # NOTE: nothing here is disabled to "make the linter pass". If Spectral aborts
+  # (e.g. spectral:oas's `duplicated-entry-in-enum` throws on a `null` node),
+  # that crash is treated as a signal that the document is malformed — the CI
+  # workflow catches it and asks a human to investigate rather than papering
+  # over it. See dev/openapi/README.md and the openapi.yml workflow.
+
+  # ---- Gravitino house conventions (warn while the backlog is triaged) ----
+
+  gravitino-vendor-media-type:
+    description: "JSON responses should use the application/vnd.gravitino.v1+json media type."
+    severity: warn
+    given: "$.paths[*][*].responses[*].content"
+    then:
+      field: "application/vnd.gravitino.v1+json"
+      function: truthy
+
+  gravitino-schema-names-pascal-case:
+    description: "Component schema names should be PascalCase."
+    severity: warn
+    given: "$.components.schemas[*]~"
+    then:
+      function: casing
+      functionOptions:
+        type: pascal
+
+  # Known exceptions to triage: JSON-LD style keys such as `@type`/`@version`
+  # are intentional and will warn under this rule.
+  gravitino-property-names-camel-case:
+    description: "Schema property names should be camelCase."
+    severity: warn
+    given: "$.components.schemas[*].properties[*]~"
+    then:
+      function: casing
+      functionOptions:
+        type: camel
+
+  gravitino-operation-tagged:
+    description: "Every operation should carry at least one tag for sidebar grouping."
+    severity: warn
+    given: "$.paths[*][get,put,post,delete,patch,options,head]"
+    then:
+      field: tags
+      function: truthy

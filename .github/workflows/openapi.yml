@@ -1,0 +1,218 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# OpenAPI spec quality gate for docs/open-api. The objective: a strictly-valid,
+# codegen-clean, consistently-governed spec, validated on current tooling whose
+# versions live in dev/openapi/package.json (tracked by Dependabot).
+#
+# Philosophy: this is EXPOSE-FIRST. Every check is warn-only (non-blocking) so
+# findings surface as annotations without blocking merges. Nothing is suppressed
+# to force a pass — if a tool CRASHES (e.g. Spectral aborts on a malformed node)
+# that crash is reported as a signal to investigate, not hidden.
+#
+# Stages:
+#   redocly-lint      structural validation at 3 strictness levels (matrix)
+#   spectral-lint     governance kitchen sink (OWASP + docs + house rules)
+#   bundle            resolve ~30 files into a single openapi.json artifact
+#   codegen           progenitor Rust-client smoke test (strictest consumer)
+#   breaking-changes  oasdiff vs the PR base branch
+#
+# Promote to enforcing later by removing continue-on-error / the `exit 0` guards.
+name: OpenAPI Spec
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/open-api/**'
+      - 'dev/openapi/**'
+      - '.github/workflows/openapi.yml'
+  pull_request:
+    paths:
+      - 'docs/open-api/**'
+      - 'dev/openapi/**'
+      - '.github/workflows/openapi.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # 1. Structural validation at increasing strictness. The matrix makes the
+  #    gradient visible: how many findings each level adds. Warn-only.
+  redocly-lint:
+    name: Redocly lint (${{ matrix.strictness }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        strictness: [ minimal, recommended, recommended-strict ]
+    defaults:
+      run:
+        working-directory: dev/openapi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dev/openapi/package-lock.json
+      - run: npm ci
+      - name: Lint
+        continue-on-error: true
+        run: npx redocly lint --extends=${{ matrix.strictness }} --format=github-actions
+
+  # 2. Governance kitchen sink: OWASP API-security + documentation completeness
+  #    + Gravitino house rules. A Spectral crash is surfaced as an investigate
+  #    signal (detected by its error signature, since exit code 2 is ambiguous).
+  spectral-lint:
+    name: Spectral governance (kitchen sink)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: dev/openapi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dev/openapi/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: |
+          set +e
+          npx spectral lint ../../docs/open-api/openapi.yaml \
+            --ruleset .spectral.yaml --format github-actions 2> spectral.err
+          code=$?
+          cat spectral.err
+          if grep -q "Error running Spectral" spectral.err; then
+            echo "::warning title=Spectral crashed::Spectral aborted (exit ${code}) instead of returning findings. A linter crash is a strong signal that the OpenAPI document is malformed (e.g. stray null nodes). Investigate the document and the trace above — an LLM can help analyze the failure. Non-blocking."
+            {
+              echo "### :warning: Spectral crashed — investigate the spec"
+              echo ""
+              echo "Spectral aborted (exit \`${code}\`) rather than returning lint findings."
+              echo "A crash means the document is malformed enough to break the linter."
+              echo "Treat it as a failing signal, not a flake. An LLM can help analyze the"
+              echo "document together with the crash trace below."
+              echo ""
+              echo '```'
+              cat spectral.err
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # Warn-only: never fail the build on findings or crashes (yet).
+          exit 0
+
+  # 3. Bundle the ~30 cross-referenced files into one machine-readable spec and
+  #    publish it as a CI artifact — the clean input for SDK generators. Always
+  #    runs, independent of lint results.
+  bundle:
+    name: Bundle artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: dev/openapi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dev/openapi/package-lock.json
+      - run: npm ci
+      - name: Bundle
+        run: npm run bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gravitino-openapi-spec
+          path: |
+            dev/openapi/build/openapi.json
+            dev/openapi/build/openapi.yaml
+          if-no-files-found: error
+
+  # 4. Codegen smoke test with progenitor (Rust). Its typify backend is stricter
+  #    than most generators, so it catches issues broad tools tolerate
+  #    (default: null, bare format, etc.). Warn-only for now.
+  #
+  #    Intentionally NOT `needs: bundle` — jobs run on separate runners with no
+  #    shared filesystem, so depending on the bundle job would only add a wait
+  #    for an artifact hop. Bundling its own copy inline keeps this job fully
+  #    parallel with the rest.
+  codegen:
+    name: Codegen smoke (progenitor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: dev/openapi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dev/openapi/package-lock.json
+      - run: npm ci
+      - name: Bundle spec (codegen input)
+        run: npm run bundle
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install progenitor CLI
+        run: cargo install cargo-progenitor
+      - name: Generate Rust client
+        continue-on-error: true
+        run: cargo progenitor -i build/openapi.json -o generated-client -n gravitino-openapi -v 0.0.0
+
+  # 5. Breaking-change detection vs the PR base branch. Bundles both sides with
+  #    the HEAD tooling (the base branch may predate dev/openapi) and diffs them.
+  breaking-changes:
+    name: Breaking changes (oasdiff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dev/openapi/package-lock.json
+      - name: Install tooling
+        working-directory: dev/openapi
+        run: npm ci
+      - name: Bundle head and base specs
+        working-directory: dev/openapi
+        run: |
+          npx redocly bundle ../../docs/open-api/openapi.yaml -o /tmp/head.json
+          git worktree add /tmp/base "origin/${{ github.base_ref }}"
+          npx redocly bundle /tmp/base/docs/open-api/openapi.yaml -o /tmp/base.json \
+            || echo "::notice::Base spec did not bundle (may predate the multi-file layout); skipping diff."
+      - name: Diff (warn-only)
+        continue-on-error: true
+        run: |
+          if [ -f /tmp/base.json ]; then
+            docker run --rm -v /tmp:/specs tufin/oasdiff breaking /specs/base.json /specs/head.json
+          fi
