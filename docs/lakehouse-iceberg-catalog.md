@@ -436,6 +436,8 @@ If you doesn't specify distribution expressions, the table distribution will be 
 | `UUID`            | `UUID`                      |
 | `Variant`         | `Variant`                   |
 | `Null`            | `Unknown`                   |
+| `Geometry`        | `Geometry`                  |
+| `Geography`       | `Geography`                 |
 
 :::note
 Gravitino `Null` maps to Apache Iceberg's V3 `unknown` type — a null-only placeholder for a column

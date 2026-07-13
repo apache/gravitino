@@ -124,6 +124,14 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
         // Iceberg V3 unknown is the null-only placeholder type; map it to Gravitino's NullType,
         // matching how Iceberg's own engine converters map unknown <-> the engine null type.
         return org.apache.gravitino.rel.types.Types.NullType.get();
+      case GEOMETRY:
+        return org.apache.gravitino.rel.types.Types.GeometryType.of(
+            ((Types.GeometryType) primitive).crs());
+      case GEOGRAPHY:
+        Types.GeographyType geography = (Types.GeographyType) primitive;
+        // EdgeAlgorithm.toString() is the lowercase spec name, which GeographyType requires.
+        return org.apache.gravitino.rel.types.Types.GeographyType.of(
+            geography.crs(), geography.algorithm().toString());
       default:
         return org.apache.gravitino.rel.types.Types.ExternalType.of(primitive.typeId().name());
     }

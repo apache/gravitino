@@ -1099,6 +1099,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
           Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}),
           Indexes.of(IndexType.DATA_SKIPPING_MINMAX, "idx_c2", new String[][] {{"c2"}}),
           Indexes.of(IndexType.DATA_SKIPPING_BLOOM_FILTER, "idx_c3", new String[][] {{"c3"}}),
+          Indexes.of(IndexType.DATA_SKIPPING_SET, "idx_c4", new String[][] {{"c2"}}),
         };
 
     String sql =
@@ -1115,6 +1116,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(sql.contains("PARTITION BY `c1`"));
     Assertions.assertTrue(sql.contains("INDEX `idx_c2` `c2` TYPE minmax GRANULARITY 1"));
     Assertions.assertTrue(sql.contains("INDEX `idx_c3` `c3` TYPE bloom_filter GRANULARITY 3"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_c4` `c2` TYPE set(0) GRANULARITY 1"));
   }
 
   @Test
@@ -1194,6 +1196,44 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertEquals("id", ((NamedReference) sortOrders[0].expression()).fieldName()[0]);
   }
 
+  @Test
+  void testParseSettingsFromCreateSql() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+
+    // Single setting
+    String sql1 =
+        "CREATE TABLE t1 (id Int32) ENGINE = MergeTree ORDER BY id SETTINGS index_granularity = 4096";
+    Map<String, String> settings1 = ops.parseSettings(sql1);
+    Assertions.assertEquals(1, settings1.size());
+    Assertions.assertEquals(
+        "4096", settings1.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    // Multiple settings
+    String sql2 =
+        "CREATE TABLE t2 (id Int32) ENGINE = MergeTree ORDER BY id"
+            + " SETTINGS index_granularity = 4096, min_bytes_for_wide_part = 0";
+    Map<String, String> settings2 = ops.parseSettings(sql2);
+    Assertions.assertEquals(2, settings2.size());
+    Assertions.assertEquals(
+        "4096", settings2.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        "0", settings2.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+
+    // No SETTINGS clause
+    String sql3 = "CREATE TABLE t3 (id Int32) ENGINE = MergeTree ORDER BY id";
+    Map<String, String> settings3 = ops.parseSettings(sql3);
+    Assertions.assertTrue(settings3.isEmpty());
+
+    // SETTINGS with COMMENT after
+    String sql4 =
+        "CREATE TABLE t4 (id Int32) ENGINE = MergeTree ORDER BY id"
+            + " SETTINGS index_granularity = 8192 COMMENT 'test'";
+    Map<String, String> settings4 = ops.parseSettings(sql4);
+    Assertions.assertEquals(1, settings4.size());
+    Assertions.assertEquals(
+        "8192", settings4.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+  }
+
   private static final class TestableClickHouseTableOperations extends ClickHouseTableOperations {
     String buildCreateSql(
         String tableName,
@@ -1210,6 +1250,10 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
     SortOrder[] parseSortOrders(String createSql) {
       return parseSortOrdersFromCreateSql(createSql);
+    }
+
+    Map<String, String> parseSettings(String createSql) {
+      return parseSettingsFromCreateSql(createSql);
     }
   }
 
@@ -1338,6 +1382,15 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(
         bloomSql.contains("ADD INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 3"));
 
+    String setSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(IndexType.DATA_SKIPPING_SET, "idx_set", new String[][] {{"c2"}})
+            });
+    Assertions.assertTrue(setSql.contains("ADD INDEX `idx_set` `c2` TYPE set(0) GRANULARITY 1"));
+
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -1358,6 +1411,35 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 new TableChange[] {
                   TableChange.addIndex(IndexType.PRIMARY_KEY, "pk_new", new String[][] {{"c1"}})
                 }));
+  }
+
+  @Test
+  public void testGetClickHouseIndexType() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    // Exact matches
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType("minmax"));
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_BLOOM_FILTER, ops.getClickHouseIndexType("bloom_filter"));
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set"));
+
+    // set(N) variants — ClickHouse may return type with parameter in some versions
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(0)"));
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(100)"));
+
+    // Blank/null defaults to MINMAX
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(""));
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(null));
+
+    // Unsupported type
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.getClickHouseIndexType("unknown_type"));
   }
 
   @Test

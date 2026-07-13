@@ -646,11 +646,19 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     // like Spark 4 would, directly through the Iceberg catalog, then load through the native
     // metadata interface.
     //
-    // variant loads as VariantType and unknown loads as the existing NullType. The remaining V3
-    // net-new types are not modeled in Gravitino's unified type system yet and load as
+    // variant, unknown, geometry, and geography load as their native Gravitino types. The remaining
+    // V3 net-new types are not modeled in Gravitino's unified type system yet and load as
     // ExternalType; native support for them is pending and tracked in apache/gravitino#11929.
     assertV3LoadsAsVariant("v3_variant");
     assertV3LoadsAsNull("v3_unknown");
+    assertV3LoadsAsGeometry("v3_geometry", org.apache.iceberg.types.Types.GeometryType.crs84());
+    assertV3LoadsAsGeometry(
+        "v3_geometry_srid", org.apache.iceberg.types.Types.GeometryType.of("srid:3857"));
+    assertV3LoadsAsGeography("v3_geography", org.apache.iceberg.types.Types.GeographyType.crs84());
+    assertV3LoadsAsGeography(
+        "v3_geography_karney",
+        org.apache.iceberg.types.Types.GeographyType.of(
+            "EPSG:4326", org.apache.iceberg.types.EdgeAlgorithm.KARNEY));
 
     // TODO(apache/gravitino#11929): expect native types once these gain unified-model support.
     assertV3LoadsAsExternal(
@@ -661,10 +669,6 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         "v3_timestamptz_ns",
         org.apache.iceberg.types.Types.TimestampNanoType.withZone(),
         "TIMESTAMP_NANO");
-    assertV3LoadsAsExternal(
-        "v3_geometry", org.apache.iceberg.types.Types.GeometryType.crs84(), "GEOMETRY");
-    assertV3LoadsAsExternal(
-        "v3_geography", org.apache.iceberg.types.Types.GeographyType.crs84(), "GEOGRAPHY");
   }
 
   @Test
@@ -781,6 +785,89 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   }
 
   @Test
+  void testCreateGeometryColumnWriteRoundTrip() {
+    // Write path: create a geometry column with a non-default CRS *through the Gravitino relational
+    // API*, write it to the REST (IRC) backend, then load it back and confirm both the type and the
+    // CRS round-trip. REST-backend only, for the same reason as
+    // testV3TypeConversionViaIcebergClient: the CI Hive metastore cannot store V3 column types.
+    Assumptions.assumeTrue(
+        "rest".equalsIgnoreCase(TYPE),
+        "Geometry columns require a backend that does not validate against the Hive metastore");
+
+    NameIdentifier ident = NameIdentifier.of(schemaName, "t_geometry_write");
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id"),
+          Column.of("shape", Types.GeometryType.of("srid:3857"), "geometry col")
+        };
+    Map<String, String> properties = Maps.newHashMap();
+    // Geometry is a V3 type, so the table must be created at format-version 3.
+    properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table created =
+        tableCatalog.createTable(
+            ident,
+            columns,
+            "geometry write",
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0]);
+    Assertions.assertInstanceOf(Types.GeometryType.class, created.columns()[1].dataType());
+
+    // Load it back through the native metadata API to confirm the round-trip against the backend.
+    Table loaded = tableCatalog.loadTable(ident);
+    Assertions.assertInstanceOf(Types.GeometryType.class, loaded.columns()[1].dataType());
+    Assertions.assertEquals(
+        "srid:3857", ((Types.GeometryType) loaded.columns()[1].dataType()).crs());
+    Assertions.assertEquals(
+        "3", loaded.properties().get(IcebergTablePropertiesMetadata.FORMAT_VERSION));
+  }
+
+  @Test
+  void testCreateGeographyColumnWriteRoundTrip() {
+    // Write path: create a geography column with a non-default CRS and edge algorithm *through the
+    // Gravitino relational API*, write it to the REST (IRC) backend, then load it back and confirm
+    // the type, CRS and algorithm round-trip. REST-backend only, for the same reason as
+    // testV3TypeConversionViaIcebergClient: the CI Hive metastore cannot store V3 column types.
+    Assumptions.assumeTrue(
+        "rest".equalsIgnoreCase(TYPE),
+        "Geography columns require a backend that does not validate against the Hive metastore");
+
+    NameIdentifier ident = NameIdentifier.of(schemaName, "t_geography_write");
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id"),
+          Column.of("shape", Types.GeographyType.of("EPSG:4326", "karney"), "geography col")
+        };
+    Map<String, String> properties = Maps.newHashMap();
+    // Geography is a V3 type, so the table must be created at format-version 3.
+    properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table created =
+        tableCatalog.createTable(
+            ident,
+            columns,
+            "geography write",
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0]);
+    Assertions.assertInstanceOf(Types.GeographyType.class, created.columns()[1].dataType());
+
+    // Load it back through the native metadata API to confirm the round-trip against the backend.
+    Table loaded = tableCatalog.loadTable(ident);
+    Assertions.assertInstanceOf(Types.GeographyType.class, loaded.columns()[1].dataType());
+    Types.GeographyType geography = (Types.GeographyType) loaded.columns()[1].dataType();
+    Assertions.assertEquals("EPSG:4326", geography.crs());
+    Assertions.assertEquals("karney", geography.algorithm());
+    Assertions.assertEquals(
+        "3", loaded.properties().get(IcebergTablePropertiesMetadata.FORMAT_VERSION));
+  }
+
+  @Test
   void testCreateVariantColumnRequiresFormatVersion3() {
     Assumptions.assumeTrue(
         "rest".equalsIgnoreCase(TYPE),
@@ -880,6 +967,24 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         createV3Table(tableName, org.apache.iceberg.types.Types.UnknownType.get());
     Column loaded = catalog.asTableCatalog().loadTable(ident).columns()[0];
     Assertions.assertInstanceOf(Types.NullType.class, loaded.dataType());
+  }
+
+  private void assertV3LoadsAsGeometry(
+      String tableName, org.apache.iceberg.types.Types.GeometryType icebergType) {
+    NameIdentifier ident = createV3Table(tableName, icebergType);
+    Column loaded = catalog.asTableCatalog().loadTable(ident).columns()[0];
+    Assertions.assertInstanceOf(Types.GeometryType.class, loaded.dataType());
+    Assertions.assertEquals(icebergType.crs(), ((Types.GeometryType) loaded.dataType()).crs());
+  }
+
+  private void assertV3LoadsAsGeography(
+      String tableName, org.apache.iceberg.types.Types.GeographyType icebergType) {
+    NameIdentifier ident = createV3Table(tableName, icebergType);
+    Column loaded = catalog.asTableCatalog().loadTable(ident).columns()[0];
+    Assertions.assertInstanceOf(Types.GeographyType.class, loaded.dataType());
+    Types.GeographyType geography = (Types.GeographyType) loaded.dataType();
+    Assertions.assertEquals(icebergType.crs(), geography.crs());
+    Assertions.assertEquals(icebergType.algorithm().toString(), geography.algorithm());
   }
 
   private void assertV3LoadsAsExternal(
