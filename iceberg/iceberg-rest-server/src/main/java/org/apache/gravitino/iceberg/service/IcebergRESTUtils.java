@@ -58,6 +58,7 @@ import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -230,6 +231,49 @@ public class IcebergRESTUtils {
     Map<String, String> filteredConfig = CredentialPropertyUtils.filterCredentialProperties(config);
     filteredConfig.putAll(buildRefreshProps(catalogName, tableIdentifier, filteredConfig));
     return toRESTCredential(prefix, ImmutableMap.copyOf(filteredConfig));
+  }
+
+  /**
+   * Rewrites credentials in a {@link PlanTableScanResponse} so their {@code
+   * refresh-credentials-endpoint} entries point at this IRC instance instead of the upstream
+   * catalog. Returns the response unchanged when no credentials are present.
+   *
+   * @param catalogName IRC catalog name used to build refresh paths
+   * @param tableIdentifier table receiving the credentials
+   * @param response the scan plan response returned by the upstream REST catalog
+   * @return the scan plan response with IRC-local refresh endpoints on any credentials
+   */
+  @SuppressWarnings("deprecation")
+  public static PlanTableScanResponse rewriteScanPlanCredentials(
+      String catalogName, TableIdentifier tableIdentifier, PlanTableScanResponse response) {
+    if (response.credentials() == null || response.credentials().isEmpty()) {
+      return response;
+    }
+    List<org.apache.iceberg.rest.credentials.Credential> rewritten = new ArrayList<>();
+    for (org.apache.iceberg.rest.credentials.Credential cred : response.credentials()) {
+      rewritten.add(rewriteCredential(catalogName, tableIdentifier, cred.prefix(), cred.config()));
+    }
+    return copyWithCredentials(response, rewritten);
+  }
+
+  /**
+   * Copies a {@link PlanTableScanResponse} with replacement credentials.
+   *
+   * <p>TODO: Remove when PlanTableScanResponse supports a native copy/toBuilder method.
+   */
+  @SuppressWarnings("deprecation")
+  static PlanTableScanResponse copyWithCredentials(
+      PlanTableScanResponse response,
+      List<org.apache.iceberg.rest.credentials.Credential> credentials) {
+    return PlanTableScanResponse.builder()
+        .withPlanStatus(response.planStatus())
+        .withPlanId(response.planId())
+        .withPlanTasks(response.planTasks())
+        .withFileScanTasks(response.fileScanTasks())
+        .withSpecsById(response.specsById())
+        .withErrorResponse(response.errorResponse())
+        .withCredentials(credentials)
+        .build();
   }
 
   public static <T> Response ok(T t) {

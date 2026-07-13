@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.clickhouse.operations;
 
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
@@ -87,6 +88,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final Pattern PARTITION_BY_PATTERN =
       Pattern.compile(
           "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
+  private static final Pattern SETTINGS_PATTERN =
+      Pattern.compile("(?is)\\bSETTINGS\\s+(.+?)(?=\\bCOMMENT\\b|$)");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
       Pattern.compile(
           "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
@@ -191,6 +194,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     appendPartitionClause(partitioning, sqlBuilder, engine);
 
+    // Add setting clause before COMMENT; ClickHouse 24.8 rejects SETTINGS that follow COMMENT
+    // (all settings become UNKNOWN_SETTING when preceded by a COMMENT clause).
+    // This matches the order in SHOW CREATE TABLE output: SETTINGS ... COMMENT '...'.
+    appendTableProperties(notNullProperties, sqlBuilder);
+
     // Add table comment; embed cluster name so it can be recovered at DROP/ALTER time.
     // ClickHouse does not persist ON CLUSTER in SHOW CREATE TABLE (see ClickHouseClusterUtils).
     String storedComment =
@@ -201,9 +209,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     if (StringUtils.isNotEmpty(storedComment)) {
       sqlBuilder.append(" COMMENT '%s'".formatted(escapeSingleQuotes(storedComment)));
     }
-
-    // Add setting clause if specified, clickhouse only supports predefine settings
-    appendTableProperties(notNullProperties, sqlBuilder);
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
@@ -479,23 +484,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case DATA_SKIPPING_MINMAX:
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
           // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
           // no field for it.
           // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
-          sqlBuilder.append(
-              " INDEX %s %s TYPE minmax GRANULARITY 1"
-                  .formatted(quoteIdentifier(index.name()), fieldStr));
+          sqlBuilder
+              .append(" ")
+              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "minmax", 1));
           break;
         case DATA_SKIPPING_BLOOM_FILTER:
           // The GRANULARITY value is always 3 here currently.
           // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
-          sqlBuilder.append(
-              " INDEX %s %s TYPE bloom_filter GRANULARITY 3"
-                  .formatted(quoteIdentifier(index.name()), fieldStr));
+          sqlBuilder
+              .append(" ")
+              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "bloom_filter", 3));
+          break;
+        case DATA_SKIPPING_SET:
+          // The max unique values (N) is always 0 (unlimited) here currently as we can't set it
+          // by Index: there is no field for it. ClickHouse requires set(N) syntax.
+          // TODO(yuqi) add a properties field to Index to support user defined max unique values.
+          sqlBuilder
+              .append(" ")
+              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "set(0)", 1));
           break;
         default:
           throw new IllegalArgumentException(
@@ -616,6 +625,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       jdbcTableBuilder.withDistribution(distribution);
 
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
+      // Merge SETTINGS parsed from SHOW CREATE TABLE into table properties.
+      // SHOW CREATE TABLE is the authoritative source for SETTINGS; it takes precedence
+      // over any settings.* keys that might exist in system.tables (though getTableProperties()
+      // currently does not read SETTINGS from system.tables, so no overlap occurs in practice).
+      if (!metadata.settings.isEmpty()) {
+        Map<String, String> merged = new HashMap<>(tableProperties);
+        merged.putAll(metadata.settings);
+        tableProperties = Collections.unmodifiableMap(merged);
+      }
       jdbcTableBuilder.withProperties(tableProperties);
 
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
@@ -858,12 +876,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String fieldStr = getIndexFieldStr(addIndex.getFieldNames());
     switch (addIndex.getType()) {
       case DATA_SKIPPING_MINMAX:
-        return "ADD INDEX %s %s TYPE minmax GRANULARITY 1"
-            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "minmax", 1);
 
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY 3"
-            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "bloom_filter", 3);
+
+      case DATA_SKIPPING_SET:
+        // The max unique values (N) is always 0 (unlimited) here currently as we can't set it
+        // by Index: there is no field for it. ClickHouse requires set(N) syntax.
+        // TODO(yuqi) add a properties field to Index to support user defined max unique values.
+        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "set(0)", 1);
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
@@ -1121,12 +1143,41 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
     }
 
+    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(createSql);
+    if (settingsMatcher.find()) {
+      metadata.settings = parseSettingsClause(settingsMatcher.group(1));
+    }
+
     return metadata;
+  }
+
+  // Parses "key1 = val1, key2 = val2" from a SETTINGS clause.
+  // Keys are prefixed with "settings." to match the write path convention in
+  // appendTableProperties(). ClickHouse SETTINGS values are scalar (UInt64, Bool,
+  // String, Enum) — arrays or nested structures are not valid SETTINGS values,
+  // so splitting by comma is safe.
+  private static Map<String, String> parseSettingsClause(String settingsStr) {
+    Map<String, String> settings = new HashMap<>();
+    for (String pair : settingsStr.split(",")) {
+      String trimmed = pair.trim();
+      int eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        String key = trimmed.substring(0, eqIdx).trim();
+        String value = trimmed.substring(eqIdx + 1).trim();
+        settings.put(TableConstants.SETTINGS_PREFIX + key, value);
+      }
+    }
+    return settings;
   }
 
   @VisibleForTesting
   SortOrder[] parseSortOrdersFromCreateSql(String createSql) {
     return parseCreateStatement(createSql).sortOrders;
+  }
+
+  @VisibleForTesting
+  Map<String, String> parseSettingsFromCreateSql(String createSql) {
+    return parseCreateStatement(createSql).settings;
   }
 
   private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
@@ -1248,6 +1299,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final class ShowCreateTableMetadata {
     private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
     private SortOrder[] sortOrders = SortOrders.NONE;
+    private Map<String, String> settings = Collections.emptyMap();
   }
 
   @VisibleForTesting
@@ -1290,7 +1342,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return secondaryIndexes;
   }
 
-  private Index.IndexType getClickHouseIndexType(String rawType) {
+  /**
+   * Maps a ClickHouse data skipping index type string to the corresponding Gravitino {@link
+   * Index.IndexType}. Returns {@code DATA_SKIPPING_MINMAX} for blank/null input (ClickHouse
+   * default). Also handles the {@code set(N)} parameterized format that some ClickHouse versions
+   * may return from {@code system.data_skipping_indices}.
+   *
+   * @param rawType the index type string from ClickHouse metadata (e.g. "minmax", "bloom_filter",
+   *     "set", "set(0)")
+   * @return the corresponding Gravitino IndexType
+   * @throws IllegalArgumentException if the type is not supported
+   */
+  @VisibleForTesting
+  Index.IndexType getClickHouseIndexType(String rawType) {
     if (StringUtils.isBlank(rawType)) {
       return Index.IndexType.DATA_SKIPPING_MINMAX;
     }
@@ -1300,9 +1364,24 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_MINMAX;
       case DATA_SKIPPING_BLOOM_FILTER:
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
+      case DATA_SKIPPING_SET:
+        return Index.IndexType.DATA_SKIPPING_SET;
       default:
+        // ClickHouse may return "set(N)" with parameter in some versions;
+        // match on prefix to handle both "set" and "set(N)" formats.
+        if (rawType.startsWith(DATA_SKIPPING_SET + "(")) {
+          return Index.IndexType.DATA_SKIPPING_SET;
+        }
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
     }
+  }
+
+  private String buildDataSkippingIndexDdl(
+      String indexName, String fieldStr, String typeName, int granularity) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(indexName), "Data skipping index name must not be blank");
+    return "INDEX %s %s TYPE %s GRANULARITY %d"
+        .formatted(quoteIdentifier(indexName), fieldStr, typeName, granularity);
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {

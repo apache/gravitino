@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
 import com.google.common.collect.Lists;
 import java.util.List;
+import org.apache.iceberg.types.EdgeAlgorithm;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
@@ -176,6 +177,14 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
       return Types.UUIDType.get();
     } else if (primitive instanceof org.apache.gravitino.rel.types.Types.VariantType) {
       return Types.VariantType.get();
+    } else if (primitive instanceof org.apache.gravitino.rel.types.Types.GeometryType) {
+      return Types.GeometryType.of(
+          ((org.apache.gravitino.rel.types.Types.GeometryType) primitive).crs());
+    } else if (primitive instanceof org.apache.gravitino.rel.types.Types.GeographyType) {
+      org.apache.gravitino.rel.types.Types.GeographyType geography =
+          (org.apache.gravitino.rel.types.Types.GeographyType) primitive;
+      // EdgeAlgorithm.fromName is case-insensitive; the Gravitino algorithm is a validated name.
+      return Types.GeographyType.of(geography.crs(), EdgeAlgorithm.fromName(geography.algorithm()));
     }
     throw new UnsupportedOperationException("Not a supported type: " + primitive.toString());
   }

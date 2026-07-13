@@ -506,6 +506,24 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         Arrays.stream(loaded.index())
             .anyMatch(index -> Objects.equals(index.name(), "idx_col_1_new")));
 
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_SET, "idx_col_2_set", new String[][] {{"col_2"}}));
+    loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index())
+            .anyMatch(
+                index ->
+                    Objects.equals(index.name(), "idx_col_2_set")
+                        && index.type() == Index.IndexType.DATA_SKIPPING_SET
+                        && Arrays.deepEquals(index.fieldNames(), new String[][] {{"col_2"}})));
+    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_col_2_set", false));
+    loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_2_set")));
+
     RuntimeException autoIncrementTrueException =
         Assertions.assertThrows(
             RuntimeException.class,
