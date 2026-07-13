@@ -36,6 +36,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.types.Types.ByteType;
 import org.apache.gravitino.rel.types.Types.ShortType;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.types.EdgeAlgorithm;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -52,6 +53,47 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         CONVERTER.fromGravitino(org.apache.gravitino.rel.types.Types.VariantType.get())
             instanceof Types.VariantType);
+  }
+
+  @Test
+  public void testGeometryType() {
+    // Iceberg V3 geometry <-> Gravitino GeometryType, preserving the CRS in both directions.
+    org.apache.gravitino.rel.types.Type defaultFromIceberg =
+        CONVERTER.toGravitino(Types.GeometryType.crs84());
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.GeometryType.class, defaultFromIceberg);
+    Assertions.assertEquals(
+        "OGC:CRS84",
+        ((org.apache.gravitino.rel.types.Types.GeometryType) defaultFromIceberg).crs());
+
+    org.apache.gravitino.rel.types.Types.GeometryType customCrs =
+        org.apache.gravitino.rel.types.Types.GeometryType.of("srid:3857");
+    org.apache.iceberg.types.Type icebergCustom = CONVERTER.fromGravitino(customCrs);
+    Assertions.assertInstanceOf(Types.GeometryType.class, icebergCustom);
+    Assertions.assertEquals("srid:3857", ((Types.GeometryType) icebergCustom).crs());
+    Assertions.assertEquals(customCrs, CONVERTER.toGravitino(icebergCustom));
+  }
+
+  @Test
+  public void testGeographyType() {
+    // Iceberg V3 geography <-> Gravitino GeographyType, preserving CRS and algorithm both ways.
+    org.apache.gravitino.rel.types.Type defaultFromIceberg =
+        CONVERTER.toGravitino(Types.GeographyType.crs84());
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.GeographyType.class, defaultFromIceberg);
+    org.apache.gravitino.rel.types.Types.GeographyType defaultGeography =
+        (org.apache.gravitino.rel.types.Types.GeographyType) defaultFromIceberg;
+    Assertions.assertEquals("OGC:CRS84", defaultGeography.crs());
+    Assertions.assertEquals("spherical", defaultGeography.algorithm());
+
+    org.apache.gravitino.rel.types.Types.GeographyType custom =
+        org.apache.gravitino.rel.types.Types.GeographyType.of("EPSG:4326", "karney");
+    org.apache.iceberg.types.Type icebergCustom = CONVERTER.fromGravitino(custom);
+    Assertions.assertInstanceOf(Types.GeographyType.class, icebergCustom);
+    Types.GeographyType icebergGeography = (Types.GeographyType) icebergCustom;
+    Assertions.assertEquals("EPSG:4326", icebergGeography.crs());
+    Assertions.assertEquals(EdgeAlgorithm.KARNEY, icebergGeography.algorithm());
+    Assertions.assertEquals(custom, CONVERTER.toGravitino(icebergCustom));
   }
 
   @Test

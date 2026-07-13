@@ -188,6 +188,32 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(instance.simple_string(), "variant")
         self.assertIs(instance, Types.VariantType.get())
 
+    def test_geometry_type(self):
+        instance: Types.GeometryType = Types.GeometryType.crs84()
+        self.assertEqual(instance.name(), Name.GEOMETRY)
+        self.assertEqual(instance.crs(), "OGC:CRS84")
+        self.assertEqual(instance.simple_string(), "geometry")
+        self.assertEqual(instance, Types.GeometryType.of("ogc:crs84"))
+        self.assertEqual(Types.GeometryType.of("ogc:crs84").simple_string(), "geometry")
+        custom = Types.GeometryType.of("srid:3857")
+        self.assertEqual(custom.simple_string(), "geometry(srid:3857)")
+        self.assertNotEqual(instance, custom)
+        self.assertRaises(ValueError, Types.GeometryType.of, "")
+
+    def test_geography_type(self):
+        instance: Types.GeographyType = Types.GeographyType.crs84()
+        self.assertEqual(instance.name(), Name.GEOGRAPHY)
+        self.assertEqual(instance.crs(), "OGC:CRS84")
+        self.assertEqual(instance.algorithm(), "spherical")
+        self.assertEqual(instance.simple_string(), "geography")
+        self.assertEqual(instance, Types.GeographyType.of("ogc:crs84", "SPHERICAL"))
+        karney = Types.GeographyType.of("EPSG:4326", "Karney")
+        self.assertEqual(karney.algorithm(), "karney")
+        self.assertEqual(karney.simple_string(), "geography(EPSG:4326,karney)")
+        self.assertNotEqual(instance, karney)
+        self.assertRaises(ValueError, Types.GeographyType.of, "OGC:CRS84", "bogus")
+        self.assertRaises(ValueError, Types.GeographyType.of, "", "spherical")
+
     def test_fixed_type(self):
         instance: Types.FixedType = Types.FixedType.of(5)
         self.assertEqual(instance.name(), Name.FIXED)
