@@ -706,6 +706,28 @@ class Types:
         def simple_string(self) -> str:
             return "binary"
 
+    class VariantType(PrimitiveType):
+        """The variant type in Gravitino, holding semi-structured data not described by the
+        schema."""
+
+        _instance: Types.VariantType = None
+
+        def __new__(cls):
+            if cls._instance is None:
+                cls._instance = super(Types.VariantType, cls).__new__(cls)
+                cls._instance.__init__()
+            return cls._instance
+
+        @classmethod
+        def get(cls) -> Types.VariantType:
+            return cls()
+
+        def name(self) -> Name:
+            return Name.VARIANT
+
+        def simple_string(self) -> str:
+            return "variant"
+
     class StructType(ComplexType):
         """The struct type in Gravitino."""
 

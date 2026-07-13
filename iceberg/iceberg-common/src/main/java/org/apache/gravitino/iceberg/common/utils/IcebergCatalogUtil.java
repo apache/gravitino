@@ -32,6 +32,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
+import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
@@ -108,7 +109,7 @@ public class IcebergCatalogUtil {
     } catch (ClassNotFoundException e) {
       throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
     }
-    JdbcCatalog jdbcCatalog =
+    ClosableJdbcCatalog jdbcCatalog =
         new JdbcCatalogWithMetadataLocationSupport(
             icebergConfig.get(IcebergConfig.JDBC_INIT_TABLES));
 
@@ -123,9 +124,20 @@ public class IcebergCatalogUtil {
 
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
-    jdbcCatalog.setConf(hdfsConfiguration);
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     try {
-      jdbcCatalog.initialize(icebergCatalogName, properties);
+      if (authenticationConfig.isSimpleAuth()) {
+        jdbcCatalog.setConf(hdfsConfiguration);
+        jdbcCatalog.initialize(icebergCatalogName, properties);
+      } else if (authenticationConfig.isKerberosAuth()) {
+        hdfsConfiguration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
+        hdfsConfiguration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+        jdbcCatalog.setConf(hdfsConfiguration);
+        jdbcCatalog.initialize(icebergCatalogName, properties);
+      } else {
+        throw new UnsupportedOperationException(
+            "Unsupported authentication method: " + authenticationConfig.getAuthType());
+      }
     } catch (UncheckedSQLException e) {
       if (e.getCause() instanceof SQLException
           && e.getCause().getMessage().contains("Access denied")) {

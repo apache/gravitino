@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -37,9 +38,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -70,6 +74,8 @@ public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String NEW_LINE = "\n";
+  private static final Pattern DORIS_VERSION_PATTERN =
+      Pattern.compile("(\\d+\\.\\d+\\.\\d+\\.?\\d*)");
 
   @Override
   public JdbcTablePartitionOperations createJdbcTablePartitionOperations(JdbcTable loadedTable) {
@@ -87,7 +93,14 @@ public class DorisTableOperations extends JdbcTableOperations {
       Distribution distribution,
       Index[] indexes) {
 
-    validateIncrementCol(columns);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("generateCreateTableSql: tableName={}, indexCount={}", tableName, indexes.length);
+    }
+
+    // Doris auto-increment requires 2.1.0+. Validate before delegating to base class.
+    validateAutoIncrementVersion(columns);
+
+    validateIncrementCol(columns, indexes);
     validateDistribution(distribution, columns);
 
     StringBuilder sqlBuilder = new StringBuilder();
@@ -113,6 +126,13 @@ public class DorisTableOperations extends JdbcTableOperations {
     appendIndexesSql(indexes, sqlBuilder);
 
     sqlBuilder.append(NEW_LINE).append(")");
+
+    // Add Doris table model key declaration (UNIQUE KEY / DUPLICATE KEY).
+    // PRIMARY_KEY and UNIQUE_KEY indexes are filtered from the INDEX clause and instead emitted
+    // here as table-model keys, which is the correct Doris DDL position.
+    // This must appear AFTER the closing ')' and BEFORE DISTRIBUTED BY, per Doris grammar:
+    // LEFT_PAREN columnDefs indexDefs? RIGHT_PAREN (UNIQUE KEY keys)? DISTRIBUTED BY ...
+    appendTableModelKeySql(indexes, sqlBuilder);
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
@@ -192,16 +212,6 @@ public class DorisTableOperations extends JdbcTableOperations {
     return resultMap;
   }
 
-  private static void validateIncrementCol(JdbcColumn[] columns) {
-    // Get all auto increment column
-    List<JdbcColumn> autoIncrementCols =
-        Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
-
-    // Doris does not support auto increment column before version 2.1.0
-    Preconditions.checkArgument(
-        autoIncrementCols.isEmpty(), "Doris does not support auto-increment column");
-  }
-
   private static void validateDistribution(Distribution distribution, JdbcColumn[] columns) {
     Preconditions.checkArgument(null != distribution, "Doris must set distribution");
 
@@ -228,26 +238,179 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
   }
 
+  /**
+   * Validates that the Doris server version supports AUTO_INCREMENT columns. AUTO_INCREMENT was
+   * introduced in Doris 2.1.0. On older versions, the SQL parser does not recognize the
+   * AUTO_INCREMENT keyword and returns a syntax error.
+   */
+  private void validateAutoIncrementVersion(JdbcColumn[] columns) {
+    boolean hasAutoIncrement = Arrays.stream(columns).anyMatch(Column::autoIncrement);
+    if (!hasAutoIncrement) {
+      return;
+    }
+    Preconditions.checkState(dataSource != null, "dataSource is required for version validation");
+    String version = null;
+    // SELECT VERSION() returns the MySQL protocol version (e.g. "5.7.99"), not the Doris version.
+    // SHOW FRONTENDS returns the actual Doris version in the "Version" column
+    // (e.g. "doris-3.0.6.2-rc01-910c4249c5").
+    try (Connection connection = dataSource.getConnection();
+        Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery("SHOW FRONTENDS")) {
+      ResultSetMetaData meta = rs.getMetaData();
+      int versionCol = -1;
+      for (int i = 1; i <= meta.getColumnCount(); i++) {
+        if ("Version".equals(meta.getColumnLabel(i))) {
+          versionCol = i;
+          break;
+        }
+      }
+      if (rs.next() && versionCol > 0) {
+        String versionStr = rs.getString(versionCol);
+        // Extract X.Y.Z from "doris-X.Y.Z-suffix-commit" using regex for robustness
+        Matcher matcher = DORIS_VERSION_PATTERN.matcher(versionStr);
+        if (matcher.find()) {
+          version = matcher.group(1);
+        }
+      }
+    } catch (SQLException e) {
+      throw new UnsupportedOperationException(
+          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
+              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
+              + "and the Doris FE is reachable.",
+          e);
+    }
+    if (version == null) {
+      throw new UnsupportedOperationException(
+          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
+              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
+              + "and the Doris FE is reachable.");
+    }
+    if (!isVersionAtLeast(version, 2, 1, 0)) {
+      throw new UnsupportedOperationException(
+          "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
+    }
+  }
+
+  @VisibleForTesting
+  static boolean isVersionAtLeast(String version, int major, int minor, int patch) {
+    if (version == null || version.isEmpty()) {
+      return false;
+    }
+    // Strip any suffix like "-rc01" or "-beta"
+    String normalized = version.split("-")[0].trim();
+    String[] parts = normalized.split("\\.");
+    try {
+      int vMajor = Integer.parseInt(parts[0]);
+      if (vMajor != major) {
+        return vMajor > major;
+      }
+      int vMinor = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
+      if (vMinor != minor) {
+        return vMinor > minor;
+      }
+      int vPatch = parts.length > 2 ? Integer.parseInt(parts[2]) : 0;
+      return vPatch >= patch;
+    } catch (NumberFormatException e) {
+      LOG.warn("Failed to parse Doris version: {}", version, e);
+      return false;
+    }
+  }
+
   private static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     if (indexes.length == 0) {
       return;
     }
 
-    // validate indexes
-    Arrays.stream(indexes)
-        .forEach(
-            index -> {
-              if (index.fieldNames().length > 1) {
-                throw new IllegalArgumentException("Index does not support multi fields in Doris");
-              }
-            });
+    // Filter out UNIQUE_KEY indexes — they are table model keys in Doris,
+    // defined via UNIQUE KEY(col) syntax. PRIMARY_KEY is kept in the INDEX clause
+    // to maintain backward compatibility with Doris 1.2.x (SHOW INDEX returns
+    // secondary indexes, not table model keys).
+    List<Index> nonKeyIndexes =
+        Arrays.stream(indexes)
+            .filter(index -> index.type() != Index.IndexType.UNIQUE_KEY)
+            .collect(Collectors.toList());
+
+    if (nonKeyIndexes.isEmpty()) {
+      return;
+    }
+
+    nonKeyIndexes.forEach(
+        index -> {
+          if (index.fieldNames().length > 1) {
+            throw new IllegalArgumentException(
+                "Index '" + index.name() + "' does not support multi fields in Doris");
+          }
+        });
 
     String indexSql =
-        Arrays.stream(indexes)
-            .map(index -> String.format("INDEX %s (%s)", index.name(), index.fieldNames()[0][0]))
+        nonKeyIndexes.stream()
+            .map(
+                index -> {
+                  String usingClause = mapIndexTypeToUsingClause(index.type());
+                  if (usingClause.isEmpty()) {
+                    return String.format(
+                        "INDEX `%s` (`%s`)", index.name(), index.fieldNames()[0][0]);
+                  }
+                  return String.format(
+                      "INDEX `%s` (`%s`) %s", index.name(), index.fieldNames()[0][0], usingClause);
+                })
             .collect(Collectors.joining(",\n"));
 
     sqlBuilder.append(",").append(NEW_LINE).append(indexSql);
+  }
+
+  private static String mapIndexTypeToUsingClause(Index.IndexType indexType) {
+    switch (indexType) {
+      case PRIMARY_KEY:
+        // PRIMARY_KEY stays in the INDEX clause (not filtered) for backward compatibility
+        // with Doris 1.2.x. No USING clause — Doris defaults to the appropriate index type.
+        return "";
+      case UNIQUE_KEY:
+        throw new IllegalStateException(
+            "UNIQUE_KEY should be filtered out before index SQL generation, got: " + indexType);
+      case INVERTED:
+        return "USING INVERTED";
+      case BITMAP:
+        // Omit the USING clause for BITMAP indexes to maintain backward compatibility.
+        // Doris 1.2.x defaults bare INDEX to BITMAP; 3.0+/4.0+ defaults to INVERTED.
+        // The read path (mapDorisIndexType) maps BITMAP->INVERTED for cross-version consistency.
+        // Note: Doris 4.0.6 removed BITMAP from Nereids grammar (USING only accepts
+        // INVERTED/NGRAM_BF/ANN), so emitting USING BITMAP would fail on 4.0.x.
+        return "";
+      case VECTOR:
+        return "USING ANN";
+      default:
+        // Doris does not support BTREE as an explicit USING clause for non-key indexes.
+        // Known types that reach here (e.g. BLOOMFILTER) are table-level properties, not indexes.
+        throw new UnsupportedOperationException(
+            "Doris does not support index type " + indexType + " via ADD INDEX syntax");
+    }
+  }
+
+  private static void appendTableModelKeySql(Index[] indexes, StringBuilder sqlBuilder) {
+    // Emit UNIQUE KEY table model declaration for UNIQUE_KEY index type.
+    // PRIMARY_KEY is kept in the INDEX clause (not here) for backward compatibility
+    // with Doris 1.2.x — SHOW INDEX returns secondary indexes, not table model keys.
+    // Note: Doris requires key columns to be an ordered prefix of the schema.
+    // The caller must ensure the key column is the first column in the table definition.
+    long uniqueKeyCount =
+        Arrays.stream(indexes).filter(index -> index.type() == Index.IndexType.UNIQUE_KEY).count();
+    Preconditions.checkArgument(
+        uniqueKeyCount <= 1,
+        "Doris table model key can have at most one UNIQUE_KEY index, got: %s",
+        uniqueKeyCount);
+
+    Arrays.stream(indexes)
+        .filter(index -> index.type() == Index.IndexType.UNIQUE_KEY)
+        .findFirst()
+        .ifPresent(
+            keyIndex -> {
+              String cols =
+                  Arrays.stream(keyIndex.fieldNames())
+                      .map(field -> BACK_QUOTE + field[0] + BACK_QUOTE)
+                      .collect(Collectors.joining(", "));
+              sqlBuilder.append(NEW_LINE).append("UNIQUE KEY(").append(cols).append(")");
+            });
   }
 
   private static void appendPartitionSql(
@@ -383,16 +546,78 @@ public class DorisTableOperations extends JdbcTableOperations {
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
         ResultSet resultSet = preparedStatement.executeQuery()) {
 
+      // Check if Index_type column exists (available in Doris 2.0+).
+      boolean hasIndexType = false;
+      ResultSetMetaData metaData = resultSet.getMetaData();
+      for (int i = 1; i <= metaData.getColumnCount(); i++) {
+        if ("Index_type".equals(metaData.getColumnName(i))) {
+          hasIndexType = true;
+          break;
+        }
+      }
+
       List<Index> indexes = new ArrayList<>();
       while (resultSet.next()) {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
-        indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+        // Doris always names the primary key index "PRIMARY"; detect it first.
+        Index.IndexType gravitinoIndexType;
+        if ("PRIMARY".equals(indexName)) {
+          gravitinoIndexType = Index.IndexType.PRIMARY_KEY;
+        } else if (hasIndexType) {
+          gravitinoIndexType = mapDorisIndexType(resultSet.getString("Index_type"), indexName);
+        } else {
+          // Doris 1.2.x: no Index_type column, infer from index name
+          gravitinoIndexType = mapDorisIndexType(null, indexName);
+        }
+        indexes.add(Indexes.of(gravitinoIndexType, indexName, new String[][] {{columnName}}));
       }
       return indexes;
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  @VisibleForTesting
+  static Index.IndexType mapDorisIndexType(String indexType, String indexName) {
+    if (indexType == null) {
+      // Index_type column unavailable (Doris 1.2.x) or returned null.
+      // In Doris 1.2.x, all indexes are BTREE-based key indexes. Without Index_type we
+      // cannot distinguish UNIQUE_KEY from PRIMARY_KEY, so infer from index name:
+      // "PRIMARY" is the primary key, everything else defaults to UNIQUE_KEY (matching
+      // the BTREE case below).
+      if ("PRIMARY".equals(indexName)) {
+        return Index.IndexType.PRIMARY_KEY;
+      }
+      LOG.warn(
+          "Index_type is null for index '{}', defaulting to UNIQUE_KEY. "
+              + "Load table metadata from Doris 3.0+ for accurate index type mapping.",
+          indexName);
+      return Index.IndexType.UNIQUE_KEY;
+    }
+    switch (indexType.toUpperCase(Locale.ROOT)) {
+      case "BTREE":
+        if ("PRIMARY".equals(indexName)) {
+          return Index.IndexType.PRIMARY_KEY;
+        }
+        return Index.IndexType.UNIQUE_KEY;
+      case "INVERTED":
+        return Index.IndexType.INVERTED;
+      case "BITMAP":
+        // Doris 4.0.6 removed BITMAP from Nereids grammar (USING clause only accepts
+        // INVERTED/NGRAM_BF/ANN). Map BITMAP to INVERTED for cross-version compatibility,
+        // matching the write path in mapIndexTypeToUsingClause.
+        return Index.IndexType.INVERTED;
+      case "BLOOMFILTER":
+        return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
+      case "ANN":
+        return Index.IndexType.VECTOR;
+      default:
+        LOG.warn(
+            "Unknown Doris index type '{}' for index '{}', falling back to INVERTED",
+            indexType,
+            indexName);
+        return Index.IndexType.INVERTED;
     }
   }
 
@@ -766,7 +991,21 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   static String addIndexDefinition(TableChange.AddIndex addIndex) {
-    return String.format("ADD INDEX %s (%s)", addIndex.getName(), addIndex.getFieldNames()[0][0]);
+    // PRIMARY_KEY and UNIQUE_KEY are table-level concepts in Doris, not index-level
+    // They should not be added via ALTER TABLE ADD INDEX
+    if (addIndex.getType() == Index.IndexType.PRIMARY_KEY
+        || addIndex.getType() == Index.IndexType.UNIQUE_KEY) {
+      throw new UnsupportedOperationException(
+          "PRIMARY_KEY and UNIQUE_KEY cannot be added via ALTER TABLE ADD INDEX in Doris");
+    }
+    String usingClause = mapIndexTypeToUsingClause(addIndex.getType());
+    if (usingClause.isEmpty()) {
+      return String.format(
+          "ADD INDEX `%s` (`%s`)", addIndex.getName(), addIndex.getFieldNames()[0][0]);
+    }
+    return String.format(
+        "ADD INDEX `%s` (`%s`) %s",
+        addIndex.getName(), addIndex.getFieldNames()[0][0], usingClause);
   }
 
   static String deleteIndexDefinition(
@@ -777,7 +1016,7 @@ public class DorisTableOperations extends JdbcTableOperations {
               .anyMatch(index -> index.name().equals(deleteIndex.getName())),
           "Index does not exist");
     }
-    return "DROP INDEX " + deleteIndex.getName();
+    return "DROP INDEX `" + deleteIndex.getName() + "`";
   }
 
   @Override
@@ -797,28 +1036,36 @@ public class DorisTableOperations extends JdbcTableOperations {
   public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
     String upperTypeName = typeName.toUpperCase();
 
-    // Check driver version compatibility first
-    boolean isDatetimeType = "DATETIME".equals(upperTypeName);
-
-    if (isDatetimeType) {
-      String driverVersion = getMySQLDriverVersion();
-      if (driverVersion != null && !isMySQLDriverVersionSupported(driverVersion)) {
-        LOG.warn(
-            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision calculation. "
-                + "Returning null for {} type precision. Driver version: {}",
-            driverVersion,
-            upperTypeName,
-            driverVersion);
+    // Handle datetime(N) format from SHOW CREATE TABLE first — precision is parsed directly
+    // from the type string and does not depend on JDBC columnSize or driver version.
+    if (upperTypeName.startsWith("DATETIME(") && upperTypeName.endsWith(")")) {
+      try {
+        String precisionStr =
+            upperTypeName.substring("DATETIME(".length(), upperTypeName.length() - 1);
+        return Integer.parseInt(precisionStr);
+      } catch (NumberFormatException e) {
+        LOG.warn("Failed to parse datetime precision from type: {}", typeName, e);
         return null;
       }
     }
 
-    if (upperTypeName.equals("DATETIME")) {
+    // For plain DATETIME, precision is derived from columnSize which depends on the JDBC driver.
+    // Check driver version compatibility before using columnSize-based calculation.
+    if ("DATETIME".equals(upperTypeName)) {
+      String driverVersion = getMySQLDriverVersion();
+      if (driverVersion != null && !isMySQLDriverVersionSupported(driverVersion)) {
+        LOG.warn(
+            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision calculation. "
+                + "Returning null for DATETIME type precision.",
+            driverVersion);
+        return null;
+      }
       // DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
       return columnSize >= DATETIME_FORMAT_WITH_DOT.length()
           ? columnSize - DATETIME_FORMAT_WITH_DOT.length()
           : 0;
     }
+
     return null;
   }
 }
