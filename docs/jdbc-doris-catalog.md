@@ -125,12 +125,12 @@ Refer to
 | `Float`                    | `Float`                      |
 | `Double`                   | `Double`                     |
 | `Decimal`                  | `Decimal`                    |
-| `Date`                     | `Date` / `DateV2`            |
+| `Date`                     | `Date`/`DateV2`              |
 | `Timestamp[(p)]`           | `Datetime[(p)]`              |
 | `VarChar`                  | `VarChar`                    |
 | `FixedChar`                | `Char`                       |
 | `String`                   | `String`                     |
-| `Binary`                   | `Binary` / `VarBinary`       |
+| `Binary`                   | `Binary`/`VarBinary`         |
 | `ExternalType("json")`     | `JSON`                       |
 | `ExternalType("variant")`  | `Variant`                    |
 | `ExternalType("ipv4")`     | `IPv4`                       |
@@ -214,13 +214,13 @@ Index[] indexes = new Index[] {
 
 The Doris catalog supports the following index types. Each index applies to a single column.
 
-| Gravitino Index Type | Doris DDL | Doris Version |
-|---------------------|-----------|---------------|
-| `PRIMARY_KEY`       | `` INDEX `PRIMARY` (col) `` (in the INDEX clause, no USING) | 1.2+ |
-| `UNIQUE_KEY`        | `UNIQUE KEY(col)` (in the table model section, not INDEX clause) | 1.2+ |
-| `INVERTED`          | `INDEX name (col) USING INVERTED` | 3.0+ |
-| `BITMAP`            | `INDEX name (col)` (bare, no USING clause; write-only, see note below) | 1.2+ |
-| `VECTOR`            | `INDEX name (col) USING ANN` | 4.0.6+ |
+| Gravitino Index Type | Doris DDL                                                                          | Doris Version |
+|----------------------|------------------------------------------------------------------------------------|---------------|
+| `PRIMARY_KEY`        | `` INDEX `PRIMARY` (col) `` (in the INDEX clause, no USING)                        | 1.2+          |
+| `UNIQUE_KEY`         | `UNIQUE KEY(col)` (in the table model section, not INDEX clause)                   | 1.2+          |
+| `INVERTED`           | `INDEX name (col) USING INVERTED`                                                  | 3.0+          |
+| `BITMAP`             | `INDEX name (col)` (bare, no USING clause; write-only, see note below)             | 1.2+          |
+| `VECTOR`             | `INDEX name (col) USING ANN`                                                       | 4.0.6+        |
 
 :::note
 - `PRIMARY_KEY` stays in the INDEX clause as a bare index (e.g. `` INDEX `PRIMARY` (`id`) ``), with no USING clause.
