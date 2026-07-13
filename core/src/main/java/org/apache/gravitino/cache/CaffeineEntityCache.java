@@ -45,7 +45,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -226,51 +225,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
             cacheIndex.put(entityCacheKey.toString(), entityCacheKey);
           }
         });
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * <p>Relation results are not cached by this implementation; always empty. This method exists
-   * only until the relation methods are removed from the {@link EntityCache} interface.
-   */
-  @Override
-  public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
-    return Optional.empty();
-  }
-
-  /** {@inheritDoc} No-op: relation results are not cached by this implementation. */
-  @Override
-  public boolean invalidate(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return false;
-  }
-
-  /** {@inheritDoc} No-op: relation results are not cached by this implementation. */
-  @Override
-  public boolean invalidateRelationEntry(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return false;
-  }
-
-  /** {@inheritDoc} No-op: relation results are not cached by this implementation. */
-  @Override
-  public boolean contains(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return false;
-  }
-
-  /** {@inheritDoc} No-op: relation results are not cached by this implementation. */
-  @Override
-  public <E extends Entity & HasIdentifier> void put(
-      NameIdentifier ident,
-      Entity.EntityType type,
-      SupportsRelationOperations.Type relType,
-      List<E> entities) {
-    // do nothing
   }
 
   /** {@inheritDoc} */
