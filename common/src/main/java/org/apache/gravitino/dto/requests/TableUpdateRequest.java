@@ -840,7 +840,8 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     @Override
     public TableChange tableChange() {
-      return TableChange.addIndex(index.type(), index.name(), index.fieldNames());
+      return TableChange.addIndex(
+          index.type(), index.name(), index.fieldNames(), index.properties());
     }
   }
 
