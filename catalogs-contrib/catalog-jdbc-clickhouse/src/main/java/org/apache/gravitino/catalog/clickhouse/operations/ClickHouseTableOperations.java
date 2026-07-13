@@ -88,6 +88,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final Pattern PARTITION_BY_PATTERN =
       Pattern.compile(
           "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
+  private static final Pattern SETTINGS_PATTERN =
+      Pattern.compile("(?is)\\bSETTINGS\\s+(.+?)(?=\\bCOMMENT\\b|$)");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
       Pattern.compile(
           "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
@@ -192,6 +194,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     appendPartitionClause(partitioning, sqlBuilder, engine);
 
+    // Add setting clause before COMMENT; ClickHouse 24.8 rejects SETTINGS that follow COMMENT
+    // (all settings become UNKNOWN_SETTING when preceded by a COMMENT clause).
+    // This matches the order in SHOW CREATE TABLE output: SETTINGS ... COMMENT '...'.
+    appendTableProperties(notNullProperties, sqlBuilder);
+
     // Add table comment; embed cluster name so it can be recovered at DROP/ALTER time.
     // ClickHouse does not persist ON CLUSTER in SHOW CREATE TABLE (see ClickHouseClusterUtils).
     String storedComment =
@@ -202,9 +209,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     if (StringUtils.isNotEmpty(storedComment)) {
       sqlBuilder.append(" COMMENT '%s'".formatted(escapeSingleQuotes(storedComment)));
     }
-
-    // Add setting clause if specified, clickhouse only supports predefine settings
-    appendTableProperties(notNullProperties, sqlBuilder);
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
@@ -621,6 +625,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       jdbcTableBuilder.withDistribution(distribution);
 
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
+      // Merge SETTINGS parsed from SHOW CREATE TABLE into table properties.
+      // SHOW CREATE TABLE is the authoritative source for SETTINGS; it takes precedence
+      // over any settings.* keys that might exist in system.tables (though getTableProperties()
+      // currently does not read SETTINGS from system.tables, so no overlap occurs in practice).
+      if (!metadata.settings.isEmpty()) {
+        Map<String, String> merged = new HashMap<>(tableProperties);
+        merged.putAll(metadata.settings);
+        tableProperties = Collections.unmodifiableMap(merged);
+      }
       jdbcTableBuilder.withProperties(tableProperties);
 
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
@@ -1130,12 +1143,41 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
     }
 
+    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(createSql);
+    if (settingsMatcher.find()) {
+      metadata.settings = parseSettingsClause(settingsMatcher.group(1));
+    }
+
     return metadata;
+  }
+
+  // Parses "key1 = val1, key2 = val2" from a SETTINGS clause.
+  // Keys are prefixed with "settings." to match the write path convention in
+  // appendTableProperties(). ClickHouse SETTINGS values are scalar (UInt64, Bool,
+  // String, Enum) — arrays or nested structures are not valid SETTINGS values,
+  // so splitting by comma is safe.
+  private static Map<String, String> parseSettingsClause(String settingsStr) {
+    Map<String, String> settings = new HashMap<>();
+    for (String pair : settingsStr.split(",")) {
+      String trimmed = pair.trim();
+      int eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        String key = trimmed.substring(0, eqIdx).trim();
+        String value = trimmed.substring(eqIdx + 1).trim();
+        settings.put(TableConstants.SETTINGS_PREFIX + key, value);
+      }
+    }
+    return settings;
   }
 
   @VisibleForTesting
   SortOrder[] parseSortOrdersFromCreateSql(String createSql) {
     return parseCreateStatement(createSql).sortOrders;
+  }
+
+  @VisibleForTesting
+  Map<String, String> parseSettingsFromCreateSql(String createSql) {
+    return parseCreateStatement(createSql).settings;
   }
 
   private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
@@ -1257,6 +1299,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final class ShowCreateTableMetadata {
     private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
     private SortOrder[] sortOrders = SortOrders.NONE;
+    private Map<String, String> settings = Collections.emptyMap();
   }
 
   @VisibleForTesting
