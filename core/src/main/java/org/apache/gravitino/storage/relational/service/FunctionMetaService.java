@@ -45,6 +45,7 @@ import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FunctionMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -165,6 +166,11 @@ public class FunctionMetaService {
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
+                        functionId, MetadataObject.Type.FUNCTION.name()));
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         functionId, MetadataObject.Type.FUNCTION.name()));
           }
         });
