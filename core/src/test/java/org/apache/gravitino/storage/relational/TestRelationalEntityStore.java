@@ -108,16 +108,8 @@ public class TestRelationalEntityStore {
 
     Mockito.doAnswer(
             invocation -> {
-              Mockito.verify(cache, Mockito.never())
-                  .invalidate(
-                      src,
-                      Entity.EntityType.TABLE,
-                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
-              Mockito.verify(cache, Mockito.never())
-                  .invalidate(
-                      dst,
-                      Entity.EntityType.TAG,
-                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+              Mockito.verify(cache, Mockito.never()).invalidate(src, Entity.EntityType.TABLE);
+              Mockito.verify(cache, Mockito.never()).invalidate(dst, Entity.EntityType.TAG);
               return null;
             })
         .when(backend)
@@ -147,14 +139,8 @@ public class TestRelationalEntityStore {
             dst,
             Entity.EntityType.TAG,
             true);
-    inOrder
-        .verify(cache)
-        .invalidate(
-            src, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
-    inOrder
-        .verify(cache)
-        .invalidate(
-            dst, Entity.EntityType.TAG, SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+    inOrder.verify(cache).invalidate(src, Entity.EntityType.TABLE);
+    inOrder.verify(cache).invalidate(dst, Entity.EntityType.TAG);
   }
 
   @Test
@@ -170,21 +156,10 @@ public class TestRelationalEntityStore {
 
     Mockito.doAnswer(
             invocation -> {
+              Mockito.verify(cache, Mockito.never()).invalidate(src, Entity.EntityType.TABLE);
+              Mockito.verify(cache, Mockito.never()).invalidate(destToAdd, Entity.EntityType.TABLE);
               Mockito.verify(cache, Mockito.never())
-                  .invalidate(
-                      src,
-                      Entity.EntityType.TABLE,
-                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
-              Mockito.verify(cache, Mockito.never())
-                  .invalidate(
-                      destToAdd,
-                      Entity.EntityType.TABLE,
-                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
-              Mockito.verify(cache, Mockito.never())
-                  .invalidate(
-                      destToRemove,
-                      Entity.EntityType.TABLE,
-                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+                  .invalidate(destToRemove, Entity.EntityType.TABLE);
               return List.of();
             })
         .when(backend)
@@ -211,21 +186,8 @@ public class TestRelationalEntityStore {
             Entity.EntityType.TABLE,
             destEntitiesToAdd,
             destEntitiesToRemove);
-    inOrder
-        .verify(cache)
-        .invalidate(
-            src, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
-    inOrder
-        .verify(cache)
-        .invalidate(
-            destToAdd,
-            Entity.EntityType.TABLE,
-            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
-    inOrder
-        .verify(cache)
-        .invalidate(
-            destToRemove,
-            Entity.EntityType.TABLE,
-            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+    inOrder.verify(cache).invalidate(src, Entity.EntityType.TABLE);
+    inOrder.verify(cache).invalidate(destToAdd, Entity.EntityType.TABLE);
+    inOrder.verify(cache).invalidate(destToRemove, Entity.EntityType.TABLE);
   }
 }
