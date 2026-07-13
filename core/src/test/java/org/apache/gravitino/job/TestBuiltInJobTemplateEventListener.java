@@ -445,6 +445,12 @@ public class TestBuiltInJobTemplateEventListener {
             Entity.EntityType.JOB_TEMPLATE,
             JobTemplateEntity.class);
     Assertions.assertEquals("v1", result.templateContent().customFields().get("version"));
+
+    // Verify no update actually happened: an update would stamp lastModifier/lastModifiedTime,
+    // which createJobTemplateEntity(...) leaves null, so these staying null proves the entity
+    // was left untouched rather than merely ending up with the same version by coincidence.
+    Assertions.assertNull(result.auditInfo().lastModifier());
+    Assertions.assertNull(result.auditInfo().lastModifiedTime());
   }
 
   @Test
@@ -591,6 +597,11 @@ public class TestBuiltInJobTemplateEventListener {
         .withId(1L)
         .withName(name)
         .withNamespace(NamespaceUtil.ofJobTemplate("test_metalake"))
+        // TemplateContent does not carry comment (see JobTemplateEntity#toJobTemplate(), which
+        // reads comment from the entity itself), so it must be set explicitly here to match what
+        // registerNewBuiltInJobTemplate(...) does in production and keep entity.toJobTemplate()
+        // consistent with `template` above.
+        .withComment(template.comment())
         .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
