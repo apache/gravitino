@@ -67,7 +67,9 @@ public class StarRocksUtils {
           "(?:^|\\s|\\))DISTRIBUTED\\s+BY\\s+(?:RANDOM\\b|\\w+\\s*\\()", Pattern.CASE_INSENSITIVE);
 
   private static final Pattern TABLE_COMMENT_PATTERN =
-      Pattern.compile("COMMENT\\s*\"([^\\(]+?)\\s*\\(From Gravitino,.*\\)\"");
+      Pattern.compile(
+          "COMMENT\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*)\\s+"
+              + "\\(From Gravitino, DO NOT EDIT: gravitino\\.v\\d+\\.uid-?\\d+\\)\"");
 
   private static final String PARTITION_TYPE_VALUE_PATTERN_STRING =
       "types: \\[([^\\]]+)\\]; keys: \\[([^\\]]+)\\];";
@@ -196,7 +198,7 @@ public class StarRocksUtils {
   public static String extractTableCommentFromSql(String createTableSql) {
     Matcher matcher = TABLE_COMMENT_PATTERN.matcher(createTableSql.trim());
     if (matcher.find()) {
-      return matcher.group(1);
+      return unescapeTableComment(matcher.group(1));
     }
     return "";
   }
@@ -359,5 +361,22 @@ public class StarRocksUtils {
       throw new UnsupportedOperationException(
           String.format("%s is not a partitioned table", tableName));
     }
+  }
+
+  private static String unescapeTableComment(String comment) {
+    StringBuilder result = new StringBuilder(comment.length());
+    for (int i = 0; i < comment.length(); i++) {
+      char current = comment.charAt(i);
+      if (current == '\\' && i + 1 < comment.length()) {
+        char next = comment.charAt(i + 1);
+        if (next == '\\' || next == '"') {
+          result.append(next);
+          i++;
+          continue;
+        }
+      }
+      result.append(current);
+    }
+    return result.toString();
   }
 }

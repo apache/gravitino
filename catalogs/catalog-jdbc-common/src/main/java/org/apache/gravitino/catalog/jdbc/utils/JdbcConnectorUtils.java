@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import javax.annotation.Nullable;
 
 public final class JdbcConnectorUtils {
   public static final ImmutableList<String> TABLE_TYPES = ImmutableList.of("TABLE");
@@ -41,6 +42,28 @@ public final class JdbcConnectorUtils {
     try (final Statement statement = connection.createStatement()) {
       return statement.executeUpdate(sql);
     }
+  }
+
+  /**
+   * Escapes a value for inclusion in a quoted SQL string literal.
+   *
+   * <p>This method escapes both backslashes and the selected quote character. Callers are
+   * responsible for adding the surrounding quote characters and any dialect-specific literal
+   * prefix.
+   *
+   * @param value the literal value to escape; {@code null} is represented as the text {@code null}
+   * @param quote the quote character used by the SQL dialect
+   * @return the escaped literal value
+   * @throws IllegalArgumentException if {@code quote} is neither a single nor double quote
+   */
+  public static String escapeSqlLiteral(@Nullable String value, char quote) {
+    if (quote != '\'' && quote != '"') {
+      throw new IllegalArgumentException("SQL literal quote must be a single or double quote");
+    }
+
+    String literalValue = String.valueOf(value);
+    String quoteString = String.valueOf(quote);
+    return literalValue.replace("\\", "\\\\").replace(quoteString, quoteString + quoteString);
   }
 
   public static String[] getTableTypes() {

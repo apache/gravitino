@@ -98,6 +98,20 @@ public class TestStarRocksUtils {
   }
 
   @Test
+  public void testExtractEscapedTableCommentFromSql() {
+    String createTableSql =
+        "CREATE TABLE `testTable` (\n"
+            + "`col1` INT COMMENT \"column comment\"\n"
+            + ")\n"
+            + "COMMENT \"owner's \\\"comment\\\" (nested) C:\\\\tmp; -- "
+            + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\"";
+
+    assertEquals(
+        "owner's \"comment\" (nested) C:\\tmp; --",
+        StarRocksUtils.extractTableCommentFromSql(createTableSql));
+  }
+
+  @Test
   public void testExtractPartitionInfoFromSql() {
     // test range partition
     String createTableSql =

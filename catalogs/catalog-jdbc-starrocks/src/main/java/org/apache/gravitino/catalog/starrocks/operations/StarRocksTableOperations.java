@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.starrocks.operations;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
@@ -118,7 +119,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     sqlBuilder.append(")\n");
     if (StringUtils.isNotEmpty(comment)) {
       comment = StringIdentifier.addToComment(StringIdentifier.DUMMY_ID, comment);
-      sqlBuilder.append(" COMMENT \"").append(comment).append("\"");
+      sqlBuilder.append(" COMMENT \"").append(escapeSqlLiteral(comment, '"')).append("\"");
     }
 
     appendPartitionSql(partitioning, columns, sqlBuilder);
@@ -170,7 +171,11 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.UpdateComment) {
         TableChange.UpdateComment updateComment = (TableChange.UpdateComment) change;
         String newComment = updateComment.getNewComment();
-        alterSql.add("MODIFY COMMENT \"" + newComment + "\"");
+        if (StringUtils.isNotEmpty(newComment)
+            && StringIdentifier.fromComment(newComment) == null) {
+          newComment = StringIdentifier.addToComment(StringIdentifier.DUMMY_ID, newComment);
+        }
+        alterSql.add("COMMENT = \"" + escapeSqlLiteral(newComment, '"') + "\"");
       } else if (change instanceof TableChange.SetProperty) {
         if (hasSetPropertyChange) {
           throw new IllegalArgumentException(
@@ -333,7 +338,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
-      sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");
+      sqlBuilder.append("COMMENT '").append(escapeSqlLiteral(column.comment(), '\'')).append("' ");
     }
     return sqlBuilder;
   }
@@ -481,7 +486,10 @@ public class StarRocksTableOperations extends JdbcTableOperations {
 
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
+      columnDefinition
+          .append("COMMENT '")
+          .append(escapeSqlLiteral(addColumn.getComment(), '\''))
+          .append("' ");
     }
 
     // Append position if available

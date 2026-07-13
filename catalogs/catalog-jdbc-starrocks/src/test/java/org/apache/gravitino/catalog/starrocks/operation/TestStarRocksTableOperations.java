@@ -196,6 +196,42 @@ public class TestStarRocksTableOperations extends TestStarRocks {
   }
 
   @Test
+  public void testTableCommentWithSqlLiteralCharacters() {
+    String tableName = GravitinoITUtils.genRandomName("starrocks_comment_test_table");
+    String createComment = "owner's \"comment\" (created) C:\\tmp; --";
+    String updatedComment = "reviewer's \"comment\" (updated) D:\\data; --";
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
+
+    try {
+      TABLE_OPERATIONS.create(
+          databaseName,
+          tableName,
+          new JdbcColumn[] {column},
+          createComment,
+          createProperties(),
+          null,
+          Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1")),
+          Indexes.EMPTY_INDEXES);
+
+      Assertions.assertEquals(
+          createComment, TABLE_OPERATIONS.load(databaseName, tableName).comment());
+
+      TABLE_OPERATIONS.alterTable(
+          databaseName, tableName, TableChange.updateComment(updatedComment));
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(
+              () ->
+                  Assertions.assertEquals(
+                      updatedComment, TABLE_OPERATIONS.load(databaseName, tableName).comment()));
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
+  }
+
+  @Test
   public void testAlterTable() {
     String tableName = GravitinoITUtils.genRandomName("starrocks_alter_test_table");
 

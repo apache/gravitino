@@ -18,39 +18,21 @@
  */
 package org.apache.gravitino.catalog.doris.operation;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.utils.RandomNameUtils;
+import java.util.Collections;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-test")
-public class TestDorisDatabaseOperations extends TestDoris {
+class TestDorisDatabaseOperationsSqlGeneration {
 
   @Test
-  public void testBaseOperationDatabase() {
-    String databaseName = RandomNameUtils.genRandomName("it_db");
+  public void testEscapeCommentInGeneratedSql() {
+    DorisDatabaseOperations operations = new DorisDatabaseOperations();
     String comment = "owner\\\"'s comment; DROP DATABASE marker; --";
 
-    Map<String, String> properties = new HashMap<>();
-    properties.put("property1", "value1");
+    String sql =
+        operations.generateCreateDatabaseSql("test_database", comment, Collections.emptyMap());
 
-    testBaseOperation(databaseName, properties, comment);
-
-    // recreate database, get exception.
-    Assertions.assertThrowsExactly(
-        SchemaAlreadyExistsException.class,
-        () -> DATABASE_OPERATIONS.create(databaseName, "", properties));
-
-    testDropDatabase(databaseName);
-  }
-
-  @Test
-  void testListSystemDatabase() {
-    List<String> databaseNames = DATABASE_OPERATIONS.listDatabases();
-    Assertions.assertFalse(databaseNames.contains("information_schema"));
+    Assertions.assertTrue(
+        sql.contains("\"comment\"=\"owner\\\\\"\"'s comment; DROP DATABASE marker; --\""), sql);
   }
 }

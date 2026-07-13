@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.doris.utils;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
+
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -65,7 +67,13 @@ public final class DorisUtils {
     StringBuilder sqlBuilder = new StringBuilder(" PROPERTIES (\n");
     sqlBuilder.append(
         properties.entrySet().stream()
-            .map(entry -> "\"" + entry.getKey() + "\"=\"" + entry.getValue() + "\"")
+            .map(
+                entry ->
+                    "\""
+                        + escapeSqlLiteral(entry.getKey(), '"')
+                        + "\"=\""
+                        + escapeSqlLiteral(entry.getValue(), '"')
+                        + "\"")
             .collect(Collectors.joining(",\n")));
     sqlBuilder.append("\n)");
     return sqlBuilder.toString();
