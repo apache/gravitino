@@ -172,10 +172,7 @@ public class CapabilityHelpers {
   }
 
   public static Partition applyCaseSensitive(Partition partition, Capability capabilities) {
-    String newName =
-        capabilities.caseSensitiveOnName(Capability.Scope.PARTITION).supported()
-            ? partition.name()
-            : partition.name().toLowerCase();
+    String newName = capabilities.normalizeName(Capability.Scope.PARTITION, partition.name());
     if (partition instanceof IdentityPartition) {
       IdentityPartition identityPartition = (IdentityPartition) partition;
       return Partitions.identity(
@@ -507,16 +504,17 @@ public class CapabilityHelpers {
 
   public static String applyCaseSensitiveOnName(
       Capability.Scope scope, String name, Capability capabilities) {
-    return capabilities.caseSensitiveOnName(scope).supported() ? name : name.toLowerCase();
+    return capabilities.normalizeName(scope, name);
   }
 
   private static String[] applyCaseSensitiveOnColumnName(String[] name, Capability capabilities) {
-    if (!capabilities.caseSensitiveOnName(Capability.Scope.COLUMN).supported()) {
-      String[] standardizeColumnName = Arrays.copyOf(name, name.length);
-      standardizeColumnName[0] = name[0].toLowerCase();
-      return standardizeColumnName;
+    String normalizedFirstName = capabilities.normalizeName(Capability.Scope.COLUMN, name[0]);
+    if (normalizedFirstName.equals(name[0])) {
+      return name;
     }
-    return name;
+    String[] standardizeColumnName = Arrays.copyOf(name, name.length);
+    standardizeColumnName[0] = normalizedFirstName;
+    return standardizeColumnName;
   }
 
   private static void applyColumnNotNull(Column column, Capability capabilities) {
