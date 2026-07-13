@@ -45,6 +45,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHouseService;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -2260,5 +2261,144 @@ public class CatalogClickHouseIT extends BaseIT {
 
     loadCatalog.asSchemas().dropSchema("test", true);
     metalake.dropCatalog(testCatalogName, true);
+  }
+
+  @Test
+  void testLoadTableWithSettingsFromNativeSql() {
+    String name = GravitinoITUtils.genRandomName("settings_native");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id"
+                + " SETTINGS index_granularity = 2048",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Map<String, String> props = loaded.properties();
+    Assertions.assertEquals(
+        "2048", props.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    // Ensure no spurious keys from the SETTINGS parsing
+    long settingsCount =
+        props.keySet().stream().filter(k -> k.startsWith(TableConstants.SETTINGS_PREFIX)).count();
+    Assertions.assertEquals(1, settingsCount);
+  }
+
+  @Test
+  void testCreateTableWithSettingsViaGravitinoApi() {
+    String name = GravitinoITUtils.genRandomName("settings_api");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(TableConstants.SETTINGS_PREFIX + "index_granularity", "2048");
+    properties.put(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part", "0");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident, cols, "settings roundtrip", properties, Distributions.NONE, getSortOrders("id"));
+
+    // Verify Gravitino API round-trip
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "2048", loadedProps.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        "0", loadedProps.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+
+    // Verify DDL-level round-trip: SHOW CREATE TABLE should contain SETTINGS clause
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertNotNull(createSql);
+    Assertions.assertTrue(
+        createSql.contains("SETTINGS"),
+        "SHOW CREATE TABLE output should contain SETTINGS clause: " + createSql);
+    Assertions.assertTrue(
+        createSql.contains("index_granularity = 2048"),
+        "SHOW CREATE TABLE output should contain index_granularity = 2048: " + createSql);
+  }
+
+  @Test
+  void testLoadTableWithMultipleSettingsAndComment() {
+    String name = GravitinoITUtils.genRandomName("settings_multi");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id"
+                + " SETTINGS index_granularity = 2048, min_bytes_for_wide_part = 0"
+                + " COMMENT 'test comment'",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Map<String, String> props = loaded.properties();
+    Assertions.assertEquals(
+        "2048", props.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        "0", props.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+    Assertions.assertEquals("test comment", loaded.comment());
+  }
+
+  @Test
+  void testCreateTableWithSettingsAndCommentViaGravitinoApi() {
+    String name = GravitinoITUtils.genRandomName("settings_comment_api");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(TableConstants.SETTINGS_PREFIX + "index_granularity", "2048");
+    properties.put(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part", "0");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "settings and comment roundtrip",
+            properties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    // Verify Gravitino API round-trip
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "2048", loadedProps.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        "0", loadedProps.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+    Assertions.assertEquals("settings and comment roundtrip", loaded.comment());
+
+    // Verify DDL-level round-trip
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertNotNull(createSql);
+    Assertions.assertTrue(
+        createSql.contains("SETTINGS"),
+        "SHOW CREATE TABLE output should contain SETTINGS clause: " + createSql);
+    Assertions.assertTrue(
+        createSql.contains("index_granularity = 2048"),
+        "SHOW CREATE TABLE output should contain index_granularity = 2048: " + createSql);
+  }
+
+  @Test
+  void testLoadTableWithoutSettings() {
+    String name = GravitinoITUtils.genRandomName("no_settings");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id", schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    long settingsCount =
+        loaded.properties().keySet().stream()
+            .filter(k -> k.startsWith(TableConstants.SETTINGS_PREFIX))
+            .count();
+    // ClickHouse 24.8 always includes default SETTINGS (index_granularity = 8192) in
+    // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
+    Assertions.assertEquals(1, settingsCount);
   }
 }
