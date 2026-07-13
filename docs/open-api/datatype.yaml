@@ -56,6 +56,10 @@ components:
         - "fixed(16)"
         - "binary"
         - "variant"
+        - "geometry"
+        - "geometry(srid:3857)"
+        - "geography"
+        - "geography(EPSG:4326,karney)"
 
     UnionType:
       type: object
