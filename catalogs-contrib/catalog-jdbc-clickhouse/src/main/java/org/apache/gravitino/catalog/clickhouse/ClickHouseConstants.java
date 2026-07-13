@@ -57,5 +57,8 @@ public class ClickHouseConstants {
 
     // The name of the data skipping index type for bloom filter index in clickhouse.
     public static final String DATA_SKIPPING_BLOOM_FILTER = "bloom_filter";
+
+    // The name of the data skipping index type for set index in clickhouse.
+    public static final String DATA_SKIPPING_SET = "set";
   }
 }
