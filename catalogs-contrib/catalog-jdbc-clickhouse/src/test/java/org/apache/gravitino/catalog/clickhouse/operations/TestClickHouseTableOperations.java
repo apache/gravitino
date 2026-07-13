@@ -589,7 +589,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     columns.add(
         JdbcColumn.builder()
             .withName("c_dt64")
-            .withType(Types.ExternalType.of("DateTime64(3)"))
+            .withType(Types.TimestampType.withoutTimeZone(3))
             .withNullable(false)
             .build());
     columns.add(
@@ -647,7 +647,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertEquals(
         Types.TimestampType.withoutTimeZone(0), loaded.columns()[14].dataType());
     Assertions.assertEquals(
-        Types.ExternalType.of("DateTime64(3)"), loaded.columns()[15].dataType());
+        Types.TimestampType.withoutTimeZone(3), loaded.columns()[15].dataType());
     Assertions.assertEquals(Types.BooleanType.get(), loaded.columns()[16].dataType());
     Assertions.assertEquals(Types.UUIDType.get(), loaded.columns()[17].dataType());
     Assertions.assertEquals(Types.ExternalType.of("IPv4"), loaded.columns()[18].dataType());
@@ -1099,6 +1099,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
           Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}),
           Indexes.of(IndexType.DATA_SKIPPING_MINMAX, "idx_c2", new String[][] {{"c2"}}),
           Indexes.of(IndexType.DATA_SKIPPING_BLOOM_FILTER, "idx_c3", new String[][] {{"c3"}}),
+          Indexes.of(IndexType.DATA_SKIPPING_SET, "idx_c4", new String[][] {{"c2"}}),
         };
 
     String sql =
@@ -1115,6 +1116,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(sql.contains("PARTITION BY `c1`"));
     Assertions.assertTrue(sql.contains("INDEX `idx_c2` `c2` TYPE minmax GRANULARITY 1"));
     Assertions.assertTrue(sql.contains("INDEX `idx_c3` `c3` TYPE bloom_filter GRANULARITY 3"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_c4` `c2` TYPE set(0) GRANULARITY 1"));
   }
 
   @Test
@@ -1338,6 +1340,15 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(
         bloomSql.contains("ADD INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 3"));
 
+    String setSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(IndexType.DATA_SKIPPING_SET, "idx_set", new String[][] {{"c2"}})
+            });
+    Assertions.assertTrue(setSql.contains("ADD INDEX `idx_set` `c2` TYPE set(0) GRANULARITY 1"));
+
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -1358,6 +1369,35 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 new TableChange[] {
                   TableChange.addIndex(IndexType.PRIMARY_KEY, "pk_new", new String[][] {{"c1"}})
                 }));
+  }
+
+  @Test
+  public void testGetClickHouseIndexType() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    // Exact matches
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType("minmax"));
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_BLOOM_FILTER, ops.getClickHouseIndexType("bloom_filter"));
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set"));
+
+    // set(N) variants — ClickHouse may return type with parameter in some versions
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(0)"));
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(100)"));
+
+    // Blank/null defaults to MINMAX
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(""));
+    Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(null));
+
+    // Unsupported type
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.getClickHouseIndexType("unknown_type"));
   }
 
   @Test

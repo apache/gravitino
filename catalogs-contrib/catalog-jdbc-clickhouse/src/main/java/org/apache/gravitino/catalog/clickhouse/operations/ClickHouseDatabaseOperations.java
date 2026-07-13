@@ -67,6 +67,15 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
+  protected String generateDatabaseExistSql(String databaseName) {
+    // Escape single quotes to prevent SQL injection.
+    // JdbcDatabaseOperations#exist executes this query via Statement (no parameters), so we must
+    // escape values embedded in string literals.
+    String escaped = escapeSingleQuotes(databaseName);
+    return String.format("SELECT name FROM system.databases WHERE name = '%s'", escaped);
+  }
+
+  @Override
   public List<String> listDatabases() {
     List<String> databaseNames = new ArrayList<>();
     try (final Connection connection = getConnection()) {

@@ -58,6 +58,7 @@ dependencies {
   testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:tencent-bundle", configuration = "shadow"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
@@ -146,6 +147,7 @@ tasks.test {
   dependsOn(":bundles:aws-bundle:jar")
   dependsOn(":bundles:aliyun-bundle:jar")
   dependsOn(":bundles:gcp-bundle:jar")
+  dependsOn(":bundles:tencent-bundle:jar")
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {

@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -104,9 +105,8 @@ public final class KerberosAuthUtils {
         "HDFS URIs are not supported for keytab files");
 
     File parentFile = keytabFile.getParentFile();
-    if (parentFile != null && !parentFile.exists() && !parentFile.mkdirs()) {
-      throw new IOException(
-          String.format("Failed to create keytab directory %s", parentFile.getAbsolutePath()));
+    if (parentFile != null) {
+      Files.createDirectories(parentFile.toPath());
     }
 
     FileFetcher.get().fetchFileFromUri(keytabUri, keytabFile, timeoutSec * 1000, hadoopConf);

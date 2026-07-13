@@ -81,6 +81,10 @@ class Name(Enum):
     BINARY = "BINARY"
     """ The binary type with variable length. The length is specified in the type itself. """
 
+    VARIANT = "VARIANT"
+    """ The variant type. A variant holds semi-structured data whose shape is not fixed by the
+    schema. """
+
     STRUCT = "STRUCT"
     """
     The struct type.

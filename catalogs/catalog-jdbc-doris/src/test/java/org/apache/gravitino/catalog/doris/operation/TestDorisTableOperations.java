@@ -376,11 +376,10 @@ public class TestDorisTableOperations extends TestDoris {
     TABLE_OPERATIONS.alterTable(
         databaseName,
         tableName,
-        TableChange.addIndex(
-            Index.IndexType.PRIMARY_KEY, "k2_index", new String[][] {{"col_2"}, {"col_3"}}));
+        TableChange.addIndex(Index.IndexType.INVERTED, "k2_index", new String[][] {{"col_2"}}));
 
     Index[] newIndexes =
-        new Index[] {Indexes.primary("k2_index", new String[][] {{"col_2"}, {"col_3"}})};
+        new Index[] {Indexes.of(Index.IndexType.INVERTED, "k2_index", new String[][] {{"col_2"}})};
     Awaitility.await()
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
@@ -475,9 +474,9 @@ public class TestDorisTableOperations extends TestDoris {
             Types.IntervalDayType.get(),
             Types.IntervalYearType.get(),
             Types.UUIDType.get(),
+            Types.UnionType.of(Types.IntegerType.get()),
             Types.ListType.of(Types.DateType.get(), true),
             Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true),
-            Types.UnionType.of(Types.IntegerType.get()),
             Types.StructType.of(
                 Types.StructType.Field.notNullField("col_1", Types.IntegerType.get())));
 
@@ -655,7 +654,8 @@ public class TestDorisTableOperations extends TestDoris {
 
     Distribution distribution =
         Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
-    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}})};
+    Index[] indexes =
+        new Index[] {Indexes.of(Index.IndexType.INVERTED, "uk_2", new String[][] {{"col_1"}})};
 
     // create table
     TABLE_OPERATIONS.create(
@@ -673,7 +673,7 @@ public class TestDorisTableOperations extends TestDoris {
     // exist.
     TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", true);
     String sql = DorisTableOperations.deleteIndexDefinition(null, deleteIndex);
-    Assertions.assertEquals("DROP INDEX uk_1", sql);
+    Assertions.assertEquals("DROP INDEX `uk_1`", sql);
 
     // The index existence check should only verify existence when ifExists is false, preventing
     // failures when dropping non-existent indexes.
@@ -686,7 +686,7 @@ public class TestDorisTableOperations extends TestDoris {
 
     TableChange.DeleteIndex deleteIndex3 = new TableChange.DeleteIndex("uk_2", false);
     sql = DorisTableOperations.deleteIndexDefinition(load, deleteIndex3);
-    Assertions.assertEquals("DROP INDEX uk_2", sql);
+    Assertions.assertEquals("DROP INDEX `uk_2`", sql);
   }
 
   @Test
@@ -718,6 +718,27 @@ public class TestDorisTableOperations extends TestDoris {
     Assertions.assertNull(
         TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
         "Non-datetime type should return 0 precision");
+
+    // DATETIME(N) format from SHOW CREATE TABLE — precision parsed from type string
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME(0)", 0, 0),
+        "DATETIME(0) should return 0 precision");
+
+    Assertions.assertEquals(
+        3,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME(3)", 0, 0),
+        "DATETIME(3) should return 3 precision");
+
+    Assertions.assertEquals(
+        6,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME(6)", 0, 0),
+        "DATETIME(6) should return 6 precision");
+
+    // Invalid DATETIME(N) — non-numeric precision
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME(x)", 0, 0),
+        "DATETIME(x) with invalid precision should return null");
   }
 
   @Test
@@ -738,5 +759,12 @@ public class TestDorisTableOperations extends TestDoris {
     Assertions.assertNull(
         operationsWithOldDriver.calculateDatetimePrecision("DATETIME", 26, 0),
         "DATETIME type should return null for unsupported driver version");
+
+    // DATETIME(N) should still work with old driver — precision comes from type string, not
+    // columnSize
+    Assertions.assertEquals(
+        3,
+        operationsWithOldDriver.calculateDatetimePrecision("DATETIME(3)", 0, 0),
+        "DATETIME(3) should return 3 even with unsupported driver version");
   }
 }

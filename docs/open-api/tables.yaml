@@ -55,6 +55,10 @@ paths:
                 $ref: "#/components/examples/MysqlTableCreate"
               PostgresqlTableCreate:
                 $ref: "#/components/examples/PostgresqlTableCreate"
+              IcebergTableCreate:
+                $ref: "#/components/examples/IcebergTableCreate"
+              IcebergVariantTableCreate:
+                $ref: "#/components/examples/IcebergVariantTableCreate"
       responses:
         "200":
           $ref: "#/components/responses/TableResponse"
@@ -996,6 +1000,54 @@ components:
           }
         ],
         "properties": { }
+      }
+
+    IcebergTableCreate:
+      value: {
+        "name": "my_iceberg_table",
+        "comment": "This is my Iceberg table",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "comment": "id column comment",
+            "nullable": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "comment": "name column comment",
+            "nullable": true
+          }
+        ],
+        "properties": {
+          "format-version": "2"
+        },
+        indexes: [ ]
+      }
+
+    IcebergVariantTableCreate:
+      value: {
+        "name": "my_iceberg_variant_table",
+        "comment": "Iceberg table with a variant column, which requires format-version 3",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "comment": "id column comment",
+            "nullable": false
+          },
+          {
+            "name": "payload",
+            "type": "variant",
+            "comment": "semi-structured payload column",
+            "nullable": true
+          }
+        ],
+        "properties": {
+          "format-version": "3"
+        },
+        indexes: [ ]
       }
 
     TableResponse:
