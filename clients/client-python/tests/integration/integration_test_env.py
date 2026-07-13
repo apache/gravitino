@@ -25,7 +25,7 @@ import shutil
 
 import requests
 
-from gravitino import GravitinoAdminClient
+from gravitino import GravitinoAdminClient, GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
 from tests.integration.config import Config
 
@@ -149,6 +149,40 @@ class IntegrationTestEnv(unittest.TestCase):
         if gravitino_server_running:
             logger.error("Can't stop Gravitino server!")
 
+    @staticmethod
+    def create_gravitino_client(metalake_name: str) -> GravitinoClient:
+        return GravitinoClient(uri="http://localhost:8090", metalake_name=metalake_name)
+
+    @classmethod
+    def create_metalake_client(
+        cls,
+        admin_client: GravitinoAdminClient,
+        metalake_name: str,
+        comment: str = "",
+    ) -> GravitinoClient:
+        admin_client.create_metalake(metalake_name, comment=comment, properties={})
+        return cls.create_gravitino_client(metalake_name)
+
+    @staticmethod
+    def drop_test_metalake(
+        admin_client: GravitinoAdminClient, metalake_name: str, log_prefix: str = ""
+    ):
+        try:
+            dropped = admin_client.drop_metalake(metalake_name, force=True)
+            if log_prefix:
+                logger.info(
+                    "%s: drop metalake %s[%s]", log_prefix, metalake_name, dropped
+                )
+            else:
+                logger.info("Drop metalake %s[%s]", metalake_name, dropped)
+        except GravitinoRuntimeException:
+            if log_prefix:
+                logger.warning(
+                    "%s: failed to drop metalake %s", log_prefix, metalake_name
+                )
+            else:
+                logger.warning("Failed to drop metalake %s", metalake_name)
+
     @classmethod
     def restart_server(cls):
         logger.info("Restarting Gravitino server...")
@@ -239,3 +273,26 @@ class IntegrationTestEnv(unittest.TestCase):
         with open(conf_path, mode="w", encoding="utf-8") as file:
             for line in filtered_lines:
                 file.write(line)
+
+
+class MetalakeTestMixin:
+    """Provide common metalake setup and cleanup for integration tests."""
+
+    def setUp(self):  # pylint: disable=invalid-name
+        super().setUp()
+        self.init_test_env()
+
+    def tearDown(self):  # pylint: disable=invalid-name
+        try:
+            self.clean_test_data()
+        finally:
+            super().tearDown()
+
+    def init_test_env(self):
+        self.gravitino_client = self.create_metalake_client(
+            self.gravitino_admin_client, self.metalake_name
+        )
+
+    def clean_test_data(self):
+        self.gravitino_client = self.create_gravitino_client(self.metalake_name)
+        self.drop_test_metalake(self.gravitino_admin_client, self.metalake_name)

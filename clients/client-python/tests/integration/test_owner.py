@@ -33,12 +33,12 @@ from gravitino.exceptions.base import (
     NotFoundException,
 )
 
-from tests.integration.integration_test_env import IntegrationTestEnv
+from tests.integration.integration_test_env import IntegrationTestEnv, MetalakeTestMixin
 
 logger = logging.getLogger(__name__)
 
 
-class TestOwner(IntegrationTestEnv):
+class TestOwner(MetalakeTestMixin, IntegrationTestEnv):
     metalake_name: str = "test_owner_metalake" + str(randint(1, 10000))
     catalog_name: str = "test_owner_catalog" + str(randint(1, 10000))
     test_user: str = "test_owner_user"
@@ -73,20 +73,6 @@ class TestOwner(IntegrationTestEnv):
         else:
             super().tearDownClass()
 
-    def setUp(self):
-        self.init_test_env()
-
-    def tearDown(self):
-        self.clean_test_data()
-
-    def init_test_env(self):
-        self.gravitino_admin_client.create_metalake(
-            self.metalake_name, comment="", properties={}
-        )
-        self.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self.metalake_name
-        )
-
     def create_catalog(self, catalog_name) -> Catalog:
         return self.gravitino_client.create_catalog(
             name=catalog_name,
@@ -97,18 +83,13 @@ class TestOwner(IntegrationTestEnv):
         )
 
     def clean_test_data(self):
-        self.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self.metalake_name
-        )
+        self.gravitino_client = self.create_gravitino_client(self.metalake_name)
         try:
             self.gravitino_client.drop_catalog(name=self.catalog_name, force=True)
         except GravitinoRuntimeException:
             logger.warning("Failed to drop catalog %s", self.catalog_name)
 
-        try:
-            self.gravitino_admin_client.drop_metalake(self.metalake_name, force=True)
-        except GravitinoRuntimeException:
-            logger.warning("Failed to drop metalake %s", self.metalake_name)
+        self.drop_test_metalake(self.gravitino_admin_client, self.metalake_name)
 
     def test_get_owner_metalake(self):
         metalake_obj = MetadataObjects.of(
