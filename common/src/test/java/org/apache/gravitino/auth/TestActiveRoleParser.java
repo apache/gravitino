@@ -106,9 +106,17 @@ public class TestActiveRoleParser {
         "ALL,analyst", // reserved keyword with a role name
         "analyst,ALL", // reserved keyword with a role name
         "NONE,reader", // reserved keyword with a role name
-        "ALL,NONE" // two reserved keywords
+        "ALL,NONE", // two different reserved keywords
+        "ALL,ALL", // repeated reserved keyword
+        "NONE,NONE" // repeated reserved keyword
       })
   public void testMalformedValuesThrow(String value) {
     assertThrows(IllegalActiveRolesException.class, () -> ActiveRoleParser.parse(value));
+  }
+
+  @Test
+  public void testMalformedExceptionIsIllegalArgument() {
+    // The server maps this to 400 Bad Request, so it must remain an IllegalArgumentException.
+    assertThrows(IllegalArgumentException.class, () -> ActiveRoleParser.parse("analyst,"));
   }
 }

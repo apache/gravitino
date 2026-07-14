@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.auth;
 
+import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -90,14 +91,12 @@ public final class ActiveRoles {
    * @throws IllegalArgumentException if {@code roleNames} is null, empty, or contains a blank name
    */
   public static ActiveRoles of(Collection<String> roleNames) {
-    if (roleNames == null || roleNames.isEmpty()) {
-      throw new IllegalArgumentException("Active role names must not be empty");
-    }
+    Preconditions.checkArgument(
+        roleNames != null && !roleNames.isEmpty(), "Active role names must not be empty");
     Set<String> names = new LinkedHashSet<>();
     for (String name : roleNames) {
-      if (name == null || name.trim().isEmpty()) {
-        throw new IllegalArgumentException("Active role name must not be blank");
-      }
+      Preconditions.checkArgument(
+          name != null && !name.trim().isEmpty(), "Active role name must not be blank");
       names.add(name);
     }
     return new ActiveRoles(Mode.NAMED, Collections.unmodifiableSet(names));

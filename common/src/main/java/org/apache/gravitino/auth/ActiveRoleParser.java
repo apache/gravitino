@@ -21,6 +21,7 @@ package org.apache.gravitino.auth;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
+import javax.annotation.Nullable;
 
 /**
  * Parses the value of the {@link AuthConstants#X_GRAVITINO_ACTIVE_ROLES_HEADER} header into an
@@ -38,7 +39,8 @@ import java.util.Set;
  *
  * <p>Entries are trimmed of surrounding whitespace and duplicates collapse; role names are matched
  * case-sensitively. The keywords {@code ALL} and {@code NONE} are reserved, matched exactly (upper
- * case), and each must appear on its own.
+ * case), and each must appear on its own. A role whose name is exactly {@code ALL} or {@code NONE}
+ * therefore cannot be activated by name.
  *
  * <p>Only <em>syntactic</em> validation is performed here. A well-formed value that names a role
  * the caller does not actually hold is not rejected by this parser; that membership check is done
@@ -62,7 +64,7 @@ public final class ActiveRoleParser {
    * @throws IllegalActiveRolesException if the value is syntactically invalid (an empty entry, or a
    *     reserved keyword combined with any other value)
    */
-  public static ActiveRoles parse(String rawValue) {
+  public static ActiveRoles parse(@Nullable String rawValue) {
     if (rawValue == null) {
       return ActiveRoles.all();
     }
@@ -96,10 +98,11 @@ public final class ActiveRoleParser {
       }
     }
 
-    // ALL and NONE are exclusive: each must appear alone, never combined with a role name or with
-    // each other.
-    int reservedCount = (sawAll ? 1 : 0) + (sawNone ? 1 : 0);
-    if (reservedCount > 0 && (reservedCount > 1 || !names.isEmpty())) {
+    // A reserved keyword must appear on its own — never combined with a role name, another keyword,
+    // or even a repeat of itself. Every entry is non-empty at this point, so a lone keyword is the
+    // only case where a reserved word is valid.
+    boolean sawReserved = sawAll || sawNone;
+    if (sawReserved && parts.length > 1) {
       throw new IllegalActiveRolesException(
           "Invalid '"
               + AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER
