@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -74,33 +75,44 @@ public class TableNormalizeDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    return withCapability(
-        ident,
-        catalogManager,
-        capability ->
-            dispatcher.createTable(
-                applyCapabilities(ident, Capability.Scope.TABLE, capability),
-                applyCapabilities(columns, capability),
-                comment,
-                properties,
-                applyCapabilities(partitions, capability),
-                applyCapabilities(distribution, capability),
-                applyCapabilities(sortOrders, capability),
-                applyCapabilities(indexes, capability)));
+    NameIdentifier normalizedIdent =
+        withCapability(
+            ident, catalogManager, cap -> applyCapabilities(ident, Capability.Scope.TABLE, cap));
+    Column[] normalizedColumns =
+        withCapability(ident, catalogManager, cap -> applyCapabilities(columns, cap));
+    Transform[] normalizedPartitions =
+        withCapability(ident, catalogManager, cap -> applyCapabilities(partitions, cap));
+    Distribution normalizedDistribution =
+        withCapability(ident, catalogManager, cap -> applyCapabilities(distribution, cap));
+    SortOrder[] normalizedSortOrders =
+        withCapability(ident, catalogManager, cap -> applyCapabilities(sortOrders, cap));
+    Index[] normalizedIndexes =
+        withCapability(ident, catalogManager, cap -> applyCapabilities(indexes, cap));
+    return dispatcher.createTable(
+        normalizedIdent,
+        normalizedColumns,
+        comment,
+        properties,
+        normalizedPartitions,
+        normalizedDistribution,
+        normalizedSortOrders,
+        normalizedIndexes);
   }
 
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    return withCapability(
-        ident,
-        catalogManager,
-        capability ->
-            dispatcher.alterTable(
-                // The constraints of the name spec may be more strict than underlying catalog,
-                // and for compatibility reasons, we only apply case-sensitive capabilities here.
-                applyCaseSensitive(ident, Capability.Scope.TABLE, capability),
-                applyCapabilities(capability, changes)));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    Pair<NameIdentifier, TableChange[]> normalized =
+        withCapability(
+            ident,
+            catalogManager,
+            cap ->
+                Pair.of(
+                    applyCaseSensitive(ident, Capability.Scope.TABLE, cap),
+                    applyCapabilities(cap, changes)));
+    return dispatcher.alterTable(normalized.getLeft(), normalized.getRight());
   }
 
   @Override

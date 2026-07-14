@@ -59,7 +59,11 @@ public class CapabilityHelpers {
    *
    * <p>If the first attempt encounters a stale (already-closed) {@link
    * CatalogManager.CatalogWrapper}, the wrapper is evicted from the cache and the call is retried
-   * once with a freshly loaded wrapper.
+   * once with a freshly loaded wrapper. Retry is safe because {@code fn} is restricted to pure
+   * normalization and never performs external I/O, so re-execution is idempotent. The retry is
+   * triggered only on {@link CatalogManager.CatalogWrapperClosedException}, which is thrown
+   * exclusively at wrapper-entry before {@code fn} has run, preventing accidental replay of
+   * partially-executed non-idempotent operations.
    *
    * <p>Callers should use this method instead of calling {@code capabilities()} on a raw wrapper
    * invoke {@link Capability} methods so that the classloader lifecycle is properly bounded.
@@ -73,14 +77,14 @@ public class CapabilityHelpers {
   public static <R> R withCapability(
       NameIdentifier ident, CatalogManager catalogManager, ThrowableFunction<Capability, R> fn) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    RuntimeException closedException = null;
+    CatalogManager.CatalogWrapperClosedException lastClosed = null;
     for (int i = 0; i < 2; i++) {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
       try {
         return c.doWithCapabilityOps(fn);
-      } catch (IllegalStateException e) {
-        if (c.isClosed() && i == 0) {
-          closedException = e;
+      } catch (CatalogManager.CatalogWrapperClosedException e) {
+        if (i == 0) {
+          lastClosed = e;
           continue;
         }
         throw e;
@@ -90,9 +94,9 @@ public class CapabilityHelpers {
         throw new RuntimeException("Failed to apply capabilities for catalog: " + catalogIdent, e);
       }
     }
-    throw closedException != null
-        ? closedException
-        : new IllegalStateException("CatalogWrapper is already closed");
+    throw lastClosed != null
+        ? lastClosed
+        : new CatalogManager.CatalogWrapperClosedException("CatalogWrapper is already closed");
   }
 
   public static Column[] applyCapabilities(Column[] columns, Capability capabilities) {

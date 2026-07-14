@@ -25,6 +25,7 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -89,15 +90,17 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    return withCapability(
-        ident,
-        catalogManager,
-        capability ->
-            dispatcher.alterFileset(
-                // The constraints of the name spec may be more strict than underlying catalog,
-                // and for compatibility reasons, we only apply case-sensitive capabilities here.
-                applyCaseSensitive(ident, Capability.Scope.FILESET, capability),
-                applyCapabilities(capability, changes)));
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    Pair<NameIdentifier, FilesetChange[]> normalized =
+        withCapability(
+            ident,
+            catalogManager,
+            cap ->
+                Pair.of(
+                    applyCaseSensitive(ident, Capability.Scope.FILESET, cap),
+                    applyCapabilities(cap, changes)));
+    return dispatcher.alterFileset(normalized.getLeft(), normalized.getRight());
   }
 
   @Override

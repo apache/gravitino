@@ -25,6 +25,7 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -88,13 +89,15 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
-    return withCapability(
-        ident,
-        catalogManager,
-        capability ->
-            dispatcher.alterView(
-                applyCaseSensitive(ident, Capability.Scope.VIEW, capability),
-                applyCapabilities(capability, changes)));
+    Pair<NameIdentifier, ViewChange[]> normalized =
+        withCapability(
+            ident,
+            catalogManager,
+            cap ->
+                Pair.of(
+                    applyCaseSensitive(ident, Capability.Scope.VIEW, cap),
+                    applyCapabilities(cap, changes)));
+    return dispatcher.alterView(normalized.getLeft(), normalized.getRight());
   }
 
   @Override
