@@ -977,7 +977,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, timestampTableName);
 
     Map<String, String> properties = createProperties();
-    properties.put("format-version", "3");
+    properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
     TableCatalog tableCatalog = catalog.asTableCatalog();
     Table createdTable =
         tableCatalog.createTable(tableIdentifier, columns, table_comment, properties);
