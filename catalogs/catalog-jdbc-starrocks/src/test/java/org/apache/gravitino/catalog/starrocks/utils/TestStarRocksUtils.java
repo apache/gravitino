@@ -109,6 +109,17 @@ public class TestStarRocksUtils {
     assertEquals(
         "owner's \"comment\" (nested) C:\\tmp; --",
         StarRocksUtils.extractTableCommentFromSql(createTableSql));
+
+    createTableSql =
+        "CREATE TABLE `testTable` (\n"
+            + "`col1` INT\n"
+            + ")\n"
+            + "COMMENT \"owner's \"\"comment\"\" D:\\\\data; -- "
+            + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\"";
+
+    assertEquals(
+        "owner's \"comment\" D:\\data; --",
+        StarRocksUtils.extractTableCommentFromSql(createTableSql));
   }
 
   @Test

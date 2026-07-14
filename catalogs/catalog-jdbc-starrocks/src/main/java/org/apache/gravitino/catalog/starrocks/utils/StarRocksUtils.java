@@ -374,6 +374,10 @@ public class StarRocksUtils {
           i++;
           continue;
         }
+      } else if (current == '"' && i + 1 < comment.length() && comment.charAt(i + 1) == '"') {
+        result.append('"');
+        i++;
+        continue;
       }
       result.append(current);
     }

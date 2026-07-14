@@ -54,9 +54,10 @@ public class TestDorisUtils {
     result = DorisUtils.generatePropertiesSql(properties);
     assertEquals(" PROPERTIES (\n\"key\"=\"value\"\n)", result);
 
-    properties = Collections.singletonMap("key\\\"", "owner\\\"'s comment; --");
+    properties = Collections.singletonMap("key\"name", "owner's \"comment\" C:\\tmp; --");
     result = DorisUtils.generatePropertiesSql(properties);
-    assertEquals(" PROPERTIES (\n\"key\\\\\"\"\"=\"owner\\\\\"\"'s comment; --\"\n)", result);
+    assertEquals(
+        " PROPERTIES (\n\"key\"\"name\"=\"owner's \"\"comment\"\" C:\\\\tmp; --\"\n)", result);
 
     // Test when properties has multiple entries
     properties = new HashMap<>();
@@ -96,6 +97,12 @@ public class TestDorisUtils {
     result = DorisUtils.extractPropertiesFromSql(createTableSql);
     assertEquals("value1", result.get("property1"));
     assertEquals("comment", result.get("comment"));
+
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n"
+            + "\"key\"name\" = \"owner's \"comment\" D:\\data; --\"\n)";
+    result = DorisUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner's \"comment\" D:\\data; --", result.get("key\"name"));
   }
 
   @Test

@@ -171,8 +171,14 @@ public class StarRocksTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.UpdateComment) {
         TableChange.UpdateComment updateComment = (TableChange.UpdateComment) change;
         String newComment = updateComment.getNewComment();
-        if (StringUtils.isNotEmpty(newComment)
-            && StringIdentifier.fromComment(newComment) == null) {
+        if (StringIdentifier.fromComment(newComment) == null) {
+          lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
+          StringIdentifier identifier = StringIdentifier.fromComment(lazyLoadTable.comment());
+          if (identifier != null) {
+            newComment = StringIdentifier.addToComment(identifier, newComment);
+          }
+        }
+        if (StringUtils.isNotEmpty(newComment)) {
           newComment = StringIdentifier.addToComment(StringIdentifier.DUMMY_ID, newComment);
         }
         alterSql.add("COMMENT = \"" + escapeSqlLiteral(newComment, '"') + "\"");

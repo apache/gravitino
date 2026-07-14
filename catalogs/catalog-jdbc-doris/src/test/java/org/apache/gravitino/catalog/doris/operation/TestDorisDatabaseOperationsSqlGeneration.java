@@ -27,12 +27,13 @@ class TestDorisDatabaseOperationsSqlGeneration {
   @Test
   public void testEscapeCommentInGeneratedSql() {
     DorisDatabaseOperations operations = new DorisDatabaseOperations();
-    String comment = "owner\\\"'s comment; DROP DATABASE marker; --";
+    String comment = "owner's \"comment\" C:\\tmp; DROP DATABASE marker; --";
 
     String sql =
         operations.generateCreateDatabaseSql("test_database", comment, Collections.emptyMap());
 
     Assertions.assertTrue(
-        sql.contains("\"comment\"=\"owner\\\\\"\"'s comment; DROP DATABASE marker; --\""), sql);
+        sql.contains("\"comment\"=\"owner's \"\"comment\"\" C:\\\\tmp; DROP DATABASE marker; --\""),
+        sql);
   }
 }

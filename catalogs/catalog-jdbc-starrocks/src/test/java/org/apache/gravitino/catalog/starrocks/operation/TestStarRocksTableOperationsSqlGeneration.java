@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.starrocks.operation;
 
 import java.util.Collections;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -70,7 +71,11 @@ public class TestStarRocksTableOperationsSqlGeneration {
     @Override
     protected JdbcTable getOrCreateTable(
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-      return JdbcTable.builder().withName(tableName).build();
+      return JdbcTable.builder()
+          .withName(tableName)
+          .withComment(
+              StringIdentifier.addToComment(StringIdentifier.fromId(42), "existing comment"))
+          .build();
     }
   }
 
@@ -162,8 +167,16 @@ public class TestStarRocksTableOperationsSqlGeneration {
     Assertions.assertTrue(
         alterSql.contains(
             "COMMENT = \"owner\"\"; DROP TABLE marker; -- "
+                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
                 + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
         alterSql);
+
+    String clearCommentSql = ops.alterTableSql("test_table", TableChange.updateComment(""));
+    Assertions.assertTrue(
+        clearCommentSql.contains(
+            "COMMENT = \"(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
+                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
+        clearCommentSql);
   }
 
   @Test
