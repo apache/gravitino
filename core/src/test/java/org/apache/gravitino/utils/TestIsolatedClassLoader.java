@@ -45,6 +45,18 @@ public class TestIsolatedClassLoader {
   }
 
   @Test
+  public void testClassNotFoundExceptionDoesNotWrapProbeMiss() {
+    // Probe-driven callers such as Janino expect a plain ClassNotFoundException for misses
+    // so they can continue trying the next candidate name.
+    ClassNotFoundException exception =
+        Assertions.assertThrows(
+            ClassNotFoundException.class,
+            () -> classLoader.withClassLoader(cl -> cl.loadClass("UnknownProbeClass")));
+
+    Assertions.assertNull(exception.getCause());
+  }
+
+  @Test
   public void testHivePackageRecognizedAsCatalogClass() throws Exception {
     // org.apache.gravitino.hive.* was moved from catalog.hive.* by HiveClient refactoring.
     // These must be treated as catalog classes so they are loaded by the IsolatedClassLoader,
