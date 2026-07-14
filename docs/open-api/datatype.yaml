@@ -222,5 +222,5 @@ components:
         description: The string representation of this type in the catalog
     example: {
       "type": "external",
-      "externalType": "user-defined"
+      "catalogString": "user-defined"
     }
