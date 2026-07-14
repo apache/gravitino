@@ -210,7 +210,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private Model getModel(String modelFilePath) {
     Model model = new Model();
     try (InputStream modelStream = JcasbinAuthorizer.class.getResourceAsStream(modelFilePath)) {
-      Preconditions.checkArgument(modelStream != null, "Jcasbin model file can not found.");
+      Preconditions.checkArgument(modelStream != null, "Jcasbin model file not found");
       String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       model.loadModelFromText(modelData);
     } catch (IOException e) {
@@ -404,7 +404,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
 
       } catch (Exception e) {
-        LOG.warn("can not get user id or role id.", e);
+        LOG.warn("Cannot get user ID or role ID", e);
         return false;
       }
     }
@@ -654,7 +654,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         userInfo = userInfoOpt.get();
         userId = userInfo.getUserId();
       } catch (Exception e) {
-        LOG.debug("Can not get entity id", e);
+        LOG.debug("Cannot get entity ID", e);
         return false;
       }
 
