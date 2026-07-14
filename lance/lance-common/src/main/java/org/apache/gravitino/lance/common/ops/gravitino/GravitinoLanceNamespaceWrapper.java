@@ -339,7 +339,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
             (key, value) -> {
               if (key.startsWith("gravitino.client.")) {
                 clientProperties.put(key, value);
-                LOG.info("Applying client config: {} = {}", key, value);
+                LOG.debug("Applying Gravitino client config key: {}", key);
               }
             });
     return clientProperties;
