@@ -120,6 +120,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   private static final String VIEW_COMMENT = "view comment";
   private static final String SPARK_DIALECT = "spark";
   private static final String TRINO_DIALECT = "trino";
+  private static final int NANO_PRECISION = 9;
   private static final String provider = "lakehouse-iceberg";
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM iceberg.%s";
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE =
@@ -633,6 +634,86 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   }
 
   @Test
+  void testCreateAndLoadIcebergTableV2Types() {
+    // End-to-end round-trip for the V2 types not otherwise exercised through a live backend:
+    // boolean, float, double, uuid, fixed, binary, decimal, list and map. The converter mappings
+    // themselves are unit-tested in TestConvertUtil; this test confirms they survive create and
+    // load through the real backend. Every V2 type is valid on both the REST/IRC and Hive backends,
+    // so this runs unconditionally under both subclasses of this base class.
+    Column[] columns =
+        new Column[] {
+          Column.of("c_boolean", Types.BooleanType.get(), "boolean col"),
+          Column.of("c_float", Types.FloatType.get(), "float col"),
+          Column.of("c_double", Types.DoubleType.get(), "double col"),
+          Column.of("c_uuid", Types.UUIDType.get(), "uuid col"),
+          Column.of("c_fixed", Types.FixedType.of(16), "fixed col"),
+          Column.of("c_binary", Types.BinaryType.get(), "binary col"),
+          Column.of("c_decimal", Types.DecimalType.of(10, 2), "decimal col"),
+          Column.of("c_list", Types.ListType.of(Types.IntegerType.get(), false), "list col"),
+          Column.of(
+              "c_map",
+              Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false),
+              "map col")
+        };
+
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("v2_types_table"));
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Gravitino -> Iceberg: create through the native metadata API.
+    Table created =
+        tableCatalog.createTable(tableIdentifier, columns, table_comment, createProperties());
+    Assertions.assertEquals(columns.length, created.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], created.columns()[i]);
+    }
+
+    // Iceberg -> Gravitino: load back through the native metadata API and confirm every type
+    // round-trips unchanged.
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(columns.length, loaded.columns().length);
+    for (int i = 0; i < columns.length; i++) {
+      assertColumn(columns[i], loaded.columns()[i]);
+    }
+
+    // Confirm the columns are stored as the expected Iceberg types in the underlying table, not
+    // merely echoed back by Gravitino.
+    org.apache.iceberg.Schema storedSchema =
+        icebergCatalog
+            .loadTable(IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier))
+            .schema();
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.BooleanType.get(),
+        storedSchema.findField("c_boolean").type());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.FloatType.get(), storedSchema.findField("c_float").type());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.DoubleType.get(), storedSchema.findField("c_double").type());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.UUIDType.get(), storedSchema.findField("c_uuid").type());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.FixedType.ofLength(16),
+        storedSchema.findField("c_fixed").type());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.BinaryType.get(), storedSchema.findField("c_binary").type());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.DecimalType.of(10, 2),
+        storedSchema.findField("c_decimal").type());
+
+    org.apache.iceberg.types.Type listType = storedSchema.findField("c_list").type();
+    Assertions.assertTrue(listType.isListType());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.IntegerType.get(), listType.asListType().elementType());
+
+    org.apache.iceberg.types.Type mapType = storedSchema.findField("c_map").type();
+    Assertions.assertTrue(mapType.isMapType());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.StringType.get(), mapType.asMapType().keyType());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.IntegerType.get(), mapType.asMapType().valueType());
+  }
+
+  @Test
   void testV3TypeConversionViaIcebergClient() {
     // REST-backend only. The Hive metastore in the current CI Hive image cannot store Iceberg V3
     // column types, so a V3 table cannot be created through the Hive backend at all. That behavior
@@ -646,9 +727,8 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     // like Spark 4 would, directly through the Iceberg catalog, then load through the native
     // metadata interface.
     //
-    // variant, unknown, geometry, and geography load as their native Gravitino types. The remaining
-    // V3 net-new types are not modeled in Gravitino's unified type system yet and load as
-    // ExternalType; native support for them is pending and tracked in apache/gravitino#11929.
+    // Variant, unknown, geometry, and geography load as their native Gravitino types. Nanosecond
+    // timestamps are asserted below.
     assertV3LoadsAsVariant("v3_variant");
     assertV3LoadsAsNull("v3_unknown");
     assertV3LoadsAsGeometry("v3_geometry", org.apache.iceberg.types.Types.GeometryType.crs84());
@@ -660,15 +740,17 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         org.apache.iceberg.types.Types.GeographyType.of(
             "EPSG:4326", org.apache.iceberg.types.EdgeAlgorithm.KARNEY));
 
-    // TODO(apache/gravitino#11929): expect native types once these gain unified-model support.
-    assertV3LoadsAsExternal(
+    // Native V3 support (apache/gravitino#11936): a raw-Iceberg (IRC-side) nanosecond column loads
+    // back through the native metadata API as timestamp(9), not ExternalType. Write-path mirror:
+    // testNanosecondTimestampTypeConversion.
+    assertV3LoadsAsTimestamp(
         "v3_timestamp_ns",
         org.apache.iceberg.types.Types.TimestampNanoType.withoutZone(),
-        "TIMESTAMP_NANO");
-    assertV3LoadsAsExternal(
+        Types.TimestampType.withoutTimeZone(NANO_PRECISION));
+    assertV3LoadsAsTimestamp(
         "v3_timestamptz_ns",
         org.apache.iceberg.types.Types.TimestampNanoType.withZone(),
-        "TIMESTAMP_NANO");
+        Types.TimestampType.withTimeZone(NANO_PRECISION));
   }
 
   @Test
@@ -994,6 +1076,73 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     Assertions.assertInstanceOf(Types.ExternalType.class, loaded.dataType());
     Assertions.assertEquals(
         expectedCatalogString, ((Types.ExternalType) loaded.dataType()).catalogString());
+  }
+
+  private void assertV3LoadsAsTimestamp(
+      String tableName,
+      org.apache.iceberg.types.Type icebergType,
+      org.apache.gravitino.rel.types.Type expectedGravitinoType) {
+    NameIdentifier ident = createV3Table(tableName, icebergType);
+    Column loaded = catalog.asTableCatalog().loadTable(ident).columns()[0];
+    Assertions.assertEquals(expectedGravitinoType, loaded.dataType());
+  }
+
+  @Test
+  void testNanosecondTimestampTypeConversion() {
+    // Nanosecond columns need an Iceberg backend that can persist them. The REST path can; the
+    // Hive backend cannot yet -- Iceberg's HiveSchemaUtil has no nanosecond arm
+    // (apache/iceberg#11937) -- so this runs on REST only.
+    Assumptions.assumeTrue(
+        "rest".equalsIgnoreCase(TYPE),
+        "Nanosecond timestamps require an Iceberg backend that can persist them");
+
+    Column col1 =
+        Column.of(
+            "iceberg_column_1", Types.TimestampType.withTimeZone(NANO_PRECISION), "col_1_comment");
+    Column col2 =
+        Column.of(
+            "iceberg_column_2",
+            Types.TimestampType.withoutTimeZone(NANO_PRECISION),
+            "col_2_comment");
+
+    Column[] columns = new Column[] {col1, col2};
+
+    String timestampTableName = "timestamp_ns_table";
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, timestampTableName);
+
+    Map<String, String> properties = createProperties();
+    properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, "3");
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(tableIdentifier, columns, table_comment, properties);
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(NANO_PRECISION), createdTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(NANO_PRECISION), createdTable.columns()[1].dataType());
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals("iceberg_column_1", loadTable.columns()[0].name());
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(NANO_PRECISION), loadTable.columns()[0].dataType());
+    Assertions.assertEquals("col_1_comment", loadTable.columns()[0].comment());
+
+    Assertions.assertEquals("iceberg_column_2", loadTable.columns()[1].name());
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(NANO_PRECISION), loadTable.columns()[1].dataType());
+    Assertions.assertEquals("col_2_comment", loadTable.columns()[1].comment());
+
+    // Confirm the write reached Iceberg as the nanosecond types, not just echoed by Gravitino.
+    org.apache.iceberg.Table table =
+        icebergCatalog.loadTable(
+            IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdentifier));
+    org.apache.iceberg.Schema icebergSchema = table.schema();
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.TimestampNanoType.withZone(),
+        icebergSchema.columns().get(0).type());
+    Assertions.assertEquals(
+        org.apache.iceberg.types.Types.TimestampNanoType.withoutZone(),
+        icebergSchema.columns().get(1).type());
   }
 
   @Test
@@ -1840,20 +1989,16 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
       Column.of("time_col_9", Types.TimeType.of(9))
     };
 
-    // Test unsupported timestamptz precision (with timezone)
     Column[] unsupportedTimestamptzColumns = {
       Column.of("timestamptz_col_0", Types.TimestampType.withTimeZone(0)),
       Column.of("timestamptz_col_1", Types.TimestampType.withTimeZone(1)),
-      Column.of("timestamptz_col_3", Types.TimestampType.withTimeZone(3)),
-      Column.of("timestamptz_col_9", Types.TimestampType.withTimeZone(9))
+      Column.of("timestamptz_col_3", Types.TimestampType.withTimeZone(3))
     };
 
-    // Test unsupported timestamp precision (without timezone)
     Column[] unsupportedTimestampColumns = {
       Column.of("timestamp_col_0", Types.TimestampType.withoutTimeZone(0)),
       Column.of("timestamp_col_1", Types.TimestampType.withoutTimeZone(1)),
-      Column.of("timestamp_col_3", Types.TimestampType.withoutTimeZone(3)),
-      Column.of("timestamp_col_9", Types.TimestampType.withoutTimeZone(9))
+      Column.of("timestamp_col_3", Types.TimestampType.withoutTimeZone(3))
     };
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
@@ -1873,10 +2018,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                       Transforms.EMPTY_TRANSFORM,
                       Distributions.NONE,
                       new SortOrder[0]));
-      Assertions.assertTrue(
-          exception
-              .getMessage()
-              .contains("Iceberg only supports microsecond precision (6) for time type"));
+      Assertions.assertTrue(exception.getMessage().contains("Cannot convert time("));
     }
 
     // Test timestamptz precision validation (with timezone)
@@ -1894,10 +2036,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                       Transforms.EMPTY_TRANSFORM,
                       Distributions.NONE,
                       new SortOrder[0]));
-      Assertions.assertTrue(
-          exception
-              .getMessage()
-              .contains("Iceberg only supports microsecond precision (6) for timestamptz type"));
+      Assertions.assertTrue(exception.getMessage().contains("Cannot convert timestamptz("));
     }
 
     // Test timestamp precision validation (without timezone)
@@ -1915,10 +2054,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                       Transforms.EMPTY_TRANSFORM,
                       Distributions.NONE,
                       new SortOrder[0]));
-      Assertions.assertTrue(
-          exception
-              .getMessage()
-              .contains("Iceberg only supports microsecond precision (6) for timestamp type"));
+      Assertions.assertTrue(exception.getMessage().contains("Cannot convert timestamp("));
     }
   }
 

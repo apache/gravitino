@@ -428,8 +428,10 @@ If you doesn't specify distribution expressions, the table distribution will be 
 | `String`          | `String`                    |
 | `Date`            | `Date`                      |
 | `Time(6)`         | `Time`                      |
-| `Timestamp(6)`    | `TimestampType withZone`    |
-| `Timestamp_tz(6)` | `TimestampType withoutZone` |
+| `Timestamp(6)`    | `TimestampType withoutZone`     |
+| `Timestamp_tz(6)` | `TimestampType withZone`        |
+| `Timestamp(9)`    | `TimestampNanoType withoutZone` |
+| `Timestamp_tz(9)` | `TimestampNanoType withZone`    |
 | `Decimal`         | `Decimal`                   |
 | `Fixed`           | `Fixed`                     |
 | `Binary`          | `Binary`                    |

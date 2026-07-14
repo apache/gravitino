@@ -63,8 +63,10 @@ class TestTypeSerdes(unittest.TestCase):
                 "time(3)": Types.TimeType.of(3),
                 "timestamp(6)": Types.TimestampType.without_time_zone(6),
                 "timestamp(0)": Types.TimestampType.without_time_zone(0),
+                "timestamp(9)": Types.TimestampType.without_time_zone(9),
                 "timestamp_tz(6)": Types.TimestampType.with_time_zone(6),
                 "timestamp_tz(3)": Types.TimestampType.with_time_zone(3),
+                "timestamp_tz(9)": Types.TimestampType.with_time_zone(9),
                 "geometry(srid:3857)": Types.GeometryType.of("srid:3857"),
                 "geography(EPSG:4326,karney)": Types.GeographyType.of(
                     "EPSG:4326", "karney"
