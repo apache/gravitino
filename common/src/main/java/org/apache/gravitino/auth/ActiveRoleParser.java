@@ -24,27 +24,24 @@ import java.util.Set;
 import javax.annotation.Nullable;
 
 /**
- * Parses the value of the {@link AuthConstants#X_GRAVITINO_ACTIVE_ROLES_HEADER} header into an
- * {@link ActiveRoles} declaration.
+ * Parses the {@link AuthConstants#X_GRAVITINO_ACTIVE_ROLES_HEADER} header value into an {@link
+ * ActiveRoles} declaration.
  *
  * <p>Accepted grammar:
  *
  * <ul>
- *   <li>absent, empty, or whitespace-only value &rarr; {@link ActiveRoles#all()} (today's
- *       behavior);
- *   <li>{@link #ALL_KEYWORD} &rarr; {@link ActiveRoles#all()};
- *   <li>{@link #NONE_KEYWORD} &rarr; {@link ActiveRoles#none()};
- *   <li>a role name or a comma-separated list of role names &rarr; {@link ActiveRoles#of}.
+ *   <li>an absent, empty, or whitespace-only value maps to {@link ActiveRoles#all()};
+ *   <li>{@code ALL} maps to {@link ActiveRoles#all()};
+ *   <li>{@code NONE} maps to {@link ActiveRoles#none()};
+ *   <li>a role name or comma-separated list of role names maps to {@link ActiveRoles#of}.
  * </ul>
  *
- * <p>Entries are trimmed of surrounding whitespace and duplicates collapse; role names are matched
- * case-sensitively. The keywords {@code ALL} and {@code NONE} are reserved, matched exactly (upper
- * case), and each must appear on its own. A role whose name is exactly {@code ALL} or {@code NONE}
- * therefore cannot be activated by name.
+ * <p>Entries are trimmed and de-duplicated, and role names are case-sensitive. {@code ALL} and
+ * {@code NONE} are reserved keywords, matched exactly in upper case, and each must appear on its
+ * own, so a role literally named {@code ALL} or {@code NONE} cannot be activated by name.
  *
- * <p>Only <em>syntactic</em> validation is performed here. A well-formed value that names a role
- * the caller does not actually hold is not rejected by this parser; that membership check is done
- * later on the server against the caller's effective roles.
+ * <p>This performs syntactic validation only. Checking that the caller actually holds a named role
+ * happens later on the server.
  */
 public final class ActiveRoleParser {
 
@@ -73,8 +70,8 @@ public final class ActiveRoleParser {
       return ActiveRoles.all();
     }
 
-    // Split with a negative limit so trailing empty entries (e.g. "analyst,") are retained and
-    // therefore rejected below rather than silently dropped.
+    // Use a negative limit so trailing empty entries (e.g. "analyst,") are kept and rejected below
+    // instead of being silently dropped.
     String[] parts = trimmed.split(",", -1);
     Set<String> names = new LinkedHashSet<>();
     boolean sawAll = false;
@@ -98,9 +95,8 @@ public final class ActiveRoleParser {
       }
     }
 
-    // A reserved keyword must appear on its own — never combined with a role name, another keyword,
-    // or even a repeat of itself. Every entry is non-empty at this point, so a lone keyword is the
-    // only case where a reserved word is valid.
+    // A reserved keyword must appear on its own. Every entry is non-empty here, so a reserved
+    // keyword is valid only when it is the single entry.
     boolean sawReserved = sawAll || sawNone;
     if (sawReserved && parts.length > 1) {
       throw new IllegalActiveRolesException(

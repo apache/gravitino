@@ -32,14 +32,13 @@ import java.util.Set;
  * <p>An instance is one of three kinds:
  *
  * <ul>
- *   <li>{@link Mode#ALL} — every role the caller holds is active (identical to today's behavior and
- *       to an absent header);
- *   <li>{@link Mode#NONE} — no role is active; all role-derived access is removed;
- *   <li>{@link Mode#NAMED} — only the listed role names are active.
+ *   <li>{@link Mode#ALL}: every role the caller holds is active, the same as an absent header;
+ *   <li>{@link Mode#NONE}: no role is active;
+ *   <li>{@link Mode#NAMED}: only the listed role names are active.
  * </ul>
  *
- * <p>This type only models the declared value. Validating that the caller actually holds the named
- * roles happens later, on the server, against the caller's effective roles.
+ * <p>This type only models the declared value. Checking that the caller actually holds the named
+ * roles happens later on the server.
  */
 public final class ActiveRoles {
 
