@@ -43,7 +43,7 @@ import javax.annotation.Nullable;
  * <p>This performs syntactic validation only. Checking that the caller actually holds a named role
  * happens later on the server.
  */
-public final class ActiveRoleParser {
+public final class ActiveRolesParser {
 
   /** The reserved keyword that activates every role the caller holds. */
   public static final String ALL_KEYWORD = "ALL";
@@ -51,7 +51,7 @@ public final class ActiveRoleParser {
   /** The reserved keyword that activates no role. */
   public static final String NONE_KEYWORD = "NONE";
 
-  private ActiveRoleParser() {}
+  private ActiveRolesParser() {}
 
   /**
    * Parses a raw header value into an {@link ActiveRoles} declaration.

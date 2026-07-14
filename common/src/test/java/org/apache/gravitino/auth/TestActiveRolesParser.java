@@ -32,13 +32,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestActiveRoleParser {
+public class TestActiveRolesParser {
 
   @ParameterizedTest
   @NullSource
   @ValueSource(strings = {"", "   ", "\t"})
   public void testAbsentOrBlankIsAll(String value) {
-    ActiveRoles roles = ActiveRoleParser.parse(value);
+    ActiveRoles roles = ActiveRolesParser.parse(value);
     assertEquals(Mode.ALL, roles.mode());
     assertTrue(roles.isAll());
     assertTrue(roles.roleNames().isEmpty());
@@ -46,12 +46,12 @@ public class TestActiveRoleParser {
 
   @Test
   public void testAllKeyword() {
-    assertEquals(Mode.ALL, ActiveRoleParser.parse("ALL").mode());
+    assertEquals(Mode.ALL, ActiveRolesParser.parse("ALL").mode());
   }
 
   @Test
   public void testNoneKeyword() {
-    ActiveRoles roles = ActiveRoleParser.parse("NONE");
+    ActiveRoles roles = ActiveRolesParser.parse("NONE");
     assertEquals(Mode.NONE, roles.mode());
     assertTrue(roles.isNone());
     assertTrue(roles.roleNames().isEmpty());
@@ -59,39 +59,39 @@ public class TestActiveRoleParser {
 
   @Test
   public void testSingleRole() {
-    ActiveRoles roles = ActiveRoleParser.parse("analyst");
+    ActiveRoles roles = ActiveRolesParser.parse("analyst");
     assertEquals(Mode.NAMED, roles.mode());
     assertIterableEquals(Collections.singletonList("analyst"), roles.roleNames());
   }
 
   @Test
   public void testCommaSeparatedList() {
-    ActiveRoles roles = ActiveRoleParser.parse("analyst,reader");
+    ActiveRoles roles = ActiveRolesParser.parse("analyst,reader");
     assertEquals(Mode.NAMED, roles.mode());
     assertIterableEquals(Arrays.asList("analyst", "reader"), roles.roleNames());
   }
 
   @Test
   public void testWhitespaceIsTrimmed() {
-    ActiveRoles roles = ActiveRoleParser.parse("  analyst ,  reader  ");
+    ActiveRoles roles = ActiveRolesParser.parse("  analyst ,  reader  ");
     assertIterableEquals(Arrays.asList("analyst", "reader"), roles.roleNames());
   }
 
   @Test
   public void testDuplicatesCollapseAndPreserveOrder() {
-    ActiveRoles roles = ActiveRoleParser.parse("reader, analyst, reader");
+    ActiveRoles roles = ActiveRolesParser.parse("reader, analyst, reader");
     assertIterableEquals(Arrays.asList("reader", "analyst"), roles.roleNames());
   }
 
   @Test
   public void testRoleNamesAreCaseSensitive() {
-    ActiveRoles roles = ActiveRoleParser.parse("Analyst,analyst");
+    ActiveRoles roles = ActiveRolesParser.parse("Analyst,analyst");
     assertIterableEquals(Arrays.asList("Analyst", "analyst"), roles.roleNames());
   }
 
   @Test
   public void testKeywordsAreCaseSensitiveSoLowercaseIsARoleName() {
-    ActiveRoles roles = ActiveRoleParser.parse("all");
+    ActiveRoles roles = ActiveRolesParser.parse("all");
     assertEquals(Mode.NAMED, roles.mode());
     assertIterableEquals(Collections.singletonList("all"), roles.roleNames());
   }
@@ -111,12 +111,12 @@ public class TestActiveRoleParser {
         "NONE,NONE" // repeated reserved keyword
       })
   public void testMalformedValuesThrow(String value) {
-    assertThrows(IllegalActiveRolesException.class, () -> ActiveRoleParser.parse(value));
+    assertThrows(IllegalActiveRolesException.class, () -> ActiveRolesParser.parse(value));
   }
 
   @Test
   public void testMalformedExceptionIsIllegalArgument() {
     // The server maps this to 400 Bad Request, so it must remain an IllegalArgumentException.
-    assertThrows(IllegalArgumentException.class, () -> ActiveRoleParser.parse("analyst,"));
+    assertThrows(IllegalArgumentException.class, () -> ActiveRolesParser.parse("analyst,"));
   }
 }

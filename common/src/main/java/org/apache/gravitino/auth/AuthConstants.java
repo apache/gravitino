@@ -48,7 +48,7 @@ public final class AuthConstants {
    * <p>When present, authorization is narrowed so that only the declared roles are considered for
    * allow decisions. The value is a single role name, a comma-separated list of role names, or one
    * of the reserved keywords {@code ALL} / {@code NONE}. An absent header is equivalent to {@code
-   * ALL} (today's behavior). See {@link ActiveRoleParser} for the accepted grammar.
+   * ALL} (today's behavior). See {@link ActiveRolesParser} for the accepted grammar.
    */
   public static final String X_GRAVITINO_ACTIVE_ROLES_HEADER = "X-Gravitino-Active-Roles";
 
