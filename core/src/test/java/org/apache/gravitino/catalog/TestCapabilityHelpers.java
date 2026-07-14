@@ -81,4 +81,15 @@ public class TestCapabilityHelpers {
             CapabilityHelpers.applyCaseSensitiveOnName(
                 Capability.Scope.TABLE, "myTable", NULL_NORMALIZING_CAPABILITY));
   }
+
+  @Test
+  void testApplyCaseSensitiveOnNameAllowsNullNameToPassThrough() {
+    // A null name (e.g. an auto-generated identity partition name yet to be assigned) must be
+    // allowed to pass through as null rather than being rejected as an invalid normalizeName
+    // result.
+    String normalized =
+        CapabilityHelpers.applyCaseSensitiveOnName(
+            Capability.Scope.PARTITION, null, Capability.DEFAULT);
+    Assertions.assertNull(normalized);
+  }
 }

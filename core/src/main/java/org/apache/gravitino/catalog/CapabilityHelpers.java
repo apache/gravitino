@@ -505,12 +505,16 @@ public class CapabilityHelpers {
 
   public static String applyCaseSensitiveOnName(
       Capability.Scope scope, String name, Capability capabilities) {
+    if (name == null) {
+      return null;
+    }
     String normalizedName = capabilities.normalizeName(scope, name);
-    Preconditions.checkArgument(
-        normalizedName != null,
-        "Capability.normalizeName(%s, %s) must not return null",
-        scope,
-        name);
+    if (normalizedName == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Capability.normalizeName(%s, %s) must not return null for a non-null name",
+              scope, name));
+    }
     return normalizedName;
   }
 
