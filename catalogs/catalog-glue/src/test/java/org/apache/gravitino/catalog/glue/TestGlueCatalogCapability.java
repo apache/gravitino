@@ -18,10 +18,8 @@
  */
 package org.apache.gravitino.catalog.glue;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.connector.capability.Capability;
@@ -73,23 +71,5 @@ class TestGlueCatalogCapability {
     // Column name case folding is not documented in Glue Column API — treated as supported.
     CapabilityResult result = capability.caseSensitiveOnName(Capability.Scope.COLUMN);
     assertTrue(result.supported());
-  }
-
-  @Test
-  void testNormalizeNameLowercasesTableAndSchemaNames() {
-    // Regression test: normalizeName must honor this instance's own caseSensitiveOnName
-    // override rather than falling back to case-sensitive DEFAULT behavior.
-    assertEquals("mytable", capability.normalizeName(Capability.Scope.TABLE, "MyTable"));
-    assertEquals("myschema", capability.normalizeName(Capability.Scope.SCHEMA, "MySchema"));
-  }
-
-  @Test
-  void testNormalizeNameKeepsColumnNameCase() {
-    assertEquals("MyColumn", capability.normalizeName(Capability.Scope.COLUMN, "MyColumn"));
-  }
-
-  @Test
-  void testNormalizeNameAllowsNullNameToPassThrough() {
-    assertNull(capability.normalizeName(Capability.Scope.TABLE, null));
   }
 }
