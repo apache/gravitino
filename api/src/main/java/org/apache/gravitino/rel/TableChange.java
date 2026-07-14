@@ -900,7 +900,7 @@ public interface TableChange {
 
     private After(String column) {
       if (null == column) {
-        throw new IllegalArgumentException("column can not be null.");
+        throw new IllegalArgumentException("column cannot be null");
       }
       this.column = column;
     }
