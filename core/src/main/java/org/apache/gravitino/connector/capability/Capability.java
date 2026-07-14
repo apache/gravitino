@@ -87,7 +87,7 @@ public interface Capability {
    * @return The normalized, canonical name.
    */
   default String normalizeName(Scope scope, String name) {
-    return caseSensitiveOnName(scope).supported() ? name : name.toLowerCase(Locale.ROOT);
+    return DEFAULT.normalizeName(scope, name);
   }
 
   /**
@@ -158,6 +158,14 @@ public interface Capability {
     @Override
     public CapabilityResult caseSensitiveOnName(Scope scope) {
       return CapabilityResult.SUPPORTED;
+    }
+
+    @Override
+    public String normalizeName(Scope scope, String name) {
+      if (name == null) {
+        return null;
+      }
+      return caseSensitiveOnName(scope).supported() ? name : name.toLowerCase(Locale.ROOT);
     }
 
     @Override

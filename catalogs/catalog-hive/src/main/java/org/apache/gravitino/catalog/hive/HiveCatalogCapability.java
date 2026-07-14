@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import java.util.Locale;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -52,5 +53,13 @@ public class HiveCatalogCapability implements Capability {
       default:
         return CapabilityResult.SUPPORTED;
     }
+  }
+
+  @Override
+  public String normalizeName(Scope scope, String name) {
+    if (name == null) {
+      return null;
+    }
+    return caseSensitiveOnName(scope).supported() ? name : name.toLowerCase(Locale.ROOT);
   }
 }

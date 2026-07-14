@@ -76,4 +76,12 @@ public class GlueCatalogCapability implements Capability {
         return CapabilityResult.SUPPORTED;
     }
   }
+
+  @Override
+  public String normalizeName(Scope scope, String name) {
+    if (name == null) {
+      return null;
+    }
+    return caseSensitiveOnName(scope).supported() ? name : name.toLowerCase(Locale.ROOT);
+  }
 }
