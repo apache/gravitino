@@ -835,7 +835,7 @@ public interface TableChange {
     @Override
     public int hashCode() {
       int result = Objects.hash(type, name, properties);
-      result = 31 * result + Arrays.hashCode(fieldNames);
+      result = 31 * result + Arrays.deepHashCode(fieldNames);
       return result;
     }
   }

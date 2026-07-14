@@ -931,6 +931,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
    */
   private int resolveIntProperty(
       Map<String, String> properties, String key, int defaultValue, int minValue) {
+    if (properties == null) {
+      return defaultValue;
+    }
     String raw = properties.get(key);
     if (raw == null) {
       return defaultValue;
