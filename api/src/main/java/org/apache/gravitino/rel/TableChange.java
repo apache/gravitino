@@ -463,7 +463,7 @@ public interface TableChange {
    * @param name The name of the index.
    * @param fieldNames The field names of the index.
    * @param properties Extra properties for index configuration (e.g., granularity for ClickHouse
-   *     data skipping indexes).
+   *     data skipping indexes). If {@code null}, an empty map is used.
    * @return A TableChange for the add index.
    */
   static TableChange addIndex(

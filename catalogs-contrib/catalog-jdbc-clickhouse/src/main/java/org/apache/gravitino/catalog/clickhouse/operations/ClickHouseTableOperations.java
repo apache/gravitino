@@ -920,15 +920,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   /**
-   * Resolves the GRANULARITY value from index properties.
+   * Resolves an integer property from the index properties map.
    *
    * @param properties the index properties map
-   * @param defaultValue the default value when the key is absent
-   * @return the resolved granularity (must be a positive integer)
-   * @throws IllegalArgumentException if the value is present but not a positive integer
+   * @param key the property key (e.g. {@link ClickHouseConstants.IndexConstants#GRANULARITY})
+   * @param defaultValue the value returned when the key is absent
+   * @param minValue the minimum allowed value (inclusive)
+   * @return the resolved integer value
+   * @throws IllegalArgumentException if the value is present but not a valid integer within bounds
    */
-  private int resolveGranularity(Map<String, String> properties, int defaultValue) {
-    String raw = properties.get(GRANULARITY);
+  private int resolveIntProperty(
+      Map<String, String> properties, String key, int defaultValue, int minValue) {
+    String raw = properties.get(key);
     if (raw == null) {
       return defaultValue;
     }
@@ -937,36 +940,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     try {
       value = Integer.parseInt(raw);
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("Granularity must be a valid integer, but got: " + raw, e);
+      throw new IllegalArgumentException(key + " must be a valid integer, but got: " + raw, e);
     }
     Preconditions.checkArgument(
-        value >= 1, "Granularity must be a positive integer (>= 1), but got: %s", value);
+        value >= minValue, "%s must be >= %s, but got: %s", key, minValue, value);
     return value;
   }
 
-  /**
-   * Resolves the set(N) max unique values from index properties.
-   *
-   * @param properties the index properties map
-   * @return the resolved max unique values (0 = unlimited); must be non-negative
-   * @throws IllegalArgumentException if the value is present but not a non-negative integer
-   */
+  private int resolveGranularity(Map<String, String> properties, int defaultValue) {
+    return resolveIntProperty(properties, GRANULARITY, defaultValue, 1);
+  }
+
   private int resolveSetMaxValues(Map<String, String> properties) {
-    String raw = properties.get(SET_MAX_VALUES);
-    if (raw == null) {
-      return 0;
-    }
-    raw = raw.trim();
-    int value;
-    try {
-      value = Integer.parseInt(raw);
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          "set_max_values must be a valid integer, but got: " + raw, e);
-    }
-    Preconditions.checkArgument(
-        value >= 0, "set_max_values must be a non-negative integer (>= 0), but got: %s", value);
-    return value;
+    return resolveIntProperty(properties, SET_MAX_VALUES, 0, 0);
   }
 
   @VisibleForTesting
