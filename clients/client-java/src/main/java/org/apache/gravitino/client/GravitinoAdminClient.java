@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.SupportsMetalakes;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
@@ -58,14 +59,16 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    *     support the case that the client-side version is higher than the server-side version.
    * @param headers The base header for Gravitino API.
    * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
+   * @param tlsConfigurer The TLS configurer, or null to use environment or JVM defaults.
    */
   private GravitinoAdminClient(
       String uri,
       AuthDataProvider authDataProvider,
       boolean checkVersion,
       Map<String, String> headers,
-      Map<String, String> properties) {
-    super(uri, authDataProvider, checkVersion, headers, properties);
+      Map<String, String> properties,
+      @Nullable TLSConfigurer tlsConfigurer) {
+    super(uri, authDataProvider, checkVersion, headers, properties, tlsConfigurer);
   }
 
   /**
@@ -259,7 +262,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
       return new GravitinoAdminClient(
-          uri, authDataProvider, isVersionCheckEnabled(), headers, properties);
+          uri, authDataProvider, isVersionCheckEnabled(), headers, properties, tlsConfigurer);
     }
   }
 }

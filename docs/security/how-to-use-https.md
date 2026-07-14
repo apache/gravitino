@@ -47,6 +47,61 @@ Both the Gravitino server and Iceberg REST service can configure and support HTT
 | `gravitino.iceberg-rest.trustStorePassword`     | Password to the trust store.                                       | (none)            | Yes if use HTTPS and the authentication of client | 0.3.0         |
 | `gravitino.iceberg-rest.trustStoreType`         | The type to the trust store.                                       | `JKS`             | No                                                | 0.3.0         |
 
+### Java Client Certificate Configuration
+
+#### Connect with HTTPS
+
+Use HTTPS to encrypt traffic and verify the server identity. Use an `https://` server URI; no client
+TLS configuration is needed when the JVM already trusts the server certificate.
+
+#### Trust a Server Signed by a Private CA
+
+Use a custom trust store when an internal or self-managed CA is not trusted by the JVM.
+
+Import the CA certificate into a trust store, then configure its path and password:
+
+```shell
+keytool -importcert -alias gravitino-ca -file ca.crt \
+  -keystore truststore.p12 -storetype PKCS12
+
+export GRAVITINO_CLIENT_TLS_TRUST_STORE_PATH=/absolute/path/truststore.p12
+export GRAVITINO_CLIENT_TLS_TRUST_STORE_PASSWORD='trust-store-password'
+```
+
+#### Present a Client Certificate for mTLS
+
+Use mTLS to allow only clients with a certificate signed by a CA trusted by the server.
+
+Create a PKCS12 key store containing the client certificate and matching private key:
+
+```shell
+openssl pkcs12 -export \
+  -in client.crt \
+  -inkey client.key \
+  -certfile ca.crt \
+  -name gravitino-client \
+  -out client.p12
+```
+
+Export the path and the password entered when prompted:
+
+```shell
+export GRAVITINO_CLIENT_TLS_KEY_STORE_PATH=/absolute/path/client.p12
+export GRAVITINO_CLIENT_TLS_KEY_STORE_PASSWORD='key-store-password'
+```
+
+Enable client authentication on the Gravitino server with
+`gravitino.server.webserver.enableClientAuth = true` and configure the server trust store with the
+CA that signed the client certificate.
+
+The certificate controls whether the connection is accepted. The `Authorization` header still
+determines the Gravitino user.
+
+Key and trust stores default to `PKCS12`; set `GRAVITINO_CLIENT_TLS_KEY_STORE_TYPE` or
+`GRAVITINO_CLIENT_TLS_TRUST_STORE_TYPE` to use another Java key store type. Configure each path
+together with its password. Precedence is an explicit `TLSConfigurer`, then environment variables,
+then JVM defaults.
+
 Refer to the "Additional JSSE Standard Names" section of the [Java security guide](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#jssenames) for the list of protocols related to tlsProtocol. You can find the list of `tlsProtocol` values for Java 8 in this document.
 
 Refer to the "Additional JSSE Standard Names" section of the [Java security guide](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#ciphersuites) for the list of protocols related to tlsProtocol. You can find the list of `enableCipherAlgorithms` values for Java 8 in this document.

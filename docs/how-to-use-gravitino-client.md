@@ -46,6 +46,13 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http:/
 
 **Note:** Invalid configuration properties will result in exceptions.
 
+### HTTPS and Mutual TLS
+
+The Java client can load a custom server trust store and an optional client certificate for mTLS.
+These settings use environment variables rather than `withClientConfig`. See
+[Java Client Certificate Configuration](./security/how-to-use-https.md#java-client-certificate-configuration)
+for the supported variables and a PKCS12 setup example.
+
 ## Python Client
 
 Customize the Gravitino Python client with config properties like this:
