@@ -2484,6 +2484,7 @@ public class CatalogClickHouseIT extends BaseIT {
           Column.of("id", Types.IntegerType.get(), "pk", false, false, DEFAULT_VALUE_NOT_SET),
           Column.of("val", Types.StringType.get(), "data", true, false, DEFAULT_VALUE_NOT_SET)
         };
+    Assertions.assertTrue(ENGINE.GRAPHITEMERGETREE.isRequireOrderBy());
     Map<String, String> properties = new HashMap<>();
     properties.put(GRAVITINO_ENGINE_KEY, ENGINE.GRAPHITEMERGETREE.getValue());
     // GraphiteMergeTree requires graphite.config property
