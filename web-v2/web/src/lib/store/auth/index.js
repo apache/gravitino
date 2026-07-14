@@ -197,9 +197,6 @@ export const logoutAction = createAsyncThunk(
     dispatch(setAuthUser(null))
     sessionStorage.removeItem('simpleAuthToken')
 
-    // Clear persisted authType to avoid stale auth mode on next visit
-    localStorage.removeItem('authType')
-
     // Reset provider factory to ensure clean state for next login
     oauthProviderFactory.reset()
 
