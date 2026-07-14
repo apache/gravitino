@@ -20,7 +20,6 @@
 'use client'
 
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import { Roboto } from 'next/font/google'
 import { Alert, Card, Flex, Typography } from 'antd'
@@ -32,44 +31,38 @@ import DefaultLogin from './components/DefaultLogin'
 import BasicLogin from './components/BasicLogin'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 import { resetMetalakeStore } from '@/lib/store/metalakes'
-import { useAppDispatch } from '@/lib/hooks/useStore'
-
-import { to } from '@/lib/utils'
-import { getAuthConfigs } from '@/lib/store/auth'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const { Title } = Typography
 
 const LoginContent = () => {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const inactiveReason = searchParams.get('reason') === 'inactive'
   const maxDurationReason = searchParams.get('reason') === 'max_duration'
-  const [authType, setAuthType] = useState(null)
   const [providerType, setProviderType] = useState(null)
   const dispatch = useAppDispatch()
+  const authType = useAppSelector(state => state.auth.authType)
 
   useEffect(() => {
-    const detectLoginType = async () => {
-      const [, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
-      const detectedAuthType = resAuthConfigs?.payload?.authType
+    dispatch(resetMetalakeStore())
 
-      setAuthType(detectedAuthType)
+    if (authType !== 'oauth') {
+      return
+    }
 
-      if (detectedAuthType === 'oauth') {
-        try {
-          const detectedType = await oauthProviderFactory.getProviderType()
-          setProviderType(detectedType)
-        } catch (error) {
-          setProviderType('default')
-        }
+    const detectProviderType = async () => {
+      try {
+        const detectedType = await oauthProviderFactory.getProviderType()
+        setProviderType(detectedType)
+      } catch (error) {
+        setProviderType('default')
       }
     }
 
-    dispatch(resetMetalakeStore())
-    detectLoginType()
-  }, [dispatch])
+    detectProviderType()
+  }, [authType, dispatch])
 
   return (
     <Flex justify='center' align='center' style={{ minHeight: 'calc(100vh - 7rem)' }}>
