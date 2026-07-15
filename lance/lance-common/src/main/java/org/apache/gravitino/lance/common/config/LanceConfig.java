@@ -33,7 +33,6 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
   public static final String CONFIG_NAMESPACE_BACKEND = "namespace-backend";
   public static final String CONFIG_METALAKE = "metalake";
   public static final String CONFIG_URI = "uri";
-  public static final String CONFIG_INTERNAL_AUX_MODE = "internal-aux-mode";
 
   public static final int DEFAULT_LANCE_REST_SERVICE_HTTP_PORT = 9101;
   public static final int DEFAULT_LANCE_REST_SERVICE_HTTPS_PORT = 9533;
@@ -61,14 +60,6 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault(GRAVITINO_URI);
 
-  public static final ConfigEntry<Boolean> INTERNAL_AUX_MODE =
-      new ConfigBuilder(CONFIG_INTERNAL_AUX_MODE)
-          .doc("Internal runtime flag indicating whether Lance REST runs as an auxiliary service")
-          .version(ConfigConstants.VERSION_1_1_0)
-          .internal()
-          .booleanConf()
-          .createWithDefault(false);
-
   public LanceConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, key -> true);
@@ -88,10 +79,6 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
 
   public String getGravitinoMetalake() {
     return get(METALAKE_NAME);
-  }
-
-  public boolean isAuxMode() {
-    return get(INTERNAL_AUX_MODE);
   }
 
   @Override

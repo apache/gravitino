@@ -83,8 +83,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     super(null);
   }
 
-  public GravitinoLanceNamespaceWrapper(LanceConfig config) {
-    super(config);
+  public GravitinoLanceNamespaceWrapper(LanceConfig config, boolean auxMode) {
+    super(config, auxMode);
   }
 
   @Override
@@ -303,7 +303,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
   }
 
   private SchemaDispatcher currentSchemaDispatcher() {
-    if (!config().isAuxMode()) {
+    if (!isAuxMode()) {
       return null;
     }
 
@@ -311,7 +311,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
   }
 
   private TableDispatcher currentTableDispatcher() {
-    if (!config().isAuxMode()) {
+    if (!isAuxMode()) {
       return null;
     }
 
@@ -320,7 +320,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
   @VisibleForTesting
   CatalogOperator createCatalogOperator(String metalakeName) {
-    return config().isAuxMode()
+    return isAuxMode()
         ? new InternalCatalogOperator(metalakeName)
         : new HttpCatalogOperator(
             config().get(NAMESPACE_BACKEND_URI), metalakeName, config(), extractClientProperties());

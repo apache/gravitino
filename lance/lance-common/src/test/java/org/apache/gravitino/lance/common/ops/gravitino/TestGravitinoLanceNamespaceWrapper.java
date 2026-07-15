@@ -260,9 +260,8 @@ public class TestGravitinoLanceNamespaceWrapper {
         new LanceConfig(
             ImmutableMap.of(
                 LanceConfig.METALAKE_NAME.getKey(), "test_metalake",
-                LanceConfig.NAMESPACE_BACKEND_URI.getKey(), "http://localhost:8090",
-                LanceConfig.INTERNAL_AUX_MODE.getKey(), "false"));
-    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig);
+                LanceConfig.NAMESPACE_BACKEND_URI.getKey(), "http://localhost:8090"));
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig, false);
 
     GravitinoLanceNamespaceWrapper.CatalogOperator operator =
         wrapper.createCatalogOperator("test_metalake");
@@ -346,11 +345,8 @@ public class TestGravitinoLanceNamespaceWrapper {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
 
     LanceConfig lanceConfig =
-        new LanceConfig(
-            ImmutableMap.of(
-                LanceConfig.METALAKE_NAME.getKey(), "test_metalake",
-                LanceConfig.INTERNAL_AUX_MODE.getKey(), "true"));
-    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig);
+        new LanceConfig(ImmutableMap.of(LanceConfig.METALAKE_NAME.getKey(), "test_metalake"));
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig, true);
     wrapper.asNamespaceOps();
 
     Schema actualSchema =
@@ -403,11 +399,8 @@ public class TestGravitinoLanceNamespaceWrapper {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
 
     LanceConfig lanceConfig =
-        new LanceConfig(
-            ImmutableMap.of(
-                LanceConfig.METALAKE_NAME.getKey(), "test_metalake",
-                LanceConfig.INTERNAL_AUX_MODE.getKey(), "true"));
-    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig);
+        new LanceConfig(ImmutableMap.of(LanceConfig.METALAKE_NAME.getKey(), "test_metalake"));
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig, true);
     wrapper.asTableOps();
 
     TableCatalog tableCatalog =

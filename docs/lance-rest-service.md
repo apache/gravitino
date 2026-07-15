@@ -144,6 +144,9 @@ gravitino.lance-rest.namespace-backend = gravitino
 gravitino.lance-rest.gravitino-metalake = my_metalake
 ```
 
+In auxiliary mode, `gravitino.lance-rest.gravitino-uri` is not required because the Lance
+REST service uses Gravitino's internal API.
+
 ### Run Standalone
 
 To run Lance REST service independently without Gravitino server (You need to start Gravitino server first):
@@ -163,8 +166,8 @@ Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-ser
 | `gravitino.lance-rest.host`               | Service hostname           | 0.0.0.0               | No       | 1.1.0         |
 
 :::tip
-In most cases, you only need to configure `gravitino.lance-rest.gravitino-metalake`, `gravitino.lance-rest.gravitino-uri`,
-and other properties can use their default values.
+In standalone deployments, you only need to configure `gravitino.lance-rest.gravitino-metalake`,
+`gravitino.lance-rest.gravitino-uri`, and other properties can use their default values.
 :::
 
 
