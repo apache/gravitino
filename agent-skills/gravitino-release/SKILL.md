@@ -341,6 +341,21 @@ export MOCK_STAGE_DELAY=180   # stage sleeps 3 minutes before completing
 
 ---
 
+### OpenAPI bundles (required before tagging)
+
+Before creating a release candidate tag, make sure the generated OpenAPI bundles are current and
+committed to the release branch. Do not forget to run:
+
+```bash
+./gradlew :docs:bundleOpenApi
+git add docs/open-api/default/openapi.json docs/open-api/default/openapi.yaml
+```
+
+Commit any resulting changes before continuing. The release tag must contain the generated
+`openapi.json` and `openapi.yaml` from the same commit as the OpenAPI source.
+
+---
+
 ### Stage 1: tag
 
 **Command:**
