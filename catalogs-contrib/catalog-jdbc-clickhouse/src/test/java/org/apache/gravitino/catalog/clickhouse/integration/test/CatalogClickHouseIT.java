@@ -1510,6 +1510,52 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testAlterTableAddIndexWithCustomGranularity() {
+    String tableName = GravitinoITUtils.genRandomName("alter_idx_gran");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("val", Types.IntegerType.get(), "val", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"));
+
+    // ALTER TABLE ADD INDEX with custom GRANULARITY via AddIndex properties
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_MINMAX,
+            "idx_val_minmax",
+            new String[][] {{"val"}},
+            Collections.singletonMap("granularity", "5")));
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index())
+            .anyMatch(
+                index ->
+                    Objects.equals(index.name(), "idx_val_minmax")
+                        && index.type() == Index.IndexType.DATA_SKIPPING_MINMAX));
+
+    // Verify DDL-level: SHOW CREATE TABLE should contain GRANULARITY 5
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName));
+    Assertions.assertNotNull(createSql);
+    Assertions.assertTrue(
+        createSql.contains("GRANULARITY 5"),
+        "SHOW CREATE TABLE output should contain GRANULARITY 5: " + createSql);
+  }
+
+  @Test
   void testCreateTableWithAutoIncrementUnsupported() {
     String tableName = GravitinoITUtils.genRandomName("create_auto_inc");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
