@@ -150,8 +150,9 @@ public class StarRocksAuthorization extends BaseAuthorization<StarRocksAuthoriza
 
 ### 4.1 Securable Objects
 
-The StarRocks mapping provider translates Gravitino securable objects into StarRocks
-authorization resources.
+The StarRocks mapping provider translates Gravitino securable objects, which are the
+owned `MetadataObject`s rather than the owner principals, into StarRocks authorization
+resources.
 
 | Gravitino object | StarRocks resource                            |
 |------------------|-----------------------------------------------|
@@ -163,9 +164,25 @@ authorization resources.
 ### 4.2 Ownership
 
 Gravitino supports object ownership, where the owner of an object implicitly has administrative privileges such as ALTER and DROP.
+Ownership has two separate parts: the owned object and the owner principal. The owned
+object is the `MetadataObject` passed to `onOwnerSet`, such as a catalog, schema, or table.
+The owner principal is `newOwner`, which can be a Gravitino user or group.
 
-Since StarRocks does not provide a native object ownership model, the plugin should map Gravitino ownership to StarRocks privileges by granting ALL privileges on the corresponding resource to the owner. 
-This approach preserves the ownership semantics in Gravitino and ensures that owners retain full administrative control over their objects in StarRocks
+Since StarRocks does not provide a native object ownership model, the plugin should map Gravitino ownership to StarRocks privileges by granting ALL privileges on the corresponding resource to the owner.
+This approach preserves the ownership semantics in Gravitino and ensures that owners retain full administrative control over their objects in StarRocks.
+
+For example, when Gravitino sets the owner of table `orders` to user `alice`,
+`onOwnerSet(tableObject, preOwner, newOwner)` receives `tableObject` as the owned table and
+`newOwner` as `alice`. The plugin first ensures `alice` exists in StarRocks
+by calling `onUserAdded`, then translates the table to the StarRocks table resource
+`orders`, and finally grants `ALL` on that table to `alice`. If
+`preOwner` is not null, the generated SQL should transfer ownership semantics by revoking the
+owner privileges from `preOwner` and granting them to `newOwner`.
+
+For a group owner, the same flow applies, but StarRocks Community Edition does not
+support native group principals. For example, setting schema `sales` to group `analytics`
+should resolve the users in `analytics`, ensure each user exists in StarRocks, then grant
+`ALL` on database `sales` and all tables in `sales` directly to those user principals.
 
 | Gravitino object | StarRocks privilege | StarRocks resource                 |
 |------------------|---------------------|------------------------------------|
@@ -194,7 +211,7 @@ This approach preserves the ownership semantics in Gravitino and ensures that ow
 ### 4.4 Deny Privileges
 
 The StarRocks pushdown plugin should only push down `Privilege.Condition.ALLOW`.
-Privileges with `Privilege.Condition.DENY` should be filtered out.
+Privileges with `Privilege.Condition.DENY` should be filtered out and unsupported privileges exception will be thrown as well.
 
 ### 4.5 Unsupported Privileges
 
