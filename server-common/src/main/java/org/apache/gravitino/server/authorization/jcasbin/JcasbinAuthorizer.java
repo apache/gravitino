@@ -533,10 +533,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       MetadataObject targetObject,
       MetadataObject metalakeObject,
       AuthorizationRequestContext requestContext) {
-    MetadataObject.Type targetType = targetObject.type();
-    if (targetType == MetadataObject.Type.SCHEMA) {
-      List<MetadataObject> useCatalogObjects =
-          ImmutableList.of(MetadataObjects.parent(targetObject), metalakeObject);
+    MetadataObject parentObject = MetadataObjects.parent(targetObject);
+    if (parentObject != null && parentObject.type() == MetadataObject.Type.CATALOG) {
+      List<MetadataObject> useCatalogObjects = ImmutableList.of(parentObject, metalakeObject);
       return hasAuthorizeWithoutDeny(
           principal,
           metalake,
@@ -545,16 +544,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           Privilege.Name.USE_CATALOG,
           requestContext);
     }
-    if (targetType == MetadataObject.Type.TABLE
-        || targetType == MetadataObject.Type.VIEW
-        || targetType == MetadataObject.Type.TOPIC
-        || targetType == MetadataObject.Type.FILESET
-        || targetType == MetadataObject.Type.MODEL
-        || targetType == MetadataObject.Type.FUNCTION) {
-      MetadataObject schemaObject = MetadataObjects.parent(targetObject);
-      MetadataObject catalogObject = MetadataObjects.parent(schemaObject);
+    if (parentObject != null && parentObject.type() == MetadataObject.Type.SCHEMA) {
+      MetadataObject catalogObject = MetadataObjects.parent(parentObject);
       List<MetadataObject> useSchemaObjects =
-          ImmutableList.of(metalakeObject, catalogObject, schemaObject);
+          ImmutableList.of(metalakeObject, catalogObject, parentObject);
       return hasAuthorizeWithoutDeny(
               principal,
               metalake,
