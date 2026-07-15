@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.trino.connector.security;
 
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.OAuth2TokenProvider;
 
 /**
@@ -40,6 +42,8 @@ public final class StaticUserTokenProvider extends OAuth2TokenProvider {
    *     Gravitino
    */
   public StaticUserTokenProvider(String accessToken) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(accessToken), "accessToken must not be blank");
     this.accessToken = accessToken;
   }
 

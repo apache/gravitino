@@ -168,9 +168,6 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
       restProperties.put(
           "iceberg.rest-catalog.warehouse", properties.get(IcebergConstants.WAREHOUSE));
     }
-    restProperties.put("iceberg.rest-catalog.security", "OAUTH2");
-    restProperties.put("iceberg.rest-catalog.session", "USER");
-    restProperties.put("iceberg.rest-catalog.vended-credentials-enabled", "true");
     return restProperties;
   }
 }
