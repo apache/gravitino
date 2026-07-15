@@ -470,7 +470,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT));
-    MetadataObject targetObject = MetadataObjects.parse(fullName, metadataType);
     MetadataObject metalakeObject =
         MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
 
@@ -479,7 +478,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return true;
     }
 
-    MetadataObject metadataObject = targetObject;
+    MetadataObject metadataObject = MetadataObjects.parse(fullName, metadataType);
     do {
       if (isOwner(currentPrincipal, metalake, metadataObject, requestContext)) {
         return hasParentUsagePermission(
@@ -550,7 +549,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         || targetType == MetadataObject.Type.VIEW
         || targetType == MetadataObject.Type.TOPIC
         || targetType == MetadataObject.Type.FILESET
-        || targetType == MetadataObject.Type.MODEL) {
+        || targetType == MetadataObject.Type.MODEL
+        || targetType == MetadataObject.Type.FUNCTION) {
       MetadataObject schemaObject = MetadataObjects.parent(targetObject);
       MetadataObject catalogObject = MetadataObjects.parent(schemaObject);
       List<MetadataObject> useSchemaObjects =

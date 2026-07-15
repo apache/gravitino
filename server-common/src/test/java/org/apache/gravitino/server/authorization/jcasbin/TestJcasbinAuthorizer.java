@@ -1858,6 +1858,48 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testHasMetadataPrivilegePermissionRejectsDenyParentUsageForFunction()
+      throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    Long allowRoleId = 210L;
+    RoleEntity allowRole =
+        mockRoleInStore(
+            allowRoleId,
+            "allowFunctionManageGrantsRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.FUNCTION,
+                    "testCatalog.testSchema.testFunction",
+                    Privilege.Name.MANAGE_GRANTS,
+                    "ALLOW"),
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.SCHEMA,
+                    "testCatalog.testSchema",
+                    USE_SCHEMA,
+                    "ALLOW")));
+    Long denyRoleId = 211L;
+    RoleEntity denyRole =
+        mockRoleInStore(
+            denyRoleId,
+            "denyUseSchemaForFunctionRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    denyRoleId, MetadataObject.Type.METALAKE, METALAKE, USE_SCHEMA, "DENY")));
+    mockDirectUserRoles(allowRole, denyRole);
+
+    assertFalse(
+        jcasbinAuthorizer.hasMetadataPrivilegePermission(
+            METALAKE,
+            "FUNCTION",
+            "testCatalog.testSchema.testFunction",
+            new AuthorizationRequestContext()),
+        "DENY USE_SCHEMA should override FUNCTION-level MANAGE_GRANTS");
+  }
+
+  @Test
   public void testHasMetadataPrivilegePermissionAllowsOwnerWithDenyManageGrants() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
@@ -1920,6 +1962,44 @@ public class TestJcasbinAuthorizer {
             "testCatalog.testSchema.testTable",
             new AuthorizationRequestContext()),
         "DENY USE_CATALOG should override table ownership when setting owner");
+  }
+
+  @Test
+  public void testHasSetOwnerPermissionRejectsDenyUseCatalogForFunctionOwner() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    Long allowRoleId = 212L;
+    RoleEntity allowRole =
+        mockRoleInStore(
+            allowRoleId,
+            "allowUseSchemaForFunctionOwnerRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    allowRoleId,
+                    MetadataObject.Type.SCHEMA,
+                    "testCatalog.testSchema",
+                    USE_SCHEMA,
+                    "ALLOW")));
+    Long denyRoleId = 213L;
+    RoleEntity denyRole =
+        mockRoleInStore(
+            denyRoleId,
+            "denyUseCatalogForFunctionOwnerRole",
+            ImmutableList.of(
+                buildSecurableObject(
+                    denyRoleId, MetadataObject.Type.METALAKE, METALAKE, USE_CATALOG, "DENY")));
+    mockDirectUserRoles(allowRole, denyRole);
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("FUNCTION")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    assertFalse(
+        jcasbinAuthorizer.hasSetOwnerPermission(
+            METALAKE,
+            "FUNCTION",
+            "testCatalog.testSchema.testFunction",
+            new AuthorizationRequestContext()),
+        "DENY USE_CATALOG should override function ownership when setting owner");
   }
 
   @Test
