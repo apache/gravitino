@@ -28,9 +28,10 @@ configure<NodeExtension> {
 
 tasks {
   val openApiSource = project.file("open-api/openapi.yaml")
-  val openApiBundle = project.file("open-api/default/openapi.json")
+  val openApiJsonBundle = project.file("open-api/default/openapi.json")
+  val openApiYamlBundle = project.file("open-api/default/openapi.yaml")
 
-  val bundleOpenApi by registering(NpxTask::class) {
+  val bundleOpenApiJson by registering(NpxTask::class) {
     group = "documentation"
     description = "Bundles the default OpenAPI specification as JSON."
     command.set("@redocly/cli@1.23.1")
@@ -39,13 +40,38 @@ tasks {
         "bundle",
         openApiSource.absolutePath,
         "--output",
-        openApiBundle.absolutePath
+        openApiJsonBundle.absolutePath
       )
     )
     inputs.files(fileTree("open-api") { include("*.yaml") })
-    outputs.file(openApiBundle)
+    outputs.file(openApiJsonBundle)
 
-    doFirst { openApiBundle.parentFile.mkdirs() }
+    doFirst { openApiJsonBundle.parentFile.mkdirs() }
+  }
+
+  val bundleOpenApiYaml by registering(NpxTask::class) {
+    group = "documentation"
+    description = "Bundles the default OpenAPI specification as YAML."
+    command.set("@redocly/cli@1.23.1")
+    args.set(
+      listOf(
+        "bundle",
+        openApiSource.absolutePath,
+        "--output",
+        openApiYamlBundle.absolutePath
+      )
+    )
+    inputs.files(fileTree("open-api") { include("*.yaml") })
+    outputs.file(openApiYamlBundle)
+
+    doFirst { openApiYamlBundle.parentFile.mkdirs() }
+  }
+
+  val bundleOpenApi by registering {
+    group = "documentation"
+    description = "Bundles the default OpenAPI specification as JSON and YAML."
+    dependsOn(bundleOpenApiJson)
+    dependsOn(bundleOpenApiYaml)
   }
 
   val lintOpenAPI by registering(NpxTask::class) {
