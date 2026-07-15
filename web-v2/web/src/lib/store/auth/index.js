@@ -209,11 +209,6 @@ export const logoutAction = createAsyncThunk(
 )
 
 export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', async (expiredIn, { dispatch }) => {
-  // If the auth type is basic, we don't need to set an interval for token refresh
-  if (localStorage.getItem('authType') === 'basic') {
-    return { intervalId: null }
-  }
-
   const localExpiredIn = localStorage.getItem('expiredIn')
   const expired = (expiredIn ?? Number(localExpiredIn)) * (2 / 3) * 1000
   const defaultExpired = 299 * (2 / 3) * 1000

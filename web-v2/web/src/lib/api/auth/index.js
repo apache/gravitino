@@ -52,8 +52,7 @@ export const basicLoginApi = basicToken => {
       headers: {
         Authorization: basicToken,
         Accept: 'application/vnd.gravitino.v1+json',
-        'Content-Type': 'application/json',
-        'X-Gravitino-Web-Login': 'true'
+        'Content-Type': 'application/json'
       }
     },
     { withToken: false }

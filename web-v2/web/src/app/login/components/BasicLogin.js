@@ -26,7 +26,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { basicLoginAction, setIntervalIdAction, clearIntervalId } from '@/lib/store/auth'
+import { basicLoginAction, clearIntervalId } from '@/lib/store/auth'
 
 const defaultValues = {
   username: '',
@@ -54,12 +54,6 @@ function BasicLogin() {
     mode: 'onChange',
     resolver: yupResolver(schema)
   })
-
-  useEffect(() => {
-    if (store.intervalId) {
-      dispatch(clearIntervalId())
-    }
-  }, [store.intervalId, dispatch])
 
   const onSubmit = async data => {
     try {

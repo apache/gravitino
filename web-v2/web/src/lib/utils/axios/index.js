@@ -273,14 +273,13 @@ const transform = {
       throw new Error(error)
     }
 
-    const webLoginHeaderValue =
-      typeof originConfig?.headers?.get === 'function'
-        ? originConfig.headers.get('X-Gravitino-Web-Login')
-        : (originConfig?.headers?.['X-Gravitino-Web-Login'] ?? originConfig?.headers?.['x-gravitino-web-login'])
+    // During a failed basic login request, don't reload the page as this would prevent error message display.
+    const isBasicLoginRequest =
+      response?.status === 401 &&
+      originConfig?.url?.includes('/api/version') &&
+      originConfig?.requestOptions?.withToken === false
 
-    const isFailedWebUILoginRequest = response?.status === 401 && String(webLoginHeaderValue).toLowerCase() === 'true'
-
-    if (isFailedWebUILoginRequest) {
+    if (isBasicLoginRequest) {
       return Promise.reject(error)
     }
 
