@@ -21,10 +21,12 @@ package org.apache.gravitino.trino.connector;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalNotification;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorAccessControl;
@@ -226,13 +228,13 @@ public class GravitinoConnector implements Connector {
   }
 
   private CatalogConnectorMetadata resolveSessionMetadata(ConnectorSession session) {
-    String credKey =
+    String authType =
         catalogConnectorContext
-                .getConfig()
-                .getClientConfig()
-                .getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple")
-            + ":"
-            + session.getUser();
+            .getConfig()
+            .getClientConfig()
+            .getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple");
+    String token = session.getIdentity().getExtraCredentials().get("token");
+    String credKey = sessionCacheKey(authType, session.getUser(), token);
     try {
       return perUserSessionCache.get(
               credKey,
@@ -246,7 +248,7 @@ public class GravitinoConnector implements Connector {
                     userClient, new CatalogConnectorMetadata(userMetalake, catalogIdentifier));
               })
           .metadata;
-    } catch (ExecutionException e) {
+    } catch (ExecutionException | UncheckedExecutionException e) {
       Throwable cause = e.getCause();
       LOG.warn(
           "Failed to create per-user Gravitino client for user '{}': {}",
@@ -260,6 +262,13 @@ public class GravitinoConnector implements Connector {
               + cause.getMessage(),
           cause);
     }
+  }
+
+  @VisibleForTesting
+  static String sessionCacheKey(String authType, String user, String token) {
+    String tokenPart =
+        StringUtils.isBlank(token) ? "" : ":" + Integer.toHexString(token.hashCode());
+    return authType + ":" + user + tokenPart;
   }
 
   private Cache<String, UserSession> buildSessionCache(GravitinoConfig config) {

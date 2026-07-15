@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -88,6 +89,41 @@ class TestGravitinoConnectorForwardUser {
   void testForwardUserFalseWithNoAuthTypeSucceeds() {
     CatalogConnectorContext ctx = mockContextWithConfig(ImmutableMap.of());
     assertDoesNotThrow(() -> new GravitinoConnector(ctx));
+  }
+
+  @Test
+  void testSessionCacheKeyIsolatesDifferentUsers() {
+    assertNotEquals(
+        GravitinoConnector.sessionCacheKey("oauth2", "alice", "tok"),
+        GravitinoConnector.sessionCacheKey("oauth2", "bob", "tok"));
+  }
+
+  @Test
+  void testSessionCacheKeyIsolatesDifferentAuthTypes() {
+    assertNotEquals(
+        GravitinoConnector.sessionCacheKey("oauth2", "alice", "tok"),
+        GravitinoConnector.sessionCacheKey("simple", "alice", "tok"));
+  }
+
+  @Test
+  void testSessionCacheKeyIsolatesDifferentTokens() {
+    assertNotEquals(
+        GravitinoConnector.sessionCacheKey("oauth2", "alice", "token-a"),
+        GravitinoConnector.sessionCacheKey("oauth2", "alice", "token-b"));
+  }
+
+  @Test
+  void testSessionCacheKeyIsStableForSameUserAuthTypeAndToken() {
+    assertEquals(
+        GravitinoConnector.sessionCacheKey("oauth2", "alice", "tok"),
+        GravitinoConnector.sessionCacheKey("oauth2", "alice", "tok"));
+  }
+
+  @Test
+  void testSessionCacheKeyIgnoresBlankTokenForSimpleAuth() {
+    assertEquals(
+        GravitinoConnector.sessionCacheKey("simple", "alice", null),
+        GravitinoConnector.sessionCacheKey("simple", "alice", ""));
   }
 
   private static CatalogConnectorContext mockContextWithConfig(

@@ -11,6 +11,8 @@ The Gravitino Trino connector supports authenticating to the Gravitino server us
 
 If `gravitino.client.authType` is not set, the connector operates in no-authentication mode and connects to the Gravitino server without any credentials.
 
+## Authentication Types
+
 ### Simple Authentication
 
 Simple authentication uses a username to authenticate with the Gravitino server.
@@ -90,32 +92,6 @@ gravitino.client.oauth2.scope=gravitino
 | `gravitino.client.oauth2.path`         | OAuth2 token endpoint path                                          | (none)          | Yes if authType is `oauth2`  | 1.3.0           |
 | `gravitino.client.oauth2.scope`        | OAuth2 scope                                                        | (none)          | Yes if authType is `oauth2`  | 1.3.0           |
 
-### Kerberos Authentication
-
-Kerberos authentication uses Kerberos tickets to authenticate with the Gravitino server.
-
-**Configuration in `etc/catalog/gravitino.properties`:**
-
-```properties
-connector.name=gravitino
-gravitino.metalake=metalake
-gravitino.uri=http://localhost:8090
-
-# Kerberos authentication with keytab
-gravitino.client.authType=kerberos
-gravitino.client.kerberos.principal=user@REALM
-gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
-```
-
-**Configuration properties:**
-
-| Property                                     | Description                                                         | Default value   | Required                                  | Since version   |
-|----------------------------------------------|---------------------------------------------------------------------|-----------------|-------------------------------------------|-----------------|
-| `gravitino.client.authType`                  | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos`     | (none)          | Yes (to enable Kerberos)                  | 1.3.0           |
-| `gravitino.client.kerberos.principal`        | Kerberos principal                                                  | (none)          | Yes if authType is `kerberos`             | 1.3.0           |
-| `gravitino.client.kerberos.keytabFilePath`   | Path to keytab file                                                 | (none)          | No (uses ticket cache if not specified)   | 1.3.0           |
-
-
 ### Example: Connecting to OAuth-Protected Gravitino Server
 
 This example shows how to configure the Trino connector to connect to a Gravitino server protected by OAuth authentication.
@@ -151,7 +127,32 @@ gravitino.client.oauth2.scope=test
 SHOW CATALOGS;
 ```
 
-### Session Credential Forwarding
+### Kerberos Authentication
+
+Kerberos authentication uses Kerberos tickets to authenticate with the Gravitino server.
+
+**Configuration in `etc/catalog/gravitino.properties`:**
+
+```properties
+connector.name=gravitino
+gravitino.metalake=metalake
+gravitino.uri=http://localhost:8090
+
+# Kerberos authentication with keytab
+gravitino.client.authType=kerberos
+gravitino.client.kerberos.principal=user@REALM
+gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
+```
+
+**Configuration properties:**
+
+| Property                                     | Description                                                         | Default value   | Required                                  | Since version   |
+|----------------------------------------------|---------------------------------------------------------------------|-----------------|-------------------------------------------|-----------------|
+| `gravitino.client.authType`                  | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos`     | (none)          | Yes (to enable Kerberos)                  | 1.3.0           |
+| `gravitino.client.kerberos.principal`        | Kerberos principal                                                  | (none)          | Yes if authType is `kerberos`             | 1.3.0           |
+| `gravitino.client.kerberos.keytabFilePath`   | Path to keytab file                                                 | (none)          | No (uses ticket cache if not specified)   | 1.3.0           |
+
+## Session Credential Forwarding
 
 Setting `gravitino.client.session.forwardUser=true` creates a dedicated Gravitino client per Trino session user, so each user is visible in the Gravitino audit log instead of the shared `gravitino.user` or service identity. It is supported with `authType=simple` and `authType=oauth2`.
 
@@ -185,7 +186,7 @@ gravitino.client.session.forwardUser=true
 
 With `authType=oauth2`, the end user's IdP access token is presented to Gravitino directly instead of the shared client-credentials identity. The token is read from the Trino session's extra-credentials under the key `token`, which requires a Trino coordinator configured with `http-server.authentication.oauth2.forward-token-to-connectors=true` and an `OAuth2Authenticator` that populates that extra credential with the caller's access token; without it, `buildForSession` fails with an error explaining the missing token. The `gravitino.client.oauth2.*` properties above still configure the shared bootstrap/admin client used for catalog discovery — they are unrelated to the per-user forwarded token.
 
-For an Iceberg catalog with `catalog-backend=rest` (backed by an Iceberg REST Catalog), enabling `forwardUser` with `authType=oauth2` also causes the connector to forward the end user's token to the REST catalog itself (`iceberg.rest-catalog.security=OAUTH2`, `iceberg.rest-catalog.session=USER`), so per-user authorization applies on both the Gravitino API path and the REST catalog path.
+For an Iceberg catalog with `catalog-backend=rest` (backed by an Iceberg REST Catalog), the connector does not set `iceberg.rest-catalog.security`/`iceberg.rest-catalog.session` on its own — that catalog's own `gravitino.client.*` config is unrelated to how its underlying Iceberg REST catalog authenticates. To also forward the end user's token to the REST catalog itself, set `trino.bypass.iceberg.rest-catalog.security=OAUTH2` and `trino.bypass.iceberg.rest-catalog.session=USER` explicitly on that catalog's properties, alongside its bootstrap `trino.bypass.iceberg.rest-catalog.oauth2.*` credentials; see the worked example below.
 
 **Configuration properties:**
 
@@ -195,14 +196,91 @@ For an Iceberg catalog with `catalog-backend=rest` (backed by an Iceberg REST Ca
 | `gravitino.client.session.cache.maxSize`                     | Maximum number of per-user sessions to keep in the cache                                       | `500`           | No         | 1.3.0           |
 | `gravitino.client.session.cache.expireAfterAccessSeconds`    | Seconds before an idle per-user session is evicted from the cache                              | `3600`          | No         | 1.3.0           |
 
-### Notes
+### Example: OAuth2 Per-User Token Forwarding
+
+This example walks through a full setup where each Trino user's own OAuth2 access token is
+forwarded to Gravitino and to an Iceberg REST catalog (IRC), instead of a single shared service
+identity.
+
+**1. Trino coordinator: forward the logged-in user's token to connectors** (in `etc/config.properties`):
+
+```properties
+http-server.authentication.type=oauth2
+http-server.authentication.oauth2.forward-token-to-connectors=true
+```
+
+This requires a Trino coordinator whose `OAuth2Authenticator` populates the session's
+extra-credentials with the user's IdP access token under the key `token` when this flag is set;
+stock Trino does not do this yet.
+
+**2. Gravitino server: enable OAuth2** (in `conf/gravitino.conf`):
+
+```properties
+gravitino.authenticators=oauth
+gravitino.authenticator.oauth.serviceAudience=account
+gravitino.authenticator.oauth.jwksUri=http://your-idp/realms/gravitino/protocol/openid-connect/certs
+gravitino.authenticator.oauth.tokenValidatorClass=org.apache.gravitino.server.authentication.JwksTokenValidator
+gravitino.authenticator.oauth.principalFields=preferred_username,email,sub
+```
+
+**3. Trino connector: enable OAuth2 forwarding** (in `etc/catalog/gravitino.properties`):
+
+```properties
+connector.name=gravitino
+gravitino.metalake=my_metalake
+gravitino.uri=http://localhost:8090
+
+gravitino.client.authType=oauth2
+gravitino.client.oauth2.serverUri=http://your-idp
+gravitino.client.oauth2.credential=service-account-id:service-account-secret
+gravitino.client.oauth2.path=realms/gravitino/protocol/openid-connect/token
+gravitino.client.oauth2.scope=email
+gravitino.client.session.forwardUser=true
+```
+
+The `gravitino.client.oauth2.*` properties configure the shared service identity used for catalog
+discovery; the per-user forwarded token (from step 1) is what each query actually authenticates
+with once `forwardUser=true`.
+
+**4. Query as a specific user.** With a real OIDC login flow, Trino populates the forwarded token
+automatically after the user signs in. For manual testing, the same extra-credential can be set
+directly on the CLI:
+
+```shell
+trino --server http://localhost:8080 \
+  --user alice \
+  --extra-credential token=<alice-idp-access-token> \
+  --execute "SHOW SCHEMAS IN my_catalog"
+```
+
+`my_catalog` here is a catalog registered under `my_metalake` in Gravitino — with
+`catalog.management=dynamic`, the connector registers each Gravitino catalog as its own top-level
+Trino catalog, not as a schema nested under a single `gravitino` catalog. Gravitino sees this
+request as `alice`, not the shared service identity — `alice`'s own privileges apply, and a
+request with a missing or invalid token is rejected before it reaches the catalog.
+
+**5. Iceberg REST catalog (IRC).** If `my_catalog` has `catalog-backend=rest`, forwarding the same
+token to the IRC itself requires opting in explicitly on that catalog's own properties:
+
+```properties
+trino.bypass.iceberg.rest-catalog.security=OAUTH2
+trino.bypass.iceberg.rest-catalog.session=USER
+```
+
+set alongside its bootstrap `trino.bypass.iceberg.rest-catalog.oauth2.credential`/`scope`/
+`server-uri`. With these set, the forwarded token from step 4 reaches the IRC directly, so
+per-user authorization applies consistently whether Trino talks to Gravitino's native API or
+straight to the IRC. Without them, the REST catalog keeps its own default security setting,
+independent of `gravitino.client.session.forwardUser`.
+
+## Notes
 
 - The Gravitino server must be configured with the corresponding authentication mechanism enabled.
 - For OAuth2 authentication, ensure the OAuth2 server is accessible from the Trino coordinator and workers.
 - For Kerberos authentication, ensure the Kerberos configuration is properly set up on all Trino nodes.
 - Authentication configuration is passed through the `gravitino.client.*` prefix to the underlying Gravitino Java client.
 
-### See Also
+## See Also
 
 - [Gravitino Server Authentication Configuration](../security/how-to-authenticate.md)
 - [How to use the built-in IDP](../security/how-to-use-built-in-idp.md)

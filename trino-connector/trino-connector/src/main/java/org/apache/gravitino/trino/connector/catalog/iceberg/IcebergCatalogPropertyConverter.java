@@ -168,12 +168,6 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
       restProperties.put(
           "iceberg.rest-catalog.warehouse", properties.get(IcebergConstants.WAREHOUSE));
     }
-    // Forward the end-user IdP token to the IRC for per-user authorization. The patched
-    // Trino captures the user token into the session and TrinoRestCatalog forwards it as-is
-    // when session security is USER. Bootstrap credential, server-uri, scope, and S3 config
-    // are supplied through the catalog's trino.bypass.* properties.
-    restProperties.put("iceberg.rest-catalog.security", "OAUTH2");
-    restProperties.put("iceberg.rest-catalog.session", "USER");
     return restProperties;
   }
 }
