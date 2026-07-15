@@ -63,15 +63,14 @@ class TestGravitinoConnectorForwardUser {
   }
 
   @Test
-  void testForwardUserWithOAuth2AuthTypeThrowsAtConstruction() {
+  void testForwardUserWithOAuth2AuthTypeSucceeds() {
     CatalogConnectorContext ctx =
         mockContextWithConfig(
             ImmutableMap.of(
                 GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
                 GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2"));
 
-    TrinoException ex = assertThrows(TrinoException.class, () -> new GravitinoConnector(ctx));
-    assertEquals(GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), ex.getErrorCode());
+    assertDoesNotThrow(() -> new GravitinoConnector(ctx));
   }
 
   @Test
