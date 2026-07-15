@@ -153,9 +153,9 @@ SHOW CATALOGS;
 
 ### Session Credential Forwarding
 
-Setting `gravitino.client.session.forwardUser=true` with `authType=simple` creates a dedicated Gravitino client per Trino session user, so each user is visible in the Gravitino audit log instead of the shared `gravitino.user`.
+Setting `gravitino.client.session.forwardUser=true` creates a dedicated Gravitino client per Trino session user, so each user is visible in the Gravitino audit log instead of the shared `gravitino.user` or service identity. It is supported with `authType=simple` and `authType=oauth2`.
 
-**Configuration:**
+**Configuration (`authType=simple`):**
 
 ```properties
 connector.name=gravitino
@@ -166,13 +166,34 @@ gravitino.client.authType=simple
 gravitino.client.session.forwardUser=true
 ```
 
+With `authType=simple`, the Trino session username is forwarded to Gravitino as the simple-auth identity.
+
+**Configuration (`authType=oauth2`):**
+
+```properties
+connector.name=gravitino
+gravitino.metalake=metalake
+gravitino.uri=http://localhost:8090
+
+gravitino.client.authType=oauth2
+gravitino.client.oauth2.serverUri=http://oauth-server:8080
+gravitino.client.oauth2.credential=client_id:client_secret
+gravitino.client.oauth2.path=oauth2/token
+gravitino.client.oauth2.scope=gravitino
+gravitino.client.session.forwardUser=true
+```
+
+With `authType=oauth2`, the end user's IdP access token is presented to Gravitino directly instead of the shared client-credentials identity. The token is read from the Trino session's extra-credentials under the key `token`, which requires a Trino coordinator configured with `http-server.authentication.oauth2.forward-token-to-connectors=true` and an `OAuth2Authenticator` that populates that extra credential with the caller's access token; without it, `buildForSession` fails with an error explaining the missing token. The `gravitino.client.oauth2.*` properties above still configure the shared bootstrap/admin client used for catalog discovery — they are unrelated to the per-user forwarded token.
+
+For an Iceberg catalog with `catalog-backend=rest` (backed by an Iceberg REST Catalog), enabling `forwardUser` with `authType=oauth2` also causes the connector to forward the end user's token to the REST catalog itself (`iceberg.rest-catalog.security=OAUTH2`, `iceberg.rest-catalog.session=USER`), so per-user authorization applies on both the Gravitino API path and the REST catalog path.
+
 **Configuration properties:**
 
-| Property                                                     | Description                                                                                  | Default value   | Required   | Since version   |
-|--------------------------------------------------------------|----------------------------------------------------------------------------------------------|-----------------|------------|-----------------|
-| `gravitino.client.session.forwardUser`                       | When `true` with `authType=simple`, forwards the Trino session user to Gravitino per-query   | `false`         | No         | 1.3.0           |
-| `gravitino.client.session.cache.maxSize`                     | Maximum number of per-user sessions to keep in the cache                                     | `500`           | No         | 1.3.0           |
-| `gravitino.client.session.cache.expireAfterAccessSeconds`    | Seconds before an idle per-user session is evicted from the cache                            | `3600`          | No         | 1.3.0           |
+| Property                                                     | Description                                                                                    | Default value   | Required   | Since version   |
+|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------|------------|-----------------|
+| `gravitino.client.session.forwardUser`                       | When `true` with `authType=simple` or `authType=oauth2`, forwards the Trino session user/token to Gravitino per-query   | `false`         | No         | 1.3.0           |
+| `gravitino.client.session.cache.maxSize`                     | Maximum number of per-user sessions to keep in the cache                                       | `500`           | No         | 1.3.0           |
+| `gravitino.client.session.cache.expireAfterAccessSeconds`    | Seconds before an idle per-user session is evicted from the cache                              | `3600`          | No         | 1.3.0           |
 
 ### Notes
 

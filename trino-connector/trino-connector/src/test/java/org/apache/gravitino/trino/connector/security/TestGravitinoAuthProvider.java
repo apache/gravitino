@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.security.ConnectorIdentity;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -256,6 +257,43 @@ public class TestGravitinoAuthProvider {
 
     assertThrows(
         UnsupportedOperationException.class,
+        () -> GravitinoAuthProvider.buildForSession(config, session));
+  }
+
+  @Test
+  public void testBuildForSessionOAuth2WithForwardedToken() {
+    GravitinoConfig config =
+        buildConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true"));
+
+    ConnectorSession session = mock(ConnectorSession.class);
+    ConnectorIdentity identity = mock(ConnectorIdentity.class);
+    when(session.getUser()).thenReturn("alice");
+    when(session.getIdentity()).thenReturn(identity);
+    when(identity.getExtraCredentials()).thenReturn(ImmutableMap.of("token", "alice-jwt"));
+
+    GravitinoAdminClient client = GravitinoAuthProvider.buildForSession(config, session);
+    assertNotNull(client);
+  }
+
+  @Test
+  public void testBuildForSessionOAuth2ThrowsWhenTokenMissing() {
+    GravitinoConfig config =
+        buildConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true"));
+
+    ConnectorSession session = mock(ConnectorSession.class);
+    ConnectorIdentity identity = mock(ConnectorIdentity.class);
+    when(session.getUser()).thenReturn("alice");
+    when(session.getIdentity()).thenReturn(identity);
+    when(identity.getExtraCredentials()).thenReturn(ImmutableMap.of());
+
+    assertThrows(
+        IllegalArgumentException.class,
         () -> GravitinoAuthProvider.buildForSession(config, session));
   }
 
