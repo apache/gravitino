@@ -31,6 +31,7 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.TestUtil;
 import org.junit.jupiter.api.Assertions;
@@ -124,11 +125,8 @@ public class TestCaffeineEntityCacheInvalidation {
   }
 
   @Test
-  void testPutModelVersionInvalidatesModel() {
+  void testModelAndModelVersionAreNotCached() {
     ModelEntity model = TestUtil.getTestModelEntity(1L, "model1", Namespace.of("m1", "c1", "s1"));
-    cache.put(model);
-    Assertions.assertTrue(cache.contains(model.nameIdentifier(), Entity.EntityType.MODEL));
-
     ModelVersionEntity version =
         TestUtil.getTestModelVersionEntity(
             model.nameIdentifier(),
@@ -137,9 +135,25 @@ public class TestCaffeineEntityCacheInvalidation {
             ImmutableMap.of(),
             "cmt",
             ImmutableList.of());
+
+    cache.put(model);
     cache.put(version);
 
+    // Model and model version carry a load-bearing pointer (a version URI, the latest version), so
+    // they are not cached; reads go straight to the store.
+    Assertions.assertEquals(0, cache.size());
     Assertions.assertFalse(cache.contains(model.nameIdentifier(), Entity.EntityType.MODEL));
+  }
+
+  @Test
+  void testTagIsCached() {
+    TagEntity tag = TestUtil.getTestTagEntity();
+
+    cache.put(tag);
+
+    Assertions.assertTrue(cache.contains(tag.nameIdentifier(), Entity.EntityType.TAG));
+    Assertions.assertEquals(
+        tag, cache.getIfPresent(tag.nameIdentifier(), Entity.EntityType.TAG).orElse(null));
   }
 
   @Test

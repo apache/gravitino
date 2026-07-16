@@ -31,7 +31,6 @@ import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -45,7 +44,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.meta.ModelVersionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,10 +56,9 @@ import org.slf4j.LoggerFactory;
  * schemas and tables under it).
  *
  * <p>Relation query results are NOT cached by this implementation; relation and list operations
- * always fall back to the {@code EntityStore}. Entity types whose materialized form embeds
- * relation-derived data ({@code USER}, {@code GROUP}, {@code ROLE}) are excluded from caching
- * entirely, because without relation tracking their entries could not be invalidated when the
- * referenced entities change.
+ * always fall back to the {@code EntityStore}. Only the self-contained metadata objects listed in
+ * {@link #CACHEABLE_TYPES} are cached; every other type (user/group/role, model/model version,
+ * function, and operational entities) is read straight from the {@code EntityStore}.
  */
 public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_CLEANUP_CORE_THREADS = 1;
@@ -86,14 +83,27 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
 
   /**
-   * Entity types that must not be cached by this implementation. Their materialized form embeds
-   * relation-derived data (a role's securable objects, a user's / group's role names); without a
-   * relation-aware index there is no way to invalidate them when the referenced entities change, so
-   * caching them would serve stale authorization data.
+   * Entity types this cache is allowed to hold. Only self-contained entities are cacheable: a stale
+   * copy of one is at worst cosmetically old (an old comment, property, or job status), never a
+   * wrong pointer, and each can be invalidated with a single one-to-one key drop.
+   *
+   * <p>Every other type is read straight from the store. user/group/role embed relation-derived
+   * data (a role's securable objects, a user's / group's role names) that a per-node cache cannot
+   * invalidate; model/model version and function carry a load-bearing pointer (a version URI, the
+   * latest version, the function implementation) that would be silently wrong if served stale.
    */
-  private static final Set<Entity.EntityType> NON_CACHEABLE_TYPES =
+  private static final Set<Entity.EntityType> CACHEABLE_TYPES =
       Sets.immutableEnumSet(
-          Entity.EntityType.USER, Entity.EntityType.GROUP, Entity.EntityType.ROLE);
+          Entity.EntityType.METALAKE,
+          Entity.EntityType.CATALOG,
+          Entity.EntityType.SCHEMA,
+          Entity.EntityType.TABLE,
+          Entity.EntityType.TOPIC,
+          Entity.EntityType.VIEW,
+          Entity.EntityType.FILESET,
+          Entity.EntityType.TAG,
+          Entity.EntityType.POLICY,
+          Entity.EntityType.JOB);
 
   /** Segmented locking for better concurrency */
   private final SegmentedLock segmentedLock;
@@ -205,11 +215,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public <E extends Entity & HasIdentifier> void put(E entity) {
     Preconditions.checkArgument(entity != null, "Entity cannot be null");
 
-    // Called before taking this entity's lock: it may take another key's lock (e.g. the model key
-    // when inserting a model version), and nesting the two segment locks could deadlock.
-    invalidateOnKeyChange(entity);
-
-    if (NON_CACHEABLE_TYPES.contains(entity.type())) {
+    if (!CACHEABLE_TYPES.contains(entity.type())) {
       return;
     }
 
@@ -230,13 +236,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity) {
-    // Invalidate the cache if inserting the entity may affect related cache keys.
-    // For example, inserting a model version changes the latest version of the model,
-    // so the corresponding model cache entry should be invalidated.
-    if (Objects.requireNonNull(entity.type()) == Entity.EntityType.MODEL_VERSION) {
-      NameIdentifier modelIdent = ((ModelVersionEntity) entity).modelIdentifier();
-      invalidate(modelIdent, Entity.EntityType.MODEL);
-    }
+    // Every cacheable entity is self-contained (see CACHEABLE_TYPES), so inserting one never
+    // requires invalidating a different key. Kept for the SPI contract; implementations that cache
+    // derived entries can override this.
   }
 
   /** {@inheritDoc} */
