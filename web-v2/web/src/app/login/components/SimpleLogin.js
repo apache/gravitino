@@ -34,9 +34,9 @@ function SimpleLogin() {
 
   useEffect(() => {
     if (store.intervalId) {
-      clearIntervalId()
+      dispatch(clearIntervalId())
     }
-  }, [store.intervalId])
+  }, [dispatch, store.intervalId])
 
   const onFinish = async values => {
     await dispatch(setAuthUser({ name: values.username, type: 'user' }))
