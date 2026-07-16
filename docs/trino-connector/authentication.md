@@ -242,7 +242,43 @@ The `gravitino.client.oauth2.*` properties configure the shared service identity
 discovery; the per-user forwarded token (from step 1) is what each query actually authenticates
 with once `forwardUser=true`.
 
-**4. Query as a specific user.** With a real OIDC login flow, Trino populates the forwarded token
+**4. Create the metalake and catalog.** Create the metalake `my_metalake` first (via the
+Gravitino REST API, SDK, or CLI — see
+[Manage metalakes](../manage-metalake-using-gravitino.md#create-a-metalake)), then create a
+REST-backed Iceberg catalog under it from the Trino CLI using the
+`gravitino.system.create_catalog` procedure. To also forward the end user's token to the Iceberg
+REST catalog (IRC) itself, set `trino.bypass.iceberg.rest-catalog.security=OAUTH2` and
+`trino.bypass.iceberg.rest-catalog.session=USER` on the catalog, alongside its bootstrap
+`trino.bypass.iceberg.rest-catalog.oauth2.*` credentials:
+
+```sql
+call gravitino.system.create_catalog(
+    'my_catalog',
+    'lakehouse-iceberg',
+    map(
+        array['uri', 'catalog-backend', 'warehouse',
+          'trino.bypass.iceberg.rest-catalog.security', 'trino.bypass.iceberg.rest-catalog.session',
+          'trino.bypass.iceberg.rest-catalog.oauth2.credential', 'trino.bypass.iceberg.rest-catalog.oauth2.scope',
+          'trino.bypass.iceberg.rest-catalog.oauth2.server-uri'
+        ],
+        array['http://irc-host:9001/iceberg', 'rest', 'my_catalog',
+          'OAUTH2', 'USER',
+          'service-account-id:service-account-secret', 'email',
+          'http://your-idp/realms/gravitino/protocol/openid-connect/token'
+        ]
+    )
+);
+```
+
+This call itself runs with the connector's own shared service identity, not any forwarded user
+token — `forwardUser` only affects `SELECT`/`SHOW`-style queries against the catalog afterward,
+not catalog registration itself. `create_catalog` both creates the catalog in Gravitino and loads
+it into Trino as its own top-level catalog — not as a schema nested under a single `gravitino`
+catalog. If the two `trino.bypass.iceberg.rest-catalog.*` properties above are omitted, the REST
+catalog keeps its own default security setting, independent of
+`gravitino.client.session.forwardUser`, and the end user's token never reaches the IRC.
+
+**5. Query as a specific user.** With a real OIDC login flow, Trino populates the forwarded token
 automatically after the user signs in. For manual testing, the same extra-credential can be set
 directly on the CLI:
 
@@ -253,25 +289,11 @@ trino --server http://localhost:8080 \
   --execute "SHOW SCHEMAS IN my_catalog"
 ```
 
-`my_catalog` here is a catalog registered under `my_metalake` in Gravitino — with
-`catalog.management=dynamic`, the connector registers each Gravitino catalog as its own top-level
-Trino catalog, not as a schema nested under a single `gravitino` catalog. Gravitino sees this
-request as `alice`, not the shared service identity — `alice`'s own privileges apply, and a
-request with a missing or invalid token is rejected before it reaches the catalog.
-
-**5. Iceberg REST catalog (IRC).** If `my_catalog` has `catalog-backend=rest`, forwarding the same
-token to the IRC itself requires opting in explicitly on that catalog's own properties:
-
-```properties
-trino.bypass.iceberg.rest-catalog.security=OAUTH2
-trino.bypass.iceberg.rest-catalog.session=USER
-```
-
-set alongside its bootstrap `trino.bypass.iceberg.rest-catalog.oauth2.credential`/`scope`/
-`server-uri`. With these set, the forwarded token from step 4 reaches the IRC directly, so
-per-user authorization applies consistently whether Trino talks to Gravitino's native API or
-straight to the IRC. Without them, the REST catalog keeps its own default security setting,
-independent of `gravitino.client.session.forwardUser`.
+Gravitino sees this request as `alice`, not the shared service identity — `alice`'s own
+privileges apply, and a request with a missing or invalid token is rejected before it reaches the
+catalog. Because `my_catalog` was created with `trino.bypass.iceberg.rest-catalog.session=USER`
+in step 4, the same forwarded token also reaches the IRC directly, so per-user authorization
+applies consistently whether Trino talks to Gravitino's native API or straight to the IRC.
 
 ## Notes
 
