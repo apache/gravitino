@@ -24,9 +24,9 @@ import { useEffect } from 'react'
 import { Button, Form, Input } from 'antd'
 
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { loginAction, setIntervalIdAction, clearIntervalId, setAuthUser } from '@/lib/store/auth'
+import { clearIntervalId, setAuthUser } from '@/lib/store/auth'
 
-function DefaultLogin() {
+function SimpleLogin() {
   const router = useRouter()
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.auth)
@@ -39,52 +39,14 @@ function DefaultLogin() {
   }, [store.intervalId])
 
   const onFinish = async values => {
-    await dispatch(loginAction({ params: values, router }))
-    await dispatch(setIntervalIdAction())
+    await dispatch(setAuthUser({ name: values.username, type: 'user' }))
+    router.push('/metalakes')
   }
 
   return (
-    <Form
-      form={form}
-      layout='vertical'
-      autoComplete='off'
-      onFinish={onFinish}
-      initialValues={{
-        grant_type: 'client_credentials',
-        client_id: '',
-        client_secret: '',
-        scope: ''
-      }}
-    >
-      <Form.Item
-        label='Grant Type'
-        name='grant_type'
-        rules={[{ required: true, message: 'Grant Type is required' }]}
-        className='mt-4'
-      >
-        <Input disabled placeholder='Please enter the grant type' />
-      </Form.Item>
-
-      <Form.Item
-        label='Client ID'
-        name='client_id'
-        rules={[{ required: true, message: 'Client ID is required' }]}
-        className='mt-4'
-      >
-        <Input placeholder='' />
-      </Form.Item>
-
-      <Form.Item
-        label='Client Secret'
-        name='client_secret'
-        rules={[{ required: true, message: 'Client Secret is required' }]}
-        className='mt-4'
-      >
-        <Input placeholder='' />
-      </Form.Item>
-
-      <Form.Item label='Scope' name='scope' rules={[{ required: true, message: 'Scope is required' }]} className='mt-4'>
-        <Input placeholder='' />
+    <Form form={form} layout='vertical' autoComplete='off' onFinish={onFinish}>
+      <Form.Item label='Username' name='username' rules={[{ required: true, message: 'Username is required' }]}>
+        <Input placeholder='Please enter your username' />
       </Form.Item>
 
       <Form.Item className='mb-7 mt-12'>
@@ -96,4 +58,4 @@ function DefaultLogin() {
   )
 }
 
-export default DefaultLogin
+export default SimpleLogin

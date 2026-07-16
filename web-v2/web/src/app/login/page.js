@@ -29,6 +29,7 @@ import { useEffect, useState, Suspense } from 'react'
 import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
 import BasicLogin from './components/BasicLogin'
+import SimpleLogin from './components/SimpleLogin'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 import { resetMetalakeStore } from '@/lib/store/metalakes'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
@@ -63,6 +64,24 @@ const LoginContent = () => {
 
     detectProviderType()
   }, [authType, dispatch])
+
+  const renderLogin = () => {
+    switch (authType) {
+      case 'basic':
+        return <BasicLogin />
+
+      case 'simple':
+        return <SimpleLogin />
+
+      case 'oauth':
+        if (providerType === null) return null
+        if (providerType === 'oidc') return <OidcLogin />
+        return <DefaultLogin />
+
+      default:
+        return null
+    }
+  }
 
   return (
     <Flex justify='center' align='center' style={{ minHeight: 'calc(100vh - 7rem)' }}>
@@ -99,15 +118,7 @@ const LoginContent = () => {
           />
         )}
 
-        {authType === null ? null : authType === 'basic' ? (
-          <BasicLogin />
-        ) : authType === 'simple' ? (
-          <DefaultLogin />
-        ) : authType === 'oauth' && providerType === null ? null : authType === 'oauth' && providerType === 'oidc' ? (
-          <OidcLogin />
-        ) : authType === 'oauth' ? (
-          <DefaultLogin />
-        ) : null}
+        {renderLogin()}
       </Card>
     </Flex>
   )
