@@ -22,7 +22,7 @@
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { Roboto } from 'next/font/google'
-import { Alert, Card, Flex, Typography } from 'antd'
+import { Alert, Card, Flex, Typography, Spin } from 'antd'
 import { cn } from '@/lib/utils/tailwind'
 import { useEffect, useState, Suspense } from 'react'
 
@@ -74,13 +74,22 @@ const LoginContent = () => {
         return <SimpleLogin />
 
       case 'oauth':
-        if (providerType === null) return null
+        if (providerType === null)
+          return (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+              <Spin />
+            </div>
+          )
         if (providerType === 'oidc') return <OidcLogin />
 
         return <DefaultLogin />
 
       default:
-        return null
+        return (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+            <Spin />
+          </div>
+        )
     }
   }
 

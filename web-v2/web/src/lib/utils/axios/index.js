@@ -253,7 +253,7 @@ const transform = {
     }
 
     try {
-if (code === 'ECONNABORTED' && message?.includes('timeout')) {
+      if (code === 'ECONNABORTED' && message?.includes('timeout')) {
         errMessage = 'The interface request timed out, please refresh the page and try again!'
       }
       if (err?.includes('Network Error')) {
