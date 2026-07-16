@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.jdbc.utils;
 
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import javax.sql.DataSource;
@@ -39,6 +40,24 @@ public class DataSourceUtils {
   /** SQL statements for database connection pool testing. */
   private static final String POOL_TEST_QUERY = "SELECT 1";
 
+  // DBCP2 connection-pool properties that must never come from catalog configuration. The whole
+  // config map is handed to BasicDataSourceFactory, so any of these would let a catalog creator run
+  // arbitrary classes on the server (remote code execution):
+  //   - connectionFactoryClassName / evictionPolicyClassName / driverClassName: their values are
+  //     class names the factory loads and instantiates via reflection (Class.forName + newInstance)
+  //     when the pool creates connections. The legitimate driver is set separately from the
+  //     "jdbc-driver" property via an explicit setter, so the raw "driverClassName" key is never
+  //     needed.
+  //   - initialSize: defense in depth. A value > 0 makes the factory eagerly open a connection
+  //     during createDataSource; blocking it keeps pool creation lazy so our explicit url/driver
+  //     setters, not factory-time eager init, control how connections are created.
+  private static final List<String> UNSAFE_POOL_PROPERTIES =
+      List.of(
+          "connectionFactoryClassName",
+          "evictionPolicyClassName",
+          "driverClassName",
+          "initialSize");
+
   public static DataSource createDataSource(Map<String, String> properties) {
     return createDataSource(new JdbcConfig(properties));
   }
@@ -56,6 +75,10 @@ public class DataSourceUtils {
     if (jdbcConfig.getJdbcDriver().toLowerCase().startsWith("org.h2.")) {
       throw new GravitinoRuntimeException("H2 JDBC driver is not allowed in catalog configuration");
     }
+    // Reject DBCP2 pool properties that load arbitrary classes via reflection before handing the
+    // config to the factory. Kept outside the try below so the specific reason surfaces directly
+    // instead of being wrapped as "Error creating datasource".
+    rejectUnsafePoolProperties(jdbcConfig.getAllConfig());
     try {
       return createDBCPDataSource(jdbcConfig);
     } catch (Exception exception) {
@@ -90,6 +113,30 @@ public class DataSourceUtils {
     Properties properties = new Properties();
     properties.putAll(jdbcConfig.getAllConfig());
     return properties;
+  }
+
+  /**
+   * Rejects DBCP2 connection-pool properties that would let catalog configuration run arbitrary
+   * classes on the server: {@code connectionFactoryClassName}, {@code evictionPolicyClassName} and
+   * {@code driverClassName} (class names loaded via reflection), plus {@code initialSize} (blocked
+   * as defense in depth to keep pool creation lazy).
+   *
+   * @param config the JDBC configuration properties forwarded to the DBCP2 factory
+   * @throws GravitinoRuntimeException if an unsafe connection-pool property is present
+   */
+  private static void rejectUnsafePoolProperties(Map<String, String> config) {
+    if (config == null) {
+      return;
+    }
+    for (String key : config.keySet()) {
+      for (String unsafe : UNSAFE_POOL_PROPERTIES) {
+        if (unsafe.equalsIgnoreCase(key)) {
+          throw new GravitinoRuntimeException(
+              "Unsafe JDBC connection pool property '%s' is not allowed in catalog configuration",
+              unsafe);
+        }
+      }
+    }
   }
 
   private static String recursiveDecode(String url) {

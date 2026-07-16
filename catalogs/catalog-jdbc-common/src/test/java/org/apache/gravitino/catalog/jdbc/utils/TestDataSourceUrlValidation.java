@@ -45,6 +45,24 @@ public class TestDataSourceUrlValidation {
   }
 
   @Test
+  public void testSimilarNamedPropertyIsNotRejected() throws SQLException {
+    // The unsafe-pool-property guard matches the whole key (equalsIgnoreCase), so a legitimate key
+    // that merely contains an unsafe name as a substring must still build. Guards against a
+    // regression to contains/startsWith matching.
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put("connectionFactoryClassNameHelper", "com.example.Fine");
+
+    DataSource dataSource =
+        Assertions.assertDoesNotThrow(() -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertTrue(dataSource instanceof BasicDataSource);
+    ((BasicDataSource) dataSource).close();
+  }
+
+  @Test
   public void testRejectMysqlAllowLoadLocalInfile() {
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
@@ -53,8 +71,13 @@ public class TestDataSourceUrlValidation {
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 
-    Assertions.assertThrows(
-        GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    // validateJdbcConfig throws inside the try, so the specific reason is the wrapped cause.
+    Assertions.assertNotNull(gre.getCause());
+    Assertions.assertTrue(
+        gre.getCause().getMessage().toLowerCase().contains("allowloadlocalinfile"));
   }
 
   @Test
@@ -67,8 +90,11 @@ public class TestDataSourceUrlValidation {
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 
-    Assertions.assertThrows(
-        GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertNotNull(gre.getCause());
+    Assertions.assertTrue(gre.getCause().getMessage().contains("socketFactory"));
   }
 
   @Test
@@ -81,8 +107,12 @@ public class TestDataSourceUrlValidation {
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 
-    Assertions.assertThrows(
-        GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertNotNull(gre.getCause());
+    Assertions.assertTrue(
+        gre.getCause().getMessage().toLowerCase().contains("allowloadlocalinfile"));
   }
 
   @Test
@@ -146,5 +176,125 @@ public class TestDataSourceUrlValidation {
             GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
     Assertions.assertEquals(
         "H2 JDBC driver is not allowed in catalog configuration", gre.getMessage());
+  }
+
+  @Test
+  public void testRejectConnectionFactoryClassName() {
+    // DBCP2's BasicDataSourceFactory loads "connectionFactoryClassName" via Class.forName and
+    // instantiates it at pool init, which is a remote-code-execution vector. A user can reach this
+    // key through the "gravitino.bypass." prefix (stripped before the config map is handed here),
+    // so it must be rejected.
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put("connectionFactoryClassName", "com.example.Evil");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "Unsafe JDBC connection pool property 'connectionFactoryClassName' is not allowed in"
+            + " catalog configuration",
+        gre.getMessage());
+  }
+
+  @Test
+  public void testRejectEvictionPolicyClassName() {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put("evictionPolicyClassName", "com.example.Evil");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "Unsafe JDBC connection pool property 'evictionPolicyClassName' is not allowed in catalog"
+            + " configuration",
+        gre.getMessage());
+  }
+
+  @Test
+  public void testRejectConnectionFactoryClassNameCaseInsensitive() {
+    // The guard matches case-insensitively (broader than DBCP2's own case-sensitive key lookup),
+    // so a mis-cased variant is rejected outright rather than silently ignored.
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put("ConnectionFactoryClassName", "com.example.Evil");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "Unsafe JDBC connection pool property 'connectionFactoryClassName' is not allowed in"
+            + " catalog configuration",
+        gre.getMessage());
+  }
+
+  @Test
+  public void testRejectEvictionPolicyClassNameCaseInsensitive() {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put("EVICTIONPOLICYCLASSNAME", "com.example.Evil");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "Unsafe JDBC connection pool property 'evictionPolicyClassName' is not allowed in catalog"
+            + " configuration",
+        gre.getMessage());
+  }
+
+  @Test
+  public void testRejectDriverClassName() {
+    // DBCP2's BasicDataSourceFactory loads the "driverClassName" value via Class.forName and
+    // instantiates it (an RCE vector) when the pool creates a connection. The legitimate driver is
+    // set separately from the "jdbc-driver" property, so the raw key must be rejected.
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put("driverClassName", "com.example.Evil");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "Unsafe JDBC connection pool property 'driverClassName' is not allowed in catalog"
+            + " configuration",
+        gre.getMessage());
+  }
+
+  @Test
+  public void testRejectInitialSize() {
+    // initialSize > 0 makes the factory eagerly open a connection during createDataSource; reject
+    // it (defense in depth) so pool creation stays lazy and our explicit url/driver setters control
+    // how connections are created.
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put("initialSize", "1");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "Unsafe JDBC connection pool property 'initialSize' is not allowed in catalog"
+            + " configuration",
+        gre.getMessage());
   }
 }
