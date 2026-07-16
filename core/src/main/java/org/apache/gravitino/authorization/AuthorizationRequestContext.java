@@ -30,6 +30,7 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -83,6 +84,12 @@ public class AuthorizationRequestContext {
   private volatile Map<Long, RoleUpdatedAt> prefetchedRoleVersions;
 
   private volatile String originalAuthorizationExpression;
+
+  /**
+   * The roles the caller has declared active for this request (role assumption). Defaults to {@link
+   * ActiveRoles#all()}, which evaluates every role the caller holds (no narrowing).
+   */
+  private volatile ActiveRoles activeRoles = ActiveRoles.all();
 
   /**
    * check allow
@@ -211,6 +218,26 @@ public class AuthorizationRequestContext {
    */
   public void setPrefetchedRoleVersions(Map<Long, RoleUpdatedAt> prefetchedRoleVersions) {
     this.prefetchedRoleVersions = prefetchedRoleVersions;
+  }
+
+  /**
+   * Returns the roles declared active for this request. Never {@code null}; defaults to {@link
+   * ActiveRoles#all()}.
+   *
+   * @return the active-role declaration
+   */
+  public ActiveRoles getActiveRoles() {
+    return activeRoles;
+  }
+
+  /**
+   * Sets the roles declared active for this request. Narrowing is subtractive: only roles the
+   * caller actually holds are ever consulted, regardless of what is declared here.
+   *
+   * @param activeRoles the active-role declaration; must not be {@code null}
+   */
+  public void setActiveRoles(ActiveRoles activeRoles) {
+    this.activeRoles = Objects.requireNonNull(activeRoles, "activeRoles must not be null");
   }
 
   /**
