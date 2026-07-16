@@ -228,7 +228,7 @@ public class Configs {
                   + "a single ClassLoader, significantly reducing Metaspace memory usage. When "
                   + "false, each catalog gets its own dedicated ClassLoader as in previous "
                   + "releases.")
-          .version(ConfigConstants.VERSION_1_3_0)
+          .version(ConfigConstants.VERSION_2_0_0)
           .booleanConf()
           .createWithDefault(true);
 
