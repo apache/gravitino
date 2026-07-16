@@ -65,7 +65,10 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
             .removalListener(
                 (k, v, c) -> {
                   String catalogName = (String) k;
-                  LOG.info("Remove IcebergCatalogWrapper cache {}.", catalogName);
+                  LOG.info(
+                      "Removing IcebergCatalogWrapper from cache: catalog={}, cause={}",
+                      catalogName,
+                      c);
                   closeIcebergCatalogWrapper((IcebergCatalogWrapper) v);
                 })
             .scheduler(

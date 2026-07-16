@@ -324,12 +324,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
+                  LOG.info("Removed catalog cache entry, identifier={}, cause={}", k, c);
                   for (Consumer<NameIdentifier> listener : removalListeners) {
                     if (k != null) {
                       listener.accept((NameIdentifier) k);
                     }
                   }
-                  LOG.info("Closing catalog {}.", k);
                   ((CatalogWrapper) v).close();
                 })
             .scheduler(
