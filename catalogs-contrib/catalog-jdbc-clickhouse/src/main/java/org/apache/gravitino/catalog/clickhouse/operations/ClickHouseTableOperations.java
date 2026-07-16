@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.clickhouse.operations;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
@@ -484,27 +486,34 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case DATA_SKIPPING_MINMAX:
-          // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
-          // no field for it.
-          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           sqlBuilder
               .append(" ")
-              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "minmax", 1));
+              .append(
+                  buildDataSkippingIndexDdl(
+                      index.name(),
+                      fieldStr,
+                      DATA_SKIPPING_MINMAX_VALUE,
+                      resolveGranularity(index.properties(), 1)));
           break;
         case DATA_SKIPPING_BLOOM_FILTER:
-          // The GRANULARITY value is always 3 here currently.
-          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           sqlBuilder
               .append(" ")
-              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "bloom_filter", 3));
+              .append(
+                  buildDataSkippingIndexDdl(
+                      index.name(),
+                      fieldStr,
+                      DATA_SKIPPING_BLOOM_FILTER,
+                      resolveGranularity(index.properties(), 1)));
           break;
         case DATA_SKIPPING_SET:
-          // The max unique values (N) is always 0 (unlimited) here currently as we can't set it
-          // by Index: there is no field for it. ClickHouse requires set(N) syntax.
-          // TODO(yuqi) add a properties field to Index to support user defined max unique values.
           sqlBuilder
               .append(" ")
-              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "set(0)", 1));
+              .append(
+                  buildDataSkippingIndexDdl(
+                      index.name(),
+                      fieldStr,
+                      "set(" + resolveSetMaxValues(index.properties()) + ")",
+                      resolveGranularity(index.properties(), 1)));
           break;
         default:
           throw new IllegalArgumentException(
@@ -874,18 +883,31 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(!indexExists, "Index '%s' already exists", addIndex.getName());
 
     String fieldStr = getIndexFieldStr(addIndex.getFieldNames());
+    Map<String, String> properties = addIndex.getProperties();
     switch (addIndex.getType()) {
       case DATA_SKIPPING_MINMAX:
-        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "minmax", 1);
+        return "ADD "
+            + buildDataSkippingIndexDdl(
+                addIndex.getName(),
+                fieldStr,
+                DATA_SKIPPING_MINMAX_VALUE,
+                resolveGranularity(properties, 1));
 
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "bloom_filter", 3);
+        return "ADD "
+            + buildDataSkippingIndexDdl(
+                addIndex.getName(),
+                fieldStr,
+                DATA_SKIPPING_BLOOM_FILTER,
+                resolveGranularity(properties, 1));
 
       case DATA_SKIPPING_SET:
-        // The max unique values (N) is always 0 (unlimited) here currently as we can't set it
-        // by Index: there is no field for it. ClickHouse requires set(N) syntax.
-        // TODO(yuqi) add a properties field to Index to support user defined max unique values.
-        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "set(0)", 1);
+        return "ADD "
+            + buildDataSkippingIndexDdl(
+                addIndex.getName(),
+                fieldStr,
+                "set(" + resolveSetMaxValues(properties) + ")",
+                resolveGranularity(properties, 1));
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
@@ -895,6 +917,45 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException(
             "Gravitino ClickHouse doesn't support index : " + addIndex.getType());
     }
+  }
+
+  /**
+   * Resolves an integer property from the index properties map.
+   *
+   * @param properties the index properties map
+   * @param key the property key (e.g. {@link ClickHouseConstants.IndexConstants#GRANULARITY})
+   * @param defaultValue the value returned when the key is absent
+   * @param minValue the minimum allowed value (inclusive)
+   * @return the resolved integer value
+   * @throws IllegalArgumentException if the value is present but not a valid integer within bounds
+   */
+  private int resolveIntProperty(
+      Map<String, String> properties, String key, int defaultValue, int minValue) {
+    if (properties == null) {
+      return defaultValue;
+    }
+    String raw = properties.get(key);
+    if (raw == null) {
+      return defaultValue;
+    }
+    raw = raw.trim();
+    int value;
+    try {
+      value = Integer.parseInt(raw);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(key + " must be a valid integer, but got: " + raw, e);
+    }
+    Preconditions.checkArgument(
+        value >= minValue, "%s must be >= %s, but got: %s", key, minValue, value);
+    return value;
+  }
+
+  private int resolveGranularity(Map<String, String> properties, int defaultValue) {
+    return resolveIntProperty(properties, GRANULARITY, defaultValue, 1);
+  }
+
+  private int resolveSetMaxValues(Map<String, String> properties) {
+    return resolveIntProperty(properties, SET_MAX_VALUES, 0, 0);
   }
 
   @VisibleForTesting
