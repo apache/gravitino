@@ -43,7 +43,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class AuthenticationFilter implements Filter {
 
   private final List<Authenticator> filterAuthenticators;
-  
+
   /**
    * The matcher used to identify health check paths that bypass authentication. Subclasses may
    * replace this with a server-specific matcher (e.g. {@code IcebergHealthCheckPathMatcher}).
