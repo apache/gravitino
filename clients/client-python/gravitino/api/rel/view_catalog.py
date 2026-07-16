@@ -95,7 +95,7 @@ class ViewCatalog(ABC):
             columns (list[Column]):
                 The columns of the new view.
             representations (list[Representation]):
-                The SQL representations of the new view.
+                The representations of the view. At least one representation is expected.
             comment (str, optional):
                 The view comment. Defaults to `None`.
             default_catalog (str, optional):
