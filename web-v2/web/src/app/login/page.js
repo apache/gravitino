@@ -76,6 +76,7 @@ const LoginContent = () => {
       case 'oauth':
         if (providerType === null) return null
         if (providerType === 'oidc') return <OidcLogin />
+
         return <DefaultLogin />
 
       default:

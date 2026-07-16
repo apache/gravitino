@@ -19,14 +19,14 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useState } from 'react'
 import { Button, Form, Input } from 'antd'
 import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { basicLoginAction, clearIntervalId } from '@/lib/store/auth'
+import { useAppDispatch } from '@/lib/hooks/useStore'
+import { basicLoginAction } from '@/lib/store/auth'
 
 const defaultValues = {
   username: '',
@@ -41,7 +41,7 @@ const schema = yup.object().shape({
 function BasicLogin() {
   const router = useRouter()
   const dispatch = useAppDispatch()
-  const store = useAppSelector(state => state.auth)
+  const [isLoading, setIsLoading] = useState(false)
 
   const {
     control,
@@ -56,6 +56,7 @@ function BasicLogin() {
   })
 
   const onSubmit = async data => {
+    setIsLoading(true)
     try {
       // Using .unwrap() to catch failed login errors
       await dispatch(basicLoginAction({ username: data.username, password: data.password, router })).unwrap()
@@ -67,10 +68,12 @@ function BasicLogin() {
         type: 'manual',
         message: error?.message || 'Login failed'
       })
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  const onError = errors => {
+  const onError = () => {
     // Form validation errors are handled by the UI
   }
 
@@ -89,7 +92,7 @@ function BasicLogin() {
           />
         </Form.Item>
 
-        <Button block size='large' type='primary' htmlType='submit'>
+        <Button block size='large' type='primary' htmlType='submit' loading={isLoading}>
           Login
         </Button>
       </Form>
