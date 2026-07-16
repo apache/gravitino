@@ -47,10 +47,7 @@ class TestUser(IntegrationTestEnv):
         }
         cls._reset_conf(auth_confs, conf_path)
         cls._append_conf(auth_confs, conf_path)
-        if (
-            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
-            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
-        ):
+        if cls.use_external_gravitino():
             cls.restart_server()
         else:
             super().setUpClass()
@@ -65,10 +62,7 @@ class TestUser(IntegrationTestEnv):
         }
         cls._reset_conf(reset_confs, conf_path)
         cls._append_conf(reset_confs, conf_path)
-        if (
-            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
-            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
-        ):
+        if cls.use_external_gravitino():
             cls.restart_server()
         else:
             super().tearDownClass()

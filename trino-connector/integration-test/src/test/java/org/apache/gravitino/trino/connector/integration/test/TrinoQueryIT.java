@@ -74,13 +74,16 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   static String trinoConnectorDir;
 
+  static String testContainers;
+
   static {
     testsetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
     testsetsDir = ITUtils.joinPath(testsetsDir, "testsets");
   }
 
   public void setup() throws Exception {
-    trinoQueryITBase = new TrinoQueryITBase(trinoWorkerNum, trinoVersion, trinoConnectorDir);
+    trinoQueryITBase =
+        new TrinoQueryITBase(trinoWorkerNum, trinoVersion, trinoConnectorDir, testContainers);
     trinoQueryITBase.setup();
     cleanupTestEnv();
 

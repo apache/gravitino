@@ -250,6 +250,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
                 .withName(addIndex.getName())
                 .withFieldNames(addIndex.getFieldNames())
                 .withIndexType(addIndex.getType())
+                .withProperties(addIndex.getProperties())
                 .build();
         newIndexes.add(newIndex);
 
@@ -472,7 +473,12 @@ public abstract class ManagedTableOperations implements TableCatalog {
         .withName(tableEntity.name())
         .withComment(tableEntity.comment())
         .withColumns(
-            tableEntity.columns().stream().map(this::toGenericColumn).toArray(Column[]::new))
+            // Columns may be returned unordered from the store; sort by position
+            // so the table's column order matches what was declared.
+            tableEntity.columns().stream()
+                .sorted(Comparator.comparingInt(ColumnEntity::position))
+                .map(this::toGenericColumn)
+                .toArray(Column[]::new))
         .withProperties(tableEntity.properties())
         .withAuditInfo(tableEntity.auditInfo())
         .withSortOrders(tableEntity.sortOrders())

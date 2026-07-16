@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a user-defined function under a schema {@link Namespace}. A function is
@@ -65,4 +66,12 @@ public interface Function extends Auditable {
    * @return The definitions of the function.
    */
   FunctionDefinition[] definitions();
+
+  /**
+   * @return The {@link SupportsTags} if the function supports tag operations.
+   * @throws UnsupportedOperationException If the function does not support tag operations.
+   */
+  default SupportsTags supportsTags() {
+    throw new UnsupportedOperationException("Function does not support tag operations.");
+  }
 }

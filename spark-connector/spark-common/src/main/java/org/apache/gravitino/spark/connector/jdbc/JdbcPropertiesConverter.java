@@ -31,7 +31,8 @@ public class JdbcPropertiesConverter implements PropertiesConverter {
 
   public static class JdbcPropertiesConverterHolder {
     private static final JdbcPropertiesConverter INSTANCE = new JdbcPropertiesConverter();
-    private static final JdbcPropertiesConverter PG_INSTANCE = new JdbcPropertiesConverter(false);
+    private static final JdbcPropertiesConverter NO_TABLE_PROPERTIES_INSTANCE =
+        new JdbcPropertiesConverter(false);
   }
 
   private JdbcPropertiesConverter() {
@@ -46,8 +47,9 @@ public class JdbcPropertiesConverter implements PropertiesConverter {
     return JdbcPropertiesConverterHolder.INSTANCE;
   }
 
-  public static JdbcPropertiesConverter getPGInstance() {
-    return JdbcPropertiesConverterHolder.PG_INSTANCE;
+  /** Returns the singleton instance that does not support table-level properties. */
+  public static JdbcPropertiesConverter getNoTablePropertiesInstance() {
+    return JdbcPropertiesConverterHolder.NO_TABLE_PROPERTIES_INSTANCE;
   }
 
   private static final Map<String, String> GRAVITINO_CONFIG_TO_JDBC =
