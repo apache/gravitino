@@ -39,168 +39,17 @@ from gravitino.dto.responses.partition_name_list_response import (
 from gravitino.dto.responses.partition_response import PartitionResponse
 from gravitino.dto.responses.table_response import TableResponse
 from gravitino.exceptions.base import IllegalArgumentException
+from tests.unittests.fixtures.table_fixtures import (
+    IDENTITY_PARTITION_WITH_PROPERTIES_JSON_STRING,
+    TABLE_JSON_STRING_WITH_ANONYMOUS_CREATOR_AND_ID_SORT,
+)
 
 
 class TestResponses(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.PARTITION_JSON_STRING = """
-            {
-                "type": "identity",
-                "name": "test_identity_partition",
-                "fieldNames": [
-                    [
-                        "upper"
-                    ],
-                    [
-                        "lower"
-                    ]
-                ],
-                "values": [
-                    {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "0"
-                    },
-                    {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "100"
-                    }
-                ],
-                "properties": {
-                    "key1": "value1",
-                    "key2": "value2"
-                }
-            }
-        """
-        cls.TABLE_JSON_STRING = """
-        {
-            "name": "example_table",
-            "comment": "This is an example table",
-            "audit": {
-                "creator": "anonymous",
-                "createTime":"2025-10-10T00:00:00"
-            },
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "integer",
-                    "comment": "id column comment",
-                    "nullable": false,
-                    "autoIncrement": true,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "-1"
-                    }
-                },
-                {
-                    "name": "name",
-                    "type": "varchar(500)",
-                    "comment": "name column comment",
-                    "nullable": true,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "null",
-                        "value": "null"
-                    }
-                },
-                {
-                    "name": "StartingDate",
-                    "type": "timestamp",
-                    "comment": "StartingDate column comment",
-                    "nullable": false,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "function",
-                        "funcName": "current_timestamp",
-                        "funcArgs": []
-                    }
-                },
-                {
-                    "name": "info",
-                    "type": {
-                        "type": "struct",
-                        "fields": [
-                            {
-                                "name": "position",
-                                "type": "string",
-                                "nullable": true,
-                                "comment": "position field comment"
-                            },
-                            {
-                                "name": "contact",
-                                "type": {
-                                "type": "list",
-                                "elementType": "integer",
-                                "containsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "contact field comment"
-                            },
-                            {
-                                "name": "rating",
-                                "type": {
-                                "type": "map",
-                                "keyType": "string",
-                                "valueType": "integer",
-                                "valueContainsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "rating field comment"
-                            }
-                        ]
-                    },
-                    "comment": "info column comment",
-                    "nullable": true
-                },
-                {
-                    "name": "dt",
-                    "type": "date",
-                    "comment": "dt column comment",
-                    "nullable": true
-                }
-            ],
-            "partitioning": [
-                {
-                    "strategy": "identity",
-                    "fieldName": [ "dt" ]
-                }
-            ],
-            "distribution": {
-                "strategy": "hash",
-                "number": 32,
-                "funcArgs": [
-                    {
-                        "type": "field",
-                        "fieldName": [ "id" ]
-                    }
-                ]
-            },
-            "sortOrders": [
-                {
-                    "sortTerm": {
-                        "type": "field",
-                        "fieldName": [ "id" ]
-                    },
-                    "direction": "asc",
-                    "nullOrdering": "nulls_first"
-                }
-            ],
-            "indexes": [
-                {
-                    "indexType": "primary_key",
-                    "name": "PRIMARY",
-                    "fieldNames": [["id"]]
-                }
-            ],
-            "properties": {
-                "format": "ORC"
-            }
-        }
-        """
+        cls.PARTITION_JSON_STRING = IDENTITY_PARTITION_WITH_PROPERTIES_JSON_STRING
+        cls.TABLE_JSON_STRING = TABLE_JSON_STRING_WITH_ANONYMOUS_CREATOR_AND_ID_SORT
 
     def test_file_location_response(self):
         json_data = {"code": 0, "fileLocation": "file:/test/1"}

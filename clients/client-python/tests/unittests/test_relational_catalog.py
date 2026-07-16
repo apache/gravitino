@@ -37,6 +37,9 @@ from gravitino.exceptions.base import (
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient, Response
+from tests.unittests.fixtures.table_fixtures import (
+    TABLE_DTO_JSON_STRING_WITH_STARTING_DATE_SORT,
+)
 
 
 class TestRelationalCatalog(unittest.TestCase):
@@ -57,133 +60,7 @@ class TestRelationalCatalog(unittest.TestCase):
             audit=AuditDTO("anonymous"),
             rest_client=cls.rest_client,
         )
-        cls.TABLE_DTO_JSON_STRING = """
-        {
-            "name": "example_table",
-            "comment": "This is an example table",
-            "audit": {
-                "creator": "Apache Gravitino",
-                "createTime":"2025-10-10T00:00:00"
-            },
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "integer",
-                    "comment": "id column comment",
-                    "nullable": false,
-                    "autoIncrement": true,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "-1"
-                    }
-                },
-                {
-                    "name": "name",
-                    "type": "varchar(500)",
-                    "comment": "name column comment",
-                    "nullable": true,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "null",
-                        "value": "null"
-                    }
-                },
-                {
-                    "name": "StartingDate",
-                    "type": "timestamp",
-                    "comment": "StartingDate column comment",
-                    "nullable": false,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "function",
-                        "funcName": "current_timestamp",
-                        "funcArgs": []
-                    }
-                },
-                {
-                    "name": "info",
-                    "type": {
-                        "type": "struct",
-                        "fields": [
-                            {
-                                "name": "position",
-                                "type": "string",
-                                "nullable": true,
-                                "comment": "position field comment"
-                            },
-                            {
-                                "name": "contact",
-                                "type": {
-                                "type": "list",
-                                "elementType": "integer",
-                                "containsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "contact field comment"
-                            },
-                            {
-                                "name": "rating",
-                                "type": {
-                                "type": "map",
-                                "keyType": "string",
-                                "valueType": "integer",
-                                "valueContainsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "rating field comment"
-                            }
-                        ]
-                    },
-                    "comment": "info column comment",
-                    "nullable": true
-                },
-                {
-                    "name": "dt",
-                    "type": "date",
-                    "comment": "dt column comment",
-                    "nullable": true
-                }
-            ],
-            "partitioning": [
-                {
-                    "strategy": "identity",
-                    "fieldName": [ "dt" ]
-                }
-            ],
-            "distribution": {
-                "strategy": "hash",
-                "number": 32,
-                "funcArgs": [
-                    {
-                        "type": "field",
-                        "fieldName": [ "id" ]
-                    }
-                ]
-            },
-            "sortOrders": [
-                {
-                    "sortTerm": {
-                        "type": "field",
-                        "fieldName": [ "StartingDate" ]
-                    },
-                    "direction": "asc",
-                    "nullOrdering": "nulls_first"
-                }
-            ],
-            "indexes": [
-                {
-                    "indexType": "primary_key",
-                    "name": "PRIMARY",
-                    "fieldNames": [["id"]]
-                }
-            ],
-            "properties": {
-                "format": "ORC"
-            }
-        }
-        """
+        cls.TABLE_DTO_JSON_STRING = TABLE_DTO_JSON_STRING_WITH_STARTING_DATE_SORT
         cls.table_dto = TableDTO.from_json(cls.TABLE_DTO_JSON_STRING)
 
     def _get_mock_http_resp(self, json_str: str, return_code: int = 200):
