@@ -104,8 +104,6 @@ const AuthProvider = ({ children }) => {
         const tokenToUse = sessionStorage.getItem('accessToken')
 
         if (tokenToUse) {
-          basicAuthToken && dispatch(setAuthToken(basicAuthToken))
-          basicAuthUser && dispatch(setAuthUser(basicAuthUser))
           goToMetalakeListPage()
         } else {
           router.push('/login')
