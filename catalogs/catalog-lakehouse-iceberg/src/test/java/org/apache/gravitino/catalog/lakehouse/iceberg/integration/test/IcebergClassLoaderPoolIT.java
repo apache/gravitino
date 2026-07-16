@@ -114,7 +114,19 @@ public class IcebergClassLoaderPoolIT extends BaseIT {
 
   private Map<String, String> icebergMysqlConf(TestDatabaseName db) throws Exception {
     Map<String, String> conf = Maps.newHashMap();
-    conf.put(IcebergConfig.CATALOG_URI.getKey(), mySQLContainer.getJdbcUrl(db));
+    // Scope JDBC metadata lookups to the connected database via nullCatalogMeansCurrent=true.
+    // These tests deliberately place DB_A and DB_B on the SAME MySQL server (to produce two
+    // distinct backend URIs for the ClassLoader isolation assertion). Iceberg's JdbcCatalog
+    // checks whether its `iceberg_tables` control table already exists with
+    // getTables(catalog=null, schema=null, "iceberg_tables", null) before creating it. Under
+    // Connector/J's default (nullCatalogMeansCurrent=false) that call scans EVERY database on the
+    // server, so a catalog on DB_B would "see" DB_A's iceberg_tables, skip creating its own, and
+    // then fail real queries with "table doesn't exist". Setting nullCatalogMeansCurrent=true
+    // scopes the check to the current database. (This mirrors the recommended setting for running
+    // multiple Iceberg JDBC catalogs against separate databases of one MySQL server.)
+    conf.put(
+        IcebergConfig.CATALOG_URI.getKey(),
+        mySQLContainer.getJdbcUrl(db) + "?nullCatalogMeansCurrent=true");
     conf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
     // Unique backend name per catalog so each catalog's JDBC namespace registry
     // (Iceberg's iceberg_namespace_properties, keyed by the initialize() name) is isolated even

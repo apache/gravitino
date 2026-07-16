@@ -985,13 +985,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     if (metricsSystem != null) {
       metricsSystem.unregister(catalogMetricsSource);
     }
-
-    // Note: ClassLoader-scoped cleanup (Hadoop FileSystem.closeAll, the metrics scheduler,
-    // ThreadLocals, etc.) is intentionally NOT done here. Because catalogs may share an
-    // IsolatedClassLoader via the ClassLoaderPool, running that destructive cleanup when a single
-    // catalog closes would break sibling catalogs still sharing the ClassLoader. It is now done
-    // centrally by CatalogManager/ClassLoaderPool only when the last catalog releasing the shared
-    // ClassLoader brings its reference count to zero.
   }
 
   private void validateLocationHierarchy(

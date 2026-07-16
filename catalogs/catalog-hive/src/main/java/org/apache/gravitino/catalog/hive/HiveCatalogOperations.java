@@ -196,13 +196,6 @@ public class HiveCatalogOperations
       clientPool.close();
       clientPool = null;
     }
-    // Note: ClassLoader-scoped cleanup (UGI/Kerberos, Hadoop FileSystem, ThreadLocals, etc.) is
-    // intentionally NOT done here. Since catalogs may share an IsolatedClassLoader via the
-    // ClassLoaderPool, running that destructive cleanup on close of a single catalog would break
-    // sibling catalogs still sharing the ClassLoader (e.g. tearing down the shared Hadoop/UGI state
-    // a live Hive catalog depends on). It is now performed centrally by CatalogManager/
-    // ClassLoaderPool only when the last catalog releasing the shared ClassLoader brings its
-    // reference count to zero.
   }
 
   /**
