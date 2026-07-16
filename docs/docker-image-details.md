@@ -108,7 +108,7 @@ Changelog
 
 - apache/gravitino-iceberg-rest:1.0.0
   - Upgrade Iceberg version to 1.9
-  - Supports to specify the catalog name using warehouse parameter
+  - Support specifying the catalog name using the warehouse parameter
 
 - apache/gravitino-iceberg-rest:0.9.1
   - Fix the issue that Iceberg REST server fail to start when enabling OAuth.
