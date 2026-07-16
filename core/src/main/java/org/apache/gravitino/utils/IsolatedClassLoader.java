@@ -172,8 +172,13 @@ public class IsolatedClassLoader implements Closeable {
 
       try {
         return clazz == null ? doLoadClass(name, resolve) : clazz;
+      } catch (ClassNotFoundException e) {
+        // Probe-driven callers, such as Janino, use a plain ClassNotFoundException as a
+        // signal that the current candidate name missed and they should try the next one.
+        // Wrapping it with a cause changes that signal into a fatal loading failure.
+        throw e;
       } catch (Exception e) {
-        throw new ClassNotFoundException("Class not found " + name, e);
+        throw new ClassNotFoundException("Failed to load " + name, e);
       }
     }
 
