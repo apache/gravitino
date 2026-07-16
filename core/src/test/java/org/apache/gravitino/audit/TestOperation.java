@@ -196,7 +196,7 @@ public class TestOperation {
     this.metalakeIdentifier = mockMetalakeIdentifier();
     this.metalakeInfo = mockMetalakeInfo();
 
-    this.catalogIdentifier = mockCatalogIndentifier();
+    this.catalogIdentifier = mockCatalogIdentifier();
     this.catalogInfo = mockCatalogInfo();
 
     this.schemaIdentifier = mockSchemaIdentifier();
@@ -673,7 +673,7 @@ public class TestOperation {
     return new MetalakeInfo("metalake", "comment", ImmutableMap.of("a", "b"), null);
   }
 
-  private NameIdentifier mockCatalogIndentifier() {
+  private NameIdentifier mockCatalogIdentifier() {
     return NameIdentifier.of("metalake", "catalog");
   }
 
