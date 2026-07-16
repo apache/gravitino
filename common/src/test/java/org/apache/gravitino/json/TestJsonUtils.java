@@ -126,6 +126,39 @@ public class TestJsonUtils {
     Assertions.assertEquals(
         Types.VariantType.get(), JsonUtils.objectMapper().readValue(jsonValue, Type.class));
 
+    type = Types.GeometryType.crs84();
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected = "\"geometry\"";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+    Assertions.assertEquals(
+        Types.GeometryType.crs84(), JsonUtils.objectMapper().readValue(jsonValue, Type.class));
+
+    // A custom, case-sensitive CRS round-trips verbatim (it is not lowercased on parse).
+    type = Types.GeometryType.of("EPSG:4326");
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected = "\"geometry(EPSG:4326)\"";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+    Types.GeometryType parsedGeometry =
+        (Types.GeometryType) JsonUtils.objectMapper().readValue(jsonValue, Type.class);
+    Assertions.assertEquals("EPSG:4326", parsedGeometry.crs());
+
+    type = Types.GeographyType.crs84();
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected = "\"geography\"";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+    Assertions.assertEquals(
+        Types.GeographyType.crs84(), JsonUtils.objectMapper().readValue(jsonValue, Type.class));
+
+    // A custom CRS + algorithm round-trips, with the case-sensitive CRS preserved verbatim.
+    type = Types.GeographyType.of("EPSG:4326", "karney");
+    jsonValue = JsonUtils.objectMapper().writeValueAsString(type);
+    expected = "\"geography(EPSG:4326,karney)\"";
+    Assertions.assertEquals(objectMapper.readTree(expected), objectMapper.readTree(jsonValue));
+    Types.GeographyType parsedGeography =
+        (Types.GeographyType) JsonUtils.objectMapper().readValue(jsonValue, Type.class);
+    Assertions.assertEquals("EPSG:4326", parsedGeography.crs());
+    Assertions.assertEquals("karney", parsedGeography.algorithm());
+
     type =
         Types.StructType.of(
             Types.StructType.Field.nullableField("name", Types.StringType.get(), "name field"),

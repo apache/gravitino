@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.doris.integration.test;
 
+import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -27,6 +28,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -38,15 +40,23 @@ import org.apache.gravitino.integration.test.container.DorisImageName;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.partitions.ListPartition;
+import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.gravitino.rel.partitions.Partitions;
+import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
@@ -313,6 +323,108 @@ public class CatalogDoris3xIT extends BaseIT {
     assertEquals(3, t.columns().length);
 
     assertEquals(Types.ExternalType.of("json"), findColumn(t, "json_col").dataType());
+  }
+
+  @Test
+  void testListPartitionRoundTrip() {
+    // Verify LIST partition with assignments round-trips correctly on Doris 3.0.x.
+    // The partition parsing regex was updated to handle Doris 3.0+ format with spaces.
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_list_partition"));
+
+    Column cityCol = Column.of("city", Types.VarCharType.of(50), "city", false, false, null);
+    Distribution dist = Distributions.hash(1, NamedReference.field("city"));
+
+    // Create table with initial partition assignments so Doris 3.0.x recognizes it as partitioned.
+    Literal[][] p1Values = {{Literals.of("beijing", Types.VarCharType.of(50))}};
+    Literal[][] p2Values = {{Literals.of("shanghai", Types.VarCharType.of(50))}};
+    ListPartition p1 = Partitions.list("p1", p1Values, Collections.emptyMap());
+    ListPartition p2 = Partitions.list("p2", p2Values, Collections.emptyMap());
+    Transform[] partitioning = {
+      Transforms.list(new String[][] {{"city"}}, new ListPartition[] {p1, p2})
+    };
+
+    tc.createTable(
+        tid,
+        new Column[] {cityCol},
+        tableComment,
+        Collections.emptyMap(),
+        partitioning,
+        dist,
+        null,
+        null);
+
+    // Verify round-trip
+    Table loaded = tc.loadTable(tid);
+    assertEquals(1, loaded.partitioning().length);
+    assertEquals("list", loaded.partitioning()[0].name());
+
+    Map<String, ListPartition> partitions =
+        Arrays.stream(loaded.supportPartitions().listPartitions())
+            .collect(Collectors.toMap(Partition::name, p -> (ListPartition) p));
+    assertEquals(2, partitions.size());
+    assertPartition(Partitions.list("p1", p1Values, Collections.emptyMap()), partitions.get("p1"));
+    assertPartition(Partitions.list("p2", p2Values, Collections.emptyMap()), partitions.get("p2"));
+  }
+
+  @Test
+  void testRangePartitionRoundTrip() {
+    // Verify RANGE partition round-trips correctly on Doris 3.0.x.
+    // The regex was updated to tolerate space between RANGE and parenthesis.
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_range_partition"));
+
+    Column dateCol = Column.of("dt", Types.DateType.get(), "date", false, false, null);
+    Distribution dist = Distributions.hash(1, NamedReference.field("dt"));
+
+    Literal todayLiteral = Literals.of("2024-07-24", Types.DateType.get());
+    Literal tomorrowLiteral = Literals.of("2024-07-25", Types.DateType.get());
+    RangePartition p1 = Partitions.range("p1", todayLiteral, Literals.NULL, Collections.emptyMap());
+    RangePartition p2 =
+        Partitions.range("p2", tomorrowLiteral, todayLiteral, Collections.emptyMap());
+    RangePartition p3 =
+        Partitions.range("p3", Literals.NULL, tomorrowLiteral, Collections.emptyMap());
+    Transform[] partitioning = {
+      Transforms.range(new String[] {"dt"}, new RangePartition[] {p1, p2, p3})
+    };
+
+    tc.createTable(
+        tid,
+        new Column[] {dateCol},
+        tableComment,
+        Collections.emptyMap(),
+        partitioning,
+        dist,
+        null,
+        null);
+
+    Table loaded = tc.loadTable(tid);
+    assertEquals(1, loaded.partitioning().length);
+    assertEquals("range", loaded.partitioning()[0].name());
+
+    // Verify partition assignments
+    SupportsPartitions partitionOps = loaded.supportPartitions();
+    Map<String, RangePartition> partitions =
+        Arrays.stream(partitionOps.listPartitions())
+            .collect(Collectors.toMap(Partition::name, p -> (RangePartition) p));
+    assertEquals(3, partitions.size());
+    assertPartition(
+        Partitions.range(
+            "p1",
+            todayLiteral,
+            Literals.of("0000-01-01", Types.DateType.get()),
+            Collections.emptyMap()),
+        partitions.get("p1"));
+    assertPartition(p2, partitions.get("p2"));
+    assertPartition(
+        Partitions.range(
+            "p3",
+            Literals.of("MAXVALUE", Types.DateType.get()),
+            tomorrowLiteral,
+            Collections.emptyMap()),
+        partitions.get("p3"));
   }
 
   private Column findColumn(Table table, String columnName) {

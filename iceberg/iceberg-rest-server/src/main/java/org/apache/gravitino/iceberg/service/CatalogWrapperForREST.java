@@ -39,6 +39,7 @@ import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
@@ -48,6 +49,7 @@ import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.Scan;
@@ -373,7 +375,19 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   /**
-   * Plan table scan and return scan tasks.
+   * Plan table scan without credential vending.
+   *
+   * @param tableIdentifier The table identifier.
+   * @param scanRequest The scan request parameters.
+   * @return PlanTableScanResponse with status=COMPLETED and file scan tasks.
+   */
+  public PlanTableScanResponse planTableScan(
+      TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest) {
+    return planTableScan(tableIdentifier, scanRequest, false, CredentialPrivilege.READ);
+  }
+
+  /**
+   * Plan table scan and optionally inject vended storage credentials.
    *
    * <p>This method performs server-side scan planning to optimize query performance by reducing
    * client-side metadata loading and enabling parallel task execution.
@@ -384,18 +398,27 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * different from asynchronous mode (SUBMITTED status) where a plan ID is returned for later
    * retrieval.
    *
+   * <p>When {@code requestCredentialVending} is true and the table is eligible (non-local,
+   * non-HDFS), storage credentials are injected directly into the response using the table already
+   * loaded for scan planning -- avoiding a redundant {@code loadTable} call.
+   *
    * <p>Referenced from Iceberg PR #13400 for scan planning implementation.
    *
    * @param tableIdentifier The table identifier.
    * @param scanRequest The scan request parameters including filters, projections, snapshot-id,
    *     etc.
+   * @param requestCredentialVending whether the client requested credential vending
+   * @param privilege the credential privilege level for vending
    * @return PlanTableScanResponse with status=COMPLETED and file scan tasks.
    * @throws IllegalArgumentException if scan request validation fails
    * @throws org.apache.gravitino.exceptions.NoSuchTableException if table doesn't exist
    * @throws RuntimeException for other scan planning failures
    */
   public PlanTableScanResponse planTableScan(
-      TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest) {
+      TableIdentifier tableIdentifier,
+      PlanTableScanRequest scanRequest,
+      boolean requestCredentialVending,
+      CredentialPrivilege privilege) {
 
     LOG.debug(
         "Planning scan for table: {}, snapshotId: {}, startSnapshotId: {}, endSnapshotId: {}, select: {}, caseSensitive: {}",
@@ -410,43 +433,47 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       Table table = getCatalog().loadTable(tableIdentifier);
       Optional<PlanTableScanResponse> cachedResponse =
           scanPlanCache.get(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest));
-      if (cachedResponse.isPresent()) {
-        LOG.info("Using cached scan plan for table: {}", tableIdentifier);
-        return cachedResponse.get();
-      }
-
-      List<FileScanTask> fileScanTasks = new ArrayList<>();
-
-      try (CloseableIterable<FileScanTask> scanTasks =
-          createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
-        for (FileScanTask fileScanTask : scanTasks) {
-          fileScanTasks.add(fileScanTask);
-        }
-      } catch (IOException e) {
-        LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
-        throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
-      }
-
-      if (fileScanTasks.isEmpty()) {
-        LOG.info(
-            "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
-            tableIdentifier);
-      }
 
       PlanTableScanResponse response;
-      try {
-        response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
-      } catch (Exception e) {
-        LOG.error("Failed to build scan plan response for table: {}", tableIdentifier, e);
-        throw new RuntimeException(
-            String.format(
-                "Failed to build scan plan response for table: %s. Error: %s",
-                tableIdentifier, e.getMessage()),
-            e);
+      if (cachedResponse.isPresent()) {
+        LOG.info("Using cached scan plan for table: {}", tableIdentifier);
+        response = cachedResponse.get();
+      } else {
+        List<FileScanTask> fileScanTasks = new ArrayList<>();
+
+        try (CloseableIterable<FileScanTask> scanTasks =
+            createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
+          for (FileScanTask fileScanTask : scanTasks) {
+            fileScanTasks.add(fileScanTask);
+          }
+        } catch (IOException e) {
+          LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
+          throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
+        }
+
+        if (fileScanTasks.isEmpty()) {
+          LOG.info(
+              "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
+              tableIdentifier);
+        }
+
+        try {
+          response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
+        } catch (Exception e) {
+          LOG.error("Failed to build scan plan response for table: {}", tableIdentifier, e);
+          throw new RuntimeException(
+              String.format(
+                  "Failed to build scan plan response for table: %s. Error: %s",
+                  tableIdentifier, e.getMessage()),
+              e);
+        }
+
+        scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
       }
 
-      // Cache the scan plan response
-      scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
+      if (requestCredentialVending && !isLocalOrHdfsLocation(table.location())) {
+        response = injectScanCredentials(tableIdentifier, table, response, privilege);
+      }
       return response;
 
     } catch (IllegalArgumentException e) {
@@ -459,6 +486,34 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       LOG.error("Unexpected error during scan planning for table: {}", tableIdentifier, e);
       throw new RuntimeException(
           "Scan planning failed for table " + tableIdentifier + ": " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Inject vended credentials into a scan response using the already-loaded table, avoiding a
+   * redundant {@code loadTable} call. Follows the same eligibility logic as {@link
+   * #shouldGenerateCredential} and the same credential generation as {@link #getCredential}.
+   */
+  private PlanTableScanResponse injectScanCredentials(
+      TableIdentifier tableIdentifier,
+      Table table,
+      PlanTableScanResponse response,
+      CredentialPrivilege privilege) {
+    try {
+      validateCredentialLocation(table.location());
+      TableMetadata metadata = ((BaseTable) table).operations().current();
+      Credential credential = getCredential(metadata, privilege);
+      Map<String, String> config =
+          new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+      config.putAll(
+          IcebergRESTUtils.buildRefreshProps(
+              catalogCredentialManager.catalogName(), tableIdentifier, config));
+      org.apache.iceberg.rest.credentials.Credential restCred =
+          IcebergRESTUtils.toRESTCredential(table.location(), config);
+      return IcebergRESTUtils.copyWithCredentials(response, Collections.singletonList(restCred));
+    } catch (ServiceUnavailableException e) {
+      LOG.warn("Failed to generate scan credentials for table: {}", tableIdentifier, e);
+      return response;
     }
   }
 

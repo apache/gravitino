@@ -173,9 +173,7 @@ public class CapabilityHelpers {
 
   public static Partition applyCaseSensitive(Partition partition, Capability capabilities) {
     String newName =
-        capabilities.caseSensitiveOnName(Capability.Scope.PARTITION).supported()
-            ? partition.name()
-            : partition.name().toLowerCase();
+        applyCaseSensitiveOnName(Capability.Scope.PARTITION, partition.name(), capabilities);
     if (partition instanceof IdentityPartition) {
       IdentityPartition identityPartition = (IdentityPartition) partition;
       return Partitions.identity(
@@ -507,16 +505,28 @@ public class CapabilityHelpers {
 
   public static String applyCaseSensitiveOnName(
       Capability.Scope scope, String name, Capability capabilities) {
-    return capabilities.caseSensitiveOnName(scope).supported() ? name : name.toLowerCase();
+    if (name == null) {
+      return null;
+    }
+    String normalizedName = capabilities.normalizeName(scope, name);
+    if (normalizedName == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Capability.normalizeName(%s, %s) must not return null for a non-null name",
+              scope, name));
+    }
+    return normalizedName;
   }
 
   private static String[] applyCaseSensitiveOnColumnName(String[] name, Capability capabilities) {
-    if (!capabilities.caseSensitiveOnName(Capability.Scope.COLUMN).supported()) {
-      String[] standardizeColumnName = Arrays.copyOf(name, name.length);
-      standardizeColumnName[0] = name[0].toLowerCase();
-      return standardizeColumnName;
+    String normalizedFirstName =
+        applyCaseSensitiveOnName(Capability.Scope.COLUMN, name[0], capabilities);
+    if (normalizedFirstName.equals(name[0])) {
+      return name;
     }
-    return name;
+    String[] standardizeColumnName = Arrays.copyOf(name, name.length);
+    standardizeColumnName[0] = normalizedFirstName;
+    return standardizeColumnName;
   }
 
   private static void applyColumnNotNull(Column column, Capability capabilities) {

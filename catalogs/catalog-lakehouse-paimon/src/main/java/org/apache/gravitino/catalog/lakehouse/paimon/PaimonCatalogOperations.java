@@ -575,7 +575,7 @@ public class PaimonCatalogOperations
         identifier != null
             && identifier.namespace() != null
             && identifier.namespace().levels().length > 0,
-        "Namespace can not be null or empty.");
+        "Namespace cannot be null or empty");
     String[] levels = identifier.namespace().levels();
     return NameIdentifier.of(levels[levels.length - 1], identifier.name());
   }
