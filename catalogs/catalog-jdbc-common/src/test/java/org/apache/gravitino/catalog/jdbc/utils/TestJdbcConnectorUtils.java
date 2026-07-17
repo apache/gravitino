@@ -37,4 +37,33 @@ public class TestJdbcConnectorUtils {
         IllegalArgumentException.class, () -> JdbcConnectorUtils.escapeSqlLiteral(value, '`'));
     Assertions.assertEquals("null", JdbcConnectorUtils.escapeSqlLiteral(null, '\''));
   }
+
+  @Test
+  public void testUnescapeSqlLiteral() {
+    String value = "owner\\'s \"comment\"; DROP TABLE marker; --";
+
+    // Round-trip: unescape(escape(x)) == x for both quote styles.
+    Assertions.assertEquals(
+        value,
+        JdbcConnectorUtils.unescapeSqlLiteral(
+            JdbcConnectorUtils.escapeSqlLiteral(value, '\''), '\''));
+    Assertions.assertEquals(
+        value,
+        JdbcConnectorUtils.unescapeSqlLiteral(
+            JdbcConnectorUtils.escapeSqlLiteral(value, '"'), '"'));
+
+    // Backslash-style escaping is unescaped too.
+    Assertions.assertEquals(
+        "owner's \"comment\"",
+        JdbcConnectorUtils.unescapeSqlLiteral("owner's \\\"comment\\\"", '"'));
+
+    // Text that was never escaped passes through unchanged, including a lone backslash before an
+    // ordinary character and a lone trailing backslash.
+    Assertions.assertEquals(
+        "D:\\data; --", JdbcConnectorUtils.unescapeSqlLiteral("D:\\data; --", '"'));
+    Assertions.assertEquals("tail\\", JdbcConnectorUtils.unescapeSqlLiteral("tail\\", '"'));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> JdbcConnectorUtils.unescapeSqlLiteral(value, '`'));
+  }
 }

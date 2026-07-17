@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -198,7 +199,7 @@ public class StarRocksUtils {
   public static String extractTableCommentFromSql(String createTableSql) {
     Matcher matcher = TABLE_COMMENT_PATTERN.matcher(createTableSql.trim());
     if (matcher.find()) {
-      return unescapeTableComment(matcher.group(1));
+      return JdbcConnectorUtils.unescapeSqlLiteral(matcher.group(1), '"');
     }
     return "";
   }
@@ -361,26 +362,5 @@ public class StarRocksUtils {
       throw new UnsupportedOperationException(
           String.format("%s is not a partitioned table", tableName));
     }
-  }
-
-  private static String unescapeTableComment(String comment) {
-    StringBuilder result = new StringBuilder(comment.length());
-    for (int i = 0; i < comment.length(); i++) {
-      char current = comment.charAt(i);
-      if (current == '\\' && i + 1 < comment.length()) {
-        char next = comment.charAt(i + 1);
-        if (next == '\\' || next == '"') {
-          result.append(next);
-          i++;
-          continue;
-        }
-      } else if (current == '"' && i + 1 < comment.length() && comment.charAt(i + 1) == '"') {
-        result.append('"');
-        i++;
-        continue;
-      }
-      result.append(current);
-    }
-    return result.toString();
   }
 }

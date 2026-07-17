@@ -98,11 +98,21 @@ public class TestDorisUtils {
     assertEquals("value1", result.get("property1"));
     assertEquals("comment", result.get("comment"));
 
+    // Escaped SHOW CREATE output (doubled quotes and backslashes, as generatePropertiesSql
+    // emits) round-trips back to the original key/value text.
     createTableSql =
         "CREATE DATABASE `test`\nPROPERTIES (\n"
-            + "\"key\"name\" = \"owner's \"comment\" D:\\data; --\"\n)";
+            + "\"key\"\"name\" = \"owner's \"\"comment\"\" D:\\\\data; --\"\n)";
     result = DorisUtils.extractPropertiesFromSql(createTableSql);
     assertEquals("owner's \"comment\" D:\\data; --", result.get("key\"name"));
+
+    // Backslash-style escaping (\" and \\) is unescaped too, and a lone backslash before an
+    // ordinary character passes through unchanged.
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n"
+            + "\"plain\" = \"owner\\\\s \\\"comment\\\" D:\\data; --\"\n)";
+    result = DorisUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner\\s \"comment\" D:\\data; --", result.get("plain"));
   }
 
   @Test
