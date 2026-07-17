@@ -82,7 +82,7 @@ public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntime
             .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
             .removalListener(
                 (key, value, cause) -> {
-                  LOG.info("Removing HiveClientPool from cache: key={}, cause={}", key, cause);
+                  LOG.debug("Removing HiveClientPool from cache: key={}, cause={}", key, cause);
                   ((HiveClientPool) value).close();
                 })
             .scheduler(Scheduler.forScheduledExecutorService(scheduler))

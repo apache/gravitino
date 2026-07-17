@@ -132,7 +132,7 @@ public class IcebergHiveCachedClientPool
               .removalListener(
                   (key, value, cause) -> {
                     Key cacheKey = (Key) key;
-                    LOG.info(
+                    LOG.debug(
                         "Removing HiveClientPool from cache: key={}, cause={}",
                         cacheKey == null ? null : cacheKey.elements(),
                         cause);

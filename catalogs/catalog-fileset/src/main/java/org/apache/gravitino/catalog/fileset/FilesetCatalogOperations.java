@@ -282,7 +282,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               .removalListener(
                   (key, value, cause) -> {
                     FileSystemCacheKey cacheKey = (FileSystemCacheKey) key;
-                    LOG.info(
+                    LOG.debug(
                         "Removing FileSystem from cache: scheme={}, authority={}, user={}, cause={}",
                         cacheKey == null ? null : cacheKey.scheme,
                         cacheKey == null ? null : cacheKey.authority,
