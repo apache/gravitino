@@ -41,13 +41,18 @@ public class DataSourceUtils {
   private static final String POOL_TEST_QUERY = "SELECT 1";
 
   // DBCP2 connection-pool properties that must never come from catalog configuration. The whole
-  // config map is handed to BasicDataSourceFactory, so any of these would let a catalog creator run
-  // arbitrary classes on the server (remote code execution):
+  // config map is handed to BasicDataSourceFactory, so allowing these would either run arbitrary
+  // code or let a raw property override the validated canonical connection fields:
   //   - connectionFactoryClassName / evictionPolicyClassName / driverClassName: their values are
   //     class names the factory loads and instantiates via reflection (Class.forName + newInstance)
-  //     when the pool creates connections. The legitimate driver is set separately from the
-  //     "jdbc-driver" property via an explicit setter, so the raw "driverClassName" key is never
-  //     needed.
+  //     when the pool creates connections (remote code execution). The legitimate driver is set
+  //     separately from the "jdbc-driver" property via an explicit setter, so the raw
+  //     "driverClassName" key is never needed.
+  //   - url / username / password: the connection identity is validated (JdbcUrlUtils, the H2
+  //     guard) and applied from the canonical "jdbc-url"/"jdbc-user"/"jdbc-password" properties via
+  //     explicit setters. A raw DBCP key here would reach the factory unvalidated and, once the
+  //     pool initializes, take effect before those setters run — e.g. a raw "url" could smuggle an
+  //     H2 or otherwise-denied URL past the guards.
   //   - initialSize: defense in depth. A value > 0 makes the factory eagerly open a connection
   //     during createDataSource; blocking it keeps pool creation lazy so our explicit url/driver
   //     setters, not factory-time eager init, control how connections are created.
@@ -56,6 +61,9 @@ public class DataSourceUtils {
           "connectionFactoryClassName",
           "evictionPolicyClassName",
           "driverClassName",
+          "url",
+          "username",
+          "password",
           "initialSize");
 
   public static DataSource createDataSource(Map<String, String> properties) {
@@ -117,9 +125,10 @@ public class DataSourceUtils {
 
   /**
    * Rejects DBCP2 connection-pool properties that would let catalog configuration run arbitrary
-   * classes on the server: {@code connectionFactoryClassName}, {@code evictionPolicyClassName} and
-   * {@code driverClassName} (class names loaded via reflection), plus {@code initialSize} (blocked
-   * as defense in depth to keep pool creation lazy).
+   * classes on the server ({@code connectionFactoryClassName}, {@code evictionPolicyClassName},
+   * {@code driverClassName}) or override the validated canonical connection identity ({@code url},
+   * {@code username}, {@code password}), plus {@code initialSize} (blocked as defense in depth to
+   * keep pool creation lazy).
    *
    * @param config the JDBC configuration properties forwarded to the DBCP2 factory
    * @throws GravitinoRuntimeException if an unsafe connection-pool property is present
