@@ -137,6 +137,22 @@ public class TestClickHouseDatabaseOperations {
         () -> newOps().buildDropSql("db_name", "ck`; DROP TABLE users; --"));
   }
 
+  @Test
+  void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> newOps().buildCreateSql("db`; DROP TABLE users; --", null, new HashMap<>()));
+  }
+
+  @Test
+  void testGenerateCreateDatabaseSqlValidatesClusterName() {
+    Map<String, String> props = new HashMap<>();
+    props.put(ClusterConstants.CLUSTER_NAME, "ck`; DROP TABLE users; --");
+    props.put(ClusterConstants.ON_CLUSTER, "true");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> newOps().buildCreateSql("db_name", null, props));
+  }
+
   // ---------------------------------------------------------------------------
   // Comment metadata helpers
   // ---------------------------------------------------------------------------

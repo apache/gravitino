@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.starrocks.operation;
 
+import java.util.Collections;
 import org.apache.gravitino.catalog.starrocks.operations.StarRocksDatabaseOperations;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -33,5 +34,16 @@ public class TestStarRocksDatabaseOperationsSqlGeneration {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.generateDropDatabaseSql("db`; DROP TABLE users; --", true));
+  }
+
+  @Test
+  public void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
+    StarRocksDatabaseOperations operations = new StarRocksDatabaseOperations();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            operations.generateCreateDatabaseSql(
+                "db`; DROP TABLE users; --", null, Collections.emptyMap()));
   }
 }

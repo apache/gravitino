@@ -16,33 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.doris.operation;
+package org.apache.gravitino.catalog.hologres.operation;
 
 import java.util.Collections;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestDorisDatabaseOperationsSqlGeneration {
+public class TestHologresSchemaOperationsSqlGeneration {
 
   @Test
-  public void testGenerateDropDatabaseSqlValidatesDatabaseName() {
-    DorisDatabaseOperations operations = new DorisDatabaseOperations();
-
-    Assertions.assertEquals(
-        "DROP DATABASE `test_db` FORCE", operations.generateDropDatabaseSql("test_db", true));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> operations.generateDropDatabaseSql("db`; DROP TABLE users; --", true));
-  }
-
-  @Test
-  public void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
-    DorisDatabaseOperations operations = new DorisDatabaseOperations();
+  public void testGenerateCreateDatabaseSqlValidatesSchemaName() {
+    HologresSchemaOperations operations = new HologresSchemaOperations();
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             operations.generateCreateDatabaseSql(
-                "db`; DROP TABLE users; --", null, Collections.emptyMap()));
+                "schema\"; DROP TABLE users; --", null, Collections.emptyMap()));
+  }
+
+  @Test
+  public void testGenerateDropDatabaseSqlValidatesSchemaName() {
+    HologresSchemaOperations operations = new HologresSchemaOperations();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.generateDropDatabaseSql("schema\"; DROP TABLE users; --", true));
   }
 }

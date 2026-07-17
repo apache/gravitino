@@ -50,8 +50,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
 
   public static final Logger LOG = LoggerFactory.getLogger(JdbcDatabaseOperations.class);
 
-  private static final Pattern BACKTICK_QUOTED_IDENTIFIER_PATTERN =
-      Pattern.compile("^[\\w\\p{L}$/=-]{1,64}$");
+  private static final Pattern SQL_IDENTIFIER_PATTERN = Pattern.compile("^[\\w\\p{L}$/=-]{1,64}$");
 
   protected DataSource dataSource;
   protected JdbcExceptionConverter exceptionMapper;
@@ -154,6 +153,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    */
   protected String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
+    validateSqlIdentifier(databaseName);
     String createDatabaseSql = String.format("CREATE DATABASE `%s`", databaseName);
     if (MapUtils.isNotEmpty(properties)) {
       throw new UnsupportedOperationException("Properties are not supported yet.");
@@ -171,7 +171,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * @return the SQL statement to drop a database with the given name.
    */
   protected String generateDropDatabaseSql(String databaseName, boolean cascade) {
-    validateBacktickQuotedIdentifier(databaseName);
+    validateSqlIdentifier(databaseName);
     final String dropDatabaseSql = String.format("DROP DATABASE `%s`", databaseName);
     if (cascade) {
       return dropDatabaseSql;
@@ -197,14 +197,14 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   }
 
   /**
-   * Validates a name before embedding it in a backtick-quoted SQL identifier.
+   * Validates a name before embedding it in a SQL identifier.
    *
    * @param identifier The identifier to validate.
    */
-  protected static void validateBacktickQuotedIdentifier(String identifier) {
+  protected static void validateSqlIdentifier(String identifier) {
     Preconditions.checkArgument(
-        identifier != null && BACKTICK_QUOTED_IDENTIFIER_PATTERN.matcher(identifier).matches(),
-        "Invalid backtick-quoted identifier: %s",
+        identifier != null && SQL_IDENTIFIER_PATTERN.matcher(identifier).matches(),
+        "Invalid SQL identifier: %s",
         identifier);
   }
 

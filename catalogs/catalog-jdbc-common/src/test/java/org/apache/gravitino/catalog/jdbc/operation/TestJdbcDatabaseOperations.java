@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.io.FileUtils;
@@ -138,9 +139,37 @@ public class TestJdbcDatabaseOperations {
         IllegalArgumentException.class, () -> operations.buildDropSql("a".repeat(65), true));
   }
 
+  @Test
+  public void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
+    TestableJdbcDatabaseOperations operations = new TestableJdbcDatabaseOperations();
+
+    Assertions.assertEquals(
+        "CREATE DATABASE `test_db-1$/=`",
+        operations.buildCreateSql("test_db-1$/=", null, Collections.emptyMap()));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.buildCreateSql(null, null, Collections.emptyMap()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.buildCreateSql("", null, Collections.emptyMap()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            operations.buildCreateSql("test`; DROP TABLE users; --", null, Collections.emptyMap()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.buildCreateSql("test schema", null, Collections.emptyMap()));
+  }
+
   private static class TestableJdbcDatabaseOperations extends JdbcDatabaseOperations {
     private String buildDropSql(String databaseName, boolean cascade) {
       return generateDropDatabaseSql(databaseName, cascade);
+    }
+
+    private String buildCreateSql(
+        String databaseName, String comment, Map<String, String> properties) {
+      return generateCreateDatabaseSql(databaseName, comment, properties);
     }
 
     @Override
