@@ -17,44 +17,14 @@
  * under the License.
  */
 
-import { defHttp } from '@/lib/utils/axios'
-import { ContentTypeEnum } from '@/lib/enums/httpEnum'
+export const normalizeServiceAdmins = serviceAdmins => {
+  if (Array.isArray(serviceAdmins)) {
+    return serviceAdmins
+  }
 
-export const getAuthConfigsApi = () => {
-  return defHttp.get({
-    url: '/configs'
-  })
-}
+  if (typeof serviceAdmins === 'string') {
+    return serviceAdmins.split(',')
+  }
 
-export const getAuthMeApi = () => {
-  return defHttp.get({
-    url: '/api/authn/me'
-  })
-}
-
-export const loginApi = (url, params) => {
-  return defHttp.post(
-    {
-      url,
-      data: params,
-      headers: {
-        'Content-Type': ContentTypeEnum.FORM_URLENCODED
-      }
-    },
-    { withToken: false }
-  )
-}
-
-export const basicLoginApi = basicToken => {
-  return defHttp.get(
-    {
-      url: '/api/version',
-      headers: {
-        Authorization: basicToken,
-        Accept: 'application/vnd.gravitino.v1+json',
-        'Content-Type': 'application/json'
-      }
-    },
-    { withToken: false }
-  )
+  return []
 }

@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#  http://www.apache.org/licenses/LICENSE-2.0
+#   http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -14,30 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-requests==2.32.5
-dataclasses-json==0.6.7
-pylint==4.0.5
-black==26.3.1
-twine==6.2.0
-coverage==7.13.4
-pandas==2.3.3
-pyarrow==23.0.1
-llama-index==0.13.0
-tenacity==9.1.4
-cachetools==7.1.4
-readerwriterlock==1.0.9
-docker==7.1.0
-pyjwt[crypto]==2.13.0
-jwcrypto==1.5.6
-sphinx==7.1.2
-furo==2024.8.6
-banks==2.4.2
-
-# Lance integration deps. Pinned so the default integration test runs against
-# a single, known-good (server-side `lance-namespace-core` 0.7.5+) combination.
-# The multi-version matrix (`:clients:client-python:lanceRayMatrixTest`) keeps
-# its own per-version venvs and does not consume these pins.
-ray==2.55.1
-lance-ray==0.4.2
-lance-namespace==0.7.5
