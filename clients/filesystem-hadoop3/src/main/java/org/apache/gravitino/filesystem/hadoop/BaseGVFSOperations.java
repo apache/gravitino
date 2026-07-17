@@ -930,7 +930,7 @@ public abstract class BaseGVFSOperations implements Closeable {
                       cacheKey == null || cacheKey.ugi() == null
                           ? null
                           : cacheKey.ugi().getUserName();
-                  LOG.debug(
+                  LOG.info(
                       "Removing FileSystem from cache: scheme={}, authority={}, user={}, cause={}",
                       cacheKey == null ? null : cacheKey.scheme(),
                       cacheKey == null ? null : cacheKey.authority(),

@@ -127,7 +127,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
         .executor(CLEANUP_EXECUTOR)
         .removalListener(
             (key, value, cause) -> {
-              LOG.debug("Removed entity cache entry, key={}, cause={}", key, cause);
+              LOG.info("Removed entity cache entry, key={}, cause={}", key, cause);
               if (cause == RemovalCause.EXPLICIT || cause == RemovalCause.REPLACED) {
                 return;
               }

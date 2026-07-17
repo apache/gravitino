@@ -51,7 +51,7 @@ class JcasbinLoadedRolesCache implements GravitinoCache<Long, Long> {
             .executor(Runnable::run)
             .removalListener(
                 (Long roleId, Long value, RemovalCause cause) -> {
-                  LOG.debug(
+                  LOG.info(
                       "Removed JCasbin loaded role cache entry, roleId={}, cause={}",
                       roleId,
                       cause);

@@ -91,7 +91,7 @@ public class CredentialCache<T> implements Closeable {
             .maximumSize(cacheSize)
             .removalListener(
                 (cacheKey, credential, cause) ->
-                    LOG.debug(
+                    LOG.info(
                         "Removed credential cache entry, cacheKey={}, cause={}", cacheKey, cause))
             .build();
   }
