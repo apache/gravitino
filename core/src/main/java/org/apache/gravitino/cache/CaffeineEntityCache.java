@@ -86,10 +86,17 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
 
   /**
-   * Entity types that must not be cached by this implementation. Their materialized form embeds
-   * relation-derived data (a role's securable objects, a user's / group's role names); without a
-   * relation-aware index there is no way to invalidate them when the referenced entities change, so
-   * caching them would serve stale authorization data.
+   * Entity types that must not be cached by this implementation.
+   *
+   * <p>{@code USER}, {@code GROUP} and {@code ROLE} are materialized with relation-derived data
+   * joined in at load time: a role carries its securable objects, and a user/group carries its role
+   * names. A mutation on the entity itself invalidates its own key through the write path, but this
+   * embedded data also goes stale through a mutation on a different entity. For example, deleting
+   * or renaming a securable object changes a role's materialized form, and deleting or renaming a
+   * role changes a user's/group's role names. Such a mutation touches neither this entity's own key
+   * nor any hierarchy ancestor of it, so neither the write-path invalidation nor the prefix cascade
+   * in {@link #invalidateHierarchy} would evict it; only the (now removed) reverse index could.
+   * Caching them would therefore serve stale authorization data.
    */
   private static final Set<Entity.EntityType> NON_CACHEABLE_TYPES =
       Sets.immutableEnumSet(
