@@ -348,11 +348,9 @@ components:
         type: string
 
     ColumnDefaultValue:
-      $ref: "./expression.yaml#/components/schemas/FunctionArg"
+      allOf:
+        - $ref: "./expression.yaml#/components/schemas/FunctionArg"
       description: The default value of the column
-      required: false
-      nullable: true
-      default: null
 
     Column:
       type: object

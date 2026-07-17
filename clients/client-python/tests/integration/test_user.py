@@ -15,23 +15,19 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
 import os
 from random import randint
 
 from gravitino import GravitinoAdminClient, GravitinoClient
 from gravitino.exceptions.base import (
-    GravitinoRuntimeException,
     NoSuchUserException,
     UserAlreadyExistsException,
 )
 
-from tests.integration.integration_test_env import IntegrationTestEnv
-
-logger = logging.getLogger(__name__)
+from tests.integration.integration_test_env import IntegrationTestEnv, MetalakeTestMixin
 
 
-class TestUser(IntegrationTestEnv):
+class TestUser(MetalakeTestMixin, IntegrationTestEnv):
     metalake_name: str = "test_user_metalake" + str(randint(1, 10000))
 
     gravitino_admin_client: GravitinoAdminClient = None
@@ -66,29 +62,6 @@ class TestUser(IntegrationTestEnv):
             cls.restart_server()
         else:
             super().tearDownClass()
-
-    def setUp(self):
-        self.init_test_env()
-
-    def tearDown(self):
-        self.clean_test_data()
-
-    def init_test_env(self):
-        self.gravitino_admin_client.create_metalake(
-            self.metalake_name, comment="", properties={}
-        )
-        self.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self.metalake_name
-        )
-
-    def clean_test_data(self):
-        self.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self.metalake_name
-        )
-        try:
-            self.gravitino_admin_client.drop_metalake(self.metalake_name, force=True)
-        except GravitinoRuntimeException:
-            logger.warning("Failed to drop metalake %s", self.metalake_name)
 
     def test_add_user(self):
         user = self.gravitino_client.add_user("test_add_user")
