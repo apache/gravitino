@@ -29,6 +29,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -94,5 +100,50 @@ public class TestIcebergCatalogOperations {
     Assertions.assertEquals(2, result.length);
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db1".equals(id.name())));
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db2".equals(id.name())));
+  }
+
+  @Test
+  public void testCreateTableRejectsMultiplePrimaryKeyIndexes() {
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary("pk1", new String[][] {{"id"}}),
+          Indexes.primary("pk2", new String[][] {{"name"}})
+        };
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> createTableWithIndexes(indexes));
+    Assertions.assertTrue(exception.getMessage().contains("no more than one PRIMARY_KEY Index"));
+  }
+
+  @Test
+  public void testCreateTableRejectsNonPrimaryKeyIndex() {
+    Index[] indexes = new Index[] {Indexes.unique("uk", new String[][] {{"id"}})};
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> createTableWithIndexes(indexes));
+    Assertions.assertTrue(exception.getMessage().contains("only supports primary key Index"));
+  }
+
+  @Test
+  public void testCreateTableRejectsNestedPrimaryKeyColumn() {
+    Index[] indexes = new Index[] {Indexes.primary("pk", new String[][] {{"struct", "field"}})};
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> createTableWithIndexes(indexes));
+    Assertions.assertTrue(exception.getMessage().contains("should not be nested"));
+  }
+
+  private static void createTableWithIndexes(Index[] indexes) {
+    // validateIcebergIndexes runs before any catalog interaction, so empty schema args suffice.
+    new IcebergCatalogOperations()
+        .createTable(
+            NameIdentifier.of(METALAKE, CATALOG, "db", "table"),
+            new Column[0],
+            null,
+            ImmutableMap.of(),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0],
+            indexes);
   }
 }

@@ -548,7 +548,7 @@ public class IcebergCatalogOperations
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(indexes.length == 0, "Iceberg-catalog does not support indexes");
+    validateIcebergIndexes(indexes);
     try {
       NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
       if (!schemaExists(schemaIdent)) {
@@ -583,6 +583,7 @@ public class IcebergCatalogOperations
               .withSortOrders(sortOrders)
               .withProperties(properties)
               .withDistribution(distribution)
+              .withIndexes(indexes)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(currentUser())
@@ -601,6 +602,36 @@ public class IcebergCatalogOperations
     } catch (AlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
     }
+  }
+
+  /**
+   * Validates the indexes supplied when creating an Iceberg table. Iceberg only supports expressing
+   * a primary key, which Gravitino models as a single {@code PRIMARY_KEY} index over one or more
+   * non-nested columns. The primary key columns are mapped to Iceberg {@code identifier-field-ids};
+   * Iceberg requires identifier fields to be required (NOT NULL), which is enforced by the Iceberg
+   * schema constructor.
+   *
+   * @param indexes The indexes to validate. An empty array is allowed (no primary key).
+   */
+  private static void validateIcebergIndexes(Index[] indexes) {
+    if (indexes == null || indexes.length == 0) {
+      return;
+    }
+    Preconditions.checkArgument(
+        indexes.length == 1, "Iceberg only supports no more than one PRIMARY_KEY Index.");
+    Index index = indexes[0];
+    Preconditions.checkArgument(
+        index.type() == Index.IndexType.PRIMARY_KEY, "Iceberg only supports primary key Index.");
+    String[][] fieldNames = index.fieldNames();
+    Preconditions.checkArgument(
+        fieldNames != null && fieldNames.length > 0,
+        "The primary key Index must contain at least one column.");
+    Arrays.stream(fieldNames)
+        .forEach(
+            fieldName ->
+                Preconditions.checkArgument(
+                    fieldName != null && fieldName.length == 1,
+                    "The primary key columns should not be nested."));
   }
 
   /**

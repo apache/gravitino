@@ -73,6 +73,10 @@ public class IcebergTable extends BaseTable {
 
   public static final String ICEBERG_COMMENT_FIELD_NAME = "comment";
 
+  /** The name of the synthetic primary key index reconstructed from Iceberg identifier fields. */
+  @VisibleForTesting
+  public static final String ICEBERG_PRIMARY_KEY_INDEX_NAME = "ICEBERG_PRIMARY_KEY_INDEX";
+
   private String location;
 
   private IcebergTable() {}
@@ -175,6 +179,7 @@ public class IcebergTable extends BaseTable {
         .withPartitioning(partitionSpec)
         .withSortOrders(sortOrder)
         .withDistribution(getDistribution(properties))
+        .withIndexes(ConvertUtil.constructIndexesFromIdentifierFields(schema))
         .build();
   }
 
@@ -218,6 +223,7 @@ public class IcebergTable extends BaseTable {
       icebergTable.partitioning = partitioning;
       icebergTable.distribution = distribution;
       icebergTable.sortOrders = sortOrders;
+      icebergTable.indexes = indexes;
       if (null != comment) {
         icebergTable.properties.putIfAbsent(ICEBERG_COMMENT_FIELD_NAME, comment);
       }

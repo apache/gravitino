@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDa
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -33,6 +34,8 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types.ByteType;
 import org.apache.gravitino.rel.types.Types.ShortType;
 import org.apache.iceberg.Schema;
@@ -206,6 +209,108 @@ public class TestConvertUtil extends TestBaseConvert {
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> ConvertUtil.toIcebergSchema((Column[]) null));
     Assertions.assertEquals("columns must not be null", exception.getMessage());
+  }
+
+  @Test
+  public void testToIcebergSchemaWithSinglePrimaryKey() {
+    IcebergTable table =
+        primaryKeyTable(
+            new String[][] {{"id"}},
+            requiredColumn("id", org.apache.gravitino.rel.types.Types.LongType.get()),
+            nullableColumn("name", org.apache.gravitino.rel.types.Types.StringType.get()));
+    Schema schema = ConvertUtil.toIcebergSchema(table);
+    Assertions.assertEquals(
+        Collections.singleton(schema.findField("id").fieldId()), schema.identifierFieldIds());
+  }
+
+  @Test
+  public void testToIcebergSchemaWithCompositePrimaryKey() {
+    IcebergTable table =
+        primaryKeyTable(
+            new String[][] {{"id"}, {"region"}},
+            requiredColumn("id", org.apache.gravitino.rel.types.Types.LongType.get()),
+            requiredColumn("region", org.apache.gravitino.rel.types.Types.StringType.get()),
+            nullableColumn("name", org.apache.gravitino.rel.types.Types.StringType.get()));
+    Schema schema = ConvertUtil.toIcebergSchema(table);
+    Assertions.assertEquals(
+        com.google.common.collect.ImmutableSet.of(
+            schema.findField("id").fieldId(), schema.findField("region").fieldId()),
+        schema.identifierFieldIds());
+  }
+
+  @Test
+  public void testToIcebergSchemaWithNullablePrimaryKeyThrows() {
+    IcebergTable table =
+        primaryKeyTable(
+            new String[][] {{"id"}},
+            nullableColumn("id", org.apache.gravitino.rel.types.Types.LongType.get()));
+    // Iceberg's Schema constructor requires identifier fields to be NOT NULL.
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ConvertUtil.toIcebergSchema(table));
+  }
+
+  @Test
+  public void testConstructIndexesFromIdentifierFields() {
+    IcebergTable table =
+        primaryKeyTable(
+            new String[][] {{"id"}, {"region"}},
+            requiredColumn("id", org.apache.gravitino.rel.types.Types.LongType.get()),
+            requiredColumn("region", org.apache.gravitino.rel.types.Types.StringType.get()),
+            nullableColumn("name", org.apache.gravitino.rel.types.Types.StringType.get()));
+    Schema schema = ConvertUtil.toIcebergSchema(table);
+
+    Index[] indexes = ConvertUtil.constructIndexesFromIdentifierFields(schema);
+    Assertions.assertEquals(1, indexes.length);
+    Assertions.assertEquals(Index.IndexType.PRIMARY_KEY, indexes[0].type());
+    Assertions.assertEquals(IcebergTable.ICEBERG_PRIMARY_KEY_INDEX_NAME, indexes[0].name());
+    // Reconstructed primary key columns follow the schema column order, not the index input order.
+    Assertions.assertArrayEquals(new String[][] {{"id"}, {"region"}}, indexes[0].fieldNames());
+  }
+
+  @Test
+  public void testConstructIndexesFromIdentifierFieldsWhenAbsent() {
+    Schema schema =
+        ConvertUtil.toIcebergSchema(
+            new Column[] {
+              nullableColumn("name", org.apache.gravitino.rel.types.Types.StringType.get())
+            });
+    Assertions.assertEquals(0, ConvertUtil.constructIndexesFromIdentifierFields(schema).length);
+  }
+
+  private static IcebergColumn requiredColumn(
+      String name, org.apache.gravitino.rel.types.Type type) {
+    return IcebergColumn.builder()
+        .withName(name)
+        .withType(type)
+        .withNullable(false)
+        .withComment(TEST_COMMENT)
+        .build();
+  }
+
+  private static IcebergColumn nullableColumn(
+      String name, org.apache.gravitino.rel.types.Type type) {
+    return IcebergColumn.builder()
+        .withName(name)
+        .withType(type)
+        .withNullable(true)
+        .withComment(TEST_COMMENT)
+        .build();
+  }
+
+  private static IcebergTable primaryKeyTable(String[][] primaryKeyFieldNames, Column... columns) {
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(IcebergTable.ICEBERG_PRIMARY_KEY_INDEX_NAME, primaryKeyFieldNames)
+        };
+    return IcebergTable.builder()
+        .withName(TEST_NAME)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator(TEST_NAME).withCreateTime(Instant.now()).build())
+        .withProperties(Maps.newHashMap())
+        .withColumns(columns)
+        .withIndexes(indexes)
+        .withComment(TEST_COMMENT)
+        .build();
   }
 
   @Test

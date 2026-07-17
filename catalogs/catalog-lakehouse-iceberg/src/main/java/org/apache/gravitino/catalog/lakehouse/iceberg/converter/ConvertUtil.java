@@ -20,9 +20,16 @@ package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -40,7 +47,72 @@ public class ConvertUtil {
         toGravitinoStructType(gravitinoTable);
     Type converted =
         ToIcebergTypeVisitor.visit(gravitinoStructType, new ToIcebergType(gravitinoStructType));
-    return new Schema(converted.asNestedType().asStructType().fields());
+    Schema schema = new Schema(converted.asNestedType().asStructType().fields());
+    return applyIdentifierFields(schema, primaryKeyColumnNames(gravitinoTable));
+  }
+
+  /**
+   * Sets the Iceberg {@code identifier-field-ids} for the primary key columns, mirroring the native
+   * Flink Iceberg connector's {@code FlinkSchemaUtil.freshIdentifierFieldIds}. Iceberg requires
+   * identifier fields to be required (NOT NULL) columns; this constraint is enforced by the Iceberg
+   * {@link Schema} constructor itself, so no nullability promotion is performed here.
+   *
+   * @param schema The Iceberg schema before identifier fields are applied.
+   * @param primaryKeyColumns The primary key column names (empty when there is no primary key).
+   * @return The Iceberg schema carrying the identifier field ids.
+   */
+  private static Schema applyIdentifierFields(Schema schema, List<String> primaryKeyColumns) {
+    if (primaryKeyColumns.isEmpty()) {
+      return schema;
+    }
+    Set<Integer> identifierFieldIds = new LinkedHashSet<>();
+    for (String columnName : primaryKeyColumns) {
+      Types.NestedField field = schema.findField(columnName);
+      Preconditions.checkArgument(
+          field != null, "Cannot find primary key column in table schema: %s", columnName);
+      identifierFieldIds.add(field.fieldId());
+    }
+    return new Schema(schema.schemaId(), schema.asStruct().fields(), identifierFieldIds);
+  }
+
+  /**
+   * Extracts the primary key column names from the table's {@code PRIMARY_KEY} index. Returns an
+   * empty list when no index is present.
+   *
+   * @param gravitinoTable Gravitino table of Iceberg.
+   * @return The ordered primary key column names.
+   */
+  private static List<String> primaryKeyColumnNames(IcebergTable gravitinoTable) {
+    Index[] indexes = gravitinoTable.index();
+    if (indexes == null || indexes.length == 0) {
+      return Collections.emptyList();
+    }
+    return Arrays.stream(indexes[0].fieldNames())
+        .map(fieldName -> fieldName[0])
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Reconstructs the Gravitino {@code PRIMARY_KEY} index from the Iceberg {@code
+   * identifier-field-ids}, mirroring Paimon's {@code constructIndexesFromPrimaryKeys}. The primary
+   * key columns are ordered by their position in the schema for deterministic results, since
+   * Iceberg identifier fields are an unordered set.
+   *
+   * @param schema The Iceberg schema loaded from the catalog.
+   * @return A single-element {@code PRIMARY_KEY} index array, or an empty array when the schema has
+   *     no identifier fields.
+   */
+  public static Index[] constructIndexesFromIdentifierFields(Schema schema) {
+    Set<Integer> identifierFieldIds = schema.identifierFieldIds();
+    if (identifierFieldIds == null || identifierFieldIds.isEmpty()) {
+      return Indexes.EMPTY_INDEXES;
+    }
+    String[][] fieldNames =
+        schema.columns().stream()
+            .filter(field -> identifierFieldIds.contains(field.fieldId()))
+            .map(field -> new String[] {field.name()})
+            .toArray(String[][]::new);
+    return new Index[] {Indexes.primary(IcebergTable.ICEBERG_PRIMARY_KEY_INDEX_NAME, fieldNames)};
   }
 
   /**
