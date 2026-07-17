@@ -63,6 +63,9 @@ UPDATE `view_meta`
 ALTER TABLE `view_meta`
     MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view audit info' AFTER `schema_id`;
 
+ALTER TABLE `table_column_version_info`
+    MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
+
 CREATE TABLE IF NOT EXISTS `view_version_info` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',

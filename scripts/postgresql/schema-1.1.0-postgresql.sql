@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS table_column_version_info (
                                                          column_name VARCHAR(128) NOT NULL,
     column_position INT NOT NULL,
     column_type TEXT NOT NULL,
-    column_comment VARCHAR(256) DEFAULT '',
+    column_comment VARCHAR(4096) DEFAULT '',
     column_nullable SMALLINT NOT NULL DEFAULT 1,
     column_auto_increment SMALLINT NOT NULL DEFAULT 0,
     column_default_value TEXT DEFAULT NULL,
