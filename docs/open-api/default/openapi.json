@@ -3222,8 +3222,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "default": null
+              "type": "string"
             },
             "description": "The name of the storage location"
           }
@@ -4579,8 +4578,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "default": null
+              "type": "string"
             },
             "description": "The uri name of the model version"
           }
@@ -4643,8 +4641,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
-              "default": null
+              "type": "string"
             },
             "description": "The uri name of the model version"
           }
@@ -8658,6 +8655,14 @@
           }
         }
       },
+      "ColumnDefaultValue": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FunctionArg"
+          }
+        ],
+        "description": "The default value of the column"
+      },
       "Column": {
         "type": "object",
         "required": [
@@ -8684,7 +8689,7 @@
             "default": true
           },
           "defaultValue": {
-            "$ref": "#/components/schemas/FunctionArg"
+            "$ref": "#/components/schemas/ColumnDefaultValue"
           },
           "autoIncrement": {
             "type": "boolean",
@@ -9461,7 +9466,7 @@
             "default": false
           },
           "defaultValue": {
-            "$ref": "#/components/schemas/FunctionArg",
+            "$ref": "#/components/schemas/ColumnDefaultValue",
             "description": "The default value of the column to add",
             "nullable": true
           }
@@ -9659,7 +9664,7 @@
             "description": "The name of the column to update"
           },
           "newDefaultValue": {
-            "$ref": "#/components/schemas/FunctionArg",
+            "$ref": "#/components/schemas/ColumnDefaultValue",
             "description": "The new default value of the column"
           }
         },
@@ -11496,6 +11501,7 @@
             "type": "array",
             "description": "The list of model versions",
             "items": {
+              "type": "integer",
               "format": "int32"
             }
           }

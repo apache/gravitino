@@ -1922,7 +1922,6 @@ paths:
           required: false
           schema:
             type: string
-            default: null
           description: The name of the storage location
       responses:
         '200':
@@ -2724,7 +2723,6 @@ paths:
           required: false
           schema:
             type: string
-            default: null
           description: The uri name of the model version
       responses:
         '200':
@@ -2760,7 +2758,6 @@ paths:
           required: false
           schema:
             type: string
-            default: null
           description: The uri name of the model version
       responses:
         '200':
@@ -5352,6 +5349,10 @@ components:
           description: The arguments of the function
           items:
             $ref: '#/components/schemas/FunctionArg'
+    ColumnDefaultValue:
+      allOf:
+        - $ref: '#/components/schemas/FunctionArg'
+      description: The default value of the column
     Column:
       type: object
       required:
@@ -5373,7 +5374,7 @@ components:
           nullable: true
           default: true
         defaultValue:
-          $ref: '#/components/schemas/FunctionArg'
+          $ref: '#/components/schemas/ColumnDefaultValue'
         autoIncrement:
           type: boolean
           description: Whether the column is auto increment
@@ -5917,7 +5918,7 @@ components:
           nullable: true
           default: false
         defaultValue:
-          $ref: '#/components/schemas/FunctionArg'
+          $ref: '#/components/schemas/ColumnDefaultValue'
           description: The default value of the column to add
           nullable: true
       example:
@@ -6059,7 +6060,7 @@ components:
           $ref: '#/components/schemas/FieldName'
           description: The name of the column to update
         newDefaultValue:
-          $ref: '#/components/schemas/FunctionArg'
+          $ref: '#/components/schemas/ColumnDefaultValue'
           description: The new default value of the column
       example:
         '@type': updateColumnDefaultValue
@@ -7327,6 +7328,7 @@ components:
           type: array
           description: The list of model versions
           items:
+            type: integer
             format: int32
     ModelVersion:
       type: object
