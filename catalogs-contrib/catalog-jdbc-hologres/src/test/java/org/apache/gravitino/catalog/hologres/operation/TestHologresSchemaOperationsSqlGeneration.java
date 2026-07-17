@@ -28,6 +28,10 @@ public class TestHologresSchemaOperationsSqlGeneration {
   public void testGenerateCreateDatabaseSqlValidatesSchemaName() {
     HologresSchemaOperations operations = new HologresSchemaOperations();
 
+    Assertions.assertEquals(
+        "CREATE SCHEMA \"test_schema\";COMMENT ON SCHEMA \"test_schema\" IS 'Jandy''s schema'",
+        operations.generateCreateDatabaseSql(
+            "test_schema", "Jandy's schema", Collections.emptyMap()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -39,6 +43,9 @@ public class TestHologresSchemaOperationsSqlGeneration {
   public void testGenerateDropDatabaseSqlValidatesSchemaName() {
     HologresSchemaOperations operations = new HologresSchemaOperations();
 
+    Assertions.assertEquals(
+        "DROP SCHEMA \"test_schema\" CASCADE",
+        operations.generateDropDatabaseSql("test_schema", true));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.generateDropDatabaseSql("schema\"; DROP TABLE users; --", true));

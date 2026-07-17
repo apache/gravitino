@@ -28,6 +28,9 @@ public class TestPostgreSqlSchemaOperationsSqlGeneration {
   public void testGenerateCreateDatabaseSqlValidatesSchemaName() {
     PostgreSqlSchemaOperations operations = new PostgreSqlSchemaOperations();
 
+    Assertions.assertEquals(
+        "CREATE SCHEMA \"test_schema\";",
+        operations.generateCreateDatabaseSql("test_schema", null, Collections.emptyMap()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -42,13 +45,18 @@ public class TestPostgreSqlSchemaOperationsSqlGeneration {
     String sql =
         operations.generateCreateDatabaseSql(
             "test_schema", "Jandy's schema", Collections.emptyMap());
-    Assertions.assertTrue(sql.contains("IS 'Jandy''s schema'"));
+    Assertions.assertEquals(
+        "CREATE SCHEMA \"test_schema\";COMMENT ON SCHEMA \"test_schema\" IS 'Jandy''s schema'",
+        sql);
   }
 
   @Test
   public void testGenerateDropDatabaseSqlValidatesSchemaName() {
     PostgreSqlSchemaOperations operations = new PostgreSqlSchemaOperations();
 
+    Assertions.assertEquals(
+        "DROP SCHEMA \"test_schema\" CASCADE",
+        operations.generateDropDatabaseSql("test_schema", true));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.generateDropDatabaseSql("schema\"; DROP TABLE users; --", true));

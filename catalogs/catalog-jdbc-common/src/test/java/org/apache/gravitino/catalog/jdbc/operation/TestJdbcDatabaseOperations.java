@@ -160,6 +160,9 @@ public class TestJdbcDatabaseOperations {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> operations.buildCreateSql("test schema", null, Collections.emptyMap()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> operations.buildCreateSql("a".repeat(65), null, Collections.emptyMap()));
   }
 
   private static class TestableJdbcDatabaseOperations extends JdbcDatabaseOperations {

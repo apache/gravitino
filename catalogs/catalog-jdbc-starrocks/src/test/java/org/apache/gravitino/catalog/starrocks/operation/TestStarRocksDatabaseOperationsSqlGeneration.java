@@ -40,6 +40,10 @@ public class TestStarRocksDatabaseOperationsSqlGeneration {
   public void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
     StarRocksDatabaseOperations operations = new StarRocksDatabaseOperations();
 
+    Assertions.assertEquals(
+        "CREATE DATABASE `test_db`\n PROPERTIES (\n\"replication_num\"=\"1\"\n)",
+        operations.generateCreateDatabaseSql(
+            "test_db", null, Collections.singletonMap("replication_num", "1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->

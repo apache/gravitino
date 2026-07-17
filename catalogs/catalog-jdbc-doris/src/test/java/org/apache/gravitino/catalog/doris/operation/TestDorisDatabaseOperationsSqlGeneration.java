@@ -39,6 +39,9 @@ public class TestDorisDatabaseOperationsSqlGeneration {
   public void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
     DorisDatabaseOperations operations = new DorisDatabaseOperations();
 
+    Assertions.assertEquals(
+        "CREATE DATABASE `test_db` PROPERTIES (\n\"comment\"=\"schema comment\"\n)",
+        operations.generateCreateDatabaseSql("test_db", "schema comment", Collections.emptyMap()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
