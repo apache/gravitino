@@ -221,7 +221,8 @@ public class TestDataSourceUrlValidation {
   @Test
   public void testRejectConnectionFactoryClassNameCaseInsensitive() {
     // The guard matches case-insensitively (broader than DBCP2's own case-sensitive key lookup),
-    // so a mis-cased variant is rejected outright rather than silently ignored.
+    // so a mis-cased variant is rejected outright rather than silently ignored. The error echoes
+    // the user-supplied key casing.
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
     properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
@@ -233,7 +234,7 @@ public class TestDataSourceUrlValidation {
         Assertions.assertThrows(
             GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
     Assertions.assertEquals(
-        "Unsafe JDBC connection pool property 'connectionFactoryClassName' is not allowed in"
+        "Unsafe JDBC connection pool property 'ConnectionFactoryClassName' is not allowed in"
             + " catalog configuration",
         gre.getMessage());
   }
@@ -251,7 +252,7 @@ public class TestDataSourceUrlValidation {
         Assertions.assertThrows(
             GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
     Assertions.assertEquals(
-        "Unsafe JDBC connection pool property 'evictionPolicyClassName' is not allowed in catalog"
+        "Unsafe JDBC connection pool property 'EVICTIONPOLICYCLASSNAME' is not allowed in catalog"
             + " configuration",
         gre.getMessage());
   }

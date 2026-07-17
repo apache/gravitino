@@ -142,7 +142,7 @@ public class DataSourceUtils {
         if (unsafe.equalsIgnoreCase(key)) {
           throw new GravitinoRuntimeException(
               "Unsafe JDBC connection pool property '%s' is not allowed in catalog configuration",
-              unsafe);
+              key);
         }
       }
     }
