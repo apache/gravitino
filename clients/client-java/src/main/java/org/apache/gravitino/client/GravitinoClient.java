@@ -178,6 +178,22 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
+   * Adds a new User with an external identifier.
+   *
+   * @param user The name of the User.
+   * @param externalId The external identifier of the User.
+   * @param enabled Whether the User is enabled.
+   * @return The added User instance.
+   * @throws UserAlreadyExistsException If a User with the same name or external id already exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the User encounters storage issues.
+   */
+  public User addUser(String user, String externalId, boolean enabled)
+      throws UserAlreadyExistsException, NoSuchMetalakeException {
+    return getMetalake().addUser(user, externalId, enabled);
+  }
+
+  /**
    * Removes a User.
    *
    * @param user The name of the User.
@@ -234,6 +250,22 @@ public class GravitinoClient extends GravitinoClientBase
    */
   public Group addGroup(String group) throws GroupAlreadyExistsException, NoSuchMetalakeException {
     return getMetalake().addGroup(group);
+  }
+
+  /**
+   * Adds a new Group with an external identifier.
+   *
+   * @param group The name of the Group.
+   * @param externalId The external identifier of the Group.
+   * @return The Added Group instance.
+   * @throws GroupAlreadyExistsException If a Group with the same name or external id already
+   *     exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Group encounters storage issues.
+   */
+  public Group addGroup(String group, String externalId)
+      throws GroupAlreadyExistsException, NoSuchMetalakeException {
+    return getMetalake().addGroup(group, externalId);
   }
 
   /**

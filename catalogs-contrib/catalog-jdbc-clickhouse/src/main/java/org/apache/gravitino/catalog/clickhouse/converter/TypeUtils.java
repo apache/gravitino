@@ -29,8 +29,12 @@ public class TypeUtils {
     return typeName.replaceFirst("^Nullable\\((.*)\\)$", "$1");
   }
 
+  public static String stripLowCardinality(String typeName) {
+    return typeName.replaceFirst("^LowCardinality\\((.*)\\)$", "$1");
+  }
+
   public static Integer extractDateTimePrecision(String typeName) {
-    Matcher matcher = Pattern.compile("^DateTime\\((\\d+)\\)$").matcher(typeName);
+    Matcher matcher = Pattern.compile("^DateTime(?:64)?\\((\\d+)\\)$").matcher(typeName);
     if (matcher.matches()) {
       return Integer.parseInt(matcher.group(1));
     }

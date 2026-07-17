@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -126,9 +127,11 @@ public class JobManager implements JobOperationDispatcher {
             String.format("Staging directory %s is not accessible", stagingDirPath));
       }
     } else {
-      if (!stagingDir.mkdirs()) {
+      try {
+        Files.createDirectories(stagingDir.toPath());
+      } catch (IOException e) {
         throw new IllegalArgumentException(
-            String.format("Failed to create staging directory %s", stagingDirPath));
+            String.format("Failed to create staging directory %s", stagingDirPath), e);
       }
     }
 
@@ -428,9 +431,12 @@ public class JobManager implements JobOperationDispatcher {
         stagingDir.getAbsolutePath()
             + String.format(JOB_STAGING_DIR, metalake, jobTemplateName, jobId);
     File jobStagingDir = new File(jobStagingPath);
-    if (!jobStagingDir.mkdirs()) {
+    try {
+      Files.createDirectories(jobStagingDir.toPath());
+    } catch (IOException e) {
       throw new RuntimeException(
-          String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId));
+          String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId),
+          e);
     }
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values, and

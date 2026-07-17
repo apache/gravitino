@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -42,6 +44,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
@@ -49,9 +52,12 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.TreeLock;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterViewRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,6 +78,8 @@ public class TestIcebergNamespaceHookDispatcher {
   private SchemaDispatcher mockInternalSchemaDispatcher;
   private TableDispatcher mockTableDispatcher;
   private TableDispatcher mockInternalTableDispatcher;
+  private ViewDispatcher mockViewDispatcher;
+  private ViewDispatcher mockInternalViewDispatcher;
   private EntityStore mockEntityStore;
   private LockManager mockLockManager;
   private IcebergRequestContext mockContext;
@@ -82,6 +90,8 @@ public class TestIcebergNamespaceHookDispatcher {
   private SchemaDispatcher previousInternalSchemaDispatcher;
   private TableDispatcher previousTableDispatcher;
   private TableDispatcher previousInternalTableDispatcher;
+  private ViewDispatcher previousViewDispatcher;
+  private ViewDispatcher previousInternalViewDispatcher;
   private EntityStore previousEntityStore;
   private LockManager previousLockManager;
 
@@ -94,6 +104,8 @@ public class TestIcebergNamespaceHookDispatcher {
     mockInternalSchemaDispatcher = mock(SchemaDispatcher.class);
     mockTableDispatcher = mock(TableDispatcher.class);
     mockInternalTableDispatcher = mock(TableDispatcher.class);
+    mockViewDispatcher = mock(ViewDispatcher.class);
+    mockInternalViewDispatcher = mock(ViewDispatcher.class);
 
     previousOwnerDispatcher =
         (OwnerDispatcher) FieldUtils.readField(GravitinoEnv.getInstance(), "ownerDispatcher", true);
@@ -111,6 +123,11 @@ public class TestIcebergNamespaceHookDispatcher {
     previousInternalTableDispatcher =
         (TableDispatcher)
             FieldUtils.readField(GravitinoEnv.getInstance(), "internalTableDispatcher", true);
+    previousViewDispatcher =
+        (ViewDispatcher) FieldUtils.readField(GravitinoEnv.getInstance(), "viewDispatcher", true);
+    previousInternalViewDispatcher =
+        (ViewDispatcher)
+            FieldUtils.readField(GravitinoEnv.getInstance(), "internalViewDispatcher", true);
     previousEntityStore =
         (EntityStore) FieldUtils.readField(GravitinoEnv.getInstance(), "entityStore", true);
     previousLockManager =
@@ -126,6 +143,9 @@ public class TestIcebergNamespaceHookDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", mockTableDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalTableDispatcher", mockInternalTableDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "viewDispatcher", mockViewDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalViewDispatcher", mockInternalViewDispatcher, true);
 
     mockEntityStore = mock(EntityStore.class);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", mockEntityStore, true);
@@ -170,6 +190,10 @@ public class TestIcebergNamespaceHookDispatcher {
         "internalTableDispatcher",
         previousInternalTableDispatcher,
         true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "viewDispatcher", previousViewDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalViewDispatcher", previousInternalViewDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", previousEntityStore, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", previousLockManager, true);
 
@@ -226,6 +250,114 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
+  public void testRegisterViewImportsIntoEntityStore() throws Exception {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterViewRequest request =
+        ImmutableRegisterViewRequest.builder()
+            .name("test_view")
+            .metadataLocation("/mock/metadata/v1.metadata.json")
+            .build();
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockDispatcher.registerView(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    NameIdentifier expectedIdent =
+        NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_view");
+    when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(false);
+
+    LoadViewResponse response = hookDispatcher.registerView(mockContext, namespace, request);
+
+    verify(mockDispatcher).registerView(mockContext, namespace, request);
+    verify(mockInternalViewDispatcher).loadView(eq(expectedIdent));
+    verify(mockViewDispatcher, never()).loadView(any());
+    verify(mockInternalOwnerDispatcher).setOwner(any(), any(), eq(TEST_USER), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+    Assertions.assertEquals(mockResponse, response);
+  }
+
+  @Test
+  public void testRegisterViewSkipsImportWhenEntityExists() throws Exception {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterViewRequest request =
+        ImmutableRegisterViewRequest.builder()
+            .name("test_view")
+            .metadataLocation("/mock/metadata/v1.metadata.json")
+            .build();
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockDispatcher.registerView(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    NameIdentifier expectedIdent =
+        NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_view");
+    when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(true);
+
+    LoadViewResponse response = hookDispatcher.registerView(mockContext, namespace, request);
+
+    verify(mockDispatcher).registerView(mockContext, namespace, request);
+    // Import and setOwner are both skipped since the entity already exists
+    verify(mockInternalViewDispatcher, never()).loadView(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+    Assertions.assertEquals(mockResponse, response);
+  }
+
+  @Test
+  public void testRegisterViewPropagatesImportFailure() throws Exception {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterViewRequest request =
+        ImmutableRegisterViewRequest.builder()
+            .name("test_view")
+            .metadataLocation("/mock/metadata/v1.metadata.json")
+            .build();
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockDispatcher.registerView(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    NameIdentifier expectedIdent =
+        NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_view");
+    when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(false);
+
+    // View import (loadView) throwing must propagate so the caller learns the view exists in
+    // Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
+    doThrow(new RuntimeException("Import failed")).when(mockInternalViewDispatcher).loadView(any());
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerView(mockContext, namespace, request));
+    Assertions.assertEquals("Import failed", thrown.getMessage());
+    verify(mockDispatcher).registerView(mockContext, namespace, request);
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRegisterViewThrowsWhenEntityStoreCheckFails() throws Exception {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterViewRequest request =
+        ImmutableRegisterViewRequest.builder()
+            .name("test_view")
+            .metadataLocation("/mock/metadata/v1.metadata.json")
+            .build();
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockDispatcher.registerView(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    NameIdentifier expectedIdent =
+        NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_view");
+    doThrow(new IOException("Store unavailable"))
+        .when(mockEntityStore)
+        .exists(eq(expectedIdent), eq(Entity.EntityType.VIEW));
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerView(mockContext, namespace, request));
+    Assertions.assertEquals(IOException.class, thrown.getCause().getClass());
+    verify(mockDispatcher).registerView(mockContext, namespace, request);
+    verify(mockInternalViewDispatcher, never()).loadView(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
   public void testCreateNamespacePropagatesImportFailure() {
     Namespace namespace = Namespace.of("test_schema");
     CreateNamespaceRequest mockRequest = mock(CreateNamespaceRequest.class);
@@ -248,6 +380,45 @@ public class TestIcebergNamespaceHookDispatcher {
     verify(mockInternalOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
     verify(mockSchemaDispatcher, never()).loadSchema(any());
+  }
+
+  @Test
+  public void testRegisterTableSkipsWhenGravitinoExists() throws Exception {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
+    when(mockRequest.name()).thenReturn("test_table");
+    doReturn(true).when(mockEntityStore).exists(any(), eq(Entity.EntityType.TABLE));
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
+        .thenReturn(mockResponse);
+
+    LoadTableResponse response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
+
+    Assertions.assertSame(mockResponse, response);
+    verify(mockInternalTableDispatcher, never()).loadTable(any());
+    verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRegisterTableImportsWhenGravitinoMissing() throws Exception {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
+    when(mockRequest.name()).thenReturn("test_table");
+    doReturn(false).when(mockEntityStore).exists(any(), eq(Entity.EntityType.TABLE));
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
+        .thenReturn(mockResponse);
+
+    LoadTableResponse response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
+
+    Assertions.assertSame(mockResponse, response);
+    verify(mockDispatcher).registerTable(mockContext, namespace, mockRequest);
+    verify(mockInternalTableDispatcher).loadTable(any());
+    verify(mockInternalOwnerDispatcher).setOwner(any(), any(), any(), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test

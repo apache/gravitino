@@ -33,6 +33,12 @@ def extract_content_from_response(response, field: str, default="") -> str:
     return json.dumps(response_json.get(field, default))
 
 
+def extract_response(response) -> str:
+    response_json = response.json()
+    _handle_gravitino_exception(response_json)
+    return json.dumps(response_json)
+
+
 def _handle_gravitino_exception(response: dict):
     error_code = response.get("code", 0)
     if error_code != 0:

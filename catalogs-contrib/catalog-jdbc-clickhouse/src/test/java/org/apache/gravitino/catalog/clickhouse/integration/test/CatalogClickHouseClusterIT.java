@@ -506,6 +506,24 @@ public class CatalogClickHouseClusterIT extends BaseIT {
         Arrays.stream(loaded.index())
             .anyMatch(index -> Objects.equals(index.name(), "idx_col_1_new")));
 
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_SET, "idx_col_2_set", new String[][] {{"col_2"}}));
+    loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index())
+            .anyMatch(
+                index ->
+                    Objects.equals(index.name(), "idx_col_2_set")
+                        && index.type() == Index.IndexType.DATA_SKIPPING_SET
+                        && Arrays.deepEquals(index.fieldNames(), new String[][] {{"col_2"}})));
+    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_col_2_set", false));
+    loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_col_2_set")));
+
     RuntimeException autoIncrementTrueException =
         Assertions.assertThrows(
             RuntimeException.class,
@@ -743,6 +761,94 @@ public class CatalogClickHouseClusterIT extends BaseIT {
           String.format(
               "DROP TABLE `%s`.`%s` ON CLUSTER `%s` SYNC",
               schemaName, name, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+    }
+  }
+
+  /**
+   * Verifies that ALTER TABLE on a cluster table includes ON CLUSTER in the executed SQL, while
+   * ALTER TABLE on a non-cluster table does not. This validates the fix for generating correct
+   * ALTER TABLE statements with ON CLUSTER support.
+   */
+  @Test
+  public void testAlterTableOnClusterSqlGeneration() throws Exception {
+    String clusterTbl = GravitinoITUtils.genRandomName("ck_alter_on_cluster");
+    String nonClusterTbl = GravitinoITUtils.genRandomName("ck_alter_no_cluster");
+    NameIdentifier clusterIdent = NameIdentifier.of(schemaName, clusterTbl);
+    NameIdentifier nonClusterIdent = NameIdentifier.of(schemaName, nonClusterTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a cluster table and a non-cluster table
+    tableCatalog.createTable(
+        clusterIdent,
+        createColumns(),
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    tableCatalog.createTable(
+        nonClusterIdent,
+        createColumns(),
+        tableComment,
+        Collections.singletonMap(GRAVITINO_ENGINE_KEY, ENGINE.MERGETREE.getValue()),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    // ALTER both tables — add a column
+    tableCatalog.alterTable(
+        clusterIdent, TableChange.addColumn(new String[] {"new_col"}, Types.StringType.get()));
+    tableCatalog.alterTable(
+        nonClusterIdent, TableChange.addColumn(new String[] {"new_col"}, Types.StringType.get()));
+
+    // Flush query_log and verify the executed SQL
+    try (Connection connection =
+            DriverManager.getConnection(
+                clickHouseClusterContainer.getJdbcUrl(TEST_DB_NAME),
+                clickHouseClusterContainer.getUsername(),
+                clickHouseClusterContainer.getPassword());
+        Statement statement = connection.createStatement()) {
+
+      statement.execute("SYSTEM FLUSH LOGS");
+
+      // Verify cluster table ALTER includes ON CLUSTER
+      try (ResultSet rs =
+          statement.executeQuery(
+              String.format(
+                  "SELECT query FROM system.query_log "
+                      + "WHERE type = 'QueryFinish' "
+                      + "AND query_kind = 'Alter' "
+                      + "AND query LIKE '%%`%s`%%' "
+                      + "AND query LIKE '%%ADD COLUMN%%' "
+                      + "ORDER BY event_time DESC LIMIT 1",
+                  clusterTbl))) {
+        Assertions.assertTrue(rs.next(), "Should find ALTER query for cluster table");
+        String sql = rs.getString("query");
+        Assertions.assertTrue(
+            sql.contains("ON CLUSTER"),
+            "ALTER TABLE on cluster table must include ON CLUSTER, actual: " + sql);
+      }
+
+      // Verify non-cluster table ALTER does NOT include ON CLUSTER
+      try (ResultSet rs =
+          statement.executeQuery(
+              String.format(
+                  "SELECT query FROM system.query_log "
+                      + "WHERE type = 'QueryFinish' "
+                      + "AND query_kind = 'Alter' "
+                      + "AND query LIKE '%%`%s`%%' "
+                      + "AND query LIKE '%%ADD COLUMN%%' "
+                      + "ORDER BY event_time DESC LIMIT 1",
+                  nonClusterTbl))) {
+        Assertions.assertTrue(rs.next(), "Should find ALTER query for non-cluster table");
+        String sql = rs.getString("query");
+        Assertions.assertFalse(
+            sql.contains("ON CLUSTER"),
+            "ALTER TABLE on non-cluster table must NOT include ON CLUSTER, actual: " + sql);
+      }
     }
   }
 }

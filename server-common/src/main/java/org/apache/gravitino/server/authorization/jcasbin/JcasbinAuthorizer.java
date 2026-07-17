@@ -115,6 +115,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizer.class);
 
+  /**
+   * Field index of {@code sub} (the role/user/group id) in a jcasbin {@code p} policy row. See the
+   * {@code policy_definition} in {@code jcasbin_model.conf}: {@code p = sub, metadataType,
+   * metadataId, act, eft}.
+   */
+  private static final int POLICY_SUBJECT_FIELD_INDEX = 0;
+
+  /** Field index of {@code act} (the privilege) in a jcasbin {@code p} policy row. */
+  private static final int POLICY_ACTION_FIELD_INDEX = 3;
+
   /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer allowEnforcer;
 
@@ -210,7 +220,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private Model getModel(String modelFilePath) {
     Model model = new Model();
     try (InputStream modelStream = JcasbinAuthorizer.class.getResourceAsStream(modelFilePath)) {
-      Preconditions.checkArgument(modelStream != null, "Jcasbin model file can not found.");
+      Preconditions.checkArgument(modelStream != null, "Jcasbin model file not found");
       String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       model.loadModelFromText(modelData);
     } catch (IOException e) {
@@ -364,6 +374,51 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean hasDenyPolicy(
+      Principal principal,
+      String metalake,
+      Set<Privilege.Name> privileges,
+      AuthorizationRequestContext requestContext) {
+    Optional<UserUpdatedAt> userInfoOpt =
+        loadUserInfo(metalake, principal.getName(), requestContext);
+    if (!userInfoOpt.isPresent()) {
+      // An unknown user holds no roles and therefore no deny policies.
+      return false;
+    }
+    UserUpdatedAt userInfo = userInfoOpt.get();
+    long userId = userInfo.getUserId();
+    // Bind the user's (direct + group-inherited) roles into the enforcers so the in-memory scan
+    // below sees every policy the user can carry. Idempotent within a request.
+    loadRolePrivilege(metalake, principal.getName(), userId, userInfo, requestContext);
+
+    Set<String> privilegeNames = privileges.stream().map(Enum::name).collect(Collectors.toSet());
+    String userIdStr = String.valueOf(userId);
+    // This is an existence query, not a per-object check: it answers "does any deny on these
+    // privileges exist for the user's roles, at any scope?" The standard enforce path needs a
+    // concrete metadataId, so reusing it would mean iterating every listed object and defeat the
+    // short-circuit. Filtering the deny enforcer's policies by role keeps the scan bounded by the
+    // user's role/policy count, never by the number of listed objects. The match is intentionally
+    // scope-agnostic (no metadataType filter): a parent-scope deny hides the whole subtree and an
+    // object-scope deny hides one object, and both must disable the short-circuit.
+    for (String roleId : denyEnforcer.getRolesForUser(userIdStr)) {
+      // getFilteredNamedPolicy returns every "p" row (p = sub, metadataType, metadataId, act, eft)
+      // whose field at POLICY_SUBJECT_FIELD_INDEX (sub) equals roleId, i.e. all rules carried by
+      // this role. denyEnforcer is a dedicated enforcer that is only ever loaded with privileges
+      // whose condition is DENY (see loadPolicyByRoleEntity), so every row here represents a deny
+      // regardless of its stored eft string. Each returned row is the list of those five fields,
+      // so we read field POLICY_ACTION_FIELD_INDEX (act) to compare the denied privilege.
+      for (List<String> policy :
+          denyEnforcer.getFilteredNamedPolicy("p", POLICY_SUBJECT_FIELD_INDEX, roleId)) {
+        if (policy.size() > POLICY_ACTION_FIELD_INDEX
+            && privilegeNames.contains(policy.get(POLICY_ACTION_FIELD_INDEX))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  @Override
   public boolean isSelf(
       Entity.EntityType type,
       NameIdentifier nameIdentifier,
@@ -404,7 +459,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
 
       } catch (Exception e) {
-        LOG.warn("can not get user id or role id.", e);
+        LOG.warn("Cannot get user ID or role ID", e);
         return false;
       }
     }
@@ -654,7 +709,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         userInfo = userInfoOpt.get();
         userId = userInfo.getUserId();
       } catch (Exception e) {
-        LOG.debug("Can not get entity id", e);
+        LOG.debug("Cannot get entity ID", e);
         return false;
       }
 

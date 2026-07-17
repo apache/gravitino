@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -57,6 +58,7 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.ErrorHandlers;
 import org.apache.iceberg.rest.HTTPClient;
+import org.apache.iceberg.rest.ParserContext;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.RESTClient;
 import org.apache.iceberg.rest.RESTUtil;
@@ -66,10 +68,12 @@ import org.apache.iceberg.rest.auth.AuthManagers;
 import org.apache.iceberg.rest.auth.AuthSession;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 
 /**
  * A {@link CatalogWrapperForREST} for a federated Iceberg REST catalog (the underlying catalog is a
@@ -153,6 +157,37 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
         catalogCredentialManager.catalogName(), identifier, upstream);
   }
 
+  /**
+   * Delegates scan planning to the remote REST catalog instead of executing it locally.
+   *
+   * <p>When credential vending is requested, the {@code X-Iceberg-Access-Delegation:
+   * vended-credentials} header is forwarded so the remote catalog returns credentials inline. Any
+   * upstream credential refresh endpoints are rewritten to point at this IRC instance.
+   *
+   * @param tableIdentifier the table to scan.
+   * @param scanRequest the scan request parameters.
+   * @param requestCredentialVending whether the client requested vended credentials.
+   * @param privilege ignored; the remote REST catalog decides what to vend.
+   * @return the scan response from the remote catalog, with rewritten credential refresh endpoints.
+   */
+  @Override
+  public PlanTableScanResponse planTableScan(
+      TableIdentifier tableIdentifier,
+      PlanTableScanRequest scanRequest,
+      boolean requestCredentialVending,
+      CredentialPrivilege privilege) {
+    Table table = getCatalog().loadTable(tableIdentifier);
+    PlanTableScanResponse response =
+        getRESTTablePlanScan(
+            (RESTCatalog) getCatalog(),
+            tableIdentifier,
+            scanRequest,
+            requestCredentialVending,
+            table.specs());
+    return IcebergRESTUtils.rewriteScanPlanCredentials(
+        catalogCredentialManager.catalogName(), tableIdentifier, response);
+  }
+
   private static LoadCredentialsResponse getRESTTableCredentials(
       RESTCatalog restCatalog, TableIdentifier identifier) {
     Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
@@ -202,6 +237,95 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
         } catch (Exception e) {
           LOG.warn(
               "Failed to close auth manager when loading credentials for table: {}", identifier, e);
+        }
+      }
+    }
+  }
+
+  /**
+   * Sends a {@code POST {table}/plan} request to the remote REST catalog.
+   *
+   * <p>Follows the same HTTP client lifecycle as {@link #getRESTTableCredentials}. When credential
+   * vending is requested, the {@code X-Iceberg-Access-Delegation: vended-credentials} header is
+   * included so the remote catalog returns credentials inline in the plan response.
+   *
+   * <p>The Iceberg response deserializer requires pre-loaded partition specs to parse {@code
+   * file-scan-tasks}. These are supplied via a {@link ParserContext} built from the caller-provided
+   * {@code specsById} map (typically obtained from a prior {@code loadTable} call).
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param identifier the table to plan.
+   * @param scanRequest the scan request parameters.
+   * @param requestCredentialVending whether to include the access-delegation header.
+   * @param specsById partition specs for the table, needed for response deserialization.
+   * @return the plan response from the remote catalog.
+   */
+  private static PlanTableScanResponse getRESTTablePlanScan(
+      RESTCatalog restCatalog,
+      TableIdentifier identifier,
+      PlanTableScanRequest scanRequest,
+      boolean requestCredentialVending,
+      Map<Integer, PartitionSpec> specsById) {
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
+    String planPath = ResourcePaths.forCatalogProperties(properties).planTableScan(identifier);
+
+    Map<String, String> headers =
+        requestCredentialVending
+            ? ImmutableMap.of("X-Iceberg-Access-Delegation", "vended-credentials")
+            : Collections.emptyMap();
+
+    ParserContext parserContext =
+        ParserContext.builder()
+            .add("specsById", specsById)
+            .add("caseSensitive", scanRequest.caseSensitive())
+            .build();
+
+    AuthManager authManager = null;
+    RESTClient client = null;
+    AuthSession authSession = null;
+    try {
+      authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
+      client =
+          HTTPClient.builder(properties)
+              .uri(properties.get(CatalogProperties.URI))
+              .withHeaders(RESTUtil.configHeaders(properties))
+              .build();
+      authSession = authManager.catalogSession(client, properties);
+      return client
+          .withAuthSession(authSession)
+          .post(
+              planPath,
+              scanRequest,
+              PlanTableScanResponse.class,
+              headers,
+              ErrorHandlers.planErrorHandler(),
+              ignored -> {},
+              parserContext);
+    } finally {
+      if (authSession != null) {
+        try {
+          authSession.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close auth session when planning table scan for table: {}", identifier, e);
+        }
+      }
+
+      if (client != null) {
+        try {
+          client.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close REST client when planning table scan for table: {}", identifier, e);
+        }
+      }
+
+      if (authManager != null) {
+        try {
+          authManager.close();
+        } catch (Exception e) {
+          LOG.warn(
+              "Failed to close auth manager when planning table scan for table: {}", identifier, e);
         }
       }
     }
@@ -296,13 +420,15 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
 
   /**
    * Federation-aware {@code registerTable}: registers the existing table metadata on the underlying
-   * (remote) catalog and extracts client-facing FileIO/credential properties from {@code
-   * table.io()}, mirroring {@link #loadTableInternal(TableIdentifier)}.
+   * (remote) catalog via {@link CatalogHandlers#registerTable} and extracts client-facing FileIO
+   * and credential properties from {@code table.io()}, mirroring {@link
+   * #loadTableInternal(TableIdentifier)}.
    */
   private LoadTableResponse registerTableInternal(
       Namespace namespace, RegisterTableRequest request) {
+    CatalogHandlers.registerTable(getCatalog(), namespace, request);
     TableIdentifier ident = TableIdentifier.of(namespace, request.name());
-    Table table = getCatalog().registerTable(ident, request.metadataLocation());
+    Table table = getCatalog().loadTable(ident);
 
     if (table instanceof BaseTable) {
       return buildLoadTableResponseFromFileIo(ident, (BaseTable) table);

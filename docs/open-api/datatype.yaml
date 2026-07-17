@@ -55,6 +55,12 @@ components:
         - "uuid"
         - "fixed(16)"
         - "binary"
+        - "variant"
+        - "null"
+        - "geometry"
+        - "geometry(srid:3857)"
+        - "geography"
+        - "geography(EPSG:4326,karney)"
 
     UnionType:
       type: object
@@ -216,5 +222,5 @@ components:
         description: The string representation of this type in the catalog
     example: {
       "type": "external",
-      "externalType": "user-defined"
+      "catalogString": "user-defined"
     }
