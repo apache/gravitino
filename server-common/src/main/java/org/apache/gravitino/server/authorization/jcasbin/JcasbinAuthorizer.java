@@ -24,7 +24,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -220,7 +219,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private Model getModel(String modelFilePath) {
     Model model = new Model();
     try (InputStream modelStream = JcasbinAuthorizer.class.getResourceAsStream(modelFilePath)) {
-      Preconditions.checkArgument(modelStream != null, "Jcasbin model file can not found.");
+      Preconditions.checkArgument(modelStream != null, "Jcasbin model file not found");
       String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       model.loadModelFromText(modelData);
     } catch (IOException e) {
@@ -459,7 +458,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
 
       } catch (Exception e) {
-        LOG.warn("can not get user id or role id.", e);
+        LOG.warn("Cannot get user ID or role ID", e);
         return false;
       }
     }
@@ -470,68 +469,100 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public boolean hasSetOwnerPermission(
       String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT));
     MetadataObject metalakeObject =
         MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
+
     // metalake owner can set owner in metalake.
     if (isOwner(currentPrincipal, metalake, metalakeObject, requestContext)) {
       return true;
     }
-    MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT));
-    MetadataObject metadataObject =
-        MetadataObjects.of(Arrays.asList(fullName.split("\\.")), metadataType);
+
+    MetadataObject metadataObject = MetadataObjects.parse(fullName, metadataType);
     do {
       if (isOwner(currentPrincipal, metalake, metadataObject, requestContext)) {
-        MetadataObject.Type tempType = metadataObject.type();
-        if (tempType == MetadataObject.Type.SCHEMA) {
-          boolean hasCatalogUseCatalog =
-              authorize(
-                  currentPrincipal,
-                  metalake,
-                  MetadataObjects.parent(metadataObject),
-                  Privilege.Name.USE_CATALOG,
-                  requestContext);
-          boolean hasMetalakeUseCatalog =
-              authorize(
-                  currentPrincipal,
-                  metalake,
-                  metalakeObject,
-                  Privilege.Name.USE_CATALOG,
-                  requestContext);
-          return hasCatalogUseCatalog || hasMetalakeUseCatalog;
-        }
-        if (tempType == MetadataObject.Type.TABLE
-            || tempType == MetadataObject.Type.VIEW
-            || tempType == MetadataObject.Type.TOPIC
-            || tempType == MetadataObject.Type.FILESET
-            || tempType == MetadataObject.Type.MODEL) {
-          boolean hasMetalakeUseSchema =
-              authorize(
-                  currentPrincipal,
-                  metalake,
-                  metalakeObject,
-                  Privilege.Name.USE_SCHEMA,
-                  requestContext);
-          MetadataObject schemaObject = MetadataObjects.parent(metadataObject);
-          boolean hasCatalogUseSchema =
-              authorize(
-                  currentPrincipal,
-                  metalake,
-                  MetadataObjects.parent(schemaObject),
-                  Privilege.Name.USE_SCHEMA,
-                  requestContext);
-          boolean hasSchemaUseSchema =
-              authorize(
-                  currentPrincipal,
-                  metalake,
-                  schemaObject,
-                  Privilege.Name.USE_SCHEMA,
-                  requestContext);
-          return hasMetalakeUseSchema || hasCatalogUseSchema || hasSchemaUseSchema;
-        }
-        return true;
+        return hasParentUsagePermission(
+            currentPrincipal, metalake, metadataObject, metalakeObject, requestContext);
       }
     } while ((metadataObject = MetadataObjects.parent(metadataObject)) != null);
     return false;
+  }
+
+  private boolean hasAuthorizeWithoutDeny(
+      Principal principal,
+      String metalake,
+      List<MetadataObject> authorizeObjects,
+      List<MetadataObject> denyObjects,
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext) {
+    return hasAuthorizeOnAny(principal, metalake, authorizeObjects, privilege, requestContext)
+        && !hasDenyOnAny(principal, metalake, denyObjects, privilege, requestContext);
+  }
+
+  private boolean hasAuthorizeOnAny(
+      Principal principal,
+      String metalake,
+      List<MetadataObject> metadataObjects,
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext) {
+    for (MetadataObject metadataObject : metadataObjects) {
+      if (authorize(principal, metalake, metadataObject, privilege, requestContext)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasDenyOnAny(
+      Principal principal,
+      String metalake,
+      List<MetadataObject> metadataObjects,
+      Privilege.Name privilege,
+      AuthorizationRequestContext requestContext) {
+    for (MetadataObject metadataObject : metadataObjects) {
+      if (deny(principal, metalake, metadataObject, privilege, requestContext)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean hasParentUsagePermission(
+      Principal principal,
+      String metalake,
+      MetadataObject targetObject,
+      MetadataObject metalakeObject,
+      AuthorizationRequestContext requestContext) {
+    MetadataObject parentObject = MetadataObjects.parent(targetObject);
+    if (parentObject != null && parentObject.type() == MetadataObject.Type.CATALOG) {
+      List<MetadataObject> useCatalogObjects = ImmutableList.of(parentObject, metalakeObject);
+      return hasAuthorizeWithoutDeny(
+          principal,
+          metalake,
+          useCatalogObjects,
+          useCatalogObjects,
+          Privilege.Name.USE_CATALOG,
+          requestContext);
+    }
+    if (parentObject != null && parentObject.type() == MetadataObject.Type.SCHEMA) {
+      MetadataObject catalogObject = MetadataObjects.parent(parentObject);
+      List<MetadataObject> useSchemaObjects =
+          ImmutableList.of(metalakeObject, catalogObject, parentObject);
+      return hasAuthorizeWithoutDeny(
+              principal,
+              metalake,
+              useSchemaObjects,
+              useSchemaObjects,
+              Privilege.Name.USE_SCHEMA,
+              requestContext)
+          && !hasDenyOnAny(
+              principal,
+              metalake,
+              ImmutableList.of(catalogObject, metalakeObject),
+              Privilege.Name.USE_CATALOG,
+              requestContext);
+    }
+    return true;
   }
 
   @Override
@@ -544,19 +575,20 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException("Unknown metadata object type: " + type, e);
     }
+    MetadataObject targetObject = MetadataObjects.parse(fullName, metadataType);
+    MetadataObject metalakeObject =
+        MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
     List<MetadataObject> chain = new ArrayList<>();
-    for (MetadataObject obj = MetadataObjects.parse(fullName, metadataType);
-        obj != null;
-        obj = MetadataObjects.parent(obj)) {
+    for (MetadataObject obj = targetObject; obj != null; obj = MetadataObjects.parent(obj)) {
       chain.add(obj);
     }
-    chain.add(MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE));
+    chain.add(metalakeObject);
 
-    for (MetadataObject obj : chain) {
-      if (authorize(
-          currentPrincipal, metalake, obj, Privilege.Name.MANAGE_GRANTS, requestContext)) {
-        return true;
-      }
+    if (hasAuthorizeWithoutDeny(
+            currentPrincipal, metalake, chain, chain, Privilege.Name.MANAGE_GRANTS, requestContext)
+        && hasParentUsagePermission(
+            currentPrincipal, metalake, targetObject, metalakeObject, requestContext)) {
+      return true;
     }
     return hasSetOwnerPermission(metalake, type, fullName, requestContext);
   }
@@ -709,7 +741,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         userInfo = userInfoOpt.get();
         userId = userInfo.getUserId();
       } catch (Exception e) {
-        LOG.debug("Can not get entity id", e);
+        LOG.debug("Cannot get entity ID", e);
         return false;
       }
 

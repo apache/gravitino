@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 public final class DorisUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(DorisUtils.class);
   private static final Pattern PARTITION_INFO_PATTERN =
-      Pattern.compile("PARTITION BY \\b(LIST|RANGE)\\b\\((.+)\\)");
+      Pattern.compile("PARTITION BY \\b(LIST|RANGE)\\b\\s*\\((.+)\\)");
 
   private static final Pattern DISTRIBUTION_INFO_PATTERN =
       Pattern.compile(

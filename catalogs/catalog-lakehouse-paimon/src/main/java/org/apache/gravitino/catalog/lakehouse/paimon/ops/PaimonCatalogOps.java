@@ -54,7 +54,7 @@ public class PaimonCatalogOps implements AutoCloseable {
     paimonBackendCatalogWrapper = loadCatalogBackend(paimonConfig);
     Preconditions.checkArgument(
         paimonBackendCatalogWrapper.getCatalog() != null,
-        "Can not load Paimon backend catalog instance.");
+        "Cannot load Paimon backend catalog instance");
     catalog = paimonBackendCatalogWrapper.getCatalog();
   }
 
