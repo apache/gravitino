@@ -68,9 +68,6 @@ CREATE TABLE IF NOT EXISTS `view_meta` (
     KEY `idx_vecid` (`catalog_id`)
 ) ENGINE=InnoDB;
 
-ALTER TABLE `table_column_version_info`
-    ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
-
 -- Add partition statistics storage support
 CREATE TABLE IF NOT EXISTS partition_statistic_meta (
     table_id BIGINT NOT NULL COMMENT 'table id from table_meta',

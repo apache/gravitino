@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
     `column_position` INT UNSIGNED NOT NULL COMMENT 'column position, starting from 0',
     `column_type` CLOB NOT NULL COMMENT 'column type',
-    `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment',
+    `column_comment` VARCHAR(256) DEFAULT '' COMMENT 'column comment',
     `column_nullable` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'column nullable, 0 is not nullable, 1 is nullable',
     `column_auto_increment` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'column auto increment, 0 is not auto increment, 1 is auto increment',
     `column_default_value` CLOB DEFAULT NULL COMMENT 'column default value',

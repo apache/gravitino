@@ -103,9 +103,6 @@ COMMENT ON COLUMN view_meta.current_version IS 'view current version';
 COMMENT ON COLUMN view_meta.last_version IS 'view last version';
 COMMENT ON COLUMN view_meta.deleted_at IS 'view deleted at';
 
-ALTER TABLE table_column_version_info
-    ALTER COLUMN column_comment TYPE VARCHAR(4096);
-
 -- Add partition statistics storage support
 CREATE TABLE IF NOT EXISTS partition_statistic_meta (
     table_id BIGINT NOT NULL,
