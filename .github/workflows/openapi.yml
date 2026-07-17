@@ -185,9 +185,9 @@ jobs:
       - name: Generate clients (Rust + TypeScript)
         continue-on-error: true
         run: |
-          npx --yes @openapitools/openapi-generator-cli generate \
+          npx --yes @openapitools/openapi-generator-cli@2.39.1 generate \
             -i build/openapi.json -g rust -o generated/rust
-          npx --yes @openapitools/openapi-generator-cli generate \
+          npx --yes @openapitools/openapi-generator-cli@2.39.1 generate \
             -i build/openapi.json -g typescript-axios -o generated/typescript
 
   # 5. Breaking-change detection vs the PR base branch. Bundles both sides with
@@ -233,5 +233,5 @@ jobs:
         continue-on-error: true
         run: |
           if [ -f /tmp/base.json ]; then
-            docker run --rm -v /tmp:/specs tufin/oasdiff breaking /specs/base.json /specs/head.json
+            docker run --rm -v /tmp:/specs tufin/oasdiff:v1.23.0 breaking /specs/base.json /specs/head.json
           fi
