@@ -211,11 +211,24 @@ jobs:
         run: npm ci
       - name: Bundle head and base specs
         working-directory: dev/openapi
+        env:
+          # Pass the base branch through the environment rather than
+          # interpolating ${{ }} straight into the shell (script-injection
+          # hygiene, even though branch names are constrained).
+          BASE_REF: ${{ github.base_ref }}
         run: |
           npx redocly bundle ../../docs/open-api/openapi.yaml -o /tmp/head.json
-          git worktree add /tmp/base "origin/${{ github.base_ref }}"
-          npx redocly bundle /tmp/base/docs/open-api/openapi.yaml -o /tmp/base.json \
-            || echo "::notice::Base spec did not bundle (may predate the multi-file layout); skipping diff."
+          # actions/checkout does not reliably leave origin/<base_ref> as a
+          # remote-tracking ref, so fetch it explicitly. Every base-side step is
+          # guarded so a fetch/worktree/bundle failure degrades to "no diff"
+          # instead of failing this warn-only job.
+          if git fetch --no-tags --depth=1 origin "$BASE_REF" \
+             && git worktree add --detach /tmp/base FETCH_HEAD; then
+            npx redocly bundle /tmp/base/docs/open-api/openapi.yaml -o /tmp/base.json \
+              || echo "::notice::Base spec did not bundle (may predate the multi-file layout); skipping diff."
+          else
+            echo "::notice::Could not materialize base ref '$BASE_REF'; skipping breaking-change diff."
+          fi
       - name: Diff (warn-only)
         continue-on-error: true
         run: |
