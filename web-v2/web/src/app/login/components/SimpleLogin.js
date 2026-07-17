@@ -32,12 +32,6 @@ function SimpleLogin() {
   const store = useAppSelector(state => state.auth)
   const [form] = Form.useForm()
 
-  useEffect(() => {
-    if (store.intervalId) {
-      dispatch(clearIntervalId())
-    }
-  }, [dispatch, store.intervalId])
-
   const onFinish = async values => {
     await dispatch(setAuthUser({ name: values.username, type: 'user' }))
     router.push('/metalakes')
