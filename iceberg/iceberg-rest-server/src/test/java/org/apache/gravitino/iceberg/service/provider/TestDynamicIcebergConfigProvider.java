@@ -35,8 +35,12 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.AwsIrsaCredential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.credential.GravitinoIcebergAwsCredentialsProvider;
+import org.apache.gravitino.iceberg.common.credential.IcebergServerCredentialUtils;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -359,6 +363,73 @@ public class TestDynamicIcebergConfigProvider {
     Optional<IcebergConfig> icebergConfig = provider.getIcebergCatalogConfig(catalogName);
 
     Assertions.assertTrue(icebergConfig.isPresent());
+  }
+
+  @Test
+  public void testConfiguresRefreshableVendedStorageCredentialsIntoIcebergConfig() {
+    String metalakeName = "test_metalake";
+    String catalogName = "credential_catalog";
+
+    Catalog mockCatalog = Mockito.mock(Catalog.class);
+    SupportsCredentials supportsCredentials = Mockito.mock(SupportsCredentials.class);
+    Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
+    Mockito.when(mockCatalog.properties())
+        .thenReturn(
+            new HashMap<String, String>() {
+              {
+                put(IcebergConstants.CATALOG_BACKEND, "custom");
+                put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
+              }
+            });
+    Mockito.when(mockCatalog.supportsCredentials()).thenReturn(supportsCredentials);
+    Mockito.when(supportsCredentials.getCredentials())
+        .thenReturn(
+            new AwsIrsaCredential[] {
+              new AwsIrsaCredential("test-access-key", "test-secret-key", "test-session-token", 123)
+            });
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
+    properties.put(IcebergConstants.GRAVITINO_METALAKE, metalakeName);
+
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.initialize(properties);
+
+    Map<String, Catalog> catalogMap = new HashMap<>();
+    catalogMap.put(catalogName, mockCatalog);
+    setMockCatalogFetcher(provider, catalogMap);
+
+    Optional<IcebergConfig> icebergConfig = provider.getIcebergCatalogConfig(catalogName);
+
+    Assertions.assertTrue(icebergConfig.isPresent());
+    Map<String, String> icebergCatalogProperties =
+        icebergConfig.get().getIcebergCatalogProperties();
+    Assertions.assertEquals(
+        GravitinoIcebergAwsCredentialsProvider.class.getName(),
+        icebergCatalogProperties.get(IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER));
+    Assertions.assertEquals(
+        GravitinoIcebergAwsCredentialsProvider.SOURCE_REMOTE,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + GravitinoIcebergAwsCredentialsProvider.SOURCE));
+    Assertions.assertEquals(
+        catalogName,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + GravitinoIcebergAwsCredentialsProvider.CATALOG_NAME));
+    Assertions.assertEquals(
+        "http://localhost:8090",
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + IcebergConstants.GRAVITINO_URI));
+    Assertions.assertEquals(
+        metalakeName,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + IcebergConstants.GRAVITINO_METALAKE));
+    Assertions.assertFalse(icebergCatalogProperties.containsKey("s3.access-key-id"));
+    Assertions.assertFalse(icebergCatalogProperties.containsKey("s3.secret-access-key"));
+    Assertions.assertFalse(icebergCatalogProperties.containsKey("s3.session-token"));
   }
 
   @Test

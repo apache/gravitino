@@ -23,12 +23,21 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.CatalogInfo;
+import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.iceberg.common.credential.GravitinoIcebergAwsCredentialsProvider;
+import org.apache.gravitino.iceberg.common.credential.IcebergServerCredentialUtils;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -94,5 +103,56 @@ public class TestIcebergCatalogOperations {
     Assertions.assertEquals(2, result.length);
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db1".equals(id.name())));
     Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db2".equals(id.name())));
+  }
+
+  @Test
+  public void testInitializeConfiguresRefreshableCredentialProvider() {
+    Map<String, String> conf = new HashMap<>();
+    conf.put(IcebergConstants.CATALOG_BACKEND, "memory");
+    conf.put(CredentialConstants.CREDENTIAL_PROVIDERS, TestIcebergCredentialProvider.TYPE);
+
+    CatalogInfo info =
+        new CatalogInfo(
+            1L,
+            CATALOG,
+            Catalog.Type.RELATIONAL,
+            "lakehouse-iceberg",
+            "comment",
+            conf,
+            AuditInfo.builder()
+                .withCreator("test")
+                .withCreateTime(Instant.EPOCH)
+                .withLastModifier("test")
+                .withLastModifiedTime(Instant.EPOCH)
+                .build(),
+            Namespace.of(METALAKE));
+
+    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
+    HasPropertyMetadata propertiesMetadata = mock(HasPropertyMetadata.class);
+    when(propertiesMetadata.catalogPropertiesMetadata())
+        .thenReturn(new IcebergCatalogPropertiesMetadata());
+    catalogOperations.initialize(conf, info, propertiesMetadata);
+
+    Map<String, String> icebergCatalogProperties =
+        catalogOperations.icebergCatalogWrapper.getIcebergConfig().getIcebergCatalogProperties();
+
+    Assertions.assertEquals(
+        GravitinoIcebergAwsCredentialsProvider.class.getName(),
+        icebergCatalogProperties.get(IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER));
+    Assertions.assertEquals(
+        CATALOG,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + GravitinoIcebergAwsCredentialsProvider.CATALOG_NAME));
+    Assertions.assertEquals(
+        TestIcebergCredentialProvider.TYPE,
+        icebergCatalogProperties.get(
+            IcebergServerCredentialUtils.CLIENT_CREDENTIALS_PROVIDER_PREFIX
+                + CredentialConstants.CREDENTIAL_PROVIDERS));
+    Assertions.assertFalse(
+        icebergCatalogProperties.containsKey(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
+    Assertions.assertFalse(
+        icebergCatalogProperties.containsKey(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY));
+    Assertions.assertFalse(icebergCatalogProperties.containsKey(IcebergConstants.ICEBERG_S3_TOKEN));
   }
 }

@@ -20,7 +20,10 @@
 package org.apache.gravitino.credential;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Map;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Catalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -146,5 +149,50 @@ public class TestCredentialPropertiesUtils {
         "v1/irc1/namespaces/db/tables/tbl/credentials",
         refreshEndpointProperties.get(
             CredentialPropertyUtils.ICEBERG_ADLS_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testGetCredentialsReturnsEmptyWhenSupportsCredentialsIsNull() {
+    Credential[] credentials = CredentialPropertyUtils.getCredentials(new NullSupportsCatalog());
+
+    Assertions.assertEquals(0, credentials.length);
+  }
+
+  private static class NullSupportsCatalog implements Catalog {
+
+    @Override
+    public String name() {
+      return "catalog";
+    }
+
+    @Override
+    public Type type() {
+      return Type.RELATIONAL;
+    }
+
+    @Override
+    public String provider() {
+      return "provider";
+    }
+
+    @Override
+    public String comment() {
+      return "comment";
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return Collections.emptyMap();
+    }
+
+    @Override
+    public Audit auditInfo() {
+      return null;
+    }
+
+    @Override
+    public SupportsCredentials supportsCredentials() {
+      return null;
+    }
   }
 }
