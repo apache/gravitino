@@ -27,6 +27,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.ViewOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,12 +42,14 @@ public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperati
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
       JdbcTableOperations tableOperation,
+      ViewOperation viewOperation,
       JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
     super(
         exceptionConverter,
         jdbcTypeConverter,
         databaseOperation,
         tableOperation,
+        viewOperation,
         columnDefaultValueConverter);
   }
 

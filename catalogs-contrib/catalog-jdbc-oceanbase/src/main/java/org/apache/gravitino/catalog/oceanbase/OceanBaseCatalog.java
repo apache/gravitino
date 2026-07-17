@@ -24,6 +24,8 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConvert
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcViewOperations;
+import org.apache.gravitino.catalog.jdbc.operation.MysqlViewOperations;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter;
 import org.apache.gravitino.catalog.oceanbase.operation.OceanBaseDatabaseOperations;
@@ -46,7 +48,13 @@ public class OceanBaseCatalog extends JdbcCatalog {
         createJdbcTypeConverter(),
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
+        createJdbcViewOperations(),
         createJdbcColumnDefaultValueConverter());
+  }
+
+  @Override
+  protected JdbcViewOperations createJdbcViewOperations() {
+    return new MysqlViewOperations();
   }
 
   @Override

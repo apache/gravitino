@@ -34,6 +34,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
+import org.apache.gravitino.catalog.jdbc.operation.InformationSchemaJdbcViewOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
@@ -51,6 +52,7 @@ public class TestJdbcCatalogOperations {
             new SqliteTypeConverter(),
             new SqliteDatabaseOperations("/illegal/path"),
             new SqliteTableOperations(),
+            new InformationSchemaJdbcViewOperations("sqlite", "\""),
             new SqliteColumnDefaultValueConverter())) {
       Assertions.assertThrows(
           GravitinoRuntimeException.class,
@@ -88,6 +90,7 @@ public class TestJdbcCatalogOperations {
             new SqliteTypeConverter(),
             new SqliteDatabaseOperations("/illegal/path"),
             new SqliteTableOperations(),
+            new InformationSchemaJdbcViewOperations("sqlite", "\""),
             new SqliteColumnDefaultValueConverter());
     catalogOperations.setDriver(DriverManager.getDriver("jdbc:sqlite::memory:"));
 
@@ -103,6 +106,7 @@ public class TestJdbcCatalogOperations {
             new SqliteTypeConverter(),
             new SqliteDatabaseOperations("/illegal/path"),
             new SqliteTableOperations(),
+            new InformationSchemaJdbcViewOperations("sqlite", "\""),
             new SqliteColumnDefaultValueConverter());
     catalogOperations.setThrowExceptionInGetDriver(true);
 
@@ -119,12 +123,14 @@ public class TestJdbcCatalogOperations {
         JdbcTypeConverter jdbcTypeConverter,
         SqliteDatabaseOperations databaseOperation,
         SqliteTableOperations tableOperation,
+        InformationSchemaJdbcViewOperations viewOperation,
         SqliteColumnDefaultValueConverter columnDefaultValueConverter) {
       super(
           exceptionConverter,
           jdbcTypeConverter,
           databaseOperation,
           tableOperation,
+          viewOperation,
           columnDefaultValueConverter);
     }
 

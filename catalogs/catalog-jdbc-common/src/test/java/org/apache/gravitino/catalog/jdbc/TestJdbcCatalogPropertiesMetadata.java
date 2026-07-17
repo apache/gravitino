@@ -28,8 +28,10 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConvert
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
+import org.apache.gravitino.catalog.jdbc.operation.InformationSchemaJdbcViewOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcViewOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.meta.AuditInfo;
@@ -106,6 +108,11 @@ public class TestJdbcCatalogPropertiesMetadata {
     @Override
     protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
       return new SqliteColumnDefaultValueConverter();
+    }
+
+    @Override
+    protected JdbcViewOperations createJdbcViewOperations() {
+      return new InformationSchemaJdbcViewOperations("sqlite", "\"");
     }
   }
 }

@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.mysql.operation;
 
 import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
+import org.apache.gravitino.catalog.jdbc.operation.MysqlViewOperations;
 import org.apache.gravitino.catalog.mysql.MysqlCatalog;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,7 @@ public class TestMysqlCatalogOperations extends TestMysql {
   public void testCheckJDBCDriver() throws SQLException {
     MySQLProtocolCompatibleCatalogOperations catalogOperations =
         new MySQLProtocolCompatibleCatalogOperations(
-            null, null, DATABASE_OPERATIONS, TABLE_OPERATIONS, null);
+            null, null, DATABASE_OPERATIONS, TABLE_OPERATIONS, new MysqlViewOperations(), null);
     catalogOperations.initialize(getMySQLCatalogProperties(), null, new MysqlCatalog());
   }
 }
