@@ -318,8 +318,11 @@ public class RelationalEntityStore
       boolean override)
       throws IOException {
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
-    // Relation results are no longer cached, but the entities on both sides may embed
-    // relation-derived data (e.g. a user's role names), so drop their single-entity entries.
+    // Defensive: relation results are not cached, and no currently cached entity type embeds
+    // relation-derived data (the only types that do — USER/GROUP/ROLE — are excluded from the
+    // cache), so these invalidations are a no-op today. They are kept so that if a cached type ever
+    // starts materializing this relation, its stale single-entity entry is dropped on a relation
+    // write.
     cache.invalidate(srcIdentifier, srcType);
     cache.invalidate(dstIdentifier, dstType);
   }
@@ -338,6 +341,8 @@ public class RelationalEntityStore
     }
     backend.batchInsertRelations(
         relType, srcIdentifiers, srcType, dstIdentifier, dstType, override);
+    // Defensive no-op invalidation for the same reason as insertRelation: no currently cached
+    // entity type embeds relation-derived data (the ones that do are excluded from the cache).
     for (NameIdentifier ident : srcIdentifiers) {
       cache.invalidate(ident, srcType);
     }
