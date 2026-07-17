@@ -299,7 +299,7 @@ public class RangerHelper {
       // not exist, then create it.
       if (e.getMessage() != null
           && e.getMessage().contains("User doesn't have permissions to get details")) {
-        LOG.warn("The role({}) does not exist in the Ranger!, e: {}", roleName, e);
+        LOG.warn("Role {} does not exist in Ranger", roleName, e);
       } else {
         throw new AuthorizationPluginException(
             "Failed to check role(%s) whether exists in the Ranger! e: %s",

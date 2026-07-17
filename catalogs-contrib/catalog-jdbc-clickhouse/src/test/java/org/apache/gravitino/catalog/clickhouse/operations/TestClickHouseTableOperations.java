@@ -1115,8 +1115,72 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
     Assertions.assertTrue(sql.contains("PARTITION BY `c1`"));
     Assertions.assertTrue(sql.contains("INDEX `idx_c2` `c2` TYPE minmax GRANULARITY 1"));
-    Assertions.assertTrue(sql.contains("INDEX `idx_c3` `c3` TYPE bloom_filter GRANULARITY 3"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_c3` `c3` TYPE bloom_filter GRANULARITY 1"));
     Assertions.assertTrue(sql.contains("INDEX `idx_c4` `c2` TYPE set(0) GRANULARITY 1"));
+  }
+
+  @Test
+  void testGenerateCreateTableSqlWithCustomIndexProperties() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.IntegerType.get())
+              .withNullable(true)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c2")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_MINMAX,
+              "idx_mm",
+              new String[][] {{"c1"}},
+              Collections.singletonMap("granularity", "5")),
+          Indexes.of(
+              IndexType.DATA_SKIPPING_BLOOM_FILTER,
+              "idx_bf",
+              new String[][] {{"c2"}},
+              Collections.singletonMap("granularity", "10")),
+          Indexes.of(
+              IndexType.DATA_SKIPPING_SET,
+              "idx_set",
+              new String[][] {{"c2"}},
+              new HashMap<String, String>() {
+                {
+                  put("set_max_values", "100");
+                  put("granularity", "3");
+                }
+              }),
+        };
+
+    String sql =
+        ops.buildCreateSql(
+            "t_idx_custom",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[] {},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    Assertions.assertTrue(sql.contains("INDEX `idx_mm` `c1` TYPE minmax GRANULARITY 5"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 10"));
+    Assertions.assertTrue(sql.contains("INDEX `idx_set` `c2` TYPE set(100) GRANULARITY 3"));
   }
 
   @Test
@@ -1196,6 +1260,44 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertEquals("id", ((NamedReference) sortOrders[0].expression()).fieldName()[0]);
   }
 
+  @Test
+  void testParseSettingsFromCreateSql() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+
+    // Single setting
+    String sql1 =
+        "CREATE TABLE t1 (id Int32) ENGINE = MergeTree ORDER BY id SETTINGS index_granularity = 4096";
+    Map<String, String> settings1 = ops.parseSettings(sql1);
+    Assertions.assertEquals(1, settings1.size());
+    Assertions.assertEquals(
+        "4096", settings1.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+
+    // Multiple settings
+    String sql2 =
+        "CREATE TABLE t2 (id Int32) ENGINE = MergeTree ORDER BY id"
+            + " SETTINGS index_granularity = 4096, min_bytes_for_wide_part = 0";
+    Map<String, String> settings2 = ops.parseSettings(sql2);
+    Assertions.assertEquals(2, settings2.size());
+    Assertions.assertEquals(
+        "4096", settings2.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        "0", settings2.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+
+    // No SETTINGS clause
+    String sql3 = "CREATE TABLE t3 (id Int32) ENGINE = MergeTree ORDER BY id";
+    Map<String, String> settings3 = ops.parseSettings(sql3);
+    Assertions.assertTrue(settings3.isEmpty());
+
+    // SETTINGS with COMMENT after
+    String sql4 =
+        "CREATE TABLE t4 (id Int32) ENGINE = MergeTree ORDER BY id"
+            + " SETTINGS index_granularity = 8192 COMMENT 'test'";
+    Map<String, String> settings4 = ops.parseSettings(sql4);
+    Assertions.assertEquals(1, settings4.size());
+    Assertions.assertEquals(
+        "8192", settings4.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+  }
+
   private static final class TestableClickHouseTableOperations extends ClickHouseTableOperations {
     String buildCreateSql(
         String tableName,
@@ -1212,6 +1314,10 @@ public class TestClickHouseTableOperations extends TestClickHouse {
 
     SortOrder[] parseSortOrders(String createSql) {
       return parseSortOrdersFromCreateSql(createSql);
+    }
+
+    Map<String, String> parseSettings(String createSql) {
+      return parseSettingsFromCreateSql(createSql);
     }
   }
 
@@ -1338,7 +1444,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                   IndexType.DATA_SKIPPING_BLOOM_FILTER, "idx_bf", new String[][] {{"c2"}})
             });
     Assertions.assertTrue(
-        bloomSql.contains("ADD INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 3"));
+        bloomSql.contains("ADD INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 1"));
 
     String setSql =
         ops.buildAlterSql(
@@ -1368,6 +1474,150 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 "tbl",
                 new TableChange[] {
                   TableChange.addIndex(IndexType.PRIMARY_KEY, "pk_new", new String[][] {{"c1"}})
+                }));
+  }
+
+  @Test
+  public void testAlterTableAddIndexWithCustomGranularity() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    // Custom GRANULARITY for minmax
+    String minmaxSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  IndexType.DATA_SKIPPING_MINMAX,
+                  "idx_mm",
+                  new String[][] {{"c2"}},
+                  Collections.singletonMap("granularity", "5"))
+            });
+    Assertions.assertTrue(minmaxSql.contains("ADD INDEX `idx_mm` `c2` TYPE minmax GRANULARITY 5"));
+
+    // Custom GRANULARITY for bloom_filter
+    String bloomSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  IndexType.DATA_SKIPPING_BLOOM_FILTER,
+                  "idx_bf",
+                  new String[][] {{"c2"}},
+                  Collections.singletonMap("granularity", "10"))
+            });
+    Assertions.assertTrue(
+        bloomSql.contains("ADD INDEX `idx_bf` `c2` TYPE bloom_filter GRANULARITY 10"));
+
+    // Custom set_max_values for set index
+    String setSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  IndexType.DATA_SKIPPING_SET,
+                  "idx_set",
+                  new String[][] {{"c2"}},
+                  new HashMap<>() {
+                    {
+                      put("set_max_values", "100");
+                      put("granularity", "3");
+                    }
+                  })
+            });
+    Assertions.assertTrue(setSql.contains("ADD INDEX `idx_set` `c2` TYPE set(100) GRANULARITY 3"));
+  }
+
+  @Test
+  public void testAlterTableAddIndexInvalidGranularity() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    // Non-numeric granularity
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.addIndex(
+                      IndexType.DATA_SKIPPING_MINMAX,
+                      "idx1",
+                      new String[][] {{"c2"}},
+                      Collections.singletonMap("granularity", "abc"))
+                }));
+
+    // Zero granularity
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.addIndex(
+                      IndexType.DATA_SKIPPING_BLOOM_FILTER,
+                      "idx2",
+                      new String[][] {{"c2"}},
+                      Collections.singletonMap("granularity", "0"))
+                }));
+  }
+
+  @Test
+  public void testAlterTableAddIndexInvalidSetMaxValues() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    // Non-numeric set_max_values
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.addIndex(
+                      IndexType.DATA_SKIPPING_SET,
+                      "idx1",
+                      new String[][] {{"c2"}},
+                      Collections.singletonMap("set_max_values", "abc"))
+                }));
+
+    // Negative set_max_values
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.addIndex(
+                      IndexType.DATA_SKIPPING_SET,
+                      "idx2",
+                      new String[][] {{"c2"}},
+                      Collections.singletonMap("set_max_values", "-1"))
                 }));
   }
 

@@ -158,6 +158,16 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support table operations")
 
+    def as_view_catalog(self) -> "ViewCatalog":  # noqa: F821
+        """
+        Raises:
+            UnsupportedOperationException if the catalog does not support view operations.
+
+        Returns:
+            the {@link ViewCatalog} if the catalog supports view operations.
+        """
+        raise UnsupportedOperationException("Catalog does not support view operations")
+
     def as_fileset_catalog(self) -> "FilesetCatalog":  # noqa: F821
         """
         Raises:

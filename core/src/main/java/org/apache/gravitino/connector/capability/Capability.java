@@ -19,6 +19,7 @@
 package org.apache.gravitino.connector.capability;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Locale;
 import java.util.Set;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.annotation.Evolving;
@@ -71,6 +72,25 @@ public interface Capability {
    */
   default CapabilityResult caseSensitiveOnName(Scope scope) {
     return DEFAULT.caseSensitiveOnName(scope);
+  }
+
+  /**
+   * Normalizes the given name to the catalog's canonical form before it is used to call the
+   * underlying catalog operation and persisted as the Gravitino entity name. This is invoked
+   * instead of the simple lowercase folding implied by {@link #caseSensitiveOnName(Scope)} whenever
+   * a catalog needs custom folding logic (for example, a catalog whose native folding direction is
+   * uppercase, or one that supports a case-sensitive quoted form alongside a case-insensitive
+   * unquoted form).
+   *
+   * @param scope The scope of the capability.
+   * @param name The name to normalize.
+   * @return The normalized, canonical name.
+   */
+  default String normalizeName(Scope scope, String name) {
+    if (name == null) {
+      return null;
+    }
+    return caseSensitiveOnName(scope).supported() ? name : name.toLowerCase(Locale.ROOT);
   }
 
   /**
