@@ -106,7 +106,13 @@ jobs:
             --ruleset .spectral.yaml --format github-actions 2> spectral.err
           code=$?
           cat spectral.err
-          if grep -q "Error running Spectral" spectral.err; then
+          # Distinguish a crash from ordinary findings. Spectral exits >=2 on an
+          # internal error and writes a diagnostic to stderr, whereas a normal
+          # run streams findings to stdout and leaves stderr empty. Keying on
+          # (exit>=2 AND non-empty stderr) is version-robust; the legacy
+          # "Error running Spectral" string match is kept only as a fallback so a
+          # future CLI reword can't silently disable crash detection on its own.
+          if { [ "${code}" -ge 2 ] && [ -s spectral.err ]; } || grep -qi "error running spectral" spectral.err; then
             echo "::warning title=Spectral crashed::Spectral aborted (exit ${code}) instead of returning findings. A linter crash is a strong signal that the OpenAPI document is malformed (e.g. stray null nodes). Investigate the document and the trace above — an LLM can help analyze the failure. Non-blocking."
             {
               echo "### :warning: Spectral crashed — investigate the spec"
