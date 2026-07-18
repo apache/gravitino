@@ -42,6 +42,7 @@ import org.apache.gravitino.rel.types.Types.StructType;
 import org.apache.gravitino.rel.types.Types.TimestampType;
 import org.apache.gravitino.rel.types.Types.UUIDType;
 import org.apache.gravitino.rel.types.Types.VarCharType;
+import org.apache.gravitino.rel.types.Types.VariantType;
 import org.apache.spark.sql.types.CharType;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
@@ -129,6 +130,19 @@ public class TestSparkTypeConverter {
             IllegalArgumentException.class,
             () -> sparkTypeConverter.toSparkType(TimestampType.withTimeZone(9)));
     Assertions.assertTrue(exception.getMessage().contains("timestamp_tz(9)"));
+  }
+
+  @Test
+  void testRejectVariant() {
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () -> sparkTypeConverter.toSparkType(VariantType.get()));
+    Assertions.assertTrue(exception.getMessage().contains("variant"));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> sparkTypeConverter.toSparkType(ListType.of(VariantType.get(), true)));
   }
 
   /** Create a Gravitino StructType for testing. */

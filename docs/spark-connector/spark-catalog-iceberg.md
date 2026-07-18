@@ -66,9 +66,13 @@ rejects Gravitino `timestamp(p)` and `timestamp_tz(p)` types when `p` is greater
 silently truncating their values. This includes Iceberg V3 nanosecond timestamp types, which map to
 precision `9`.
 
+Spark 3.x has no data type that can losslessly represent Iceberg V3 `variant`. The connector rejects
+the type, including when it is nested, before exposing the table to Spark.
+
 | Gravitino type family | Spark 3.3 | Spark 3.4 | Spark 3.5 |
 |-----------------------|-----------|-----------|-----------|
 | `timestamp(9)`, `timestamp_tz(9)` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
+| `variant` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
 
 ## SQL Example
 
