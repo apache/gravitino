@@ -2395,6 +2395,14 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_variant",
+        Types.VariantType.get(),
+        "MySQL JSON does not represent the complete Variant value domain");
+  }
+
+  @Test
   void testObjectNamesWithDots() {
     // Create a MySQL database with a dot in its name directly (bypassing Gravitino)
     String dottedSchemaName = GravitinoITUtils.genRandomName("db") + ".nested";

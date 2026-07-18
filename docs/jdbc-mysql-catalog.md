@@ -145,8 +145,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 MySQL supports fractional-second precision from 0 through 6. The catalog rejects Gravitino
 `Timestamp` and `Timestamp_tz` precision from 7 through 9 before executing DDL.
 
+Gravitino `Variant` is rejected before executing DDL because MySQL `JSON` does not represent the
+complete Variant value domain.
+
 :::info
-MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 

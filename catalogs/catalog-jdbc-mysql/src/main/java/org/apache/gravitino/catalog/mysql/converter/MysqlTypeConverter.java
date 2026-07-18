@@ -165,6 +165,9 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       return type.simpleString();
     } else if (type instanceof Types.BooleanType) {
       return BIT;
+    } else if (type instanceof Types.VariantType) {
+      throw unsupportedType(
+          type, "MySQL JSON does not represent the complete Variant value domain");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

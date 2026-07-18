@@ -126,6 +126,18 @@ public class TestMysqlTypeConverter {
             .contains("fractional-second precision must be between 0 and 6"));
   }
 
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.VariantType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("MySQL JSON does not represent the complete Variant value domain"));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, MYSQL_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }
