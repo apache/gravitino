@@ -148,6 +148,7 @@ Hologres-specific table properties are set via the `WITH` clause during CREATE T
 |-------------------------------------|----------------------------------------------------------------------------------------------------------|
 | `Timestamp(9)` / `Timestamp_tz(9)` | Rejected before DDL. Hologres stores these types with microsecond and millisecond precision, respectively. |
 | `Variant`                           | Rejected before DDL. Native `json` and `jsonb` load as `External` and do not preserve Variant semantics. |
+| `Unknown`                           | Rejected before DDL because Hologres table columns cannot represent a null-only logical type.             |
 
 :::info
 - Hologres stores `TIMESTAMP` values with microsecond precision and `TIMESTAMPTZ` values with millisecond precision. JDBC metadata is normalized to precision 6 and 3, respectively, and the type converter emits the base type without a precision suffix.

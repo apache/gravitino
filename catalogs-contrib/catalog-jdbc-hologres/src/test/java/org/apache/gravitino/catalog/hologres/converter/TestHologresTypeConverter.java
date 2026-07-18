@@ -299,6 +299,21 @@ public class TestHologresTypeConverter {
   }
 
   @Test
+  public void testRejectUnknownType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> converter.fromGravitino(Types.NullType.get()));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Hologres table columns cannot represent Gravitino Unknown (NullType)"));
+
+    JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean("unknown");
+    Assertions.assertEquals(Types.ExternalType.of("unknown"), converter.toGravitino(typeBean));
+  }
+
+  @Test
   public void testNullableArrayThrowsException() {
     Assertions.assertThrows(
         IllegalArgumentException.class,

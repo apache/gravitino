@@ -912,6 +912,29 @@ public class TestHologresTableOperations {
             .contains("Hologres JSON and JSONB do not preserve Gravitino Variant semantics"));
   }
 
+  @Test
+  void testCreateTableRejectsUnknownBeforeSqlGeneration() {
+    JdbcColumn column =
+        JdbcColumn.builder().withName("unknown_col").withType(Types.NullType.get()).build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains("Hologres table columns cannot represent Gravitino Unknown (NullType)"));
+  }
+
   // ==================== generateAlterTableSql tests ====================
 
   @Test

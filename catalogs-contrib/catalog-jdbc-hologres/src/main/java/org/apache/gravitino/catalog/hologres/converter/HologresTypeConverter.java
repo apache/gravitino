@@ -167,6 +167,9 @@ public class HologresTypeConverter extends JdbcTypeConverter {
       return BPCHAR + "(" + ((Types.FixedCharType) type).length() + ")";
     } else if (type instanceof Types.BinaryType) {
       return BYTEA;
+    } else if (type instanceof Types.NullType) {
+      throw new IllegalArgumentException(
+          "Hologres table columns cannot represent Gravitino Unknown (NullType); cannot convert Gravitino type null");
     } else if (type instanceof Types.VariantType) {
       throw new IllegalArgumentException(
           "Hologres JSON and JSONB do not preserve Gravitino Variant semantics; cannot convert Gravitino type variant");
