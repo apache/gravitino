@@ -28,6 +28,7 @@ import static org.apache.gravitino.rel.types.Types.ExternalType;
 import static org.apache.gravitino.rel.types.Types.FixedCharType;
 import static org.apache.gravitino.rel.types.Types.FixedType;
 import static org.apache.gravitino.rel.types.Types.FloatType;
+import static org.apache.gravitino.rel.types.Types.GeometryType;
 import static org.apache.gravitino.rel.types.Types.IntegerType;
 import static org.apache.gravitino.rel.types.Types.ListType;
 import static org.apache.gravitino.rel.types.Types.LongType;
@@ -627,6 +628,11 @@ final class GlueIcebergTableHelper {
   }
 
   private static org.apache.iceberg.types.Type toIcebergType(Type type, int[] nextId) {
+    if (type instanceof GeometryType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: geometry. "
+              + "Glue Hive and Iceberg table paths do not preserve Geometry CRS semantics.");
+    }
     if (type instanceof NullType) {
       throw new IllegalArgumentException(
           "Unsupported Gravitino type for Glue: unknown. "

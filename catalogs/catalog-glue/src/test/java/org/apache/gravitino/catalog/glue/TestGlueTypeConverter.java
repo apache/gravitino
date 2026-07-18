@@ -262,6 +262,18 @@ class TestGlueTypeConverter {
         error.getMessage());
   }
 
+  @Test
+  void testFromGravitinoGeometryThrows() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.GeometryType.of("EPSG:3857")));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: geometry. "
+            + "Glue Hive and Iceberg table paths do not preserve Geometry CRS semantics.",
+        error.getMessage());
+  }
+
   // -------------------------------------------------------------------------
   // helpers
   // -------------------------------------------------------------------------

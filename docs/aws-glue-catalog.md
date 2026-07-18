@@ -145,6 +145,7 @@ AWS Glue stores column types as strings and does not validate their downstream c
 | `timestamp(9)` / `timestamp_tz(9)`  | Not supported      | Not supported         | Rejected before the Glue API is called. Iceberg supports at most microsecond precision, and Hive-format Glue metadata does not safely preserve an explicit nanosecond precision. |
 | `variant`                            | Not supported      | Not supported         | Rejected before the Glue API is called because neither table path defines a Variant column type. |
 | `unknown`                            | Not supported      | Not supported         | Rejected before the Glue API is called because both table paths require a concrete column type. |
+| `geometry(crs)`                      | Not supported      | Not supported         | Rejected before the Glue API is called because neither table path preserves Geometry CRS semantics. |
 
 ### Table Properties
 

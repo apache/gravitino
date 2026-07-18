@@ -324,6 +324,33 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
+  void testCreateTableRejectsGeometryBeforeGlueCall() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "geometry");
+    Column[] columns = {
+      GlueColumn.builder()
+          .withName("shape")
+          .withType(Types.GeometryType.crs84())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(GlueConstants.FORMAT, "parquet"),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockClient, never()).createTable(any(CreateTableRequest.class));
+  }
+
+  @Test
   void testCreateTableStorageDescriptorProperties() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
     Map<String, String> props =
