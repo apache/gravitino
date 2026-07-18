@@ -131,6 +131,7 @@ The current Gravitino Hudi catalog is read-only. It nevertheless validates V3 co
 | `variant`                            | Rejected before the backend is called. Hudi 0.15 does not define a Variant column type. |
 | `unknown`                            | Rejected before the backend is called. Hudi 0.15 table columns require a concrete value type. |
 | `geometry(crs)`                      | Rejected before the backend is called. Hudi 0.15 does not define a Geometry type that preserves CRS semantics. |
+| `geography(crs, algorithm)`          | Rejected before the backend is called. Hudi 0.15 does not define a Geography type that preserves CRS and edge-algorithm semantics. |
 
 ### Table Operations
 

@@ -273,6 +273,12 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private static void validateWritableType(Type type) {
+    if (type instanceof Types.GeographyType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Hudi: geography. "
+              + "Hudi 0.15 does not define a Geography type that preserves CRS and edge "
+              + "algorithm semantics.");
+    }
     if (type instanceof Types.GeometryType) {
       throw new IllegalArgumentException(
           "Unsupported Gravitino type for Hudi: geometry. "

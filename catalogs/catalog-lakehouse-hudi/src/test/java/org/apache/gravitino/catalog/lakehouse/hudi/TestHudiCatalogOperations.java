@@ -182,6 +182,15 @@ public class TestHudiCatalogOperations {
             + "Hudi 0.15 does not define a Geometry type that preserves CRS semantics.");
   }
 
+  @Test
+  public void testCreateTableRejectsGeographyBeforeBackendCall() throws Exception {
+    assertCreateRejected(
+        Types.GeographyType.of("EPSG:4326", "SPHERICAL"),
+        "Unsupported Gravitino type for Hudi: geography. "
+            + "Hudi 0.15 does not define a Geography type that preserves CRS and edge "
+            + "algorithm semantics.");
+  }
+
   private static void assertCreateRejected(Type type, String expectedMessage) throws Exception {
     try (InMemoryBackendOps backend = new InMemoryBackendOps()) {
       HudiCatalogOperations ops = new HudiCatalogOperations();
