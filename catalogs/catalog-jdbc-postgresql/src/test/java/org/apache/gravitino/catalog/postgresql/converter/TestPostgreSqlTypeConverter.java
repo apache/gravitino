@@ -95,6 +95,7 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("json"), "json", null, null, 0);
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("jsonb"), "jsonb", null, null, 0);
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("unknown"), "unknown", null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("geometry"), "geometry", null, null, 0);
   }
 
   @Test
@@ -183,6 +184,20 @@ public class TestPostgreSqlTypeConverter {
         exception
             .getMessage()
             .contains("PostgreSQL table columns cannot represent Gravitino Unknown (NullType)"));
+  }
+
+  @Test
+  public void testRejectGeometryType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.GeometryType.of("EPSG:3857")));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics"));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {

@@ -1999,6 +1999,14 @@ public class CatalogPostgreSqlIT extends BaseIT {
         "PostgreSQL table columns cannot represent Gravitino Unknown (NullType)");
   }
 
+  @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geometry",
+        Types.GeometryType.of("EPSG:3857"),
+        "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics");
+  }
+
   private void assertCreateRejectedWithoutSideEffects(
       String typeName, Type type, String expectedMessage) {
     String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);

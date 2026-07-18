@@ -139,4 +139,24 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
             .getMessage()
             .contains("PostgreSQL table columns cannot represent Gravitino Unknown (NullType)"));
   }
+
+  @Test
+  public void testCreateTableRejectsGeometryBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("geometry_col")
+            .withType(Types.GeometryType.of("EPSG:3857"))
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics"));
+  }
 }
