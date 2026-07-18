@@ -149,6 +149,11 @@ public class TestTypeUtils {
   }
 
   @Test
+  void testGeographyType() {
+    checkRejectedType(Types.GeographyType.of("EPSG:4326", "karney"));
+  }
+
+  @Test
   void testToPaimonTypeNullability() {
     assertEquals(
         DataTypes.ARRAY(DataTypes.INT().notNull()),

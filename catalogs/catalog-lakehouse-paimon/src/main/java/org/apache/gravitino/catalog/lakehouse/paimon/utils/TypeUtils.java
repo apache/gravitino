@@ -255,6 +255,7 @@ public class TypeUtils {
         case VARIANT:
           return DataTypes.VARIANT();
         case GEOMETRY:
+        case GEOGRAPHY:
         case NULL:
           throw unsupportedType(type);
         case LIST:

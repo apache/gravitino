@@ -307,6 +307,12 @@ public class TestGravitinoPaimonTable {
   }
 
   @Test
+  void testGeographyTypeRejectedWithoutMutation() {
+    assertUnsupportedTypeRejectedWithoutMutation(
+        Types.GeographyType.of("EPSG:4326", "karney"), "geography");
+  }
+
+  @Test
   void testCreatePaimonPartitionedTable() {
     String paimonTableName = "test_paimon_partitioned_table";
     NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);

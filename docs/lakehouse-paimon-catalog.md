@@ -206,6 +206,7 @@ Paimon Table primary key constraint should not be same with partition fields, th
 | `Variant`         | `Variant`                    |
 | `Unknown` (`NullType`) | Rejected before mutation |
 | `Geometry(crs)`   | Rejected before mutation     |
+| `Geography(crs, algorithm)` | Rejected before mutation |
 
 Paimon 1.2 supports timestamp precision from 0 through 9. Gravitino `Timestamp(9)` and
 `Timestamp_tz(9)` therefore round-trip losslessly as Paimon `Timestamp(9)` and
@@ -222,6 +223,10 @@ Creating, adding, or changing a column to `Unknown` therefore returns an
 Paimon has no spatial logical type or field-level CRS metadata. Mapping Gravitino `Geometry` to
 Paimon `VarBinary` would preserve WKB bytes but lose the planar geometry and CRS semantics, so the
 connector rejects it before mutation.
+
+Paimon also has no spheroidal spatial type carrying both a CRS and an edge-interpolation algorithm.
+Mapping Gravitino `Geography` to `VarBinary` would discard that type metadata, so it is rejected
+before mutation as well.
 
 :::info
 Gravitino doesn't support Paimon `MultisetType` type.
