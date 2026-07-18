@@ -184,6 +184,12 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
   @Override
   public String fromGravitino(Type type) {
+    if (type instanceof Types.GeographyType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: geography. "
+              + "Glue Hive and Iceberg table paths do not preserve Geography CRS and edge "
+              + "algorithm semantics.");
+    }
     if (type instanceof Types.GeometryType) {
       throw new IllegalArgumentException(
           "Unsupported Gravitino type for Glue: geometry. "

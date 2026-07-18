@@ -28,6 +28,7 @@ import static org.apache.gravitino.rel.types.Types.ExternalType;
 import static org.apache.gravitino.rel.types.Types.FixedCharType;
 import static org.apache.gravitino.rel.types.Types.FixedType;
 import static org.apache.gravitino.rel.types.Types.FloatType;
+import static org.apache.gravitino.rel.types.Types.GeographyType;
 import static org.apache.gravitino.rel.types.Types.GeometryType;
 import static org.apache.gravitino.rel.types.Types.IntegerType;
 import static org.apache.gravitino.rel.types.Types.ListType;
@@ -628,6 +629,12 @@ final class GlueIcebergTableHelper {
   }
 
   private static org.apache.iceberg.types.Type toIcebergType(Type type, int[] nextId) {
+    if (type instanceof GeographyType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: geography. "
+              + "Glue Hive and Iceberg table paths do not preserve Geography CRS and edge "
+              + "algorithm semantics.");
+    }
     if (type instanceof GeometryType) {
       throw new IllegalArgumentException(
           "Unsupported Gravitino type for Glue: geometry. "

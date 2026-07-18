@@ -265,6 +265,33 @@ class TestGlueCatalogOperationsForIceberg {
     verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
   }
 
+  @Test
+  void testCreateTable_icebergRejectsGeographyBeforeSdkCall() {
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, "geography");
+    GlueColumn[] cols = {
+      GlueColumn.builder()
+          .withName("region")
+          .withType(Types.GeographyType.crs84())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                cols,
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "iceberg", GlueConstants.LOCATION, LOCATION),
+                new Transform[0],
+                Distributions.NONE,
+                null,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
   // ---------------------------------------------------------------------------
   // alterTable Iceberg routing
   // ---------------------------------------------------------------------------

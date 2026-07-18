@@ -146,6 +146,7 @@ AWS Glue stores column types as strings and does not validate their downstream c
 | `variant`                            | Not supported      | Not supported         | Rejected before the Glue API is called because neither table path defines a Variant column type. |
 | `unknown`                            | Not supported      | Not supported         | Rejected before the Glue API is called because both table paths require a concrete column type. |
 | `geometry(crs)`                      | Not supported      | Not supported         | Rejected before the Glue API is called because neither table path preserves Geometry CRS semantics. |
+| `geography(crs, algorithm)`          | Not supported      | Not supported         | Rejected before the Glue API is called because neither table path preserves Geography CRS and edge-algorithm semantics. |
 
 ### Table Properties
 

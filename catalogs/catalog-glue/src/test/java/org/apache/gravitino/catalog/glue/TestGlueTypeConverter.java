@@ -274,6 +274,19 @@ class TestGlueTypeConverter {
         error.getMessage());
   }
 
+  @Test
+  void testFromGravitinoGeographyThrows() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.GeographyType.of("EPSG:4326", "SPHERICAL")));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: geography. "
+            + "Glue Hive and Iceberg table paths do not preserve Geography CRS and edge "
+            + "algorithm semantics.",
+        error.getMessage());
+  }
+
   // -------------------------------------------------------------------------
   // helpers
   // -------------------------------------------------------------------------
