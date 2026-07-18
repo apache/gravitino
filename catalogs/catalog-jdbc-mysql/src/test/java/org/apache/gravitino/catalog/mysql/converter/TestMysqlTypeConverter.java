@@ -160,6 +160,20 @@ public class TestMysqlTypeConverter {
             .contains("the JDBC catalog cannot round-trip Geometry CRS/SRID metadata"));
   }
 
+  @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                MYSQL_TYPE_CONVERTER.fromGravitino(Types.GeographyType.of("EPSG:4326", "karney")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "MySQL has no Geography type that preserves CRS and edge-algorithm metadata"));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, MYSQL_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }

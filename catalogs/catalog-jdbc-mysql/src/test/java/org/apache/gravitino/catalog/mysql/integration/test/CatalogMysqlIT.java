@@ -2417,6 +2417,14 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "MySQL has no Geography type that preserves CRS and edge-algorithm metadata");
+  }
+
+  @Test
   void testObjectNamesWithDots() {
     // Create a MySQL database with a dot in its name directly (bypassing Gravitino)
     String dottedSchemaName = GravitinoITUtils.genRandomName("db") + ".nested";

@@ -172,6 +172,9 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       throw unsupportedType(type, "the null-only placeholder has no MySQL column type");
     } else if (type instanceof Types.GeometryType) {
       throw unsupportedType(type, "the JDBC catalog cannot round-trip Geometry CRS/SRID metadata");
+    } else if (type instanceof Types.GeographyType) {
+      throw unsupportedType(
+          type, "MySQL has no Geography type that preserves CRS and edge-algorithm metadata");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }
