@@ -220,6 +220,11 @@ public class DorisTypeConverter extends JdbcTypeConverter {
       return STRING;
     } else if (type instanceof Types.BinaryType) {
       return BINARY;
+    } else if (type instanceof Types.VariantType) {
+      throw unsupportedType(
+          type,
+          "MySQL JDBC metadata reports Doris VARIANT as UNKNOWN, so the catalog cannot preserve "
+              + "the type on round-trip");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

@@ -964,6 +964,14 @@ public class CatalogDorisIT extends BaseIT {
   }
 
   @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_variant",
+        Types.VariantType.get(),
+        "MySQL JDBC metadata reports Doris VARIANT as UNKNOWN");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");

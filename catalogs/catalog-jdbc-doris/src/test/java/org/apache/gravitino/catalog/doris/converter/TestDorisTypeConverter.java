@@ -139,6 +139,20 @@ public class TestDorisTypeConverter {
   }
 
   @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.VariantType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "MySQL JDBC metadata reports Doris VARIANT as UNKNOWN, so the catalog cannot "
+                    + "preserve the type on round-trip"));
+  }
+
+  @Test
   public void testExternalTypeRoundTrip() {
     // ExternalType round-trip: fromGravitino(ExternalType) → toGravitino
     String[] externalTypes = {

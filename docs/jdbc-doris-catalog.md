@@ -143,7 +143,12 @@ Apache Doris `DATETIME` supports fractional-second precision from 0 through 6 an
 time-zone information. The catalog rejects `Timestamp` precision from 7 through 9 and all
 `Timestamp_tz` types before executing DDL.
 
-Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+Although Doris 2.1 and later have a native `VARIANT` type, MySQL JDBC metadata reports it as
+`UNKNOWN`. The catalog therefore rejects Gravitino `Variant` before executing DDL because a
+create/get round-trip cannot preserve the type family. `ExternalType("variant")` remains the raw
+Doris type escape hatch.
+
+Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` type.
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 
 :::note
