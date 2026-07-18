@@ -264,6 +264,21 @@ public class TestLanceDataTypeConverter {
   }
 
   @Test
+  public void testUnknownTypeRoundTripAndNullability() {
+    Field field = CONVERTER.toArrowField("unknown_value", Types.NullType.get(), true);
+
+    assertEquals(ArrowType.Null.INSTANCE, field.getType());
+    assertTrue(field.isNullable());
+    assertEquals(Types.NullType.get(), CONVERTER.toGravitino(field));
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.toArrowField("unknown_value", Types.NullType.get(), false));
+    assertTrue(exception.getMessage().contains("Null columns must be nullable"));
+  }
+
+  @Test
   public void testExternalTypeConversion() {
     String expectedColumnName = "col_name";
     boolean expectedNullable = true;

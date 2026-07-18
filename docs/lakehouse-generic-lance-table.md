@@ -70,7 +70,7 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Timestamp_tz(3)`                | `TimestampType Millisecond withUtc`     |
 | `Timestamp_tz(9)`                | `TimestampType Nanosecond withUtc`      |
 | `Time`/`Time(9)`                 | `Time Nanosecond`                       |
-| `Null`                           | `Null`                                  |
+| `Unknown` (`NullType`)           | `Null` (nullable columns only)          |
 | `Variant`                        | Rejected before mutation                |
 | `Fixed(n)`                       | `Fixed-Size Binary(n)`                  |
 | `Interval_year`                  | Not supported by Lance                  |
@@ -86,6 +86,10 @@ that identifier.
 Lance 6.0 with Arrow 18 has no exact native representation for Gravitino `Variant`, so table
 creation rejects it before creating, replacing, or deleting table data. Arrow extension fields,
 including newer `arrow.parquet.variant` fields, remain lossless `External` types.
+
+Gravitino `Unknown` is a nullable, null-only placeholder whose concrete type may be assigned during
+schema evolution. It round-trips exactly as Arrow `Null`; a non-nullable Unknown column is rejected
+because it cannot contain a valid value.
 
 ### External Types
 

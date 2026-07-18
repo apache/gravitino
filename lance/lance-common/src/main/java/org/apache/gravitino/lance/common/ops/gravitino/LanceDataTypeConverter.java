@@ -133,6 +133,10 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
             field.isNullable());
         return field;
 
+      case NULL:
+        Preconditions.checkArgument(nullable, "Lance Arrow Null columns must be nullable");
+        return Field.nullable(name, ArrowType.Null.INSTANCE);
+
       default:
         // non-complex type
         FieldType fieldType = new FieldType(nullable, fromGravitino(type), null);

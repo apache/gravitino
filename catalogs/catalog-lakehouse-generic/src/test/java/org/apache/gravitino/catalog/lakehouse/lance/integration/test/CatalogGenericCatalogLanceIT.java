@@ -508,6 +508,39 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   }
 
   @Test
+  public void testUnknownTypeRoundTrip() {
+    String phase2TableName = GravitinoITUtils.genRandomName("lance_unknown");
+    NameIdentifier identifier = NameIdentifier.of(schemaName, phase2TableName);
+    String location = tempDirectory + "/" + phase2TableName;
+    Column[] columns = {Column.of("unknown_value", Types.NullType.get(), "null-only value")};
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Table created =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                identifier,
+                columns,
+                "unknown type round-trip",
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+    Table loaded = catalog.asTableCatalog().loadTable(identifier);
+
+    Assertions.assertEquals(Types.NullType.get(), created.columns()[0].dataType());
+    Assertions.assertEquals(Types.NullType.get(), loaded.columns()[0].dataType());
+    Assertions.assertTrue(created.columns()[0].nullable());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Field field = dataset.getSchema().getFields().get(0);
+      Assertions.assertEquals(ArrowType.Null.INSTANCE, field.getType());
+      Assertions.assertTrue(field.isNullable());
+    }
+  }
+
+  @Test
   void testLanceTableFormat() {
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     Column[] columns = createColumns();
