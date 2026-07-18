@@ -89,6 +89,20 @@ class TestStarRocksTypeConverter {
             .contains("StarRocks table columns cannot represent Gravitino Unknown (NullType)"));
   }
 
+  @Test
+  void testRejectGeometryType() {
+    Assertions.assertEquals(Types.ExternalType.of("geometry"), toGravitino("geometry", null));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> TYPE_CONVERTER.fromGravitino(Types.GeometryType.of("EPSG:3857")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("StarRocks has no storable GEOMETRY column type with CRS metadata"));
+  }
+
   private static Type toGravitino(String typeName, Integer datetimePrecision) {
     JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean(typeName);
     typeBean.setDatetimePrecision(datetimePrecision);

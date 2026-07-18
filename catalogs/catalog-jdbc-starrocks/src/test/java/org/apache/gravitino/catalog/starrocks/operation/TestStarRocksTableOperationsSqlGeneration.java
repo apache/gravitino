@@ -187,4 +187,24 @@ public class TestStarRocksTableOperationsSqlGeneration {
             .getMessage()
             .contains("StarRocks table columns cannot represent Gravitino Unknown (NullType)"));
   }
+
+  @Test
+  public void testCreateTableRejectsGeometryBeforeSqlGeneration() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("unsupported_col")
+            .withType(Types.GeometryType.of("EPSG:3857"))
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("unsupported_col"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("StarRocks has no storable GEOMETRY column type with CRS metadata"));
+  }
 }

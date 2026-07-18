@@ -166,6 +166,11 @@ public class StarRocksTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.NullType) {
       throw new IllegalArgumentException(
           "StarRocks table columns cannot represent Gravitino Unknown (NullType); cannot convert Gravitino type null");
+    } else if (type instanceof Types.GeometryType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "StarRocks has no storable GEOMETRY column type with CRS metadata; cannot convert Gravitino type %s",
+              type.simpleString()));
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to StarRocks type", type.simpleString()));

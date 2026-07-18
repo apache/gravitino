@@ -842,6 +842,14 @@ public class CatalogStarRocksIT extends BaseIT {
   }
 
   @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geometry",
+        Types.GeometryType.of("EPSG:3857"),
+        "StarRocks has no storable GEOMETRY column type with CRS metadata");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");
