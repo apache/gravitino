@@ -41,7 +41,7 @@ public class TypeUtils {
 
   // Flink supports time/timestamp precision from 0 to 9 (nanosecond precision).
   // @see
-  // https://nightlies.apache.org/flink/flink-docs-release-2.1/docs/dev/table/types/#date-and-time
+  // https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/#date-and-time
   protected static final int FLINK_SECONDS_PRECISION = 0;
   protected static final int FLINK_MICROS_PRECISION = 6;
   protected static final int FLINK_NANOS_PRECISION = 9;
@@ -99,10 +99,9 @@ public class TypeUtils {
         int localZonedPrecision = localZonedTimestampType.getPrecision();
         return Types.TimestampType.withTimeZone(localZonedPrecision);
       case TIMESTAMP_WITH_TIME_ZONE:
-        org.apache.flink.table.types.logical.ZonedTimestampType zonedTimestampType =
-            (org.apache.flink.table.types.logical.ZonedTimestampType) logicalType;
-        int zonedPrecision = zonedTimestampType.getPrecision();
-        return Types.TimestampType.withTimeZone(zonedPrecision);
+        throw new IllegalArgumentException(
+            "Flink TIMESTAMP WITH TIME ZONE stores an offset per value and cannot be "
+                + "losslessly represented by Gravitino timestamp_tz; use TIMESTAMP_LTZ");
       case ARRAY:
         ArrayType arrayType = (ArrayType) logicalType;
         LogicalType elementLogicalType = arrayType.getElementType();
@@ -188,10 +187,8 @@ public class TypeUtils {
         if (timestampType.hasPrecisionSet()) {
           precision = timestampType.precision();
           if (precision < FLINK_SECONDS_PRECISION || precision > FLINK_NANOS_PRECISION) {
-            throw new UnsupportedOperationException(
-                "Unsupported timestamp precision for Flink: "
-                    + precision
-                    + ". Flink supports precision from 0 to 9.");
+            throw new IllegalArgumentException(
+                "Flink supports timestamp precision from 0 to 9, but got " + precision);
           }
         }
         if (timestampType.hasTimeZone()) {

@@ -71,8 +71,8 @@ public class TestTypeUtils {
     Assertions.assertEquals(Types.ShortType.get(), TypeUtils.toGravitinoType(new SmallIntType()));
     Assertions.assertEquals(
         Types.TimestampType.withoutTimeZone(6), TypeUtils.toGravitinoType(new TimestampType()));
-    Assertions.assertEquals(
-        Types.TimestampType.withTimeZone(6), TypeUtils.toGravitinoType(new ZonedTimestampType()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> TypeUtils.toGravitinoType(new ZonedTimestampType()));
     Assertions.assertEquals(
         Types.TimestampType.withTimeZone(6),
         TypeUtils.toGravitinoType(new LocalZonedTimestampType()));
@@ -242,16 +242,40 @@ public class TestTypeUtils {
   }
 
   @Test
+  public void testNanosecondTimestampRoundTrip() {
+    Types.TimestampType timestamp = Types.TimestampType.withoutTimeZone(9);
+    Types.TimestampType timestampTz = Types.TimestampType.withTimeZone(9);
+
+    Assertions.assertEquals(
+        timestamp, TypeUtils.toGravitinoType(TypeUtils.toFlinkType(timestamp).getLogicalType()));
+    Assertions.assertEquals(
+        timestampTz,
+        TypeUtils.toGravitinoType(TypeUtils.toFlinkType(timestampTz).getLogicalType()));
+  }
+
+  @Test
+  public void testRejectOffsetBearingFlinkTimestamp() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> TypeUtils.toGravitinoType(new ZonedTimestampType(9)));
+    Assertions.assertEquals(
+        "Flink TIMESTAMP WITH TIME ZONE stores an offset per value and cannot be "
+            + "losslessly represented by Gravitino timestamp_tz; use TIMESTAMP_LTZ",
+        exception.getMessage());
+  }
+
+  @Test
   public void testInvalidPrecisionHandling() {
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> TypeUtils.toFlinkType(Types.TimeType.of(10)));
 
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
+        IllegalArgumentException.class,
         () -> TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(10)));
 
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
+        IllegalArgumentException.class,
         () -> TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(10)));
   }
 

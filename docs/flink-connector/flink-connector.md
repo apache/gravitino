@@ -146,3 +146,12 @@ Gravitino flink connector support the following datatype mapping between Flink a
 | `tinyint`                        | `byte`                        | 0.6.0-incubating |
 | `varbinary`                      | `binary`                      | 0.6.0-incubating |
 | `varchar`                        | `string`                      | 0.6.0-incubating |
+
+### Iceberg V3 type interoperability
+
+The Flink connector either preserves an Iceberg V3 type exactly or rejects it before changing
+catalog metadata. These behaviors apply to the supported Flink 1.18, 1.19, and 1.20 runtimes.
+
+| Gravitino type family                 | Flink behavior |
+|---------------------------------------|----------------|
+| `timestamp(9)`, `timestamp_tz(9)`     | Preserved as `TIMESTAMP(9)` and `TIMESTAMP_LTZ(9)`. Offset-bearing Flink `TIMESTAMP(9) WITH TIME ZONE` is rejected because converting it to `TIMESTAMP_LTZ` would discard its per-value offset semantics. |

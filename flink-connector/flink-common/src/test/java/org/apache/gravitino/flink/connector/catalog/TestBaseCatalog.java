@@ -31,8 +31,11 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
+import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.CatalogView;
 import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.TableChange;
@@ -47,6 +50,7 @@ import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -135,6 +139,57 @@ public class TestBaseCatalog {
     List<org.apache.gravitino.rel.TableChange> expected =
         ImmutableList.of(org.apache.gravitino.rel.TableChange.updateComment("new comment"));
     Assertions.assertArrayEquals(expected.toArray(), tableChanges);
+  }
+
+  @Test
+  public void testBuildSchemaWithNanosecondTimestamps() {
+    Schema schema =
+        BaseCatalog.buildSchemaFromColumns(
+                new org.apache.gravitino.rel.Column[] {
+                  org.apache.gravitino.rel.Column.of(
+                      "timestamp_ns", Types.TimestampType.withoutTimeZone(9)),
+                  org.apache.gravitino.rel.Column.of(
+                      "timestamp_tz_ns", Types.TimestampType.withTimeZone(9))
+                })
+            .build();
+
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP(9),
+        ((Schema.UnresolvedPhysicalColumn) schema.getColumns().get(0)).getDataType());
+    Assertions.assertEquals(
+        DataTypes.TIMESTAMP_LTZ(9),
+        ((Schema.UnresolvedPhysicalColumn) schema.getColumns().get(1)).getDataType());
+  }
+
+  @Test
+  public void testRejectOffsetTimestampBeforeTableMutation() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    BaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    Schema schema =
+        Schema.newBuilder()
+            .column("timestamp_tz_ns", DataTypes.TIMESTAMP_WITH_TIME_ZONE(9))
+            .build();
+    CatalogTable unresolvedTable =
+        DefaultCatalogCompat.INSTANCE.createCatalogTable(
+            schema, "test", ImmutableList.of(), ImmutableMap.of());
+    ResolvedCatalogTable resolvedTable =
+        new ResolvedCatalogTable(
+            unresolvedTable,
+            ResolvedSchema.of(
+                Column.physical("timestamp_tz_ns", DataTypes.TIMESTAMP_WITH_TIME_ZONE(9))));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog.createTable(
+                    new ObjectPath("database", "timestamp_tz_table"), resolvedTable, false));
+    Assertions.assertTrue(exception.getMessage().contains("cannot be losslessly represented"));
+    Mockito.verifyNoInteractions(tableCatalog);
   }
 
   @Test
