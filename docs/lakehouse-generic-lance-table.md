@@ -76,6 +76,12 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Interval_day`                   | `Duration(Microsecond)`                 |
 | `External(arrow_field_json_str)` | Any Arrow Field                         |
 
+`Timestamp(9)` and `Timestamp_tz(9)` round-trip losslessly through Lance as nanosecond Arrow
+timestamps. Gravitino `Timestamp_tz` has time-zone-aware instant semantics but does not carry a
+zone identifier, so the connector writes the canonical Arrow `UTC` identifier. Native Arrow
+timestamps with another zone identifier are preserved as `External` instead of silently rewriting
+that identifier.
+
 ### External Types
 
 For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_json_str)` type, which accepts a JSON string representation of an Arrow `Field`.

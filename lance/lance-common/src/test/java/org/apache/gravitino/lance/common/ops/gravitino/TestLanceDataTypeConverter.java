@@ -208,6 +208,36 @@ public class TestLanceDataTypeConverter {
   }
 
   @Test
+  public void testNanosecondTimestampRoundTrip() {
+    Types.TimestampType timestampNs = Types.TimestampType.withoutTimeZone(9);
+    Types.TimestampType timestampTzNs = Types.TimestampType.withTimeZone(9);
+
+    Field timestampField = CONVERTER.toArrowField("timestamp_ns", timestampNs, true);
+    Field timestampTzField = CONVERTER.toArrowField("timestamptz_ns", timestampTzNs, true);
+
+    assertEquals(
+        new ArrowType.Timestamp(TimeUnit.NANOSECOND, null),
+        timestampField.getFieldType().getType());
+    assertEquals(
+        new ArrowType.Timestamp(TimeUnit.NANOSECOND, "UTC"),
+        timestampTzField.getFieldType().getType());
+    assertEquals(timestampNs, CONVERTER.toGravitino(timestampField));
+    assertEquals(timestampTzNs, CONVERTER.toGravitino(timestampTzField));
+  }
+
+  @Test
+  public void testNonUtcTimestampPreservesTimezoneAsExternalType() {
+    Field field =
+        Field.nullable(
+            "event_time", new ArrowType.Timestamp(TimeUnit.NANOSECOND, "America/Los_Angeles"));
+
+    Type converted = CONVERTER.toGravitino(field);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(field, CONVERTER.toArrowField("event_time", converted, true));
+  }
+
+  @Test
   public void testExternalTypeConversion() {
     String expectedColumnName = "col_name";
     boolean expectedNullable = true;

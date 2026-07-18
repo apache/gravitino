@@ -44,6 +44,7 @@ import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowReader;
+import org.apache.arrow.vector.types.TimeUnit;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
@@ -411,6 +412,47 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
     Assertions.assertThrows(
         RuntimeException.class, () -> catalog.asTableCatalog().loadTable(newNameIdentifier));
+  }
+
+  @Test
+  public void testNanosecondTimestampTypeRoundTrip() {
+    String phase2TableName = GravitinoITUtils.genRandomName("lance_timestamp_ns");
+    NameIdentifier identifier = NameIdentifier.of(schemaName, phase2TableName);
+    String location = tempDirectory + "/" + phase2TableName;
+    Column[] columns = {
+      Column.of("timestamp_ns", Types.TimestampType.withoutTimeZone(9), "nanosecond timestamp"),
+      Column.of("timestamptz_ns", Types.TimestampType.withTimeZone(9), "nanosecond instant")
+    };
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Table created =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                identifier,
+                columns,
+                "timestamp nanosecond round-trip",
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+    Table loaded = catalog.asTableCatalog().loadTable(identifier);
+
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(9), created.columns()[0].dataType());
+    Assertions.assertEquals(Types.TimestampType.withTimeZone(9), created.columns()[1].dataType());
+    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(9), loaded.columns()[0].dataType());
+    Assertions.assertEquals(Types.TimestampType.withTimeZone(9), loaded.columns()[1].dataType());
+
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      List<Field> fields = dataset.getSchema().getFields();
+      Assertions.assertEquals(
+          new ArrowType.Timestamp(TimeUnit.NANOSECOND, null), fields.get(0).getType());
+      Assertions.assertEquals(
+          new ArrowType.Timestamp(TimeUnit.NANOSECOND, "UTC"), fields.get(1).getType());
+    }
   }
 
   @Test

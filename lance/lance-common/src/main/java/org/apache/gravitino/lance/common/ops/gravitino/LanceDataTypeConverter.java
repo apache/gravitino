@@ -284,10 +284,13 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
               case MICROSECOND -> 6;
               case NANOSECOND -> 9;
             };
-        boolean hasTimeZone = timestampType.getTimezone() != null;
-        return hasTimeZone
-            ? Types.TimestampType.withTimeZone(precision)
-            : Types.TimestampType.withoutTimeZone(precision);
+        if (timestampType.getTimezone() == null) {
+          return Types.TimestampType.withoutTimeZone(precision);
+        }
+        if ("UTC".equals(timestampType.getTimezone())) {
+          return Types.TimestampType.withTimeZone(precision);
+        }
+        break;
       case Time:
         ArrowType.Time timeType = (ArrowType.Time) fieldType.getType();
         if (timeType.getUnit() == TimeUnit.NANOSECOND && timeType.getBitWidth() == 8 * 8) {
