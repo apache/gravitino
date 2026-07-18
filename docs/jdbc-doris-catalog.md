@@ -148,7 +148,10 @@ Although Doris 2.1 and later have a native `VARIANT` type, MySQL JDBC metadata r
 create/get round-trip cannot preserve the type family. `ExternalType("variant")` remains the raw
 Doris type escape hatch.
 
-Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` type.
+Gravitino `Null` (the V3 unknown type) is rejected before executing DDL because it is a null-only
+placeholder, not a Doris column type.
+
+Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` type.
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 
 :::note

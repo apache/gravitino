@@ -225,6 +225,8 @@ public class DorisTypeConverter extends JdbcTypeConverter {
           type,
           "MySQL JDBC metadata reports Doris VARIANT as UNKNOWN, so the catalog cannot preserve "
               + "the type on round-trip");
+    } else if (type instanceof Types.NullType) {
+      throw unsupportedType(type, "the null-only placeholder has no Doris column type");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

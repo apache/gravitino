@@ -153,6 +153,16 @@ public class TestDorisTypeConverter {
   }
 
   @Test
+  public void testRejectNullType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.NullType.get()));
+    Assertions.assertTrue(
+        exception.getMessage().contains("the null-only placeholder has no Doris column type"));
+  }
+
+  @Test
   public void testExternalTypeRoundTrip() {
     // ExternalType round-trip: fromGravitino(ExternalType) → toGravitino
     String[] externalTypes = {

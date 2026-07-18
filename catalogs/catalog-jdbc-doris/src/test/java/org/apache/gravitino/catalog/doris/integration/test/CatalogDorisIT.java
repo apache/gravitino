@@ -972,6 +972,12 @@ public class CatalogDorisIT extends BaseIT {
   }
 
   @Test
+  void testRejectNullTypeWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_null", Types.NullType.get(), "the null-only placeholder has no Doris column type");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");
