@@ -146,6 +146,19 @@ public class StarRocksTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.DateType) {
       return DATE;
     } else if (type instanceof Types.TimestampType) {
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasTimeZone()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "StarRocks DATETIME does not preserve time-zone semantics; cannot convert Gravitino type %s",
+                type.simpleString()));
+      }
+      if (timestampType.hasPrecisionSet()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "StarRocks DATETIME columns do not preserve declared fractional precision; cannot convert Gravitino type %s",
+                type.simpleString()));
+      }
       return DATETIME;
     }
     throw new IllegalArgumentException(

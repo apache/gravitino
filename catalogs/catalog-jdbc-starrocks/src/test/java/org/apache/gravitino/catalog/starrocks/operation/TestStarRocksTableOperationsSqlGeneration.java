@@ -120,4 +120,37 @@ public class TestStarRocksTableOperationsSqlGeneration {
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT '   ' but was: " + sql);
   }
+
+  @Test
+  public void testCreateTableUsesUnparameterizedDatetime() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("timestamp_col")
+            .withType(Types.TimestampType.withoutTimeZone())
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("timestamp_col"));
+
+    String sql = ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution);
+
+    Assertions.assertTrue(sql.contains("`timestamp_col` datetime"));
+  }
+
+  @Test
+  public void testCreateTableRejectsPrecisionQualifiedTimestampTypesBeforeSqlGeneration() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    Types.TimestampType[] unsupportedTypes = {
+      Types.TimestampType.withoutTimeZone(3),
+      Types.TimestampType.withoutTimeZone(9),
+      Types.TimestampType.withTimeZone(9)
+    };
+    Distribution distribution = Distributions.hash(1, NamedReference.field("unsupported_col"));
+
+    for (Types.TimestampType type : unsupportedTypes) {
+      JdbcColumn column = JdbcColumn.builder().withName("unsupported_col").withType(type).build();
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
+    }
+  }
 }
