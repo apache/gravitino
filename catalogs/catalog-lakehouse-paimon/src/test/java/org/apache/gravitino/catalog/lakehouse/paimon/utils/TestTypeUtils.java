@@ -113,6 +113,12 @@ public class TestTypeUtils {
   }
 
   @Test
+  void testVariantType() {
+    assertEquals(DataTypes.VARIANT(), toPaimonType(Types.VariantType.get()));
+    assertEquals(Types.VariantType.get(), fromPaimonType(DataTypes.VARIANT()));
+  }
+
+  @Test
   void testUnparsedType() {
     Arrays.asList(
             DataTypes.CHAR(CharType.MAX_LENGTH), DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH))

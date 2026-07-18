@@ -271,6 +271,30 @@ public class TestGravitinoPaimonTable {
   }
 
   @Test
+  void testVariantRoundTrip() {
+    NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), "test_variant");
+    Column variantColumn =
+        GravitinoPaimonColumn.builder()
+            .withName("variant_col")
+            .withType(Types.VariantType.get())
+            .withNullable(true)
+            .build();
+
+    paimonCatalogOperations.createTable(
+        tableIdentifier,
+        new Column[] {variantColumn},
+        PAIMON_COMMENT,
+        Collections.emptyMap(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    Table loadedTable = paimonCatalogOperations.loadTable(tableIdentifier);
+    Assertions.assertEquals(Types.VariantType.get(), loadedTable.columns()[0].dataType());
+    Assertions.assertTrue(loadedTable.columns()[0].nullable());
+  }
+
+  @Test
   void testCreatePaimonPartitionedTable() {
     String paimonTableName = "test_paimon_partitioned_table";
     NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);
