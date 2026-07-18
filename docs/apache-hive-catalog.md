@@ -172,6 +172,7 @@ types return an invalid-argument response before Hive Metastore metadata is chan
 |----------------|--------------|--------|
 | `variant` | Rejected | Hive has no equivalent type that preserves arbitrary semi-structured values. |
 | `unknown` | Converted to `void` | Both types accept only null values and round-trip without changing semantics. |
+| `geometry` | Rejected | Hive has no geometry type that preserves coordinate-reference-system metadata. |
 
 ### Table Properties
 

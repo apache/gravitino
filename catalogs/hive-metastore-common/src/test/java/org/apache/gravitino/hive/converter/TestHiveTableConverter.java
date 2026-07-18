@@ -81,6 +81,27 @@ public class TestHiveTableConverter {
   }
 
   @Test
+  public void testRejectGeometryBeforeBuildingHiveTable() {
+    Column[] columns = {Column.of("shape", Types.GeometryType.crs84(), "Planar geometry")};
+    HiveTable hiveTable =
+        HiveTable.builder()
+            .withName("places")
+            .withDatabaseName("db")
+            .withColumns(columns)
+            .withProperties(new HashMap<>())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> HiveTableConverter.toHiveTable(hiveTable));
+    assertEquals(
+        "Hive cannot preserve the Gravitino geometry type because it has no geometry type with CRS metadata.",
+        exception.getMessage());
+  }
+
+  @Test
   public void testGetColumnsWithNoDuplicates() {
     // Create a table with columns and partition keys that don't overlap
     Table table = new Table();

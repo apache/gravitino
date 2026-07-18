@@ -145,6 +145,9 @@ public class HiveDataTypeConverter implements DataTypeConverter<TypeInfo, String
             "Hive cannot preserve the Gravitino variant type because it has no equivalent type.");
       case NULL:
         return getPrimitiveTypeInfo(VOID_TYPE_NAME);
+      case GEOMETRY:
+        throw new IllegalArgumentException(
+            "Hive cannot preserve the Gravitino geometry type because it has no geometry type with CRS metadata.");
       default:
         throw new UnsupportedOperationException("Unsupported conversion to Hive type: " + type);
     }

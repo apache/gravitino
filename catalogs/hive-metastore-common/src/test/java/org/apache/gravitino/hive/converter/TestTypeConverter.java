@@ -125,6 +125,17 @@ public class TestTypeConverter {
         Types.NullType.get(), HiveDataTypeConverter.CONVERTER.toGravitino(VOID_TYPE_NAME));
   }
 
+  @Test
+  public void testGeometryThrowsException() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> HiveDataTypeConverter.CONVERTER.fromGravitino(Types.GeometryType.crs84()));
+    Assertions.assertEquals(
+        "Hive cannot preserve the Gravitino geometry type because it has no geometry type with CRS metadata.",
+        exception.getMessage());
+  }
+
   private void testConverter(String typeName) {
     TypeInfo hiveType = getTypeInfoFromTypeString(typeName);
     TypeInfo convertedType = CONVERTER.fromGravitino(CONVERTER.toGravitino(hiveType.getTypeName()));
