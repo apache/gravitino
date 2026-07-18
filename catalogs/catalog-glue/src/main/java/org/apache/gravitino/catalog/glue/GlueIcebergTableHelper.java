@@ -32,6 +32,7 @@ import static org.apache.gravitino.rel.types.Types.IntegerType;
 import static org.apache.gravitino.rel.types.Types.ListType;
 import static org.apache.gravitino.rel.types.Types.LongType;
 import static org.apache.gravitino.rel.types.Types.MapType;
+import static org.apache.gravitino.rel.types.Types.NullType;
 import static org.apache.gravitino.rel.types.Types.ShortType;
 import static org.apache.gravitino.rel.types.Types.StringType;
 import static org.apache.gravitino.rel.types.Types.StructType;
@@ -626,6 +627,11 @@ final class GlueIcebergTableHelper {
   }
 
   private static org.apache.iceberg.types.Type toIcebergType(Type type, int[] nextId) {
+    if (type instanceof NullType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: unknown. "
+              + "Glue Hive and Iceberg table paths require a concrete column type.");
+    }
     if (type instanceof VariantType) {
       throw new IllegalArgumentException(
           "Unsupported Gravitino type for Glue: variant. "

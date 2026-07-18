@@ -184,6 +184,11 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
   @Override
   public String fromGravitino(Type type) {
+    if (type instanceof Types.NullType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: unknown. "
+              + "Glue Hive and Iceberg table paths require a concrete column type.");
+    }
     if (type instanceof Types.VariantType) {
       throw new IllegalArgumentException(
           "Unsupported Gravitino type for Glue: variant. "

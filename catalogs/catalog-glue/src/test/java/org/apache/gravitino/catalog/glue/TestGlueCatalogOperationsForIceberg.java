@@ -211,6 +211,33 @@ class TestGlueCatalogOperationsForIceberg {
     verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
   }
 
+  @Test
+  void testCreateTable_icebergRejectsUnknownBeforeSdkCall() {
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, "unknown");
+    GlueColumn[] cols = {
+      GlueColumn.builder()
+          .withName("unknown_value")
+          .withType(Types.NullType.get())
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                cols,
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "iceberg", GlueConstants.LOCATION, LOCATION),
+                new Transform[0],
+                Distributions.NONE,
+                null,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
+  }
+
   // ---------------------------------------------------------------------------
   // alterTable Iceberg routing
   // ---------------------------------------------------------------------------

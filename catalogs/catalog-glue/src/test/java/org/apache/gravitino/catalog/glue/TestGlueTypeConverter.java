@@ -252,9 +252,14 @@ class TestGlueTypeConverter {
   }
 
   @Test
-  void testFromGravitinoUnsupportedTypeThrows() {
-    assertThrows(
-        IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.NullType.get()));
+  void testFromGravitinoUnknownThrows() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.NullType.get()));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: unknown. "
+            + "Glue Hive and Iceberg table paths require a concrete column type.",
+        error.getMessage());
   }
 
   // -------------------------------------------------------------------------
