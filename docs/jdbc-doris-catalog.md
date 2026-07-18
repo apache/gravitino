@@ -155,7 +155,10 @@ Gravitino `Geometry` is rejected before executing DDL. Doris GEO is not a column
 geospatial values in `String`/`VarChar`, which cannot preserve Gravitino CRS metadata as part of the
 type.
 
-Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` `Geometry` type.
+Gravitino `Geography` is also rejected before executing DDL because Doris has no geography column
+type that preserves both its CRS and edge-algorithm metadata.
+
+Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` `Geometry` `Geography` type.
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 
 :::note

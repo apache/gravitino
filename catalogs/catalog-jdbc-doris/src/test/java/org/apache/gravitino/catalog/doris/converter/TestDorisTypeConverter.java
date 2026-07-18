@@ -177,6 +177,21 @@ public class TestDorisTypeConverter {
   }
 
   @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                DORIS_TYPE_CONVERTER.fromGravitino(Types.GeographyType.of("EPSG:4326", "karney")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Doris GEO has no Geography column type that preserves CRS and edge-algorithm "
+                    + "metadata"));
+  }
+
+  @Test
   public void testExternalTypeRoundTrip() {
     // ExternalType round-trip: fromGravitino(ExternalType) → toGravitino
     String[] externalTypes = {

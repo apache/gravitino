@@ -986,6 +986,14 @@ public class CatalogDorisIT extends BaseIT {
   }
 
   @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "Doris GEO has no Geography column type that preserves CRS and edge-algorithm metadata");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");

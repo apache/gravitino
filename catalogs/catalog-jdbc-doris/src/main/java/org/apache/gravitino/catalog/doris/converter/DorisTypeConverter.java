@@ -232,6 +232,10 @@ public class DorisTypeConverter extends JdbcTypeConverter {
           type,
           "Doris GEO uses String/Varchar storage and cannot preserve Geometry CRS metadata as a "
               + "column type");
+    } else if (type instanceof Types.GeographyType) {
+      throw unsupportedType(
+          type,
+          "Doris GEO has no Geography column type that preserves CRS and edge-algorithm metadata");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }
