@@ -116,6 +116,29 @@ public class TestDorisTypeConverter {
   }
 
   @Test
+  public void testRejectNanosecondTimestampTypes() {
+    checkGravitinoTypeToJdbcType("datetime(6)", Types.TimestampType.withoutTimeZone(6));
+
+    IllegalArgumentException timestampException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.TimestampType.withoutTimeZone(9)));
+    Assertions.assertTrue(
+        timestampException
+            .getMessage()
+            .contains("fractional-second precision must be between 0 and 6"));
+
+    IllegalArgumentException timestampTzException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.TimestampType.withTimeZone(9)));
+    Assertions.assertTrue(
+        timestampTzException
+            .getMessage()
+            .contains("Doris DATETIME does not store time-zone information"));
+  }
+
+  @Test
   public void testExternalTypeRoundTrip() {
     // ExternalType round-trip: fromGravitino(ExternalType) → toGravitino
     String[] externalTypes = {

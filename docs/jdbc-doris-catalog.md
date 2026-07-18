@@ -126,7 +126,7 @@ Refer to
 | `Double`                   | `Double`             |
 | `Decimal`                  | `Decimal`            |
 | `Date`                     | `Date`/`DateV2`      |
-| `Timestamp[(p)]`           | `Datetime[(p)]`      |
+| `Timestamp[(p)]`           | `Datetime[(p)]`, p in [0, 6] |
 | `VarChar`                  | `VarChar`            |
 | `FixedChar`                | `Char`               |
 | `String`                   | `String`             |
@@ -138,6 +138,10 @@ Refer to
 | `ExternalType("largeint")` | `LargeInt`           |
 | `ExternalType("bitmap")`   | `Bitmap`             |
 | `ExternalType("hll")`      | `HLL`                |
+
+Apache Doris `DATETIME` supports fractional-second precision from 0 through 6 and does not store
+time-zone information. The catalog rejects `Timestamp` precision from 7 through 9 and all
+`Timestamp_tz` types before executing DDL.
 
 Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.

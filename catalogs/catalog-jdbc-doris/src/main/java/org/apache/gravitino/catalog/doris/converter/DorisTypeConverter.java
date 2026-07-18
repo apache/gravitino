@@ -24,6 +24,8 @@ import org.apache.gravitino.rel.types.Types;
 
 /** Type converter for Apache Doris. */
 public class DorisTypeConverter extends JdbcTypeConverter {
+  private static final int MAX_DATETIME_PRECISION = 6;
+
   static final String BOOLEAN = "boolean";
   static final String TINYINT = "tinyint";
   static final String SMALLINT = "smallint";
@@ -188,6 +190,12 @@ public class DorisTypeConverter extends JdbcTypeConverter {
       return DATEV2;
     } else if (type instanceof Types.TimestampType) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasTimeZone()) {
+        throw unsupportedType(type, "Doris DATETIME does not store time-zone information");
+      }
+      if (timestampType.hasPrecisionSet() && timestampType.precision() > MAX_DATETIME_PRECISION) {
+        throw unsupportedType(type, "fractional-second precision must be between 0 and 6");
+      }
       return timestampType.hasPrecisionSet()
           ? String.format("%s(%d)", DATETIME, timestampType.precision())
           : DATETIME;
@@ -217,5 +225,10 @@ public class DorisTypeConverter extends JdbcTypeConverter {
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to Doris type", type.simpleString()));
+  }
+
+  private static IllegalArgumentException unsupportedType(Type type, String reason) {
+    return new IllegalArgumentException(
+        String.format("Doris does not support Gravitino type %s: %s", type.simpleString(), reason));
   }
 }
