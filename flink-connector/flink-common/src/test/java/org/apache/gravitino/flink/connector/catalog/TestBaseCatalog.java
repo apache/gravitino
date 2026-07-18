@@ -209,6 +209,37 @@ public class TestBaseCatalog {
   }
 
   @Test
+  public void testBuildSchemaWithNullableUnknown() {
+    Schema schema =
+        BaseCatalog.buildSchemaFromColumns(
+                new org.apache.gravitino.rel.Column[] {
+                  org.apache.gravitino.rel.Column.of("unknown_column", Types.NullType.get())
+                })
+            .build();
+
+    Assertions.assertEquals(
+        DataTypes.NULL(),
+        ((Schema.UnresolvedPhysicalColumn) schema.getColumns().get(0)).getDataType());
+  }
+
+  @Test
+  public void testRejectNonNullableUnknownBeforeSchemaExposure() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BaseCatalog.buildSchemaFromColumns(
+                    new org.apache.gravitino.rel.Column[] {
+                      org.apache.gravitino.rel.Column.of(
+                          "unknown_column", Types.NullType.get(), null, false, false, null)
+                    }));
+
+    Assertions.assertEquals(
+        "Flink NULL columns must be nullable because NULL has no non-null value",
+        exception.getMessage());
+  }
+
+  @Test
   public void testToGravitinoDistributionDefaultsToNone() {
     TestableBaseCatalog catalog =
         new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), mockUnsupportedViewCatalog());

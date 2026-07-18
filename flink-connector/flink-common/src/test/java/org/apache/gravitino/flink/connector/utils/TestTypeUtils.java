@@ -290,6 +290,15 @@ public class TestTypeUtils {
   }
 
   @Test
+  public void testUnknownTypeRoundTrip() {
+    Types.NullType unknown = Types.NullType.get();
+
+    Assertions.assertEquals(DataTypes.NULL(), TypeUtils.toFlinkType(unknown));
+    Assertions.assertEquals(
+        unknown, TypeUtils.toGravitinoType(TypeUtils.toFlinkType(unknown).getLogicalType()));
+  }
+
+  @Test
   public void testMultisetTypeConversion() {
     // MULTISET<STRING> (VARCHAR(MAX)) should be preserved as ExternalType
     Assertions.assertEquals(
