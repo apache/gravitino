@@ -26,6 +26,8 @@ import org.apache.gravitino.rel.types.Types;
 /** Type converter for OceanBase. */
 public class OceanBaseTypeConverter extends JdbcTypeConverter {
 
+  private static final int MAX_TIMESTAMP_PRECISION = 6;
+
   static final String TINYINT = "tinyint";
   static final String TINYINT_UNSIGNED = "tinyint unsigned";
   static final String SMALLINT = "smallint";
@@ -137,6 +139,13 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
       return type.simpleString();
     } else if (type instanceof Types.TimestampType) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasPrecisionSet() && timestampType.precision() > MAX_TIMESTAMP_PRECISION) {
+        throw new IllegalArgumentException(
+            String.format(
+                "OceanBase MySQL mode cannot preserve timestamp precision %d; "
+                    + "the maximum supported precision is %d",
+                timestampType.precision(), MAX_TIMESTAMP_PRECISION));
+      }
       String baseType = timestampType.hasTimeZone() ? TIMESTAMP : DATETIME;
       return timestampType.hasPrecisionSet()
           ? String.format("%s(%d)", baseType, timestampType.precision())

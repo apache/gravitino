@@ -69,6 +69,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -1989,5 +1990,43 @@ public class CatalogOceanBaseIT extends BaseIT {
           Assertions.fail("Unexpected datetime column: " + column.name());
       }
     }
+  }
+
+  @Test
+  void testRejectNanosecondTimestampsWithoutCreatingTables() {
+    assertCreateRejectedWithoutSideEffect(
+        "timestamp_ns",
+        Types.TimestampType.withoutTimeZone(9),
+        "OceanBase MySQL mode cannot preserve timestamp precision 9; "
+            + "the maximum supported precision is 6");
+    assertCreateRejectedWithoutSideEffect(
+        "timestamptz_ns",
+        Types.TimestampType.withTimeZone(9),
+        "OceanBase MySQL mode cannot preserve timestamp precision 9; "
+            + "the maximum supported precision is 6");
+  }
+
+  private void assertCreateRejectedWithoutSideEffect(
+      String tablePrefix, Type type, String expectedMessage) {
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(tablePrefix));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    new Column[] {Column.of("value", type)},
+                    "unsupported type",
+                    Collections.emptyMap()));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains(expectedMessage),
+        String.format(
+            "Expected rejection to contain \"%s\", but was: %s",
+            expectedMessage, exception.getMessage()));
+    Assertions.assertFalse(tableCatalog.tableExists(tableIdentifier));
   }
 }

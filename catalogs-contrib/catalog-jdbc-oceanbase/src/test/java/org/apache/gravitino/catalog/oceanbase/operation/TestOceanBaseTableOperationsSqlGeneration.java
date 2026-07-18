@@ -27,6 +27,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -88,5 +89,26 @@ public class TestOceanBaseTableOperationsSqlGeneration {
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
+  }
+
+  @Test
+  public void testRejectNanosecondTimestampsBeforeSqlGeneration() {
+    assertCreateTableRejected(Types.TimestampType.withoutTimeZone(9));
+    assertCreateTableRejected(Types.TimestampType.withTimeZone(9));
+  }
+
+  private void assertCreateTableRejected(Type type) {
+    TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("col1").withType(type).withNullable(true).build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertEquals(
+        "OceanBase MySQL mode cannot preserve timestamp precision 9; "
+            + "the maximum supported precision is 6",
+        exception.getMessage());
   }
 }
