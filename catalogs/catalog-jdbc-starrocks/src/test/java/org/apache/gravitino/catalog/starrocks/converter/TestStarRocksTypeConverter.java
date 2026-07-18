@@ -75,6 +75,20 @@ class TestStarRocksTypeConverter {
             .contains("StarRocks JSON is not an exact representation of Gravitino Variant"));
   }
 
+  @Test
+  void testRejectUnknownType() {
+    Assertions.assertEquals(Types.ExternalType.of("unknown"), toGravitino("unknown", null));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> TYPE_CONVERTER.fromGravitino(Types.NullType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("StarRocks table columns cannot represent Gravitino Unknown (NullType)"));
+  }
+
   private static Type toGravitino(String typeName, Integer datetimePrecision) {
     JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean(typeName);
     typeBean.setDatetimePrecision(datetimePrecision);

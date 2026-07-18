@@ -834,6 +834,14 @@ public class CatalogStarRocksIT extends BaseIT {
   }
 
   @Test
+  void testRejectUnknownWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "unknown",
+        Types.NullType.get(),
+        "StarRocks table columns cannot represent Gravitino Unknown (NullType)");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");

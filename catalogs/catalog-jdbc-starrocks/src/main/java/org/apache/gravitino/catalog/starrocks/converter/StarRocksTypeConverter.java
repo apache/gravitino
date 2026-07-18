@@ -163,6 +163,9 @@ public class StarRocksTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.VariantType) {
       throw new IllegalArgumentException(
           "StarRocks JSON is not an exact representation of Gravitino Variant; cannot convert Gravitino type variant");
+    } else if (type instanceof Types.NullType) {
+      throw new IllegalArgumentException(
+          "StarRocks table columns cannot represent Gravitino Unknown (NullType); cannot convert Gravitino type null");
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to StarRocks type", type.simpleString()));
