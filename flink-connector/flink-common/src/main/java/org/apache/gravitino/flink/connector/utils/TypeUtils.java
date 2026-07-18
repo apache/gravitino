@@ -243,6 +243,9 @@ public class TypeUtils {
       case VARIANT:
         throw new IllegalArgumentException(
             "Flink 1.18-1.20 has no VARIANT logical type for Gravitino variant");
+      case GEOMETRY:
+        throw new IllegalArgumentException(
+            "Flink 1.18-1.20 has no geometry logical type that preserves CRS metadata");
       case EXTERNAL:
         Types.ExternalType externalType = (Types.ExternalType) gravitinoType;
         String catalogString = externalType.catalogString();

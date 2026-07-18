@@ -299,6 +299,25 @@ public class TestTypeUtils {
   }
 
   @Test
+  public void testRejectGeometryTypes() {
+    String expectedMessage =
+        "Flink 1.18-1.20 has no geometry logical type that preserves CRS metadata";
+
+    Assertions.assertEquals(
+        expectedMessage,
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> TypeUtils.toFlinkType(Types.GeometryType.crs84()))
+            .getMessage());
+    Assertions.assertEquals(
+        expectedMessage,
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> TypeUtils.toFlinkType(Types.GeometryType.of("EPSG:3857")))
+            .getMessage());
+  }
+
+  @Test
   public void testMultisetTypeConversion() {
     // MULTISET<STRING> (VARCHAR(MAX)) should be preserved as ExternalType
     Assertions.assertEquals(

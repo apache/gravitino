@@ -240,6 +240,23 @@ public class TestBaseCatalog {
   }
 
   @Test
+  public void testRejectGeometryBeforeSchemaExposure() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BaseCatalog.buildSchemaFromColumns(
+                    new org.apache.gravitino.rel.Column[] {
+                      org.apache.gravitino.rel.Column.of(
+                          "geometry_column", Types.GeometryType.crs84())
+                    }));
+
+    Assertions.assertEquals(
+        "Flink 1.18-1.20 has no geometry logical type that preserves CRS metadata",
+        exception.getMessage());
+  }
+
+  @Test
   public void testToGravitinoDistributionDefaultsToNone() {
     TestableBaseCatalog catalog =
         new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), mockUnsupportedViewCatalog());
