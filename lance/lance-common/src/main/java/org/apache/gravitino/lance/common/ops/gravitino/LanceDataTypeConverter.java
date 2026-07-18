@@ -44,6 +44,7 @@ import org.apache.gravitino.rel.types.Types.FixedType;
 public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Field> {
 
   public static final LanceDataTypeConverter CONVERTER = new LanceDataTypeConverter();
+  private static final String ARROW_EXTENSION_NAME = "ARROW:extension:name";
   private static final ObjectMapper mapper = new ObjectMapper();
 
   public Field toArrowField(String name, Type type, boolean nullable) {
@@ -196,6 +197,9 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
       case FIXED:
         FixedType fixedType = (FixedType) type;
         return new ArrowType.FixedSizeBinary(fixedType.length());
+      case VARIANT:
+        throw new IllegalArgumentException(
+            "Lance 6.0 and Arrow 18 do not provide an exact native representation for Gravitino Variant");
       default:
         throw new UnsupportedOperationException("Unsupported Gravitino type: " + type.name());
     }
@@ -204,6 +208,11 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
   @Override
   public Type toGravitino(Field arrowField) {
     FieldType fieldType = arrowField.getFieldType();
+    if (fieldType.getMetadata() != null
+        && fieldType.getMetadata().containsKey(ARROW_EXTENSION_NAME)) {
+      return toExternalType(arrowField);
+    }
+
     switch (fieldType.getType().getTypeID()) {
       case Map:
         Field structField = arrowField.getChildren().get(0);
@@ -318,12 +327,14 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
         // fallthrough
     }
 
-    String typeString;
+    return toExternalType(arrowField);
+  }
+
+  private Types.ExternalType toExternalType(Field arrowField) {
     try {
-      typeString = mapper.writeValueAsString(arrowField);
+      return Types.ExternalType.of(mapper.writeValueAsString(arrowField));
     } catch (Exception e) {
       throw new RuntimeException("Failed to serialize Arrow field to string.", e);
     }
-    return Types.ExternalType.of(typeString);
   }
 }

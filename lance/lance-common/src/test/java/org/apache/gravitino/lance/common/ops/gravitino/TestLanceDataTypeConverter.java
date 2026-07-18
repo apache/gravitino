@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.apache.arrow.vector.complex.MapVector;
@@ -235,6 +237,30 @@ public class TestLanceDataTypeConverter {
 
     assertInstanceOf(Types.ExternalType.class, converted);
     assertEquals(field, CONVERTER.toArrowField("event_time", converted, true));
+  }
+
+  @Test
+  public void testVariantTypeIsRejectedAndArrowExtensionsRemainExternal() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.VariantType.get()));
+    assertTrue(exception.getMessage().contains("exact native representation"));
+
+    Field nativeVariant =
+        new Field(
+            "payload",
+            new FieldType(
+                true,
+                ArrowType.Struct.INSTANCE,
+                null,
+                Map.of("ARROW:extension:name", "arrow.parquet.variant")),
+            List.of(
+                Field.notNullable("metadata", ArrowType.Binary.INSTANCE),
+                Field.nullable("value", ArrowType.Binary.INSTANCE)));
+    Type converted = CONVERTER.toGravitino(nativeVariant);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(nativeVariant, CONVERTER.toArrowField("payload", converted, true));
   }
 
   @Test

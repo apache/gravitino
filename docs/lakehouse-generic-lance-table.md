@@ -71,6 +71,7 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Timestamp_tz(9)`                | `TimestampType Nanosecond withUtc`      |
 | `Time`/`Time(9)`                 | `Time Nanosecond`                       |
 | `Null`                           | `Null`                                  |
+| `Variant`                        | Rejected before mutation                |
 | `Fixed(n)`                       | `Fixed-Size Binary(n)`                  |
 | `Interval_year`                  | Not supported by Lance                  |
 | `Interval_day`                   | `Duration(Microsecond)`                 |
@@ -81,6 +82,10 @@ timestamps. Gravitino `Timestamp_tz` has time-zone-aware instant semantics but d
 zone identifier, so the connector writes the canonical Arrow `UTC` identifier. Native Arrow
 timestamps with another zone identifier are preserved as `External` instead of silently rewriting
 that identifier.
+
+Lance 6.0 with Arrow 18 has no exact native representation for Gravitino `Variant`, so table
+creation rejects it before creating, replacing, or deleting table data. Arrow extension fields,
+including newer `arrow.parquet.variant` fields, remain lossless `External` types.
 
 ### External Types
 

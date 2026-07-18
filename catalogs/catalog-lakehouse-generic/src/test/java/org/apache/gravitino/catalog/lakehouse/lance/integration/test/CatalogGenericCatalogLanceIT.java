@@ -456,6 +456,58 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   }
 
   @Test
+  public void testVariantOverwriteRejectedWithoutSideEffects() {
+    String phase2TableName = GravitinoITUtils.genRandomName("lance_variant_rejection");
+    NameIdentifier identifier = NameIdentifier.of(schemaName, phase2TableName);
+    String location = tempDirectory + "/" + phase2TableName;
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    Column[] originalColumns = {
+      Column.of("id", Types.IntegerType.get(), "original integer column")
+    };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            identifier,
+            originalColumns,
+            "original table",
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            null,
+            null);
+
+    Map<String, String> overwriteProperties = Maps.newHashMap(properties);
+    overwriteProperties.put(LANCE_CREATION_MODE, "OVERWRITE");
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        identifier,
+                        new Column[] {Column.of("payload", Types.VariantType.get(), "variant")},
+                        "invalid overwrite",
+                        overwriteProperties,
+                        Transforms.EMPTY_TRANSFORM,
+                        null,
+                        null));
+
+    Assertions.assertTrue(exception.getMessage().contains("exact native representation"));
+    Assertions.assertTrue(catalog.asTableCatalog().tableExists(identifier));
+    Assertions.assertEquals(
+        Types.IntegerType.get(),
+        catalog.asTableCatalog().loadTable(identifier).columns()[0].dataType());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals(
+          new ArrowType.Int(32, true), dataset.getSchema().getFields().get(0).getType());
+    }
+  }
+
+  @Test
   void testLanceTableFormat() {
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     Column[] columns = createColumns();
