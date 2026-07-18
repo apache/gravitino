@@ -134,13 +134,16 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `String`             | `Text`              |
 | `Date`               | `Date`              |
 | `Time[(p)]`          | `Time[(p)]`         |
-| `Timestamp_tz[(p)]`  | `Timestamp(p)`      |
-| `Timestamp[(p)]`     | `Datetime[(p)]`     |
+| `Timestamp_tz[(p)]`  | `Timestamp[(p)]`, p in [0, 6] |
+| `Timestamp[(p)]`     | `Datetime[(p)]`, p in [0, 6]  |
 | `Decimal`            | `Decimal`           |
 | `VarChar`            | `VarChar`           |
 | `FixedChar`          | `FixedChar`         |
 | `Binary`             | `Binary`            |
 | `BOOLEAN`            | `BIT`               |
+
+MySQL supports fractional-second precision from 0 through 6. The catalog rejects Gravitino
+`Timestamp` and `Timestamp_tz` precision from 7 through 9 before executing DDL.
 
 :::info
 MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
