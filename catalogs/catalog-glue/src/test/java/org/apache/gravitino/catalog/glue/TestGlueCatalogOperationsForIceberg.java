@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -154,6 +155,33 @@ class TestGlueCatalogOperationsForIceberg {
 
     verify(mockIcebergCatalog).buildTable(any(TableIdentifier.class), any(Schema.class));
     verify(mockBuilder).create();
+  }
+
+  @Test
+  void testCreateTable_icebergRejectsNanosecondTimestampBeforeSdkCall() {
+    NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, "timestamp_ns");
+    GlueColumn[] cols = {
+      GlueColumn.builder()
+          .withName("event_time")
+          .withType(Types.TimestampType.withTimeZone(9))
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                cols,
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "iceberg", GlueConstants.LOCATION, LOCATION),
+                new Transform[0],
+                Distributions.NONE,
+                null,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockIcebergCatalog, never()).buildTable(any(TableIdentifier.class), any(Schema.class));
   }
 
   // ---------------------------------------------------------------------------

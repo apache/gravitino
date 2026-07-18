@@ -220,6 +220,27 @@ class TestGlueTypeConverter {
   }
 
   @Test
+  void testFromGravitinoNanosecondTimestampThrows() {
+    IllegalArgumentException timestampError =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.TimestampType.withoutTimeZone(9)));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: timestamp(9). "
+            + "Glue cannot safely preserve timestamp precision greater than 6.",
+        timestampError.getMessage());
+
+    IllegalArgumentException timestampTzError =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.TimestampType.withTimeZone(9)));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: timestamp_tz(9). "
+            + "Glue cannot safely preserve timestamp precision greater than 6.",
+        timestampTzError.getMessage());
+  }
+
+  @Test
   void testFromGravitinoUnsupportedTypeThrows() {
     assertThrows(
         IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.NullType.get()));

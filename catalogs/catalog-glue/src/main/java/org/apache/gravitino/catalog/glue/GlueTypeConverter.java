@@ -194,9 +194,15 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     if (type instanceof Types.StringType) return STRING;
     if (type instanceof Types.DateType) return DATE;
     if (type instanceof Types.TimestampType) {
+      Types.TimestampType tsType = (Types.TimestampType) type;
+      if (tsType.hasPrecisionSet() && tsType.precision() > 6) {
+        throw new IllegalArgumentException(
+            "Unsupported Gravitino type for Glue: "
+                + type.simpleString()
+                + ". Glue cannot safely preserve timestamp precision greater than 6.");
+      }
       // Glue/Hive timestamps are timezoneless; see:
       // https://cwiki.apache.org/confluence/display/hive/languagemanual+types
-      Types.TimestampType tsType = (Types.TimestampType) type;
       if (tsType.hasTimeZone()) {
         throw new IllegalArgumentException(
             "Unsupported Gravitino type for Glue: "

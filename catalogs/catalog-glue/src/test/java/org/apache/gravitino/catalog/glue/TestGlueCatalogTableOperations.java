@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -239,6 +240,33 @@ class TestGlueCatalogTableOperations {
                 Distributions.NONE,
                 SortOrders.NONE,
                 new Index[] {mock(Index.class)}));
+  }
+
+  @Test
+  void testCreateTableRejectsNanosecondTimestampBeforeGlueCall() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "timestamp_ns");
+    Column[] columns = {
+      GlueColumn.builder()
+          .withName("event_time")
+          .withType(Types.TimestampType.withoutTimeZone(9))
+          .withNullable(true)
+          .build()
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(GlueConstants.FORMAT, "parquet"),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    verify(mockClient, never()).createTable(any(CreateTableRequest.class));
   }
 
   @Test
