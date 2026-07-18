@@ -130,6 +130,7 @@ The current Gravitino Hudi catalog is read-only. It nevertheless validates V3 co
 | `timestamp(9)` / `timestamp_tz(9)`  | Rejected before the backend is called. Hudi 0.15 supports timestamp logical types only through microsecond precision. |
 | `variant`                            | Rejected before the backend is called. Hudi 0.15 does not define a Variant column type. |
 | `unknown`                            | Rejected before the backend is called. Hudi 0.15 table columns require a concrete value type. |
+| `geometry(crs)`                      | Rejected before the backend is called. Hudi 0.15 does not define a Geometry type that preserves CRS semantics. |
 
 ### Table Operations
 

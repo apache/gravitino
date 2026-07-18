@@ -174,6 +174,14 @@ public class TestHudiCatalogOperations {
             + "Hudi 0.15 table columns require a concrete value type.");
   }
 
+  @Test
+  public void testCreateTableRejectsGeometryBeforeBackendCall() throws Exception {
+    assertCreateRejected(
+        Types.GeometryType.of("EPSG:3857"),
+        "Unsupported Gravitino type for Hudi: geometry. "
+            + "Hudi 0.15 does not define a Geometry type that preserves CRS semantics.");
+  }
+
   private static void assertCreateRejected(Type type, String expectedMessage) throws Exception {
     try (InMemoryBackendOps backend = new InMemoryBackendOps()) {
       HudiCatalogOperations ops = new HudiCatalogOperations();
