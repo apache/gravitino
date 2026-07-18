@@ -214,6 +214,9 @@ closed list of alternative types and cannot preserve Gravitino's open-ended Vari
 Gravitino `Null` is rejected before executing DDL because ClickHouse has no column type for a
 null-only placeholder whose concrete type is not yet known.
 
+Gravitino `Geometry` is rejected before executing DDL. The Geo types in the supported ClickHouse
+24.8 line are shape-specific and do not preserve Gravitino's CRS metadata.
+
 ### Table Properties
 
 :::note

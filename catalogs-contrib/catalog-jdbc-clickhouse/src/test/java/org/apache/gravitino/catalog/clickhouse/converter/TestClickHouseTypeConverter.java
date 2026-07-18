@@ -207,6 +207,18 @@ public class TestClickHouseTypeConverter {
         exception.getMessage().contains("the null-only placeholder has no ClickHouse column type"));
   }
 
+  @Test
+  public void testRejectGeometryType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.GeometryType.of("SRID:3857")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("ClickHouse Geo types do not preserve Gravitino Geometry CRS metadata"));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, CLICKHOUSE_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }

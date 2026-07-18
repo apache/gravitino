@@ -219,6 +219,9 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
               + "the open-ended Gravitino Variant contract");
     } else if (type instanceof Types.NullType) {
       throw unsupportedType(type, "the null-only placeholder has no ClickHouse column type");
+    } else if (type instanceof Types.GeometryType) {
+      throw unsupportedType(
+          type, "ClickHouse Geo types do not preserve Gravitino Geometry CRS metadata");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

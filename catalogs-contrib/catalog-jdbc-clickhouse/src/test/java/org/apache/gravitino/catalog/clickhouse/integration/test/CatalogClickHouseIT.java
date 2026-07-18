@@ -2543,6 +2543,14 @@ public class CatalogClickHouseIT extends BaseIT {
         "the null-only placeholder has no ClickHouse column type");
   }
 
+  @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geometry",
+        Types.GeometryType.of("SRID:3857"),
+        "ClickHouse Geo types do not preserve Gravitino Geometry CRS metadata");
+  }
+
   private void assertUnsupportedV3TypeDoesNotCreateTable(
       String tablePrefix, Type type, String expectedMessage) {
     NameIdentifier tableIdentifier =
