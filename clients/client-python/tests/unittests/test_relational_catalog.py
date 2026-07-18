@@ -25,6 +25,7 @@ from gravitino.api.rel.dialects import Dialects
 from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.table_change import TableChange
 from gravitino.api.rel.types.types import Types
+from gravitino.api.rel.view_change import ViewChange
 from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.column_dto import ColumnDTO
@@ -32,14 +33,17 @@ from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.rel.view_dto import ViewDTO
+from gravitino.dto.requests.view_update_request import ViewUpdateRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
 from gravitino.dto.responses.view_response import ViewResponse
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import (
+    IllegalArgumentException,
     NoSuchSchemaException,
     NoSuchTableException,
+    NoSuchViewException,
     TableAlreadyExistsException,
     ViewAlreadyExistsException,
 )
@@ -369,6 +373,64 @@ class TestRelationalCatalog(unittest.TestCase):
             )
             self.assertEqual(table.name(), self.table_dto.name())
 
+    def test_list_views(self):
+        view1 = NameIdentifier.of(
+            self.metalake_name, self.catalog_name, self.schema_name, "view1"
+        )
+        view2 = NameIdentifier.of(
+            self.metalake_name, self.catalog_name, self.schema_name, "view2"
+        )
+
+        resp_body = EntityListResponse(0, [view1, view2])
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_resp,
+        ):
+            views = self.catalog.as_view_catalog().list_views(
+                Namespace.of(self.schema_name)
+            )
+            self.assertEqual(2, len(views))
+            self.assertEqual("view1", views[0].name())
+            self.assertEqual("view2", views[1].name())
+
+    def test_list_views_invalid_namespace(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            side_effect=NoSuchSchemaException("Schema not found"),
+        ):
+            with self.assertRaises(NoSuchSchemaException):
+                self.catalog.as_view_catalog().list_views(
+                    Namespace.of("invalid_schema")
+                )
+
+    def test_load_view(self):
+        resp_body = ViewResponse(0, self.view_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_resp,
+        ):
+            view = self.catalog.as_view_catalog().load_view(self.view_identifier)
+            self.assertEqual(self.view_name, view.name())
+            self.assertEqual("test view comment", view.comment())
+            self.assertEqual("test_catalog", view.default_catalog())
+            self.assertEqual("test_schema", view.default_schema())
+            self.assertEqual("v1", view.properties()["k1"])
+            self.assertEqual(
+                "SELECT id FROM test_table", view.sql_for(Dialects.TRINO).sql()
+            )
+
+    def test_load_view_not_exists(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            side_effect=NoSuchViewException("View not found"),
+        ):
+            with self.assertRaises(NoSuchViewException):
+                self.catalog.as_view_catalog().load_view(self.view_identifier)
+
     def test_create_view(self):
         resp_body = ViewResponse(0, self.view_dto)
         mock_resp = self._get_mock_http_resp(resp_body.to_json())
@@ -401,6 +463,55 @@ class TestRelationalCatalog(unittest.TestCase):
                     [SQLRepresentation(Dialects.TRINO, "SELECT id FROM test_table")],
                 )
 
+    def test_alter_view(self):
+        updated_view_dto = ViewDTO(
+            _name="new_view",
+            _columns=[
+                ColumnDTO(
+                    _name="id",
+                    _data_type=Types.IntegerType.get(),
+                    _comment="id column",
+                    _nullable=False,
+                )
+            ],
+            _representations=[
+                SQLRepresentationDTO(
+                    _dialect=Dialects.TRINO,
+                    _sql="SELECT id FROM test_table",
+                )
+            ],
+            _comment="test view comment",
+            _default_catalog="test_catalog",
+            _default_schema="test_schema",
+            _properties={"k1": "v1"},
+            _audit=AuditDTO(
+                "creator", "2022-01-01T00:00:00Z", "modifier", "2022-01-01T00:00:00Z"
+            ),
+        )
+        resp_body = ViewResponse(0, updated_view_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            return_value=mock_resp,
+        ):
+            view = self.catalog.as_view_catalog().alter_view(
+                self.view_identifier,
+                ViewChange.rename("new_view"),
+            )
+            self.assertEqual("new_view", view.name())
+
+    def test_alter_view_not_exists(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.put",
+            side_effect=NoSuchViewException("View not found"),
+        ):
+            with self.assertRaises(NoSuchViewException):
+                self.catalog.as_view_catalog().alter_view(
+                    self.view_identifier,
+                    ViewChange.rename("new_view"),
+                )
+
     def test_drop_view(self):
         resp_body = DropResponse(0, True)
         mock_resp = self._get_mock_http_resp(resp_body.to_json())
@@ -422,3 +533,50 @@ class TestRelationalCatalog(unittest.TestCase):
         ):
             is_dropped = self.catalog.as_view_catalog().drop_view(self.view_identifier)
             self.assertFalse(is_dropped)
+
+    def test_to_view_update_request(self):
+        to_request = (
+            RelationalCatalog._to_view_update_request  # pylint: disable=protected-access
+        )
+
+        rename_request = to_request(ViewChange.rename("new_view"))
+        set_property_request = to_request(ViewChange.set_property("key", "value"))
+        remove_property_request = to_request(ViewChange.remove_property("key"))
+        replace_view_request = to_request(
+            ViewChange.replace_view(
+                [Column.of("id", Types.IntegerType.get())],
+                [SQLRepresentation(Dialects.TRINO, "SELECT id FROM table")],
+                "catalog",
+                "schema",
+                "comment",
+            )
+        )
+
+        self.assertIsInstance(rename_request, ViewUpdateRequest.RenameViewRequest)
+        self.assertEqual("new_view", rename_request.view_change().new_name())
+        self.assertIsInstance(
+            set_property_request, ViewUpdateRequest.SetViewPropertyRequest
+        )
+        self.assertEqual("key", set_property_request.view_change().property())
+        self.assertEqual("value", set_property_request.view_change().value())
+        self.assertIsInstance(
+            remove_property_request, ViewUpdateRequest.RemoveViewPropertyRequest
+        )
+        self.assertEqual("key", remove_property_request.view_change().property())
+        self.assertIsInstance(
+            replace_view_request, ViewUpdateRequest.ReplaceViewRequest
+        )
+        self.assertEqual(
+            "catalog", replace_view_request.view_change().default_catalog()
+        )
+        self.assertEqual("schema", replace_view_request.view_change().default_schema())
+        self.assertEqual("comment", replace_view_request.view_change().comment())
+
+    def test_to_view_update_request_unsupported_change(self):
+        class UnsupportedViewChange(ViewChange):
+            pass
+
+        with self.assertRaisesRegex(IllegalArgumentException, "Unknown change type"):
+            RelationalCatalog._to_view_update_request(  # pylint: disable=protected-access
+                UnsupportedViewChange()
+            )
