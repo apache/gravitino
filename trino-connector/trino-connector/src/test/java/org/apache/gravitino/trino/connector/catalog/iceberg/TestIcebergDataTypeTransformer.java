@@ -22,6 +22,11 @@ package org.apache.gravitino.trino.connector.catalog.iceberg;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
+import io.trino.spi.connector.ColumnMetadata;
+import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorTableMetadata;
+import io.trino.spi.connector.SaveMode;
+import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.type.TimeType;
 import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.TimestampWithTimeZoneType;
@@ -30,6 +35,8 @@ import io.trino.spi.type.VarcharType;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.GravitinoMetadata;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
@@ -40,9 +47,12 @@ import org.mockito.Mockito;
 
 public class TestIcebergDataTypeTransformer {
 
+  private static final int TRINO_478 = 478;
+
   @Test
   public void testTrinoTypeToGravitinoType() {
-    GeneralDataTypeTransformer generalDataTypeTransformer = new IcebergDataTypeTransformer();
+    GeneralDataTypeTransformer generalDataTypeTransformer =
+        new IcebergDataTypeTransformer(TRINO_478);
     io.trino.spi.type.Type charTypeWithLengthOne = io.trino.spi.type.CharType.createCharType(1);
 
     Exception e =
@@ -74,11 +84,18 @@ public class TestIcebergDataTypeTransformer {
     Assertions.assertEquals(
         generalDataTypeTransformer.getTrinoType(Types.TimestampType.withTimeZone()),
         TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS);
+
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getGravitinoType(TimestampType.TIMESTAMP_MILLIS),
+        Types.TimestampType.withoutTimeZone(6));
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getGravitinoType(TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS),
+        Types.TimestampType.withTimeZone(6));
   }
 
   @Test
   public void testRejectNanosecondTimestamps() {
-    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer();
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer(TRINO_478);
     Type[] gravitinoTypes = {
       Types.TimestampType.withoutTimeZone(9), Types.TimestampType.withTimeZone(9)
     };
@@ -88,20 +105,73 @@ public class TestIcebergDataTypeTransformer {
     };
 
     for (Type type : gravitinoTypes) {
-      assertIllegalArgument(
-          () -> transformer.getTrinoType(type), "only timestamp precision 6 is lossless");
+      assertIllegalArgument(() -> transformer.getTrinoType(type), "requires Trino 481 or newer");
       assertMetadataRejectedBeforeConnectorInvocation(type);
     }
     for (io.trino.spi.type.Type type : trinoTypes) {
       assertIllegalArgument(
-          () -> transformer.getGravitinoType(type), "only timestamp precision 6 is lossless");
+          () -> transformer.getGravitinoType(type), "requires Trino 481 or newer");
     }
   }
 
   @Test
+  public void testNanosecondTimestampsStartInTrino481() {
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer(481);
+
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withoutTimeZone(9)),
+        TimestampType.createTimestampType(9));
+    Assertions.assertEquals(
+        transformer.getTrinoType(Types.TimestampType.withTimeZone(9)),
+        TimestampWithTimeZoneType.createTimestampWithTimeZoneType(9));
+    Assertions.assertEquals(
+        transformer.getGravitinoType(TimestampType.createTimestampType(9)),
+        Types.TimestampType.withoutTimeZone(9));
+    Assertions.assertEquals(
+        transformer.getGravitinoType(TimestampWithTimeZoneType.createTimestampWithTimeZoneType(9)),
+        Types.TimestampType.withTimeZone(9));
+  }
+
+  @Test
+  public void testRejectTimestampPrecisionWithoutIcebergRepresentation() {
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer(482);
+
+    assertIllegalArgument(
+        () -> transformer.getTrinoType(Types.TimestampType.withoutTimeZone(7)),
+        "timestamp precision must be 6 or 9");
+    assertIllegalArgument(
+        () -> transformer.getGravitinoType(TimestampType.createTimestampType(12)),
+        "timestamp precision must be 6 or 9");
+  }
+
+  @Test
+  public void testCreateTableRejectsBeforeCatalogMutation() {
+    CatalogConnectorMetadata catalogMetadata = Mockito.mock(CatalogConnectorMetadata.class);
+    ConnectorMetadata internalMetadata = Mockito.mock(ConnectorMetadata.class);
+    IcebergMetadataAdapter adapter =
+        (IcebergMetadataAdapter) new IcebergConnectorAdapter().getMetadataAdapter(TRINO_478);
+    GravitinoMetadata metadata =
+        new GravitinoMetadata(catalogMetadata, adapter, internalMetadata) {};
+    ConnectorTableMetadata tableMetadata =
+        new ConnectorTableMetadata(
+            new SchemaTableName("schema", "unsupported_type"),
+            ImmutableList.of(
+                ColumnMetadata.builder()
+                    .setName("col")
+                    .setType(TimestampType.createTimestampType(9))
+                    .build()),
+            ImmutableMap.of(IcebergPropertyMeta.ICEBERG_FORMAT_PROPERTY, "PARQUET"));
+
+    assertIllegalArgument(
+        () -> metadata.createTable(null, tableMetadata, SaveMode.FAIL),
+        "current Trino version is 478");
+    Mockito.verifyNoInteractions(catalogMetadata, internalMetadata);
+  }
+
+  @Test
   public void testRejectVariant() {
-    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer();
-    String expectedMessage = "support starts in Trino 481";
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer(TRINO_478);
+    String expectedMessage = "requires Trino 481 or newer";
 
     assertIllegalArgument(() -> transformer.getTrinoType(Types.VariantType.get()), expectedMessage);
     assertMetadataRejectedBeforeConnectorInvocation(Types.VariantType.get(), expectedMessage);
@@ -111,8 +181,8 @@ public class TestIcebergDataTypeTransformer {
 
   @Test
   public void testRejectUnknown() {
-    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer();
-    String expectedMessage = "cannot represent Iceberg V3 unknown as a table column";
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer(TRINO_478);
+    String expectedMessage = "not supported by any Trino Iceberg connector version";
 
     assertIllegalArgument(() -> transformer.getTrinoType(Types.NullType.get()), expectedMessage);
     assertMetadataRejectedBeforeConnectorInvocation(Types.NullType.get(), expectedMessage);
@@ -122,8 +192,8 @@ public class TestIcebergDataTypeTransformer {
 
   @Test
   public void testRejectGeometry() {
-    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer();
-    String expectedMessage = "support starts in Trino 482";
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer(TRINO_478);
+    String expectedMessage = "requires Trino 482 or newer";
     Type type = Types.GeometryType.of("EPSG:3857");
 
     assertIllegalArgument(() -> transformer.getTrinoType(type), expectedMessage);
@@ -134,8 +204,8 @@ public class TestIcebergDataTypeTransformer {
 
   @Test
   public void testRejectGeography() {
-    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer();
-    String expectedMessage = "support starts in Trino 482";
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer(TRINO_478);
+    String expectedMessage = "requires Trino 482 or newer";
     Type type = Types.GeographyType.of("EPSG:4326", "karney");
 
     assertIllegalArgument(() -> transformer.getTrinoType(type), expectedMessage);
@@ -146,14 +216,40 @@ public class TestIcebergDataTypeTransformer {
         () -> transformer.getGravitinoType(mockTrinoType("sphericalgeography")), expectedMessage);
   }
 
+  @Test
+  public void testRejectTypesWithoutLosslessGravitinoConversionOnNewerTrino() {
+    IcebergDataTypeTransformer trino481Transformer = new IcebergDataTypeTransformer(481);
+    assertIllegalArgument(
+        () -> trino481Transformer.getTrinoType(Types.VariantType.get()),
+        "cannot losslessly convert Iceberg V3 variant on Trino 481");
+    assertIllegalArgument(
+        () -> trino481Transformer.getGravitinoType(mockTrinoType("variant")),
+        "cannot losslessly convert Iceberg V3 variant on Trino 481");
+
+    IcebergDataTypeTransformer trino482Transformer = new IcebergDataTypeTransformer(482);
+    assertIllegalArgument(
+        () -> trino482Transformer.getTrinoType(Types.GeometryType.of("EPSG:3857")),
+        "cannot losslessly convert Iceberg V3 geometry on Trino 482");
+    assertIllegalArgument(
+        () -> trino482Transformer.getGravitinoType(mockTrinoType("geometry")),
+        "cannot losslessly convert Iceberg V3 geometry on Trino 482");
+    assertIllegalArgument(
+        () -> trino482Transformer.getTrinoType(Types.GeographyType.of("EPSG:4326", "spherical")),
+        "cannot losslessly convert Iceberg V3 geography on Trino 482");
+    assertIllegalArgument(
+        () -> trino482Transformer.getGravitinoType(mockTrinoType("geography")),
+        "cannot losslessly convert Iceberg V3 geography on Trino 482");
+  }
+
   private static void assertMetadataRejectedBeforeConnectorInvocation(Type type) {
-    assertMetadataRejectedBeforeConnectorInvocation(type, "only timestamp precision 6 is lossless");
+    assertMetadataRejectedBeforeConnectorInvocation(type, "requires Trino 481 or newer");
   }
 
   private static void assertMetadataRejectedBeforeConnectorInvocation(
       Type type, String expectedMessage) {
     IcebergMetadataAdapter adapter =
-        new IcebergMetadataAdapter(ImmutableList.of(), ImmutableList.of(), ImmutableList.of());
+        new IcebergMetadataAdapter(
+            ImmutableList.of(), ImmutableList.of(), ImmutableList.of(), TRINO_478);
     GravitinoTable table =
         new GravitinoTable(
             "schema",

@@ -67,6 +67,16 @@ public interface CatalogConnectorAdapter {
   CatalogConnectorMetadataAdapter getMetadataAdapter();
 
   /**
+   * Returns the metadata adapter for the catalog connector on a specific Trino runtime.
+   *
+   * @param trinoVersion the runtime Trino SPI version
+   * @return the metadata adapter
+   */
+  default CatalogConnectorMetadataAdapter getMetadataAdapter(int trinoVersion) {
+    return getMetadataAdapter();
+  }
+
+  /**
    * @return ColumnProperties list that used to validate column properties.
    */
   default List<PropertyMetadata<?>> getColumnProperties() {
