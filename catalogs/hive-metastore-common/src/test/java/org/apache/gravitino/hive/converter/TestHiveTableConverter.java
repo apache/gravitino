@@ -63,6 +63,24 @@ public class TestHiveTableConverter {
   }
 
   @Test
+  public void testConvertUnknownColumnToHiveVoid() {
+    Column[] columns = {Column.of("future_value", Types.NullType.get(), "Unknown value")};
+    HiveTable hiveTable =
+        HiveTable.builder()
+            .withName("events")
+            .withDatabaseName("db")
+            .withColumns(columns)
+            .withProperties(new HashMap<>())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+
+    Table convertedTable = HiveTableConverter.toHiveTable(hiveTable);
+    assertEquals("void", convertedTable.getSd().getCols().get(0).getType());
+    assertEquals(Types.NullType.get(), HiveTableConverter.getColumns(convertedTable)[0].dataType());
+  }
+
+  @Test
   public void testGetColumnsWithNoDuplicates() {
     // Create a table with columns and partition keys that don't overlap
     Table table = new Table();

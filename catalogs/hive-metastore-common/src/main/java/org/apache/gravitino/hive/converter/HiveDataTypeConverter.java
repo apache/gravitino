@@ -31,6 +31,7 @@ import static org.apache.hadoop.hive.serde.serdeConstants.SMALLINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.TIMESTAMP_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.VOID_TYPE_NAME;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getCharTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getDecimalTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getListTypeInfo;
@@ -142,6 +143,8 @@ public class HiveDataTypeConverter implements DataTypeConverter<TypeInfo, String
       case VARIANT:
         throw new IllegalArgumentException(
             "Hive cannot preserve the Gravitino variant type because it has no equivalent type.");
+      case NULL:
+        return getPrimitiveTypeInfo(VOID_TYPE_NAME);
       default:
         throw new UnsupportedOperationException("Unsupported conversion to Hive type: " + type);
     }
@@ -182,6 +185,8 @@ public class HiveDataTypeConverter implements DataTypeConverter<TypeInfo, String
             return Types.IntervalYearType.get();
           case INTERVAL_DAY_TIME_TYPE_NAME:
             return Types.IntervalDayType.get();
+          case VOID_TYPE_NAME:
+            return Types.NullType.get();
           default:
             if (hiveTypeInfo instanceof CharTypeInfo) {
               return Types.FixedCharType.of(((CharTypeInfo) hiveTypeInfo).getLength());

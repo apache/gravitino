@@ -32,6 +32,7 @@ import static org.apache.hadoop.hive.serde.serdeConstants.SMALLINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.STRING_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.TIMESTAMP_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.TINYINT_TYPE_NAME;
+import static org.apache.hadoop.hive.serde.serdeConstants.VOID_TYPE_NAME;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getCharTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getDecimalTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getListTypeInfo;
@@ -65,6 +66,7 @@ public class TestTypeConverter {
     testConverter(DATE_TYPE_NAME);
     testConverter(TIMESTAMP_TYPE_NAME);
     testConverter(BINARY_TYPE_NAME);
+    testConverter(VOID_TYPE_NAME);
     testConverter(INTERVAL_YEAR_MONTH_TYPE_NAME);
     testConverter(INTERVAL_DAY_TIME_TYPE_NAME);
     testConverter(getVarcharTypeInfo(10).getTypeName());
@@ -112,6 +114,15 @@ public class TestTypeConverter {
     Assertions.assertEquals(
         "Hive cannot preserve the Gravitino variant type because it has no equivalent type.",
         exception.getMessage());
+  }
+
+  @Test
+  public void testUnknownMapsToHiveVoid() {
+    Assertions.assertEquals(
+        getPrimitiveTypeInfo(VOID_TYPE_NAME),
+        HiveDataTypeConverter.CONVERTER.fromGravitino(Types.NullType.get()));
+    Assertions.assertEquals(
+        Types.NullType.get(), HiveDataTypeConverter.CONVERTER.toGravitino(VOID_TYPE_NAME));
   }
 
   private void testConverter(String typeName) {
