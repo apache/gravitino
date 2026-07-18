@@ -217,6 +217,9 @@ null-only placeholder whose concrete type is not yet known.
 Gravitino `Geometry` is rejected before executing DDL. The Geo types in the supported ClickHouse
 24.8 line are shape-specific and do not preserve Gravitino's CRS metadata.
 
+Gravitino `Geography` is rejected before executing DDL because ClickHouse Geo types do not preserve
+its CRS and edge-algorithm metadata.
+
 ### Table Properties
 
 :::note

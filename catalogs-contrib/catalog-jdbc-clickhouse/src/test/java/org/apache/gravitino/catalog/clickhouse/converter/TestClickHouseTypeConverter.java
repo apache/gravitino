@@ -219,6 +219,22 @@ public class TestClickHouseTypeConverter {
             .contains("ClickHouse Geo types do not preserve Gravitino Geometry CRS metadata"));
   }
 
+  @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CLICKHOUSE_TYPE_CONVERTER.fromGravitino(
+                    Types.GeographyType.of("EPSG:4326", "karney")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "ClickHouse Geo types do not preserve Gravitino Geography CRS and "
+                    + "edge-algorithm metadata"));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, CLICKHOUSE_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }

@@ -222,6 +222,11 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.GeometryType) {
       throw unsupportedType(
           type, "ClickHouse Geo types do not preserve Gravitino Geometry CRS metadata");
+    } else if (type instanceof Types.GeographyType) {
+      throw unsupportedType(
+          type,
+          "ClickHouse Geo types do not preserve Gravitino Geography CRS and edge-algorithm "
+              + "metadata");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

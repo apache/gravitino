@@ -2551,6 +2551,14 @@ public class CatalogClickHouseIT extends BaseIT {
         "ClickHouse Geo types do not preserve Gravitino Geometry CRS metadata");
   }
 
+  @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "ClickHouse Geo types do not preserve Gravitino Geography CRS and edge-algorithm metadata");
+  }
+
   private void assertUnsupportedV3TypeDoesNotCreateTable(
       String tablePrefix, Type type, String expectedMessage) {
     NameIdentifier tableIdentifier =
