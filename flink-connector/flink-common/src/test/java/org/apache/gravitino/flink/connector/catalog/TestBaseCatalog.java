@@ -193,6 +193,22 @@ public class TestBaseCatalog {
   }
 
   @Test
+  public void testRejectVariantBeforeSchemaExposure() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BaseCatalog.buildSchemaFromColumns(
+                    new org.apache.gravitino.rel.Column[] {
+                      org.apache.gravitino.rel.Column.of("variant_column", Types.VariantType.get())
+                    }));
+
+    Assertions.assertEquals(
+        "Flink 1.18-1.20 has no VARIANT logical type for Gravitino variant",
+        exception.getMessage());
+  }
+
+  @Test
   public void testToGravitinoDistributionDefaultsToNone() {
     TestableBaseCatalog catalog =
         new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), mockUnsupportedViewCatalog());

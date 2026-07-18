@@ -155,3 +155,4 @@ catalog metadata. These behaviors apply to the supported Flink 1.18, 1.19, and 1
 | Gravitino type family                 | Flink behavior |
 |---------------------------------------|----------------|
 | `timestamp(9)`, `timestamp_tz(9)`     | Preserved as `TIMESTAMP(9)` and `TIMESTAMP_LTZ(9)`. Offset-bearing Flink `TIMESTAMP(9) WITH TIME ZONE` is rejected because converting it to `TIMESTAMP_LTZ` would discard its per-value offset semantics. |
+| `variant`                             | Rejected because Flink 1.18–1.20 has no `VARIANT` logical type. |

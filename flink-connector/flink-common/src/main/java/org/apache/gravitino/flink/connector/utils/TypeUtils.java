@@ -240,6 +240,9 @@ public class TypeUtils {
         return DataTypes.INTERVAL(DataTypes.YEAR());
       case INTERVAL_DAY:
         return DataTypes.INTERVAL(DataTypes.DAY());
+      case VARIANT:
+        throw new IllegalArgumentException(
+            "Flink 1.18-1.20 has no VARIANT logical type for Gravitino variant");
       case EXTERNAL:
         Types.ExternalType externalType = (Types.ExternalType) gravitinoType;
         String catalogString = externalType.catalogString();
