@@ -61,6 +61,20 @@ class TestStarRocksTypeConverter {
             .contains("StarRocks DATETIME does not preserve time-zone semantics"));
   }
 
+  @Test
+  void testRejectVariantType() {
+    Assertions.assertEquals(Types.ExternalType.of("json"), toGravitino("json", null));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> TYPE_CONVERTER.fromGravitino(Types.VariantType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("StarRocks JSON is not an exact representation of Gravitino Variant"));
+  }
+
   private static Type toGravitino(String typeName, Integer datetimePrecision) {
     JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean(typeName);
     typeBean.setDatetimePrecision(datetimePrecision);

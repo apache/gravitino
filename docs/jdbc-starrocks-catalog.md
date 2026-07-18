@@ -114,6 +114,7 @@ Refer to
 | Gravitino Type                      | StarRocks outcome                                                                                                       |
 |-------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
 | `Timestamp(9)` / `Timestamp_tz(9)` | Rejected before DDL. `DATETIME` has no time zone or declared fractional-precision parameter.                            |
+| `Variant`                           | Rejected before DDL. Native `JSON` columns load as `External` because JSON is not an exact Variant representation.      |
 
 Although StarRocks 3.3.5 and later can store fractional seconds in `DATETIME` values, its column type cannot preserve a declared Gravitino `Timestamp(p)` precision.
 The connector therefore rejects every precision-qualified `Timestamp(p)`; native fractional-precision metadata support remains separate Phase 3 work.

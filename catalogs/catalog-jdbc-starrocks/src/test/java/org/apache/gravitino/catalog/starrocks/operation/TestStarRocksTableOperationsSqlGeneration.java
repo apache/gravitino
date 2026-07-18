@@ -153,4 +153,21 @@ public class TestStarRocksTableOperationsSqlGeneration {
           () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
     }
   }
+
+  @Test
+  public void testCreateTableRejectsVariantBeforeSqlGeneration() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("unsupported_col").withType(Types.VariantType.get()).build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("unsupported_col"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("StarRocks JSON is not an exact representation of Gravitino Variant"));
+  }
 }

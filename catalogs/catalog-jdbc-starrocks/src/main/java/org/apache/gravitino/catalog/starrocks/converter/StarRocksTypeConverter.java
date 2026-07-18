@@ -160,6 +160,9 @@ public class StarRocksTypeConverter extends JdbcTypeConverter {
                 type.simpleString()));
       }
       return DATETIME;
+    } else if (type instanceof Types.VariantType) {
+      throw new IllegalArgumentException(
+          "StarRocks JSON is not an exact representation of Gravitino Variant; cannot convert Gravitino type variant");
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to StarRocks type", type.simpleString()));

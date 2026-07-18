@@ -826,6 +826,14 @@ public class CatalogStarRocksIT extends BaseIT {
   }
 
   @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "variant",
+        Types.VariantType.get(),
+        "StarRocks JSON is not an exact representation of Gravitino Variant");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");
