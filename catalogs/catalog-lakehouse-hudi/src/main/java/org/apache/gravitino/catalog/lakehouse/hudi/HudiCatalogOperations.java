@@ -49,6 +49,8 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -237,6 +239,9 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    for (Column column : columns) {
+      validateWritableType(column.dataType());
+    }
     return hudiCatalogBackendOps.createTable(
         ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
   }
@@ -265,5 +270,32 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public boolean dropTable(NameIdentifier ident) {
     return hudiCatalogBackendOps.dropTable(ident);
+  }
+
+  private static void validateWritableType(Type type) {
+    if (type instanceof Types.TimestampType) {
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasPrecisionSet() && timestampType.precision() > 6) {
+        throw new IllegalArgumentException(
+            "Unsupported Gravitino type for Hudi: "
+                + type.simpleString()
+                + ". Hudi 0.15 cannot preserve timestamp precision greater than 6.");
+      }
+    }
+    if (type instanceof Types.ListType) {
+      validateWritableType(((Types.ListType) type).elementType());
+    } else if (type instanceof Types.MapType) {
+      Types.MapType mapType = (Types.MapType) type;
+      validateWritableType(mapType.keyType());
+      validateWritableType(mapType.valueType());
+    } else if (type instanceof Types.StructType) {
+      for (Types.StructType.Field field : ((Types.StructType) type).fields()) {
+        validateWritableType(field.type());
+      }
+    } else if (type instanceof Types.UnionType) {
+      for (Type unionType : ((Types.UnionType) type).types()) {
+        validateWritableType(unionType);
+      }
+    }
   }
 }

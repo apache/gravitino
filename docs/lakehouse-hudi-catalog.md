@@ -121,6 +121,14 @@ The following table shows the mapping between Gravitino and [Apache Hudi column 
 | `map`          | `map`            |
 | `struct`       | `struct`         |
 
+#### V3 Type Write Compatibility
+
+The current Gravitino Hudi catalog is read-only. It nevertheless validates V3 column types before delegating a create request so that an incompatible type returns a deterministic invalid-argument error without invoking the backend.
+
+| Gravitino Type                       | Hudi 0.15 Write Outcome |
+|--------------------------------------|-------------------------|
+| `timestamp(9)` / `timestamp_tz(9)`  | Rejected before the backend is called. Hudi 0.15 supports timestamp logical types only through microsecond precision. |
+
 ### Table Operations
 
 Only support read operations: listTable, loadTable, and tableExists.
