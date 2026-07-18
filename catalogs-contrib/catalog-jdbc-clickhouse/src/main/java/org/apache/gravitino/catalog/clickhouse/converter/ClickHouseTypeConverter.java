@@ -217,6 +217,8 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
           type,
           "ClickHouse Variant requires a closed list of alternative types and cannot preserve "
               + "the open-ended Gravitino Variant contract");
+    } else if (type instanceof Types.NullType) {
+      throw unsupportedType(type, "the null-only placeholder has no ClickHouse column type");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

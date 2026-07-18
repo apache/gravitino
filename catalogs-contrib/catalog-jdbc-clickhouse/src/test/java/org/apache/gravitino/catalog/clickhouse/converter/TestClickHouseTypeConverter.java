@@ -197,6 +197,16 @@ public class TestClickHouseTypeConverter {
                     + "preserve the open-ended Gravitino Variant contract"));
   }
 
+  @Test
+  public void testRejectNullType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.NullType.get()));
+    Assertions.assertTrue(
+        exception.getMessage().contains("the null-only placeholder has no ClickHouse column type"));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, CLICKHOUSE_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }

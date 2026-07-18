@@ -211,6 +211,9 @@ Timestamp precision from 10 through 12 is rejected before executing DDL because 
 Gravitino `Variant` is rejected before executing DDL. ClickHouse `Variant(T1, T2, ...)` requires a
 closed list of alternative types and cannot preserve Gravitino's open-ended Variant contract.
 
+Gravitino `Null` is rejected before executing DDL because ClickHouse has no column type for a
+null-only placeholder whose concrete type is not yet known.
+
 ### Table Properties
 
 :::note

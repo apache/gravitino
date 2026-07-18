@@ -2535,6 +2535,14 @@ public class CatalogClickHouseIT extends BaseIT {
         "ClickHouse Variant requires a closed list of alternative types");
   }
 
+  @Test
+  void testRejectNullTypeWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_null",
+        Types.NullType.get(),
+        "the null-only placeholder has no ClickHouse column type");
+  }
+
   private void assertUnsupportedV3TypeDoesNotCreateTable(
       String tablePrefix, Type type, String expectedMessage) {
     NameIdentifier tableIdentifier =
