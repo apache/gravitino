@@ -148,8 +148,11 @@ MySQL supports fractional-second precision from 0 through 6. The catalog rejects
 Gravitino `Variant` is rejected before executing DDL because MySQL `JSON` does not represent the
 complete Variant value domain.
 
+Gravitino `Null` (the V3 unknown type) is rejected before executing DDL because it is a null-only
+placeholder, not a MySQL column type.
+
 :::info
-MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` type.
+MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 

@@ -168,6 +168,8 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.VariantType) {
       throw unsupportedType(
           type, "MySQL JSON does not represent the complete Variant value domain");
+    } else if (type instanceof Types.NullType) {
+      throw unsupportedType(type, "the null-only placeholder has no MySQL column type");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

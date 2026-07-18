@@ -2403,6 +2403,12 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testRejectNullTypeWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_null", Types.NullType.get(), "the null-only placeholder has no MySQL column type");
+  }
+
+  @Test
   void testObjectNamesWithDots() {
     // Create a MySQL database with a dot in its name directly (bypassing Gravitino)
     String dottedSchemaName = GravitinoITUtils.genRandomName("db") + ".nested";

@@ -138,6 +138,16 @@ public class TestMysqlTypeConverter {
             .contains("MySQL JSON does not represent the complete Variant value domain"));
   }
 
+  @Test
+  public void testRejectNullType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.NullType.get()));
+    Assertions.assertTrue(
+        exception.getMessage().contains("the null-only placeholder has no MySQL column type"));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, MYSQL_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }
