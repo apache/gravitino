@@ -133,8 +133,8 @@ Hologres-specific table properties are set via the `WITH` clause during CREATE T
 | `Binary`                    | `bytea`                    |                                                    |
 | `Date`                      | `date`                     |                                                    |
 | `Time`                      | `time`                     | With optional precision                            |
-| `Timestamp`                 | `timestamp`                | Always emitted without precision suffix             |
-| `Timestamp_tz`              | `timestamptz`              | Always emitted without precision suffix             |
+| `Timestamp`                 | `timestamp`                | Microsecond precision; emitted without a precision suffix |
+| `Timestamp_tz`              | `timestamptz`              | Millisecond precision; emitted without a precision suffix |
 | `List(IntegerType, false)`  | `int4[]` (`_int4`)         | Array types via `_` prefix                          |
 | `List(LongType, false)`     | `int8[]` (`_int8`)         |                                                    |
 | `List(FloatType, false)`    | `float4[]` (`_float4`)     |                                                    |
@@ -142,8 +142,14 @@ Hologres-specific table properties are set via the `WITH` clause during CREATE T
 | `List(BooleanType, false)`  | `bool[]` (`_bool`)         |                                                    |
 | `List(StringType, false)`   | `text[]` (`_text`)         |                                                    |
 
+#### V3 Type Compatibility
+
+| Gravitino Type                      | Hologres outcome                                                                                         |
+|-------------------------------------|----------------------------------------------------------------------------------------------------------|
+| `Timestamp(9)` / `Timestamp_tz(9)` | Rejected before DDL. Hologres stores these types with microsecond and millisecond precision, respectively. |
+
 :::info
-- Hologres does not support precision syntax for `TIMESTAMP`/`TIMESTAMPTZ` (e.g., `timestamptz(6)` is invalid), so the type converter always emits the base type without precision.
+- Hologres stores `TIMESTAMP` values with microsecond precision and `TIMESTAMPTZ` values with millisecond precision. JDBC metadata is normalized to precision 6 and 3, respectively, and the type converter emits the base type without a precision suffix.
 - Array element types must be non-nullable (Hologres limitation). Multidimensional arrays are not supported.
 - Types like `json`, `jsonb`, `uuid`, `inet`, `money`, `roaringbitmap` are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** with the original type name preserved.
 :::

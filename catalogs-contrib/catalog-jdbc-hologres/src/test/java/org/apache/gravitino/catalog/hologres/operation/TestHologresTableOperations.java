@@ -865,6 +865,30 @@ public class TestHologresTableOperations {
     assertTrue(sql.contains("NULL DEFAULT val * 2"));
   }
 
+  @Test
+  void testCreateTableRejectsNanosecondTimestampTypesBeforeSqlGeneration() {
+    Types.TimestampType[] nanosecondTypes = {
+      Types.TimestampType.withoutTimeZone(9), Types.TimestampType.withTimeZone(9)
+    };
+
+    for (Types.TimestampType type : nanosecondTypes) {
+      JdbcColumn column = JdbcColumn.builder().withName("nanosecond_col").withType(type).build();
+      IllegalArgumentException exception =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.createTableSql(
+                      "test_table",
+                      new JdbcColumn[] {column},
+                      null,
+                      Collections.emptyMap(),
+                      Transforms.EMPTY_TRANSFORM,
+                      Distributions.NONE,
+                      Indexes.EMPTY_INDEXES));
+      assertTrue(exception.getMessage().contains("cannot preserve Gravitino type"));
+    }
+  }
+
   // ==================== generateAlterTableSql tests ====================
 
   @Test
