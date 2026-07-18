@@ -963,6 +963,14 @@ public class CatalogHologresIT extends BaseIT {
         "Hologres timestamptz supports precision up to 3");
   }
 
+  @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "variant",
+        Types.VariantType.get(),
+        "Hologres JSON and JSONB do not preserve Gravitino Variant semantics");
+  }
+
   private void assertCreateRejectedWithoutSideEffects(
       String typeName, Type type, String expectedMessage) {
     String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);

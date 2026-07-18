@@ -889,6 +889,29 @@ public class TestHologresTableOperations {
     }
   }
 
+  @Test
+  void testCreateTableRejectsVariantBeforeSqlGeneration() {
+    JdbcColumn column =
+        JdbcColumn.builder().withName("variant_col").withType(Types.VariantType.get()).build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains("Hologres JSON and JSONB do not preserve Gravitino Variant semantics"));
+  }
+
   // ==================== generateAlterTableSql tests ====================
 
   @Test

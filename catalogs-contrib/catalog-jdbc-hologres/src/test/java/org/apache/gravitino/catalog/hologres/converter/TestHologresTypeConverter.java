@@ -280,6 +280,22 @@ public class TestHologresTypeConverter {
     // Test fromGravitino for external type
     String hologresType = converter.fromGravitino(Types.ExternalType.of("jsonb"));
     Assertions.assertEquals("jsonb", hologresType);
+
+    typeBean = new JdbcTypeConverter.JdbcTypeBean("jsonb");
+    gravitinoType = converter.toGravitino(typeBean);
+    Assertions.assertEquals(Types.ExternalType.of("jsonb"), gravitinoType);
+  }
+
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> converter.fromGravitino(Types.VariantType.get()));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Hologres JSON and JSONB do not preserve Gravitino Variant semantics"));
   }
 
   @Test
