@@ -123,6 +123,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `Variant`                           | Rejected before DDL. Native `json` and `jsonb` columns load as `External` because they do not preserve Variant semantics. |
 | `Unknown`                           | Rejected before DDL. PostgreSQL table columns cannot represent an optional, null-only Unknown logical type.             |
 | `Geometry`                          | Rejected before DDL. Native PostGIS `geometry` columns load as `External`; exact CRS semantics are not translated.      |
+| `Geography`                         | Rejected before DDL. Native PostGIS `geography` columns load as `External`; exact CRS and edge-algorithm semantics are not translated. |
 
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` type.

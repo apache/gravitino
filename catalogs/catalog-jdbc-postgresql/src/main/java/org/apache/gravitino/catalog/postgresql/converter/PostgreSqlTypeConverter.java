@@ -164,6 +164,11 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
           String.format(
               "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics; cannot convert Gravitino type %s",
               type.simpleString()));
+    } else if (type instanceof Types.GeographyType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "PostgreSQL PostGIS geography does not preserve Gravitino Geography CRS and edge-algorithm semantics; cannot convert Gravitino type %s",
+              type.simpleString()));
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
     } else if (type instanceof Types.ExternalType) {

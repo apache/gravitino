@@ -159,4 +159,24 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
             .contains(
                 "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics"));
   }
+
+  @Test
+  public void testCreateTableRejectsGeographyBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("geography_col")
+            .withType(Types.GeographyType.of("EPSG:4326", "karney"))
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "PostgreSQL PostGIS geography does not preserve Gravitino Geography CRS and edge-algorithm semantics"));
+  }
 }

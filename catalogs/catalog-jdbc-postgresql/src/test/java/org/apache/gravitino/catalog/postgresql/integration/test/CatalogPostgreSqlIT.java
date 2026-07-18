@@ -2007,6 +2007,14 @@ public class CatalogPostgreSqlIT extends BaseIT {
         "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics");
   }
 
+  @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "PostgreSQL PostGIS geography does not preserve Gravitino Geography CRS and edge-algorithm semantics");
+  }
+
   private void assertCreateRejectedWithoutSideEffects(
       String typeName, Type type, String expectedMessage) {
     String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);

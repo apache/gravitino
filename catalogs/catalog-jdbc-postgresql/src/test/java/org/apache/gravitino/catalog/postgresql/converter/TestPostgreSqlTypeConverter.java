@@ -96,6 +96,7 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("jsonb"), "jsonb", null, null, 0);
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("unknown"), "unknown", null, null, 0);
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("geometry"), "geometry", null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("geography"), "geography", null, null, 0);
   }
 
   @Test
@@ -198,6 +199,22 @@ public class TestPostgreSqlTypeConverter {
             .getMessage()
             .contains(
                 "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics"));
+  }
+
+  @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(
+                    Types.GeographyType.of("EPSG:4326", "karney")));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "PostgreSQL PostGIS geography does not preserve Gravitino Geography CRS and edge-algorithm semantics"));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
