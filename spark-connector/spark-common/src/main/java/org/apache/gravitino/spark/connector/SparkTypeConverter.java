@@ -161,6 +161,8 @@ public class SparkTypeConverter {
       return DataTypes.StringType;
     } else if (gravitinoType instanceof Types.VariantType) {
       throw new IllegalArgumentException("Spark 3.x does not support the Gravitino variant type");
+    } else if (gravitinoType instanceof Types.GeometryType) {
+      throw new IllegalArgumentException("Spark 3.x does not support the Gravitino geometry type");
     } else if (gravitinoType instanceof Types.BinaryType) {
       return DataTypes.BinaryType;
     } else if (gravitinoType instanceof Types.BooleanType) {

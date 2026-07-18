@@ -74,11 +74,16 @@ and 3.5 support optional, null-only fields when using the Iceberg catalog. Requi
 are rejected. Spark 3.3 uses Iceberg 1.8.1 and rejects the type. Other Gravitino Spark catalogs also
 reject `NullType`; this mapping is not applied to Hive, JDBC, Glue, or Paimon.
 
+Spark 3.x has no geometry data type that preserves WKB values together with Gravitino's CRS
+metadata. The connector rejects `geometry`, including nested geometry, rather than translating it
+to an untyped binary value.
+
 | Gravitino type family | Spark 3.3 | Spark 3.4 | Spark 3.5 |
 |-----------------------|-----------|-----------|-----------|
 | `timestamp(9)`, `timestamp_tz(9)` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
 | `variant` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
 | `unknown` / Spark `NullType` | Rejected | Optional, null-only fields with Iceberg 1.11 | Optional, null-only fields with Iceberg 1.11 |
+| `geometry` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
 
 ## SQL Example
 
