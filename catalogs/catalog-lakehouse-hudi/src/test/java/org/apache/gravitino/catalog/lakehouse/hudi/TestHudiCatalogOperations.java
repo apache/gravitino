@@ -158,6 +158,14 @@ public class TestHudiCatalogOperations {
             + "Hudi 0.15 cannot preserve timestamp precision greater than 6.");
   }
 
+  @Test
+  public void testCreateTableRejectsVariantBeforeBackendCall() throws Exception {
+    assertCreateRejected(
+        Types.VariantType.get(),
+        "Unsupported Gravitino type for Hudi: variant. "
+            + "Hudi 0.15 does not define a Variant column type.");
+  }
+
   private static void assertCreateRejected(Type type, String expectedMessage) throws Exception {
     try (InMemoryBackendOps backend = new InMemoryBackendOps()) {
       HudiCatalogOperations ops = new HudiCatalogOperations();

@@ -273,6 +273,11 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private static void validateWritableType(Type type) {
+    if (type instanceof Types.VariantType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Hudi: variant. "
+              + "Hudi 0.15 does not define a Variant column type.");
+    }
     if (type instanceof Types.TimestampType) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
       if (timestampType.hasPrecisionSet() && timestampType.precision() > 6) {
