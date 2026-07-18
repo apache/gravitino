@@ -1991,6 +1991,14 @@ public class CatalogPostgreSqlIT extends BaseIT {
         "PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics");
   }
 
+  @Test
+  void testRejectUnknownWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "unknown",
+        Types.NullType.get(),
+        "PostgreSQL table columns cannot represent Gravitino Unknown (NullType)");
+  }
+
   private void assertCreateRejectedWithoutSideEffects(
       String typeName, Type type, String expectedMessage) {
     String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);

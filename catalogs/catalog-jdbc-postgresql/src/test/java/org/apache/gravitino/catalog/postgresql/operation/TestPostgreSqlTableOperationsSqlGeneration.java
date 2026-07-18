@@ -123,4 +123,20 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
             .getMessage()
             .contains("PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics"));
   }
+
+  @Test
+  public void testCreateTableRejectsUnknownBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("unknown_col").withType(Types.NullType.get()).build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("PostgreSQL table columns cannot represent Gravitino Unknown (NullType)"));
+  }
 }

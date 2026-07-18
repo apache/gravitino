@@ -153,6 +153,9 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       return BYTEA;
     } else if (type instanceof Types.UUIDType) {
       return UUID;
+    } else if (type instanceof Types.NullType) {
+      throw new IllegalArgumentException(
+          "PostgreSQL table columns cannot represent Gravitino Unknown (NullType); cannot convert Gravitino type null");
     } else if (type instanceof Types.VariantType) {
       throw new IllegalArgumentException(
           "PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics; cannot convert Gravitino type variant");

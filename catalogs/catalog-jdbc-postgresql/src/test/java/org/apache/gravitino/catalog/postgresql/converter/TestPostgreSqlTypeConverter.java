@@ -94,6 +94,7 @@ public class TestPostgreSqlTypeConverter {
         Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("json"), "json", null, null, 0);
     checkJdbcTypeToGravitinoType(Types.ExternalType.of("jsonb"), "jsonb", null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("unknown"), "unknown", null, null, 0);
   }
 
   @Test
@@ -169,6 +170,19 @@ public class TestPostgreSqlTypeConverter {
         exception
             .getMessage()
             .contains("PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics"));
+  }
+
+  @Test
+  public void testRejectUnknownType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.NullType.get()));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("PostgreSQL table columns cannot represent Gravitino Unknown (NullType)"));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {

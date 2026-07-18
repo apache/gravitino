@@ -121,6 +121,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 |-------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
 | `Timestamp(9)` / `Timestamp_tz(9)` | Rejected before DDL. PostgreSQL only supports precision 0 through 6 and cannot preserve nanosecond timestamp precision. |
 | `Variant`                           | Rejected before DDL. Native `json` and `jsonb` columns load as `External` because they do not preserve Variant semantics. |
+| `Unknown`                           | Rejected before DDL. PostgreSQL table columns cannot represent an optional, null-only Unknown logical type.             |
 
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` type.
