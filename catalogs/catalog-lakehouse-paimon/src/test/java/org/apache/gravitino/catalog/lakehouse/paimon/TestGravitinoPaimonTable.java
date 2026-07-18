@@ -212,6 +212,65 @@ public class TestGravitinoPaimonTable {
   }
 
   @Test
+  void testNanosecondTimestampRoundTrip() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(paimonSchema.name(), "test_nanosecond_timestamp");
+    Column[] columns =
+        new Column[] {
+          GravitinoPaimonColumn.builder()
+              .withName("timestamp_ns")
+              .withType(Types.TimestampType.withoutTimeZone(9))
+              .withNullable(true)
+              .build(),
+          GravitinoPaimonColumn.builder()
+              .withName("timestamp_tz_ns")
+              .withType(Types.TimestampType.withTimeZone(9))
+              .withNullable(true)
+              .build()
+        };
+
+    paimonCatalogOperations.createTable(
+        tableIdentifier,
+        columns,
+        PAIMON_COMMENT,
+        Collections.emptyMap(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    Table loadedTable = paimonCatalogOperations.loadTable(tableIdentifier);
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(9), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(9), loadedTable.columns()[1].dataType());
+
+    NameIdentifier invalidTableIdentifier =
+        NameIdentifier.of(paimonSchema.name(), "test_picosecond_timestamp");
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () ->
+                paimonCatalogOperations.createTable(
+                    invalidTableIdentifier,
+                    new Column[] {
+                      GravitinoPaimonColumn.builder()
+                          .withName("timestamp_ps")
+                          .withType(Types.TimestampType.withoutTimeZone(10))
+                          .withNullable(true)
+                          .build()
+                    },
+                    PAIMON_COMMENT,
+                    Collections.emptyMap(),
+                    new Transform[0],
+                    Distributions.NONE,
+                    new SortOrder[0]));
+    Assertions.assertEquals(
+        "Paimon supports Gravitino timestamp precision from 0 to 9, but got: 10.",
+        exception.getMessage());
+    Assertions.assertFalse(paimonCatalogOperations.tableExists(invalidTableIdentifier));
+  }
+
+  @Test
   void testCreatePaimonPartitionedTable() {
     String paimonTableName = "test_paimon_partitioned_table";
     NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);

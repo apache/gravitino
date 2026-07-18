@@ -92,6 +92,27 @@ public class TestTypeUtils {
   }
 
   @Test
+  void testNanosecondTimestampType() {
+    Type timestamp = Types.TimestampType.withoutTimeZone(9);
+    Type timestampTz = Types.TimestampType.withTimeZone(9);
+
+    assertEquals(DataTypes.TIMESTAMP(9), toPaimonType(timestamp));
+    assertEquals(DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(9), toPaimonType(timestampTz));
+    assertEquals(timestamp, fromPaimonType(DataTypes.TIMESTAMP(9)));
+    assertEquals(timestampTz, fromPaimonType(DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(9)));
+
+    Arrays.asList(Types.TimestampType.withoutTimeZone(10), Types.TimestampType.withTimeZone(10))
+        .forEach(
+            type -> {
+              IllegalArgumentException exception =
+                  assertThrowsExactly(IllegalArgumentException.class, () -> toPaimonType(type));
+              assertEquals(
+                  "Paimon supports Gravitino timestamp precision from 0 to 9, but got: 10.",
+                  exception.getMessage());
+            });
+  }
+
+  @Test
   void testUnparsedType() {
     Arrays.asList(
             DataTypes.CHAR(CharType.MAX_LENGTH), DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH))

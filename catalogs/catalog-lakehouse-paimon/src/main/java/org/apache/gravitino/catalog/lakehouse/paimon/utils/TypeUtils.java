@@ -234,14 +234,7 @@ public class TypeUtils {
               timeType.hasPrecisionSet() ? timeType.precision() : PRECISION_SECOND;
           return DataTypes.TIME(timeTypePrecision);
         case TIMESTAMP:
-          Types.TimestampType timestampType = (Types.TimestampType) type;
-          int timestampTypePrecision =
-              timestampType.hasPrecisionSet() ? timestampType.precision() : PRECISION_MICROSECOND;
-          if (timestampType.hasTimeZone()) {
-            return DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(timestampTypePrecision);
-          } else {
-            return DataTypes.TIMESTAMP(timestampTypePrecision);
-          }
+          return toPaimonTimestampType((Types.TimestampType) type);
         case STRING:
           return DataTypes.STRING();
         case VARCHAR:
@@ -294,6 +287,20 @@ public class TypeUtils {
               String.format(
                   "Paimon does not support Gravitino %s data type.", type.simpleString()));
       }
+    }
+
+    private static DataType toPaimonTimestampType(Types.TimestampType timestampType) {
+      int precision =
+          timestampType.hasPrecisionSet() ? timestampType.precision() : PRECISION_MICROSECOND;
+      if (precision < TimestampType.MIN_PRECISION || precision > TimestampType.MAX_PRECISION) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Paimon supports Gravitino timestamp precision from %d to %d, but got: %d.",
+                TimestampType.MIN_PRECISION, TimestampType.MAX_PRECISION, precision));
+      }
+      return timestampType.hasTimeZone()
+          ? DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(precision)
+          : DataTypes.TIMESTAMP(precision);
     }
   }
 }

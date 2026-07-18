@@ -199,10 +199,15 @@ Paimon Table primary key constraint should not be same with partition fields, th
 | `FixedChar`       | `Char`                       |
 | `Date`            | `Date`                       |
 | `Time(p)`         | `Time(p)`                    |
-| `Timestamp(p)`    | `LocalZonedTimestamp(p)`     |
-| `Timestamp_tz(p)` | `Timestamp(p)`               |
+| `Timestamp(p)`    | `Timestamp(p)`               |
+| `Timestamp_tz(p)` | `LocalZonedTimestamp(p)`     |
 | `Fixed`           | `Binary`                     |
 | `Binary`          | `VarBinary`                  |
+
+Paimon 1.2 supports timestamp precision from 0 through 9. Gravitino `Timestamp(9)` and
+`Timestamp_tz(9)` therefore round-trip losslessly as Paimon `Timestamp(9)` and
+`LocalZonedTimestamp(9)`, respectively. Higher precisions are rejected before table metadata is
+created or altered.
 
 :::info
 Gravitino doesn't support Paimon `MultisetType` type.
