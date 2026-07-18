@@ -73,6 +73,7 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Unknown` (`NullType`)           | `Null` (nullable columns only)          |
 | `Variant`                        | Rejected before mutation                |
 | `Geometry(crs)`                  | `geoarrow.wkb` with planar CRS metadata |
+| `Geography(crs, algorithm)`      | `geoarrow.wkb` with CRS and edge metadata |
 | `Fixed(n)`                       | `Fixed-Size Binary(n)`                  |
 | `Interval_year`                  | Not supported by Lance                  |
 | `Interval_day`                   | `Duration(Microsecond)`                 |
@@ -95,6 +96,10 @@ because it cannot contain a valid value.
 Gravitino `Geometry` uses WKB with planar edges and CRS type metadata. Lance preserves the same
 semantics as a GeoArrow 0.2 `geoarrow.wkb` extension field backed by Arrow `Binary`; both textual
 CRS identifiers and PROJJSON round-trip without losing the CRS.
+
+Gravitino `Geography` uses the same GeoArrow WKB storage and records its spherical or spheroidal
+edge algorithm in the GeoArrow `edges` metadata. All five Gravitino algorithms (`spherical`,
+`vincenty`, `thomas`, `andoyer`, and `karney`) round-trip with the CRS.
 
 ### External Types
 

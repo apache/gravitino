@@ -305,6 +305,99 @@ public class TestLanceDataTypeConverter {
     assertEquals(geometry, CONVERTER.toGravitino(field));
   }
 
+  @ParameterizedTest
+  @CsvSource({"spherical", "vincenty", "thomas", "andoyer", "karney"})
+  public void testGeographyTypeRoundTripAsGeoArrowWkb(String edgeAlgorithm) {
+    Types.GeographyType geography = Types.GeographyType.of("EPSG:4326", edgeAlgorithm);
+
+    Field field = CONVERTER.toArrowField("shape", geography, true);
+
+    assertEquals(ArrowType.Binary.INSTANCE, field.getType());
+    assertEquals("geoarrow.wkb", field.getMetadata().get("ARROW:extension:name"));
+    assertEquals(
+        String.format("{\"crs\":\"EPSG:4326\",\"edges\":\"%s\"}", edgeAlgorithm),
+        field.getMetadata().get("ARROW:extension:metadata"));
+    assertEquals(geography, CONVERTER.toGravitino(field));
+  }
+
+  @Test
+  public void testUnsupportedGeoArrowEdgesRemainExternal() {
+    Field field =
+        new Field(
+            "shape",
+            new FieldType(
+                true,
+                ArrowType.Binary.INSTANCE,
+                null,
+                Map.of(
+                    "ARROW:extension:name",
+                    "geoarrow.wkb",
+                    "ARROW:extension:metadata",
+                    "{\"crs\":\"EPSG:4326\",\"edges\":\"rhumb\"}")),
+            null);
+
+    Type converted = CONVERTER.toGravitino(field);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(field, CONVERTER.toArrowField("shape", converted, true));
+  }
+
+  @Test
+  public void testGeoArrowRepresentationMetadataRemainsExternal() {
+    Field field =
+        new Field(
+            "shape",
+            new FieldType(
+                true,
+                ArrowType.Binary.INSTANCE,
+                null,
+                Map.of(
+                    "ARROW:extension:name",
+                    "geoarrow.wkb",
+                    "ARROW:extension:metadata",
+                    "{\"crs\":\"EPSG:4326\",\"crs_type\":\"authority_code\",\"edges\":\"karney\"}")),
+            null);
+
+    Type converted = CONVERTER.toGravitino(field);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(field, CONVERTER.toArrowField("shape", converted, true));
+  }
+
+  @Test
+  public void testGeoArrowCustomFieldMetadataRemainsExternal() {
+    Field field =
+        new Field(
+            "shape",
+            new FieldType(
+                true,
+                ArrowType.Binary.INSTANCE,
+                null,
+                Map.of(
+                    "ARROW:extension:name",
+                    "geoarrow.wkb",
+                    "ARROW:extension:metadata",
+                    "{\"crs\":\"EPSG:4326\",\"edges\":\"karney\"}",
+                    "producer",
+                    "native-client")),
+            null);
+
+    Type converted = CONVERTER.toGravitino(field);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(field, CONVERTER.toArrowField("shape", converted, true));
+  }
+
+  @Test
+  public void testGeographyRequiresFieldMetadata() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.GeographyType.crs84()));
+
+    assertTrue(exception.getMessage().contains("requires GeoArrow field metadata"));
+  }
+
   @Test
   public void testExternalTypeConversion() {
     String expectedColumnName = "col_name";

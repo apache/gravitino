@@ -52,7 +52,7 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
   private static final String ARROW_EXTENSION_NAME = "ARROW:extension:name";
   private static final String ARROW_EXTENSION_METADATA = "ARROW:extension:metadata";
   private static final String GEOARROW_WKB_EXTENSION_NAME = "geoarrow.wkb";
-  private static final Set<String> GEOARROW_METADATA_KEYS = Set.of("crs", "crs_type", "edges");
+  private static final Set<String> GEOARROW_METADATA_KEYS = Set.of("crs", "edges");
   private static final ObjectMapper mapper = new ObjectMapper();
 
   public Field toArrowField(String name, Type type, boolean nullable) {
@@ -148,6 +148,9 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
       case GEOMETRY:
         return toGeoArrowField(name, (Types.GeometryType) type, nullable);
 
+      case GEOGRAPHY:
+        return toGeoArrowField(name, (Types.GeographyType) type, nullable);
+
       default:
         // non-complex type
         FieldType fieldType = new FieldType(nullable, fromGravitino(type), null);
@@ -218,6 +221,9 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
       case GEOMETRY:
         throw new IllegalArgumentException(
             "Gravitino Geometry requires GeoArrow field metadata; use toArrowField for Lance schemas");
+      case GEOGRAPHY:
+        throw new IllegalArgumentException(
+            "Gravitino Geography requires GeoArrow field metadata; use toArrowField for Lance schemas");
       default:
         throw new UnsupportedOperationException("Unsupported Gravitino type: " + type.name());
     }
@@ -349,8 +355,18 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
   }
 
   private Field toGeoArrowField(String name, Types.GeometryType type, boolean nullable) {
+    return toGeoArrowField(name, type.crs(), Optional.empty(), nullable);
+  }
+
+  private Field toGeoArrowField(String name, Types.GeographyType type, boolean nullable) {
+    return toGeoArrowField(name, type.crs(), Optional.of(type.algorithm()), nullable);
+  }
+
+  private Field toGeoArrowField(
+      String name, String crs, Optional<String> edgeAlgorithm, boolean nullable) {
     ObjectNode extensionMetadata = mapper.createObjectNode();
-    putCrs(extensionMetadata, type.crs());
+    putCrs(extensionMetadata, crs);
+    edgeAlgorithm.ifPresent(algorithm -> extensionMetadata.put("edges", algorithm));
     FieldType fieldType =
         new FieldType(
             nullable,
@@ -367,7 +383,11 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
   private Optional<Type> toKnownExtensionType(Field arrowField) {
     Map<String, String> metadata = arrowField.getFieldType().getMetadata();
     if (!GEOARROW_WKB_EXTENSION_NAME.equals(metadata.get(ARROW_EXTENSION_NAME))
-        || !(arrowField.getType() instanceof ArrowType.Binary)) {
+        || metadata.size() != 2
+        || !metadata.containsKey(ARROW_EXTENSION_METADATA)
+        || !(arrowField.getType() instanceof ArrowType.Binary)
+        || arrowField.getFieldType().getDictionary() != null
+        || !arrowField.getChildren().isEmpty()) {
       return Optional.empty();
     }
 
@@ -377,13 +397,21 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
     }
     try {
       JsonNode metadataNode = mapper.readTree(extensionMetadata);
-      if (!metadataNode.isObject()
-          || !hasOnlyGeoArrowMetadataKeys(metadataNode)
-          || metadataNode.has("edges")) {
+      if (!metadataNode.isObject() || !hasOnlyGeoArrowMetadataKeys(metadataNode)) {
         return Optional.empty();
       }
       String crs = readCrs(metadataNode.get("crs"));
-      return crs == null ? Optional.empty() : Optional.of(Types.GeometryType.of(crs));
+      if (crs == null) {
+        return Optional.empty();
+      }
+      JsonNode edgesNode = metadataNode.get("edges");
+      if (edgesNode == null) {
+        return Optional.of(Types.GeometryType.of(crs));
+      }
+      if (!edgesNode.isTextual()) {
+        return Optional.empty();
+      }
+      return Optional.of(Types.GeographyType.of(crs, edgesNode.asText()));
     } catch (Exception e) {
       return Optional.empty();
     }

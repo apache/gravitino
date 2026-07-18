@@ -576,6 +576,42 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   }
 
   @Test
+  public void testGeographyTypeRoundTrip() {
+    String phase2TableName = GravitinoITUtils.genRandomName("lance_geography");
+    NameIdentifier identifier = NameIdentifier.of(schemaName, phase2TableName);
+    String location = tempDirectory + "/" + phase2TableName;
+    Types.GeographyType geography = Types.GeographyType.of("EPSG:4326", "karney");
+    Column[] columns = {Column.of("shape", geography, "ellipsoidal WKB geography")};
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Table created =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                identifier,
+                columns,
+                "geography type round-trip",
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+    Table loaded = catalog.asTableCatalog().loadTable(identifier);
+
+    Assertions.assertEquals(geography, created.columns()[0].dataType());
+    Assertions.assertEquals(geography, loaded.columns()[0].dataType());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Field field = dataset.getSchema().getFields().get(0);
+      Assertions.assertEquals(ArrowType.Binary.INSTANCE, field.getType());
+      Assertions.assertEquals("geoarrow.wkb", field.getMetadata().get("ARROW:extension:name"));
+      Assertions.assertEquals(
+          "{\"crs\":\"EPSG:4326\",\"edges\":\"karney\"}",
+          field.getMetadata().get("ARROW:extension:metadata"));
+    }
+  }
+
+  @Test
   void testLanceTableFormat() {
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     Column[] columns = createColumns();
