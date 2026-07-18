@@ -241,6 +241,17 @@ class TestGlueTypeConverter {
   }
 
   @Test
+  void testFromGravitinoVariantThrows() {
+    IllegalArgumentException error =
+        assertThrows(
+            IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.VariantType.get()));
+    assertEquals(
+        "Unsupported Gravitino type for Glue: variant. "
+            + "Glue Hive and Iceberg table paths do not define a Variant column type.",
+        error.getMessage());
+  }
+
+  @Test
   void testFromGravitinoUnsupportedTypeThrows() {
     assertThrows(
         IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.NullType.get()));

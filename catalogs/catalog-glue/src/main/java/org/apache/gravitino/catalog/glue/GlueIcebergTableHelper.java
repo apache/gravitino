@@ -39,6 +39,7 @@ import static org.apache.gravitino.rel.types.Types.TimeType;
 import static org.apache.gravitino.rel.types.Types.TimestampType;
 import static org.apache.gravitino.rel.types.Types.UUIDType;
 import static org.apache.gravitino.rel.types.Types.VarCharType;
+import static org.apache.gravitino.rel.types.Types.VariantType;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -625,6 +626,11 @@ final class GlueIcebergTableHelper {
   }
 
   private static org.apache.iceberg.types.Type toIcebergType(Type type, int[] nextId) {
+    if (type instanceof VariantType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: variant. "
+              + "Glue Hive and Iceberg table paths do not define a Variant column type.");
+    }
     if (type instanceof ListType) {
       ListType listType = (ListType) type;
       org.apache.iceberg.types.Type elementType = toIcebergType(listType.elementType(), nextId);

@@ -184,6 +184,11 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
   @Override
   public String fromGravitino(Type type) {
+    if (type instanceof Types.VariantType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Glue: variant. "
+              + "Glue Hive and Iceberg table paths do not define a Variant column type.");
+    }
     if (type instanceof Types.BooleanType) return BOOLEAN;
     if (type instanceof Types.ByteType) return TINYINT;
     if (type instanceof Types.ShortType) return SMALLINT;
