@@ -155,6 +155,7 @@ DDL. The pinned OceanBase 4.2.1 test environment uses MySQL compatibility mode.
 | `Variant`                               | Rejected because OceanBase `JSON` cannot losslessly preserve the complete Gravitino variant domain. |
 | `Unknown` (`NullType`)                  | Rejected because OceanBase has no corresponding column type.                                        |
 | `Geometry(crs)`                         | Rejected because the connector cannot currently reload OceanBase spatial subtype and SRID metadata. |
+| `Geography(crs, algorithm)`             | Rejected because OceanBase has no type preserving geography edge semantics.                         |
 
 :::info
 OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.

@@ -2032,6 +2032,16 @@ public class CatalogOceanBaseIT extends BaseIT {
         "geometry_epsg3857", Types.GeometryType.of("EPSG:3857"), expectedMessage);
   }
 
+  @Test
+  void testRejectGeographyWithoutCreatingTables() {
+    String expectedMessage =
+        "OceanBase has no geography column type that preserves CRS and edge algorithm metadata";
+    assertCreateRejectedWithoutSideEffect(
+        "geography_crs84", Types.GeographyType.crs84(), expectedMessage);
+    assertCreateRejectedWithoutSideEffect(
+        "geography_karney", Types.GeographyType.of("EPSG:4326", "karney"), expectedMessage);
+  }
+
   private void assertCreateRejectedWithoutSideEffect(
       String tablePrefix, Type type, String expectedMessage) {
     TableCatalog tableCatalog = catalog.asTableCatalog();

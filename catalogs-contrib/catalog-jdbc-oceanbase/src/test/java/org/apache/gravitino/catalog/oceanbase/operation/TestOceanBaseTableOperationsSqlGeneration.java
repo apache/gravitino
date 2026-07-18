@@ -121,6 +121,13 @@ public class TestOceanBaseTableOperationsSqlGeneration {
         "OceanBase JDBC metadata cannot preserve Gravitino geometry CRS/SRID metadata");
   }
 
+  @Test
+  public void testRejectGeographyBeforeSqlGeneration() {
+    assertCreateTableRejected(
+        Types.GeographyType.crs84(),
+        "OceanBase has no geography column type that preserves CRS and edge algorithm metadata");
+  }
+
   private void assertCreateTableRejected(Type type, String expectedMessage) {
     TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations();
     JdbcColumn column =

@@ -167,6 +167,9 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.GeometryType) {
       throw new IllegalArgumentException(
           "OceanBase JDBC metadata cannot preserve Gravitino geometry CRS/SRID metadata");
+    } else if (type instanceof Types.GeographyType) {
+      throw new IllegalArgumentException(
+          "OceanBase has no geography column type that preserves CRS and edge algorithm metadata");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

@@ -133,6 +133,14 @@ public class TestOceanBaseTypeConverter {
     assertFromGravitinoRejected(Types.GeometryType.of("EPSG:3857"), expectedMessage);
   }
 
+  @Test
+  public void testRejectGeographyTypes() {
+    String expectedMessage =
+        "OceanBase has no geography column type that preserves CRS and edge algorithm metadata";
+    assertFromGravitinoRejected(Types.GeographyType.crs84(), expectedMessage);
+    assertFromGravitinoRejected(Types.GeographyType.of("EPSG:4326", "karney"), expectedMessage);
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, OCEANBASE_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }
