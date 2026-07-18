@@ -1983,6 +1983,14 @@ public class CatalogPostgreSqlIT extends BaseIT {
         "timestamptz_ns", Types.TimestampType.withTimeZone(9), "timestamp precision up to 6");
   }
 
+  @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "variant",
+        Types.VariantType.get(),
+        "PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics");
+  }
+
   private void assertCreateRejectedWithoutSideEffects(
       String typeName, Type type, String expectedMessage) {
     String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);

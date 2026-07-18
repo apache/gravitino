@@ -107,4 +107,20 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
           exception.getMessage().contains("PostgreSQL supports timestamp precision up to 6"));
     }
   }
+
+  @Test
+  public void testCreateTableRejectsVariantBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("variant_col").withType(Types.VariantType.get()).build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics"));
+  }
 }

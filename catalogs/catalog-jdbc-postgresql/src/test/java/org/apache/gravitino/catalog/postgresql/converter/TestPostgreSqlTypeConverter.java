@@ -92,6 +92,8 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.UUIDType.get(), UUID, null, null, 0);
     checkJdbcTypeToGravitinoType(
         Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("json"), "json", null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("jsonb"), "jsonb", null, null, 0);
   }
 
   @Test
@@ -154,6 +156,19 @@ public class TestPostgreSqlTypeConverter {
               .contains(
                   "PostgreSQL supports timestamp precision up to " + MAX_TIMESTAMP_PRECISION));
     }
+  }
+
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.VariantType.get()));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics"));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
