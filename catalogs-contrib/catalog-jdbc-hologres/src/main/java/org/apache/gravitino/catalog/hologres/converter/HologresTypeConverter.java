@@ -173,6 +173,11 @@ public class HologresTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.VariantType) {
       throw new IllegalArgumentException(
           "Hologres JSON and JSONB do not preserve Gravitino Variant semantics; cannot convert Gravitino type variant");
+    } else if (type instanceof Types.GeometryType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Hologres PostGIS geometry metadata does not preserve Gravitino Geometry CRS semantics; cannot convert Gravitino type %s",
+              type.simpleString()));
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
     } else if (type instanceof Types.ExternalType) {

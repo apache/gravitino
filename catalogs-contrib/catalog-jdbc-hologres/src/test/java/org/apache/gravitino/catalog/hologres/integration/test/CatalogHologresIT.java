@@ -979,6 +979,14 @@ public class CatalogHologresIT extends BaseIT {
         "Hologres table columns cannot represent Gravitino Unknown (NullType)");
   }
 
+  @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geometry",
+        Types.GeometryType.of("EPSG:3857"),
+        "Hologres PostGIS geometry metadata does not preserve Gravitino Geometry CRS semantics");
+  }
+
   private void assertCreateRejectedWithoutSideEffects(
       String typeName, Type type, String expectedMessage) {
     String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);

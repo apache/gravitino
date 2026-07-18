@@ -935,6 +935,33 @@ public class TestHologresTableOperations {
             .contains("Hologres table columns cannot represent Gravitino Unknown (NullType)"));
   }
 
+  @Test
+  void testCreateTableRejectsGeometryBeforeSqlGeneration() {
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("geometry_col")
+            .withType(Types.GeometryType.of("EPSG:3857"))
+            .build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Hologres PostGIS geometry metadata does not preserve Gravitino Geometry CRS semantics"));
+  }
+
   // ==================== generateAlterTableSql tests ====================
 
   @Test
