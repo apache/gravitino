@@ -111,6 +111,13 @@ public class TestOceanBaseTypeConverter {
             + "the maximum supported precision is 6");
   }
 
+  @Test
+  public void testRejectVariantType() {
+    assertFromGravitinoRejected(
+        Types.VariantType.get(),
+        "OceanBase JSON cannot losslessly preserve the Gravitino variant type");
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, OCEANBASE_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }

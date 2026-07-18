@@ -158,6 +158,9 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
       return type.simpleString();
     } else if (type instanceof Types.BinaryType) {
       return type.simpleString();
+    } else if (type instanceof Types.VariantType) {
+      throw new IllegalArgumentException(
+          "OceanBase JSON cannot losslessly preserve the Gravitino variant type");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

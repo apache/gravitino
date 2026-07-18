@@ -93,11 +93,21 @@ public class TestOceanBaseTableOperationsSqlGeneration {
 
   @Test
   public void testRejectNanosecondTimestampsBeforeSqlGeneration() {
-    assertCreateTableRejected(Types.TimestampType.withoutTimeZone(9));
-    assertCreateTableRejected(Types.TimestampType.withTimeZone(9));
+    String expectedMessage =
+        "OceanBase MySQL mode cannot preserve timestamp precision 9; "
+            + "the maximum supported precision is 6";
+    assertCreateTableRejected(Types.TimestampType.withoutTimeZone(9), expectedMessage);
+    assertCreateTableRejected(Types.TimestampType.withTimeZone(9), expectedMessage);
   }
 
-  private void assertCreateTableRejected(Type type) {
+  @Test
+  public void testRejectVariantBeforeSqlGeneration() {
+    assertCreateTableRejected(
+        Types.VariantType.get(),
+        "OceanBase JSON cannot losslessly preserve the Gravitino variant type");
+  }
+
+  private void assertCreateTableRejected(Type type, String expectedMessage) {
     TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations();
     JdbcColumn column =
         JdbcColumn.builder().withName("col1").withType(type).withNullable(true).build();
@@ -106,9 +116,6 @@ public class TestOceanBaseTableOperationsSqlGeneration {
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
-    Assertions.assertEquals(
-        "OceanBase MySQL mode cannot preserve timestamp precision 9; "
-            + "the maximum supported precision is 6",
-        exception.getMessage());
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
   }
 }

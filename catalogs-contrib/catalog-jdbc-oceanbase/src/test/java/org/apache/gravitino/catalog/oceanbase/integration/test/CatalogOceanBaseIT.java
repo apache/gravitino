@@ -2006,6 +2006,14 @@ public class CatalogOceanBaseIT extends BaseIT {
             + "the maximum supported precision is 6");
   }
 
+  @Test
+  void testRejectVariantWithoutCreatingTable() {
+    assertCreateRejectedWithoutSideEffect(
+        "variant",
+        Types.VariantType.get(),
+        "OceanBase JSON cannot losslessly preserve the Gravitino variant type");
+  }
+
   private void assertCreateRejectedWithoutSideEffect(
       String tablePrefix, Type type, String expectedMessage) {
     TableCatalog tableCatalog = catalog.asTableCatalog();
