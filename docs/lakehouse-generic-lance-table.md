@@ -72,6 +72,7 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Time`/`Time(9)`                 | `Time Nanosecond`                       |
 | `Unknown` (`NullType`)           | `Null` (nullable columns only)          |
 | `Variant`                        | Rejected before mutation                |
+| `Geometry(crs)`                  | `geoarrow.wkb` with planar CRS metadata |
 | `Fixed(n)`                       | `Fixed-Size Binary(n)`                  |
 | `Interval_year`                  | Not supported by Lance                  |
 | `Interval_day`                   | `Duration(Microsecond)`                 |
@@ -90,6 +91,10 @@ including newer `arrow.parquet.variant` fields, remain lossless `External` types
 Gravitino `Unknown` is a nullable, null-only placeholder whose concrete type may be assigned during
 schema evolution. It round-trips exactly as Arrow `Null`; a non-nullable Unknown column is rejected
 because it cannot contain a valid value.
+
+Gravitino `Geometry` uses WKB with planar edges and CRS type metadata. Lance preserves the same
+semantics as a GeoArrow 0.2 `geoarrow.wkb` extension field backed by Arrow `Binary`; both textual
+CRS identifiers and PROJJSON round-trip without losing the CRS.
 
 ### External Types
 

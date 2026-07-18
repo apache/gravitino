@@ -19,11 +19,16 @@
 
 package org.apache.gravitino.lance.common.ops.gravitino;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.types.DateUnit;
 import org.apache.arrow.vector.types.FloatingPointPrecision;
@@ -45,6 +50,9 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
 
   public static final LanceDataTypeConverter CONVERTER = new LanceDataTypeConverter();
   private static final String ARROW_EXTENSION_NAME = "ARROW:extension:name";
+  private static final String ARROW_EXTENSION_METADATA = "ARROW:extension:metadata";
+  private static final String GEOARROW_WKB_EXTENSION_NAME = "geoarrow.wkb";
+  private static final Set<String> GEOARROW_METADATA_KEYS = Set.of("crs", "crs_type", "edges");
   private static final ObjectMapper mapper = new ObjectMapper();
 
   public Field toArrowField(String name, Type type, boolean nullable) {
@@ -137,6 +145,9 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
         Preconditions.checkArgument(nullable, "Lance Arrow Null columns must be nullable");
         return Field.nullable(name, ArrowType.Null.INSTANCE);
 
+      case GEOMETRY:
+        return toGeoArrowField(name, (Types.GeometryType) type, nullable);
+
       default:
         // non-complex type
         FieldType fieldType = new FieldType(nullable, fromGravitino(type), null);
@@ -204,6 +215,9 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
       case VARIANT:
         throw new IllegalArgumentException(
             "Lance 6.0 and Arrow 18 do not provide an exact native representation for Gravitino Variant");
+      case GEOMETRY:
+        throw new IllegalArgumentException(
+            "Gravitino Geometry requires GeoArrow field metadata; use toArrowField for Lance schemas");
       default:
         throw new UnsupportedOperationException("Unsupported Gravitino type: " + type.name());
     }
@@ -214,7 +228,7 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
     FieldType fieldType = arrowField.getFieldType();
     if (fieldType.getMetadata() != null
         && fieldType.getMetadata().containsKey(ARROW_EXTENSION_NAME)) {
-      return toExternalType(arrowField);
+      return toKnownExtensionType(arrowField).orElseGet(() -> toExternalType(arrowField));
     }
 
     switch (fieldType.getType().getTypeID()) {
@@ -332,6 +346,75 @@ public class LanceDataTypeConverter implements DataTypeConverter<ArrowType, Fiel
     }
 
     return toExternalType(arrowField);
+  }
+
+  private Field toGeoArrowField(String name, Types.GeometryType type, boolean nullable) {
+    ObjectNode extensionMetadata = mapper.createObjectNode();
+    putCrs(extensionMetadata, type.crs());
+    FieldType fieldType =
+        new FieldType(
+            nullable,
+            ArrowType.Binary.INSTANCE,
+            null,
+            Map.of(
+                ARROW_EXTENSION_NAME,
+                GEOARROW_WKB_EXTENSION_NAME,
+                ARROW_EXTENSION_METADATA,
+                extensionMetadata.toString()));
+    return new Field(name, fieldType, null);
+  }
+
+  private Optional<Type> toKnownExtensionType(Field arrowField) {
+    Map<String, String> metadata = arrowField.getFieldType().getMetadata();
+    if (!GEOARROW_WKB_EXTENSION_NAME.equals(metadata.get(ARROW_EXTENSION_NAME))
+        || !(arrowField.getType() instanceof ArrowType.Binary)) {
+      return Optional.empty();
+    }
+
+    String extensionMetadata = metadata.get(ARROW_EXTENSION_METADATA);
+    if (extensionMetadata == null) {
+      return Optional.empty();
+    }
+    try {
+      JsonNode metadataNode = mapper.readTree(extensionMetadata);
+      if (!metadataNode.isObject()
+          || !hasOnlyGeoArrowMetadataKeys(metadataNode)
+          || metadataNode.has("edges")) {
+        return Optional.empty();
+      }
+      String crs = readCrs(metadataNode.get("crs"));
+      return crs == null ? Optional.empty() : Optional.of(Types.GeometryType.of(crs));
+    } catch (Exception e) {
+      return Optional.empty();
+    }
+  }
+
+  private boolean hasOnlyGeoArrowMetadataKeys(JsonNode metadataNode) {
+    return Lists.newArrayList(metadataNode.fieldNames()).stream()
+        .allMatch(GEOARROW_METADATA_KEYS::contains);
+  }
+
+  private void putCrs(ObjectNode metadataNode, String crs) {
+    try {
+      JsonNode parsedCrs = mapper.readTree(crs);
+      if (parsedCrs.isObject()) {
+        metadataNode.set("crs", parsedCrs);
+        return;
+      }
+    } catch (Exception ignored) {
+      // A CRS string is a valid GeoArrow fallback when it is not PROJJSON.
+    }
+    metadataNode.put("crs", crs);
+  }
+
+  private String readCrs(JsonNode crsNode) {
+    if (crsNode == null) {
+      return null;
+    }
+    if (crsNode.isTextual() && !crsNode.asText().isEmpty()) {
+      return crsNode.asText();
+    }
+    return crsNode.isObject() ? crsNode.toString() : null;
   }
 
   private Types.ExternalType toExternalType(Field arrowField) {

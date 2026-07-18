@@ -279,6 +279,33 @@ public class TestLanceDataTypeConverter {
   }
 
   @Test
+  public void testGeometryTypeRoundTripAsGeoArrowWkb() {
+    Types.GeometryType geometry = Types.GeometryType.of("EPSG:3857");
+
+    Field field = CONVERTER.toArrowField("shape", geometry, true);
+
+    assertEquals(ArrowType.Binary.INSTANCE, field.getType());
+    assertEquals("geoarrow.wkb", field.getMetadata().get("ARROW:extension:name"));
+    assertEquals("{\"crs\":\"EPSG:3857\"}", field.getMetadata().get("ARROW:extension:metadata"));
+    assertEquals(geometry, CONVERTER.toGravitino(field));
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> CONVERTER.fromGravitino(geometry));
+    assertTrue(exception.getMessage().contains("requires GeoArrow field metadata"));
+  }
+
+  @Test
+  public void testGeometryProjJsonCrsRoundTrip() {
+    String projJson = "{\"type\":\"ProjectedCRS\",\"name\":\"WGS 84 / Pseudo-Mercator\"}";
+    Types.GeometryType geometry = Types.GeometryType.of(projJson);
+
+    Field field = CONVERTER.toArrowField("shape", geometry, true);
+
+    assertEquals("{\"crs\":" + projJson + "}", field.getMetadata().get("ARROW:extension:metadata"));
+    assertEquals(geometry, CONVERTER.toGravitino(field));
+  }
+
+  @Test
   public void testExternalTypeConversion() {
     String expectedColumnName = "col_name";
     boolean expectedNullable = true;
