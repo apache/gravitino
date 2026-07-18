@@ -109,6 +109,17 @@ public class TestIcebergDataTypeTransformer {
         () -> transformer.getGravitinoType(mockTrinoType("variant")), expectedMessage);
   }
 
+  @Test
+  public void testRejectUnknown() {
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer();
+    String expectedMessage = "cannot represent Iceberg V3 unknown as a table column";
+
+    assertIllegalArgument(() -> transformer.getTrinoType(Types.NullType.get()), expectedMessage);
+    assertMetadataRejectedBeforeConnectorInvocation(Types.NullType.get(), expectedMessage);
+    assertIllegalArgument(
+        () -> transformer.getGravitinoType(mockTrinoType("unknown")), expectedMessage);
+  }
+
   private static void assertMetadataRejectedBeforeConnectorInvocation(Type type) {
     assertMetadataRejectedBeforeConnectorInvocation(type, "only timestamp precision 6 is lossless");
   }

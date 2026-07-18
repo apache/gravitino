@@ -38,7 +38,9 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
 
   @Override
   public Type getGravitinoType(io.trino.spi.type.Type type) {
-    if (hasBaseType(type, "variant")) {
+    if (hasBaseType(type, "unknown")) {
+      throw unsupportedUnknownType();
+    } else if (hasBaseType(type, "variant")) {
       throw unsupportedIcebergV3Type("variant", 481);
     }
 
@@ -74,7 +76,9 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
 
   @Override
   public io.trino.spi.type.Type getTrinoType(Type type) {
-    if (Name.FIXED == type.name()) {
+    if (Name.NULL == type.name()) {
+      throw unsupportedUnknownType();
+    } else if (Name.FIXED == type.name()) {
       return VarbinaryType.VARBINARY;
     } else if (Name.VARIANT == type.name()) {
       throw unsupportedIcebergV3Type(type.simpleString(), 481);
@@ -115,5 +119,11 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
         String.format(
             "The supported Trino Iceberg connector versions cannot preserve Iceberg V3 %s; support starts in Trino %d",
             typeName, requiredVersion));
+  }
+
+  private static TrinoException unsupportedUnknownType() {
+    return new TrinoException(
+        GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+        "The Trino Iceberg connector cannot represent Iceberg V3 unknown as a table column");
   }
 }
