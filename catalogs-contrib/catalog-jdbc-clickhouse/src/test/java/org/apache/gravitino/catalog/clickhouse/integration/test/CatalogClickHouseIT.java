@@ -2482,4 +2482,47 @@ public class CatalogClickHouseIT extends BaseIT {
     // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
     Assertions.assertEquals(1, settingsCount);
   }
+
+  @Test
+  void testNanosecondTimestampRoundTrip() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("timestamp_ns_round_trip"));
+    Column[] columns = {
+      Column.of("id", Types.IntegerType.get(), "sort column", false, false, DEFAULT_VALUE_NOT_SET),
+      Column.of(
+          "timestamp_ns",
+          Types.TimestampType.withoutTimeZone(9),
+          "nanosecond timestamp",
+          false,
+          false,
+          DEFAULT_VALUE_NOT_SET),
+      Column.of(
+          "timestamp_tz_ns",
+          Types.TimestampType.withTimeZone(9),
+          "nanosecond timestamp with time zone",
+          false,
+          false,
+          DEFAULT_VALUE_NOT_SET)
+    };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            "nanosecond timestamp round-trip",
+            createProperties(),
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(9), loaded.columns()[1].dataType());
+    Assertions.assertEquals(Types.TimestampType.withTimeZone(9), loaded.columns()[2].dataType());
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableIdentifier.name()));
+    Assertions.assertTrue(createSql.contains("DateTime64(9)"), createSql);
+    Assertions.assertTrue(createSql.contains("DateTime64(9, 'UTC')"), createSql);
+  }
 }

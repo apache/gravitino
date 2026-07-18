@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.converter;
 
+import java.util.Optional;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -73,6 +74,8 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
   static final String JSON = "JSON";
 
   private static final int MAX_PRECISION = 76;
+  private static final int MAX_DATETIME_PRECISION = 9;
+  private static final String UTC = "UTC";
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
@@ -83,6 +86,13 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
 
     Integer dateTimePrecision = TypeUtils.extractDateTimePrecision(typeName);
     if (dateTimePrecision != null) {
+      Optional<String> timeZone = TypeUtils.extractDateTimeTimeZone(typeName);
+      if (timeZone.isPresent()) {
+        if (UTC.equalsIgnoreCase(timeZone.get())) {
+          return Types.TimestampType.withTimeZone(dateTimePrecision);
+        }
+        return Types.ExternalType.of(typeBean.getTypeName());
+      }
       return Types.TimestampType.withoutTimeZone(dateTimePrecision);
     }
 
@@ -177,10 +187,17 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.DateType) {
       return DATE;
     } else if (type instanceof Types.TimestampType timestampType) {
-      // Gravitino timestamp type maps to ClickHouse DateTime with precision 0.
-      // For precision > 0, use DateTime64(N).
-      if (timestampType.precision() > 0) {
-        return DATETIME64 + "(" + timestampType.precision() + ")";
+      int precision = timestampType.hasPrecisionSet() ? timestampType.precision() : 0;
+      if (precision > MAX_DATETIME_PRECISION) {
+        throw unsupportedType(type, "DateTime64 precision must be between 0 and 9");
+      }
+      if (timestampType.hasTimeZone()) {
+        return precision > 0
+            ? String.format("%s(%d, '%s')", DATETIME64, precision, UTC)
+            : String.format("%s('%s')", DATETIME, UTC);
+      }
+      if (precision > 0) {
+        return DATETIME64 + "(" + precision + ")";
       }
       return DATETIME;
     } else if (type instanceof Types.TimeType) {
@@ -201,5 +218,11 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
     throw new IllegalArgumentException(
         String.format(
             "Couldn't convert Gravitino type %s to ClickHouse type", type.simpleString()));
+  }
+
+  private static IllegalArgumentException unsupportedType(Type type, String reason) {
+    return new IllegalArgumentException(
+        String.format(
+            "ClickHouse does not support Gravitino type %s: %s", type.simpleString(), reason));
   }
 }
