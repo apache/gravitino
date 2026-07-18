@@ -48,6 +48,7 @@ import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter.DistributionAndSortOrdersInfo;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.gravitino.spark.connector.authorization.AuthorizationTable;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -197,34 +198,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   public Table createTable(
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
-    NameIdentifier gravitinoIdentifier = NameIdentifier.of(getDatabase(ident), ident.name());
-    org.apache.gravitino.rel.Column[] gravitinoColumns =
-        Arrays.stream(schema.fields())
-            .map(structField -> createGravitinoColumn(structField))
-            .toArray(org.apache.gravitino.rel.Column[]::new);
-
-    Map<String, String> gravitinoProperties =
-        propertiesConverter.toGravitinoTableProperties(properties);
-    // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
-    String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
-
-    DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
-        sparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
-    org.apache.gravitino.rel.expressions.transforms.Transform[] partitionings =
-        sparkTransformConverter.toGravitinoPartitionings(transforms);
-
     try {
       org.apache.gravitino.rel.Table gravitinoTable =
-          gravitinoCatalogClient
-              .asTableCatalog()
-              .createTable(
-                  gravitinoIdentifier,
-                  gravitinoColumns,
-                  comment,
-                  gravitinoProperties,
-                  partitionings,
-                  distributionAndSortOrdersInfo.getDistribution(),
-                  distributionAndSortOrdersInfo.getSortOrders());
+          createGravitinoTable(ident, schema, transforms, properties);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
       return createSparkTable(
           ident,
@@ -241,6 +217,42 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
   }
 
+  /**
+   * Creates a table in Gravitino and returns the Gravitino table object. Subclasses may call this
+   * to create via Gravitino without triggering the default {@code loadSparkTable()} that follows in
+   * {@link #createTable}.
+   */
+  protected org.apache.gravitino.rel.Table createGravitinoTable(
+      Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
+      throws NoSuchSchemaException, org.apache.gravitino.exceptions.TableAlreadyExistsException {
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of(getDatabase(ident), ident.name());
+    org.apache.gravitino.rel.Column[] gravitinoColumns =
+        Arrays.stream(schema.fields())
+            .map(structField -> createGravitinoColumn(structField))
+            .toArray(org.apache.gravitino.rel.Column[]::new);
+
+    Map<String, String> gravitinoProperties =
+        propertiesConverter.toGravitinoTableProperties(properties);
+    // Spark store comment in properties, we should retrieve it and pass to Gravitino explicitly.
+    String comment = gravitinoProperties.remove(ConnectorConstants.COMMENT);
+
+    DistributionAndSortOrdersInfo distributionAndSortOrdersInfo =
+        sparkTransformConverter.toGravitinoDistributionAndSortOrders(transforms);
+    org.apache.gravitino.rel.expressions.transforms.Transform[] partitionings =
+        sparkTransformConverter.toGravitinoPartitionings(transforms);
+
+    return gravitinoCatalogClient
+        .asTableCatalog()
+        .createTable(
+            gravitinoIdentifier,
+            gravitinoColumns,
+            comment,
+            gravitinoProperties,
+            partitionings,
+            distributionAndSortOrdersInfo.getDistribution(),
+            distributionAndSortOrdersInfo.getSortOrders());
+  }
+
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
     org.apache.gravitino.rel.Table gravitinoTable;
@@ -249,6 +261,15 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     } catch (NoSuchTableException e) {
       // Not a table in Gravitino; try as a view.
       return loadViewAsTable(ident);
+    } catch (ForbiddenException e) {
+      // Do not load the underlying Spark table here: that load bypasses Gravitino authorization,
+      // which the caller is precisely missing. Return a standalone table that carries the failure
+      // so RequiredPrivilegesCheck can aggregate and report it during analysis.
+      return AuthorizationTable.deny(
+          ident.name(),
+          String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+          Sets.newHashSet(Privilege.Name.SELECT_TABLE),
+          e);
     }
     Table sparkTable = loadSparkTable(ident);
     return createSparkTable(
@@ -268,7 +289,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
             .map(sparkTableChangeConverter::toGravitinoTableChange)
             .toArray(org.apache.gravitino.rel.TableChange[]::new);
     try {
-      sparkCatalog.invalidateTable(ident);
+      invalidateTable(ident);
       org.apache.gravitino.rel.Table gravitinoTable =
           gravitinoCatalogClient
               .asTableCatalog()
@@ -290,7 +311,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public boolean dropTable(Identifier ident) {
-    sparkCatalog.invalidateTable(ident);
+    invalidateTable(ident);
     return gravitinoCatalogClient
         .asTableCatalog()
         .dropTable(NameIdentifier.of(getDatabase(ident), ident.name()));
@@ -298,7 +319,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public boolean purgeTable(Identifier ident) {
-    sparkCatalog.invalidateTable(ident);
+    invalidateTable(ident);
     return gravitinoCatalogClient
         .asTableCatalog()
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
@@ -343,7 +364,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     org.apache.gravitino.rel.TableChange rename =
         org.apache.gravitino.rel.TableChange.rename(newIdent.name());
     try {
-      sparkCatalog.invalidateTable(oldIdent);
+      invalidateTable(oldIdent);
       gravitinoCatalogClient
           .asTableCatalog()
           .alterTable(NameIdentifier.of(getDatabase(oldIdent), oldIdent.name()), rename);
@@ -480,7 +501,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       String database = getDatabase(ident);
       return gravitinoCatalogClient
           .asTableCatalog()
-          .loadTable(NameIdentifier.of(database, ident.name()));
+          .loadTable(
+              NameIdentifier.of(database, ident.name()),
+              Sets.newHashSet(Privilege.Name.SELECT_TABLE));
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
     }
@@ -569,7 +592,26 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   protected Table loadTableForWriting(Identifier ident)
       throws NoSuchTableException, ForbiddenException {
-    org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTableForWriting(ident);
+    org.apache.gravitino.rel.Table gravitinoTable;
+    try {
+      gravitinoTable = loadGravitinoTableForWriting(ident);
+    } catch (ForbiddenException e) {
+      // Do not load the underlying Spark table here: that load bypasses Gravitino authorization,
+      // which the caller is precisely missing.
+      //
+      // Unlike the read path, a write command targets a single table, so there is nothing to
+      // aggregate across relations. Returning an empty-schema placeholder here would let Spark's
+      // ResolveOutputRelation reject the write with a column-arity error before
+      // RequiredPrivilegesCheck runs, surfacing the wrong failure and leaving the recorded denial
+      // on the thread to leak into later queries. Record the denial and surface the aggregated
+      // authorization failure immediately, which also clears the per-thread collector.
+      AuthorizationTable.deny(
+          ident.name(),
+          String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+          Sets.newHashSet(Privilege.Name.MODIFY_TABLE),
+          e);
+      throw AuthorizationTable.drainFailure().orElse(e);
+    }
     org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
     // Will create a catalog specific table
     return createSparkTable(
@@ -655,7 +697,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     throw new NoSuchFunctionException(ident);
   }
 
-  private Table loadSparkTable(Identifier ident) {
+  protected Table loadSparkTable(Identifier ident) {
     try {
       return sparkCatalog.loadTable(ident);
     } catch (NoSuchTableException e) {

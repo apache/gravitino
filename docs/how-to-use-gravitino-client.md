@@ -1,23 +1,23 @@
 ---
-title: "How to use Apache Gravitino client"
-slug: /how-to-use-gravitino-client
+title: "Java Client"
+slug: "/how-to-use-gravitino-client"
 date: 2025-07-09
-keyword: Gravitino client
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino client"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-You can use Gravitino Java client library with Spark, Spring and other Java environment or
+Use Gravitino Java client library with Spark, Spring and other Java environment or
 use Gravitino Python client library with Spark, PyTorch, Tensorflow, Ray and Python environment.
 
 First of all, you must have a Gravitino server set up and run, you can refer document of 
 [how to install Gravitino](./how-to-install.md) to build Gravitino server from source code and 
 install it in your local.
 
-## Gravitino Java client
+## Java Client
 
-You can customize the Gravitino Java client by using `withClientConfig` like this:
+Customize the Gravitino Java client by using `withClientConfig` like this:
 
 ```java
  Map<String, String> properties =
@@ -37,7 +37,7 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http:/
 // ...
 ```
 
-### Gravitino Java client configuration
+### Java Client Configuration
 
 | Configuration item                     | Description                                          | Default value       | Required | Since version |
 |----------------------------------------|------------------------------------------------------|---------------------|----------|---------------|
@@ -46,9 +46,9 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http:/
 
 **Note:** Invalid configuration properties will result in exceptions.
 
-## Gravitino Python client
+## Python Client
 
-You can customize the Gravitino Python client with config properties like this:
+Customize the Gravitino Python client with config properties like this:
 
 ```python
 gravitino_admin_client = GravitinoAdminClient(
@@ -65,7 +65,7 @@ gravitino_client = GravitinoClient(
 # ...
 ```
 
-### Gravitino Python client configuration
+### Python Client Configuration
 
 | Configuration item                 | Description                            | Default value | Required | Since version |
 |------------------------------------|----------------------------------------|---------------|----------|---------------|

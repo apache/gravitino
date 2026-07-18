@@ -97,15 +97,27 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     this.namespaceWrapper = namespaceWrapper;
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p><b>Implementation note</b>: the {@code version} parameter is accepted but ignored; this
+   * implementation always returns metadata for the latest version of the table. A warning is logged
+   * when a non-empty version is supplied.
+   */
   @Override
   public DescribeTableResponse describeTable(
-      String tableId, String delimiter, Optional<Long> version, boolean checkDeclared) {
-    if (!version.isEmpty()) {
-      throw new UnsupportedOperationException(
-          "Describing specific table version is not supported. It should be null to indicate the"
-              + " latest version.");
+      String tableId,
+      String delimiter,
+      Optional<Long> version,
+      boolean checkDeclared,
+      boolean loadDetailedMetadata) {
+    if (version.isPresent()) {
+      LOG.warn(
+          "describeTable: version={} requested for table {} but versioned describe is not "
+              + "implemented; returning latest version instead",
+          version.get(),
+          tableId);
     }
-
     ObjectIdentifier nsId = ObjectIdentifier.of(tableId, Pattern.quote(delimiter));
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
@@ -126,7 +138,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     response.setMetadata(table.properties());
     response.setProperties(table.properties());
     response.setLocation(table.properties().get(LANCE_LOCATION));
-    response.setSchema(toJsonArrowSchema(table.columns()));
+    if (loadDetailedMetadata) {
+      response.setSchema(toJsonArrowSchema(table.columns()));
+    }
     response.setVersion(
         Optional.ofNullable(table.properties().get(LANCE_TABLE_VERSION))
             .map(Long::valueOf)
@@ -267,7 +281,21 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
     }
     Map<String, String> properties = t.properties();
-    // TODO Support real deregister API.
+
+    // Verify the table is external before deregistering. For non-external (managed) tables,
+    // dropTable would delete the underlying Lance data, violating the deregister contract
+    // ("It will not delete the underlying lance data"). The TableCatalog interface does not
+    // expose a metadata-only removal path, so we fail fast rather than risk silent data loss.
+    boolean external =
+        Optional.ofNullable(properties.get(Table.PROPERTY_EXTERNAL))
+            .map(Boolean::parseBoolean)
+            .orElse(false);
+    if (!external) {
+      throw new UnsupportedOperationException(
+          "deregisterTable only supports external tables, but table " + tableId + " is managed");
+    }
+
+    // External tables: dropTable removes catalog metadata only, preserving Lance data.
     boolean result = catalog.asTableCatalog().dropTable(tableIdentifier);
     if (!result) {
       throw new TableNotFoundException(

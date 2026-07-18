@@ -19,7 +19,12 @@
 
 package org.apache.gravitino.spark.connector.plugin;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
+import org.apache.spark.SparkConf;
+import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -30,5 +35,27 @@ public class TestGravitinoDriverPlugin {
     Assertions.assertEquals(
         IcebergSparkSessionExtensions.class.getName(),
         GravitinoDriverPlugin.ICEBERG_SPARK_EXTENSIONS);
+  }
+
+  @Test
+  void testAlwaysRegistersAuthorizationExtension() {
+    SparkConf sparkConf = new SparkConf(false);
+
+    new GravitinoDriverPlugin().registerSqlExtensions(sparkConf);
+
+    assertEquals(
+        GravitinoAuthorizationSparkSessionExtensions.class.getName(),
+        sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
+  }
+
+  @Test
+  void testDoesNotDuplicateAuthorizationExtension() {
+    SparkConf sparkConf = new SparkConf(false);
+    String extension = GravitinoAuthorizationSparkSessionExtensions.class.getName();
+    sparkConf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), extension);
+
+    new GravitinoDriverPlugin().registerSqlExtensions(sparkConf);
+
+    assertEquals(extension, sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
   }
 }

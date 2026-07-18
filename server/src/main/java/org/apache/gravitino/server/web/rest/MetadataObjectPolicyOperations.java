@@ -60,6 +60,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationObject
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,11 +111,13 @@ public class MetadataObjectPolicyOperations {
             Optional<PolicyDTO> policyDTO =
                 policyEntity.map(t -> PolicyOperations.toDTO(t, Optional.of(false)));
 
-            MetadataObject parentObject = MetadataObjects.parent(object);
-            while (!policyEntity.isPresent() && parentObject != null) {
+            for (MetadataObject parentObject :
+                MetadataObjectUtil.getParentMetadataObjects(object)) {
+              if (policyEntity.isPresent()) {
+                break;
+              }
               policyEntity = getPolicyForObject(metalake, parentObject, policyName);
               policyDTO = policyEntity.map(t -> PolicyOperations.toDTO(t, Optional.of(true)));
-              parentObject = MetadataObjects.parent(parentObject);
             }
 
             if (!policyDTO.isPresent()) {
@@ -194,8 +197,8 @@ public class MetadataObjectPolicyOperations {
                       .toArray(PolicyDTO[]::new));
             }
 
-            MetadataObject parentObject = MetadataObjects.parent(object);
-            while (parentObject != null) {
+            for (MetadataObject parentObject :
+                MetadataObjectUtil.getParentMetadataObjects(object)) {
               PolicyEntity[] inheritedPolicies =
                   policyDispatcher.listPolicyInfosForMetadataObject(metalake, parentObject);
               if (ArrayUtils.isNotEmpty(inheritedPolicies)) {
@@ -205,7 +208,6 @@ public class MetadataObjectPolicyOperations {
                         .map(t -> PolicyOperations.toDTO(t, Optional.of(true)))
                         .toArray(PolicyDTO[]::new));
               }
-              parentObject = MetadataObjects.parent(parentObject);
             }
 
             if (verbose) {

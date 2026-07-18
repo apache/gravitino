@@ -257,6 +257,17 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   }
 
   @Test
+  public void testGetScheme() throws IOException {
+    Assumptions.assumeTrue(getClass() == TestGvfsBase.class);
+    try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(conf)) {
+      // The default FileSystem#getScheme() throws UnsupportedOperationException, which breaks
+      // Hadoop / Spark commit protocols when writing to a gvfs:// path. GVFS must override it
+      // and return the GVFS scheme constant.
+      assertEquals(GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME, fs.getScheme());
+    }
+  }
+
+  @Test
   public void testRequestHeaders()
       throws NoSuchFieldException, IllegalAccessException, IOException {
     String envKey = "GRAVITINO_TEST_HEADER";
@@ -472,6 +483,222 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       // Both should be the same instance since they share scheme/authority/user
       assertSame(cachedFs1, cachedFs2, "FileSystem instances should be reused for same storage");
     }
+  }
+
+  /**
+   * Regression test for #11303: cache eviction must not close the underlying {@link FileSystem};
+   * close is deferred to GVFS shutdown.
+   */
+  @Test
+  public void testFileSystemNotClosedOnEviction() throws IOException {
+    String filesetName = "fileset_evict_no_close";
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    Path filesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, filesetName);
+    try (FileSystem fs = filesetPath.getFileSystem(conf)) {
+      FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "");
+      buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResourceForCredential(filesetName, localPath.toString());
+
+      // Populate the cache by performing one operation.
+      FileSystemTestUtils.mkdirs(filesetPath, fs);
+
+      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+          ((GravitinoVirtualFileSystem) fs).getOperations().internalFileSystemCache();
+      assertEquals(1, cache.asMap().size());
+      FileSystem underlyingFs = cache.asMap().values().iterator().next();
+      assertNotNull(underlyingFs);
+
+      // Force an eviction; the underlying FS must NOT be closed.
+      cache.invalidateAll();
+      cache.cleanUp();
+      Awaitility.await()
+          .atMost(5, TimeUnit.SECONDS)
+          .pollInterval(100, TimeUnit.MILLISECONDS)
+          .untilAsserted(() -> assertTrue(cache.asMap().isEmpty()));
+
+      // The underlying FileSystem must still be usable after eviction.
+      Path probe = new Path(localPath, "probe_after_eviction");
+      FileSystemTestUtils.mkdirs(probe, underlyingFs);
+      assertTrue(underlyingFs.exists(probe));
+
+      // Evicted FS must still be tracked so GVFS#close() can release it.
+      assertTrue(
+          ((GravitinoVirtualFileSystem) fs)
+              .getOperations()
+              .allCreatedFileSystems()
+              .contains(underlyingFs),
+          "Evicted FileSystem must still be tracked for shutdown-time close");
+    }
+  }
+
+  /**
+   * Regression test for #11303: an evicted-but-not-yet-closed {@link FileSystem} must be closed
+   * exactly once when the owning GVFS instance is closed.
+   */
+  @Test
+  public void testEvictedFileSystemClosedOnGvfsShutdown() throws IOException {
+    String filesetName = "fileset_evict_close_on_shutdown";
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    Path filesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, filesetName);
+
+    FileSystem gvfs = filesetPath.getFileSystem(conf);
+    // Mock FS to verify close() is called at GVFS shutdown. Registered via the test-only
+    // accessor to simulate an FS that was created earlier and (after the #11303 fix) is no
+    // longer in the cache but must still be closed on shutdown.
+    FileSystem mockExtraFs = Mockito.mock(FileSystem.class);
+    try {
+      FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "");
+      buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResourceForCredential(filesetName, localPath.toString());
+
+      FileSystemTestUtils.mkdirs(filesetPath, gvfs);
+
+      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+          ((GravitinoVirtualFileSystem) gvfs).getOperations().internalFileSystemCache();
+      assertEquals(1, cache.asMap().size());
+
+      // Inject a tracked-but-not-cached FS to model an "evicted but still tracked" instance.
+      ((GravitinoVirtualFileSystem) gvfs).getOperations().allCreatedFileSystems().add(mockExtraFs);
+
+      // Force eviction of the cache. Per the fix, this must NOT close any FS.
+      cache.invalidateAll();
+      cache.cleanUp();
+      Awaitility.await()
+          .atMost(5, TimeUnit.SECONDS)
+          .pollInterval(100, TimeUnit.MILLISECONDS)
+          .untilAsserted(() -> assertTrue(cache.asMap().isEmpty()));
+      Mockito.verify(mockExtraFs, Mockito.never()).close();
+    } finally {
+      gvfs.close();
+    }
+
+    // After GVFS shutdown, every FS that was ever tracked (including evicted ones) must be
+    // closed exactly once.
+    Mockito.verify(mockExtraFs, Mockito.times(1)).close();
+
+    // The tracking set must be cleared on shutdown to avoid retaining stale references.
+    assertTrue(
+        ((GravitinoVirtualFileSystem) gvfs).getOperations().allCreatedFileSystems().isEmpty(),
+        "allCreatedFileSystems must be cleared after GVFS shutdown");
+  }
+
+  /**
+   * Regression test: the #11303 fix must not change cache hit/miss semantics; the same key must
+   * still return the same {@link FileSystem} instance.
+   */
+  @Test
+  public void testCacheHitMissSemanticsUnchanged() throws IOException {
+    String filesetName = "fileset_cache_hit_miss";
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    Path filesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, filesetName);
+    try (FileSystem fs = filesetPath.getFileSystem(conf)) {
+      FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "");
+      buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResourceForCredential(filesetName, localPath.toString());
+
+      // First access -> cache miss, instantiate FS.
+      FileSystemTestUtils.mkdirs(filesetPath, fs);
+      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+          ((GravitinoVirtualFileSystem) fs).getOperations().internalFileSystemCache();
+      assertEquals(1, cache.asMap().size());
+      FileSystem firstHit = cache.asMap().values().iterator().next();
+
+      // Second access for the same fileset -> cache hit, must reuse the same instance.
+      Path subDir = new Path(filesetPath, "sub");
+      FileSystemTestUtils.mkdirs(subDir, fs);
+      assertEquals(1, cache.asMap().size());
+      FileSystem secondHit = cache.asMap().values().iterator().next();
+
+      assertSame(
+          firstHit,
+          secondHit,
+          "Cache hit must return the same FileSystem instance for the same key");
+    }
+  }
+
+  /**
+   * Verifies the legacy escape-hatch {@code closeOnEviction=true}: eviction must close the FS
+   * immediately and remove it from {@code allCreatedFileSystems} to avoid double-close on shutdown.
+   */
+  @Test
+  public void testCloseOnEvictionLegacyBehaviour() throws IOException {
+    Configuration legacyConf = new Configuration(conf);
+    legacyConf.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CACHE_CLOSE_ON_EVICTION_KEY,
+        true);
+
+    String filesetName = "fileset_evict_legacy_close";
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    Path filesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, filesetName);
+
+    FileSystem mockFs = Mockito.mock(FileSystem.class);
+    try (FileSystem fs = filesetPath.getFileSystem(legacyConf)) {
+      FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath.toString());
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "");
+      buildMockResource(Method.GET, locationPath, queryParams, null, fileLocationResponse, SC_OK);
+      buildMockResourceForCredential(filesetName, localPath.toString());
+
+      // Populate the cache with a real FS first so the cache is non-empty.
+      FileSystemTestUtils.mkdirs(filesetPath, fs);
+
+      Cache<BaseGVFSOperations.FileSystemCacheKey, FileSystem> cache =
+          ((GravitinoVirtualFileSystem) fs).getOperations().internalFileSystemCache();
+      assertEquals(1, cache.asMap().size());
+
+      // Inject a mock FS with a fresh key so it doesn't collide with the real entry.
+      BaseGVFSOperations.FileSystemCacheKey mockKey =
+          new BaseGVFSOperations.FileSystemCacheKey("file", "mock-authority", null);
+      cache.put(mockKey, mockFs);
+      // Mirror the real loader so the legacy listener path can remove it.
+      ((GravitinoVirtualFileSystem) fs).getOperations().allCreatedFileSystems().add(mockFs);
+
+      // Force eviction.
+      cache.invalidate(mockKey);
+      cache.cleanUp();
+
+      // Legacy path: close() called exactly once, and the FS removed from the tracking set.
+      Awaitility.await()
+          .atMost(5, TimeUnit.SECONDS)
+          .pollInterval(100, TimeUnit.MILLISECONDS)
+          .untilAsserted(() -> Mockito.verify(mockFs, Mockito.times(1)).close());
+      assertFalse(
+          ((GravitinoVirtualFileSystem) fs)
+              .getOperations()
+              .allCreatedFileSystems()
+              .contains(mockFs),
+          "Legacy mode must remove evicted FS from allCreatedFileSystems to prevent "
+              + "double-close at GVFS shutdown");
+    }
+
+    // After GVFS#close(), close() must still have been called exactly once -- not twice.
+    Mockito.verify(mockFs, Mockito.times(1)).close();
   }
 
   @ParameterizedTest

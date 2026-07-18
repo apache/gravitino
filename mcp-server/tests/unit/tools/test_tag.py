@@ -98,3 +98,51 @@ class TestTagTool(unittest.TestCase):
                 )
 
         asyncio.run(_test_disassociate_tag_from_metadata(self.mcp))
+
+    def test_write_tag_tools_are_exposed(self):
+        """Tag write tools are registered/exposed (not hidden).
+
+        Authorization enforcement is delegated to Gravitino and covered by the
+        live integration test, not asserted here; this only checks exposure.
+        """
+
+        async def _test(mcp_server):
+            tool_names = {tool.name for tool in await mcp_server.list_tools()}
+            self.assertIn("create_tag", tool_names)
+            self.assertIn("alter_tag", tool_names)
+            self.assertIn("delete_tag", tool_names)
+
+        asyncio.run(_test(self.mcp))
+
+    def test_create_tag(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_tag",
+                    {"name": "t1", "comment": "c", "properties": {"k": "v"}},
+                )
+                self.assertEqual("mock_tag_created: t1", result.content[0].text)
+
+        asyncio.run(_test(self.mcp))
+
+    def test_alter_tag(self):
+        async def _test(mcp_server):
+            updates = [{"@type": "rename", "newName": "t2"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_tag", {"name": "t1", "updates": updates}
+                )
+                self.assertEqual(
+                    f"mock_tag_altered: t1 with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_delete_tag(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool("delete_tag", {"name": "t1"})
+                self.assertEqual("mock_tag_deleted: t1", result.content[0].text)
+
+        asyncio.run(_test(self.mcp))

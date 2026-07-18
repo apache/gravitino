@@ -107,10 +107,9 @@ public class JdbcCredential implements Credential {
 
   private void validate(String jdbcUser, String jdbcPassword, long expireTimeInMs) {
     Preconditions.checkArgument(StringUtils.isNotBlank(jdbcUser), "JDBC user should not be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(jdbcPassword), "JDBC password should not be empty");
+    Preconditions.checkArgument(jdbcPassword != null, "JDBC password should not be null");
     // JDBC credentials are static (no server-issued expiry). expireTimeInMs must always be 0.
     Preconditions.checkArgument(
-        expireTimeInMs == 0, "The expire time of JdbcCredential should be 0");
+        expireTimeInMs == 0, "The expiration time of JdbcCredential should be 0");
   }
 }

@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -64,11 +65,13 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,7 +104,9 @@ public class IcebergNamespaceOperations {
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response listNamespaces(
       @DefaultValue("") @Encoded() @QueryParam("parent") String parent,
-      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix) {
+      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @QueryParam("pageToken") String pageToken,
+      @QueryParam("pageSize") Integer pageSize) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace parentNamespace =
         parent.isEmpty()
@@ -124,6 +129,9 @@ public class IcebergNamespaceOperations {
               response =
                   filterListNamespacesResponse(response, authContext.metalakeName(), catalogName);
             }
+            response =
+                IcebergPaginationHelper.paginateNamespaces(
+                    response, Optional.ofNullable(pageToken), Optional.ofNullable(pageSize));
             return IcebergRESTUtils.ok(response);
           });
     } catch (Exception e) {
@@ -337,6 +345,42 @@ public class IcebergNamespaceOperations {
                 namespaceOperationDispatcher.registerTable(
                     context, icebergNS, registerTableRequest);
             return IcebergRESTUtils.buildResponseWithETag(loadTableResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
+  }
+
+  @POST
+  @Path("{namespace}/register-view")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "register-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "register-view", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.ICEBERG_CREATE_VIEW_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
+  public Response registerView(
+      @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
+      @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
+          String namespace,
+      RegisterViewRequest registerViewRequest) {
+    String catalogName = IcebergRESTUtils.getCatalogName(prefix);
+    Namespace icebergNS =
+        RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+    LOG.info(
+        "Register Iceberg view, catalog: {}, namespace: {}, registerViewRequest: {}",
+        catalogName,
+        icebergNS,
+        registerViewRequest);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            LoadViewResponse loadViewResponse =
+                namespaceOperationDispatcher.registerView(context, icebergNS, registerViewRequest);
+            return IcebergRESTUtils.ok(loadViewResponse);
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);

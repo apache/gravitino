@@ -31,6 +31,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergAuthenticationFilter;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.iceberg.service.IcebergHealthCheckPathMatcher;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore;
@@ -51,9 +52,11 @@ import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.web.HealthAliasServlet;
+import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -139,13 +142,20 @@ public class RESTService implements GravitinoAuxiliaryService {
           "Async Iceberg table cleanup is only available in auxiliary mode; "
               + "purge requests with async mode will fall back to synchronous purge.");
     }
+
+    // The raw namespace operation executor is shared with the table and view hook dispatchers so
+    // their orphan-schema cleanup can probe namespace existence without firing namespace events.
+    IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
+        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
+
     // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
     IcebergTableOperationDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {
-      icebergTableEventDispatcher = new IcebergTableHookDispatcher(icebergTableEventDispatcher);
+      icebergTableEventDispatcher =
+          new IcebergTableHookDispatcher(icebergTableEventDispatcher, namespaceOperationDispatcher);
     }
     IcebergTableOperationDispatcher icebergTableDispatcher = icebergTableEventDispatcher;
 
@@ -156,13 +166,12 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {
       icebergViewEventDispatcher =
-          new IcebergViewHookDispatcher(icebergViewEventDispatcher, metalakeName);
+          new IcebergViewHookDispatcher(
+              icebergViewEventDispatcher, namespaceOperationDispatcher, metalakeName);
     }
     IcebergViewOperationDispatcher icebergViewDispatcher = icebergViewEventDispatcher;
 
     // Namespace: HookDispatcher -> EventDispatcher -> OperationExecutor
-    IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
-        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
     IcebergNamespaceOperationDispatcher icebergNamespaceEventDispatcher =
         new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {
@@ -195,6 +204,12 @@ public class RESTService implements GravitinoAuxiliaryService {
 
     Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, ICEBERG_SPEC);
+    server.addFilter(
+        new HttpAuditFilter(
+            eventBus,
+            EventSource.GRAVITINO_ICEBERG_REST_SERVER,
+            new IcebergHealthCheckPathMatcher()),
+        ICEBERG_SPEC);
     server.addCustomFilters(ICEBERG_SPEC);
     server.addSystemFilters(ICEBERG_SPEC);
 

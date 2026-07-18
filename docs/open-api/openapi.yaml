@@ -22,7 +22,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
-  version: 1.3.0-SNAPSHOT
+  version: 2.0.0-SNAPSHOT
   description: |
     Defines the specification for the first version of the Gravitino REST API.
 
@@ -594,10 +594,12 @@ components:
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"
+          - "VIEW"
           - "COLUMN"
           - "FILESET"
           - "TOPIC"
           - "MODEL"
+          - "FUNCTION"
           - "ROLE"
     metadataObjectFullName:
       name: metadataObjectFullName
@@ -634,4 +636,3 @@ components:
     KerberosAuth:
       type: http
       scheme: negotiate
-

@@ -151,6 +151,16 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   }
 
   /**
+   * Returns the mutable options map shared with {@link BaseCatalog}, allowing subclasses to inject
+   * credentials into catalog options after construction.
+   *
+   * @return the mutable catalog options map
+   */
+  protected Map<String, String> getMutableOptions() {
+    return mutableOptions;
+  }
+
+  /**
    * Overwrites the Flink JDBC user and password in {@code options} with credentials obtained from
    * the server via credential vending, if available. Falls back to the existing options if the
    * catalog does not support credential vending or no JDBC credential is returned.
@@ -159,7 +169,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * @param options the mutable Flink catalog options map to update
    */
   @VisibleForTesting
-  static void applyJdbcCredential(Catalog catalog, Map<String, String> options) {
+  protected static void applyJdbcCredential(Catalog catalog, Map<String, String> options) {
     Credential[] credentials;
     try {
       credentials = catalog.supportsCredentials().getCredentials();

@@ -62,22 +62,36 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionParams;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -107,10 +121,16 @@ public class TestTagManager {
 
   private static final String COLUMN = "column_for_tag_test";
 
+  private static final String VIEW = "view_for_tag_test";
+
+  private static final String FUNCTION = "function_for_tag_test";
+
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
   private static final CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
   private static final SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
   private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+  private static final ViewDispatcher viewDispatcher = mock(ViewDispatcher.class);
+  private static final FunctionDispatcher functionDispatcher = mock(FunctionDispatcher.class);
 
   private static EntityStore entityStore;
 
@@ -211,6 +231,37 @@ public class TestTagManager {
             .build();
     entityStore.put(table, false /* overwritten */);
 
+    ViewEntity view =
+        ViewEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(VIEW)
+            .withNamespace(Namespace.of(METALAKE, CATALOG, SCHEMA))
+            .withColumns(new Column[0])
+            .withRepresentations(
+                new Representation[] {
+                  SQLRepresentation.builder().withDialect("unknown").withSql("SELECT 1").build()
+                })
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(view, false /* overwritten */);
+
+    FunctionParam param = FunctionParams.of("param", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "mock.udf.class.name");
+    FunctionDefinition definition =
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
+    FunctionEntity function =
+        FunctionEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(FUNCTION)
+            .withNamespace(Namespace.of(METALAKE, CATALOG, SCHEMA))
+            .withFunctionType(FunctionType.SCALAR)
+            .withDeterministic(false)
+            .withDefinitions(new FunctionDefinition[] {definition})
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(function, false /* overwritten */);
+
     tagManager = new TagManager(idGenerator, entityStore);
 
     FieldUtils.writeField(
@@ -218,11 +269,16 @@ public class TestTagManager {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "viewDispatcher", viewDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "functionDispatcher", functionDispatcher, true);
 
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
     when(schemaDispatcher.schemaExists(any())).thenReturn(true);
     when(tableDispatcher.tableExists(any())).thenReturn(true);
+    when(viewDispatcher.viewExists(any())).thenReturn(true);
+    when(functionDispatcher.functionExists(any())).thenReturn(true);
   }
 
   @AfterAll
@@ -261,6 +317,19 @@ public class TestTagManager {
             Entity.EntityType.COLUMN);
     String[] columnTags = tagManager.listTagsForMetadataObject(METALAKE, columnObject);
     tagManager.associateTagsForMetadataObject(METALAKE, columnObject, null, columnTags);
+
+    MetadataObject viewObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofView(METALAKE, CATALOG, SCHEMA, VIEW), Entity.EntityType.VIEW);
+    String[] viewTags = tagManager.listTagsForMetadataObject(METALAKE, viewObject);
+    tagManager.associateTagsForMetadataObject(METALAKE, viewObject, null, viewTags);
+
+    MetadataObject functionObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofFunction(METALAKE, CATALOG, SCHEMA, FUNCTION),
+            Entity.EntityType.FUNCTION);
+    String[] functionTags = tagManager.listTagsForMetadataObject(METALAKE, functionObject);
+    tagManager.associateTagsForMetadataObject(METALAKE, functionObject, null, functionTags);
 
     Arrays.stream(tagManager.listTags(METALAKE)).forEach(n -> tagManager.deleteTag(METALAKE, n));
   }
@@ -501,6 +570,44 @@ public class TestTagManager {
     Assertions.assertEquals(2, tags6.length);
     Assertions.assertEquals(ImmutableSet.of("tag1", "tag3"), ImmutableSet.copyOf(tags6));
 
+    // Test associate tags for view
+    MetadataObject viewObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofView(METALAKE, CATALOG, SCHEMA, VIEW), Entity.EntityType.VIEW);
+    String[] tagsForView =
+        tagManager.associateTagsForMetadataObject(METALAKE, viewObject, tagsToAdd1, null);
+
+    Assertions.assertEquals(1, tagsForView.length);
+    Assertions.assertEquals(ImmutableSet.of("tag1"), ImmutableSet.copyOf(tagsForView));
+
+    // Test associate and disassociate same tags for view
+    String[] tagsForViewAfterUpdate =
+        tagManager.associateTagsForMetadataObject(METALAKE, viewObject, tagsToAdd2, tagsToRemove1);
+
+    Assertions.assertEquals(2, tagsForViewAfterUpdate.length);
+    Assertions.assertEquals(
+        ImmutableSet.of("tag1", "tag3"), ImmutableSet.copyOf(tagsForViewAfterUpdate));
+
+    // Test associate tags for function
+    MetadataObject functionObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofFunction(METALAKE, CATALOG, SCHEMA, FUNCTION),
+            Entity.EntityType.FUNCTION);
+    String[] tagsForFunction =
+        tagManager.associateTagsForMetadataObject(METALAKE, functionObject, tagsToAdd1, null);
+
+    Assertions.assertEquals(1, tagsForFunction.length);
+    Assertions.assertEquals(ImmutableSet.of("tag1"), ImmutableSet.copyOf(tagsForFunction));
+
+    // Test associate and disassociate same tags for function
+    String[] tagsForFunctionAfterUpdate =
+        tagManager.associateTagsForMetadataObject(
+            METALAKE, functionObject, tagsToAdd2, tagsToRemove1);
+
+    Assertions.assertEquals(2, tagsForFunctionAfterUpdate.length);
+    Assertions.assertEquals(
+        ImmutableSet.of("tag1", "tag3"), ImmutableSet.copyOf(tagsForFunctionAfterUpdate));
+
     // Test associate and disassociate same tags for column
     MetadataObject columnObject =
         NameIdentifierUtil.toMetadataObject(
@@ -552,6 +659,13 @@ public class TestTagManager {
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
             Entity.EntityType.COLUMN);
+    MetadataObject viewObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofView(METALAKE, CATALOG, SCHEMA, VIEW), Entity.EntityType.VIEW);
+    MetadataObject functionObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofFunction(METALAKE, CATALOG, SCHEMA, FUNCTION),
+            Entity.EntityType.FUNCTION);
 
     tagManager.associateTagsForMetadataObject(
         METALAKE, catalogObject, new String[] {tag1.name(), tag2.name(), tag3.name()}, null);
@@ -561,11 +675,16 @@ public class TestTagManager {
         METALAKE, tableObject, new String[] {tag1.name()}, null);
     tagManager.associateTagsForMetadataObject(
         METALAKE, columnObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, viewObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, functionObject, new String[] {tag1.name()}, null);
 
     MetadataObject[] objects = tagManager.listMetadataObjectsForTag(METALAKE, tag1.name());
-    Assertions.assertEquals(4, objects.length);
+    Assertions.assertEquals(6, objects.length);
     Assertions.assertEquals(
-        ImmutableSet.of(catalogObject, schemaObject, tableObject, columnObject),
+        ImmutableSet.of(
+            catalogObject, schemaObject, tableObject, columnObject, viewObject, functionObject),
         ImmutableSet.copyOf(objects));
 
     MetadataObject[] objects1 = tagManager.listMetadataObjectsForTag(METALAKE, tag2.name());
@@ -607,6 +726,13 @@ public class TestTagManager {
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
             Entity.EntityType.COLUMN);
+    MetadataObject viewObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofView(METALAKE, CATALOG, SCHEMA, VIEW), Entity.EntityType.VIEW);
+    MetadataObject functionObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofFunction(METALAKE, CATALOG, SCHEMA, FUNCTION),
+            Entity.EntityType.FUNCTION);
 
     tagManager.associateTagsForMetadataObject(
         METALAKE, catalogObject, new String[] {tag1.name(), tag2.name(), tag3.name()}, null);
@@ -616,6 +742,10 @@ public class TestTagManager {
         METALAKE, tableObject, new String[] {tag1.name()}, null);
     tagManager.associateTagsForMetadataObject(
         METALAKE, columnObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, viewObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, functionObject, new String[] {tag1.name()}, null);
 
     String[] tags = tagManager.listTagsForMetadataObject(METALAKE, catalogObject);
     Assertions.assertEquals(3, tags.length);
@@ -649,6 +779,22 @@ public class TestTagManager {
     Assertions.assertEquals(1, tagsInfo3.length);
     Assertions.assertEquals(ImmutableSet.of(tag1), ImmutableSet.copyOf(tagsInfo3));
 
+    String[] tags4 = tagManager.listTagsForMetadataObject(METALAKE, viewObject);
+    Assertions.assertEquals(1, tags4.length);
+    Assertions.assertEquals(ImmutableSet.of("tag1"), ImmutableSet.copyOf(tags4));
+
+    Tag[] tagsInfo4 = tagManager.listTagsInfoForMetadataObject(METALAKE, viewObject);
+    Assertions.assertEquals(1, tagsInfo4.length);
+    Assertions.assertEquals(ImmutableSet.of(tag1), ImmutableSet.copyOf(tagsInfo4));
+
+    String[] tags5 = tagManager.listTagsForMetadataObject(METALAKE, functionObject);
+    Assertions.assertEquals(1, tags5.length);
+    Assertions.assertEquals(ImmutableSet.of("tag1"), ImmutableSet.copyOf(tags5));
+
+    Tag[] tagsInfo5 = tagManager.listTagsInfoForMetadataObject(METALAKE, functionObject);
+    Assertions.assertEquals(1, tagsInfo5.length);
+    Assertions.assertEquals(ImmutableSet.of(tag1), ImmutableSet.copyOf(tagsInfo5));
+
     // List tags for non-existent metadata object
     MetadataObject nonExistentObject =
         NameIdentifierUtil.toMetadataObject(
@@ -681,6 +827,13 @@ public class TestTagManager {
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
             Entity.EntityType.COLUMN);
+    MetadataObject viewObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofView(METALAKE, CATALOG, SCHEMA, VIEW), Entity.EntityType.VIEW);
+    MetadataObject functionObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofFunction(METALAKE, CATALOG, SCHEMA, FUNCTION),
+            Entity.EntityType.FUNCTION);
 
     tagManager.associateTagsForMetadataObject(
         METALAKE, catalogObject, new String[] {tag1.name(), tag2.name(), tag3.name()}, null);
@@ -690,6 +843,10 @@ public class TestTagManager {
         METALAKE, tableObject, new String[] {tag1.name()}, null);
     tagManager.associateTagsForMetadataObject(
         METALAKE, columnObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, viewObject, new String[] {tag1.name()}, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, functionObject, new String[] {tag1.name()}, null);
 
     Tag result = tagManager.getTagForMetadataObject(METALAKE, catalogObject, tag1.name());
     Assertions.assertEquals(tag1, result);
@@ -705,6 +862,12 @@ public class TestTagManager {
 
     Tag result4 = tagManager.getTagForMetadataObject(METALAKE, tableObject, tag1.name());
     Assertions.assertEquals(tag1, result4);
+
+    Tag result5 = tagManager.getTagForMetadataObject(METALAKE, viewObject, tag1.name());
+    Assertions.assertEquals(tag1, result5);
+
+    Tag result6 = tagManager.getTagForMetadataObject(METALAKE, functionObject, tag1.name());
+    Assertions.assertEquals(tag1, result6);
 
     // Test get non-existent tag for metadata object
     Throwable e =

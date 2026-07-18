@@ -22,16 +22,30 @@ package org.apache.gravitino.maintenance.optimizer.recommender.util;
 import com.alibaba.qlexpress4.Express4Runner;
 import com.alibaba.qlexpress4.InitOptions;
 import com.alibaba.qlexpress4.QLOptions;
+import com.alibaba.qlexpress4.exception.QLException;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class QLExpressionEvaluator implements ExpressionEvaluator {
+
+  private static final Logger LOG = LoggerFactory.getLogger(QLExpressionEvaluator.class);
+
   private static final Express4Runner RUNNER = new Express4Runner(InitOptions.DEFAULT_OPTIONS);
+
+  // Cache compiled regex patterns for hyphen-to-underscore replacement, keyed by the set of
+  // hyphenated context keys. Avoids expensive Pattern.compile on every evaluation call.
+  private final Map<Set<String>, HyphenReplacementRule> replacementRuleCache =
+      new ConcurrentHashMap<>();
 
   @Override
   public long evaluateLong(String expression, Map<String, Object> context) {
@@ -43,6 +57,11 @@ public class QLExpressionEvaluator implements ExpressionEvaluator {
     return (boolean) evaluate(expression, context);
   }
 
+  @Override
+  public Optional<Boolean> tryToEvaluateBool(String expression, Map<String, Object> context) {
+    return tryToEvaluate(expression, context).map(o -> (Boolean) o);
+  }
+
   private Object evaluate(String expression, Map<String, Object> context) {
     Preconditions.checkArgument(StringUtils.isNotBlank(expression), "expression is blank");
     Preconditions.checkArgument(context != null, "context is null");
@@ -50,6 +69,16 @@ public class QLExpressionEvaluator implements ExpressionEvaluator {
     return RUNNER
         .execute(formattedExpression, formatContextKey(context), QLOptions.DEFAULT_OPTIONS)
         .getResult();
+  }
+
+  private Optional<Object> tryToEvaluate(String expression, Map<String, Object> context) {
+    try {
+      Object result = evaluate(expression, context);
+      return Optional.of(result);
+    } catch (QLException e) {
+      LOG.warn("Failed to evaluate expression '{}': {}", expression, e.getMessage());
+      return Optional.empty();
+    }
   }
 
   private Map<String, Object> formatContextKey(Map<String, Object> context) {
@@ -60,27 +89,55 @@ public class QLExpressionEvaluator implements ExpressionEvaluator {
   }
 
   private String formatExpression(String expression, Map<String, Object> context) {
-    Map<String, String> replacements =
-        context.keySet().stream()
-            .collect(
-                Collectors.toMap(key -> key, this::normalizeIdentifier, (left, right) -> left));
-    replacements.entrySet().removeIf(entry -> entry.getKey().equals(entry.getValue()));
-    if (replacements.isEmpty()) {
+    HyphenReplacementRule rule = getReplacementRule(context);
+    if (rule == null) {
       return expression;
     }
-
-    String alternation =
-        replacements.keySet().stream().map(Pattern::quote).collect(Collectors.joining("|"));
-    Pattern pattern = Pattern.compile("(?<![A-Za-z0-9_])(" + alternation + ")(?![A-Za-z0-9_])");
-    Matcher matcher = pattern.matcher(expression);
+    Matcher matcher = rule.pattern.matcher(expression);
     StringBuffer buffer = new StringBuffer();
     while (matcher.find()) {
       String matched = matcher.group(1);
       matcher.appendReplacement(
-          buffer, Matcher.quoteReplacement(replacements.getOrDefault(matched, matched)));
+          buffer, Matcher.quoteReplacement(rule.replacements.getOrDefault(matched, matched)));
     }
     matcher.appendTail(buffer);
     return buffer.toString();
+  }
+
+  /** Return a cached replacement rule for the hyphenated keys in the context, or null if none. */
+  private HyphenReplacementRule getReplacementRule(Map<String, Object> context) {
+    Set<String> hyphenatedKeys =
+        context.keySet().stream()
+            .filter(key -> !key.equals(normalizeIdentifier(key)))
+            .collect(Collectors.toSet());
+    if (hyphenatedKeys.isEmpty()) {
+      return null;
+    }
+    return replacementRuleCache.computeIfAbsent(
+        hyphenatedKeys,
+        keys -> {
+          Map<String, String> replacements =
+              keys.stream()
+                  .collect(
+                      Collectors.toMap(
+                          key -> key, this::normalizeIdentifier, (left, right) -> left));
+          String alternation =
+              replacements.keySet().stream().map(Pattern::quote).collect(Collectors.joining("|"));
+          Pattern pattern =
+              Pattern.compile("(?<![A-Za-z0-9_])(" + alternation + ")(?![A-Za-z0-9_])");
+          return new HyphenReplacementRule(pattern, replacements);
+        });
+  }
+
+  /** Pre-compiled pattern and replacement map for rewriting hyphenated identifiers. */
+  private static class HyphenReplacementRule {
+    final Pattern pattern;
+    final Map<String, String> replacements;
+
+    HyphenReplacementRule(Pattern pattern, Map<String, String> replacements) {
+      this.pattern = pattern;
+      this.replacements = replacements;
+    }
   }
 
   private String normalizeIdentifier(String name) {

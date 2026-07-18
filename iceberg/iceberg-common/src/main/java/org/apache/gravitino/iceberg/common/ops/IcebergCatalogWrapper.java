@@ -54,6 +54,7 @@ import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
@@ -338,6 +339,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {
     request.validate();
     return CatalogHandlers.createView(getViewCatalog(), namespace, request);
+  }
+
+  public LoadViewResponse registerView(Namespace namespace, RegisterViewRequest request) {
+    request.validate();
+    return CatalogHandlers.registerView(getViewCatalog(), namespace, request);
   }
 
   public LoadViewResponse updateView(TableIdentifier viewIdentifier, UpdateTableRequest request) {

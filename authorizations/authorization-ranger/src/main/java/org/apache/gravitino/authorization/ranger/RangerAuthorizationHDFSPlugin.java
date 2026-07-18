@@ -550,7 +550,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     if (type == Entity.EntityType.METALAKE) {
       NameIdentifier[] catalogs =
           GravitinoEnv.getInstance()
-              .catalogDispatcher()
+              .internalCatalogDispatcher()
               .listCatalogs(Namespace.of(identifier.name()));
       for (NameIdentifier catalog : catalogs) {
         locations.addAll(
@@ -592,7 +592,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       boolean recursive) {
     NameIdentifier[] catalogs =
         GravitinoEnv.getInstance()
-            .catalogDispatcher()
+            .internalCatalogDispatcher()
             .listCatalogs(Namespace.of(identifier.name()));
     for (NameIdentifier catalog : catalogs) {
       AuthorizationUtils.getMetadataObjectLocation(catalog, Entity.EntityType.CATALOG)
@@ -668,7 +668,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     if (metadataObject.type() == MetadataObject.Type.METALAKE) {
       NameIdentifier[] catalogs =
           GravitinoEnv.getInstance()
-              .catalogDispatcher()
+              .internalCatalogDispatcher()
               .listCatalogs(Namespace.of(identifier.name()));
       for (NameIdentifier catalog : catalogs) {
         locations.addAll(
@@ -723,11 +723,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, newMetadataObject);
           NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(ident);
           if (GravitinoEnv.getInstance()
-              .catalogDispatcher()
+              .internalCatalogDispatcher()
               .loadCatalog(catalogIdent)
               .provider()
               .equals("hive")) {
-            Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
+            Table table = GravitinoEnv.getInstance().internalTableDispatcher().loadTable(ident);
             if (table.properties().get("table-type").equals("EXTERNAL_TABLE")) {
               continue;
             }

@@ -46,6 +46,7 @@ import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
@@ -80,7 +81,9 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           GravitinoIcebergSparkSessionExtensions.class.getName(), ICEBERG_SPARK_EXTENSIONS);
   private final List<String> gravitinoPaimonExtensions = Arrays.asList(PAIMON_SPARK_EXTENSIONS);
 
-  private final List<String> gravitinoDriverExtensions = new ArrayList<>();
+  private final List<String> gravitinoDriverExtensions =
+      new ArrayList<>(
+          Collections.singletonList(GravitinoAuthorizationSparkSessionExtensions.class.getName()));
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
 
@@ -173,7 +176,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
   }
 
-  private void registerSqlExtensions(SparkConf conf) {
+  @VisibleForTesting
+  void registerSqlExtensions(SparkConf conf) {
     String extensionString = String.join(COMMA, gravitinoDriverExtensions);
     if (conf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key())) {
       String sparkSessionExtensions = conf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
@@ -191,7 +195,17 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private static GravitinoClient createGravitinoClient(
+  /**
+   * Creates a Gravitino client using authentication settings from the Spark configuration.
+   *
+   * @param uri Gravitino REST server URI
+   * @param metalake Gravitino metalake name
+   * @param sparkConf Spark configuration containing auth settings
+   * @param sparkUser Spark session user for simple authentication
+   * @param clientConfig additional Gravitino client configuration
+   * @return configured Gravitino client
+   */
+  public static GravitinoClient createGravitinoClient(
       String uri,
       String metalake,
       SparkConf sparkConf,
@@ -206,6 +220,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           !UserGroupInformation.isSecurityEnabled(),
           "Spark simple auth mode doesn't support setting kerberos configurations");
       builder.withSimpleAuth(sparkUser);
+    } else if (AuthProperties.isBasic(authType)) {
+      String username = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_BASIC_USERNAME);
+      String password = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_BASIC_PASSWORD);
+      builder.withBasicAuth(username, password);
     } else if (AuthProperties.isOAuth2(authType)) {
       String oAuthUri = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_OAUTH2_URI);
       String credential =

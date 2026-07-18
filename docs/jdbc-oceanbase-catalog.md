@@ -1,6 +1,6 @@
 ---
-title: "OceanBase catalog"
-slug: /jdbc-oceanbase-catalog
+title: "OceanBase Catalog"
+slug: "/jdbc-oceanbase-catalog"
 keywords:
 - jdbc
 - OceanBase
@@ -16,13 +16,13 @@ import TabItem from '@theme/TabItem';
 Apache Gravitino provides the ability to manage OceanBase metadata.
 
 :::caution
-1. Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+1. Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 2. Since 1.2.0, OceanBase catalog is not included in standard Gravitino distribution, but you can still build it from source if you need it. Check [build from source](./how-to-build.md) for more details.
 :::
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the OceanBase instance.
 - Supports metadata management of OceanBase (4.x).
@@ -30,14 +30,14 @@ Apache Gravitino provides the ability to manage OceanBase metadata.
 - Supports table index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
-### Catalog properties
+### Catalog Properties
 
-You can pass to a OceanBase data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+Pass to a OceanBase data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the OceanBase catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the OceanBase catalog has the following properties:
 
 | Configuration item      | Description                                                                                                                           | Default value | Required | Since Version    |
 |-------------------------|---------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -82,41 +82,45 @@ Returning null for TIMESTAMP type precision. Driver version: mysql-connector-jav
 - `mysql-connector-java-8.0.16` or higher
 - `com.oceanbase.jdbc.Driver` (OceanBase official driver)
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
+:::note
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+:::
+
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the OceanBase database.
 - Supports creating schema, but does not support setting comment.
 - Supports dropping schema.
 - Supports cascade dropping schema.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support any schema property settings.
 
-### Schema operations
+### Schema Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the OceanBase table.
 - Supports DDL operation for OceanBase tables.
 - Supports index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
 
-### Table properties
+### Table Properties
 
 - Doesn't support table properties.
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type      | OceanBase Type      |
 |---------------------|---------------------|
@@ -145,14 +149,14 @@ OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Int
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-### Table column auto-increment
+### Table Column Auto-Increment
 
 :::note
 OceanBase setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
 :::
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -199,12 +203,12 @@ Index[] indexes = new Index[] {
 </Tabs>
 
 
-### Table indexes
+### Table Indexes
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -236,7 +240,7 @@ Index[] indexes = new Index[] {
 </TabItem>
 </Tabs>
 
-### Table operations
+### Table Operations
 
 :::note
 The OceanBase catalog does not support creating partitioned tables in the current version.
@@ -244,7 +248,7 @@ The OceanBase catalog does not support creating partitioned tables in the curren
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations:
 

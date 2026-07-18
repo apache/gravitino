@@ -98,7 +98,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     if (!topic.imported()) {
       // Load the schema to make sure the schema is imported.
       // This is not necessary for Kafka catalogs.
-      SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+      SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().internalSchemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
@@ -134,7 +134,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       throws NoSuchSchemaException, TopicAlreadyExistsException {
 
     // Load the schema to make sure the schema exists.
-    SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+    SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().internalSchemaDispatcher();
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
@@ -307,7 +307,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       store.put(topicEntity, true);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
-      throw new RuntimeException("Fail to import topic entity to store.", e);
+      throw new RuntimeException("Failed to import topic entity to the store", e);
     }
   }
 

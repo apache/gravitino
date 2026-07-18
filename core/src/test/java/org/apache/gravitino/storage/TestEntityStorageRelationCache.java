@@ -58,6 +58,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -1603,6 +1604,735 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
         Assertions.assertTrue(
             rolesAfterRevoke.isEmpty(),
             "listEntitiesByRelation must return empty after revoking the last privilege from role");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  /**
+   * Reproduces the stale-read defect where granting a role access to an already-cached metadata
+   * object is not reflected by {@code listEntitiesByRelation(METADATA_OBJECT_ROLE_REL)} until the
+   * cache entry's TTL elapses.
+   *
+   * <p>Flow: create schema + roleA (bound to schema) + roleB (no securable object, never cached as
+   * a binding role) -> list binding roles (warms cache; the reverse index maps roleA but not roleB)
+   * -> update roleB to bind the schema (simulates grantPrivilegesToRole) -> list binding roles
+   * again -> must immediately contain roleB.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testGrantPrivilegeInvalidatesMetadataObjectRoleRelCache(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "test_schema",
+                auditInfo);
+        store.put(schema, false);
+
+        SecurableObject catalogObject = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+        SecurableObject schemaObject =
+            SecurableObjects.ofSchema(
+                catalogObject, "test_schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+
+        // roleA is bound to the schema; roleB has no securable object, so it was never cached as a
+        // binding role of any metadata object (its identifier is absent from the reverse index).
+        RoleEntity roleA =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(schemaObject))
+                .build();
+        store.put(roleA, false);
+
+        RoleEntity roleB =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleB")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList())
+                .build();
+        store.put(roleB, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm the METADATA_OBJECT_ROLE_REL cache: schema -> [roleA]. The reverse index now holds
+        // roleA -> schemaKey but NOT roleB, because roleB has never been served as a binding role.
+        List<RoleEntity> rolesBeforeGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertEquals(1, rolesBeforeGrant.size());
+        Assertions.assertEquals("roleA", rolesBeforeGrant.get(0).name());
+
+        // Simulate grantPrivilegesToRole: bind roleB to the schema. roleB was never cached, so the
+        // role-side invalidation cannot reach the schema's relation cache entry through the reverse
+        // index; RelationalEntityStore must explicitly invalidate it to avoid a stale read.
+        store.update(
+            roleB.nameIdentifier(),
+            RoleEntity.class,
+            Entity.EntityType.ROLE,
+            existing ->
+                RoleEntity.builder()
+                    .withId(existing.id())
+                    .withName(existing.name())
+                    .withNamespace(existing.namespace())
+                    .withProperties(existing.properties())
+                    .withAuditInfo(existing.auditInfo())
+                    .withSecurableObjects(Lists.newArrayList(schemaObject))
+                    .build());
+
+        // listBindingRoleNames(schema) must immediately reflect roleB after the grant.
+        List<RoleEntity> rolesAfterGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        List<String> roleNames =
+            rolesAfterGrant.stream().map(RoleEntity::name).sorted().collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("roleA", "roleB"),
+            roleNames,
+            "grant must be immediately visible via listBindingRoleNames");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  /**
+   * Guards the subtraction side of {@link
+   * #testGrantPrivilegeInvalidatesMetadataObjectRoleRelCache}: after fully revoking a role's
+   * privilege on an already-warmed metadata object, listBindingRoleNames must immediately drop the
+   * role. The removed object is no longer in the updated entity, so this relies on the role-side
+   * {@code invalidate(roleIdent, ROLE)} propagating to the object's relation cache via the reverse
+   * index; the test pins that behavior so a future change to the reverse-index rule cannot silently
+   * regress revoke.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testRevokeAllPrivilegesInvalidatesMetadataObjectRoleRelCache(
+      String type, boolean enableCache) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "test_schema",
+                auditInfo);
+        store.put(schema, false);
+
+        SecurableObject catalogObject = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+        SecurableObject schemaObject =
+            SecurableObjects.ofSchema(
+                catalogObject, "test_schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+
+        RoleEntity role =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("test_role")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(schemaObject))
+                .build();
+        store.put(role, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm the cache: schema -> [test_role].
+        List<RoleEntity> rolesBeforeRevoke =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertEquals(1, rolesBeforeRevoke.size());
+        Assertions.assertEquals("test_role", rolesBeforeRevoke.get(0).name());
+
+        // Revoke all privileges on the schema (the object is removed from the role). The removed
+        // object is absent from the updated entity, so it must be invalidated via the role side.
+        store.update(
+            role.nameIdentifier(),
+            RoleEntity.class,
+            Entity.EntityType.ROLE,
+            existing ->
+                RoleEntity.builder()
+                    .withId(existing.id())
+                    .withName(existing.name())
+                    .withNamespace(existing.namespace())
+                    .withProperties(existing.properties())
+                    .withAuditInfo(existing.auditInfo())
+                    .withSecurableObjects(Lists.newArrayList())
+                    .build());
+
+        List<RoleEntity> rolesAfterRevoke =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertTrue(
+            rolesAfterRevoke.stream().noneMatch(r -> r.name().equals("test_role")),
+            "revoke must be immediately visible: the role must no longer bind the schema");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  /**
+   * Guards the subtraction side: overriding a role so that a previously-bound, already-warmed
+   * metadata object is dropped must make listBindingRoleNames immediately drop the role for that
+   * object. The removed object is absent from the updated entity, so invalidation must come from
+   * the role side via the reverse index.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testOverrideRemoveObjectInvalidatesMetadataObjectRoleRelCache(
+      String type, boolean enableCache) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "test_schema",
+                auditInfo);
+        store.put(schema, false);
+
+        SecurableObject catalogObject =
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+        SecurableObject schemaObject =
+            SecurableObjects.ofSchema(
+                catalogObject, "test_schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+
+        // role binds both catalog and schema.
+        RoleEntity role =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("test_role")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(catalogObject, schemaObject))
+                .build();
+        store.put(role, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm the cache: schema -> [test_role].
+        List<RoleEntity> rolesBeforeOverride =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertEquals(1, rolesBeforeOverride.size());
+        Assertions.assertEquals("test_role", rolesBeforeOverride.get(0).name());
+
+        // Override to keep only the catalog object, dropping the schema object.
+        store.update(
+            role.nameIdentifier(),
+            RoleEntity.class,
+            Entity.EntityType.ROLE,
+            existing ->
+                RoleEntity.builder()
+                    .withId(existing.id())
+                    .withName(existing.name())
+                    .withNamespace(existing.namespace())
+                    .withProperties(existing.properties())
+                    .withAuditInfo(existing.auditInfo())
+                    .withSecurableObjects(Lists.newArrayList(catalogObject))
+                    .build());
+
+        List<RoleEntity> rolesAfterOverride =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertTrue(
+            rolesAfterOverride.stream().noneMatch(r -> r.name().equals("test_role")),
+            "override-remove must be immediately visible: the role must no longer bind the schema");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  /**
+   * Guards the subtraction side: deleting a role that bound an already-warmed metadata object must
+   * make listBindingRoleNames immediately drop the role. deleteRole goes through {@code
+   * store.delete} (not put/update), so the object-side invalidation must come from the role-side
+   * {@code invalidate(roleIdent, ROLE)} via the reverse index.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testDeleteRoleInvalidatesMetadataObjectRoleRelCache(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "test_schema",
+                auditInfo);
+        store.put(schema, false);
+
+        SecurableObject catalogObject = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+        SecurableObject schemaObject =
+            SecurableObjects.ofSchema(
+                catalogObject, "test_schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+
+        RoleEntity role =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("test_role")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(schemaObject))
+                .build();
+        store.put(role, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm the cache: schema -> [test_role].
+        List<RoleEntity> rolesBeforeDelete =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertEquals(1, rolesBeforeDelete.size());
+        Assertions.assertEquals("test_role", rolesBeforeDelete.get(0).name());
+
+        // Delete the role; its binding must vanish from the warmed schema cache.
+        store.delete(role.nameIdentifier(), Entity.EntityType.ROLE);
+
+        List<RoleEntity> rolesAfterDelete =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertTrue(
+            rolesAfterDelete.stream().noneMatch(r -> r.name().equals("test_role")),
+            "deleteRole must be immediately visible: the role must no longer bind the schema");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  /**
+   * Covers the createRole path (which goes through {@code store.put}, not update): creating a role
+   * that already carries securable objects must make listBindingRoleNames on those objects
+   * immediately reflect the new role, even when the object's relation cache was warmed beforehand.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testCreateRoleWithSecurableObjectsInvalidatesMetadataObjectRoleRelCache(
+      String type, boolean enableCache) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "test_schema",
+                auditInfo);
+        store.put(schema, false);
+
+        SecurableObject catalogObject = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+        SecurableObject schemaObject =
+            SecurableObjects.ofSchema(
+                catalogObject, "test_schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+
+        RoleEntity roleA =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(schemaObject))
+                .build();
+        store.put(roleA, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm the cache: schema -> [roleA].
+        List<RoleEntity> rolesBeforeCreate =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        Assertions.assertEquals(1, rolesBeforeCreate.size());
+        Assertions.assertEquals("roleA", rolesBeforeCreate.get(0).name());
+
+        // Create roleB already bound to the schema (createRole goes through store.put).
+        RoleEntity roleB =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleB")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList(schemaObject))
+                .build();
+        store.put(roleB, false);
+
+        // listBindingRoleNames(schema) must immediately reflect roleB.
+        List<RoleEntity> rolesAfterCreate =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+                schema.nameIdentifier(),
+                Entity.EntityType.SCHEMA,
+                true);
+        List<String> roleNames =
+            rolesAfterCreate.stream().map(RoleEntity::name).sorted().collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("roleA", "roleB"),
+            roleNames,
+            "createRole with securable objects must be immediately visible");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  /**
+   * Covers the {@code grantRolesToUser} path: after a role is granted to a user that was never
+   * cached against that role, listEntitiesByRelation(ROLE_USER_REL, roleIdent) must immediately
+   * reflect the new user. Same defect shape as {@link
+   * #testGrantPrivilegeInvalidatesMetadataObjectRoleRelCache}, on user.roleNames instead of
+   * role.securableObjects.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testGrantRolesToUserInvalidatesRoleUserRelCache(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        RoleEntity roleA =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList())
+                .build();
+        store.put(roleA, false);
+
+        UserEntity user1 =
+            UserEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("user1")
+                .withNamespace(AuthorizationUtils.ofUserNamespace("metalake"))
+                .withRoleNames(Lists.newArrayList("roleA"))
+                .withRoleIds(Lists.newArrayList(roleA.id()))
+                .withAuditInfo(auditInfo)
+                .build();
+        store.put(user1, false);
+
+        UserEntity user2 =
+            UserEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("user2")
+                .withNamespace(AuthorizationUtils.ofUserNamespace("metalake"))
+                .withRoleNames(Lists.newArrayList())
+                .withRoleIds(Lists.newArrayList())
+                .withAuditInfo(auditInfo)
+                .build();
+        store.put(user2, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm the cache: roleA -> [user1].
+        List<UserEntity> usersBeforeGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                roleA.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        Assertions.assertEquals(1, usersBeforeGrant.size());
+        Assertions.assertEquals("user1", usersBeforeGrant.get(0).name());
+
+        // Simulate grantRolesToUser(roleA -> user2): store.update(user2, roleNames=[roleA]).
+        store.update(
+            user2.nameIdentifier(),
+            UserEntity.class,
+            Entity.EntityType.USER,
+            existing ->
+                UserEntity.builder()
+                    .withId(existing.id())
+                    .withName(existing.name())
+                    .withNamespace(existing.namespace())
+                    .withRoleNames(Lists.newArrayList("roleA"))
+                    .withRoleIds(Lists.newArrayList(roleA.id()))
+                    .withAuditInfo(auditInfo)
+                    .build());
+
+        // roleA -> users must immediately reflect user2.
+        List<UserEntity> usersAfterGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                roleA.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        List<String> names =
+            usersAfterGrant.stream().map(UserEntity::name).sorted().collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("user1", "user2"),
+            names,
+            "grantRolesToUser must be immediately visible via role->users");
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  /**
+   * Covers the {@code grantRolesToGroup} path: after a role is granted to a group that was never
+   * cached against that role, listEntitiesByRelation(ROLE_GROUP_REL, roleIdent) must immediately
+   * reflect the new group.
+   */
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testGrantRolesToGroupInvalidatesRoleGroupRelCache(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        RoleEntity roleA =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("roleA")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(Lists.newArrayList())
+                .build();
+        store.put(roleA, false);
+
+        GroupEntity group1 =
+            GroupEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("group1")
+                .withNamespace(AuthorizationUtils.ofGroupNamespace("metalake"))
+                .withRoleNames(Lists.newArrayList("roleA"))
+                .withRoleIds(Lists.newArrayList(roleA.id()))
+                .withAuditInfo(auditInfo)
+                .build();
+        store.put(group1, false);
+
+        GroupEntity group2 =
+            GroupEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("group2")
+                .withNamespace(AuthorizationUtils.ofGroupNamespace("metalake"))
+                .withRoleNames(Lists.newArrayList())
+                .withRoleIds(Lists.newArrayList())
+                .withAuditInfo(auditInfo)
+                .build();
+        store.put(group2, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // Warm the cache: roleA -> [group1].
+        List<GroupEntity> groupsBeforeGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                roleA.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        Assertions.assertEquals(1, groupsBeforeGrant.size());
+        Assertions.assertEquals("group1", groupsBeforeGrant.get(0).name());
+
+        // Simulate grantRolesToGroup(roleA -> group2): store.update(group2, roleNames=[roleA]).
+        store.update(
+            group2.nameIdentifier(),
+            GroupEntity.class,
+            Entity.EntityType.GROUP,
+            existing ->
+                GroupEntity.builder()
+                    .withId(existing.id())
+                    .withName(existing.name())
+                    .withNamespace(existing.namespace())
+                    .withRoleNames(Lists.newArrayList("roleA"))
+                    .withRoleIds(Lists.newArrayList(roleA.id()))
+                    .withAuditInfo(auditInfo)
+                    .build());
+
+        // roleA -> groups must immediately reflect group2.
+        List<GroupEntity> groupsAfterGrant =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                roleA.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true);
+        List<String> names =
+            groupsAfterGrant.stream().map(GroupEntity::name).sorted().collect(Collectors.toList());
+        Assertions.assertEquals(
+            Lists.newArrayList("group1", "group2"),
+            names,
+            "grantRolesToGroup must be immediately visible via role->groups");
 
       } finally {
         destroy(type);

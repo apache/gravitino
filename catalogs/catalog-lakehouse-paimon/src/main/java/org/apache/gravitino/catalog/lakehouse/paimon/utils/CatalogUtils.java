@@ -35,10 +35,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
+import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.hadoop.conf.Configuration;
@@ -64,9 +66,24 @@ public class CatalogUtils {
       configuration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
 
       try {
-        KerberosClient kerberosClient = new KerberosClient(allConfig, configuration);
+        KerberosConfig kerberosConfig = new KerberosConfig(allConfig);
+        KerberosClient kerberosClient =
+            KerberosClient.builder(kerberosConfig.getPrincipalName(), configuration)
+                .loginMode(KerberosAuthUtils.LoginMode.CURRENT_USER)
+                .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
+                .build();
         File keytabFile =
-            kerberosClient.saveKeyTabFileFromUri(UUID.randomUUID().toString().replace("-", ""));
+            new File(
+                String.format(
+                    "keytabs/gravitino-lakehouse-paimon-%s-keytab",
+                    UUID.randomUUID().toString().replace("-", "")));
+        KerberosAuthUtils.saveKeytabFromUri(
+            kerberosConfig.getKeytab(),
+            keytabFile,
+            kerberosConfig.getFetchTimeoutSec(),
+            false,
+            // Paimon keytab URIs never use the hdfs scheme.
+            null);
         kerberosClient.login(keytabFile.getAbsolutePath());
         Catalog catalog = loadCatalogBackendWithKerberosAuth(paimonConfig, configuration);
         return new PaimonBackendCatalogWrapper(catalog, kerberosClient);
@@ -125,16 +142,16 @@ public class CatalogUtils {
   private static void checkPaimonConfig(PaimonConfig paimonConfig) {
     String metastore = paimonConfig.get(CATALOG_BACKEND);
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(metastore), "Paimon Catalog metastore can not be null or empty.");
+        StringUtils.isNotBlank(metastore), "Paimon Catalog metastore cannot be null or empty");
 
     String warehouse = paimonConfig.get(CATALOG_WAREHOUSE);
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(warehouse), "Paimon Catalog warehouse can not be null or empty.");
+        StringUtils.isNotBlank(warehouse), "Paimon Catalog warehouse cannot be null or empty");
 
     if (!PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(metastore)) {
       String uri = paimonConfig.get(CATALOG_URI);
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
+          StringUtils.isNotBlank(uri), "Paimon Catalog URI cannot be null or empty");
     }
 
     if (PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(metastore)) {

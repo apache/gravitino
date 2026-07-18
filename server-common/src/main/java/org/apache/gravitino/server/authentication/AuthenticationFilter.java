@@ -33,12 +33,22 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.server.web.HealthCheckPathMatcher;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class AuthenticationFilter implements Filter {
 
   private final List<Authenticator> filterAuthenticators;
+
+  /**
+   * The matcher used to identify health check paths that bypass authentication. Subclasses may
+   * replace this with a server-specific matcher (e.g. {@code IcebergHealthCheckPathMatcher}).
+   */
+  protected HealthCheckPathMatcher healthCheckMatcher = new HealthCheckPathMatcher();
 
   public AuthenticationFilter() {
     filterAuthenticators = null;
@@ -103,7 +113,9 @@ public class AuthenticationFilter implements Filter {
         // to let client to create correct authenticated request.
         // Refer to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
         for (String challenge : ue.getChallenges()) {
-          resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
+          if (!challenge.toLowerCase().startsWith("basic")) {
+            resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
+          }
         }
       }
       sendAuthErrorResponse(resp, ue);
@@ -114,27 +126,40 @@ public class AuthenticationFilter implements Filter {
   }
 
   /**
-   * Sends an error response when authentication fails. Subclasses can override this to customize
-   * the error response format (e.g., Iceberg REST server returns JSON error bodies).
-   *
-   * <p>TODO: Gravitino server should override this method to return a correct JSON response
-   * following the Gravitino error response spec.
+   * Sends a JSON error response when authentication fails. Subclasses can override this to
+   * customize the error response format (e.g., Iceberg REST server returns Iceberg-specific JSON
+   * error bodies).
    *
    * @param response the HTTP servlet response
    * @param exception the authentication exception
    */
   protected void sendAuthErrorResponse(HttpServletResponse response, Exception exception)
       throws IOException {
-    int status =
-        exception instanceof UnauthorizedException
-            ? HttpServletResponse.SC_UNAUTHORIZED
-            : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-    response.sendError(status, exception.getMessage());
+    int httpStatus;
+    ErrorResponse errorResponse;
+
+    if (exception instanceof UnauthorizedException) {
+      httpStatus = HttpServletResponse.SC_UNAUTHORIZED;
+      errorResponse =
+          ErrorResponse.unauthorized(
+              exception.getClass().getSimpleName(), exception.getMessage(), exception);
+    } else if (exception instanceof ForbiddenException) {
+      httpStatus = HttpServletResponse.SC_FORBIDDEN;
+      errorResponse = ErrorResponse.forbidden(exception.getMessage(), exception);
+    } else {
+      httpStatus = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+      errorResponse = ErrorResponse.internalError(exception.getMessage(), exception);
+    }
+
+    response.setStatus(httpStatus);
+    response.setContentType("application/json");
+    response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+    ObjectMapperProvider.objectMapper().writeValue(response.getWriter(), errorResponse);
   }
 
   /**
    * Returns {@code true} if the request targets a health check endpoint that should bypass
-   * authentication. Subclasses may override this to add additional bypass paths.
+   * authentication, as determined by the configured {@link #healthCheckMatcher}.
    *
    * @param request the incoming servlet request
    * @return {@code true} if the request should skip authentication
@@ -143,17 +168,7 @@ public class AuthenticationFilter implements Filter {
     if (!(request instanceof HttpServletRequest)) {
       return false;
     }
-    String path = ((HttpServletRequest) request).getRequestURI();
-    if (path == null) {
-      return false;
-    }
-    // Also match /health, /health/*, and /health.html — root-level aliases that forward to
-    // /api/health/*. During a forward, getRequestURI() returns the original URI, not the target.
-    return path.equals("/health")
-        || path.startsWith("/health/")
-        || path.equals("/health.html")
-        || path.equals("/api/health")
-        || path.startsWith("/api/health/");
+    return healthCheckMatcher.isHealthCheckPath(((HttpServletRequest) request).getRequestURI());
   }
 
   @Override

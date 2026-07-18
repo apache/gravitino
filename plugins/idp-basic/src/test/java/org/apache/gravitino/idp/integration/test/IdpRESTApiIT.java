@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.KeyPairGenerator;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
@@ -48,6 +50,7 @@ import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -85,6 +88,15 @@ public class IdpRESTApiIT extends BaseIT {
     configs.put(Configs.STORE_DELETE_AFTER_TIME.getKey(), String.valueOf(20 * 60 * 1000L));
     configs.put(Configs.SERVICE_ADMINS.getKey(), ADMIN);
     configs.put(
+        Configs.AUTHENTICATORS.getKey(),
+        AuthenticatorType.BASIC.name().toLowerCase()
+            + ","
+            + AuthenticatorType.OAUTH.name().toLowerCase());
+    configs.put(OAuthConfig.SERVICE_AUDIENCE.getKey(), "service1");
+    configs.put(OAuthConfig.DEFAULT_SIGN_KEY.getKey(), oauthPublicSignKey());
+    configs.put(OAuthConfig.DEFAULT_SERVER_URI.getKey(), "test");
+    configs.put(OAuthConfig.DEFAULT_TOKEN_PATH.getKey(), "test");
+    configs.put(
         Configs.REST_API_EXTENSION_PACKAGES.getKey(), IdpRESTFeature.IDP_REST_EXTENSION_PACKAGE);
     registerCustomConfigs(configs);
     super.startIntegrationTest();
@@ -117,8 +129,8 @@ public class IdpRESTApiIT extends BaseIT {
   @Test
   void testIdpAuthorization() throws Exception {
     Assertions.assertEquals(200, get("/version", ADMIN, ADMIN_PASSWORD).statusCode());
-    // No Authorization: simple authenticator allows anonymous access; IdP filter rejects.
-    assertError(403, get("/idp/users/" + USER1, null, null), ErrorConstants.FORBIDDEN_CODE);
+    // No Authorization: OAuth rejects the request before the IdP filter runs.
+    Assertions.assertEquals(401, get("/idp/users/" + USER1, null, null).statusCode());
 
     postUser(USER2, USER_PASSWORD);
     assertError(
@@ -140,6 +152,10 @@ public class IdpRESTApiIT extends BaseIT {
     assertError(
         400,
         post("/idp/users", new AddUserRequest(USER1, " ")),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertError(
+        400,
+        post("/idp/users", new AddUserRequest("a".repeat(129), USER_PASSWORD)),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
     assertError(
         409,
@@ -179,6 +195,10 @@ public class IdpRESTApiIT extends BaseIT {
 
     assertError(
         409, post("/idp/groups", new AddGroupRequest(GROUP1)), ErrorConstants.ALREADY_EXISTS_CODE);
+    assertError(
+        400,
+        post("/idp/groups", new AddGroupRequest("a".repeat(129))),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
     assertError(
         404,
         get("/idp/groups/" + MISSING_GROUP, ADMIN, ADMIN_PASSWORD),
@@ -362,5 +382,11 @@ public class IdpRESTApiIT extends BaseIT {
 
   private static int errorCode(HttpResponse<String> response) throws Exception {
     return JsonUtils.objectMapper().readTree(response.body()).get("code").asInt();
+  }
+
+  private static String oauthPublicSignKey() throws Exception {
+    KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+    generator.initialize(2048);
+    return Base64.getEncoder().encodeToString(generator.generateKeyPair().getPublic().getEncoded());
   }
 }

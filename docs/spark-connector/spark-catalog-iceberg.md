@@ -1,20 +1,36 @@
 ---
-title: "Spark connector Iceberg catalog"
-slug: /spark-connector/spark-catalog-iceberg
-keyword: spark connector iceberg catalog
+title: "Spark Connector: Iceberg Catalog"
+slug: "/spark-connector/spark-catalog-iceberg"
+keyword: "spark connector iceberg catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 The Apache Gravitino Spark connector offers the capability to read and write Iceberg tables, with the metadata managed by the Gravitino server.
 
 ## Preparation
 
 1. Set `spark.sql.gravitino.enableIcebergSupport` to `true` in Spark configuration.
-2. Download Iceberg Spark runtime jar to Spark classpath.
+2. Download the Iceberg Spark runtime JAR and the Gravitino Spark connector runtime JAR that match your Spark minor version and Scala version, and place them in the Spark classpath.
+
+Spark clients use a different Iceberg version than the Gravitino server (1.11.0). Use the table below to choose the correct JARs for your Spark version.
+
+| Spark version | Scala          | Iceberg version | Iceberg client runtime artifact                         | Gravitino connector runtime artifact                                              |
+|---------------|----------------|-----------------|---------------------------------------------------------|-----------------------------------------------------------------------------------|
+| 3.3           | 2.12 or 2.13   | 1.8.1           | `iceberg-spark-runtime-3.3_${scala-version}-1.8.1.jar`  | `gravitino-spark-connector-runtime-3.3_${scala-version}-${gravitino-version}.jar` |
+| 3.4           | 2.12 or 2.13   | 1.11.0          | `iceberg-spark-runtime-3.4_${scala-version}-1.11.0.jar` | `gravitino-spark-connector-runtime-3.4_${scala-version}-${gravitino-version}.jar` |
+| 3.5           | 2.12 or 2.13   | 1.11.0          | `iceberg-spark-runtime-3.5_${scala-version}-1.11.0.jar` | `gravitino-spark-connector-runtime-3.5_${scala-version}-${gravitino-version}.jar` |
+
+Replace `${scala-version}` with `2.12` or `2.13`, and `${gravitino-version}` with your Gravitino release version.
+
+:::caution
+Use only the JARs from the matching table row. Mixing Iceberg JARs from different versions on the client classpath is not compatible and may cause runtime errors.
+:::
 
 ## Capabilities
 
-#### Support DML and DDL operations:
+### DML and DDL Operations
 
 - `CREATE TABLE`
 
@@ -31,7 +47,7 @@ Doesn't support distribution and sort orders.
 - `TIME TRAVEL QUERY`
 - `DESCRIBE TABLE`
 
-#### Not supported operations:
+### Unsupported Operations
 
 - View operations.
 - Metadata tables, like:
@@ -43,7 +59,7 @@ Doesn't support distribution and sort orders.
   - `ALTER TABLE prod.db.sample CREATE TAG tagName`
 - AtomicCreateTableAsSelect&AtomicReplaceTableAsSelect
 
-## SQL example
+## SQL Example
 
 ```sql
 -- Suppose iceberg_a is the Iceberg catalog name managed by Gravitino
@@ -100,9 +116,9 @@ SELECT * FROM employee FOR SYSTEM_TIME AS OF '2024-05-27 01:01:00';
 DESC EXTENDED employee;
 ```
 
-For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/1.5.2/spark-procedures/#spark-procedures) in Iceberg official document.
+For more details about `CALL`, refer to the [Spark Procedures description](https://iceberg.apache.org/docs/1.5.2/spark-procedures/#spark-procedures) in Iceberg official document.
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Iceberg connector configuration.
 
@@ -152,6 +168,6 @@ Please make sure the credential file is accessible by Spark, like using `export 
 
 Please downloading the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it in the classpath of Spark.
 
-### Other storage
+### Other Storage
 
-You may need to add custom configurations with the format `spark.sql.catalog.${iceberg_catalog_name}.{configuration_key}`. Additionally, place corresponding jars which implement `FileIO` in the classpath of Spark.
+Add custom configurations with the format `spark.sql.catalog.${iceberg_catalog_name}.{configuration_key}`. Additionally, place corresponding jars which implement `FileIO` in the classpath of Spark.

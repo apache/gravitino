@@ -24,7 +24,9 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Catalog;
@@ -33,7 +35,6 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
-import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -80,13 +81,34 @@ public class TestIcebergCatalogUtil {
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(
             IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
-    Assertions.assertTrue(catalog instanceof JdbcCatalog);
+    Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog);
 
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> {
           IcebergCatalogUtil.loadCatalogBackend("other");
         });
+  }
+
+  @Test
+  void testJdbcBadAuth() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, warehouse.toString());
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
+    properties.put(AuthenticationConfig.AUTH_TYPE_KEY, "oauth");
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () ->
+                IcebergCatalogUtil.loadCatalogBackend(
+                    IcebergCatalogBackend.JDBC, new IcebergConfig(properties)));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Unsupported authentication method: oauth"));
   }
 
   @Test
@@ -224,5 +246,48 @@ public class TestIcebergCatalogUtil {
 
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", properties.get(IcebergConstants.IO_IMPL));
+  }
+
+  @Test
+  void testApplyRestCatalogHttpTimeoutPropertiesUsesDefaults() {
+    Map<String, String> properties = new HashMap<>();
+
+    IcebergCatalogUtil.applyRestCatalogHttpTimeoutProperties(
+        new IcebergConfig(new HashMap<>()), properties);
+
+    Assertions.assertEquals(
+        "10000", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "60000", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testApplyRestCatalogHttpTimeoutPropertiesUsesConfiguredValues() {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS.getKey(), "1234");
+    config.put(IcebergConfig.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS.getKey(), "5678");
+    Map<String, String> properties = new HashMap<>();
+
+    IcebergCatalogUtil.applyRestCatalogHttpTimeoutProperties(new IcebergConfig(config), properties);
+
+    Assertions.assertEquals(
+        "1234", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "5678", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
+  }
+
+  @Test
+  void testApplyRestCatalogHttpTimeoutPropertiesUsesIcebergPropertyAliases() {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS, "2345");
+    config.put(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS, "6789");
+    Map<String, String> properties = new HashMap<>();
+
+    IcebergCatalogUtil.applyRestCatalogHttpTimeoutProperties(new IcebergConfig(config), properties);
+
+    Assertions.assertEquals(
+        "2345", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS));
+    Assertions.assertEquals(
+        "6789", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
   }
 }

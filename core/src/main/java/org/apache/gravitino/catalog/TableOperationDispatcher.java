@@ -26,6 +26,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Arrays;
@@ -33,6 +34,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
@@ -72,6 +74,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
   private static final Logger LOG = LoggerFactory.getLogger(TableOperationDispatcher.class);
 
+  private final Supplier<SchemaDispatcher> schemaDispatcherSupplier;
+
   /**
    * Creates a new TableOperationDispatcher instance.
    *
@@ -81,7 +85,26 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   public TableOperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
+    this(catalogManager, store, idGenerator, () -> GravitinoEnv.getInstance().schemaDispatcher());
+  }
+
+  /**
+   * Creates a new TableOperationDispatcher instance.
+   *
+   * @param catalogManager The CatalogManager instance to be used for table operations.
+   * @param store The EntityStore instance to be used for table operations.
+   * @param idGenerator The IdGenerator instance to be used for table operations.
+   * @param schemaDispatcherSupplier The SchemaDispatcher supplier to ensure schemas are imported.
+   */
+  public TableOperationDispatcher(
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      Supplier<SchemaDispatcher> schemaDispatcherSupplier) {
     super(catalogManager, store, idGenerator);
+    this.schemaDispatcherSupplier =
+        Preconditions.checkNotNull(
+            schemaDispatcherSupplier, "schemaDispatcherSupplier must not be null");
   }
 
   /**
@@ -118,7 +141,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     if (!entityCombinedTable.imported()) {
       // Load the schema to make sure the schema is imported.
-      SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
@@ -180,7 +203,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throws NoSuchSchemaException, TableAlreadyExistsException {
 
     // Load the schema to make sure the schema exists.
-    SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+    SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
@@ -356,7 +379,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // 2. Is found in the catalog but not in the store (not managed by Gravitino)
           // 3. Is found in the catalog and the store (managed by Gravitino)
           // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the schema from the store, but we don't take the
+          // In all situations, we try to delete the table from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
           try {
@@ -366,6 +389,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
+          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
+          // cleanup is best-effort and stops as soon as a schema still exists.
+          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
   }
@@ -409,7 +435,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // 2. Is found in the catalog but not in the store (not managed by Gravitino)
           // 3. Is found in the catalog and the store (managed by Gravitino)
           // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the schema from the store, but we don't take the
+          // In all situations, we try to delete the table from the store, but we don't take the
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
           try {
@@ -420,6 +446,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
+          // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
+          // cleanup is best-effort and stops as soon as a schema still exists.
+          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
           return droppedFromCatalog;
         });
   }
@@ -494,7 +523,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
-      throw new RuntimeException("Fail to import the table entity to the store.", e);
+      throw new RuntimeException("Failed to import the table entity to the store", e);
     }
 
     return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)
@@ -503,6 +532,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 getCatalogIdentifier(identifier),
                 HasPropertyMetadata::tablePropertiesMetadata,
                 table.tableFromCatalog().properties()));
+  }
+
+  private SchemaDispatcher getSchemaDispatcher() {
+    SchemaDispatcher schemaDispatcher = schemaDispatcherSupplier.get();
+    Preconditions.checkArgument(
+        schemaDispatcher != null,
+        "schemaDispatcherSupplier returned null. "
+            + "SchemaDispatcher must be available for table operations.");
+    return schemaDispatcher;
   }
 
   private EntityCombinedTable internalLoadTable(NameIdentifier ident) {
@@ -848,7 +886,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .withId(entity.id())
                                 .withName(entity.name())
                                 .withNamespace(entity.namespace())
+                                .withComment(entity.comment())
+                                .withProperties(entity.properties())
                                 .withColumns(columnsUpdateResult.getRight())
+                                .withPartitioning(entity.partitioning())
+                                .withDistribution(entity.distribution())
+                                .withSortOrders(entity.sortOrders())
+                                .withIndexes(entity.indexes())
                                 .withAuditInfo(
                                     AuditInfo.builder()
                                         .withCreator(entity.auditInfo().creator())

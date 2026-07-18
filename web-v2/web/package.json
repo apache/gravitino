@@ -2,7 +2,7 @@
   "name": "gravitino-web",
   "private": true,
   "engines": {
-    "node": "20.19.0",
+    "node": ">=20.19.0",
     "npm": ">=9.8.1"
   },
   "scripts": {
@@ -25,7 +25,7 @@
     "@hookform/resolvers": "^3.7.0",
     "@reduxjs/toolkit": "^1.9.7",
     "antd": "^5.24.5",
-    "axios": "^1.15.2",
+    "axios": "^1.16.0",
     "chroma-js": "^2.4.2",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.11",
@@ -35,7 +35,7 @@
     "next-themes": "^0.4.6",
     "nprogress": "^0.2.0",
     "oidc-client-ts": "^3.3.0",
-    "qs": "^6.14.2",
+    "qs": "^6.15.2",
     "react": "^18.3.1",
     "react-antd-column-resize": "^1.0.3",
     "react-dom": "^18.3.1",
@@ -56,9 +56,9 @@
     "@next/bundle-analyzer": "^14.2.4",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.14.9",
-    "@types/qs": "^6.14.0",
+    "@types/qs": "^6.15.1",
     "@types/react": "^18.3.3",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^3.2.6",
     "autoprefixer": "^10.4.21",
     "env-cmd": "^10.1.0",
     "eslint": "^9.39.1",
@@ -70,7 +70,7 @@
     "tailwindcss": "^3.4.4",
     "tsx": "^4.16.0",
     "typescript": "^5.5.3",
-    "vitest": "^2.1.9"
+    "vitest": "^3.2.6"
   },
   "pnpm": {
     "overrides": {
@@ -83,7 +83,9 @@
       "postcss": "^8.5.10",
       "picomatch": "^4.0.4",
       "yaml": "^2.4.2",
-      "esbuild": "0.25.0"
+      "esbuild": "0.28.1",
+      "axios": "^1.16.0",
+      "js-cookie": "^3.0.7"
     }
   }
 }

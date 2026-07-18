@@ -132,3 +132,86 @@ def load_topic_tools(mcp: FastMCP):
         return await client.as_topic_operation().load_topic(
             catalog_name, schema_name, topic_name
         )
+
+    @mcp.tool(tags={"topic"})
+    # pylint: disable=too-many-positional-arguments
+    async def create_topic(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        properties: dict,
+    ) -> str:
+        """
+        Create a new topic within a schema.
+
+        Authorization is enforced by Gravitino: a principal without the
+        required grant receives an authorization denial.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            name (str): Name of the topic to create.
+            comment (str): Human-readable description.
+            properties (dict): Topic configuration properties.
+
+        Returns:
+            str: JSON-formatted string containing the created topic.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_topic_operation().create_topic(
+            catalog_name, schema_name, name, comment, properties
+        )
+
+    @mcp.tool(tags={"topic"})
+    async def alter_topic(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        topic_name: str,
+        updates: list,
+    ) -> str:
+        """
+        Alter an existing topic.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            topic_name (str): Name of the topic to alter.
+            updates (list): List of update operations. Example:
+                [
+                  {"@type": "updateComment", "newComment": "updated"},
+                  {"@type": "setProperty", "property": "k", "value": "v"}
+                ]
+
+        Returns:
+            str: JSON-formatted string containing the altered topic.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_topic_operation().alter_topic(
+            catalog_name, schema_name, topic_name, updates
+        )
+
+    @mcp.tool(tags={"topic"})
+    async def delete_topic(
+        ctx: Context, catalog_name: str, schema_name: str, topic_name: str
+    ) -> str:
+        """
+        Delete a topic by its name.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            topic_name (str): Name of the topic to delete.
+
+        Returns:
+            str: JSON-formatted string indicating whether the topic was deleted.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_topic_operation().delete_topic(
+            catalog_name, schema_name, topic_name
+        )

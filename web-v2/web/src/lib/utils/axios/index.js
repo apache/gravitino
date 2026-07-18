@@ -180,19 +180,45 @@ const transform = {
       return config
     }
 
-    // Use OAuth provider factory for proper token management
-    try {
-      const token = await oauthProviderFactory.getAccessToken()
+    // Get authType from localStorage (persisted by getAuthConfigs)
+    // to avoid circular dependency with Redux store
+    const authType = localStorage.getItem('authType')
 
-      if (token && config?.requestOptions?.withToken !== false) {
-        // ** jwt token
-        config.headers.Authorization = options.authenticationScheme ? `${options.authenticationScheme} ${token}` : token
-      } else if (window.sessionStorage.getItem('simpleAuthUser')) {
-        // Simple auth fallback
-        const simpleAuthToken = window.sessionStorage.getItem('simpleAuthToken')
+    try {
+      if (authType === 'oauth') {
+        // OAuth auth: use Bearer token from OAuth provider
+        const token = await oauthProviderFactory.getAccessToken()
+
+        if (token && config?.requestOptions?.withToken !== false) {
+          // ** jwt token
+          config.headers.Authorization = options.authenticationScheme
+            ? `${options.authenticationScheme} ${token}`
+            : token
+        }
+      } else if (authType === 'simple') {
+        // Simple auth: use Basic auth with username from sessionStorage
         const user = JSON.parse(window.sessionStorage.getItem('simpleAuthUser'))?.name
         if (user) {
-          config.headers.Authorization = `Basic ${Buffer.from(user || '').toString('base64')}`
+          config.headers.Authorization = `Basic ${Buffer.from(user).toString('base64')}`
+        }
+      } else if (authType === 'basic') {
+        // Basic auth: use token from sessionStorage
+        const token = sessionStorage.getItem('accessToken')
+        if (token && config?.requestOptions?.withToken !== false) {
+          const isFullAuthHeader = token.startsWith('Basic ') || token.startsWith('Bearer ')
+
+          config.headers.Authorization =
+            isFullAuthHeader || !options.authenticationScheme ? token : `${options.authenticationScheme} ${token}`
+        }
+      } else {
+        // authType not yet persisted during bootstrap (before /configs resolves).
+        // Fall back to persisted auth artifacts to avoid spurious 401s.
+        // localStorage.accessToken indicates a prior OAuth session (simple auth doesn't persist tokens).
+        const persistedToken = localStorage.getItem('accessToken')
+        if (persistedToken && config?.requestOptions?.withToken !== false) {
+          config.headers.Authorization = options.authenticationScheme
+            ? `${options.authenticationScheme} ${persistedToken}`
+            : persistedToken
         }
       }
     } catch (error) {
@@ -227,7 +253,7 @@ const transform = {
     }
 
     try {
-      if (code === 'ECONNABORTED' && message.indexOf('timeout') !== -1) {
+      if (code === 'ECONNABORTED' && message?.includes('timeout')) {
         errMessage = 'The interface request timed out, please refresh the page and try again!'
       }
       if (err?.includes('Network Error')) {
@@ -247,11 +273,27 @@ const transform = {
       throw new Error(error)
     }
 
+    // During a failed basic login request, don't reload the page as this would prevent error message display.
+    const isBasicLoginRequest =
+      response?.status === 401 &&
+      originConfig?.url?.includes('/api/version') &&
+      originConfig?.requestOptions?.withToken === false
+
+    if (isBasicLoginRequest) {
+      return Promise.reject(error)
+    }
+
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
-    if (response?.status === 401 && !originConfig._retry && response.config.url !== githubApis.GET) {
+    if (response?.status === 401 && !originConfig?._retry && response?.config?.url !== githubApis.GET) {
+      // Clear OAuth + BasicAuth tokens
       localStorage.removeItem('accessToken')
       localStorage.removeItem('authParams')
+      sessionStorage.removeItem('accessToken')
+
+      // Clear simple auth data
+      sessionStorage.removeItem('simpleAuthUser')
+      sessionStorage.removeItem('simpleAuthToken')
 
       try {
         const provider = await oauthProviderFactory.getProvider()
@@ -270,8 +312,8 @@ const transform = {
     }
 
     const retryRequest = new AxiosRetry()
-    const { isOpenRetry } = originConfig.requestOptions.retryRequest
-    originConfig.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
+    const { isOpenRetry } = originConfig?.requestOptions?.retryRequest
+    originConfig?.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
 
     return Promise.reject(error)
   }

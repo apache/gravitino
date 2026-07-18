@@ -61,6 +61,7 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -126,9 +127,11 @@ public class JobManager implements JobOperationDispatcher {
             String.format("Staging directory %s is not accessible", stagingDirPath));
       }
     } else {
-      if (!stagingDir.mkdirs()) {
+      try {
+        Files.createDirectories(stagingDir.toPath());
+      } catch (IOException e) {
         throw new IllegalArgumentException(
-            String.format("Failed to create staging directory %s", stagingDirPath));
+            String.format("Failed to create staging directory %s", stagingDirPath), e);
       }
     }
 
@@ -428,9 +431,12 @@ public class JobManager implements JobOperationDispatcher {
         stagingDir.getAbsolutePath()
             + String.format(JOB_STAGING_DIR, metalake, jobTemplateName, jobId);
     File jobStagingDir = new File(jobStagingPath);
-    if (!jobStagingDir.mkdirs()) {
+    try {
+      Files.createDirectories(jobStagingDir.toPath());
+    } catch (IOException e) {
       throw new RuntimeException(
-          String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId));
+          String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId),
+          e);
     }
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values, and
@@ -801,30 +807,13 @@ public class JobManager implements JobOperationDispatcher {
   static String fetchFileFromUri(String uri, File stagingDir, int timeoutInMs) {
     try {
       URI fileUri = new URI(uri);
-      String scheme = Optional.ofNullable(fileUri.getScheme()).orElse("file");
       File destFile = new File(stagingDir, new File(fileUri.getPath()).getName());
-
-      switch (scheme) {
-        case "http":
-        case "https":
-        case "ftp":
-          FileUtils.copyURLToFile(fileUri.toURL(), destFile, timeoutInMs, timeoutInMs);
-          break;
-
-        case "file":
-          java.nio.file.Path sourcePath = new File(fileUri.getPath()).toPath();
-          if (!Files.exists(sourcePath)) {
-            throw new IOException(
-                String.format("Source file does not exist: %s", sourcePath.toAbsolutePath()));
-          }
-          Files.createSymbolicLink(destFile.toPath(), sourcePath);
-          break;
-
-        default:
-          throw new IllegalArgumentException("Unsupported scheme: " + scheme);
-      }
-
-      return destFile.getAbsolutePath();
+      return FileFetcher.get()
+          .fetchFileFromUri(
+              uri,
+              destFile,
+              timeoutInMs,
+              null /* hadoopConf: job file URIs never use the hdfs scheme */);
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
     }

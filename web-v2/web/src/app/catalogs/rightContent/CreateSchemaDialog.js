@@ -32,7 +32,7 @@ import { nameRegex } from '@/lib/utils/regex'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
 import { genUpdates } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
-import { useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { createSchema, updateSchema, getSchemaDetails } from '@/lib/store/metalakes'
 
 const { Paragraph } = Typography
@@ -41,6 +41,7 @@ const { TextArea } = Input
 const defaultValues = {
   name: '',
   comment: '',
+  glueLocation: '',
   properties: []
 }
 
@@ -68,9 +69,18 @@ export default function CreateSchemaDialog({ ...props }) {
   const [topShadow, setTopShadow] = useState(false)
   const currentSelectBefore = locationProviders?.map(p => filesetLocationProviders[p])
   const selectBefore = [...new Set(['file:/', 'hdfs://', ...currentSelectBefore])]
+  const isGlueProvider = provider === 'glue'
   const dispatch = useAppDispatch()
 
   const paimonCatalogBackend = provider === 'lakehouse-paimon' && ['hive', 'jdbc'].includes(catalogBackend)
+  const isIcebergJdbcCatalog = provider === 'lakehouse-iceberg' && catalogBackend === 'jdbc'
+
+  const auth = useAppSelector(state => state.auth)
+  const { systemConfig } = auth || {}
+  const separator = (systemConfig && systemConfig['gravitino.schema.separator']) || ':'
+  const escapeForRegex = s => s.replace(/[-\\/\^$*+?.()|[\]{}]/g, '\\$&')
+  const escSep = escapeForRegex(separator)
+  const dynamicSchemaNameRegex = new RegExp(`^\\w(?!.*${escSep}${escSep})(?!.*${escSep}$)[\\w\\/${escSep}=-]{0,63}$`)
 
   const [form] = Form.useForm()
   const values = Form.useWatch([], form)
@@ -110,12 +120,17 @@ export default function CreateSchemaDialog({ ...props }) {
           setCacheData(schema)
           form.setFieldValue('name', schema.name)
           form.setFieldValue('comment', schema.comment)
-          let index = 0
-          Object.entries(schema.properties || {}).forEach(([key, value]) => {
-            form.setFieldValue(['properties', index, 'key'], key)
-            form.setFieldValue(['properties', index, 'value'], value)
-            index++
-          })
+          if (isGlueProvider) {
+            form.setFieldValue('glueLocation', schema.properties?.location || '')
+            form.setFieldValue('properties', [])
+          } else {
+            let index = 0
+            Object.entries(schema.properties || {}).forEach(([key, value]) => {
+              form.setFieldValue(['properties', index, 'key'], key)
+              form.setFieldValue(['properties', index, 'value'], value)
+              index++
+            })
+          }
           handScroll()
           setIsLoading(false)
         } catch (e) {
@@ -129,14 +144,24 @@ export default function CreateSchemaDialog({ ...props }) {
     if (!open) {
       loadedRef.current = false
     }
-  }, [open, editSchema, metalake, catalog])
+  }, [open, editSchema, metalake, catalog, provider])
 
   useEffect(() => {
-    if (open && !editSchema && locationProviders?.length) {
-      form.setFieldValue(['properties', 0, 'key'], 'location')
-      form.setFieldValue(['properties', 0, 'description'], 'Hadoop catalog storage location')
-      form.setFieldValue(['properties', 0, 'selectBefore'], selectBefore)
-      form.setFieldValue(['properties', 0, 'prefix'], selectBefore?.[0])
+    if (!open || editSchema) {
+      return
+    }
+
+    if (locationProviders?.length || isGlueProvider) {
+      if (isGlueProvider) {
+        form.setFieldValue('glueLocation', '')
+        form.setFieldValue('properties', [])
+      } else {
+        const locationPrefix = selectBefore
+        form.setFieldValue(['properties', 0, 'key'], 'location')
+        form.setFieldValue(['properties', 0, 'description'], 'Schema storage location')
+        form.setFieldValue(['properties', 0, 'selectBefore'], locationPrefix)
+        form.setFieldValue(['properties', 0, 'prefix'], locationPrefix?.[0])
+      }
     }
   }, [open, editSchema, provider, locationProviders])
 
@@ -150,19 +175,24 @@ export default function CreateSchemaDialog({ ...props }) {
         const submitData = {
           name: values.name.trim(),
           comment: values.comment,
-          properties:
-            values.properties &&
-            values.properties.reduce((acc, item) => {
-              if (item.key === 'location' || item.key.startsWith('location-')) {
-                if (item.value) {
-                  acc[item.key] = item.prefix ? item.prefix + item.value : item.value
-                }
-              } else {
-                acc[item.key] = values[item.key] || item.value
-              }
+          properties: isGlueProvider
+            ? (() => {
+                const location = values.glueLocation?.trim()
 
-              return acc
-            }, {})
+                return location ? { location } : {}
+              })()
+            : values.properties &&
+              values.properties.reduce((acc, item) => {
+                if (item.key === 'location' || item.key.startsWith('location-')) {
+                  if (item.value) {
+                    acc[item.key] = item.prefix ? item.prefix + item.value : item.value
+                  }
+                } else {
+                  acc[item.key] = values[item.key] || item.value
+                }
+
+                return acc
+              }, {})
         }
         if (editSchema) {
           // update schema
@@ -175,7 +205,11 @@ export default function CreateSchemaDialog({ ...props }) {
         } else {
           await dispatch(createSchema({ data: submitData, metalake, catalog, catalogType }))
         }
-        !editSchema && treeRef.current.onLoadData({ key: catalog, nodeType: 'catalog', inUse: 'true' }, true)
+        !editSchema &&
+          treeRef.current.onLoadData(
+            { key: `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`, nodeType: 'catalog', inUse: 'true' },
+            true
+          )
         setConfirmLoading(false)
         setOpen(false)
       })
@@ -226,8 +260,26 @@ export default function CreateSchemaDialog({ ...props }) {
                 <Form.Item
                   name='name'
                   label='Schema Name'
+                  extra={
+                    isIcebergJdbcCatalog
+                      ? `For nested schemas, separate each level with '${separator}' (for example: a${separator}b${separator}c).`
+                      : undefined
+                  }
                   data-refer='schema-name-field'
-                  rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                  rules={[
+                    { required: true },
+                    { type: 'string', max: 64 },
+                    { pattern: isIcebergJdbcCatalog ? dynamicSchemaNameRegex : new RegExp(nameRegex) },
+                    {
+                      validator: (_, value) => {
+                        if (!isGlueProvider || !value || !value.includes('-')) {
+                          return Promise.resolve()
+                        }
+
+                        return Promise.reject(new Error('Glue schema name does not support hyphen (-).'))
+                      }
+                    }
+                  ]}
                   messageVariables={{ label: 'schema name' }}
                 >
                   <Input placeholder={mismatchName} disabled={editSchema} />
@@ -237,22 +289,33 @@ export default function CreateSchemaDialog({ ...props }) {
                     <TextArea disabled={editSchema} />
                   </Form.Item>
                 )}
-                {(!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql'].includes(provider) ||
-                  paimonCatalogBackend) && (
-                  <Form.Item label='Properties'>
-                    <Form.List name='properties'>
-                      {(fields, subOpt) => (
-                        <RenderPropertiesFormItem
-                          fields={fields}
-                          subOpt={subOpt}
-                          form={form}
-                          isEdit={!!editSchema}
-                          isDisable={['jdbc-doris'].includes(provider) && !!editSchema}
-                          selectBefore={selectBefore}
-                        />
-                      )}
-                    </Form.List>
+                {isGlueProvider ? (
+                  <Form.Item
+                    name='glueLocation'
+                    label='Location'
+                    data-refer='schema-location-field'
+                    extra='Only location is supported for Glue schema properties.'
+                  >
+                    <Input placeholder='s3://my-bucket/path' />
                   </Form.Item>
+                ) : (
+                  (!['jdbc-postgresql', 'lakehouse-paimon', 'kafka', 'jdbc-mysql'].includes(provider) ||
+                    paimonCatalogBackend) && (
+                    <Form.Item label='Properties'>
+                      <Form.List name='properties'>
+                        {(fields, subOpt) => (
+                          <RenderPropertiesFormItem
+                            fields={fields}
+                            subOpt={subOpt}
+                            form={form}
+                            isEdit={!!editSchema}
+                            isDisable={['jdbc-doris'].includes(provider) && !!editSchema}
+                            selectBefore={selectBefore}
+                          />
+                        )}
+                      </Form.List>
+                    </Form.Item>
+                  )
                 )}
               </Form>
             </Spin>

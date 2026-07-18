@@ -81,7 +81,7 @@ public class KerberosAuthenticator implements Authenticator {
       // "HTTP/host" from "HTTP/host@REALM")
       String mapperType = config.get(KerberosConfig.PRINCIPAL_MAPPER);
       String regexPattern = config.get(KerberosConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
-      this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
+      this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern, config);
 
       gssManager =
           Subject.doAs(
@@ -144,8 +144,8 @@ public class KerberosAuthenticator implements Authenticator {
             }
           });
     } catch (Exception e) {
-      LOG.warn("Fail to validate the token, exception: ", e);
-      throw new UnauthorizedException("Fail to validate the token", AuthConstants.NEGOTIATE);
+      LOG.warn("Failed to validate the token, exception: ", e);
+      throw new UnauthorizedException("Failed to validate the token", AuthConstants.NEGOTIATE);
     }
   }
 

@@ -26,8 +26,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.ConnectException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -283,10 +285,18 @@ public class HTTPClient implements RESTClient {
       if (params != null) {
         params.forEach(builder::addParameter);
       }
-      return builder.build();
+
+      URI requestUri = builder.build();
+
+      if (requestUri.getScheme() == null || requestUri.getHost() == null) {
+        throw new RESTException(
+            "Invalid request URI built from base URI %s and path %s: %s", uri, path, requestUri);
+      }
+
+      return requestUri;
     } catch (URISyntaxException e) {
       throw new RESTException(
-          "Failed to create request URI from base %s, params %s", baseUri, params);
+          e, "Failed to create request URI from base %s, path %s, params %s", uri, path, params);
     }
   }
 
@@ -372,7 +382,8 @@ public class HTTPClient implements RESTClient {
           "Received a malformed path for a REST request: %s. Paths should not start with /", path);
     }
 
-    HttpUriRequestBase request = new HttpUriRequestBase(method.name(), buildUri(path, queryParams));
+    URI requestUri = buildUri(path, queryParams);
+    HttpUriRequestBase request = new HttpUriRequestBase(method.name(), requestUri);
 
     if (requestBody instanceof Map) {
       // encode maps as form data, application/x-www-form-urlencoded
@@ -431,8 +442,24 @@ public class HTTPClient implements RESTClient {
             response.getCode(),
             responseType != null ? responseType.getSimpleName() : "unknown");
       }
+    } catch (UnknownHostException e) {
+      throw new RESTException(
+          e,
+          "Cannot resolve Gravitino server host while processing %s request: %s",
+          method,
+          requestUri);
+    } catch (ConnectException e) {
+      throw new RESTException(
+          e,
+          "Failed to connect to Gravitino server while processing %s request: %s",
+          method,
+          requestUri);
     } catch (IOException e) {
-      throw new RESTException(e, "Error occurred while processing %s request", method);
+      throw new RESTException(
+          e,
+          "Failed to execute request to Gravitino server while processing %s request: %s",
+          method,
+          requestUri);
     }
   }
 

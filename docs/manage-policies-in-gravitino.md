@@ -1,9 +1,9 @@
 ---
-title: "Manage policies in Gravitino"
-slug: /manage-policies-in-gravitino
+title: "Manage Policies"
+slug: "/manage-policies-in-gravitino"
 date: 2025-08-04
-keyword: policy management, policy, policies, Gravitino, data governance
-license: This software is licensed under the Apache License version 2.
+keyword: "policy management, policy, policies, Gravitino, data governance"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -16,7 +16,7 @@ metadata objects. Policies are a set of rules that can be associated with a meta
 object for data governance and similar purposes.
 
 This document provides a brief introduction to using policies in Gravitino, covering both the Gravitino Java client and 
-REST APIs. If you want to know more about the policy system in Gravitino, please refer to the
+REST APIs. If you want to know more about the policy system in Gravitino, refer to the
 Javadoc and REST API documentation.
 
 :::info
@@ -25,21 +25,24 @@ Javadoc and REST API documentation.
    `name`. For example, a `CATALOG` object has a name "catalog1" with type "CATALOG", a `SCHEMA`
    object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE` object has a name
    "catalog1.schema1.table1" with type "TABLE".
-2. Currently, `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` objects can be
+2`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` objects can be
    associated with policies. 
 3. Policies in Gravitino are inheritable, so listing policies of a metadata object will also list the
    policies of its parent metadata objects. For example, listing policies of a `Table` will also list
-   the policies of its parent `Schema` and `Catalog`.
+   the policies of its parent `Schema` and `Catalog`. For catalogs that support multi-level
+   (hierarchical) schemas, such as a schema named `a:b:c` (using the configured schema separator),
+   the intermediate parent schemas `a:b` and `a` are also part of the hierarchy, so their policies
+   are inherited as well.
 4. The same policy can be associated with both parent and child metadata objects. But when you list the
    associated policies of a child metadata object, this policy will be included only once in the result
    list with `inherited` value `false`.
 :::
 
-## Policy operations
+## Policy Operations
 
-### Create new policies
+### Create New Policies
 
-The first step to managing policies is to create new policies. You can create a new policy by providing a policy
+The first step to managing policies is to create new policies. Create a policy by providing a
 name, type, and other optional fields like comment, enabled, etc.
 
 Gravitino supports two kinds of policies: built-in policies and custom policies.
@@ -104,13 +107,13 @@ Policy policy = client.createPolicy(
 </TabItem>
 </Tabs>
 
-### Built-in Iceberg compaction policy
+### Built-In Iceberg Compaction Policy
 
 For the built-in `system_iceberg_compaction` policy content, field definitions, and examples, see [Iceberg compaction policy](./iceberg-compaction-policy.md).
 
-### List created policies
+### List Policies
 
-You can list all the created policy names as well as policy objects in a metalake in Gravitino.
+List all the policy names as well as policy objects in a metalake in Gravitino.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -138,9 +141,9 @@ Policy[] policies = client.listPolicyInfos();
 </TabItem>
 </Tabs>
 
-### Get a policy by name
+### Get a Policy by Name
 
-You can get a policy by its name.
+Get a policy by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -161,7 +164,7 @@ Policy policy = client.getPolicy("my_policy1");
 </TabItem>
 </Tabs>
 
-### Update a policy
+### Update a Policy
 
 Gravitino allows you to update a policy by providing changes.
 
@@ -223,7 +226,7 @@ Policy policy = client.alterPolicy(
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following policy changes:
+Gravitino supports the following policy changes:
 
 | Supported modification | JSON                                                                 | Java                                                  |
 |------------------------|----------------------------------------------------------------------|-------------------------------------------------------|
@@ -231,9 +234,9 @@ Currently, Gravitino supports the following policy changes:
 | Update a comment       | `{"@type":"updateComment","newComment":"new_comment"}`               | `PolicyChange.updateComment("new_comment")`           |
 | Update policy content  | `{"@type":"updateContent","policyType":"custom","newContent":{...}}` | `PolicyChange.updateContent("test_type", newContent)` |
 
-### Enable or disable a policy
+### Enable or Disable a Policy
 
-You can enable or disable a policy.
+Enable or disable a policy.
 
 The `enabled` field of a policy is only a display attribute that marks whether the policy is enabled or disabled.
 It does not affect the actual behavior or characteristics of the policy itself. This field is intended for 
@@ -277,9 +280,9 @@ client.enablePolicy("my_policy_new");
 </TabItem>
 </Tabs>
 
-### Delete a policy
+### Delete a Policy
 
-You can delete a policy by its name.
+Delete a policy by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -300,14 +303,13 @@ client.deletePolicy("my_policy_new");
 </TabItem>
 </Tabs>
 
-## Policy associations
+## Policy Associations
 
-Gravitino allows you to associate and disassociate policies with metadata objects. Currently,
-`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` objects can have policies.
+Gravitino lets you associate and disassociate policies with metadata objects. The `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` object types can have policies.
 
-### Associate and disassociate policies with a metadata object
+### Associate and Disassociate Policies with a Metadata Object
 
-You can associate and disassociate policies with a metadata object by providing the object type, object
+Associate and disassociate policies with a metadata object by providing the object type, object
 name and policy names.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies`.
@@ -379,10 +381,11 @@ schema.supportsPolicies().associatePolicies(new String[] {"policy1"}, null);
 </TabItem>
 </Tabs>
 
-### List associated policies for a metadata object
+### List Associated Policies for a Metadata Object
 
-You can list all the policies associated with a metadata object. If a policy is inheritable, 
-listing policies of a metadata object will also list the policies of its parent metadata objects.
+List all the policies associated with a metadata object. If a policy is inheritable, 
+listing policies of a metadata object will also list the policies of its parent metadata objects,
+including the intermediate parent schemas of a multi-level (hierarchical) schema.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies`.
 
@@ -415,9 +418,9 @@ Policy[] schemaPolicies = schema.supportsPolicies().listPolicyInfos();
 </TabItem>
 </Tabs>
 
-### Get an associated policy by name for a metadata object
+### Get an Associated Policy by Name for a Metadata Object
 
-You can get an associated policy by its name for a metadata object.
+Get an associated policy by its name for a metadata object.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies/{policy}`.
 
@@ -446,9 +449,9 @@ Policy schemaPolicy = schema.supportsPolicies().getPolicy("policy1");
 </TabItem>
 </Tabs>
 
-### List metadata objects associated with a policy
+### List Metadata Objects Associated with a Policy
 
-You can list all the metadata objects **directly associated with** a policy.
+List all the metadata objects **directly associated with** a policy.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

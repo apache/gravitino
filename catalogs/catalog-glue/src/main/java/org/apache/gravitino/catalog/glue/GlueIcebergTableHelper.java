@@ -40,6 +40,7 @@ import static org.apache.gravitino.rel.types.Types.TimestampType;
 import static org.apache.gravitino.rel.types.Types.UUIDType;
 import static org.apache.gravitino.rel.types.Types.VarCharType;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -157,7 +158,7 @@ final class GlueIcebergTableHelper {
     icebergProps.put(IcebergConstants.AWS_S3_REGION, region);
 
     String catalogId = config.get(GlueConstants.AWS_GLUE_CATALOG_ID);
-    if (catalogId != null) {
+    if (StringUtils.isNotBlank(catalogId)) {
       icebergProps.put(GLUE_ID, catalogId);
     }
 
@@ -379,8 +380,9 @@ final class GlueIcebergTableHelper {
   /**
    * Alters an Iceberg table via the Iceberg SDK.
    *
-   * <p>Delegates schema changes to {@link UpdateSchema} and property changes to {@link
-   * UpdateProperties}.
+   * <p>Supports {@link TableChange.RenameTable}, {@link TableChange.ColumnChange}, {@link
+   * TableChange.SetProperty}, and {@link TableChange.RemoveProperty}. A rename is an exclusive
+   * operation and cannot be combined with other changes.
    *
    * <p><b>Note:</b> Schema changes and property changes are committed in two separate transactions.
    * If the schema commit succeeds but the property commit fails, the table is left in a partially
@@ -390,9 +392,25 @@ final class GlueIcebergTableHelper {
    * @param dbName the Glue database name
    * @param tableName the table name
    * @param changes the table changes to apply
+   * @return the final {@link TableIdentifier} (differs from the input only when a rename is
+   *     applied, including cross-schema renames)
    */
-  static void alterTable(
+  static TableIdentifier alterTable(
       Catalog icebergCatalog, String dbName, String tableName, TableChange... changes) {
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.RenameTable) {
+        Preconditions.checkArgument(
+            changes.length == 1, "RenameTable cannot be combined with other table changes");
+        TableChange.RenameTable rename = (TableChange.RenameTable) change;
+        String newDbName = rename.getNewSchemaName().orElse(dbName);
+        String newName = rename.getNewName();
+        TableIdentifier to = TableIdentifier.of(newDbName, newName);
+        icebergCatalog.renameTable(TableIdentifier.of(dbName, tableName), to);
+        LOG.info("Renamed Iceberg table {}.{} to {}.{}", dbName, tableName, newDbName, newName);
+        return to;
+      }
+    }
+
     Table table = icebergCatalog.loadTable(TableIdentifier.of(dbName, tableName));
 
     boolean hasSchemaChange = false;
@@ -442,9 +460,13 @@ final class GlueIcebergTableHelper {
           TableChange.UpdateColumnType upd = (TableChange.UpdateColumnType) change;
           Preconditions.checkArgument(
               upd.fieldName().length == 1, "Nested column type updates are not supported");
+          org.apache.iceberg.types.Type newIcebergType = toIcebergType(upd.getNewDataType());
+          Preconditions.checkArgument(
+              newIcebergType instanceof org.apache.iceberg.types.Type.PrimitiveType,
+              "Iceberg only supports primitive type promotion via updateColumn, got: %s",
+              upd.getNewDataType().simpleString());
           update.updateColumn(
-              upd.fieldName()[0],
-              (org.apache.iceberg.types.Type.PrimitiveType) toIcebergType(upd.getNewDataType()));
+              upd.fieldName()[0], (org.apache.iceberg.types.Type.PrimitiveType) newIcebergType);
         } else if (change instanceof TableChange.UpdateColumnComment) {
           TableChange.UpdateColumnComment upd = (TableChange.UpdateColumnComment) change;
           Preconditions.checkArgument(
@@ -479,6 +501,7 @@ final class GlueIcebergTableHelper {
       update.commit();
       LOG.info("Altered Iceberg table {}.{} properties via Iceberg SDK", dbName, tableName);
     }
+    return TableIdentifier.of(dbName, tableName);
   }
 
   // ---------------------------------------------------------------------------
@@ -578,13 +601,15 @@ final class GlueIcebergTableHelper {
   // Type conversion (Gravitino -> Iceberg)
   // ---------------------------------------------------------------------------
 
-  private static Schema toIcebergSchema(Column[] columns) {
+  @VisibleForTesting
+  static Schema toIcebergSchema(Column[] columns) {
     List<Types.NestedField> fields = new ArrayList<>();
-    // Field IDs are assigned sequentially starting from 0. This is the Iceberg convention
-    // for initial schema creation. Schema evolution reuses existing IDs from the table.
+    // Top-level columns use ordinal IDs (0, 1, ...). Nested field IDs start after that range
+    // so all IDs are unique within the schema, as required by the Schema constructor.
+    int[] nextId = {columns.length};
     for (int i = 0; i < columns.length; i++) {
       Column col = columns[i];
-      org.apache.iceberg.types.Type icebergType = toIcebergType(col.dataType());
+      org.apache.iceberg.types.Type icebergType = toIcebergType(col.dataType(), nextId);
       if (col.nullable()) {
         fields.add(Types.NestedField.optional(i, col.name(), icebergType, col.comment()));
       } else {
@@ -595,6 +620,42 @@ final class GlueIcebergTableHelper {
   }
 
   private static org.apache.iceberg.types.Type toIcebergType(Type type) {
+    int[] nextId = {0};
+    return toIcebergType(type, nextId);
+  }
+
+  private static org.apache.iceberg.types.Type toIcebergType(Type type, int[] nextId) {
+    if (type instanceof ListType) {
+      ListType listType = (ListType) type;
+      org.apache.iceberg.types.Type elementType = toIcebergType(listType.elementType(), nextId);
+      int elementId = nextId[0]++;
+      return listType.elementNullable()
+          ? Types.ListType.ofOptional(elementId, elementType)
+          : Types.ListType.ofRequired(elementId, elementType);
+    }
+    if (type instanceof MapType) {
+      MapType mapType = (MapType) type;
+      org.apache.iceberg.types.Type keyType = toIcebergType(mapType.keyType(), nextId);
+      org.apache.iceberg.types.Type valueType = toIcebergType(mapType.valueType(), nextId);
+      int keyId = nextId[0]++;
+      int valueId = nextId[0]++;
+      return mapType.valueNullable()
+          ? Types.MapType.ofOptional(keyId, valueId, keyType, valueType)
+          : Types.MapType.ofRequired(keyId, valueId, keyType, valueType);
+    }
+    if (type instanceof StructType) {
+      StructType structType = (StructType) type;
+      List<Types.NestedField> nestedFields = new ArrayList<>();
+      for (StructType.Field field : structType.fields()) {
+        org.apache.iceberg.types.Type fieldType = toIcebergType(field.type(), nextId);
+        int fieldId = nextId[0]++;
+        nestedFields.add(
+            field.nullable()
+                ? Types.NestedField.optional(fieldId, field.name(), fieldType, field.comment())
+                : Types.NestedField.required(fieldId, field.name(), fieldType, field.comment()));
+      }
+      return Types.StructType.of(nestedFields);
+    }
     if (type instanceof BooleanType) {
       return Types.BooleanType.get();
     }

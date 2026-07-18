@@ -1,15 +1,15 @@
 ---
-title: "Docker image details"
-slug: /docker-image-details
-keyword: docker
+title: "Docker Image Details"
+slug: "/docker-image-details"
+keyword: "docker"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# User Docker images
+## User Docker Images
 
-## Apache Gravitino Docker image
+## Apache Gravitino Docker Image
 
-You can deploy the service with the Gravitino Docker image.
+Deploy the service with the Gravitino Docker image.
 
 Container startup commands
 
@@ -22,6 +22,9 @@ Memory settings
 JVM heap and metaspace are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"` to tune sizes. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it whenever you need different heap/metaspace sizes.
 
 Changelog
+
+- apache/gravitino:1.3.0
+  - Built with Gravitino 1.3.0. For more information, see 1.3.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.3.0).
 
 - apache/gravitino:1.2.0
   - Built with Gravitino 1.2.0. For more information, see 1.2.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.2.0).
@@ -70,9 +73,9 @@ Changelog
     - `8090` Gravitino Web UI
     - `9001` Iceberg REST service
 
-## Apache Gravitino Iceberg REST server Docker image
+## Apache Gravitino Iceberg REST Server Docker Image
 
-You can deploy the standalone Gravitino Iceberg REST server with the Docker image.
+Deploy the standalone Gravitino Iceberg REST server with the Docker image.
 
 Container startup commands
 
@@ -85,6 +88,9 @@ Memory settings
 Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Override with `-e GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"` when you need different sizes. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it to change heap/metaspace settings.
 
 Changelog
+
+- apache/gravitino-iceberg-rest:1.3.0
+  - Built with Gravitino 1.3.0. For more information, see 1.3.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.3.0).
 
 - apache/gravitino-iceberg-rest:1.2.0
   - Upgrade Iceberg to 1.10.1
@@ -133,9 +139,9 @@ Changelog
   - Expose ports:
     - `9001` Iceberg REST service
 
-## Apache Gravitino MCP server image
+## Apache Gravitino MCP Server Image
 
-You can deploy the Gravitino MCP server with the Docker image.
+Deploy the Gravitino MCP server with the Docker image.
 
 Container startup commands
 
@@ -144,6 +150,9 @@ docker run --rm -d -p 8000:8000 apache/gravitino-mcp-server:latest --metalake te
 ```
 
 Changelog
+
+- apache/gravitino-mcp-server:1.3.0
+  - Built with Gravitino 1.3.0. For more information, see 1.3.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.3.0).
 
 - apache/gravitino-mcp-server:1.2.0
   - Built with Gravitino 1.2.0. For more information, see 1.2.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.2.0).
@@ -156,9 +165,9 @@ Changelog
   - Supports associate&disassociate tag, policy to metadata
   - Supports submit&cancel jobs.
 
-## Apache Gravitino Lance REST server Docker image
+## Apache Gravitino Lance REST Server Docker Image
 
-You can deploy the standalone Gravitino Lance REST server with the Docker image.
+Deploy the standalone Gravitino Lance REST server with the Docker image.
 
 
 ```shell
@@ -169,16 +178,19 @@ Memory settings
 
 Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Example: `-e GRAVITINO_MEM="-Xms2g -Xmx2g -XX:MaxMetaspaceSize=512m"`. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it whenever you need different heap/metaspace sizes.
 
-Currently, Gravitino Lance REST server supports setting the following environment variables
+Gravitino Lance REST server supports setting the following environment variables
 - LANCE_REST_GRAVITINO_METALAKE_NAME: It will overwrite the configuration "gravitino.lance-rest.gravitino-metalake" in configuration file `conf/gravitino-lance-rest-server.conf`. **You should set it to your Gravitino metalake name.**
 - LANCE_REST_NAMESPACE_BACKEND: It will overwrite the configuration "gravitino.lance-rest.namespace-backend" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "gravitino" and you should not change it as of now.
-- LANCE_REST_GRAVITINO_URI: It will overwrite the configuration "gravitino.lance-rest.gravitino-uri" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "http://localhost:8090" and you can change it to your Gravitino server address. **Be care that Gravitino server URI `http://localhost:8090` is a docker container internal address, if your Gravitino server is running outside the docker container, you should set it to your host IP address like `http://host-ip:8090`.**
+- LANCE_REST_GRAVITINO_URI: It will overwrite the configuration "gravitino.lance-rest.gravitino-uri" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "http://localhost:8090" and you can change it to your Gravitino server address. **Be care that Gravitino server URI `http://localhost:8090` is a Docker container internal address; if your Gravitino server is running outside the Docker container, you should set it to your host IP address like `http://host-ip:8090`.**
 - LANCE_REST_HOST: It will overwrite the configuration "gravitino.lance-rest.host" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is `0.0.0.0`.
 - LANCE_REST_PORT: It will overwrite the configuration "gravitino.lance-rest.httpPort" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is `9101`.
 
 It's not advised to change `LANCE_REST_NAMESPACE_BACKEND`, `LANCE_REST_HOST` and `LANCE_REST_PORT` if you are not familiar with Gravitino Lance REST server and no special requirements.
 
 Changelog
+
+- apache/gravitino-lance-rest:1.3.0
+  - Built with Gravitino 1.3.0. For more information, see 1.3.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.3.0).
 
 - apache/gravitino-lance-rest:1.2.0
   - Supports delete and rename column operations
@@ -190,15 +202,15 @@ Changelog
   - Support Lance tables integration through REST API
   - Built with Gravitino 1.1.0. For more information, see 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
 
-## Playground Docker image
+## Playground Docker Image
 
-You can use the [playground](https://github.com/apache/gravitino-playground) to experience the whole Gravitino system with other components.
+Use the [playground](https://github.com/apache/gravitino-playground) to experience the whole Gravitino system with other components.
 
 The playground consists of multiple Docker images.
 
 The Docker images of the playground have suitable configurations for users to experience.
 
-### Apache Hive image
+### Apache Hive Image
 
 Changelog
 
@@ -211,11 +223,14 @@ Changelog
   - `hive-2.3.9`
   - Don't start YARN when container startup
 
-### Trino image
+### Trino Image
 
 Changelog
 
-- apache/gravitino-playground:trino-435-gravitino-1.2.0
+- apache/gravitino-playground:trino-478-gravitino-1.3.0
+  - Use Gravitino release 1.3.0 Dockerfile to build the image.
+
+- apache/gravitino-playground:trino-478-gravitino-1.2.0
   - Use Gravitino release 1.2.0 Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-1.1.0
@@ -259,13 +274,13 @@ Changelog
   - Base on `trino:426`
   - Added Gravitino trino-connector-0.3.0 libraries into the `/usr/lib/trino/plugin/gravitino`
 
-# Developer Docker images
+## Developer Docker Images
 
-You can use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
+Use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
 
-## Apache Gravitino CI Apache Hive image with kerberos enabled
+## Hive Image with Kerberos
 
-You can use this kind of image to test the catalog of Apache Hive with kerberos enable
+Use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
 
@@ -299,11 +314,11 @@ Changelog
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.0
     - Set up a Hive cluster with kerberos enabled.
-    - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
+    - Install a KDC server and create a principal for Hive. For more, see [kerberos-hive](../dev/docker/kerberos-hive)
 
-## Apache Gravitino CI Apache Hive image
+## Hive Image
 
-You can use this kind of image to test the catalog of Apache Hive.
+Use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
@@ -316,7 +331,7 @@ Changelog
  
 - apache/gravitino-ci:hive-0.1.18
   - Support UTF-8 encoding for the `hive-site.xml` file and Hive Metastore. 
-    For more information, please see [PR](https://github.com/apache/gravitino/pull/6625)
+    For more information, see [PR](https://github.com/apache/gravitino/pull/6625)
   - Change ranger-hive-plugin and ranger-hdfs-plugin download URL. 
 
 - apache/gravitino-ci:hive-0.1.17
@@ -418,9 +433,9 @@ Changelog
     - `10000` HiveServer2
     - `10002` HiveServer2 HTTP
 
-## Apache Gravitino CI Trino image
+## Trino Image
 
-You can use this image to test Trino.
+Use this image to test Trino.
 
 Changelog
 
@@ -448,9 +463,9 @@ Changelog
   - Expose ports:
     - `8080` Trino JDBC port
 
-## Apache Gravitino CI Doris image
+## Doris Image
 
-You can use this image to test Apache Doris.
+Use this image to test Apache Doris.
 
 Changelog
 
@@ -482,9 +497,9 @@ Changelog
     - `8030` Doris FE HTTP port
     - `9030` Doris FE MySQL server port
 
-## Apache Gravitino CI Apache Ranger image
+## Ranger Image
 
-You can use this image to control Trino's permissions.
+Use this image to control Trino's permissions.
 
 Changelog
 
@@ -496,12 +511,12 @@ Changelog
 
 - datastrato/gravitino-ci-ranger:0.1.1
   - Docker image datastrato/gravitino-ci-ranger:0.1.1
-  - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build docker image.
+  - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build the Docker image.
   - Remove unnecessary hack in `start-ranger-service.sh`.
-  - Reduce docker image build time from `~1h` to `~5min`.
+  - Reduce Docker image build time from `~1h` to `~5min`.
   - How to debug Ranger admin service:
-    - Use `docker exec -it <container_id> bash` to enter the docker container.
-    - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the docker container.
+    - Use `docker exec -it <container_id> bash` to enter the Docker container.
+    - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the Docker container.
     - Execute `./opt/ranger-admin/stop-ranger-admin.sh` and `./opt/ranger-admin/start-ranger-admin.sh` to restart Ranger admin.
     - Clone the `Apache Ranger` project from GitHub and checkout the `2.4.0` release.
     - Create a remote debug configuration (`Use model classpath` = `EmbeddedServer`) in your IDE and connect to the Ranger admin container.
@@ -509,7 +524,6 @@ Changelog
 - datastrato/gravitino-ci-ranger:0.1.0
   - Docker image `datastrato/gravitino-ci-ranger:0.1.0`
   - Support Apache Ranger 2.4.0
-  - Use environment variable `RANGER_PASSWORD` to set up Apache Ranger admin password, please 
-    notice Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
+  - Use the environment variable `RANGER_PASSWORD` to set the Apache Ranger admin password. The password must be at least 8 characters and include at least one letter and one digit.
   - Expose ports:
     - `6080` Apache Ranger admin port

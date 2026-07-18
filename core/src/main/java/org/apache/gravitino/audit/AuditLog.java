@@ -105,6 +105,7 @@ import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
 import org.apache.gravitino.listener.api.event.view.CreateViewEvent;
@@ -345,6 +346,8 @@ public interface AuditLog {
 
     LIST_VIEW,
 
+    REGISTER_VIEW,
+
     REGISTER_MODEL,
 
     DELETE_MODEL,
@@ -375,7 +378,15 @@ public interface AuditLog {
 
     REMOVE_USER,
 
+    REMOVE_USER_BY_EXTERNAL_ID,
+
     GET_USER,
+
+    GET_USER_BY_EXTERNAL_ID,
+
+    ENABLE_USER,
+
+    DISABLE_USER,
 
     LIST_USERS,
 
@@ -389,7 +400,11 @@ public interface AuditLog {
 
     REMOVE_GROUP,
 
+    REMOVE_GROUP_BY_EXTERNAL_ID,
+
     GET_GROUP,
+
+    GET_GROUP_BY_EXTERNAL_ID,
 
     LIST_GROUPS,
 
@@ -482,6 +497,8 @@ public interface AuditLog {
     LIST_FUNCTION,
 
     LIST_FUNCTION_INFOS,
+
+    AUTHORIZATION_DENIAL,
 
     UNKNOWN_OPERATION;
 
@@ -587,6 +604,8 @@ public interface AuditLog {
         return LOAD_FILESET;
       } else if (event instanceof ListFilesetEvent || event instanceof ListFilesetFailureEvent) {
         return LIST_FILESET;
+      } else if (event instanceof AuthorizationDenialFailureEvent) {
+        return AUTHORIZATION_DENIAL;
       } else {
         return UNKNOWN_OPERATION;
       }

@@ -222,9 +222,13 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest) {
+    CredentialPrivilege privilege = CredentialPrivilege.READ;
+    if (context.requestCredentialVending()) {
+      privilege = getCredentialPrivilege(context, tableIdentifier);
+    }
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .planTableScan(tableIdentifier, scanRequest);
+        .planTableScan(tableIdentifier, scanRequest, context.requestCredentialVending(), privilege);
   }
 
   @Override

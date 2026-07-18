@@ -210,6 +210,7 @@
    Apache Directory LDAP API Utilities
    ApacheDS I18n
    ApacheDS Protocol Kerberos Codec
+   Aviator
    AWS Java SDK annotations
    AWS SDK for Java 2.0
    RoaringBitmap
@@ -221,6 +222,7 @@
    Apache Commons Codec
    Apache Commons Collections
    Apache Commons Configuration
+   Apache Commons CSV
    Apache Commons Daemon
    Apache Commons DBCP
    Apache Jakarta Commons Digester
@@ -253,6 +255,7 @@
    Apache HttpComponents Core HTTP/1.1
    Apache HttpComponents Core HTTP/2
    Apache Iceberg
+   IPAddress
    J2ObjC Annotations
    Jackson Annotations
    Jackson Core
@@ -270,6 +273,7 @@
    Javax JDO API
    JBoss Logging
    JBoss Threads
+   JCasbin
    JCIP Annotations
    Apache Java Data Objects (JDO)
    JetS3t
@@ -282,6 +286,7 @@
    MyBatis
    The Netty Project
    Nimbus JOSE + JWT
+   OGNL
    OkHttp
    Okio
    OpenCSV

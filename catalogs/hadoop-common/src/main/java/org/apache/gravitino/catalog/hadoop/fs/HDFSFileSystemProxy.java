@@ -34,8 +34,10 @@ import java.util.Map;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
+import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
-import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosClient;
+import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -167,12 +169,25 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   private UserGroupInformation initKerberosUgi(
       Map<String, String> properties, Configuration configuration) {
     try {
-      KerberosClient client = new KerberosClient(properties, configuration, true);
+      KerberosConfig kerberosConfig = new KerberosConfig(properties, configuration);
+      KerberosClient client =
+          KerberosClient.builder(kerberosConfig.getPrincipalName(), configuration)
+              .loginMode(KerberosAuthUtils.LoginMode.RETURN_UGI)
+              .refreshCredentials(true)
+              .checkIntervalSec(kerberosConfig.getCheckIntervalSec())
+              .krb5Conf(Constants.HADOOP_KRB5_CONF, Constants.SECURITY_KRB5_ENV)
+              .build();
       String keytabPath =
           String.format(GRAVITINO_KEYTAB_FORMAT, properties.getOrDefault(GRAVITINO_ID_KEY, ""));
-      File keytabFile = client.saveKeyTabFileFromUri(keytabPath);
+      File keytabFile =
+          KerberosAuthUtils.saveKeytabFromUri(
+              kerberosConfig.getKeytab(),
+              new File(keytabPath),
+              kerberosConfig.getFetchTimeoutSec(),
+              false,
+              configuration);
       UserGroupInformation ugi = client.login(keytabFile.getAbsolutePath());
-      this.kerberosRealm = client.getKerberosRealm();
+      this.kerberosRealm = client.getRealm();
       return ugi;
     } catch (IOException e) {
       throw new RuntimeException("Failed to login with Kerberos", e);

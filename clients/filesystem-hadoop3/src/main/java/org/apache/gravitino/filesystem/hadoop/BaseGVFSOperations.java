@@ -44,6 +44,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -132,6 +134,15 @@ public abstract class BaseGVFSOperations implements Closeable {
   private final Configuration conf;
 
   private final Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+
+  /**
+   * Tracks all {@link FileSystem} instances ever created by this operations instance, including
+   * those already evicted from {@link #fileSystemCache}, so that {@link #close()} can close them
+   * all at GVFS shutdown. See <a
+   * href="https://github.com/apache/gravitino/issues/11303">#11303</a>.
+   */
+  private final Set<FileSystem> allCreatedFileSystems =
+      Collections.newSetFromMap(new ConcurrentHashMap<>());
 
   private final Map<String, FileSystemProvider> fileSystemProvidersMap;
 
@@ -274,15 +285,18 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   @Override
   public void close() throws IOException {
-    // close all actual FileSystems
-    for (FileSystem fileSystem : fileSystemCache.asMap().values()) {
+    // Invalidate cache first so the removal listener can close cached FileSystems,
+    // then close any remaining ones tracked in allCreatedFileSystems to avoid double-close.
+    fileSystemCache.invalidateAll();
+
+    for (FileSystem fileSystem : allCreatedFileSystems) {
       try {
         fileSystem.close();
       } catch (IOException e) {
-        // ignore
+        LOG.warn("Failed to close FileSystem during GVFS shutdown: {}", fileSystem, e);
       }
     }
-    fileSystemCache.invalidateAll();
+    allCreatedFileSystems.clear();
 
     try {
       if (filesetMetadataCache != null && filesetMetadataCache.isPresent()) {
@@ -762,6 +776,11 @@ public abstract class BaseGVFSOperations implements Closeable {
     return fileSystemCache;
   }
 
+  @VisibleForTesting
+  Set<FileSystem> allCreatedFileSystems() {
+    return allCreatedFileSystems;
+  }
+
   /**
    * Lazy initialization of GravitinoClient using double-checked locking pattern. This ensures the
    * expensive client creation only happens when actually needed.
@@ -824,11 +843,16 @@ public abstract class BaseGVFSOperations implements Closeable {
             // https://github.com/apache/gravitino/issues/5609
             resetFileSystemServiceLoader(scheme);
 
+            FileSystem created;
             if (scheme.equals(SCHEME_HDFS)) {
-              return new HDFSFileSystemProxy(actualFilePath, allProperties).getProxy();
+              created = new HDFSFileSystemProxy(actualFilePath, allProperties).getProxy();
             } else {
-              return provider.getFileSystem(actualFilePath, allProperties);
+              created = provider.getFileSystem(actualFilePath, allProperties);
             }
+            // Track every FS we create so we can guarantee close() at GVFS shutdown,
+            // even if the entry is later evicted from the cache (see #11303).
+            allCreatedFileSystems.add(created);
+            return created;
           } catch (IOException e) {
             throw new GravitinoRuntimeException(
                 e, "Cannot get FileSystem for path: %s", actualFilePath);
@@ -877,6 +901,19 @@ public abstract class BaseGVFSOperations implements Closeable {
         GravitinoVirtualFileSystemConfiguration
             .FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_KEY);
 
+    // Legacy fallback: close FS immediately on eviction (see #11303).
+    final boolean closeOnEviction =
+        configuration.getBoolean(
+            GravitinoVirtualFileSystemConfiguration
+                .FS_GRAVITINO_FILESET_CACHE_CLOSE_ON_EVICTION_KEY,
+            GravitinoVirtualFileSystemConfiguration
+                .FS_GRAVITINO_FILESET_CACHE_CLOSE_ON_EVICTION_DEFAULT);
+    if (closeOnEviction) {
+      LOG.warn(
+          "'{}' is enabled; FileSystem will be closed on cache eviction (legacy behaviour, see #11303).",
+          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_CACHE_CLOSE_ON_EVICTION_KEY);
+    }
+
     Caffeine<Object, Object> cacheBuilder =
         Caffeine.newBuilder()
             .maximumSize(maxCapacity)
@@ -888,14 +925,21 @@ public abstract class BaseGVFSOperations implements Closeable {
                         1, newDaemonThreadFactory("gvfs-filesystem-cache-cleaner"))))
             .removalListener(
                 (key, value, cause) -> {
-                  FileSystem fs = (FileSystem) value;
-                  if (fs != null) {
-                    try {
-                      fs.close();
-                    } catch (IOException e) {
-                      LOG.error("Cannot close the file system for fileset: {}", key, e);
+                  if (closeOnEviction) {
+                    FileSystem fs = (FileSystem) value;
+                    if (fs != null) {
+                      // Remove from allCreatedFileSystems first to avoid double-close at shutdown.
+                      allCreatedFileSystems.remove(fs);
+                      try {
+                        fs.close();
+                      } catch (IOException e) {
+                        LOG.error("Cannot close the file system for fileset: {}", key, e);
+                      }
                     }
+                    return;
                   }
+                  // Default: do not close on eviction; close is deferred to GVFS shutdown.
+                  LOG.debug("FileSystem evicted from cache (key={}, cause={})", key, cause);
                 });
     cacheBuilder.expireAfterAccess(evictionMillsAfterAccess, TimeUnit.MILLISECONDS);
     return cacheBuilder.build();

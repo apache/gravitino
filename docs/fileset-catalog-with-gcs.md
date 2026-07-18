@@ -1,14 +1,17 @@
 ---
-title: "Fileset catalog with GCS"
-slug: /fileset-catalog-with-gcs
+title: "Fileset Catalog with GCS"
+slug: "/fileset-catalog-with-gcs"
 date: 2024-01-03
-keyword: Fileset catalog GCS
+keyword: "Fileset catalog GCS"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 This document describes how to configure a Fileset catalog with GCS.
 
 ## Prerequisites
+
 To set up a Fileset catalog with OSS, follow these steps:
 
 1. Download the [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) file.
@@ -19,38 +22,38 @@ To set up a Fileset catalog with OSS, follow these steps:
 $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Fileset catalog with GCS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
+Once the server is up and running, you can proceed to configure the Fileset catalog with GCS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
 
-## Configurations for creating a Fileset catalog with GCS
+## GCS Catalog Configuration
 
-### Configurations for a GCS Fileset catalog
+### GCS Fileset Catalog Configuration
 
 Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with GCS:
 
-| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Default value   | Required | Since version    |
-|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.                                                                                                                                                                                                                                                                               | `builtin-local` | No       | 0.7.0-incubating |
-| `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | (none)          | Yes      | 0.7.0-incubating |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `gcs-token`. As the default authentication type is using service account as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like service account to access GCS by GVFS. Once it's set, more configuration items are needed to make it works, please see [gcs-credential-vending](security/credential-vending.md#gcs-credentials) | (none)          | No       | 0.8.0-incubating |
+| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Default value   | Required | Since version    |
+|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                                                                                                                                                                                                                                                                                           | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.                                                                                                                                                                                                                                                                       | `builtin-local` | No       | 0.7.0-incubating |
+| `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | (none)          | Yes      | 0.7.0-incubating |
+| `credential-providers`        | The credential provider types, separated by comma, possible value can be `gcs-token`. As the default authentication type is using service account as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like service account to access GCS by GVFS. Once it's set, more configuration items are needed to make it works, see [gcs-credential-vending](security/credential-vending.md#gcs-credentials) | (none)          | No       | 0.8.0-incubating |
 
 :::note
 `default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-gcp-bundle`).
 :::
 
-### Configurations for a schema
+### Schema Configuration
 
 Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.
 
-### Configurations for a fileset
+### Fileset Configuration
 
 Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
-## Example of creating Fileset catalog with GCS
+## Create the Catalog, Schema, and Fileset
 
 This section will show you how to use the Fileset catalog with GCS in Gravitino, including detailed examples.
 
-### Step1: Create a Fileset catalog with GCS
+### Step 1: Create a Fileset Catalog with GCS
 
 First, you need to create a Fileset catalog with GCS. The following example shows how to create a Fileset catalog with GCS:
 
@@ -112,7 +115,7 @@ gcs_properties = gravitino_client.create_catalog(name="test_catalog",
 </TabItem>
 </Tabs>
 
-### Step2: Create a schema
+### Step 2: Create a Schema
 
 Once you’ve created a Fileset catalog with GCS, you can create a schema. The following example shows how to create a schema:
 
@@ -163,7 +166,7 @@ catalog.as_schemas().create_schema(name="test_schema",
 </Tabs>
 
 
-### Step3: Create a fileset
+### Step 3: Create a Fileset
 
 After creating a schema, you can create a fileset. The following example shows how to create a fileset:
 
@@ -225,9 +228,9 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 </TabItem>
 </Tabs>
 
-## Accessing a fileset with GCS
+## Access a Fileset with GCS
 
-### Using the GVFS Java client to access the fileset
+### Access the Fileset with the GVFS Java Client
 
 To access fileset with GCS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -293,7 +296,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
   </dependency>
 ```
 
-### Using Spark to access the fileset
+### Access the Fileset with Spark
 
 The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
@@ -374,9 +377,9 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Accessing a fileset using the Hadoop fs command
+### Access a Fileset Using the Hadoop Fs Command
 
-The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
+The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3:
 
 1. Adding the following contents to the `${HADOOP_HOME}/etc/hadoop/core-site.xml` file:
 
@@ -418,9 +421,9 @@ For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 ./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
 ```
 
-### Using the GVFS Python client to access a fileset
+### Access the Fileset with the GVFS Python Client
 
-In order to access fileset with GCS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+To access fileset with GCS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
 | Configuration item         | Description                               | Default value | Required | Since version    |
 |----------------------------|-------------------------------------------|---------------|----------|------------------|
@@ -448,7 +451,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
 
-### Using fileset with pandas
+### Access the Fileset with Pandas
 
 The following are examples of how to use the pandas library to access the GCS fileset
 
@@ -467,15 +470,15 @@ ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}
 ds.head()
 ```
 
-For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
+For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with credential vending
+## Fileset with Credential Vending
 
 Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access GCS fileset without providing authentication information like `gcs-service-account-file` in the properties.
 
-### How to create a GCS Fileset catalog with credential vending
+### Create a GCS Fileset Catalog with Credential Vending
 
-Apart from configuration method in [create-gcs-fileset-catalog](#configurations-for-a-gcs-fileset-catalog),
+Apart from configuration method in [create-gcs-fileset-catalog](#gcs-fileset-catalog-configuration),
 properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also
 be set to enable credential vending for GCS fileset. Take `gcs-token` credential provider for example:
 
@@ -493,7 +496,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### How to access GCS fileset with credential vending
+### Access a GCS Fileset with Credential Vending
 
 When the catalog is configured with credentials and client-side credential vending is enabled,
 you can access GCS filesets directly using the GVFS Java/Python client or Spark without providing authentication details.
