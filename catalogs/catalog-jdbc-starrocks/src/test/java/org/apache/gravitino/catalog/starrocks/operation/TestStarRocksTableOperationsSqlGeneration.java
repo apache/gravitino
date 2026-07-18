@@ -207,4 +207,25 @@ public class TestStarRocksTableOperationsSqlGeneration {
             .getMessage()
             .contains("StarRocks has no storable GEOMETRY column type with CRS metadata"));
   }
+
+  @Test
+  public void testCreateTableRejectsGeographyBeforeSqlGeneration() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("unsupported_col")
+            .withType(Types.GeographyType.of("EPSG:4326", "karney"))
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("unsupported_col"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "StarRocks has no storable GEOGRAPHY column type with CRS and edge-algorithm metadata"));
+  }
 }

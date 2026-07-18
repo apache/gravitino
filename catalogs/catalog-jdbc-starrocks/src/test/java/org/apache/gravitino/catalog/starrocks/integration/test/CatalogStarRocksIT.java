@@ -850,6 +850,14 @@ public class CatalogStarRocksIT extends BaseIT {
   }
 
   @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "StarRocks has no storable GEOGRAPHY column type with CRS and edge-algorithm metadata");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");

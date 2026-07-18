@@ -117,6 +117,7 @@ Refer to
 | `Variant`                           | Rejected before DDL. Native `JSON` columns load as `External` because JSON is not an exact Variant representation.      |
 | `Unknown`                           | Rejected before DDL. StarRocks table columns cannot represent an optional, null-only Unknown logical type.             |
 | `Geometry`                          | Rejected before DDL. Spatial functions produce transient geometry values, but no storable column type carries CRS metadata. |
+| `Geography`                         | Rejected before DDL. StarRocks has no storable column type carrying both CRS and edge-algorithm metadata.               |
 
 Although StarRocks 3.3.5 and later can store fractional seconds in `DATETIME` values, its column type cannot preserve a declared Gravitino `Timestamp(p)` precision.
 The connector therefore rejects every precision-qualified `Timestamp(p)`; native fractional-precision metadata support remains separate Phase 3 work.

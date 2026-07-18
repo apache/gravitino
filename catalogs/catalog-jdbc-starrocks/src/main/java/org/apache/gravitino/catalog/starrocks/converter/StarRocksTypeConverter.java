@@ -171,6 +171,11 @@ public class StarRocksTypeConverter extends JdbcTypeConverter {
           String.format(
               "StarRocks has no storable GEOMETRY column type with CRS metadata; cannot convert Gravitino type %s",
               type.simpleString()));
+    } else if (type instanceof Types.GeographyType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "StarRocks has no storable GEOGRAPHY column type with CRS and edge-algorithm metadata; cannot convert Gravitino type %s",
+              type.simpleString()));
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to StarRocks type", type.simpleString()));

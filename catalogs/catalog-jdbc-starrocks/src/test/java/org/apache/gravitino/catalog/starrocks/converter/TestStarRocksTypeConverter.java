@@ -103,6 +103,21 @@ class TestStarRocksTypeConverter {
             .contains("StarRocks has no storable GEOMETRY column type with CRS metadata"));
   }
 
+  @Test
+  void testRejectGeographyType() {
+    Assertions.assertEquals(Types.ExternalType.of("geography"), toGravitino("geography", null));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> TYPE_CONVERTER.fromGravitino(Types.GeographyType.of("EPSG:4326", "karney")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "StarRocks has no storable GEOGRAPHY column type with CRS and edge-algorithm metadata"));
+  }
+
   private static Type toGravitino(String typeName, Integer datetimePrecision) {
     JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean(typeName);
     typeBean.setDatetimePrecision(datetimePrecision);
