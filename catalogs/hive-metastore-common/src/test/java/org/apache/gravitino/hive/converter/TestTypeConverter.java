@@ -103,6 +103,17 @@ public class TestTypeConverter {
         exception.getMessage());
   }
 
+  @Test
+  public void testVariantThrowsException() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> HiveDataTypeConverter.CONVERTER.fromGravitino(Types.VariantType.get()));
+    Assertions.assertEquals(
+        "Hive cannot preserve the Gravitino variant type because it has no equivalent type.",
+        exception.getMessage());
+  }
+
   private void testConverter(String typeName) {
     TypeInfo hiveType = getTypeInfoFromTypeString(typeName);
     TypeInfo convertedType = CONVERTER.fromGravitino(CONVERTER.toGravitino(hiveType.getTypeName()));

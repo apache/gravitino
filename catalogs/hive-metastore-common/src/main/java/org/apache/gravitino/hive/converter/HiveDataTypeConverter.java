@@ -139,6 +139,9 @@ public class HiveDataTypeConverter implements DataTypeConverter<TypeInfo, String
             Arrays.stream(((Types.UnionType) type).types())
                 .map(this::fromGravitino)
                 .collect(Collectors.toList()));
+      case VARIANT:
+        throw new IllegalArgumentException(
+            "Hive cannot preserve the Gravitino variant type because it has no equivalent type.");
       default:
         throw new UnsupportedOperationException("Unsupported conversion to Hive type: " + type);
     }

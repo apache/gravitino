@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -39,6 +40,27 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.junit.jupiter.api.Test;
 
 public class TestHiveTableConverter {
+
+  @Test
+  public void testRejectVariantBeforeBuildingHiveTable() {
+    Column[] columns = {Column.of("payload", Types.VariantType.get(), "Semi-structured payload")};
+    HiveTable hiveTable =
+        HiveTable.builder()
+            .withName("events")
+            .withDatabaseName("db")
+            .withColumns(columns)
+            .withProperties(new HashMap<>())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> HiveTableConverter.toHiveTable(hiveTable));
+    assertEquals(
+        "Hive cannot preserve the Gravitino variant type because it has no equivalent type.",
+        exception.getMessage());
+  }
 
   @Test
   public void testGetColumnsWithNoDuplicates() {
