@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.jdbc.converter;
 
 import java.util.Objects;
 import org.apache.gravitino.connector.DataTypeConverter;
+import org.apache.gravitino.rel.types.Type;
 
 public abstract class JdbcTypeConverter
     implements DataTypeConverter<String, JdbcTypeConverter.JdbcTypeBean> {
@@ -29,6 +30,42 @@ public abstract class JdbcTypeConverter
   public static final String TIMESTAMP = "timestamp";
   public static final String VARCHAR = "varchar";
   public static final String TEXT = "text";
+
+  /**
+   * Creates a deterministic invalid-argument exception for an unsupported Gravitino-to-JDBC type
+   * mapping.
+   *
+   * @param connector JDBC connector name
+   * @param sourceType Gravitino source type
+   * @param constraint connector constraint that the source type violates
+   * @return invalid-argument exception containing the connector, source type, and constraint
+   */
+  public static IllegalArgumentException unsupportedTypeException(
+      String connector, Type sourceType, String constraint) {
+    return unsupportedTypeException(connector, sourceType.simpleString(), constraint);
+  }
+
+  /**
+   * Creates a deterministic invalid-argument exception for an unsupported JDBC-to-Gravitino type
+   * mapping.
+   *
+   * @param connector JDBC connector name
+   * @param sourceType JDBC source type
+   * @param constraint connector constraint that the source type violates
+   * @return invalid-argument exception containing the connector, source type, and constraint
+   */
+  public static IllegalArgumentException unsupportedTypeException(
+      String connector, JdbcTypeBean sourceType, String constraint) {
+    return unsupportedTypeException(connector, sourceType.toString(), constraint);
+  }
+
+  private static IllegalArgumentException unsupportedTypeException(
+      String connector, String sourceType, String constraint) {
+    return new IllegalArgumentException(
+        String.format(
+            "JDBC connector '%s' cannot map source type '%s': %s",
+            connector, sourceType, constraint));
+  }
 
   public static class JdbcTypeBean {
     /** Data type name. */

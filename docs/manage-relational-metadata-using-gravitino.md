@@ -937,6 +937,14 @@ The following types that Gravitino supports:
 
 The related java doc is [here](pathname:///docs/2.0.0-SNAPSHOT/api/java/org/apache/gravitino/rel/types/Type.html).
 
+##### JDBC type compatibility
+
+JDBC catalogs validate every type-bearing column in a create or alter request before sending table
+DDL to the database. Type support and constraints remain connector-specific; for example, a
+connector may reject a timestamp precision it cannot preserve or a spatial type whose CRS metadata
+would be lost. An incompatible mapping fails as an invalid argument before any statement in the
+request is executed. See the individual JDBC catalog documentation for supported mappings.
+
 ##### Null type
 
 The null type represents a column that holds only null values and whose concrete type is not yet

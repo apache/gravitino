@@ -532,6 +532,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
+      validateAlterTableTypes(connection, databaseName, tableName, changes);
       String sql = generateAlterTableSql(databaseName, tableName, changes);
       if (StringUtils.isEmpty(sql)) {
         LOG.info("No changes to alter table {} from database {}", tableName, databaseName);
