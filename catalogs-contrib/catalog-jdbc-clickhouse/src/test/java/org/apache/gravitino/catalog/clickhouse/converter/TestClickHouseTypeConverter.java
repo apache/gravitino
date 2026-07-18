@@ -183,6 +183,20 @@ public class TestClickHouseTypeConverter {
         precisionException.getMessage().contains("DateTime64 precision must be between 0 and 9"));
   }
 
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.VariantType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "ClickHouse Variant requires a closed list of alternative types and cannot "
+                    + "preserve the open-ended Gravitino Variant contract"));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, CLICKHOUSE_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }

@@ -208,6 +208,9 @@ with a different explicit time zone remain `ExternalType`, preserving the detail
 Timestamp precision from 10 through 12 is rejected before executing DDL because ClickHouse
 `DateTime64` supports at most nanoseconds.
 
+Gravitino `Variant` is rejected before executing DDL. ClickHouse `Variant(T1, T2, ...)` requires a
+closed list of alternative types and cannot preserve Gravitino's open-ended Variant contract.
+
 ### Table Properties
 
 :::note

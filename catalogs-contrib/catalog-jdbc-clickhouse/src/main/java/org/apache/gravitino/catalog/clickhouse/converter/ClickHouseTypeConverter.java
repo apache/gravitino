@@ -212,6 +212,11 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       return BOOL;
     } else if (type instanceof Types.UUIDType) {
       return UUID;
+    } else if (type instanceof Types.VariantType) {
+      throw unsupportedType(
+          type,
+          "ClickHouse Variant requires a closed list of alternative types and cannot preserve "
+              + "the open-ended Gravitino Variant contract");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }
