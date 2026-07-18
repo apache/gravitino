@@ -127,16 +127,20 @@ public class TestTypeUtils {
 
   @Test
   void testUnsupportedType() {
-    // Test UnsupportedOperationException with IntervalYearType, IntervalDayType, FixedCharType,
-    // UUIDType, FixedType, UnionType, NullType for toPaimonType.
+    // Test UnsupportedOperationException with IntervalYearType, IntervalDayType, UUIDType,
+    // UnionType and UnparsedType for toPaimonType.
     Arrays.asList(
             Types.IntervalYearType.get(),
             Types.IntervalDayType.get(),
             Types.UUIDType.get(),
             Types.UnionType.of(Types.IntegerType.get()),
-            Types.NullType.get(),
             Types.UnparsedType.of("unparsed"))
         .forEach(this::checkUnsupportedType);
+  }
+
+  @Test
+  void testUnknownType() {
+    checkRejectedType(Types.NullType.get());
   }
 
   @Test
@@ -262,6 +266,14 @@ public class TestTypeUtils {
   private void checkUnsupportedType(Type type) {
     UnsupportedOperationException exception =
         assertThrowsExactly(UnsupportedOperationException.class, () -> toPaimonType(type));
+    assertEquals(
+        String.format("Paimon does not support Gravitino %s data type.", type.simpleString()),
+        exception.getMessage());
+  }
+
+  private void checkRejectedType(Type type) {
+    IllegalArgumentException exception =
+        assertThrowsExactly(IllegalArgumentException.class, () -> toPaimonType(type));
     assertEquals(
         String.format("Paimon does not support Gravitino %s data type.", type.simpleString()),
         exception.getMessage());

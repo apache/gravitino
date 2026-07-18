@@ -254,6 +254,8 @@ public class TypeUtils {
           return DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH);
         case VARIANT:
           return DataTypes.VARIANT();
+        case NULL:
+          throw unsupportedType(type);
         case LIST:
           Types.ListType listType = (Types.ListType) type;
           DataType elementType = visit(listType.elementType());
@@ -309,6 +311,11 @@ public class TypeUtils {
       return timestampType.hasTimeZone()
           ? DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(precision)
           : DataTypes.TIMESTAMP(precision);
+    }
+
+    private static IllegalArgumentException unsupportedType(Type type) {
+      return new IllegalArgumentException(
+          String.format("Paimon does not support Gravitino %s data type.", type.simpleString()));
     }
   }
 }

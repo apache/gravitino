@@ -204,6 +204,7 @@ Paimon Table primary key constraint should not be same with partition fields, th
 | `Fixed`           | `Binary`                     |
 | `Binary`          | `VarBinary`                  |
 | `Variant`         | `Variant`                    |
+| `Unknown` (`NullType`) | Rejected before mutation |
 
 Paimon 1.2 supports timestamp precision from 0 through 9. Gravitino `Timestamp(9)` and
 `Timestamp_tz(9)` therefore round-trip losslessly as Paimon `Timestamp(9)` and
@@ -212,6 +213,10 @@ created or altered.
 
 Gravitino `Variant` maps directly to Paimon's native `Variant` logical type. The connector does not
 coerce Variant values to JSON strings or binary values.
+
+Paimon has nullable types but no null-only logical column type equivalent to Gravitino `Unknown`.
+Creating, adding, or changing a column to `Unknown` therefore returns an
+`IllegalArgumentException` before Paimon table metadata is changed.
 
 :::info
 Gravitino doesn't support Paimon `MultisetType` type.
