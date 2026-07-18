@@ -151,8 +151,11 @@ complete Variant value domain.
 Gravitino `Null` (the V3 unknown type) is rejected before executing DDL because it is a null-only
 placeholder, not a MySQL column type.
 
+Although MySQL has a native `GEOMETRY` type, Gravitino `Geometry` is rejected before executing DDL
+because the JDBC catalog cannot round-trip its CRS/SRID metadata without loss.
+
 :::info
-MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` type.
+MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` `Geometry` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 

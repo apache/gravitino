@@ -2409,6 +2409,14 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geometry",
+        Types.GeometryType.of("SRID:3857"),
+        "the JDBC catalog cannot round-trip Geometry CRS/SRID metadata");
+  }
+
+  @Test
   void testObjectNamesWithDots() {
     // Create a MySQL database with a dot in its name directly (bypassing Gravitino)
     String dottedSchemaName = GravitinoITUtils.genRandomName("db") + ".nested";

@@ -148,6 +148,18 @@ public class TestMysqlTypeConverter {
         exception.getMessage().contains("the null-only placeholder has no MySQL column type"));
   }
 
+  @Test
+  public void testRejectGeometryType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.GeometryType.of("SRID:3857")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("the JDBC catalog cannot round-trip Geometry CRS/SRID metadata"));
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, MYSQL_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }
