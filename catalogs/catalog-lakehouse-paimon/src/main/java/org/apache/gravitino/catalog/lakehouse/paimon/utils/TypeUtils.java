@@ -254,6 +254,7 @@ public class TypeUtils {
           return DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH);
         case VARIANT:
           return DataTypes.VARIANT();
+        case GEOMETRY:
         case NULL:
           throw unsupportedType(type);
         case LIST:

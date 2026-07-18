@@ -302,6 +302,11 @@ public class TestGravitinoPaimonTable {
   }
 
   @Test
+  void testGeometryTypeRejectedWithoutMutation() {
+    assertUnsupportedTypeRejectedWithoutMutation(Types.GeometryType.of("EPSG:3857"), "geometry");
+  }
+
+  @Test
   void testCreatePaimonPartitionedTable() {
     String paimonTableName = "test_paimon_partitioned_table";
     NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);

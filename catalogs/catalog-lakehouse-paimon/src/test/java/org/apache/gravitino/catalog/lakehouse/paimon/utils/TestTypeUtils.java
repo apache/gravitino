@@ -144,6 +144,11 @@ public class TestTypeUtils {
   }
 
   @Test
+  void testGeometryType() {
+    checkRejectedType(Types.GeometryType.of("EPSG:3857"));
+  }
+
+  @Test
   void testToPaimonTypeNullability() {
     assertEquals(
         DataTypes.ARRAY(DataTypes.INT().notNull()),
