@@ -31,6 +31,7 @@ import org.apache.gravitino.rel.types.Types.DecimalType;
 import org.apache.gravitino.rel.types.Types.DoubleType;
 import org.apache.gravitino.rel.types.Types.FixedCharType;
 import org.apache.gravitino.rel.types.Types.FloatType;
+import org.apache.gravitino.rel.types.Types.GeographyType;
 import org.apache.gravitino.rel.types.Types.GeometryType;
 import org.apache.gravitino.rel.types.Types.IntegerType;
 import org.apache.gravitino.rel.types.Types.ListType;
@@ -164,6 +165,19 @@ public class TestSparkTypeConverter {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> sparkTypeConverter.toSparkType(ListType.of(geometry, true)));
+  }
+
+  @Test
+  void testRejectGeography() {
+    GeographyType geography = GeographyType.of("EPSG:4326", "karney");
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class, () -> sparkTypeConverter.toSparkType(geography));
+    Assertions.assertTrue(exception.getMessage().contains("geography"));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> sparkTypeConverter.toSparkType(ListType.of(geography, true)));
   }
 
   /** Create a Gravitino StructType for testing. */

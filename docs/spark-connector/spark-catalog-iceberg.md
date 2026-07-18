@@ -78,12 +78,17 @@ Spark 3.x has no geometry data type that preserves WKB values together with Grav
 metadata. The connector rejects `geometry`, including nested geometry, rather than translating it
 to an untyped binary value.
 
+Spark 3.x likewise cannot preserve a geography field's WKB values, CRS, and edge-interpolation
+algorithm as one typed value. The connector rejects `geography`, including nested geography,
+instead of discarding the CRS or algorithm.
+
 | Gravitino type family | Spark 3.3 | Spark 3.4 | Spark 3.5 |
 |-----------------------|-----------|-----------|-----------|
 | `timestamp(9)`, `timestamp_tz(9)` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
 | `variant` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
 | `unknown` / Spark `NullType` | Rejected | Optional, null-only fields with Iceberg 1.11 | Optional, null-only fields with Iceberg 1.11 |
 | `geometry` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
+| `geography` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
 
 ## SQL Example
 
