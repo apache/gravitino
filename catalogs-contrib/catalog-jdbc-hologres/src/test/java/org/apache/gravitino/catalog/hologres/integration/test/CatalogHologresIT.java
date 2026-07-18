@@ -987,6 +987,14 @@ public class CatalogHologresIT extends BaseIT {
         "Hologres PostGIS geometry metadata does not preserve Gravitino Geometry CRS semantics");
   }
 
+  @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "Hologres PostGIS geography metadata does not preserve Gravitino Geography CRS and edge-algorithm semantics");
+  }
+
   private void assertCreateRejectedWithoutSideEffects(
       String typeName, Type type, String expectedMessage) {
     String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);

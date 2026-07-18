@@ -962,6 +962,33 @@ public class TestHologresTableOperations {
                 "Hologres PostGIS geometry metadata does not preserve Gravitino Geometry CRS semantics"));
   }
 
+  @Test
+  void testCreateTableRejectsGeographyBeforeSqlGeneration() {
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("geography_col")
+            .withType(Types.GeographyType.of("EPSG:4326", "karney"))
+            .build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.createTableSql(
+                    "test_table",
+                    new JdbcColumn[] {column},
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Hologres PostGIS geography metadata does not preserve Gravitino Geography CRS and edge-algorithm semantics"));
+  }
+
   // ==================== generateAlterTableSql tests ====================
 
   @Test

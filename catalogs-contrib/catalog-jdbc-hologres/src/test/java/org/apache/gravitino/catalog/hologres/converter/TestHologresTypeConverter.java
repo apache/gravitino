@@ -331,6 +331,23 @@ public class TestHologresTypeConverter {
   }
 
   @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> converter.fromGravitino(Types.GeographyType.of("EPSG:4326", "karney")));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Hologres PostGIS geography metadata does not preserve Gravitino Geography CRS and edge-algorithm semantics"));
+
+    JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean("geography");
+    Assertions.assertEquals(Types.ExternalType.of("geography"), converter.toGravitino(typeBean));
+  }
+
+  @Test
   public void testNullableArrayThrowsException() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
