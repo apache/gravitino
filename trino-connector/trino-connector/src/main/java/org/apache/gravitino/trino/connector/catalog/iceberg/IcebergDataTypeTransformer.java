@@ -34,6 +34,8 @@ import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 /** Type transformer between Apache Iceberg and Trino */
 public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
 
+  private static final int ICEBERG_TIMESTAMP_PRECISION = TRINO_MICROS_PRECISION;
+
   @Override
   public Type getGravitinoType(io.trino.spi.type.Type type) {
     Class<? extends io.trino.spi.type.Type> typeClass = type.getClass();
@@ -53,11 +55,14 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
       // Iceberg only supports time type with microsecond (6) precision
       return Types.TimeType.of(TRINO_MICROS_PRECISION);
     } else if (io.trino.spi.type.TimestampType.class.isAssignableFrom(typeClass)) {
+      validateTimestampPrecision(((TimestampType) type).getPrecision(), type.getDisplayName());
       // Iceberg only supports timestamp type (without time zone) with microsecond (6) precision
-      return Types.TimestampType.withoutTimeZone(TRINO_MICROS_PRECISION);
+      return Types.TimestampType.withoutTimeZone(ICEBERG_TIMESTAMP_PRECISION);
     } else if (io.trino.spi.type.TimestampWithTimeZoneType.class.isAssignableFrom(typeClass)) {
+      validateTimestampPrecision(
+          ((TimestampWithTimeZoneType) type).getPrecision(), type.getDisplayName());
       // Iceberg only supports timestamp with time zone type with microsecond (6) precision
-      return Types.TimestampType.withTimeZone(TRINO_MICROS_PRECISION);
+      return Types.TimestampType.withTimeZone(ICEBERG_TIMESTAMP_PRECISION);
     }
 
     return super.getGravitinoType(type);
@@ -71,6 +76,9 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
       return TimeType.TIME_MICROS;
     } else if (Name.TIMESTAMP == type.name()) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasPrecisionSet()) {
+        validateTimestampPrecision(timestampType.precision(), type.simpleString());
+      }
       if (timestampType.hasTimeZone()) {
         return TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
       } else {
@@ -79,5 +87,15 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
     }
 
     return super.getTrinoType(type);
+  }
+
+  private static void validateTimestampPrecision(int precision, String typeName) {
+    if (precision != ICEBERG_TIMESTAMP_PRECISION) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          String.format(
+              "The supported Trino Iceberg connector versions cannot preserve %s; only timestamp precision %d is lossless",
+              typeName, ICEBERG_TIMESTAMP_PRECISION));
+    }
   }
 }

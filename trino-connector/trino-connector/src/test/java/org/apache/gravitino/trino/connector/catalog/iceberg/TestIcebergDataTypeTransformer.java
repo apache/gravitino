@@ -19,15 +19,22 @@
 
 package org.apache.gravitino.trino.connector.catalog.iceberg;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.TimeType;
 import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.TimestampWithTimeZoneType;
 import io.trino.spi.type.VarcharType;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
+import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 public class TestIcebergDataTypeTransformer {
 
@@ -65,5 +72,49 @@ public class TestIcebergDataTypeTransformer {
     Assertions.assertEquals(
         generalDataTypeTransformer.getTrinoType(Types.TimestampType.withTimeZone()),
         TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS);
+  }
+
+  @Test
+  public void testRejectNanosecondTimestamps() {
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer();
+    Type[] gravitinoTypes = {
+      Types.TimestampType.withoutTimeZone(9), Types.TimestampType.withTimeZone(9)
+    };
+    io.trino.spi.type.Type[] trinoTypes = {
+      TimestampType.createTimestampType(9),
+      TimestampWithTimeZoneType.createTimestampWithTimeZoneType(9)
+    };
+
+    for (Type type : gravitinoTypes) {
+      assertIllegalArgument(
+          () -> transformer.getTrinoType(type), "only timestamp precision 6 is lossless");
+      assertMetadataRejectedBeforeConnectorInvocation(type);
+    }
+    for (io.trino.spi.type.Type type : trinoTypes) {
+      assertIllegalArgument(
+          () -> transformer.getGravitinoType(type), "only timestamp precision 6 is lossless");
+    }
+  }
+
+  private static void assertMetadataRejectedBeforeConnectorInvocation(Type type) {
+    IcebergMetadataAdapter adapter =
+        new IcebergMetadataAdapter(ImmutableList.of(), ImmutableList.of(), ImmutableList.of());
+    GravitinoTable table =
+        new GravitinoTable(
+            "schema",
+            "unsupported_type",
+            ImmutableList.of(new GravitinoColumn("col", type, 0, "", true)),
+            "",
+            ImmutableMap.of());
+
+    assertIllegalArgument(
+        () -> adapter.getTableMetadata(table), "only timestamp precision 6 is lossless");
+  }
+
+  private static void assertIllegalArgument(Executable executable, String expectedMessage) {
+    TrinoException exception = Assertions.assertThrows(TrinoException.class, executable);
+    Assertions.assertEquals(
+        GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), exception.getErrorCode());
+    Assertions.assertTrue(exception.getMessage().contains(expectedMessage));
   }
 }

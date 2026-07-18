@@ -20,6 +20,15 @@ To use Iceberg, you need:
   - ORC
   - Parquet (default)
 
+## Iceberg V3 type compatibility
+
+The supported Trino versions are 435 through 478. They predate Trino's Iceberg V3 type support, so
+the connector rejects incompatible V3 types before invoking the internal Iceberg connector.
+
+| Gravitino type                         | Outcome                                                                                     |
+|----------------------------------------|---------------------------------------------------------------------------------------------|
+| `Timestamp(9)` / `Timestamp_tz(9)`    | Rejected before connector invocation; these versions preserve only microsecond precision 6. |
+
 ## Schema Operations
 
 ### Create a Schema
