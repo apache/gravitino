@@ -31,6 +31,7 @@ the connector rejects incompatible V3 types before invoking the internal Iceberg
 | `Variant`                              | Rejected before connector invocation; Trino Iceberg support starts in version 481.           |
 | `Unknown`                              | Rejected before connector invocation; Trino cannot use a null-only type for table columns.    |
 | `Geometry`                             | Rejected before connector invocation; Trino Iceberg support starts in version 482.           |
+| `Geography`                            | Rejected before connector invocation; Trino Iceberg support starts in version 482.           |
 
 ## Schema Operations
 

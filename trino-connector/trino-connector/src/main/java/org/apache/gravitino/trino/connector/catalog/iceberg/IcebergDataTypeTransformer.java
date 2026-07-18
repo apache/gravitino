@@ -44,6 +44,8 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
       throw unsupportedIcebergV3Type("variant", 481);
     } else if (hasBaseType(type, "geometry")) {
       throw unsupportedIcebergV3Type("geometry", 482);
+    } else if (hasBaseType(type, "geography") || hasBaseType(type, "sphericalgeography")) {
+      throw unsupportedIcebergV3Type("geography", 482);
     }
 
     Class<? extends io.trino.spi.type.Type> typeClass = type.getClass();
@@ -85,6 +87,8 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
     } else if (Name.VARIANT == type.name()) {
       throw unsupportedIcebergV3Type(type.simpleString(), 481);
     } else if (Name.GEOMETRY == type.name()) {
+      throw unsupportedIcebergV3Type(type.simpleString(), 482);
+    } else if (Name.GEOGRAPHY == type.name()) {
       throw unsupportedIcebergV3Type(type.simpleString(), 482);
     } else if (Name.TIME == type.name()) {
       return TimeType.TIME_MICROS;

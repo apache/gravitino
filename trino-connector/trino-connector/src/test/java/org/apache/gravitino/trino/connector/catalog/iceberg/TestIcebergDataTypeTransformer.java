@@ -132,6 +132,20 @@ public class TestIcebergDataTypeTransformer {
         () -> transformer.getGravitinoType(mockTrinoType("geometry")), expectedMessage);
   }
 
+  @Test
+  public void testRejectGeography() {
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer();
+    String expectedMessage = "support starts in Trino 482";
+    Type type = Types.GeographyType.of("EPSG:4326", "karney");
+
+    assertIllegalArgument(() -> transformer.getTrinoType(type), expectedMessage);
+    assertMetadataRejectedBeforeConnectorInvocation(type, expectedMessage);
+    assertIllegalArgument(
+        () -> transformer.getGravitinoType(mockTrinoType("geography")), expectedMessage);
+    assertIllegalArgument(
+        () -> transformer.getGravitinoType(mockTrinoType("sphericalgeography")), expectedMessage);
+  }
+
   private static void assertMetadataRejectedBeforeConnectorInvocation(Type type) {
     assertMetadataRejectedBeforeConnectorInvocation(type, "only timestamp precision 6 is lossless");
   }
