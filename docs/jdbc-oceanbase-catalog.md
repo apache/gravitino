@@ -153,6 +153,7 @@ DDL. The pinned OceanBase 4.2.1 test environment uses MySQL compatibility mode.
 |-----------------------------------------|------------------------------------------------------------------------------------------------------|
 | `Timestamp(9)`, `Timestamp_tz(9)`       | Rejected because MySQL-mode `DATETIME` and `TIMESTAMP` preserve at most microsecond precision (0–6). |
 | `Variant`                               | Rejected because OceanBase `JSON` cannot losslessly preserve the complete Gravitino variant domain. |
+| `Unknown` (`NullType`)                  | Rejected because OceanBase has no corresponding column type.                                        |
 
 :::info
 OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.

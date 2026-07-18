@@ -2014,6 +2014,14 @@ public class CatalogOceanBaseIT extends BaseIT {
         "OceanBase JSON cannot losslessly preserve the Gravitino variant type");
   }
 
+  @Test
+  void testRejectUnknownWithoutCreatingTable() {
+    assertCreateRejectedWithoutSideEffect(
+        "unknown",
+        Types.NullType.get(),
+        "OceanBase has no column type that preserves the Gravitino unknown type");
+  }
+
   private void assertCreateRejectedWithoutSideEffect(
       String tablePrefix, Type type, String expectedMessage) {
     TableCatalog tableCatalog = catalog.asTableCatalog();

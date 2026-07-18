@@ -107,6 +107,13 @@ public class TestOceanBaseTableOperationsSqlGeneration {
         "OceanBase JSON cannot losslessly preserve the Gravitino variant type");
   }
 
+  @Test
+  public void testRejectUnknownBeforeSqlGeneration() {
+    assertCreateTableRejected(
+        Types.NullType.get(),
+        "OceanBase has no column type that preserves the Gravitino unknown type");
+  }
+
   private void assertCreateTableRejected(Type type, String expectedMessage) {
     TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations();
     JdbcColumn column =
