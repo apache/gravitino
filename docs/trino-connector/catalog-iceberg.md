@@ -30,6 +30,7 @@ the connector rejects incompatible V3 types before invoking the internal Iceberg
 | `Timestamp(9)` / `Timestamp_tz(9)`    | Rejected before connector invocation; these versions preserve only microsecond precision 6. |
 | `Variant`                              | Rejected before connector invocation; Trino Iceberg support starts in version 481.           |
 | `Unknown`                              | Rejected before connector invocation; Trino cannot use a null-only type for table columns.    |
+| `Geometry`                             | Rejected before connector invocation; Trino Iceberg support starts in version 482.           |
 
 ## Schema Operations
 
