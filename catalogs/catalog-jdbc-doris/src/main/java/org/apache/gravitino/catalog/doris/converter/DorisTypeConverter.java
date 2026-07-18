@@ -227,6 +227,11 @@ public class DorisTypeConverter extends JdbcTypeConverter {
               + "the type on round-trip");
     } else if (type instanceof Types.NullType) {
       throw unsupportedType(type, "the null-only placeholder has no Doris column type");
+    } else if (type instanceof Types.GeometryType) {
+      throw unsupportedType(
+          type,
+          "Doris GEO uses String/Varchar storage and cannot preserve Geometry CRS metadata as a "
+              + "column type");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

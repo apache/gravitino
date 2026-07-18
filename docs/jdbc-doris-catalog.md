@@ -151,7 +151,11 @@ Doris type escape hatch.
 Gravitino `Null` (the V3 unknown type) is rejected before executing DDL because it is a null-only
 placeholder, not a Doris column type.
 
-Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` type.
+Gravitino `Geometry` is rejected before executing DDL. Doris GEO is not a column type; it stores
+geospatial values in `String`/`VarChar`, which cannot preserve Gravitino CRS metadata as part of the
+type.
+
+Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` `Geometry` type.
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 
 :::note

@@ -978,6 +978,14 @@ public class CatalogDorisIT extends BaseIT {
   }
 
   @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geometry",
+        Types.GeometryType.of("SRID:3857"),
+        "Doris GEO uses String/Varchar storage and cannot preserve Geometry CRS metadata");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");

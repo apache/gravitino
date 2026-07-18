@@ -163,6 +163,20 @@ public class TestDorisTypeConverter {
   }
 
   @Test
+  public void testRejectGeometryType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.GeometryType.of("SRID:3857")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Doris GEO uses String/Varchar storage and cannot preserve Geometry CRS metadata "
+                    + "as a column type"));
+  }
+
+  @Test
   public void testExternalTypeRoundTrip() {
     // ExternalType round-trip: fromGravitino(ExternalType) → toGravitino
     String[] externalTypes = {
