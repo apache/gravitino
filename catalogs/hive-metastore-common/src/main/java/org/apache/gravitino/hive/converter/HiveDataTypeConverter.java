@@ -148,6 +148,9 @@ public class HiveDataTypeConverter implements DataTypeConverter<TypeInfo, String
       case GEOMETRY:
         throw new IllegalArgumentException(
             "Hive cannot preserve the Gravitino geometry type because it has no geometry type with CRS metadata.");
+      case GEOGRAPHY:
+        throw new IllegalArgumentException(
+            "Hive cannot preserve the Gravitino geography type because it has no geography type with CRS and edge-algorithm metadata.");
       default:
         throw new UnsupportedOperationException("Unsupported conversion to Hive type: " + type);
     }

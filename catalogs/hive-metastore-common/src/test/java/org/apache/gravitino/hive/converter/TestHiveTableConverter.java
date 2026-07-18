@@ -102,6 +102,27 @@ public class TestHiveTableConverter {
   }
 
   @Test
+  public void testRejectGeographyBeforeBuildingHiveTable() {
+    Column[] columns = {Column.of("region", Types.GeographyType.crs84(), "Spheroidal geography")};
+    HiveTable hiveTable =
+        HiveTable.builder()
+            .withName("places")
+            .withDatabaseName("db")
+            .withColumns(columns)
+            .withProperties(new HashMap<>())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> HiveTableConverter.toHiveTable(hiveTable));
+    assertEquals(
+        "Hive cannot preserve the Gravitino geography type because it has no geography type with CRS and edge-algorithm metadata.",
+        exception.getMessage());
+  }
+
+  @Test
   public void testGetColumnsWithNoDuplicates() {
     // Create a table with columns and partition keys that don't overlap
     Table table = new Table();

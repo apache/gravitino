@@ -136,6 +136,17 @@ public class TestTypeConverter {
         exception.getMessage());
   }
 
+  @Test
+  public void testGeographyThrowsException() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> HiveDataTypeConverter.CONVERTER.fromGravitino(Types.GeographyType.crs84()));
+    Assertions.assertEquals(
+        "Hive cannot preserve the Gravitino geography type because it has no geography type with CRS and edge-algorithm metadata.",
+        exception.getMessage());
+  }
+
   private void testConverter(String typeName) {
     TypeInfo hiveType = getTypeInfoFromTypeString(typeName);
     TypeInfo convertedType = CONVERTER.fromGravitino(CONVERTER.toGravitino(hiveType.getTypeName()));
