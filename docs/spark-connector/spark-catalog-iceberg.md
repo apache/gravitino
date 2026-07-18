@@ -69,10 +69,16 @@ precision `9`.
 Spark 3.x has no data type that can losslessly represent Iceberg V3 `variant`. The connector rejects
 the type, including when it is nested, before exposing the table to Spark.
 
+Iceberg 1.11 maps an optional Iceberg V3 `unknown` field to Spark `NullType`. Therefore, Spark 3.4
+and 3.5 support optional, null-only fields when using the Iceberg catalog. Required `unknown` fields
+are rejected. Spark 3.3 uses Iceberg 1.8.1 and rejects the type. Other Gravitino Spark catalogs also
+reject `NullType`; this mapping is not applied to Hive, JDBC, Glue, or Paimon.
+
 | Gravitino type family | Spark 3.3 | Spark 3.4 | Spark 3.5 |
 |-----------------------|-----------|-----------|-----------|
 | `timestamp(9)`, `timestamp_tz(9)` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
 | `variant` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
+| `unknown` / Spark `NullType` | Rejected | Optional, null-only fields with Iceberg 1.11 | Optional, null-only fields with Iceberg 1.11 |
 
 ## SQL Example
 

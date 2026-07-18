@@ -65,6 +65,7 @@ import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.types.NullType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
@@ -639,6 +640,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   }
 
   private org.apache.gravitino.rel.Column createGravitinoColumn(StructField structField) {
+    if (structField.dataType() instanceof NullType && !structField.nullable()) {
+      throw new IllegalArgumentException(
+          String.format("Spark NullType column '%s' must be nullable", structField.name()));
+    }
     return org.apache.gravitino.rel.Column.of(
         structField.name(),
         sparkTypeConverter.toGravitinoType(structField.dataType()),

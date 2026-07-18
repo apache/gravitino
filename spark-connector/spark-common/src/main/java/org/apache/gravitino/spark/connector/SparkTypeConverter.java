@@ -105,7 +105,8 @@ public class SparkTypeConverter {
               .toArray(Types.StructType.Field[]::new);
       return Types.StructType.of(fields);
     } else if (sparkType instanceof NullType) {
-      return Types.NullType.get();
+      throw new IllegalArgumentException(
+          "Spark NullType is only supported by Spark 3.4 and 3.5 Iceberg catalogs");
     }
     throw new UnsupportedOperationException("Not support " + sparkType.toString());
   }
@@ -197,7 +198,8 @@ public class SparkTypeConverter {
               .collect(Collectors.toList());
       return DataTypes.createStructType(fields);
     } else if (gravitinoType instanceof Types.NullType) {
-      return DataTypes.NullType;
+      throw new IllegalArgumentException(
+          "Gravitino null type is only supported by Spark 3.4 and 3.5 Iceberg catalogs");
     }
     throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
   }

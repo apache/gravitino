@@ -85,8 +85,6 @@ public class TestSparkTypeConverter {
         MapType.of(IntegerType.get(), StringType.get(), true),
         DataTypes.createMapType(DataTypes.IntegerType, DataTypes.StringType));
     gravitinoToSparkTypeMapper.put(createGravitinoStructType(), createSparkStructType());
-    gravitinoToSparkTypeMapper.put(NullType.get(), DataTypes.NullType);
-
     this.sparkTypeConverter = new SparkTypeConverter();
   }
 
@@ -143,6 +141,15 @@ public class TestSparkTypeConverter {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> sparkTypeConverter.toSparkType(ListType.of(VariantType.get(), true)));
+  }
+
+  @Test
+  void testRejectUnknownWithoutVersionSpecificIcebergSupport() {
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> sparkTypeConverter.toSparkType(NullType.get()));
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> sparkTypeConverter.toGravitinoType(DataTypes.NullType));
   }
 
   /** Create a Gravitino StructType for testing. */
