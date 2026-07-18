@@ -89,4 +89,22 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
   }
+
+  @Test
+  public void testCreateTableRejectsNanosecondTimestampTypesBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    Types.TimestampType[] nanosecondTypes = {
+      Types.TimestampType.withoutTimeZone(9), Types.TimestampType.withTimeZone(9)
+    };
+
+    for (Types.TimestampType type : nanosecondTypes) {
+      JdbcColumn column = JdbcColumn.builder().withName("nanosecond_col").withType(type).build();
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+      Assertions.assertTrue(
+          exception.getMessage().contains("PostgreSQL supports timestamp precision up to 6"));
+    }
+  }
 }

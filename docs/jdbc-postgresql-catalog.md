@@ -115,6 +115,12 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `UUID`            | `Uuid`           |
 | `List`            | `Array`          |
 
+#### V3 Type Compatibility
+
+| Gravitino Type                      | PostgreSQL outcome                                                                                                      |
+|-------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `Timestamp(9)` / `Timestamp_tz(9)` | Rejected before DDL. PostgreSQL only supports precision 0 through 6 and cannot preserve nanosecond timestamp precision. |
+
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.

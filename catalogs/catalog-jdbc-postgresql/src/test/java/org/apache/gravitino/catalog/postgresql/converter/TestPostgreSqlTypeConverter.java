@@ -35,6 +35,7 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_4;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.JDBC_ARRAY_PREFIX;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.MAX_TIMESTAMP_PRECISION;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.NUMERIC;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.UUID;
 
@@ -135,6 +136,24 @@ public class TestPostgreSqlTypeConverter {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
+  }
+
+  @Test
+  public void testRejectNanosecondTimestampTypes() {
+    Type[] nanosecondTypes = {
+      Types.TimestampType.withoutTimeZone(9), Types.TimestampType.withTimeZone(9)
+    };
+
+    for (Type type : nanosecondTypes) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(type));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains(
+                  "PostgreSQL supports timestamp precision up to " + MAX_TIMESTAMP_PRECISION));
+    }
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
