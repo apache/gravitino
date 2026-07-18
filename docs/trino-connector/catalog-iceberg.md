@@ -28,6 +28,7 @@ the connector rejects incompatible V3 types before invoking the internal Iceberg
 | Gravitino type                         | Outcome                                                                                     |
 |----------------------------------------|---------------------------------------------------------------------------------------------|
 | `Timestamp(9)` / `Timestamp_tz(9)`    | Rejected before connector invocation; these versions preserve only microsecond precision 6. |
+| `Variant`                              | Rejected before connector invocation; Trino Iceberg support starts in version 481.           |
 
 ## Schema Operations
 

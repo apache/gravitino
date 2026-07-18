@@ -25,6 +25,7 @@ import io.trino.spi.TrinoException;
 import io.trino.spi.type.TimeType;
 import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.TimestampWithTimeZoneType;
+import io.trino.spi.type.TypeSignature;
 import io.trino.spi.type.VarcharType;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -35,6 +36,7 @@ import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.mockito.Mockito;
 
 public class TestIcebergDataTypeTransformer {
 
@@ -96,7 +98,23 @@ public class TestIcebergDataTypeTransformer {
     }
   }
 
+  @Test
+  public void testRejectVariant() {
+    IcebergDataTypeTransformer transformer = new IcebergDataTypeTransformer();
+    String expectedMessage = "support starts in Trino 481";
+
+    assertIllegalArgument(() -> transformer.getTrinoType(Types.VariantType.get()), expectedMessage);
+    assertMetadataRejectedBeforeConnectorInvocation(Types.VariantType.get(), expectedMessage);
+    assertIllegalArgument(
+        () -> transformer.getGravitinoType(mockTrinoType("variant")), expectedMessage);
+  }
+
   private static void assertMetadataRejectedBeforeConnectorInvocation(Type type) {
+    assertMetadataRejectedBeforeConnectorInvocation(type, "only timestamp precision 6 is lossless");
+  }
+
+  private static void assertMetadataRejectedBeforeConnectorInvocation(
+      Type type, String expectedMessage) {
     IcebergMetadataAdapter adapter =
         new IcebergMetadataAdapter(ImmutableList.of(), ImmutableList.of(), ImmutableList.of());
     GravitinoTable table =
@@ -107,8 +125,13 @@ public class TestIcebergDataTypeTransformer {
             "",
             ImmutableMap.of());
 
-    assertIllegalArgument(
-        () -> adapter.getTableMetadata(table), "only timestamp precision 6 is lossless");
+    assertIllegalArgument(() -> adapter.getTableMetadata(table), expectedMessage);
+  }
+
+  private static io.trino.spi.type.Type mockTrinoType(String baseType) {
+    io.trino.spi.type.Type type = Mockito.mock(io.trino.spi.type.Type.class);
+    Mockito.when(type.getTypeSignature()).thenReturn(new TypeSignature(baseType));
+    return type;
   }
 
   private static void assertIllegalArgument(Executable executable, String expectedMessage) {

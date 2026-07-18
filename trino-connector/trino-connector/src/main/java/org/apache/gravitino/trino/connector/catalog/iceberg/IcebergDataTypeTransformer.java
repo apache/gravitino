@@ -38,6 +38,10 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
 
   @Override
   public Type getGravitinoType(io.trino.spi.type.Type type) {
+    if (hasBaseType(type, "variant")) {
+      throw unsupportedIcebergV3Type("variant", 481);
+    }
+
     Class<? extends io.trino.spi.type.Type> typeClass = type.getClass();
     if (typeClass == io.trino.spi.type.CharType.class) {
       throw new TrinoException(
@@ -72,6 +76,8 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
   public io.trino.spi.type.Type getTrinoType(Type type) {
     if (Name.FIXED == type.name()) {
       return VarbinaryType.VARBINARY;
+    } else if (Name.VARIANT == type.name()) {
+      throw unsupportedIcebergV3Type(type.simpleString(), 481);
     } else if (Name.TIME == type.name()) {
       return TimeType.TIME_MICROS;
     } else if (Name.TIMESTAMP == type.name()) {
@@ -97,5 +103,17 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
               "The supported Trino Iceberg connector versions cannot preserve %s; only timestamp precision %d is lossless",
               typeName, ICEBERG_TIMESTAMP_PRECISION));
     }
+  }
+
+  private static boolean hasBaseType(io.trino.spi.type.Type type, String typeName) {
+    return type.getTypeSignature().getBase().equalsIgnoreCase(typeName);
+  }
+
+  private static TrinoException unsupportedIcebergV3Type(String typeName, int requiredVersion) {
+    return new TrinoException(
+        GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+        String.format(
+            "The supported Trino Iceberg connector versions cannot preserve Iceberg V3 %s; support starts in Trino %d",
+            typeName, requiredVersion));
   }
 }
