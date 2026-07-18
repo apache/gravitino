@@ -59,6 +59,17 @@ Doesn't support distribution and sort orders.
   - `ALTER TABLE prod.db.sample CREATE TAG tagName`
 - AtomicCreateTableAsSelect&AtomicReplaceTableAsSelect
 
+### Iceberg V3 type compatibility
+
+Spark 3.3, 3.4, and 3.5 represent timestamps with at most microsecond precision. The connector
+rejects Gravitino `timestamp(p)` and `timestamp_tz(p)` types when `p` is greater than `6` instead of
+silently truncating their values. This includes Iceberg V3 nanosecond timestamp types, which map to
+precision `9`.
+
+| Gravitino type family | Spark 3.3 | Spark 3.4 | Spark 3.5 |
+|-----------------------|-----------|-----------|-----------|
+| `timestamp(9)`, `timestamp_tz(9)` | Rejected before conversion | Rejected before conversion | Rejected before conversion |
+
 ## SQL Example
 
 ```sql

@@ -111,6 +111,10 @@ public class SparkTypeConverter {
   }
 
   public DataType toSparkType(Type gravitinoType) {
+    if (gravitinoType instanceof Types.TimestampType) {
+      validateTimestampPrecision((Types.TimestampType) gravitinoType);
+    }
+
     if (gravitinoType instanceof Types.ByteType) {
       if (((Types.ByteType) gravitinoType).signed()) {
         return DataTypes.ByteType;
@@ -194,5 +198,20 @@ public class SparkTypeConverter {
       return DataTypes.NullType;
     }
     throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
+  }
+
+  /**
+   * Validates that a Gravitino timestamp precision can be represented in Spark.
+   *
+   * @param timestampType the Gravitino timestamp type
+   * @throws IllegalArgumentException if the precision exceeds Spark's microsecond precision
+   */
+  protected static void validateTimestampPrecision(Types.TimestampType timestampType) {
+    if (timestampType.hasPrecisionSet() && timestampType.precision() > 6) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Spark supports timestamp precision up to 6, but %s has precision %d",
+              timestampType.simpleString(), timestampType.precision()));
+    }
   }
 }

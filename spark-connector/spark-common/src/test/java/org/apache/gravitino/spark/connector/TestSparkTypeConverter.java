@@ -117,6 +117,20 @@ public class TestSparkTypeConverter {
                 () -> sparkTypeConverter.toGravitinoType(sparkType)));
   }
 
+  @Test
+  void testRejectNanosecondTimestampWithTimeZone() {
+    Assertions.assertEquals(
+        DataTypes.TimestampType, sparkTypeConverter.toSparkType(TimestampType.withTimeZone()));
+    Assertions.assertEquals(
+        DataTypes.TimestampType, sparkTypeConverter.toSparkType(TimestampType.withTimeZone(6)));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () -> sparkTypeConverter.toSparkType(TimestampType.withTimeZone(9)));
+    Assertions.assertTrue(exception.getMessage().contains("timestamp_tz(9)"));
+  }
+
   /** Create a Gravitino StructType for testing. */
   private static StructType createGravitinoStructType() {
     return StructType.of(
