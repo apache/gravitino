@@ -318,6 +318,26 @@ public class TestTypeUtils {
   }
 
   @Test
+  public void testRejectGeographyTypes() {
+    String expectedMessage =
+        "Flink 1.18-1.20 has no geography logical type that preserves CRS and edge algorithm "
+            + "metadata";
+
+    Assertions.assertEquals(
+        expectedMessage,
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> TypeUtils.toFlinkType(Types.GeographyType.crs84()))
+            .getMessage());
+    Assertions.assertEquals(
+        expectedMessage,
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> TypeUtils.toFlinkType(Types.GeographyType.of("EPSG:4326", "karney")))
+            .getMessage());
+  }
+
+  @Test
   public void testMultisetTypeConversion() {
     // MULTISET<STRING> (VARCHAR(MAX)) should be preserved as ExternalType
     Assertions.assertEquals(

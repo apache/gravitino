@@ -246,6 +246,10 @@ public class TypeUtils {
       case GEOMETRY:
         throw new IllegalArgumentException(
             "Flink 1.18-1.20 has no geometry logical type that preserves CRS metadata");
+      case GEOGRAPHY:
+        throw new IllegalArgumentException(
+            "Flink 1.18-1.20 has no geography logical type that preserves CRS and edge algorithm "
+                + "metadata");
       case EXTERNAL:
         Types.ExternalType externalType = (Types.ExternalType) gravitinoType;
         String catalogString = externalType.catalogString();

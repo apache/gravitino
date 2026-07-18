@@ -158,3 +158,4 @@ catalog metadata. These behaviors apply to the supported Flink 1.18, 1.19, and 1
 | `variant`                             | Rejected because Flink 1.18–1.20 has no `VARIANT` logical type. |
 | `unknown` (`NullType`)                | Preserved as nullable Flink `NULL`. A non-nullable Unknown column is rejected because `NULL` has no non-null value. |
 | `geometry(crs)`                       | Rejected because Flink 1.18–1.20 has no geometry logical type that preserves CRS metadata. |
+| `geography(crs, algorithm)`           | Rejected because Flink 1.18–1.20 has no geography logical type that preserves CRS and edge-algorithm metadata. |

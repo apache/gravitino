@@ -257,6 +257,24 @@ public class TestBaseCatalog {
   }
 
   @Test
+  public void testRejectGeographyBeforeSchemaExposure() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BaseCatalog.buildSchemaFromColumns(
+                    new org.apache.gravitino.rel.Column[] {
+                      org.apache.gravitino.rel.Column.of(
+                          "geography_column", Types.GeographyType.crs84())
+                    }));
+
+    Assertions.assertEquals(
+        "Flink 1.18-1.20 has no geography logical type that preserves CRS and edge algorithm "
+            + "metadata",
+        exception.getMessage());
+  }
+
+  @Test
   public void testToGravitinoDistributionDefaultsToNone() {
     TestableBaseCatalog catalog =
         new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), mockUnsupportedViewCatalog());
