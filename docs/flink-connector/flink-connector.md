@@ -150,12 +150,15 @@ Gravitino flink connector support the following datatype mapping between Flink a
 ### Iceberg V3 type interoperability
 
 The Flink connector either preserves an Iceberg V3 type exactly or rejects it before changing
-catalog metadata. These behaviors apply to the supported Flink 1.18, 1.19, and 1.20 runtimes.
+catalog metadata. Gravitino currently publishes and tests Flink 1.18, 1.19, and 1.20 modules with
+the corresponding [Iceberg dependency pins](https://github.com/apache/gravitino/blob/main/gradle/libs.versions.toml).
+The converter reads the active Flink runtime version so the same conversion methods can enforce
+the correct contract without version-specific copies.
 
-| Gravitino type family                 | Flink behavior |
-|---------------------------------------|----------------|
-| `timestamp(9)`, `timestamp_tz(9)`     | Preserved as `TIMESTAMP(9)` and `TIMESTAMP_LTZ(9)`. Offset-bearing Flink `TIMESTAMP(9) WITH TIME ZONE` is rejected because converting it to `TIMESTAMP_LTZ` would discard its per-value offset semantics. |
-| `variant`                             | Rejected because Flink 1.18–1.20 has no `VARIANT` logical type. |
-| `unknown` (`NullType`)                | Preserved as nullable Flink `NULL`. A non-nullable Unknown column is rejected because `NULL` has no non-null value. |
-| `geometry(crs)`                       | Rejected because Flink 1.18–1.20 has no geometry logical type that preserves CRS metadata. |
-| `geography(crs, algorithm)`           | Rejected because Flink 1.18–1.20 has no geography logical type that preserves CRS and edge-algorithm metadata. |
+| Gravitino type family | Flink behavior | Minimum compatible version | Upstream evidence |
+|-----------------------|----------------|----------------------------|-------------------|
+| `timestamp(9)`, `timestamp_tz(9)` | Flink 1.18 and 1.19 reject precision above 6 because their pinned Iceberg paths can silently convert it to microseconds. Flink 1.20 preserves it as `TIMESTAMP(9)` and `TIMESTAMP_LTZ(9)`. Offset-bearing Flink `TIMESTAMP WITH TIME ZONE` always rejects because `TIMESTAMP_LTZ` would discard its per-value offset. | Flink 1.20 + Iceberg 1.11.0 | [Iceberg nanosecond fix](https://github.com/apache/iceberg/pull/15475), [Flink 1.20 backport](https://github.com/apache/iceberg/pull/16240) |
+| `variant` | Rejects through Flink 1.20. The native `VARIANT` conversion path is enabled when the connector runs with Flink 2.1 or later; a Gravitino Flink 2.1 module is not currently published. | Flink 2.1 + Iceberg 1.11.0 | [Flink 2.1 `VARIANT`](https://nightlies.apache.org/flink/flink-docs-release-2.1/docs/dev/table/types/#variant), [Iceberg integration](https://github.com/apache/iceberg/pull/15265) |
+| nullable `unknown` (`NullType`) | Preserved on the Iceberg-backed schema/load path as nullable Flink `NULL`, backed by Iceberg `UNKNOWN`. A non-nullable Unknown column rejects because `NULL` has no non-null value. Flink `NULL` remains a planning-only type, not general table DDL support. | Flink 1.18 + Iceberg 1.9.0 | [Iceberg 1.18/1.19 support](https://github.com/apache/iceberg/pull/12532), [Iceberg 1.20 support](https://github.com/apache/iceberg/pull/12470), [Flink `NullType` contract](https://github.com/apache/flink/blob/release-2.1/flink-table/flink-table-common/src/main/java/org/apache/flink/table/types/logical/NullType.java) |
+| `geometry(crs)` | Rejected because Flink has no native logical type that preserves CRS metadata. | None through released Flink 2.3 | [Flink 2.3 type list](https://nightlies.apache.org/flink/flink-docs-release-2.3/docs/sql/reference/data-types/), [Iceberg geometry contract](https://iceberg.apache.org/spec/#version-3-extended-types-and-capabilities) |
+| `geography(crs, algorithm)` | Rejected because Flink has no native logical type that preserves CRS and edge-algorithm metadata. Upstream support is proposed but not released. | None through released Flink 2.3 | [Flink 2.3 type list](https://nightlies.apache.org/flink/flink-docs-release-2.3/docs/sql/reference/data-types/), [Flink geography proposal](https://issues.apache.org/jira/browse/FLINK-39896), [Iceberg geography contract](https://iceberg.apache.org/spec/#version-3-extended-types-and-capabilities) |
