@@ -273,6 +273,11 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private static void validateWritableType(Type type) {
+    if (type instanceof Types.NullType) {
+      throw new IllegalArgumentException(
+          "Unsupported Gravitino type for Hudi: unknown. "
+              + "Hudi 0.15 table columns require a concrete value type.");
+    }
     if (type instanceof Types.VariantType) {
       throw new IllegalArgumentException(
           "Unsupported Gravitino type for Hudi: variant. "

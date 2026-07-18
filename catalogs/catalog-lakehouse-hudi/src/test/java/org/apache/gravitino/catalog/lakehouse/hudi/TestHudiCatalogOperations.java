@@ -166,6 +166,14 @@ public class TestHudiCatalogOperations {
             + "Hudi 0.15 does not define a Variant column type.");
   }
 
+  @Test
+  public void testCreateTableRejectsUnknownBeforeBackendCall() throws Exception {
+    assertCreateRejected(
+        Types.NullType.get(),
+        "Unsupported Gravitino type for Hudi: unknown. "
+            + "Hudi 0.15 table columns require a concrete value type.");
+  }
+
   private static void assertCreateRejected(Type type, String expectedMessage) throws Exception {
     try (InMemoryBackendOps backend = new InMemoryBackendOps()) {
       HudiCatalogOperations ops = new HudiCatalogOperations();
