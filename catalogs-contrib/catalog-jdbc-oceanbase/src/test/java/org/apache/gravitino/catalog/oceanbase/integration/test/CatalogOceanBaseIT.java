@@ -2022,6 +2022,16 @@ public class CatalogOceanBaseIT extends BaseIT {
         "OceanBase has no column type that preserves the Gravitino unknown type");
   }
 
+  @Test
+  void testRejectGeometryWithoutCreatingTables() {
+    String expectedMessage =
+        "OceanBase JDBC metadata cannot preserve Gravitino geometry CRS/SRID metadata";
+    assertCreateRejectedWithoutSideEffect(
+        "geometry_crs84", Types.GeometryType.crs84(), expectedMessage);
+    assertCreateRejectedWithoutSideEffect(
+        "geometry_epsg3857", Types.GeometryType.of("EPSG:3857"), expectedMessage);
+  }
+
   private void assertCreateRejectedWithoutSideEffect(
       String tablePrefix, Type type, String expectedMessage) {
     TableCatalog tableCatalog = catalog.asTableCatalog();

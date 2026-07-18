@@ -164,6 +164,9 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.VariantType) {
       throw new IllegalArgumentException(
           "OceanBase JSON cannot losslessly preserve the Gravitino variant type");
+    } else if (type instanceof Types.GeometryType) {
+      throw new IllegalArgumentException(
+          "OceanBase JDBC metadata cannot preserve Gravitino geometry CRS/SRID metadata");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }

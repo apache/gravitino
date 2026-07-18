@@ -114,6 +114,13 @@ public class TestOceanBaseTableOperationsSqlGeneration {
         "OceanBase has no column type that preserves the Gravitino unknown type");
   }
 
+  @Test
+  public void testRejectGeometryBeforeSqlGeneration() {
+    assertCreateTableRejected(
+        Types.GeometryType.crs84(),
+        "OceanBase JDBC metadata cannot preserve Gravitino geometry CRS/SRID metadata");
+  }
+
   private void assertCreateTableRejected(Type type, String expectedMessage) {
     TestableOceanBaseTableOperations ops = new TestableOceanBaseTableOperations();
     JdbcColumn column =

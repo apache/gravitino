@@ -125,6 +125,14 @@ public class TestOceanBaseTypeConverter {
         "OceanBase has no column type that preserves the Gravitino unknown type");
   }
 
+  @Test
+  public void testRejectGeometryTypes() {
+    String expectedMessage =
+        "OceanBase JDBC metadata cannot preserve Gravitino geometry CRS/SRID metadata";
+    assertFromGravitinoRejected(Types.GeometryType.crs84(), expectedMessage);
+    assertFromGravitinoRejected(Types.GeometryType.of("EPSG:3857"), expectedMessage);
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, OCEANBASE_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }
