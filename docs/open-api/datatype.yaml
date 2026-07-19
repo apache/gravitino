@@ -27,6 +27,7 @@ components:
         - $ref: "#/components/schemas/MapType"
         - $ref: "#/components/schemas/UnionType"
         - $ref: "#/components/schemas/UnparsedType"
+        - $ref: "#/components/schemas/ExternalType"
 
     PrimitiveType:
       type: string
@@ -207,20 +208,20 @@ components:
         ]
       }
 
-  ExternalType:
-    type: object
-    required:
-      - type
-      - catalogString
-    properties:
-      type:
-        type: string
-        enum:
-          - "external"
-      catalogString:
-        type: string
-        description: The string representation of this type in the catalog
-    example: {
-      "type": "external",
-      "catalogString": "user-defined"
-    }
+    ExternalType:
+      type: object
+      required:
+        - type
+        - catalogString
+      properties:
+        type:
+          type: string
+          enum:
+            - "external"
+        catalogString:
+          type: string
+          description: The string representation of this type in the catalog
+      example: {
+        "type": "external",
+        "catalogString": "user-defined"
+      }
