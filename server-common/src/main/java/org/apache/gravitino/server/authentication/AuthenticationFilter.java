@@ -113,7 +113,9 @@ public class AuthenticationFilter implements Filter {
         // to let client to create correct authenticated request.
         // Refer to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
         for (String challenge : ue.getChallenges()) {
-          resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
+          if (!challenge.toLowerCase().startsWith("basic")) {
+            resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
+          }
         }
       }
       sendAuthErrorResponse(resp, ue);

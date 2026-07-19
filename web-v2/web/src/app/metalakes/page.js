@@ -37,6 +37,7 @@ import {
 } from '@/lib/store/metalakes'
 import { to } from '@/lib/utils'
 import { formatToDateTime } from '@/lib/utils/date'
+import { normalizeServiceAdmins } from '@/lib/utils/serviceAdmins'
 import Icons from '@/components/Icons'
 import GetOwner from '@/components/GetOwner'
 import PropertiesContent from '@/components/PropertiesContent'
@@ -70,7 +71,7 @@ const MetalakeList = () => {
   const [ownerRefreshKey, setOwnerRefreshKey] = useState(0)
   const auth = useAppSelector(state => state.auth)
   const { serviceAdmins, authUser, anthEnable } = auth
-  const admins = Array.isArray(serviceAdmins) ? serviceAdmins : (serviceAdmins || '').split(',')
+  const admins = normalizeServiceAdmins(serviceAdmins)
   const isServiceAdmin = admins.includes(authUser?.name)
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)

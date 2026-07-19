@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.clickhouse.operations;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
@@ -88,6 +90,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final Pattern PARTITION_BY_PATTERN =
       Pattern.compile(
           "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
+  private static final Pattern SETTINGS_PATTERN =
+      Pattern.compile("(?is)\\bSETTINGS\\s+(.+?)(?=\\bCOMMENT\\b|$)");
   private static final Pattern DISTRIBUTED_ENGINE_PATTERN =
       Pattern.compile(
           "(?i)^Distributed\\(([^,]+),\\s*([^,]+),\\s*([^,]+),\\s*(.+)\\)$", Pattern.DOTALL);
@@ -192,6 +196,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     appendPartitionClause(partitioning, sqlBuilder, engine);
 
+    // Add setting clause before COMMENT; ClickHouse 24.8 rejects SETTINGS that follow COMMENT
+    // (all settings become UNKNOWN_SETTING when preceded by a COMMENT clause).
+    // This matches the order in SHOW CREATE TABLE output: SETTINGS ... COMMENT '...'.
+    appendTableProperties(notNullProperties, sqlBuilder);
+
     // Add table comment; embed cluster name so it can be recovered at DROP/ALTER time.
     // ClickHouse does not persist ON CLUSTER in SHOW CREATE TABLE (see ClickHouseClusterUtils).
     String storedComment =
@@ -202,9 +211,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     if (StringUtils.isNotEmpty(storedComment)) {
       sqlBuilder.append(" COMMENT '%s'".formatted(escapeSingleQuotes(storedComment)));
     }
-
-    // Add setting clause if specified, clickhouse only supports predefine settings
-    appendTableProperties(notNullProperties, sqlBuilder);
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
@@ -480,27 +486,34 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case DATA_SKIPPING_MINMAX:
-          // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
-          // no field for it.
-          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           sqlBuilder
               .append(" ")
-              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "minmax", 1));
+              .append(
+                  buildDataSkippingIndexDdl(
+                      index.name(),
+                      fieldStr,
+                      DATA_SKIPPING_MINMAX_VALUE,
+                      resolveGranularity(index.properties(), 1)));
           break;
         case DATA_SKIPPING_BLOOM_FILTER:
-          // The GRANULARITY value is always 3 here currently.
-          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           sqlBuilder
               .append(" ")
-              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "bloom_filter", 3));
+              .append(
+                  buildDataSkippingIndexDdl(
+                      index.name(),
+                      fieldStr,
+                      DATA_SKIPPING_BLOOM_FILTER,
+                      resolveGranularity(index.properties(), 1)));
           break;
         case DATA_SKIPPING_SET:
-          // The max unique values (N) is always 0 (unlimited) here currently as we can't set it
-          // by Index: there is no field for it. ClickHouse requires set(N) syntax.
-          // TODO(yuqi) add a properties field to Index to support user defined max unique values.
           sqlBuilder
               .append(" ")
-              .append(buildDataSkippingIndexDdl(index.name(), fieldStr, "set(0)", 1));
+              .append(
+                  buildDataSkippingIndexDdl(
+                      index.name(),
+                      fieldStr,
+                      "set(" + resolveSetMaxValues(index.properties()) + ")",
+                      resolveGranularity(index.properties(), 1)));
           break;
         default:
           throw new IllegalArgumentException(
@@ -621,6 +634,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       jdbcTableBuilder.withDistribution(distribution);
 
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
+      // Merge SETTINGS parsed from SHOW CREATE TABLE into table properties.
+      // SHOW CREATE TABLE is the authoritative source for SETTINGS; it takes precedence
+      // over any settings.* keys that might exist in system.tables (though getTableProperties()
+      // currently does not read SETTINGS from system.tables, so no overlap occurs in practice).
+      if (!metadata.settings.isEmpty()) {
+        Map<String, String> merged = new HashMap<>(tableProperties);
+        merged.putAll(metadata.settings);
+        tableProperties = Collections.unmodifiableMap(merged);
+      }
       jdbcTableBuilder.withProperties(tableProperties);
 
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
@@ -861,18 +883,31 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(!indexExists, "Index '%s' already exists", addIndex.getName());
 
     String fieldStr = getIndexFieldStr(addIndex.getFieldNames());
+    Map<String, String> properties = addIndex.getProperties();
     switch (addIndex.getType()) {
       case DATA_SKIPPING_MINMAX:
-        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "minmax", 1);
+        return "ADD "
+            + buildDataSkippingIndexDdl(
+                addIndex.getName(),
+                fieldStr,
+                DATA_SKIPPING_MINMAX_VALUE,
+                resolveGranularity(properties, 1));
 
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "bloom_filter", 3);
+        return "ADD "
+            + buildDataSkippingIndexDdl(
+                addIndex.getName(),
+                fieldStr,
+                DATA_SKIPPING_BLOOM_FILTER,
+                resolveGranularity(properties, 1));
 
       case DATA_SKIPPING_SET:
-        // The max unique values (N) is always 0 (unlimited) here currently as we can't set it
-        // by Index: there is no field for it. ClickHouse requires set(N) syntax.
-        // TODO(yuqi) add a properties field to Index to support user defined max unique values.
-        return "ADD " + buildDataSkippingIndexDdl(addIndex.getName(), fieldStr, "set(0)", 1);
+        return "ADD "
+            + buildDataSkippingIndexDdl(
+                addIndex.getName(),
+                fieldStr,
+                "set(" + resolveSetMaxValues(properties) + ")",
+                resolveGranularity(properties, 1));
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
@@ -882,6 +917,45 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException(
             "Gravitino ClickHouse doesn't support index : " + addIndex.getType());
     }
+  }
+
+  /**
+   * Resolves an integer property from the index properties map.
+   *
+   * @param properties the index properties map
+   * @param key the property key (e.g. {@link ClickHouseConstants.IndexConstants#GRANULARITY})
+   * @param defaultValue the value returned when the key is absent
+   * @param minValue the minimum allowed value (inclusive)
+   * @return the resolved integer value
+   * @throws IllegalArgumentException if the value is present but not a valid integer within bounds
+   */
+  private int resolveIntProperty(
+      Map<String, String> properties, String key, int defaultValue, int minValue) {
+    if (properties == null) {
+      return defaultValue;
+    }
+    String raw = properties.get(key);
+    if (raw == null) {
+      return defaultValue;
+    }
+    raw = raw.trim();
+    int value;
+    try {
+      value = Integer.parseInt(raw);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(key + " must be a valid integer, but got: " + raw, e);
+    }
+    Preconditions.checkArgument(
+        value >= minValue, "%s must be >= %s, but got: %s", key, minValue, value);
+    return value;
+  }
+
+  private int resolveGranularity(Map<String, String> properties, int defaultValue) {
+    return resolveIntProperty(properties, GRANULARITY, defaultValue, 1);
+  }
+
+  private int resolveSetMaxValues(Map<String, String> properties) {
+    return resolveIntProperty(properties, SET_MAX_VALUES, 0, 0);
   }
 
   @VisibleForTesting
@@ -1130,12 +1204,41 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
     }
 
+    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(createSql);
+    if (settingsMatcher.find()) {
+      metadata.settings = parseSettingsClause(settingsMatcher.group(1));
+    }
+
     return metadata;
+  }
+
+  // Parses "key1 = val1, key2 = val2" from a SETTINGS clause.
+  // Keys are prefixed with "settings." to match the write path convention in
+  // appendTableProperties(). ClickHouse SETTINGS values are scalar (UInt64, Bool,
+  // String, Enum) — arrays or nested structures are not valid SETTINGS values,
+  // so splitting by comma is safe.
+  private static Map<String, String> parseSettingsClause(String settingsStr) {
+    Map<String, String> settings = new HashMap<>();
+    for (String pair : settingsStr.split(",")) {
+      String trimmed = pair.trim();
+      int eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        String key = trimmed.substring(0, eqIdx).trim();
+        String value = trimmed.substring(eqIdx + 1).trim();
+        settings.put(TableConstants.SETTINGS_PREFIX + key, value);
+      }
+    }
+    return settings;
   }
 
   @VisibleForTesting
   SortOrder[] parseSortOrdersFromCreateSql(String createSql) {
     return parseCreateStatement(createSql).sortOrders;
+  }
+
+  @VisibleForTesting
+  Map<String, String> parseSettingsFromCreateSql(String createSql) {
+    return parseCreateStatement(createSql).settings;
   }
 
   private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
@@ -1257,6 +1360,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   private static final class ShowCreateTableMetadata {
     private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
     private SortOrder[] sortOrders = SortOrders.NONE;
+    private Map<String, String> settings = Collections.emptyMap();
   }
 
   @VisibleForTesting
