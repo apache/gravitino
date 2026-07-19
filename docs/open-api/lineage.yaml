@@ -29,7 +29,7 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
+              anyOf:
                 - $ref: '#/components/schemas/RunEvent'
                 - $ref: '#/components/schemas/DatasetEvent'
                 - $ref: '#/components/schemas/JobEvent'
@@ -218,7 +218,7 @@ components:
                 - ABORT
                 - FAIL
                 - OTHER
-              example: START|RUNNING|COMPLETE|ABORT|FAIL|OTHER
+              example: START
             run:
               $ref: '#/components/schemas/Run'
             job:
@@ -250,10 +250,6 @@ components:
               $ref: '#/components/schemas/StaticDataset'
           required:
             - dataset
-          not:
-            required:
-              - job
-              - run
     JobEvent:
       allOf:
         - $ref: '#/components/schemas/BaseEvent'
@@ -273,6 +269,3 @@ components:
                 $ref: '#/components/schemas/OutputDataset'
           required:
             - job
-          not:
-            required:
-              - run
