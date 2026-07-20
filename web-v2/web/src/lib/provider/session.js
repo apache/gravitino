@@ -100,6 +100,14 @@ const AuthProvider = ({ children }) => {
           dispatch(setAuthUser(sessionUser))
           goToMetalakeListPage()
         }
+      } else if (authType === 'basic') {
+        const tokenToUse = sessionStorage.getItem('accessToken')
+
+        if (tokenToUse) {
+          goToMetalakeListPage()
+        } else {
+          router.push('/login')
+        }
       } else if (authType === 'oauth') {
         // Clear any residual simpleAuthUser when authType is oauth
         sessionStorage.removeItem('simpleAuthUser')
