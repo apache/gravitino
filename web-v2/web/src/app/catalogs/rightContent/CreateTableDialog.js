@@ -436,9 +436,9 @@ export default function CreateTableDialog({ ...props }) {
             let idxPartiton = 0
             if (table.partitioning?.length) {
               table.partitioning.forEach(item => {
-const fieldName = item.fieldName?.[0] ?? item.fieldNames?.[0]?.[0] ?? ''
-form.setFieldValue(['partitions', idxPartiton, 'strategy'], item.strategy)
-form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fieldName)
+                const fieldName = item.fieldName?.[0] ?? item.fieldNames?.[0]?.[0] ?? ''
+                form.setFieldValue(['partitions', idxPartiton, 'strategy'], item.strategy)
+                form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fieldName)
                 form.setFieldValue(['partitions', idxPartiton, 'number'], item.numBuckets || item.width || item.number)
                 if (item.strategy === 'range' && item.assignments?.length) {
                   form.setFieldValue(
@@ -753,10 +753,10 @@ form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fieldName)
                     const assignment = { type: 'range', name: a.name }
                     assignment.upper = a.upper
                       ? { type: 'literal', dataType, value: a.upper }
-                      : { type: 'literal', dataType: 'null', value: null }
+                      : { type: 'literal', dataType: 'null', value: 'NULL' }
                     assignment.lower = a.lower
                       ? { type: 'literal', dataType, value: a.lower }
-                      : { type: 'literal', dataType: 'null', value: null }
+                      : { type: 'literal', dataType: 'null', value: 'NULL' }
                     assignment.properties = null
 
                     return assignment

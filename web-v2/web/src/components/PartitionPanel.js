@@ -20,14 +20,15 @@
 import React, { useCallback } from 'react'
 
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, DatePicker, Flex, Form, Input, InputNumber, Select } from 'antd'
+import { Button, DatePicker, Flex, Form, Input, InputNumber, Select, TimePicker } from 'antd'
 import dayjs from 'dayjs'
 import Icons from '@/components/Icons'
 import { partitionInfoMap, transformsLimitMap } from '@/config'
 import { capitalizeFirstLetter } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 
-const dateTypes = ['date', 'time', 'timestamp', 'timestamp_tz']
+const dateTypes = ['date', 'timestamp', 'timestamp_tz']
+const timeTypes = ['time']
 
 /** Helper: get the base column type for a partition row */
 function getColumnBaseType(form, partitionIndex) {
@@ -59,6 +60,21 @@ function newAssignmentId() {
 }
 
 function BoundInput({ columnType, value, onChange, ...props }) {
+  if (timeTypes.includes(columnType)) {
+    return (
+      <TimePicker
+        size='small'
+        className='w-full'
+        value={value ? (dayjs.isDayjs(value) ? value : dayjs(value, 'HH:mm:ss')) : undefined}
+        onChange={(time, timeString) => {
+          const val = Array.isArray(timeString) ? timeString[0] : timeString
+          onChange?.(val || '')
+        }}
+        {...props}
+      />
+    )
+  }
+
   if (dateTypes.includes(columnType)) {
     return (
       <DatePicker
@@ -173,7 +189,6 @@ function PartitionRow({ form, editTable, subField, subOpt, partitioningInfo, pro
   })()
 
   const strategyOptions = (() => {
-    const fieldName = form.getFieldValue(['partitions', idx, 'fieldName'])
     const type = getColumnBaseType(form, idx)
 
     return partitioningInfo
@@ -422,11 +437,7 @@ function ListAssignments({ editTable, partitionIndex, form }) {
                     <Input
                       size='small'
                       className='flex-1'
-                      placeholder={
-                        assignItem?.listGroups?.length > 1
-                          ? 'val1, val2 (multi-column values for this group)'
-                          : 'val1, val2, val3'
-                      }
+                      placeholder='val1, val2, val3'
                       disabled={!!editTable}
                       value={group ?? ''}
                       onChange={e => onListGroupChange(assignIdx, groupIdx, e.target.value)}
