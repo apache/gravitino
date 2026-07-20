@@ -887,6 +887,31 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testIsSelfGroupViaPrincipalGroup() throws Exception {
+    NameIdentifier groupIdent = NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME);
+
+    setCurrentPrincipalWithGroup(GROUP_NAME);
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
+        .thenReturn(new GroupUpdatedAt(GROUP_ID, groupVersionCounter.incrementAndGet()));
+    assertTrue(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+
+    setCurrentPrincipalWithGroup("otherGroup");
+    assertFalse(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+
+    setCurrentPrincipalWithGroup(GROUP_NAME);
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME))).thenReturn(null);
+    assertFalse(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+
+    restoreDefaultPrincipal();
+  }
+
+  @Test
   public void testIsSelfRoleReusesCacheAcrossCalls() throws Exception {
     // Acceptance criterion for #11088: repeated isSelf(ROLE) calls in the same logical request
     // must not re-issue the role-list DB queries (listRolesByUserId / listRolesByGroupId).

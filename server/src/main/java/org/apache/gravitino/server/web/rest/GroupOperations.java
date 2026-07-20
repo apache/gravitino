@@ -62,6 +62,9 @@ public class GroupOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(GroupOperations.class);
 
+  private static final String LOAD_GROUP_PRIVILEGE =
+      "METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF";
+
   private final AccessControlDispatcher accessControlManager;
   private final OwnerDispatcher ownerDispatcher;
 
@@ -80,8 +83,11 @@ public class GroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-group", absolute = true)
+  @AuthorizationExpression(expression = LOAD_GROUP_PRIVILEGE)
   public Response getGroup(
-      @PathParam("metalake") String metalake, @PathParam("group") String group) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("group") @AuthorizationMetadata(type = Entity.EntityType.GROUP) String group) {
     try {
       return Utils.doAs(
           httpRequest,

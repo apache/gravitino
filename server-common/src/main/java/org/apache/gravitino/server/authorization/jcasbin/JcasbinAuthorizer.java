@@ -427,6 +427,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     String currentUserName = PrincipalUtils.getCurrentUserName();
     if (Entity.EntityType.USER == type) {
       return Objects.equals(nameIdentifier.name(), currentUserName);
+    } else if (Entity.EntityType.GROUP == type) {
+      if (!currentPrincipalGroupNames().contains(nameIdentifier.name())) {
+        return false;
+      }
+
+      try {
+        return loadGroupInfo(metalake, nameIdentifier.name(), requestContext).isPresent();
+      } catch (Exception e) {
+        LOG.warn("can not get group id.", e);
+        return false;
+      }
     } else if (Entity.EntityType.ROLE == type) {
       try {
         Optional<Long> roleId =
