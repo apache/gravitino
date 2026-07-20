@@ -167,12 +167,123 @@ public class MetadataAuthzHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
+<<<<<<< HEAD
+=======
+    if (enableAuthorization() && nameIdentifiers.length > 0) {
+      String principalName = PrincipalUtils.getCurrentPrincipal().getName();
+      if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
+        // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in
+        // the list visible, and no object-level deny exists, so the per-object authorization loop
+        // is skipped entirely. See AuthorizationExpressionConstants.*_LIST_PARENT_SCOPE_*.
+        LOG.debug(
+            "List authorization short-circuit HIT for principal {}, entity type {} under metalake "
+                + "{}: all {} listed object(s) are visible via a parent-scope grant; skipping the "
+                + "per-object authorization loop.",
+            principalName,
+            entityType,
+            metalake,
+            nameIdentifiers.length);
+        return nameIdentifiers;
+      }
+      LOG.debug(
+          "List authorization short-circuit MISS for principal {}, entity type {} under metalake "
+              + "{} ({} object(s)); falling back to the per-object authorization loop.",
+          principalName,
+          entityType,
+          metalake,
+          nameIdentifiers.length);
+    }
+>>>>>>> b49d895ea ([MINOR] improvement(authz): Add debug logging for list-authorization short-circuit (#12101))
     preloadToCache(entityType, nameIdentifiers);
     preloadOwner(entityType, nameIdentifiers);
     return filterByExpression(metalake, expression, entityType, nameIdentifiers, e -> e);
   }
 
   /**
+<<<<<<< HEAD
+=======
+   * Attempts the list-authorization short-circuit: when the listed objects all share one parent and
+   * the matching filter expression is granted at a parent scope, the whole list is visible unless
+   * an object-level deny may exist. Returns {@code true} only when it is safe to return every
+   * identifier without per-object authorization.
+   */
+  private static boolean allVisibleViaParentScope(
+      String metalake,
+      String expression,
+      Entity.EntityType entityType,
+      NameIdentifier[] nameIdentifiers) {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    ListShortCircuit spec = LIST_SHORT_CIRCUITS.get(entityType);
+    if (spec == null || !spec.filterExpression.equals(expression)) {
+      LOG.debug(
+          "Parent-scope short-circuit unavailable for principal {}, entity type {} under metalake "
+              + "{}: {}.",
+          principal.getName(),
+          entityType,
+          metalake,
+          spec == null
+              ? "no short-circuit spec is registered for this entity type"
+              : "the requested filter expression does not match the registered short-circuit "
+                  + "expression");
+      return false;
+    }
+
+    // The short-circuit reasons about a single parent scope, so every identifier must share it.
+    Namespace parent = nameIdentifiers[0].namespace();
+    for (NameIdentifier ident : nameIdentifiers) {
+      if (!ident.namespace().equals(parent)) {
+        LOG.debug(
+            "Parent-scope short-circuit skipped for principal {}, entity type {} under metalake "
+                + "{}: listed objects span multiple parent namespaces (e.g. {} vs {}).",
+            principal.getName(),
+            entityType,
+            metalake,
+            parent,
+            ident.namespace());
+        return false;
+      }
+    }
+
+    GravitinoAuthorizer authorizer =
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+    requestContext.setOriginalAuthorizationExpression(spec.parentScopeExpression);
+    Map<Entity.EntityType, NameIdentifier> metadataNames =
+        NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifiers[0]);
+
+    boolean parentGrantsAccess =
+        new AuthorizationExpressionEvaluator(spec.parentScopeExpression, authorizer)
+            .evaluate(metadataNames, requestContext, principal, Optional.empty());
+    if (!parentGrantsAccess) {
+      LOG.debug(
+          "Parent-scope short-circuit skipped for entity type {} under metalake {}: principal {} "
+              + "is not granted access at the parent scope, so per-object authorization is "
+              + "required.",
+          entityType,
+          metalake,
+          principal.getName());
+      return false;
+    }
+
+    // Parent scope grants access to every object; the only thing that can still hide one is a
+    // deny on these privileges (at the parent scope or on an individual object), so the
+    // short-circuit is only safe when no such deny may exist.
+    boolean hasDeny =
+        authorizer.hasDenyPolicy(principal, metalake, spec.denyPrivileges, requestContext);
+    if (hasDeny) {
+      LOG.debug(
+          "Parent-scope short-circuit disabled for entity type {} under metalake {}: principal {} "
+              + "holds a deny policy on {}, so per-object authorization is required.",
+          entityType,
+          metalake,
+          principal.getName(),
+          spec.denyPrivileges);
+    }
+    return !hasDeny;
+  }
+
+  /**
+>>>>>>> b49d895ea ([MINOR] improvement(authz): Add debug logging for list-authorization short-circuit (#12101))
    * Call {@link AuthorizationExpressionEvaluator} to check access
    *
    * @param identifier metadata identifier
