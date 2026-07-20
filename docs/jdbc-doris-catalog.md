@@ -49,7 +49,6 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc-password`         | The JDBC password.                                                                                                                                                                                                                                                                                                                                                                                               | (none)        | Yes      | 0.5.0            |
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                                                                                                                                                                                                                                                   | `2`           | No       | 0.5.0            |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                                                                                                                                                                                                                                                  | `10`          | No       | 0.5.0            |
-| `replication_num`       | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If not specified and the number of backend servers greater or equals to 3, the default value (3) in Doris server will be used. For more, see the [doc](https://doris.apache.org/docs/1.2/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/)        | `1` or `3`    | No       | 0.6.0-incubating |
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                                                                                                                                                                                                                                                | `30000`       | No       | 1.1.0            |
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
@@ -207,8 +206,21 @@ Index[] indexes = new Index[] {
 
 ### Table Properties
 
-- Doris supports table properties, and you can set them in the table properties.
-- Only supports Doris table properties and doesn't support user-defined properties.
+Doris table properties can be set when creating a table.
+Only Doris built-in table properties are supported; user-defined properties are not supported.
+
+| Property Name                    | Description                                                                                                                                                                                 | Default Value | Required | Reserved | Immutable | Since Version    |
+|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|------------------|
+| `replication_num`                | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If BE ≥ 3, the server-side default (3) will be used. | `1` or `3`    | No       | No       | No        | 0.6.0-incubating |
+| `compression`                    | The compression type for the table. Supported values: `ZSTD`, `LZ4`, `LZ4F`, `ZLIB`. Deprecated as a table-level property in Doris 4.0+.                                                    | (none)        | No       | No       | No        | 1.3.0            |
+| `bloom_filter_columns`           | Comma-separated list of columns for which bloom filter indexes are created.                                                                                                                 | (none)        | No       | No       | No        | 1.3.0            |
+| `storage_policy`                 | The name of the storage policy for cold-hot separation.                                                                                                                                     | (none)        | No       | No       | No        | 1.3.0            |
+| `light_schema_change`            | Whether light schema change is enabled for the table. Read-only; reflects the table's actual state and cannot be set by users.                                                              | (none)        | No       | Yes      | —         | 1.3.0            |
+| `enable_unique_key_merge_on_write` | Whether merge-on-write is enabled for Unique Key tables. Read-only; reflects the table's actual state and cannot be set by users.                                                         | (none)        | No       | Yes      | —         | 1.3.0            |
+
+:::note
+**Reserved** properties are read-only. They reflect the table's actual state and cannot be set by users. Passing a reserved property to `createTable` will be rejected with an error.
+:::
 
 ### Table Indexes
 
