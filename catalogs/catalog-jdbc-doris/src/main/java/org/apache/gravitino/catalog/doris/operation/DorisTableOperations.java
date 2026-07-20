@@ -178,6 +178,12 @@ public class DorisTableOperations extends JdbcTableOperations {
       resultMap = new HashMap<>(properties);
     }
 
+    // Remove reserved (read-only) properties that should not be written to DDL.
+    // The server layer (PropertiesMetadataHelpers.validatePropertyForCreate) already
+    // rejects these, but filtering here provides defense-in-depth against any path
+    // that bypasses server validation.
+    resultMap.keySet().removeIf(DORIS_TABLE_PROPERTIES_META::isReservedProperty);
+
     // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
     // set the property 'replication_num' to 1 explicitly.
     if (!resultMap.containsKey(REPLICATION_FACTOR)) {

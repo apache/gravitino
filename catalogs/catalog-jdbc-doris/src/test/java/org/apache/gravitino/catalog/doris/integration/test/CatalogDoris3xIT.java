@@ -442,7 +442,8 @@ public class CatalogDoris3xIT extends BaseIT {
     // infrastructure) and cannot be tested end-to-end in a Docker environment. Its metadata
     // is verified in TestDorisCatalog.testDorisTablePropertiesMetadata().
     TableCatalog tc = catalog.asTableCatalog();
-    NameIdentifier tid = NameIdentifier.of(schemaName, "t_props_roundtrip");
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_props_roundtrip"));
 
     Map<String, String> properties = new HashMap<>();
     properties.put(BLOOM_FILTER_COLUMNS, colName1 + "," + colName2);
@@ -481,7 +482,8 @@ public class CatalogDoris3xIT extends BaseIT {
     // Verify that enable_unique_key_merge_on_write (reserved) and light_schema_change
     // (reserved) appear in SHOW CREATE TABLE for UNIQUE KEY tables on Doris 3.0.x.
     TableCatalog tc = catalog.asTableCatalog();
-    NameIdentifier tid = NameIdentifier.of(schemaName, "t_uk_props");
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_uk_props"));
     Index[] indexes =
         new Index[] {Indexes.of(Index.IndexType.UNIQUE_KEY, "uk_pk", new String[][] {{colName1}})};
 

@@ -440,7 +440,8 @@ public class CatalogDoris4xIT extends BaseIT {
     //          light_schema_change (reserved, auto-populated by Doris),
     //          storage_policy (writable, requires infrastructure; metadata verified in unit test).
     TableCatalog tc = catalog.asTableCatalog();
-    NameIdentifier tid = NameIdentifier.of(schemaName, "t_props_roundtrip");
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_props_roundtrip"));
 
     // NOTE: compression is deprecated as a table-level property in Doris 4.0.6
     // (it is silently ignored in SHOW CREATE TABLE). We include it to verify
@@ -482,7 +483,8 @@ public class CatalogDoris4xIT extends BaseIT {
     // Verify that enable_unique_key_merge_on_write (reserved) and light_schema_change
     // (reserved) appear in SHOW CREATE TABLE for UNIQUE KEY tables on Doris 4.0.x.
     TableCatalog tc = catalog.asTableCatalog();
-    NameIdentifier tid = NameIdentifier.of(schemaName, "t_uk_props");
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_uk_props"));
     Index[] indexes =
         new Index[] {Indexes.of(Index.IndexType.UNIQUE_KEY, "uk_pk", new String[][] {{colName1}})};
 

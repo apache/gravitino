@@ -27,11 +27,10 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
+  // ---- writable properties ----
   public static final String REPLICATION_FACTOR = "replication_num";
   public static final int DEFAULT_REPLICATION_FACTOR = 1;
   public static final int DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE = 3;
-
-  // ---- writable properties ----
   public static final String COMPRESSION = "compression";
   public static final String BLOOM_FILTER_COLUMNS = "bloom_filter_columns";
   public static final String STORAGE_POLICY = "storage_policy";

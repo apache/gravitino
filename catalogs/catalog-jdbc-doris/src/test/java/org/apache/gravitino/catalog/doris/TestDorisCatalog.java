@@ -140,11 +140,10 @@ public class TestDorisCatalog {
         IllegalArgumentException.class,
         () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, props3));
 
-    // Writable properties alone should pass validation.
+    // Writable properties alone must pass validation.
     Map<String, String> props4 = new HashMap<>();
     props4.put(BLOOM_FILTER_COLUMNS, "col1,col2");
     props4.put(COMPRESSION, "ZSTD");
-    // Writable properties alone must pass validation.
     PropertiesMetadataHelpers.validatePropertyForCreate(metadata, props4);
   }
 }
