@@ -194,6 +194,8 @@ jobs:
             -PskipITs
             -PskipDockerTests=false
             -x :clients:client-python:build
+            -x :catalogs-contrib:catalog-jdbc-clickhouse:test
+            -x :catalogs-contrib:catalog-jdbc-hologres:test
             -x :catalogs-contrib:catalog-jdbc-oceanbase:test
           )
 

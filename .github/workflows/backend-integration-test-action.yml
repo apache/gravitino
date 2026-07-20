@@ -63,18 +63,31 @@ jobs:
           wget https://nz2.archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb
           sudo dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb  
 
-      - name: OceanBase Contrib Catalog Test
-        id: oceanBaseContribTest
+      - name: Contrib Catalog Test
+        id: contribCatalogTest
         if: inputs.changed-catalogs-contrib-modules != '' && inputs.backend == 'h2' && inputs.test-mode == 'embedded'
         run: |
           CHANGED_CONTRIB_MODULES="${{ inputs.changed-catalogs-contrib-modules }}"
 
-          if [ "$CHANGED_CONTRIB_MODULES" != "__all__" ] && [[ " $CHANGED_CONTRIB_MODULES " != *" catalog-jdbc-oceanbase "* ]]; then
-            echo "Skip OceanBase contrib catalog test because catalog-jdbc-oceanbase is not changed."
+          if [ "$CHANGED_CONTRIB_MODULES" = "__all__" ]; then
+            CONTRIB_MODULES="$(find catalogs-contrib -mindepth 1 -maxdepth 1 -type d -name 'catalog-*' -exec basename {} \; | sort)"
+          else
+            CONTRIB_MODULES="$CHANGED_CONTRIB_MODULES"
+          fi
+
+          gradle_args=()
+          for module in $CONTRIB_MODULES; do
+            if [ -d "catalogs-contrib/$module" ]; then
+              gradle_args+=(":catalogs-contrib:$module:test")
+            fi
+          done
+
+          if [ "${#gradle_args[@]}" -eq 0 ]; then
+            echo "No changed contrib catalog test tasks."
             exit 0
           fi
 
-          ./gradlew :catalogs-contrib:catalog-jdbc-oceanbase:test -PskipITs -PskipDockerTests=false -PskipWeb=true
+          ./gradlew "${gradle_args[@]}" -PskipITs -PskipDockerTests=false -PskipWeb=true
 
       - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
         id: integrationTest
@@ -109,7 +122,7 @@ jobs:
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7
-        if: ${{ (failure() && (steps.oceanBaseContribTest.outcome == 'failure' || steps.integrationTest.outcome == 'failure')) || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        if: ${{ (failure() && (steps.contribCatalogTest.outcome == 'failure' || steps.integrationTest.outcome == 'failure')) || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}
           path: |
