@@ -120,4 +120,112 @@ public class TestStarRocksTableOperationsSqlGeneration {
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT '   ' but was: " + sql);
   }
+
+  @Test
+  public void testCreateTableUsesUnparameterizedDatetime() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("timestamp_col")
+            .withType(Types.TimestampType.withoutTimeZone())
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("timestamp_col"));
+
+    String sql = ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution);
+
+    Assertions.assertTrue(sql.contains("`timestamp_col` datetime"));
+  }
+
+  @Test
+  public void testCreateTableRejectsPrecisionQualifiedTimestampTypesBeforeSqlGeneration() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    Types.TimestampType[] unsupportedTypes = {
+      Types.TimestampType.withoutTimeZone(3),
+      Types.TimestampType.withoutTimeZone(9),
+      Types.TimestampType.withTimeZone(9)
+    };
+    Distribution distribution = Distributions.hash(1, NamedReference.field("unsupported_col"));
+
+    for (Types.TimestampType type : unsupportedTypes) {
+      JdbcColumn column = JdbcColumn.builder().withName("unsupported_col").withType(type).build();
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
+    }
+  }
+
+  @Test
+  public void testCreateTableRejectsVariantBeforeSqlGeneration() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("unsupported_col").withType(Types.VariantType.get()).build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("unsupported_col"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("StarRocks JSON is not an exact representation of Gravitino Variant"));
+  }
+
+  @Test
+  public void testCreateTableRejectsUnknownBeforeSqlGeneration() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("unsupported_col").withType(Types.NullType.get()).build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("unsupported_col"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("StarRocks table columns cannot represent Gravitino Unknown (NullType)"));
+  }
+
+  @Test
+  public void testCreateTableRejectsGeometryBeforeSqlGeneration() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("unsupported_col")
+            .withType(Types.GeometryType.of("EPSG:3857"))
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("unsupported_col"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("StarRocks has no storable GEOMETRY column type with CRS metadata"));
+  }
+
+  @Test
+  public void testCreateTableRejectsGeographyBeforeSqlGeneration() {
+    TestableStarRocksTableOperations ops = new TestableStarRocksTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("unsupported_col")
+            .withType(Types.GeographyType.of("EPSG:4326", "karney"))
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("unsupported_col"));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}, distribution));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "StarRocks has no storable GEOGRAPHY column type with CRS and edge-algorithm metadata"));
+  }
 }

@@ -146,7 +146,36 @@ public class StarRocksTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.DateType) {
       return DATE;
     } else if (type instanceof Types.TimestampType) {
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasTimeZone()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "StarRocks DATETIME does not preserve time-zone semantics; cannot convert Gravitino type %s",
+                type.simpleString()));
+      }
+      if (timestampType.hasPrecisionSet()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "StarRocks DATETIME columns do not preserve declared fractional precision; cannot convert Gravitino type %s",
+                type.simpleString()));
+      }
       return DATETIME;
+    } else if (type instanceof Types.VariantType) {
+      throw new IllegalArgumentException(
+          "StarRocks JSON is not an exact representation of Gravitino Variant; cannot convert Gravitino type variant");
+    } else if (type instanceof Types.NullType) {
+      throw new IllegalArgumentException(
+          "StarRocks table columns cannot represent Gravitino Unknown (NullType); cannot convert Gravitino type null");
+    } else if (type instanceof Types.GeometryType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "StarRocks has no storable GEOMETRY column type with CRS metadata; cannot convert Gravitino type %s",
+              type.simpleString()));
+    } else if (type instanceof Types.GeographyType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "StarRocks has no storable GEOGRAPHY column type with CRS and edge-algorithm metadata; cannot convert Gravitino type %s",
+              type.simpleString()));
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to StarRocks type", type.simpleString()));

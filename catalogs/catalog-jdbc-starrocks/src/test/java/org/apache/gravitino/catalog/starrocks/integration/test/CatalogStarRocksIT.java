@@ -74,6 +74,7 @@ import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.awaitility.Awaitility;
@@ -809,6 +810,54 @@ public class CatalogStarRocksIT extends BaseIT {
   }
 
   @Test
+  void testRejectPrecisionQualifiedTimestampTypesWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "timestamp_3",
+        Types.TimestampType.withoutTimeZone(3),
+        "StarRocks DATETIME columns do not preserve declared fractional precision");
+    assertCreateRejectedWithoutSideEffects(
+        "timestamp_ns",
+        Types.TimestampType.withoutTimeZone(9),
+        "StarRocks DATETIME columns do not preserve declared fractional precision");
+    assertCreateRejectedWithoutSideEffects(
+        "timestamptz_ns",
+        Types.TimestampType.withTimeZone(9),
+        "StarRocks DATETIME does not preserve time-zone semantics");
+  }
+
+  @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "variant",
+        Types.VariantType.get(),
+        "StarRocks JSON is not an exact representation of Gravitino Variant");
+  }
+
+  @Test
+  void testRejectUnknownWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "unknown",
+        Types.NullType.get(),
+        "StarRocks table columns cannot represent Gravitino Unknown (NullType)");
+  }
+
+  @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geometry",
+        Types.GeometryType.of("EPSG:3857"),
+        "StarRocks has no storable GEOMETRY column type with CRS metadata");
+  }
+
+  @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "StarRocks has no storable GEOGRAPHY column type with CRS and edge-algorithm metadata");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");
@@ -999,5 +1048,30 @@ public class CatalogStarRocksIT extends BaseIT {
         Literals.timestampLiteral(LocalDateTime.of(2024, 1, 1, 1, 1, 1)),
         colDefaultValues[1].defaultValue());
     Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, colDefaultValues[2].defaultValue());
+  }
+
+  private void assertCreateRejectedWithoutSideEffects(
+      String typeName, Type type, String expectedMessage) {
+    String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, rejectedTableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Distribution distribution = Distributions.hash(2, NamedReference.field("unsupported_col"));
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    new Column[] {Column.of("unsupported_col", type)},
+                    null,
+                    ImmutableMap.of(),
+                    Transforms.EMPTY_TRANSFORM,
+                    distribution,
+                    null,
+                    null));
+
+    Assertions.assertTrue(exception.getMessage().contains(expectedMessage));
+    Assertions.assertFalse(tableCatalog.tableExists(tableIdentifier));
   }
 }
