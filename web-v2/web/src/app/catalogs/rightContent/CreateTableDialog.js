@@ -436,9 +436,9 @@ export default function CreateTableDialog({ ...props }) {
             let idxPartiton = 0
             if (table.partitioning?.length) {
               table.partitioning.forEach(item => {
-                const fields = item.fieldName || item.fieldNames?.map(f => f[0])
-                form.setFieldValue(['partitions', idxPartiton, 'strategy'], item.strategy)
-                form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fields)
+const fieldName = item.fieldName?.[0] ?? item.fieldNames?.[0]?.[0] ?? ''
+form.setFieldValue(['partitions', idxPartiton, 'strategy'], item.strategy)
+form.setFieldValue(['partitions', idxPartiton, 'fieldName'], fieldName)
                 form.setFieldValue(['partitions', idxPartiton, 'number'], item.numBuckets || item.width || item.number)
                 if (item.strategy === 'range' && item.assignments?.length) {
                   form.setFieldValue(
