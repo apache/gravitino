@@ -61,7 +61,7 @@ public class TestCapabilityHelpers {
    * quoted) rather than the already-unquoted result of {@code normalizeName}, or a quoted name with
    * a space would be wrongly rejected after normalization even though it was valid as supplied.
    */
-  private static final Capability QUOTE_AWARE_CAPABILITY =
+  static final Capability QUOTE_AWARE_CAPABILITY =
       new Capability() {
         @Override
         public CapabilityResult specificationOnName(Scope scope, String name) {
