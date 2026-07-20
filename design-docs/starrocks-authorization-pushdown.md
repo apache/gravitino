@@ -184,11 +184,11 @@ support native group principals. For example, setting schema `sales` to group `a
 should resolve the users in `analytics`, ensure each user exists in StarRocks, then grant
 `ALL` on database `sales` and all tables in `sales` directly to those user principals.
 
-| Gravitino object | StarRocks privilege | StarRocks resource                 |
-|------------------|---------------------|------------------------------------|
-| Catalog          | `ALL`               | `default_catalog`                  |
-| Schema           | `ALL`               | `default_catalog.{schema}.*`       |
-| Table            | `ALL`               | `default_catalog.{schema}.{table}` |
+| Gravitino object | StarRocks privilege         | StarRocks resource                 |
+|------------------|-----------------------------|------------------------------------|
+| Catalog          | `DROP`, `CREATE DATABASE`   | `default_catalog`                  |
+| Schema           | `DROP` , `CREATE TABLE`     | `default_catalog.{schema}`         |
+| Table            | `DROP`                      | `default_catalog.{schema}.{table}` |
 
 ### 4.3 Supported Privileges
 
@@ -196,12 +196,12 @@ should resolve the users in `analytics`, ensure each user exists in StarRocks, t
 |------------------|---------------------|-------------------------------------------------|------------------------------------|
 | Catalog          | `USE_CATALOG`       | `USAGE`                                         | `default_catalog`                  |
 | Catalog          | `USE_SCHEMA`        | `USAGE`                                         | `default_catalog`                  |
-| Catalog          | `CREATE_SCHEMA`     | `CREATE DATABASE`                               | `default_catalog.*`                |
+| Catalog          | `CREATE_SCHEMA`     | `CREATE DATABASE`                               | `default_catalog`                  |
 | Catalog          | `CREATE_TABLE`      | `CREATE TABLE`                                  | `default_catalog.*.*`              |
 | Catalog          | `SELECT_TABLE`      | `SELECT`                                        | `default_catalog.*.*`              |
 | Catalog          | `MODIFY_TABLE`      | `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `ALTER` | `default_catalog.*.*`              |
 | Schema           | `USE_SCHEMA`        |                                                 |                                    |
-| Schema           | `CREATE_TABLE`      | `CREATE TABLE`                                  | `default_catalog.{schema}.*`       |
+| Schema           | `CREATE_TABLE`      | `CREATE TABLE`                                  | `default_catalog.{schema}`         |
 | Schema           | `SELECT_TABLE`      | `SELECT`                                        | `default_catalog.{schema}.*`       |
 | Schema           | `MODIFY_TABLE`      | `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `ALTER` | `default_catalog.{schema}.*`       |
 | Table            | `SELECT_TABLE`      | `SELECT`                                        | `default_catalog.{schema}.{table}` |
