@@ -49,10 +49,12 @@ import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -185,11 +187,26 @@ public class GroupOperations {
           () -> {
             MetalakeManager.checkMetalakeInUse(metalake);
             if (verbose) {
-              return Utils.ok(
-                  new GroupListResponse(
-                      DTOConverters.toDTOs(accessControlManager.listGroups(metalake))));
+              Group[] groups = accessControlManager.listGroups(metalake);
+              groups =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      LOAD_GROUP_PRIVILEGE,
+                      Entity.EntityType.GROUP,
+                      groups,
+                      groupEntity -> NameIdentifierUtil.ofGroup(metalake, groupEntity.name()));
+
+              return Utils.ok(new GroupListResponse(DTOConverters.toDTOs(groups)));
             } else {
-              return Utils.ok(new NameListResponse(accessControlManager.listGroupNames(metalake)));
+              String[] groups = accessControlManager.listGroupNames(metalake);
+              groups =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      LOAD_GROUP_PRIVILEGE,
+                      Entity.EntityType.GROUP,
+                      groups,
+                      groupName -> NameIdentifierUtil.ofGroup(metalake, groupName));
+              return Utils.ok(new NameListResponse(groups));
             }
           });
 
