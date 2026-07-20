@@ -891,22 +891,17 @@ public class TestJcasbinAuthorizer {
     NameIdentifier groupIdent = NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME);
 
     setCurrentPrincipalWithGroup(GROUP_NAME);
-    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
-        .thenReturn(new GroupUpdatedAt(GROUP_ID, groupVersionCounter.incrementAndGet()));
+    Mockito.clearInvocations(groupMetaMapper);
     assertTrue(
         jcasbinAuthorizer.isSelf(
             Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+    Mockito.verify(groupMetaMapper, Mockito.never()).getGroupUpdatedAt(anyString(), anyString());
 
     setCurrentPrincipalWithGroup("otherGroup");
     assertFalse(
         jcasbinAuthorizer.isSelf(
             Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
-
-    setCurrentPrincipalWithGroup(GROUP_NAME);
-    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME))).thenReturn(null);
-    assertFalse(
-        jcasbinAuthorizer.isSelf(
-            Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+    Mockito.verify(groupMetaMapper, Mockito.never()).getGroupUpdatedAt(anyString(), anyString());
 
     restoreDefaultPrincipal();
   }
@@ -921,8 +916,6 @@ public class TestJcasbinAuthorizer {
     when(groupPrincipal.getName())
         .thenThrow(new AssertionError("GROUP self check should only use principal groups"));
     principalUtilsMockedStatic.when(PrincipalUtils::getCurrentPrincipal).thenReturn(groupPrincipal);
-    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
-        .thenReturn(new GroupUpdatedAt(GROUP_ID, groupVersionCounter.incrementAndGet()));
 
     try {
       assertTrue(
