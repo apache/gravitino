@@ -133,29 +133,41 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       Index[] indexes,
       SortOrder[] sortOrders)
       throws TableAlreadyExistsException {
+    // When columns are provided, delegate directly to the parent implementation.
+    if (ArrayUtils.isNotEmpty(columns)) {
+      super.create(
+          databaseName,
+          tableName,
+          columns,
+          comment,
+          properties,
+          partitioning,
+          distribution,
+          indexes,
+          sortOrders);
+      return;
+    }
+
     // When columns is empty (distributed table using AS remote_table), the shard key validation
     // in handleDistributeTable is skipped. Fetch remote table columns and validate here.
-    if (ArrayUtils.isEmpty(columns)) {
-      Map<String, String> props =
-          MapUtils.isNotEmpty(properties) ? properties : Collections.emptyMap();
-      String engine = props.get(GRAVITINO_ENGINE_KEY);
-      if (StringUtils.isNotEmpty(engine) && ENGINE.DISTRIBUTED == ENGINE.fromString(engine)) {
-        String shardingKey = props.get(DistributedTableConstants.SHARDING_KEY);
-        String remoteDb = props.get(DistributedTableConstants.REMOTE_DATABASE);
-        String remoteTbl = props.get(DistributedTableConstants.REMOTE_TABLE);
-        if (StringUtils.isNotBlank(shardingKey)) {
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(remoteDb),
-              "Remote database must be specified for Distributed");
-          Preconditions.checkArgument(
-              StringUtils.isNotBlank(remoteTbl), "Remote table must be specified for Distributed");
-          try (Connection conn = getConnection(databaseName)) {
-            JdbcColumn[] remoteCols = fetchRemoteColumns(conn, remoteDb, remoteTbl);
-            validateShardKeyColumns(
-                remoteCols, shardingKey, "in remote table %s.%s".formatted(remoteDb, remoteTbl));
-          } catch (SQLException e) {
-            throw exceptionMapper.toGravitinoException(e);
-          }
+    Map<String, String> props =
+        MapUtils.isNotEmpty(properties) ? properties : Collections.emptyMap();
+    String engine = props.get(GRAVITINO_ENGINE_KEY);
+    if (StringUtils.isNotEmpty(engine) && ENGINE.DISTRIBUTED == ENGINE.fromString(engine)) {
+      String shardingKey = props.get(DistributedTableConstants.SHARDING_KEY);
+      String remoteDb = props.get(DistributedTableConstants.REMOTE_DATABASE);
+      String remoteTbl = props.get(DistributedTableConstants.REMOTE_TABLE);
+      if (StringUtils.isNotBlank(shardingKey)) {
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(remoteDb), "Remote database must be specified for Distributed");
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(remoteTbl), "Remote table must be specified for Distributed");
+        try (Connection conn = getConnection(databaseName)) {
+          JdbcColumn[] remoteCols = fetchRemoteColumns(conn, remoteDb, remoteTbl);
+          validateShardKeyColumns(
+              remoteCols, shardingKey, "in remote table %s.%s".formatted(remoteDb, remoteTbl));
+        } catch (SQLException e) {
+          throw exceptionMapper.toGravitinoException(e);
         }
       }
     }
