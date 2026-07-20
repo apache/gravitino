@@ -33,6 +33,10 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link #listSchemas(Namespace)})
+ * are assumed to already be in their canonical, legal form and are not re-normalized here.
+ */
 public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   private final CatalogManager catalogManager;
   private final SchemaDispatcher dispatcher;
@@ -56,8 +60,6 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
               NameIdentifier.of(namespace.levels())));
     }
 
-    // listSchemas() is assumed to already return names in their canonical, legal form, so no
-    // re-normalization is applied here.
     return dispatcher.listSchemas(namespace);
   }
 

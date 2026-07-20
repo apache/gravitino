@@ -37,6 +37,10 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link #listTables(Namespace)}) are
+ * assumed to already be in their canonical, legal form and are not re-normalized here.
+ */
 public class TableNormalizeDispatcher implements TableDispatcher {
   private final CatalogManager catalogManager;
   private final TableDispatcher dispatcher;
@@ -51,8 +55,6 @@ public class TableNormalizeDispatcher implements TableDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    // listTables() is assumed to already return names in their canonical, legal form, so no
-    // re-normalization is applied here.
     return dispatcher.listTables(caseSensitiveNs);
   }
 
