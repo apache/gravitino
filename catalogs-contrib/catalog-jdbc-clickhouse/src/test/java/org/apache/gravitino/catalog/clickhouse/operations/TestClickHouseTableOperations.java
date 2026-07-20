@@ -1184,6 +1184,63 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  void testGranularityNormalizedToCanonicalForm() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.IntegerType.get())
+              .withNullable(false)
+              .build(),
+        };
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"c1"}}),
+          Indexes.of(
+              IndexType.DATA_SKIPPING_MINMAX,
+              "idx_c1",
+              new String[][] {{"c1"}},
+              Map.of("granularity", "005")),
+          Indexes.of(
+              IndexType.DATA_SKIPPING_BLOOM_FILTER,
+              "idx_c2",
+              new String[][] {{"c1"}},
+              Map.of("granularity", " 3 ")),
+        };
+
+    String sql =
+        ops.buildCreateSql(
+            "t_norm",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[] {Transforms.identity("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    // "005" should be normalized to "5" after parsing
+    Assertions.assertTrue(
+        sql.contains("GRANULARITY 5"),
+        "Leading-zero granularity should be normalized, actual SQL: " + sql);
+    Assertions.assertFalse(
+        sql.contains("GRANULARITY 005"), "Raw leading-zero granularity must not appear in DDL");
+    // Whitespace around the granularity value should be tolerated.
+    Assertions.assertTrue(
+        sql.contains("GRANULARITY 3"),
+        "Whitespace around granularity should be trimmed, actual SQL: " + sql);
+  }
+
+  @Test
   void testGenerateCreateTableSqlWithAutoIncrementColumnUnsupported() {
     TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
     ops.initialize(
