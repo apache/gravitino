@@ -115,6 +115,16 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `UUID`            | `Uuid`           |
 | `List`            | `Array`          |
 
+#### V3 Type Compatibility
+
+| Gravitino Type                      | PostgreSQL outcome                                                                                                      |
+|-------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `Timestamp(9)` / `Timestamp_tz(9)` | Rejected before DDL. PostgreSQL only supports precision 0 through 6 and cannot preserve nanosecond timestamp precision. |
+| `Variant`                           | Rejected before DDL. Native `json` and `jsonb` columns load as `External` because they do not preserve Variant semantics. |
+| `Unknown`                           | Rejected before DDL. PostgreSQL table columns cannot represent an optional, null-only Unknown logical type.             |
+| `Geometry`                          | Rejected before DDL. Native PostGIS `geometry` columns load as `External`; exact CRS semantics are not translated.      |
+| `Geography`                         | Rejected before DDL. Native PostGIS `geography` columns load as `External`; exact CRS and edge-algorithm semantics are not translated. |
+
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.

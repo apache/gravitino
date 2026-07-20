@@ -35,6 +35,7 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_4;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.JDBC_ARRAY_PREFIX;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.MAX_TIMESTAMP_PRECISION;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.NUMERIC;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.UUID;
 
@@ -91,6 +92,11 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.UUIDType.get(), UUID, null, null, 0);
     checkJdbcTypeToGravitinoType(
         Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("json"), "json", null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("jsonb"), "jsonb", null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("unknown"), "unknown", null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("geometry"), "geometry", null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ExternalType.of("geography"), "geography", null, null, 0);
   }
 
   @Test
@@ -135,6 +141,80 @@ public class TestPostgreSqlTypeConverter {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
+  }
+
+  @Test
+  public void testRejectNanosecondTimestampTypes() {
+    Type[] nanosecondTypes = {
+      Types.TimestampType.withoutTimeZone(9), Types.TimestampType.withTimeZone(9)
+    };
+
+    for (Type type : nanosecondTypes) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(type));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains(
+                  "PostgreSQL supports timestamp precision up to " + MAX_TIMESTAMP_PRECISION));
+    }
+  }
+
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.VariantType.get()));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics"));
+  }
+
+  @Test
+  public void testRejectUnknownType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.NullType.get()));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("PostgreSQL table columns cannot represent Gravitino Unknown (NullType)"));
+  }
+
+  @Test
+  public void testRejectGeometryType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.GeometryType.of("EPSG:3857")));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics"));
+  }
+
+  @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(
+                    Types.GeographyType.of("EPSG:4326", "karney")));
+
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "PostgreSQL PostGIS geography does not preserve Gravitino Geography CRS and edge-algorithm semantics"));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {

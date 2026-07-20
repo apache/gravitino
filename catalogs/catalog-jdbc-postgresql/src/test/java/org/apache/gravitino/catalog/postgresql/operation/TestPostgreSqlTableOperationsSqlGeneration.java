@@ -89,4 +89,94 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
   }
+
+  @Test
+  public void testCreateTableRejectsNanosecondTimestampTypesBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    Types.TimestampType[] nanosecondTypes = {
+      Types.TimestampType.withoutTimeZone(9), Types.TimestampType.withTimeZone(9)
+    };
+
+    for (Types.TimestampType type : nanosecondTypes) {
+      JdbcColumn column = JdbcColumn.builder().withName("nanosecond_col").withType(type).build();
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+      Assertions.assertTrue(
+          exception.getMessage().contains("PostgreSQL supports timestamp precision up to 6"));
+    }
+  }
+
+  @Test
+  public void testCreateTableRejectsVariantBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("variant_col").withType(Types.VariantType.get()).build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics"));
+  }
+
+  @Test
+  public void testCreateTableRejectsUnknownBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder().withName("unknown_col").withType(Types.NullType.get()).build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("PostgreSQL table columns cannot represent Gravitino Unknown (NullType)"));
+  }
+
+  @Test
+  public void testCreateTableRejectsGeometryBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("geometry_col")
+            .withType(Types.GeometryType.of("EPSG:3857"))
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics"));
+  }
+
+  @Test
+  public void testCreateTableRejectsGeographyBeforeSqlGeneration() {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("geography_col")
+            .withType(Types.GeographyType.of("EPSG:4326", "karney"))
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.createTableSql("test_table", new JdbcColumn[] {column}));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "PostgreSQL PostGIS geography does not preserve Gravitino Geography CRS and edge-algorithm semantics"));
+  }
 }

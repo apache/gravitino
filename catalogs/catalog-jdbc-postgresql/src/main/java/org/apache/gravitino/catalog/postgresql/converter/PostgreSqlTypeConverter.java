@@ -44,6 +44,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
   @VisibleForTesting static final int DEFAULT_NUMERIC_PRECISION = 38;
   @VisibleForTesting static final int DEFAULT_NUMERIC_SCALE = 18;
+  @VisibleForTesting static final int MAX_TIMESTAMP_PRECISION = 6;
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
@@ -127,6 +128,12 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       return type.simpleString();
     } else if (type instanceof Types.TimestampType) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasPrecisionSet() && timestampType.precision() > MAX_TIMESTAMP_PRECISION) {
+        throw new IllegalArgumentException(
+            String.format(
+                "PostgreSQL supports timestamp precision up to %d, but cannot convert Gravitino type %s",
+                MAX_TIMESTAMP_PRECISION, type.simpleString()));
+      }
       String baseType = timestampType.hasTimeZone() ? TIMESTAMP_TZ : TIMESTAMP;
       return timestampType.hasPrecisionSet()
           ? String.format("%s(%d)", baseType, timestampType.precision())
@@ -146,6 +153,22 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       return BYTEA;
     } else if (type instanceof Types.UUIDType) {
       return UUID;
+    } else if (type instanceof Types.NullType) {
+      throw new IllegalArgumentException(
+          "PostgreSQL table columns cannot represent Gravitino Unknown (NullType); cannot convert Gravitino type null");
+    } else if (type instanceof Types.VariantType) {
+      throw new IllegalArgumentException(
+          "PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics; cannot convert Gravitino type variant");
+    } else if (type instanceof Types.GeometryType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics; cannot convert Gravitino type %s",
+              type.simpleString()));
+    } else if (type instanceof Types.GeographyType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "PostgreSQL PostGIS geography does not preserve Gravitino Geography CRS and edge-algorithm semantics; cannot convert Gravitino type %s",
+              type.simpleString()));
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
     } else if (type instanceof Types.ExternalType) {

@@ -73,6 +73,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rel.types.Types.IntegerType;
 import org.apache.gravitino.utils.RandomNameUtils;
@@ -1972,5 +1973,65 @@ public class CatalogPostgreSqlIT extends BaseIT {
           Assertions.fail("Unexpected time column: " + column.name());
       }
     }
+  }
+
+  @Test
+  void testRejectNanosecondTimestampTypesWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "timestamp_ns", Types.TimestampType.withoutTimeZone(9), "timestamp precision up to 6");
+    assertCreateRejectedWithoutSideEffects(
+        "timestamptz_ns", Types.TimestampType.withTimeZone(9), "timestamp precision up to 6");
+  }
+
+  @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "variant",
+        Types.VariantType.get(),
+        "PostgreSQL JSON and JSONB do not preserve Gravitino Variant semantics");
+  }
+
+  @Test
+  void testRejectUnknownWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "unknown",
+        Types.NullType.get(),
+        "PostgreSQL table columns cannot represent Gravitino Unknown (NullType)");
+  }
+
+  @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geometry",
+        Types.GeometryType.of("EPSG:3857"),
+        "PostgreSQL PostGIS geometry does not preserve Gravitino Geometry CRS semantics");
+  }
+
+  @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "PostgreSQL PostGIS geography does not preserve Gravitino Geography CRS and edge-algorithm semantics");
+  }
+
+  private void assertCreateRejectedWithoutSideEffects(
+      String typeName, Type type, String expectedMessage) {
+    String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, rejectedTableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    new Column[] {Column.of("unsupported_col", type)},
+                    null,
+                    ImmutableMap.of()));
+
+    Assertions.assertTrue(exception.getMessage().contains(expectedMessage));
+    Assertions.assertFalse(tableCatalog.tableExists(tableIdentifier));
   }
 }
