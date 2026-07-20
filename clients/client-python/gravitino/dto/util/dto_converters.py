@@ -41,6 +41,8 @@ from gravitino.api.rel.partitions.identity_partition import IdentityPartition
 from gravitino.api.rel.partitions.list_partition import ListPartition
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.range_partition import RangePartition
+from gravitino.api.rel.representation import Representation
+from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.table_change import (
     AddColumn,
@@ -87,7 +89,9 @@ from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitio
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
+from gravitino.dto.rel.representation_dto import RepresentationDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
+from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.requests.table_update_request import (
     TableUpdateRequest,
@@ -226,6 +230,19 @@ class DTOConverters:
             dto.auto_increment(),
             DTOConverters.from_function_arg(dto.default_value()),
         )
+
+    @from_dto.register
+    @staticmethod
+    def _(dto: SQLRepresentationDTO) -> SQLRepresentation:
+        """Converts a SQLRepresentationDTO to a SQLRepresentation.
+
+        Args:
+            dto (SQLRepresentationDTO): The SQLRepresentation DTO to be converted.
+
+        Returns:
+            SQLRepresentation: The SQLRepresentation.
+        """
+        return SQLRepresentation(_dialect=dto.dialect(), _sql=dto.sql())
 
     @from_dto.register
     @staticmethod
@@ -377,20 +394,23 @@ class DTOConverters:
 
     @overload
     @staticmethod
+    def from_dtos(
+        dtos: list[RepresentationDTO],
+    ) -> list[Representation]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
     def from_dtos(dtos: list[Partitioning]) -> list[Transform]: ...  # pragma: no cover
 
     @staticmethod
     def from_dtos(dtos):
-        """Converts list of `ColumnDTO`, `IndexDTO`, `SortOrderDTO`, or `Partitioning`
-        to the corresponding list of `Column`s, `Index`es, `SortOrder`s, or `Transform`s.
+        """Converts a list of DTOs to the corresponding API objects.
 
         Args:
-            dtos (list[ColumnDTO] | list[IndexDTO] | list[SortOrderDTO] | list[Partitioning]):
-                The DTOs to be converted.
+            dtos: The DTOs to be converted.
 
         Returns:
-            list[Column] | list[Index] | list[SortOrder] | list[Transform]:
-                The list of Columns, Indexes, SortOrders, or Transforms depends on the input DTOs.
+            The converted objects.
         """
         if not dtos:
             return []
@@ -559,6 +579,16 @@ class DTOConverters:
 
     @to_dto.register
     @staticmethod
+    def _(obj: RepresentationDTO) -> RepresentationDTO:
+        return obj
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: SQLRepresentation) -> SQLRepresentationDTO:
+        return SQLRepresentationDTO(_dialect=obj.dialect(), _sql=obj.sql())
+
+    @to_dto.register
+    @staticmethod
     def _(obj: Partitioning) -> Partitioning:
         return obj
 
@@ -645,6 +675,18 @@ class DTOConverters:
     @overload
     @staticmethod
     def to_dtos(dtos: list[SortOrderDTO]) -> list[SortOrderDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(
+        dtos: list[Representation],
+    ) -> list[RepresentationDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(
+        dtos: list[RepresentationDTO],
+    ) -> list[RepresentationDTO]: ...  # pragma: no cover
 
     @overload
     @staticmethod
