@@ -20,6 +20,7 @@ from gravitino.api.rel.representation import Representation
 from gravitino.dto.rel.representation_dto import RepresentationDTO
 from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.exceptions.base import IllegalArgumentException
+from gravitino.utils.precondition import Precondition
 
 
 class RepresentationSerdes:
@@ -37,6 +38,10 @@ class RepresentationSerdes:
         """Decode a representation DTO from a dictionary."""
         if value is None:
             return None
+        Precondition.check_argument(
+            isinstance(value, dict) and len(value) > 0,
+            f"Cannot parse representation from invalid JSON: {value}",
+        )
         if value.get("type") == Representation.TYPE_SQL:
             return SQLRepresentationDTO.from_dict(value)
         raise IllegalArgumentException(

@@ -40,6 +40,15 @@ class TestRepresentationSerdes(unittest.TestCase):
         self.assertIsNone(RepresentationSerdes.serialize(None))
         self.assertIsNone(RepresentationSerdes.deserialize(None))
 
+    def test_representation_serdes_invalid_json(self):
+        for invalid_json in ("invalid", {}):
+            with self.subTest(invalid_json=invalid_json):
+                with self.assertRaisesRegex(
+                    IllegalArgumentException,
+                    "Cannot parse representation from invalid JSON",
+                ):
+                    RepresentationSerdes.deserialize(invalid_json)
+
     def test_representation_serdes_unknown_type(self):
         with self.assertRaises(IllegalArgumentException):
             RepresentationSerdes.deserialize({"type": "unknown"})
