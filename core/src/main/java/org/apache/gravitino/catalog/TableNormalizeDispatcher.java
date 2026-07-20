@@ -51,8 +51,8 @@ public class TableNormalizeDispatcher implements TableDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    // The catalog guarantees listTables() already returns names in their canonical, legal
-    // form, so no re-normalization is needed here.
+    // listTables() is assumed to already return names in their canonical, legal form, so no
+    // re-normalization is applied here.
     return dispatcher.listTables(caseSensitiveNs);
   }
 

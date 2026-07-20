@@ -56,8 +56,8 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
               NameIdentifier.of(namespace.levels())));
     }
 
-    // The catalog guarantees listSchemas() already returns names in their canonical, legal
-    // form, so no re-normalization is needed here.
+    // listSchemas() is assumed to already return names in their canonical, legal form, so no
+    // re-normalization is applied here.
     return dispatcher.listSchemas(namespace);
   }
 
