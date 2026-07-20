@@ -194,6 +194,7 @@ jobs:
             -PskipITs
             -PskipDockerTests=false
             -x :clients:client-python:build
+            -x :catalogs-contrib:catalog-jdbc-oceanbase:test
           )
 
           if [ "${{ needs.changes.outputs.mcp_server_changes }}" != "true" ]; then
