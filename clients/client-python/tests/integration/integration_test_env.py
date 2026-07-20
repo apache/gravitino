@@ -186,7 +186,10 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def configure_authorization(
-        cls, enabled: bool, service_admins: str | None = "anonymous", append: bool = True
+        cls,
+        enabled: bool,
+        service_admins: str | None = "anonymous",
+        append: bool = True,
     ):
         cls._get_gravitino_home()
         config = {"gravitino.authorization.enable": str(enabled).lower()}

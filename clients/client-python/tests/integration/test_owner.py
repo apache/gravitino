@@ -16,7 +16,6 @@
 # under the License.
 
 import logging
-import os
 from random import randint
 
 from gravitino import (
