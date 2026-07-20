@@ -64,6 +64,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -1295,6 +1296,131 @@ public class TestJcasbinAuthorizer {
   }
 
   /**
+   * Role assumption narrows allows to the active subset. The caller holds a granting and a
+   * non-granting role; the per-assertion comments below cover each case.
+   */
+  @Test
+  public void testActiveRolesNarrowAllowToNamedRole() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal currentPrincipal = setCurrentPrincipalWithGroup(null);
+
+    RoleEntity grantingRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "grantingRole", ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity nonGrantingRole = mockRoleInStore(30L, "nonGrantingRole", ImmutableList.of());
+    mockDirectUserRoles(grantingRole, nonGrantingRole);
+
+    // Default (ALL) evaluates every role -> allowed.
+    assertTrue(doAuthorizeWithActiveRoles(currentPrincipal, ActiveRoles.all()));
+
+    // Narrowing to the non-granting role removes the granting role's allow -> denied.
+    assertFalse(
+        doAuthorizeWithActiveRoles(
+            currentPrincipal, ActiveRoles.of(ImmutableList.of("nonGrantingRole"))));
+
+    // Narrowing to the granting role keeps the allow -> allowed.
+    assertTrue(
+        doAuthorizeWithActiveRoles(
+            currentPrincipal, ActiveRoles.of(ImmutableList.of("grantingRole"))));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** {@code NONE} activates no role, so every role-derived allow is dropped. */
+  @Test
+  public void testActiveRolesNoneDeniesRoleDerivedAccess() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal currentPrincipal = setCurrentPrincipalWithGroup(null);
+
+    RoleEntity grantingRole =
+        mockRoleInStore(
+            ALLOW_ROLE_ID, "noneGrantingRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(grantingRole);
+
+    assertTrue(doAuthorizeWithActiveRoles(currentPrincipal, ActiveRoles.all()));
+    assertFalse(doAuthorizeWithActiveRoles(currentPrincipal, ActiveRoles.none()));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
+   * Deny stays global: a deny carried by a role that is <em>not</em> in the active set still blocks
+   * access. Here only the granting role is active, but the caller also holds a deny role, so the
+   * request is denied.
+   */
+  @Test
+  public void testActiveRolesDenyStaysGlobalWhenAllowNarrowed() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal currentPrincipal = setCurrentPrincipalWithGroup(null);
+
+    RoleEntity grantingRole =
+        mockRoleInStore(
+            ALLOW_ROLE_ID, "denyGlobalAllowRole", ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity denyRole =
+        mockRoleInStore(
+            DENY_ROLE_ID, "denyGlobalDenyRole", ImmutableList.of(getDenySecurableObject()));
+    mockDirectUserRoles(grantingRole, denyRole);
+
+    assertFalse(
+        doAuthorizeWithActiveRoles(
+            currentPrincipal, ActiveRoles.of(ImmutableList.of("denyGlobalAllowRole"))));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** A group-inherited role can be activated by name exactly like a directly-granted role. */
+  @Test
+  public void testActiveRolesNarrowingCoversGroupInheritedRole() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    Long groupRoleId = 31L;
+    RoleEntity groupRole =
+        mockRoleInStore(
+            groupRoleId, "activeGroupRole", ImmutableList.of(getAllowSecurableObject()));
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(
+        GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of(groupRole.name()));
+
+    assertTrue(
+        doAuthorizeWithActiveRoles(
+            groupPrincipal, ActiveRoles.of(ImmutableList.of("activeGroupRole"))));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
+   * Narrowing is subtractive: naming only a role the caller does not hold activates nothing. The
+   * {@code 403} rejection for unheld roles happens earlier in the request pipeline, not here.
+   */
+  @Test
+  public void testActiveRolesUnheldRoleActivatesNothing() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal currentPrincipal = setCurrentPrincipalWithGroup(null);
+
+    RoleEntity grantingRole =
+        mockRoleInStore(
+            ALLOW_ROLE_ID, "heldGrantingRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(grantingRole);
+
+    assertFalse(
+        doAuthorizeWithActiveRoles(
+            currentPrincipal, ActiveRoles.of(ImmutableList.of("roleTheUserDoesNotHold"))));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
    * Sets the current principal mock to a {@link UserPrincipal} with the given group, or with no
    * groups when {@code groupName} is null. Returns the principal for use in assertions.
    */
@@ -1405,6 +1531,17 @@ public class TestJcasbinAuthorizer {
         MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
         USE_CATALOG,
         new AuthorizationRequestContext());
+  }
+
+  private Boolean doAuthorizeWithActiveRoles(Principal currentPrincipal, ActiveRoles activeRoles) {
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+    requestContext.setActiveRoles(activeRoles);
+    return jcasbinAuthorizer.authorize(
+        currentPrincipal,
+        "testMetalake",
+        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+        USE_CATALOG,
+        requestContext);
   }
 
   private Boolean doAuthorizeOwner(Principal currentPrincipal) {
