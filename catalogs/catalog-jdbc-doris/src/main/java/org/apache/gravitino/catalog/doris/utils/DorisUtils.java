@@ -85,14 +85,7 @@ public final class DorisUtils {
     String[] lines = createTableSql.split("\n");
 
     boolean isProperties = false;
-    // Match a "key"="value" pair where the key/value may contain escaped double quotes ("" or \"),
-    // backslash escapes, and characters (including '=') that are only meaningful inside the
-    // literal.
-    // Using an escape-aware, non-greedy group instead of a greedy ".*" ensures the pair is split at
-    // the real closing quote, so a value that legally contains a quoted "=" is not silently
-    // corrupted. The captured groups are still escaped; callers unescape them below.
-    final String sProperties =
-        "\"((?:\\\\.|\"\"|[^\"\\\\])*)\"\\s*=\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*)\",?";
+    final String sProperties = "\"(.*)\"\\s*=\\s*\"(.*)\",?";
     final Pattern patternProperties = Pattern.compile(sProperties);
 
     for (String line : lines) {
