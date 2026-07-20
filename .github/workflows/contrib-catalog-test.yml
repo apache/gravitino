@@ -119,7 +119,7 @@ jobs:
             exit 0
           fi
 
-          ./gradlew "${gradle_args[@]}" -PskipITs -PskipDockerTests=false -PskipWeb=true
+          ./gradlew "${gradle_args[@]}" -PskipDockerTests=false -PskipWeb=true
 
       - name: Upload contrib catalog test reports
         uses: actions/upload-artifact@v7
