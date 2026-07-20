@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -46,6 +47,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -192,9 +194,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     // Initialize enforcers before caches that reference them in removal listeners
     allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer);
+    allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer, true);
     denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
+    denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer, false);
 
     // loadedRoles: roleId -> updated_at.
     // When evicted, we must clean up the corresponding JCasbin policies.
@@ -696,8 +698,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     Enforcer enforcer;
 
-    public InternalAuthorizer(Enforcer enforcer) {
+    /**
+     * When {@code true}, evaluation considers only the request's active roles instead of every role
+     * the caller holds. Enabled for the allow authorizer so role assumption can drop allows; the
+     * deny authorizer leaves it {@code false} so denies always apply. See {@link #enforceNarrowed}.
+     */
+    private final boolean narrowByActiveRoles;
+
+    public InternalAuthorizer(Enforcer enforcer, boolean narrowByActiveRoles) {
       this.enforcer = enforcer;
+      this.narrowByActiveRoles = narrowByActiveRoles;
     }
 
     private boolean authorizeInternal(
@@ -809,11 +819,71 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return ownerMatchesUserOrGroups(
             owner, PrincipalUtils.getCurrentPrincipal(), metalake, requestContext);
       }
-      return enforcer.enforce(
-          String.valueOf(userId),
-          String.valueOf(metadataObject.type()),
-          String.valueOf(metadataId),
-          privilege);
+
+      String metadataType = String.valueOf(metadataObject.type());
+      String metadataIdStr = String.valueOf(metadataId);
+
+      // Role assumption: if the caller activated only a subset of their roles, check this allow
+      // against just those roles (enforceNarrowed). ALL or an absent header falls through to the
+      // normal check over every role the caller holds.
+      ActiveRoles activeRoles = requestContext.getActiveRoles();
+      if (narrowByActiveRoles && !activeRoles.isAll()) {
+        return enforceNarrowed(
+            userId, metadataType, metadataIdStr, privilege, activeRoles, requestContext);
+      }
+
+      return enforcer.enforce(String.valueOf(userId), metadataType, metadataIdStr, privilege);
+    }
+
+    /**
+     * Enforces one object/privilege against only the active roles the caller actually holds, so
+     * narrowing can never grant access the caller lacks. {@link ActiveRoles#none()} activates no
+     * role and denies every role-derived privilege.
+     *
+     * <p>Deny stays global: denyEnforcer is checked over the caller's full role union first, so a
+     * deny on any held role still applies even when that role is inactive.
+     */
+    private boolean enforceNarrowed(
+        long userId,
+        String metadataType,
+        String metadataIdStr,
+        String privilege,
+        ActiveRoles activeRoles,
+        AuthorizationRequestContext requestContext) {
+      String userIdStr = String.valueOf(userId);
+      if (denyEnforcer.enforce(userIdStr, metadataType, metadataIdStr, privilege)) {
+        return false;
+      }
+      if (activeRoles.isNone()) {
+        return false;
+      }
+      for (String roleId : activeRoleIds(userId, activeRoles, requestContext)) {
+        if (enforcer.enforce(roleId, metadataType, metadataIdStr, privilege)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Returns the ids of the caller's roles whose names are in the active set. Only roles the
+     * caller actually holds are considered, so naming a role the caller lacks activates nothing.
+     */
+    private Set<String> activeRoleIds(
+        long userId, ActiveRoles activeRoles, AuthorizationRequestContext requestContext) {
+      Map<Long, RoleUpdatedAt> roleVersions = requestContext.getPrefetchedRoleVersions();
+      if (roleVersions == null || roleVersions.isEmpty()) {
+        return Collections.emptySet();
+      }
+      Set<String> activeNames = activeRoles.roleNames();
+      Set<String> result = new HashSet<>();
+      for (String roleId : enforcer.getRolesForUser(String.valueOf(userId))) {
+        RoleUpdatedAt roleInfo = roleVersions.get(Long.parseLong(roleId));
+        if (roleInfo != null && activeNames.contains(roleInfo.getRoleName())) {
+          result.add(roleId);
+        }
+      }
+      return result;
     }
   }
 
