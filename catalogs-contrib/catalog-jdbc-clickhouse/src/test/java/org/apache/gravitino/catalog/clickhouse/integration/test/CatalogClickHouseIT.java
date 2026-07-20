@@ -2482,4 +2482,29 @@ public class CatalogClickHouseIT extends BaseIT {
     // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
     Assertions.assertEquals(1, settingsCount);
   }
+
+  @Test
+  void testIPv4ColumnIsExternalType() {
+    // Verify that real ClickHouse IPv4 columns are mapped to ExternalType in Gravitino metadata.
+    // Verify that ClickHouse IPv4 columns are exposed as ExternalType in Gravitino
+    // metadata. This is the first half of the Spark crash path: the Gravitino metadata
+    // layer must return ExternalType for ClickHouse-specific types, which then reaches
+    // SparkTypeConverter.toSparkType() — the crash itself is covered by unit tests
+    // (TestSparkJdbcTypeConverter.testConvertExternalTypeToSparkString).
+    String tableName = GravitinoITUtils.genRandomName("test_ipv4_type_");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32, ip IPv4 COMMENT 'IPv4 address') "
+                + "ENGINE = MergeTree ORDER BY id",
+            schemaName, tableName));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    Column ipCol = loaded.columns()[1];
+    Assertions.assertEquals("ip", ipCol.name());
+    Assertions.assertTrue(
+        ipCol.dataType() instanceof Types.ExternalType,
+        "ClickHouse IPv4 must be ExternalType — otherwise Spark crash path is not triggered");
+    Assertions.assertEquals("IPv4", ((Types.ExternalType) ipCol.dataType()).catalogString());
+  }
 }
