@@ -19,6 +19,8 @@
 package org.apache.gravitino.catalog;
 
 import java.util.Locale;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -49,6 +51,39 @@ public class TestCapabilityHelpers {
         @Override
         public String normalizeName(Scope scope, String name) {
           return null;
+        }
+      };
+
+  /**
+   * Mimics Oracle's quoting convention: a quoted name (e.g. {@code "My Table"}) is unquoted with
+   * its case and embedded spaces preserved, while an unquoted name must match a simple word
+   * pattern. {@code specificationOnName} must see the name as it was originally supplied (still
+   * quoted) rather than the already-unquoted result of {@code normalizeName}, or a quoted name with
+   * a space would be wrongly rejected after normalization even though it was valid as supplied.
+   */
+  private static final Capability QUOTE_AWARE_CAPABILITY =
+      new Capability() {
+        @Override
+        public CapabilityResult specificationOnName(Scope scope, String name) {
+          if (name.startsWith("\"") && name.endsWith("\"") && name.length() >= 2) {
+            return CapabilityResult.SUPPORTED;
+          }
+          return name.matches("^\\w+$")
+              ? CapabilityResult.SUPPORTED
+              : CapabilityResult.unsupported("Illegal name: " + name);
+        }
+
+        @Override
+        public CapabilityResult caseSensitiveOnName(Scope scope) {
+          return CapabilityResult.unsupported("folding depends on quoting");
+        }
+
+        @Override
+        public String normalizeName(Scope scope, String name) {
+          if (name.startsWith("\"") && name.endsWith("\"") && name.length() >= 2) {
+            return name.substring(1, name.length() - 1);
+          }
+          return name.toUpperCase(Locale.ROOT);
         }
       };
 
@@ -91,5 +126,20 @@ public class TestCapabilityHelpers {
         CapabilityHelpers.applyCaseSensitiveOnName(
             Capability.Scope.PARTITION, null, Capability.DEFAULT);
     Assertions.assertNull(normalized);
+  }
+
+  @Test
+  void testApplyCapabilitiesValidatesNameBeforeNormalizing() {
+    // A quoted name with an embedded space is valid as supplied, but its normalized (unquoted)
+    // form no longer matches the plain-word pattern. specificationOnName must be checked against
+    // the original name, not the already-normalized one, or this would be wrongly rejected.
+    NameIdentifier quotedIdent =
+        NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "\"My Table\"");
+
+    NameIdentifier result =
+        CapabilityHelpers.applyCapabilities(
+            quotedIdent, Capability.Scope.TABLE, QUOTE_AWARE_CAPABILITY);
+
+    Assertions.assertEquals("My Table", result.name());
   }
 }

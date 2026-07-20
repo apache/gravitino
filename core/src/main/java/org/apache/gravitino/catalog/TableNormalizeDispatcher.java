@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -52,8 +51,9 @@ public class TableNormalizeDispatcher implements TableDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    NameIdentifier[] identifiers = dispatcher.listTables(caseSensitiveNs);
-    return normalizeCaseSensitive(identifiers);
+    // The catalog guarantees listTables() already returns names in their canonical, legal
+    // form, so no re-normalization is needed here.
+    return dispatcher.listTables(caseSensitiveNs);
   }
 
   @Override
@@ -121,15 +121,6 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   private NameIdentifier normalizeCaseSensitive(NameIdentifier tableIdent) {
     Capability capability = getCapability(tableIdent, catalogManager);
     return applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability);
-  }
-
-  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] tableIdents) {
-    if (ArrayUtils.isEmpty(tableIdents)) {
-      return tableIdents;
-    }
-
-    Capability capabilities = getCapability(tableIdents[0], catalogManager);
-    return applyCaseSensitive(tableIdents, Capability.Scope.TABLE, capabilities);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier tableIdent) {
