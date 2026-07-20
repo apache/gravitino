@@ -279,7 +279,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           Caffeine.newBuilder()
               .expireAfterAccess(1, TimeUnit.HOURS)
               .removalListener(
-                  (ignored, value, cause) -> {
+                  (key, value, cause) -> {
+                    FileSystemCacheKey cacheKey = (FileSystemCacheKey) key;
+                    LOG.debug(
+                        "Removing FileSystem from cache: scheme={}, authority={}, user={}, cause={}",
+                        cacheKey == null ? null : cacheKey.scheme,
+                        cacheKey == null ? null : cacheKey.authority,
+                        cacheKey == null ? null : cacheKey.currentUser,
+                        cause);
                     try {
                       ((FileSystem) value).close();
                     } catch (IOException e) {

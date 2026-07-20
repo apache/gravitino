@@ -69,10 +69,12 @@ public class TagManager implements TagDispatcher {
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
           MetadataObject.Type.FILESET,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.COLUMN,
-          MetadataObject.Type.MODEL);
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.FUNCTION);
 
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     this.idGenerator = idGenerator;

@@ -211,6 +211,40 @@ public class TestUserOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAddUserWithExternalId() throws IOException {
+    UserAddRequest req = new UserAddRequest("user1", "ext-1", false);
+    User user =
+        UserEntity.builder()
+            .withId(1L)
+            .withName("user1")
+            .withExternalId("ext-1")
+            .withEnabled(false)
+            .withRoleNames(Collections.emptyList())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+
+    when(manager.addUser(any(), any(), any(), any(Boolean.class))).thenReturn(user);
+
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
+    Response resp =
+        target("/metalakes/metalake1/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    UserResponse userResponse = resp.readEntity(UserResponse.class);
+    Assertions.assertEquals("ext-1", userResponse.getUser().externalId());
+    Assertions.assertFalse(userResponse.getUser().enabled());
+  }
+
+  @Test
   public void testGetUser() throws IOException {
 
     User user = buildUser("user1");

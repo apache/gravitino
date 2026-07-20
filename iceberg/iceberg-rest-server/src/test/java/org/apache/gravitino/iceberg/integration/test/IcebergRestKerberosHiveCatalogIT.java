@@ -18,31 +18,24 @@
  */
 package org.apache.gravitino.iceberg.integration.test;
 
-import java.io.File;
-import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
-import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.spark.SparkConf;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.jupiter.api.condition.DisabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-@EnabledIf("isEmbedded")
 public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
 
   protected static final String HIVE_METASTORE_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
-  protected static final String HIVE_METASTORE_CLIENT_KEYTAB = "/client.keytab";
 
   protected static String tempDir;
 
@@ -51,58 +44,12 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
   }
 
   void initEnv() {
-    containerSuite.startKerberosHiveContainer();
-    try {
-
-      // Init kerberos configurations;
-      File baseDir = new File(System.getProperty("java.io.tmpdir"));
-      File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
-      file.deleteOnExit();
-      tempDir = file.getAbsolutePath();
-
-      HiveContainer kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
-      kerberosHiveContainer
-          .getContainer()
-          .copyFileFromContainer("/etc/admin.keytab", tempDir + HIVE_METASTORE_CLIENT_KEYTAB);
-
-      String tmpKrb5Path = tempDir + "/krb5.conf_tmp";
-      String krb5Path = tempDir + "/krb5.conf";
-      kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
-
-      // Modify the krb5.conf and change the kdc and admin_server to the container IP
-      String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
-      String content = FileUtils.readFileToString(new File(tmpKrb5Path), StandardCharsets.UTF_8);
-      content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
-      content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
-      FileUtils.write(new File(krb5Path), content, StandardCharsets.UTF_8);
-
-      LOG.info("Kerberos kdc config:\n{}, path: {}", content, krb5Path);
-      System.setProperty("java.security.krb5.conf", krb5Path);
-      System.setProperty("sun.security.krb5.debug", "true");
-      System.setProperty("java.security.krb5.realm", "HADOOPKRB");
-      System.setProperty("java.security.krb5.kdc", ip);
-
-      refreshKerberosConfig();
-      resetDefaultRealm();
-
-      // Give cli@HADOOPKRB permission to access the hdfs
-      containerSuite
-          .getKerberosHiveContainer()
-          .executeInContainer("hadoop", "fs", "-chown", "-R", "cli", "/user/hive/");
-
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    tempDir = IcebergRestKerberosTestEnv.init(containerSuite);
   }
 
-  void resetDefaultRealm() {
-    try {
-      String kerberosNameClass = "org.apache.hadoop.security.authentication.util.KerberosName";
-      Class<?> cl = Class.forName(kerberosNameClass);
-      cl.getMethod("resetDefaultRealm").invoke(null);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  @Override
+  protected void afterIcebergRESTServerStopped() {
+    IcebergRestKerberosTestEnv.reset();
   }
 
   @Override
@@ -115,7 +62,7 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
         HIVE_METASTORE_CLIENT_PRINCIPAL);
     configMap.put(
         "gravitino.iceberg-rest.authentication.kerberos.keytab-uri",
-        tempDir + HIVE_METASTORE_CLIENT_KEYTAB);
+        tempDir + IcebergRestKerberosTestEnv.CLIENT_KEYTAB);
     configMap.put("gravitino.iceberg-rest.hive.metastore.sasl.enabled", "true");
     configMap.put(
         "gravitino.iceberg-rest.hive.metastore.kerberos.principal",
@@ -150,28 +97,44 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
     return configMap;
   }
 
-  protected static boolean isEmbedded() {
-    String mode =
-        System.getProperty(ITUtils.TEST_MODE) == null
-            ? ITUtils.EMBEDDED_TEST_MODE
-            : System.getProperty(ITUtils.TEST_MODE);
-
-    return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
+  @Override
+  protected void customizeSparkConf(SparkConf sparkConf) {
+    IcebergRestKerberosTestEnv.configureSparkKerberos(
+        sparkConf,
+        HIVE_METASTORE_CLIENT_PRINCIPAL,
+        containerSuite.getKerberosHiveContainer().getHostName());
   }
 
-  protected static void refreshKerberosConfig() {
-    Class<?> classRef;
-    try {
-      if (System.getProperty("java.vendor").contains("IBM")) {
-        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
-      } else {
-        classRef = Class.forName("sun.security.krb5.Config");
-      }
+  // Spark writes data files to HDFS directly in these tests; keep them in embedded mode only.
+  @Test
+  @DisabledIf(
+      "org.apache.gravitino.iceberg.integration.test.IcebergRestKerberosTestEnv#isDeployMode")
+  @Override
+  void testDML() {
+    super.testDML();
+  }
 
-      Method refreshMethod = classRef.getMethod("refresh");
-      refreshMethod.invoke(null);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  @Test
+  @DisabledIf(
+      "org.apache.gravitino.iceberg.integration.test.IcebergRestKerberosTestEnv#isDeployMode")
+  @Override
+  void testRegisterTable() {
+    super.testRegisterTable();
+  }
+
+  @Test
+  @DisabledIf(
+      "org.apache.gravitino.iceberg.integration.test.IcebergRestKerberosTestEnv#isDeployMode")
+  @Override
+  void testSnapshot() {
+    super.testSnapshot();
+  }
+
+  @Test
+  @DisabledIf(
+      "org.apache.gravitino.iceberg.integration.test.IcebergRestKerberosTestEnv#isDeployMode")
+  @Override
+  void testRegisterTableOverwrite() throws Exception {
+    super.testRegisterTableOverwrite();
   }
 }

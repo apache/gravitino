@@ -111,6 +111,32 @@ public class IsolatedClassLoader implements Closeable {
     }
   }
 
+  /**
+   * Executes {@code fn} within the isolated class loading context, rethrowing any of the given
+   * {@code passthroughExceptions} unchanged and wrapping everything else in a {@link
+   * RuntimeException}.
+   *
+   * @param fn The function to be executed within the isolated class loading context.
+   * @param passthroughExceptions Exception types to rethrow as-is instead of wrapping.
+   * @param <T> The type of value returned by this method.
+   * @return The return value of the fn that executed within the classloader.
+   */
+  @SafeVarargs
+  public final <T> T withClassLoader(
+      ThrowableFunction<ClassLoader, T> fn,
+      Class<? extends RuntimeException>... passthroughExceptions) {
+    try {
+      return withClassLoader(fn);
+    } catch (Exception e) {
+      for (Class<? extends RuntimeException> exceptionClass : passthroughExceptions) {
+        if (exceptionClass.isInstance(e)) {
+          throw (RuntimeException) e;
+        }
+      }
+      throw new RuntimeException(e);
+    }
+  }
+
   public static IsolatedClassLoader buildClassLoader(List<String> libAndResourcesPaths) {
     // Listing all the classPath under the package path and build the isolated class loader.
     List<URL> classPathContents = Lists.newArrayList();
@@ -182,8 +208,13 @@ public class IsolatedClassLoader implements Closeable {
 
       try {
         return clazz == null ? doLoadClass(name, resolve) : clazz;
+      } catch (ClassNotFoundException e) {
+        // Probe-driven callers, such as Janino, use a plain ClassNotFoundException as a
+        // signal that the current candidate name missed and they should try the next one.
+        // Wrapping it with a cause changes that signal into a fatal loading failure.
+        throw e;
       } catch (Exception e) {
-        throw new ClassNotFoundException("Class not found " + name, e);
+        throw new ClassNotFoundException("Failed to load " + name, e);
       }
     }
 
