@@ -163,20 +163,21 @@ public class TestStarRocksTableOperationsSqlGeneration {
     Assertions.assertTrue(
         createSql.contains("COMMENT 'owner''s comment; DROP TABLE marker; --'"), createSql);
 
+    // The identifier from the existing table (uid42) is preserved and appended exactly once; the
+    // DUMMY_ID marker must not be added again once a marker is already present.
     String alterSql = ops.alterTableSql("test_table", TableChange.updateComment(tableComment));
     Assertions.assertTrue(
         alterSql.contains(
             "COMMENT = \"owner\"\"; DROP TABLE marker; -- "
-                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
-                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
+                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid42)\""),
         alterSql);
+    Assertions.assertFalse(alterSql.contains("gravitino.v1.uid-1"), alterSql);
 
     String clearCommentSql = ops.alterTableSql("test_table", TableChange.updateComment(""));
     Assertions.assertTrue(
-        clearCommentSql.contains(
-            "COMMENT = \"(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
-                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
+        clearCommentSql.contains("COMMENT = \"(From Gravitino, DO NOT EDIT: gravitino.v1.uid42)\""),
         clearCommentSql);
+    Assertions.assertFalse(clearCommentSql.contains("gravitino.v1.uid-1"), clearCommentSql);
   }
 
   @Test

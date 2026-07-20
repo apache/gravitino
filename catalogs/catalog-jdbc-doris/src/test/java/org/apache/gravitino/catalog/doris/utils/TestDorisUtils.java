@@ -113,6 +113,15 @@ public class TestDorisUtils {
             + "\"plain\" = \"owner\\\\s \\\"comment\\\" D:\\data; --\"\n)";
     result = DorisUtils.extractPropertiesFromSql(createTableSql);
     assertEquals("owner\\s \"comment\" D:\\data; --", result.get("plain"));
+
+    // A value that legally contains an escaped quoted "=" must not be split at the wrong point.
+    // Original value is b"="c; generatePropertiesSql doubles the quotes to b""=""c, so the line is
+    // "a"="b""=""c". A greedy, escape-unaware regex would split at the inner "=" and corrupt the
+    // pair; the escape-aware pattern splits at the real closing quote and round-trips correctly.
+    createTableSql = "CREATE DATABASE `test`\nPROPERTIES (\n" + "\"a\"=\"b\"\"=\"\"c\"\n)";
+    result = DorisUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals(1, result.size());
+    assertEquals("b\"=\"c", result.get("a"));
   }
 
   @Test
