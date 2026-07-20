@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -42,6 +43,7 @@ import org.apache.gravitino.SupportsExternalIdOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
+import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
@@ -69,6 +71,11 @@ public class RelationalEntityStore
   private RelationalGarbageCollector garbageCollector;
   private EntityChangeLogPoller entityChangeLogPoller;
   private EntityCache cache;
+
+  // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. A SHARED cache
+  // has a single cluster-wide copy, so there is nothing per-node to invalidate and no listener is
+  // registered.
+  @Nullable private EntityCacheChangeLogListener entityCacheChangeLogListener;
 
   @VisibleForTesting
   public EntityCache getCache() {
@@ -99,6 +106,14 @@ public class RelationalEntityStore
             config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
+
+    // The coherence gate: a LOCAL_PER_NODE cache keeps its own copy per node, so changes made on
+    // other nodes must be replayed here through the change log. A SHARED cache (or a disabled
+    // NoOpsCache) has nothing per-node to invalidate, so no listener is registered.
+    if (cache.coherence() == Coherence.LOCAL_PER_NODE && !(cache instanceof NoOpsCache)) {
+      this.entityCacheChangeLogListener = new EntityCacheChangeLogListener(cache);
+      this.entityChangeLogPoller.registerListener(entityCacheChangeLogListener);
+    }
     this.entityChangeLogPoller.start();
   }
 

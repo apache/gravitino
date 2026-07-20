@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -38,12 +39,14 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -151,6 +154,8 @@ public class PolicyMetaService {
       PolicyPO newPolicyPO =
           POConverters.updatePolicyPOWithVersion(
               oldPolicyPO, updatedPolicyEntity, checkNeedUpdateVersion);
+      // Write the update and its ALTER change-log row (for cross-node cache invalidation) in the
+      // same transaction, so another node's poller never sees the change without the committed row.
       if (checkNeedUpdateVersion) {
         SessionUtils.doMultipleWithCommit(
             () ->
@@ -160,14 +165,41 @@ public class PolicyMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyMetaMapper.class,
-                    mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO)));
+                    mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    EntityChangeLogMapper.class,
+                    mapper ->
+                        mapper.insertEntityChange(
+                            metalakeName,
+                            Entity.EntityType.POLICY.name(),
+                            ident.toString(),
+                            OperateType.ALTER)));
         // we set the updateResult to 1 to indicate that the update is successful
         updateResult = 1;
       } else {
-        updateResult =
-            SessionUtils.doWithCommitAndFetchResult(
-                PolicyMetaMapper.class,
-                mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
+        AtomicInteger metaUpdateResult = new AtomicInteger(0);
+        SessionUtils.doMultipleWithCommit(
+            () -> {
+              Integer result =
+                  SessionUtils.getWithoutCommit(
+                      PolicyMetaMapper.class,
+                      mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
+              metaUpdateResult.set(result == null ? 0 : result);
+            },
+            () -> {
+              if (metaUpdateResult.get() > 0) {
+                SessionUtils.doWithoutCommit(
+                    EntityChangeLogMapper.class,
+                    mapper ->
+                        mapper.insertEntityChange(
+                            metalakeName,
+                            Entity.EntityType.POLICY.name(),
+                            ident.toString(),
+                            OperateType.ALTER));
+              }
+            });
+        updateResult = metaUpdateResult.get();
       }
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -204,7 +236,21 @@ public class PolicyMetaService {
                     PolicyVersionMapper.class,
                     mapper ->
                         mapper.softDeletePolicyVersionByMetalakeAndPolicyName(
-                            metalakeName, ident.name())));
+                            metalakeName, ident.name())),
+        () -> {
+          // Emit a DROP change-log row in the same transaction so other nodes drop their cached
+          // copy of this policy within one poll interval.
+          if (policyMetaDeletedCount[0] > 0) {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.POLICY.name(),
+                        ident.toString(),
+                        OperateType.DROP));
+          }
+        });
     return policyMetaDeletedCount[0] + policyVersionDeletedCount[0] > 0;
   }
 
