@@ -81,6 +81,18 @@ class Name(Enum):
     BINARY = "BINARY"
     """ The binary type with variable length. The length is specified in the type itself. """
 
+    VARIANT = "VARIANT"
+    """ The variant type. A variant holds semi-structured data whose shape is not fixed by the
+    schema. """
+
+    GEOMETRY = "GEOMETRY"
+    """ The geometry type. A geometry holds a geospatial shape (WKB-encoded) on a planar coordinate
+    reference system. """
+
+    GEOGRAPHY = "GEOGRAPHY"
+    """ The geography type. A geography holds a geospatial shape (WKB-encoded) on a spheroidal
+    coordinate reference system, with an edge-interpolation algorithm. """
+
     STRUCT = "STRUCT"
     """
     The struct type.

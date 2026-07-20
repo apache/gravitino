@@ -109,6 +109,11 @@ public class TrinoQueryTestTool {
               + "the default value is ${project_root}/trino-connector/trino-connector/build/libs.");
 
       options.addOption(
+          "test_containers",
+          true,
+          "Specify the docker compose test containers to start, the default value is 'default'.");
+
+      options.addOption(
           "env_only",
           false,
           "Start the environment (Gravitino + Trino) and keep it running for manual testing. Press Ctrl+C to shutdown.");
@@ -258,6 +263,7 @@ public class TrinoQueryTestTool {
       TrinoQueryIT.trinoWorkerNum = extractIntValue(commandLine, "trino_worker_num");
       TrinoQueryIT.trinoVersion = extractIntValue(commandLine, "trino_version");
       TrinoQueryIT.trinoConnectorDir = commandLine.getOptionValue("trino_connector_dir");
+      TrinoQueryIT.testContainers = commandLine.getOptionValue("test_containers");
 
       checkEnv();
 

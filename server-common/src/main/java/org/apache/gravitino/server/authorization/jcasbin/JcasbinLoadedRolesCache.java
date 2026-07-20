@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.casbin.jcasbin.main.Enforcer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A {@link GravitinoCache} of {@code roleId -> updated_at} that synchronously deletes the role's
@@ -37,6 +39,8 @@ import org.casbin.jcasbin.main.Enforcer;
  */
 class JcasbinLoadedRolesCache implements GravitinoCache<Long, Long> {
 
+  private static final Logger LOG = LoggerFactory.getLogger(JcasbinLoadedRolesCache.class);
+
   private final Cache<Long, Long> cache;
 
   JcasbinLoadedRolesCache(long ttlMs, long maxSize, Enforcer allowEnforcer, Enforcer denyEnforcer) {
@@ -47,6 +51,10 @@ class JcasbinLoadedRolesCache implements GravitinoCache<Long, Long> {
             .executor(Runnable::run)
             .removalListener(
                 (Long roleId, Long value, RemovalCause cause) -> {
+                  LOG.debug(
+                      "Removed JCasbin loaded role cache entry, roleId={}, cause={}",
+                      roleId,
+                      cause);
                   if (roleId != null && cause != RemovalCause.REPLACED) {
                     allowEnforcer.deleteRole(String.valueOf(roleId));
                     denyEnforcer.deleteRole(String.valueOf(roleId));

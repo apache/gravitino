@@ -47,6 +47,12 @@ public class TestParseType {
   }
 
   @Test
+  public void testParseTypeVariant() {
+    Type type = ParseType.toType("variant");
+    assertThat(type, instanceOf(Types.VariantType.class));
+  }
+
+  @Test
   public void testParseTypeListValidInput() {
     Type type = ParseType.toType("list(integer)");
     assertThat(type, instanceOf(Types.ListType.class));
