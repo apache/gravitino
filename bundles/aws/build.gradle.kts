@@ -40,19 +40,32 @@ dependencies {
   implementation(libs.guava)
 
   compileOnly(libs.aws.iam)
+  compileOnly(libs.aws.kms)
   compileOnly(libs.aws.policy)
   compileOnly(libs.aws.sts)
   compileOnly(libs.hadoop3.aws)
   compileOnly(libs.hadoop3.client.api)
 
   testImplementation(libs.aws.iam)
+  testImplementation(libs.aws.kms)
   testImplementation(libs.aws.policy)
   testImplementation(libs.aws.sts)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.localstack)
+  testImplementation(testFixtures(project(":api")))
   testRuntimeOnly(libs.junit.jupiter.engine)
+  testRuntimeOnly(libs.slf4j.jdk14)
 }
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-fileset:runtimeJars")
+}
+
+tasks.test {
+  if (project.hasProperty("skipITs")) {
+    exclude("**/integration/test/**")
+  }
 }
