@@ -25,8 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -222,6 +224,84 @@ class TestClassLoaderResourceCleanerUtils {
     systemThread.join();
 
     assertNotNull(cleared[0], "system-group thread ThreadLocals must be left untouched");
+  }
+
+  /**
+   * End-to-end proof that broadening the sweep lets a dropped catalog's ClassLoader be collected. A
+   * long-lived worker thread that is not a {@code Gravitino-webserver-*} thread holds a ThreadLocal
+   * whose value was loaded by the target ClassLoader, which is exactly what pins the ClassLoader
+   * after a catalog is dropped. After {@code clearThreadLocalMap} runs and the test drops its own
+   * references, a WeakReference to the ClassLoader must clear once GC runs. The webserver-only
+   * filter used before would skip this thread and the ClassLoader would stay reachable.
+   */
+  @Test
+  @SuppressWarnings("ThreadLocalUsage") // a per-thread ThreadLocal is the leak this test reproduces
+  void testClearThreadLocalMapLetsDroppedClassLoaderBeCollected() throws Exception {
+    URL classesUrl = LeakyValue.class.getProtectionDomain().getCodeSource().getLocation();
+    ClassLoader platform = ClassLoader.getSystemClassLoader().getParent();
+
+    WeakReference<ClassLoader> ref;
+    // Blocks the worker after it sets the ThreadLocal so the thread stays alive; a thread that
+    // exits would null its own threadLocals in Thread.exit() and hide the leak.
+    CountDownLatch release = new CountDownLatch(1);
+    Thread worker;
+    try {
+      URLClassLoader child = new URLClassLoader(new URL[] {classesUrl}, platform);
+      Object childOwnedValue =
+          Class.forName(LeakyValue.class.getName(), true, child)
+              .getDeclaredConstructor()
+              .newInstance();
+      ref = new WeakReference<>(child);
+
+      CountDownLatch valueSet = new CountDownLatch(1);
+      Object[] valueHolder = {childOwnedValue};
+      worker =
+          new Thread(
+              () -> {
+                ThreadLocal<Object> tl = new ThreadLocal<>();
+                tl.set(valueHolder[0]);
+                valueSet.countDown();
+                try {
+                  release.await();
+                } catch (InterruptedException ignored) {
+                  // test teardown
+                }
+              },
+              "clp-reclaim-probe");
+      worker.setDaemon(true);
+      worker.start();
+      valueSet.await();
+
+      assertFalse(worker.getName().startsWith("Gravitino-webserver-"));
+      ClassLoaderResourceCleanerUtils.clearThreadLocalMap(worker, child);
+
+      // Drop every strong reference the test holds; the only thing that could still pin `child` is
+      // the worker's ThreadLocal, which the sweep just cleared.
+      child.close();
+      child = null;
+      childOwnedValue = null;
+      valueHolder[0] = null;
+    } finally {
+      // nothing yet; worker is released after the assertion
+    }
+
+    assertTrue(
+        awaitCollected(ref),
+        "dropped ClassLoader must be collectable once its ThreadLocal is swept");
+    release.countDown();
+    worker.join(1000);
+  }
+
+  private static boolean awaitCollected(WeakReference<?> ref) throws InterruptedException {
+    for (int i = 0; i < 20; i++) {
+      if (ref.get() == null) {
+        return true;
+      }
+      System.gc();
+      Runtime.getRuntime().runFinalization();
+      Thread.sleep(50);
+    }
+    return ref.get() == null;
   }
 
   private static URL mysqlConnectorJarUrl() {
