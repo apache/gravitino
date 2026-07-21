@@ -49,6 +49,8 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
   private static TableNormalizeDispatcher tableNormalizeDispatcher;
@@ -192,6 +194,86 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
             () -> tableNormalizeDispatcher.createTable(tableIdent3, columns1, "comment", props));
     Assertions.assertEquals(
         "The COLUMN name '*' is reserved. Illegal name: *", exception.getMessage());
+  }
+
+  @Test
+  public void testCreateTableListTablesLoadTableRoundTrip() throws Exception {
+    // Mirrors the correct usage pattern for a quote-aware catalog (e.g. Oracle):
+    // 1. CREATE TABLE "My Table" is issued with a quoted name, so the catalog stores the
+    //    physical table with its case preserved: My Table.
+    // 2. listTables() surfaces that physical name unquoted (My Table) -- this is the behavior
+    //    this PR's fix guarantees: the name is not re-folded by the core layer.
+    // 3. Loading the table again requires re-quoting the case-sensitive name ("My Table"), not
+    //    passing the bare listed name back in: normalizeName cannot tell an already-canonical
+    //    name apart from raw user input, so an unquoted "My Table" would be folded to MY TABLE.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema");
+    TableDispatcher mockDispatcher = Mockito.mock(TableDispatcher.class);
+    Mockito.when(
+            mockDispatcher.createTable(
+                Mockito.any(NameIdentifier.class),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any()))
+        .thenReturn(Mockito.mock(Table.class));
+    Mockito.when(mockDispatcher.loadTable(Mockito.any(NameIdentifier.class)))
+        .thenReturn(Mockito.mock(Table.class));
+
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Mockito.when(mockWrapper.capabilities())
+        .thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+    Mockito.when(mockCatalogManager.loadCatalogAndWrap(Mockito.any(NameIdentifier.class)))
+        .thenReturn(mockWrapper);
+
+    TableNormalizeDispatcher dispatcher =
+        new TableNormalizeDispatcher(mockDispatcher, mockCatalogManager);
+
+    // 1. Create the table with a quoted, case-sensitive name.
+    NameIdentifier quotedCreateIdent = NameIdentifier.of(tableNs, "\"My Table\"");
+    dispatcher.createTable(
+        quotedCreateIdent,
+        new Column[0],
+        "comment",
+        ImmutableMap.of(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    ArgumentCaptor<NameIdentifier> createdIdentCaptor =
+        ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher)
+        .createTable(
+            createdIdentCaptor.capture(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any());
+    String physicalName = createdIdentCaptor.getValue().name();
+    Assertions.assertEquals("My Table", physicalName);
+
+    // 2. listTables() must surface that physical name unchanged.
+    Mockito.when(mockDispatcher.listTables(Mockito.any(Namespace.class)))
+        .thenReturn(new NameIdentifier[] {NameIdentifier.of(tableNs, physicalName)});
+    NameIdentifier[] listed = dispatcher.listTables(tableNs);
+    Assertions.assertEquals(1, listed.length);
+    Assertions.assertEquals("My Table", listed[0].name());
+
+    // 3. Loading the table again requires re-quoting the listed name.
+    NameIdentifier quotedLoadIdent = NameIdentifier.of(tableNs, "\"" + listed[0].name() + "\"");
+    dispatcher.loadTable(quotedLoadIdent);
+
+    ArgumentCaptor<NameIdentifier> loadedIdentCaptor =
+        ArgumentCaptor.forClass(NameIdentifier.class);
+    Mockito.verify(mockDispatcher).loadTable(loadedIdentCaptor.capture());
+    Assertions.assertEquals("My Table", loadedIdentCaptor.getValue().name());
   }
 
   private void assertTableCaseInsensitive(
