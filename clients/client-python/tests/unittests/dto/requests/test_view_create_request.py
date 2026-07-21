@@ -91,6 +91,11 @@ class TestViewCreateRequest(unittest.TestCase):
         with self.assertRaises(ValueError):
             request.validate()
 
+    def test_serialize_excludes_missing_representations(self):
+        request = ViewCreateRequest(_name="test_view")
+
+        self.assertNotIn('"representations"', request.to_json())
+
     def test_validate_rejects_missing_representations(self):
         request = ViewCreateRequest(_name="test_view")
 

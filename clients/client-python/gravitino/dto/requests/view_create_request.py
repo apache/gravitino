@@ -46,6 +46,7 @@ class ViewCreateRequest(RESTRequest):
             decoder=lambda values: [
                 RepresentationSerdes.deserialize(value) for value in values
             ],
+            exclude=lambda value: value is None,
         ),
     )
     _comment: Optional[str] = field(default=None, metadata=config(field_name="comment"))

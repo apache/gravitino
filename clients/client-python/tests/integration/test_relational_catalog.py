@@ -17,6 +17,7 @@
 
 import logging
 from random import randint
+from uuid import uuid4
 
 from gravitino import (
     Catalog,
@@ -57,8 +58,6 @@ class TestRelationalCatalog(IntegrationTestEnv):
     TABLE_IDENT: NameIdentifier = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME)
     TABLE_COMMENT: str = "Test table for relational catalog"
     TABLE_PROPERTIES = {"property1": "value1", "property2": "value2"}
-    VIEW_NAME: str = "test_view"
-    VIEW_IDENT: NameIdentifier = NameIdentifier.of(SCHEMA_NAME, VIEW_NAME)
     VIEW_COMMENT: str = "Test view for relational catalog"
     VIEW_PROPERTIES = {"view_property1": "value1", "view_property2": "value2"}
 
@@ -102,6 +101,10 @@ class TestRelationalCatalog(IntegrationTestEnv):
         super().tearDownClass()
 
     def setUp(self):
+        self.view_name = f"test_view_{uuid4().hex}"
+        self.view_ident = NameIdentifier.of(
+            TestRelationalCatalog.SCHEMA_NAME, self.view_name
+        )
         # Create schema for each test
         TestRelationalCatalog.schema = (
             TestRelationalCatalog.catalog.as_schemas().create_schema(
@@ -155,7 +158,7 @@ class TestRelationalCatalog(IntegrationTestEnv):
         ]
 
         return view_catalog.create_view(
-            identifier=TestRelationalCatalog.VIEW_IDENT,
+            identifier=self.view_ident,
             columns=columns,
             representations=[
                 SQLRepresentation(
@@ -347,7 +350,7 @@ class TestRelationalCatalog(IntegrationTestEnv):
         self._create_test_table()
         view = self._create_test_view()
         self.assertIsNotNone(view)
-        self.assertEqual(view.name(), TestRelationalCatalog.VIEW_NAME)
+        self.assertEqual(view.name(), self.view_name)
         self.assertEqual(view.comment(), TestRelationalCatalog.VIEW_COMMENT)
         self.assertEqual(view.properties().get("view_property1"), "value1")
         self.assertEqual(view.properties().get("view_property2"), "value2")
@@ -369,7 +372,7 @@ class TestRelationalCatalog(IntegrationTestEnv):
 
         with self.assertRaises(ViewAlreadyExistsException):
             view_catalog.create_view(
-                identifier=TestRelationalCatalog.VIEW_IDENT,
+                identifier=self.view_ident,
                 columns=[Column.of("id", Types.LongType.get(), "Primary key")],
                 representations=[
                     SQLRepresentation(
@@ -385,13 +388,12 @@ class TestRelationalCatalog(IntegrationTestEnv):
         self._create_test_view()
         view_catalog = self.catalog.as_view_catalog()
 
-        is_dropped = view_catalog.drop_view(TestRelationalCatalog.VIEW_IDENT)
+        is_dropped = view_catalog.drop_view(self.view_ident)
         self.assertTrue(is_dropped)
 
     def test_relational_catalog_drop_view_not_exists(self):
         """Test dropping a view that doesn't exist should return False."""
         view_catalog = self.catalog.as_view_catalog()
-        ident = NameIdentifier.of(TestRelationalCatalog.SCHEMA_NAME, "invalid_view")
 
-        is_dropped = view_catalog.drop_view(ident)
+        is_dropped = view_catalog.drop_view(self.view_ident)
         self.assertFalse(is_dropped)
