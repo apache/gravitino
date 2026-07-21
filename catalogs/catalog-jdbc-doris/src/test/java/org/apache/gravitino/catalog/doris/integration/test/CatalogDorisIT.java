@@ -812,6 +812,12 @@ public class CatalogDorisIT extends BaseIT {
         null,
         new Transform[] {Transforms.range(new String[] {DORIS_COL_NAME4})},
         loadedTable);
+    RangePartition[] rangeAssignments =
+        ((Transforms.RangeTransform) loadedTable.partitioning()[0]).assignments();
+    assertEquals(3, rangeAssignments.length);
+    assertEquals(
+        Set.of("p1", "p2", "p3"),
+        Arrays.stream(rangeAssignments).map(Partition::name).collect(Collectors.toSet()));
 
     // assert partition info
     SupportsPartitions tablePartitionOperations = loadedTable.supportPartitions();
@@ -876,6 +882,12 @@ public class CatalogDorisIT extends BaseIT {
         null,
         new Transform[] {Transforms.list(new String[][] {{DORIS_COL_NAME1}, {DORIS_COL_NAME4}})},
         loadedTable);
+    ListPartition[] listAssignments =
+        ((Transforms.ListTransform) loadedTable.partitioning()[0]).assignments();
+    assertEquals(2, listAssignments.length);
+    assertEquals(
+        Set.of("p4", "p5"),
+        Arrays.stream(listAssignments).map(Partition::name).collect(Collectors.toSet()));
 
     // assert partition info
     tablePartitionOperations = loadedTable.supportPartitions();
