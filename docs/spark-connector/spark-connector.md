@@ -108,5 +108,5 @@ Gravitino spark connector support the following datatype mapping between Spark a
 :::note
 For Gravitino `UUID` and `ExternalType` types, Spark connector represents them as `StringType`:
 - `UUID`: Spark has no native UUID type. This behavior is consistent with Spark built-in PostgreSQL JDBC mapping (`uuid` -> `StringType`).
-- `ExternalType`: Represents types that have no Gravitino-native mapping (e.g. ClickHouse `IPv4`/`IPv6`, Doris `LARGEINT`/`BITMAP`, Glue unknown types). These columns are preserved as `StringType` so that tables remain loadable in Spark. Users can `CAST` to the desired type as needed, e.g. `CAST(ip AS STRING)`.
+- `ExternalType`: Represents types that have no Gravitino-native mapping (e.g. ClickHouse `IPv4`/`IPv6`, Doris `LARGEINT`/`BITMAP`, Glue unknown types). These columns are preserved as `StringType` so that tables remain loadable in Spark. Users can `CAST` to the desired type as needed, e.g. `CAST(col AS BIGINT)`.
 :::

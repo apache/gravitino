@@ -2485,9 +2485,8 @@ public class CatalogClickHouseIT extends BaseIT {
 
   @Test
   void testIPv4ColumnIsExternalType() {
-    // Verify that real ClickHouse IPv4 columns are mapped to ExternalType in Gravitino metadata.
-    // Verify that ClickHouse IPv4 columns are exposed as ExternalType in Gravitino
-    // metadata. This is the first half of the Spark crash path: the Gravitino metadata
+    // Verify that ClickHouse IPv4 columns are exposed as ExternalType in Gravitino metadata.
+    // This is the first half of the Spark crash path: the Gravitino metadata
     // layer must return ExternalType for ClickHouse-specific types, which then reaches
     // SparkTypeConverter.toSparkType() — the crash itself is covered by unit tests
     // (TestSparkJdbcTypeConverter.testConvertExternalTypeToSparkString).
