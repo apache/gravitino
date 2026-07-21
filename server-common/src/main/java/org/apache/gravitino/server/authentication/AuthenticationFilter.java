@@ -96,7 +96,6 @@ public class AuthenticationFilter implements Filter {
         if (authenticator.supportsToken(authData) && authenticator.isDataFromToken()) {
           principal = authenticator.authenticateToken(authData);
           if (principal != null) {
-            request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
             break;
           }
         }
@@ -110,9 +109,10 @@ public class AuthenticationFilter implements Filter {
           ActiveRolesParser.parse(req.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER));
       if (!activeRoles.isAll() && principal instanceof UserPrincipal) {
         principal = ((UserPrincipal) principal).withActiveRoles(activeRoles);
-        // Sync the attribute so re-binds from it (e.g. Utils.doAs) also see the narrowed roles.
-        request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
       }
+      // Publish the finalized principal (already carrying any narrowed roles) so downstream
+      // re-binds from the attribute (e.g. Utils.doAs) see the same identity and roles.
+      request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
       PrincipalUtils.doAs(
           principal,
           () -> {
