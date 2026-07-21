@@ -28,6 +28,7 @@ from mcp_server.client.statistic_operation import StatisticOperation
 from mcp_server.client.table_operation import TableOperation
 from mcp_server.client.tag_operation import TagOperation
 from mcp_server.client.topic_operation import TopicOperation
+from mcp_server.client.view_operation import ViewOperation
 
 
 class GravitinoOperation(ABC):
@@ -141,5 +142,15 @@ class GravitinoOperation(ABC):
 
         Returns:
             PartitionOperation: Interface for performing partition-level operations
+        """
+        pass
+
+    @abstractmethod
+    def as_view_operation(self) -> ViewOperation:
+        """
+        Access the view operation interface of this Gravitino operation.
+
+        Returns:
+            ViewOperation: Interface for performing view-level operations
         """
         pass
