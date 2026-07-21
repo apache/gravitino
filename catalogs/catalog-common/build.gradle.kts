@@ -34,6 +34,9 @@ dependencies {
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  // Used only by TestClassLoaderResourceCleanerUtils to verify the MySQL
+  // AbandonedConnectionCleanupThread is shut down during ClassLoader cleanup.
+  testImplementation(libs.mysql.driver)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
