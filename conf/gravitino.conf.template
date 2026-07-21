@@ -60,6 +60,10 @@ gravitino.entity.store.relational.jdbcPassword = gravitino
 # THE CONFIGURATION FOR Gravitino CATALOG
 # The interval in milliseconds to evict the catalog cache
 gravitino.catalog.cache.evictionIntervalMs = 3600000
+# Whether to share a ClassLoader across catalogs that have identical isolation-relevant properties.
+# When true (default), such catalogs reuse one ClassLoader, reducing Metaspace usage. Set to false
+# to give every catalog its own ClassLoader, as in releases before 2.0.0.
+gravitino.catalog.classloader.sharing.enabled = true
 
 # THE CONFIGURATION FOR Gravitino Entity Cache
 # Whether to enable the cached Entity store.

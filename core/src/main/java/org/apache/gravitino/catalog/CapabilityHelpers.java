@@ -252,9 +252,8 @@ public class CapabilityHelpers {
   }
 
   private static String[] applyCapabilities(String[] fieldName, Capability capabilities) {
-    String[] sensitiveOnColumnName = applyCaseSensitiveOnColumnName(fieldName, capabilities);
-    applyNameSpecification(Capability.Scope.COLUMN, sensitiveOnColumnName[0], capabilities);
-    return sensitiveOnColumnName;
+    applyNameSpecification(Capability.Scope.COLUMN, fieldName[0], capabilities);
+    return applyCaseSensitiveOnColumnName(fieldName, capabilities);
   }
 
   private static Transform applyCapabilities(Transform transform, Capability capabilities) {
@@ -343,38 +342,42 @@ public class CapabilityHelpers {
 
   private static FilesetChange applyCapabilities(
       FilesetChange.RenameFileset renameFileset, Capability capabilities) {
+    applyNameSpecification(Capability.Scope.FILESET, renameFileset.getNewName(), capabilities);
     String newName =
         applyCaseSensitiveOnName(
             Capability.Scope.FILESET, renameFileset.getNewName(), capabilities);
-    applyNameSpecification(Capability.Scope.FILESET, newName, capabilities);
     return FilesetChange.rename(newName);
   }
 
   private static ViewChange applyCapabilities(
       ViewChange.RenameView renameView, Capability capabilities) {
+    applyNameSpecification(Capability.Scope.VIEW, renameView.getNewName(), capabilities);
     String newName =
         applyCaseSensitiveOnName(Capability.Scope.VIEW, renameView.getNewName(), capabilities);
-    applyNameSpecification(Capability.Scope.VIEW, newName, capabilities);
     return ViewChange.rename(newName);
   }
 
   private static TableChange applyCapabilities(
       TableChange.RenameTable renameTable, Capability capabilities) {
+    applyNameSpecification(Capability.Scope.TABLE, renameTable.getNewName(), capabilities);
     String newName =
         applyCaseSensitiveOnName(Capability.Scope.TABLE, renameTable.getNewName(), capabilities);
     String newSchemaName =
         renameTable
             .getNewSchemaName()
-            .map(s -> applyCaseSensitiveOnName(Capability.Scope.SCHEMA, s, capabilities))
+            .map(
+                s -> {
+                  applyNameSpecification(Capability.Scope.SCHEMA, s, capabilities);
+                  return applyCaseSensitiveOnName(Capability.Scope.SCHEMA, s, capabilities);
+                })
             .orElse(null);
-    applyNameSpecification(Capability.Scope.TABLE, newName, capabilities);
     return TableChange.rename(newName, newSchemaName);
   }
 
   private static TableChange applyCapabilities(
       TableChange.ColumnChange change, Capability capabilities) {
+    applyNameSpecification(Capability.Scope.COLUMN, change.fieldName()[0], capabilities);
     String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
-    applyNameSpecification(Capability.Scope.COLUMN, fieldName[0], capabilities);
 
     if (change instanceof TableChange.AddColumn) {
       return applyCapabilities((TableChange.AddColumn) change, capabilities);
@@ -404,10 +407,10 @@ public class CapabilityHelpers {
           (TableChange.UpdateColumnPosition) change;
       if (updateColumnPosition.getPosition() instanceof TableChange.After) {
         TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
+        applyNameSpecification(Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
         String afterFieldName =
             applyCaseSensitiveOnName(
                 Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
-        applyNameSpecification(Capability.Scope.COLUMN, afterFieldName, capabilities);
         return TableChange.updateColumnPosition(
             fieldName, TableChange.ColumnPosition.after(afterFieldName));
       }
@@ -498,9 +501,8 @@ public class CapabilityHelpers {
 
   private static String applyCapabilitiesOnName(
       Capability.Scope scope, String name, Capability capabilities) {
-    String standardizeName = applyCaseSensitiveOnName(scope, name, capabilities);
-    applyNameSpecification(scope, standardizeName, capabilities);
-    return standardizeName;
+    applyNameSpecification(scope, name, capabilities);
+    return applyCaseSensitiveOnName(scope, name, capabilities);
   }
 
   public static String applyCaseSensitiveOnName(
