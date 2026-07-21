@@ -51,6 +51,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -72,6 +73,9 @@ import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.metrics.source.HiveCatalogMetricsSource;
+import org.apache.gravitino.metrics.source.MetricsProvider;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
@@ -111,6 +115,8 @@ public class HiveCatalogOperations
   private HiveViewCatalogOperations viewCatalogOperations;
 
   private boolean listAllTables = true;
+
+  private HiveCatalogMetricsSource catalogMetricsSource;
   // The maximum number of tables that can be returned by the listTableNamesByFilter function.
   // The default value is -1, which means that all tables are returned.
   private static final short MAX_TABLES = -1;
@@ -145,6 +151,30 @@ public class HiveCatalogOperations
     String catalogKey =
         String.format("hive-%s", info == null || info.id() == null ? "0" : info.id());
     this.clientPool = new CachedClientPool(catalogKey, prop, conf);
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    // Metrics System could be null in UT.
+    if (metricsSystem != null) {
+      this.catalogMetricsSource =
+          new HiveCatalogMetricsSource(info.namespace().toString(), info.name());
+      catalogMetricsSource.registerClientPoolMetrics(
+          new MetricsProvider() {
+            @Override
+            public int currentSize() {
+              return clientPool.totalCurrentSize();
+            }
+
+            @Override
+            public int idleCount() {
+              return clientPool.totalIdleCount();
+            }
+
+            @Override
+            public int poolSize() {
+              return clientPool.totalPoolSize();
+            }
+          });
+      metricsSystem.register(catalogMetricsSource);
+    }
     this.listAllTables = enableListAllTables(conf);
 
     // Initialize the HMS catalog name from catalog properties (default to DEFAULT_HMS_CATALOG)
@@ -193,6 +223,11 @@ public class HiveCatalogOperations
   /** Closes the Hive catalog and releases the associated client pool. */
   @Override
   public void close() {
+    // Metrics System could be null in UT.
+    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
+    if (metricsSystem != null) {
+      metricsSystem.unregister(catalogMetricsSource);
+    }
     if (clientPool != null) {
       clientPool.close();
       clientPool = null;

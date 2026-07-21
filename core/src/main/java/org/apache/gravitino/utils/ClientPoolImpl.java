@@ -165,6 +165,16 @@ public abstract class ClientPoolImpl<C, E extends Exception>
     return poolSize;
   }
 
+  public int currentSize() {
+    return currentSize;
+  }
+
+  public int idleCount() {
+    synchronized (this) {
+      return clients.size();
+    }
+  }
+
   public boolean isClosed() {
     return closed;
   }
