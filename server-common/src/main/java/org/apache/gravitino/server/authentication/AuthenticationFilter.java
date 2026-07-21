@@ -104,16 +104,13 @@ public class AuthenticationFilter implements Filter {
       if (principal == null) {
         throw new UnauthorizedException("The provided credentials did not support");
       }
-      // Role assumption: parse the active-role header (syntactic only; a malformed value maps to
-      // 400 via IllegalActiveRolesException) and attach it to the principal. Membership 403 is
-      // checked later, where the metalake and the caller's roles are known. Only wrap when the
-      // caller actually narrowed; the default principal already carries ALL.
+      // Role assumption: parse the header (syntactic only; malformed -> 400) and, only when
+      // narrowed, attach the roles to the principal. Membership 403 is checked later.
       ActiveRoles activeRoles =
           ActiveRolesParser.parse(req.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER));
       if (!activeRoles.isAll() && principal instanceof UserPrincipal) {
         principal = ((UserPrincipal) principal).withActiveRoles(activeRoles);
-        // Keep the request attribute in sync so paths that re-bind the principal from it (e.g.
-        // Utils.doAs around REST operation bodies) also see the narrowed roles, not the original.
+        // Sync the attribute so re-binds from it (e.g. Utils.doAs) also see the narrowed roles.
         request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
       }
       PrincipalUtils.doAs(
