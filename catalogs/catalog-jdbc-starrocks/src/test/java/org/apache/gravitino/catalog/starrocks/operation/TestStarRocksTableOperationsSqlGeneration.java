@@ -163,21 +163,23 @@ public class TestStarRocksTableOperationsSqlGeneration {
     Assertions.assertTrue(
         createSql.contains("COMMENT 'owner''s comment; DROP TABLE marker; --'"), createSql);
 
-    // The identifier from the existing table (uid42) is preserved and appended exactly once; the
-    // DUMMY_ID marker must not be added again once a marker is already present.
+    // The existing table's identifier (uid42) is preserved, and a sacrificial DUMMY_ID (uid-1)
+    // marker is appended on top: the read path (extractTableCommentFromSql) strips exactly one
+    // (outermost) marker, so the real identifier survives the round-trip.
     String alterSql = ops.alterTableSql("test_table", TableChange.updateComment(tableComment));
     Assertions.assertTrue(
         alterSql.contains(
             "COMMENT = \"owner\"\"; DROP TABLE marker; -- "
-                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid42)\""),
+                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
+                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
         alterSql);
-    Assertions.assertFalse(alterSql.contains("gravitino.v1.uid-1"), alterSql);
 
     String clearCommentSql = ops.alterTableSql("test_table", TableChange.updateComment(""));
     Assertions.assertTrue(
-        clearCommentSql.contains("COMMENT = \"(From Gravitino, DO NOT EDIT: gravitino.v1.uid42)\""),
+        clearCommentSql.contains(
+            "COMMENT = \"(From Gravitino, DO NOT EDIT: gravitino.v1.uid42) "
+                + "(From Gravitino, DO NOT EDIT: gravitino.v1.uid-1)\""),
         clearCommentSql);
-    Assertions.assertFalse(clearCommentSql.contains("gravitino.v1.uid-1"), clearCommentSql);
   }
 
   @Test

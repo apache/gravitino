@@ -178,8 +178,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
             newComment = StringIdentifier.addToComment(identifier, newComment);
           }
         }
-        if (StringUtils.isNotEmpty(newComment)
-            && StringIdentifier.fromComment(newComment) == null) {
+        if (StringUtils.isNotEmpty(newComment)) {
           newComment = StringIdentifier.addToComment(StringIdentifier.DUMMY_ID, newComment);
         }
         alterSql.add("COMMENT = \"" + escapeSqlLiteral(newComment, '"') + "\"");
