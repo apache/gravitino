@@ -32,6 +32,7 @@ dependencies {
   }
 
   implementation(libs.azure.identity)
+  implementation(libs.azure.security.keyvault.keys)
   implementation(libs.azure.storage.file.datalake)
   implementation(libs.hadoop3.abs)
   implementation(libs.hadoop3.client.api)

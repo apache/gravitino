@@ -40,16 +40,30 @@ dependencies {
   implementation(libs.guava)
 
   compileOnly(libs.azure.identity)
+  compileOnly(libs.azure.security.keyvault.keys)
   compileOnly(libs.azure.storage.file.datalake)
   compileOnly(libs.hadoop3.abs)
   compileOnly(libs.hadoop3.client.api)
 
   testImplementation(libs.azure.identity)
+  testImplementation(libs.azure.security.keyvault.keys)
+  testImplementation(testFixtures(project(":api")))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
+  testRuntimeOnly(libs.slf4j.simple)
 }
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-fileset:runtimeJars")
+}
+
+tasks.test {
+  if (project.hasProperty("skipITs")) {
+    exclude("**/integration/test/**")
+  } else {
+    testLogging.showStandardStreams = true
+    systemProperty("org.slf4j.simpleLogger.defaultLogLevel", "warn")
+    systemProperty("org.slf4j.simpleLogger.log.com.azure", "off")
+  }
 }
