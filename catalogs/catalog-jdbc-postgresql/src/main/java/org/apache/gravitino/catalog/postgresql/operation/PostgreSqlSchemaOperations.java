@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations.PG_QUOTE;
 
 import com.google.common.collect.ImmutableSet;
@@ -106,8 +107,8 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
           .append(PG_QUOTE)
           .append(schema)
           .append(PG_QUOTE)
-          .append(" IS '")
-          .append(comment.replace("'", "''"))
+          .append(" IS E'")
+          .append(escapeSqlLiteral(comment, '\''))
           .append("'");
     }
     return sqlBuilder.toString();

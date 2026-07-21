@@ -104,7 +104,6 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
-import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
 import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -993,8 +992,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     if (metricsSystem != null) {
       metricsSystem.unregister(catalogMetricsSource);
     }
-
-    ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
   }
 
   private void validateLocationHierarchy(

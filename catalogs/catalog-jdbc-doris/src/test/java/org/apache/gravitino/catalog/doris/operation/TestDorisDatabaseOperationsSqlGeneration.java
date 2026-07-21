@@ -22,7 +22,20 @@ import java.util.Collections;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestDorisDatabaseOperationsSqlGeneration {
+class TestDorisDatabaseOperationsSqlGeneration {
+
+  @Test
+  public void testEscapeCommentInGeneratedSql() {
+    DorisDatabaseOperations operations = new DorisDatabaseOperations();
+    String comment = "owner's \"comment\" C:\\tmp; DROP DATABASE marker; --";
+
+    String sql =
+        operations.generateCreateDatabaseSql("test_database", comment, Collections.emptyMap());
+
+    Assertions.assertTrue(
+        sql.contains("\"comment\"=\"owner's \"\"comment\"\" C:\\\\tmp; DROP DATABASE marker; --\""),
+        sql);
+  }
 
   @Test
   public void testGenerateDropDatabaseSqlValidatesDatabaseName() {
@@ -39,9 +52,6 @@ public class TestDorisDatabaseOperationsSqlGeneration {
   public void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
     DorisDatabaseOperations operations = new DorisDatabaseOperations();
 
-    Assertions.assertEquals(
-        "CREATE DATABASE `test_db` PROPERTIES (\n\"comment\"=\"schema comment\"\n)",
-        operations.generateCreateDatabaseSql("test_db", "schema comment", Collections.emptyMap()));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->

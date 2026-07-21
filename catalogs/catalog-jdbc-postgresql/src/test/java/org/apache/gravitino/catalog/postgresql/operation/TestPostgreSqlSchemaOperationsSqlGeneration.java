@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -25,6 +25,20 @@ import org.junit.jupiter.api.Test;
 public class TestPostgreSqlSchemaOperationsSqlGeneration {
 
   @Test
+  public void testEscapeCommentInGeneratedSql() {
+    PostgreSqlSchemaOperations operations = new PostgreSqlSchemaOperations();
+
+    String sql =
+        operations.generateCreateDatabaseSql(
+            "test_schema", "owner\\'s comment; DROP SCHEMA marker; --", Collections.emptyMap());
+
+    Assertions.assertEquals(
+        "CREATE SCHEMA \"test_schema\";COMMENT ON SCHEMA \"test_schema\" "
+            + "IS E'owner\\\\''s comment; DROP SCHEMA marker; --'",
+        sql);
+  }
+
+  @Test
   public void testGenerateCreateDatabaseSqlValidatesSchemaName() {
     PostgreSqlSchemaOperations operations = new PostgreSqlSchemaOperations();
 
@@ -36,18 +50,6 @@ public class TestPostgreSqlSchemaOperationsSqlGeneration {
         () ->
             operations.generateCreateDatabaseSql(
                 "schema\"; DROP TABLE users; --", null, Collections.emptyMap()));
-  }
-
-  @Test
-  public void testGenerateCreateDatabaseSqlEscapesComment() {
-    PostgreSqlSchemaOperations operations = new PostgreSqlSchemaOperations();
-
-    String sql =
-        operations.generateCreateDatabaseSql(
-            "test_schema", "Jandy's schema", Collections.emptyMap());
-    Assertions.assertEquals(
-        "CREATE SCHEMA \"test_schema\";COMMENT ON SCHEMA \"test_schema\" IS 'Jandy''s schema'",
-        sql);
   }
 
   @Test
