@@ -125,6 +125,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
       if (Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())) {
         params.put(HiveView.TRINO_VIEW_MARKER_KEY, "true");
+      } else {
+        params.remove(HiveView.TRINO_VIEW_MARKER_KEY);
       }
       String viewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
 
@@ -226,6 +228,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
           updatedViewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
           if (Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())) {
             updatedProperties.put(HiveView.TRINO_VIEW_MARKER_KEY, "true");
+          } else {
+            updatedProperties.remove(HiveView.TRINO_VIEW_MARKER_KEY);
           }
         } else {
           throw new IllegalArgumentException(

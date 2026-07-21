@@ -257,6 +257,43 @@ class TestHiveCatalogOperations {
   }
 
   @Test
+  void testCreateViewClearsStalePrestoViewMarkerForNonTrinoDialect() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
+    when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing().when(hiveClient).createTable(hiveTableCaptor.capture());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    Map<String, String> propertiesWithStaleMarker = Maps.newHashMap();
+    propertiesWithStaleMarker.put("presto_view", "true");
+
+    op.createView(
+        NameIdentifier.of("db", "v_hive"),
+        null,
+        new Column[0],
+        new SQLRepresentation[] {
+          SQLRepresentation.builder().withDialect("hive").withSql("SELECT 1").build()
+        },
+        null,
+        null,
+        propertiesWithStaleMarker);
+
+    Assertions.assertNull(hiveTableCaptor.getValue().properties().get("presto_view"));
+  }
+
+  @Test
   void testCreateViewPassesColumnsToHiveMetastore() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
@@ -652,6 +689,56 @@ class TestHiveCatalogOperations {
     SQLRepresentation representation = (SQLRepresentation) updated.representations()[0];
     Assertions.assertEquals("trino", representation.dialect());
     Assertions.assertEquals("SELECT 2", representation.sql());
+  }
+
+  @Test
+  void testAlterViewReplaceClearsPrestoViewMarkerForNonTrinoDialect() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_trino")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "presto_view",
+                        "true")))
+            .withViewOriginalText("SELECT 1")
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(hiveClient)
+        .alterTable(anyString(), anyString(), anyString(), hiveTableCaptor.capture());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    op.alterView(
+        NameIdentifier.of("db", "v_trino"),
+        ViewChange.replaceView(
+            new Column[0],
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("hive").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null));
+
+    Assertions.assertNull(hiveTableCaptor.getValue().properties().get("presto_view"));
   }
 
   @Test

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
@@ -577,19 +578,29 @@ public class CatalogConnectorMetadata {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION, "Catalog does not support views");
     }
+    Preconditions.checkArgument(
+        view.getSql() != null,
+        "View %s.%s has no Trino dialect SQL representation",
+        view.getSchemaName(),
+        view.getName());
     NameIdentifier identifier = NameIdentifier.of(view.getSchemaName(), view.getName());
     SQLRepresentation[] representations = {
       SQLRepresentation.builder().withDialect(Dialects.TRINO).withSql(view.getSql()).build()
     };
     try {
       boolean exists = viewCatalog.viewExists(identifier);
-      if (exists && !getViewIfPresent(view.getSchemaName(), view.getName()).isPresent()) {
-        // An entity with this name already exists but is not visible to Trino (e.g. a view
-        // created by another engine), so it must not be treated as replaceable.
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists");
-      } else if (exists && replace) {
+      if (exists) {
         View existingView = viewCatalog.loadView(identifier);
+        if (!existingView.sqlFor(Dialects.TRINO).isPresent()) {
+          // An entity with this name already exists but is not visible to Trino (e.g. a view
+          // created by another engine), so it must not be treated as replaceable.
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists");
+        }
+        if (!replace) {
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists");
+        }
         viewCatalog.alterView(
             identifier,
             ViewChange.replaceView(
@@ -598,9 +609,6 @@ public class CatalogConnectorMetadata {
                 view.getDefaultCatalog(),
                 view.getDefaultSchema(),
                 view.getComment()));
-      } else if (exists) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists");
       } else {
         viewCatalog.createView(
             identifier,

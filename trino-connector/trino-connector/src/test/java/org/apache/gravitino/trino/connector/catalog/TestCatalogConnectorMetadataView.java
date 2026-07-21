@@ -195,6 +195,15 @@ public class TestCatalogConnectorMetadataView {
   }
 
   @Test
+  public void testCreateViewRejectsViewWithoutTrinoSql() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    GravitinoView view = createGravitinoView("db", "v1", null);
+
+    assertThrows(IllegalArgumentException.class, () -> metadata.createView(view, false));
+  }
+
+  @Test
   public void testCreateViewCreatesWhenNotExists() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.viewExists(any())).thenReturn(false);
