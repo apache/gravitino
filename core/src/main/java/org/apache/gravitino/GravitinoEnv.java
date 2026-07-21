@@ -56,6 +56,7 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.encryption.kms.KmsClientRegistry;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
@@ -154,6 +155,8 @@ public class GravitinoEnv {
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
 
+  private KmsClientRegistry kmsClientRegistry;
+
   private TagDispatcher tagDispatcher;
 
   private PolicyDispatcher policyDispatcher;
@@ -222,7 +225,13 @@ public class GravitinoEnv {
     FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
     this.manageFullComponents = true;
     initBaseComponents();
-    initGravitinoServerComponents();
+    try {
+      this.kmsClientRegistry = new KmsClientRegistry(config);
+      initGravitinoServerComponents();
+    } catch (RuntimeException e) {
+      closeKmsClientRegistry();
+      throw e;
+    }
     LOG.info("Gravitino full environment is initialized.");
   }
 
@@ -419,6 +428,18 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the metadata-only KMS client registry associated with the full Gravitino environment.
+   *
+   * @return The KMS client registry instance.
+   * @throws IllegalStateException if full components have not been initialized
+   */
+  public KmsClientRegistry kmsClientRegistry() {
+    Preconditions.checkState(
+        kmsClientRegistry != null, "GravitinoEnv full components are not initialized.");
+    return kmsClientRegistry;
+  }
+
+  /**
    * Get the IdGenerator associated with the Gravitino environment.
    *
    * @return The IdGenerator instance.
@@ -586,6 +607,8 @@ public class GravitinoEnv {
   public void shutdown() {
     LOG.info("Shutting down Gravitino Environment...");
 
+    closeKmsClientRegistry();
+
     if (entityStore != null) {
       try {
         entityStore.close();
@@ -636,6 +659,18 @@ public class GravitinoEnv {
     }
 
     LOG.info("Gravitino Environment is shut down.");
+  }
+
+  private void closeKmsClientRegistry() {
+    KmsClientRegistry registry = kmsClientRegistry;
+    kmsClientRegistry = null;
+    if (registry != null) {
+      try {
+        registry.close();
+      } catch (RuntimeException e) {
+        LOG.warn("Failed to close KmsClientRegistry.", e);
+      }
+    }
   }
 
   private void initBaseComponents() {
