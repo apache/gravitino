@@ -20,7 +20,6 @@ package org.apache.gravitino.encryption.kms;
 
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.exceptions.ConnectionFailedException;
 
 /** Creates server-side KMS clients for one KMS API. */
 @DeveloperApi
@@ -40,13 +39,15 @@ public interface KmsClientFactory {
    * Creates a client bound to a configured KMS source.
    *
    * <p>Provider credentials are private implementation details of the returned client. They must
-   * not be exposed as Gravitino credentials or key properties.
+   * not be exposed as Gravitino credentials or key properties. The caller owns the returned client
+   * and must close it. This method validates configuration and constructs a reusable client without
+   * contacting the configured KMS; network and authentication failures are reported by client
+   * operations.
    *
    * @param source logical name of the configured KMS instance
    * @param properties provider-specific configuration
    * @return the configured client
    * @throws IllegalArgumentException if the source or configuration is invalid
-   * @throws ConnectionFailedException if required external initialization fails
    */
   KmsClient create(String source, Map<String, String> properties);
 }
