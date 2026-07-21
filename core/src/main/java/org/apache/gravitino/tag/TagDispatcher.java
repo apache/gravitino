@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.tag;
 
+import java.util.Arrays;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -67,6 +69,25 @@ public interface TagDispatcher {
   Tag createTag(String metalake, String name, String comment, Map<String, String> properties);
 
   /**
+   * Create a new tag in the specified metalake with optional allowed assignment values.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @param comment A comment for the new tag.
+   * @param properties The properties of the tag.
+   * @param allowedValues The allowed assignment values of the tag.
+   * @return The created tag.
+   */
+  default Tag createTag(
+      String metalake,
+      String name,
+      String comment,
+      Map<String, String> properties,
+      String[] allowedValues) {
+    return createTag(metalake, name, comment, properties);
+  }
+
+  /**
    * Alter an existing tag in the specified metalake
    *
    * @param metalake The name of the metalake.
@@ -97,6 +118,19 @@ public interface TagDispatcher {
   MetadataObject[] listMetadataObjectsForTag(String metalake, String name);
 
   /**
+   * List all metadata objects associated with the specified tag and exact assignment value.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @param value The exact assignment value to match, or null to return all objects for the tag.
+   * @return The array of metadata objects associated with the specified tag and value.
+   */
+  default MetadataObject[] listMetadataObjectsForTag(
+      String metalake, String name, @Nullable String value) {
+    return listMetadataObjectsForTag(metalake, name);
+  }
+
+  /**
    * List all tag names associated with the specified metadata object.
    *
    * @param metalake The name of the metalake
@@ -125,6 +159,32 @@ public interface TagDispatcher {
    */
   String[] associateTagsForMetadataObject(
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove);
+
+  /**
+   * Associate or disassociate tag-value pairs with the specified metadata object.
+   *
+   * @param metalake The name of the metalake.
+   * @param metadataObject The metadata object to update tags for.
+   * @param tagsToAdd Tag-value pairs to associate with the object.
+   * @param tagsToRemove Tag-value pairs to disassociate from the object.
+   * @return An array of updated tag names.
+   */
+  default String[] associateTagsForMetadataObject(
+      String metalake,
+      MetadataObject metadataObject,
+      TagValuePair[] tagsToAdd,
+      TagValuePair[] tagsToRemove) {
+    String[] tagNamesToAdd =
+        tagsToAdd == null
+            ? null
+            : Arrays.stream(tagsToAdd).map(TagValuePair::name).toArray(String[]::new);
+    String[] tagNamesToRemove =
+        tagsToRemove == null
+            ? null
+            : Arrays.stream(tagsToRemove).map(TagValuePair::name).toArray(String[]::new);
+    return associateTagsForMetadataObject(
+        metalake, metadataObject, tagNamesToAdd, tagNamesToRemove);
+  }
 
   /**
    * Retrieve a specific tag associated with the specified metadata object.

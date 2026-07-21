@@ -50,12 +50,16 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.tag.TagValuePair;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -452,6 +456,29 @@ public class RelationalEntityStore
   }
 
   @Override
+  public List<GenericEntity> listMetadataObjectsForTag(NameIdentifier tagIdent, String value)
+      throws IOException {
+    return backend.listMetadataObjectsForTag(tagIdent, value);
+  }
+
+  @Override
+  public List<TagEntity> updateTagRelations(
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      TagValuePair[] tagsToAdd,
+      TagValuePair[] tagsToRemove)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    List<TagEntity> result =
+        backend.updateTagRelations(srcEntityIdent, srcEntityType, tagsToAdd, tagsToRemove);
+
+    cache.invalidate(srcEntityIdent, srcEntityType, Type.TAG_METADATA_OBJECT_REL);
+    invalidateTagRelationCache(srcEntityIdent, tagsToAdd);
+    invalidateTagRelationCache(srcEntityIdent, tagsToRemove);
+
+    return result;
+  }
+
+  @Override
   public int batchDelete(
       List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
       throws IOException {
@@ -462,6 +489,20 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+  }
+
+  private void invalidateTagRelationCache(NameIdentifier srcEntityIdent, TagValuePair[] tagPairs) {
+    if (tagPairs == null) {
+      return;
+    }
+
+    String metalake = srcEntityIdent.namespace().level(0);
+    for (TagValuePair tagPair : tagPairs) {
+      cache.invalidate(
+          NameIdentifierUtil.ofTag(metalake, tagPair.name()),
+          Entity.EntityType.TAG,
+          Type.TAG_METADATA_OBJECT_REL);
+    }
   }
 
   private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>> getCachedRelations(

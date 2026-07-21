@@ -140,27 +140,27 @@ Assignment values follow these rules:
 
 1. Values are strings.
 2. In assignment update requests, a pair with an omitted or null `value` represents a valueless tag
-   assignment row and is stored as `tag_value IS NULL`.
+   assignment request.
 3. A logical assignment with one active null row means the tag is assigned without values, matching
    current tag behavior.
 4. A logical assignment with one or more active non-null rows means the tag is assigned with those
    values. Public value arrays omit the null marker.
 5. Blank individual assignment values are invalid. Non-null values are limited to 256 characters so
    they can be indexed consistently.
-6. Duplicate pairs in one request are removed while preserving client-provided order. Defensive read
-   paths also de-duplicate duplicated active rows if storage contains them.
+6. Duplicate pairs in one request are removed while preserving the first occurrence order. Read
+   paths also de-duplicate duplicated active rows defensively if storage contains them.
 7. Exact value lookup is case-sensitive, matching Gravitino's existing binary string comparison.
 8. Adding a value is incremental. It does not replace the other active values for the same tag and
    metadata object.
-9. Removing a value removes only that specific pair. Removing the last active value removes the
-   direct tag assignment unless the same request adds the valueless pair.
+9. Adding a non-null value to a tag that currently has only a valueless row converts that direct
+   assignment to valued form by soft-deleting the null row and inserting the requested value row.
 10. A tag may define optional allowed values. Missing allowed values means assignment values are
     unrestricted.
 11. An empty allowed value list means the tag can only be assigned without values.
-12. When allowed values are configured, every non-null assignment value must be in the allowed
-    value list.
-13. Allowed values are normalized with the same null, blank, length, duplicate, order, and
-    case-sensitive comparison rules as assignment values.
+12. If allowed values are configured, every non-null assignment value must be in the allowed value
+    list. Valueless assignment remains valid.
+13. Allowed values use the same case-sensitive comparison and 256-character length limit as
+    assignment values.
 
 ### Assignment Update Semantics
 
@@ -178,24 +178,23 @@ A null `tag_value` is the valueless pair. Non-null values are normal indexed val
 
 The update semantics are:
 
-1. Adding a non-null pair inserts that value row if it is not already active. Existing active values
-   for the same tag remain active.
+1. Adding a non-null pair inserts that value row if it is not already active. Existing active
+   non-null values for the same tag remain active.
 2. Adding an already active pair is an idempotent no-op and does not create another physical row.
 3. Adding a non-null pair when the same tag has an active valueless row converts the assignment to
    valued form by soft-deleting the null row and inserting the requested value row.
-4. Adding a valueless pair inserts one null row only when the tag has no active values after the
-   request's removals are applied. If active non-null values remain, the request fails with
-   `409 Conflict` because the request is ambiguous.
-5. Removing a pair soft-deletes only the matching active row. Removing a missing pair is an
-   idempotent no-op.
-6. Removing the last active non-null pair leaves no direct assignment for that tag unless the same
-   request adds the valueless pair.
-7. Duplicate pairs inside `tagsToAdd` or `tagsToRemove` are de-duplicated while preserving order.
-8. The same exact pair cannot appear in both `tagsToAdd` and `tagsToRemove` in one request.
-   Violations return `400 Bad Request`.
-9. `tagsToAdd` cannot contain both the valueless pair and non-null value pairs for the same tag.
-   Clients that need to convert valued assignments to valueless assignments should remove the
-   active value pairs and add the valueless pair in the same request.
+4. Adding a valueless pair inserts one null row only when the tag has no active non-null values
+   after the request's removals are applied. If active non-null values remain, the request fails
+   because the request is ambiguous.
+5. Removing a non-null pair soft-deletes only the matching active value row. Removing a missing
+   non-null pair is an idempotent no-op.
+6. Removing a pair with null or omitted `value` removes all active rows for that tag on the
+   metadata object. This preserves the old tag-name remove behavior while allowing value-specific
+   removes.
+7. Duplicate pairs inside `tagsToAdd` or `tagsToRemove` are de-duplicated while preserving first
+   occurrence order.
+8. If the same exact pair appears in both `tagsToAdd` and `tagsToRemove`, the two entries cancel
+   each other and become a no-op for that pair.
 
 Example sequence for table `t1`:
 
@@ -209,8 +208,8 @@ Example sequence for table `t1`:
    Active rows: `finance`, `ml`.
 5. Remove `(data_domain, risk)` again.
    Result: no-op; active rows stay `finance`, `ml`.
-6. Remove `(data_domain, finance)` and `(data_domain, ml)`.
-   Result: no active rows for `data_domain`, so the direct tag assignment is removed.
+6. Remove `(data_domain, null)`.
+   Result: all active rows for `data_domain` are removed.
 7. Add `(data_domain, null)`.
    Result: one active valueless row with `tag_value IS NULL`.
 8. Add `(data_domain, finance)`.

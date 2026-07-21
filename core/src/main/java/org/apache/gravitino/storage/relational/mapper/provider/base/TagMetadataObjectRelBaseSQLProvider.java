@@ -41,6 +41,9 @@ public class TagMetadataObjectRelBaseSQLProvider {
       @Param("metadataObjectType") String metadataObjectType) {
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId, tm.tag_comment as comment, tm.properties as properties,"
+        + " tm.allowed_values as allowedValues,"
+        + " te.tag_value as assignmentValue,"
+        + " te.value_order as valueOrder,"
         + " tm.audit_info as auditInfo,"
         + " tm.current_version as currentVersion,"
         + " tm.last_version as lastVersion,"
@@ -61,6 +64,9 @@ public class TagMetadataObjectRelBaseSQLProvider {
       @Param("tagName") String tagName) {
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId, tm.tag_comment as comment, tm.properties as properties,"
+        + " tm.allowed_values as allowedValues,"
+        + " te.tag_value as assignmentValue,"
+        + " te.value_order as valueOrder,"
         + " tm.audit_info as auditInfo,"
         + " tm.current_version as currentVersion,"
         + " tm.last_version as lastVersion,"
@@ -78,7 +84,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
   public String listTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
     return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
-        + " te.metadata_object_type as metadataObjectType, te.audit_info as auditInfo,"
+        + " te.metadata_object_type as metadataObjectType, te.tag_value as tagValue,"
+        + " te.value_order as valueOrder, te.audit_info as auditInfo,"
         + " te.current_version as currentVersion, te.last_version as lastVersion,"
         + " te.deleted_at as deletedAt"
         + " FROM "
@@ -92,18 +99,41 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0";
   }
 
+  public String listTagMetadataObjectRelsByMetalakeAndTagNameAndValue(
+      @Param("metalakeName") String metalakeName,
+      @Param("tagName") String tagName,
+      @Param("tagValue") String tagValue) {
+    return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
+        + " te.metadata_object_type as metadataObjectType, te.tag_value as tagValue,"
+        + " te.value_order as valueOrder, te.audit_info as auditInfo,"
+        + " te.current_version as currentVersion, te.last_version as lastVersion,"
+        + " te.deleted_at as deletedAt"
+        + " FROM "
+        + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " te JOIN "
+        + TagMetaMapper.TAG_TABLE_NAME
+        + " tm ON te.tag_id = tm.tag_id JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON tm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
+        + " AND te.tag_value = #{tagValue}"
+        + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0";
+  }
+
   public String batchInsertTagMetadataObjectRels(
       @Param("tagRels") List<TagMetadataObjectRelPO> tagRelPOs) {
     return "<script>"
         + "INSERT INTO "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " (tag_id, metadata_object_id, metadata_object_type, audit_info,"
+        + " (tag_id, metadata_object_id, metadata_object_type, tag_value, value_order, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES "
         + "<foreach collection='tagRels' item='item' separator=','>"
         + "(#{item.tagId},"
         + " #{item.metadataObjectId},"
         + " #{item.metadataObjectType},"
+        + " #{item.tagValue},"
+        + " #{item.valueOrder},"
         + " #{item.auditInfo},"
         + " #{item.currentVersion},"
         + " #{item.lastVersion},"
@@ -127,6 +157,30 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + "</foreach>"
         + " AND metadata_object_id = #{metadataObjectId}"
         + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+        + "</script>";
+  }
+
+  public String batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType,
+      @Param("tagRels") List<TagMetadataObjectRelPO> tagRelPOs) {
+    return "<script>"
+        + "UPDATE "
+        + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+        + " AND ("
+        + "<foreach item='item' collection='tagRels' separator=' OR '>"
+        + "(tag_id = #{item.tagId}"
+        + "<choose>"
+        + "<when test='item.tagValue == null'> AND tag_value IS NULL</when>"
+        + "<otherwise> AND tag_value = #{item.tagValue}</otherwise>"
+        + "</choose>"
+        + ")"
+        + "</foreach>"
+        + ")"
         + "</script>";
   }
 

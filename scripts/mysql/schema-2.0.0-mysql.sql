@@ -286,6 +286,7 @@ CREATE TABLE IF NOT EXISTS `tag_meta` (
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `tag_comment` VARCHAR(256) DEFAULT '' COMMENT 'tag comment',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'tag properties',
+    `allowed_values` MEDIUMTEXT DEFAULT NULL COMMENT 'tag allowed values',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'tag audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag last version',
@@ -299,14 +300,16 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
     `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
     `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
+    `tag_value` VARCHAR(256) DEFAULT NULL COMMENT 'tag relation value',
+    `value_order` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag relation value order',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'tag relation audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ti_mi_mo_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_tid` (`tag_id`),
-    KEY `idx_mid` (`metadata_object_id`)
+    KEY `idx_mid` (`metadata_object_id`),
+    KEY `idx_tid_value` (`tag_id`, `tag_value`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'tag metadata object relation';
 
 CREATE TABLE IF NOT EXISTS `owner_meta` (

@@ -20,7 +20,11 @@ package org.apache.gravitino;
 
 import java.io.IOException;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.tag.TagValuePair;
 
 /**
  * This is an extended interface. This is mainly used for strengthen the ability of querying
@@ -219,5 +223,42 @@ public interface SupportsRelationOperations {
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     throw new UnsupportedOperationException(
         "updateEntityRelations is not supported by this implementation");
+  }
+
+  /**
+   * Lists metadata objects associated with a tag and, optionally, an exact assignment value.
+   *
+   * @param tagIdent The tag identifier.
+   * @param value The exact assignment value to match, or null to return all assignments.
+   * @return A list of metadata objects associated with the tag.
+   * @throws IOException If a storage-related error occurs.
+   */
+  default List<GenericEntity> listMetadataObjectsForTag(
+      NameIdentifier tagIdent, @Nullable String value) throws IOException {
+    throw new UnsupportedOperationException(
+        "listMetadataObjectsForTag is not supported by this implementation");
+  }
+
+  /**
+   * Updates tag relations for a given entity by adding and removing tag-value assignment pairs.
+   *
+   * @param srcEntityIdent The identifier of the source entity whose tag relations are being
+   *     updated.
+   * @param srcEntityType The source entity type.
+   * @param tagsToAdd Tag-value pairs to associate with the source entity.
+   * @param tagsToRemove Tag-value pairs to disassociate from the source entity.
+   * @return A list of tags that are related to the given entity after the update.
+   * @throws IOException If a storage-related error occurs.
+   * @throws NoSuchEntityException If any of the specified entities does not exist.
+   * @throws EntityAlreadyExistsException If a relation to be added already exists.
+   */
+  default List<TagEntity> updateTagRelations(
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      TagValuePair[] tagsToAdd,
+      TagValuePair[] tagsToRemove)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    throw new UnsupportedOperationException(
+        "updateTagRelations is not supported by this implementation");
   }
 }

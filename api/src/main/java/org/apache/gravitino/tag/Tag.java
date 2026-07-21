@@ -55,6 +55,25 @@ public interface Tag extends Auditable {
   Map<String, String> properties();
 
   /**
+   * @return The allowed assignment values of the tag. Empty means the tag is unrestricted.
+   */
+  default Optional<String[]> allowedValues() {
+    return Optional.empty();
+  }
+
+  /**
+   * Returns the assignment values of the tag in the current metadata-object context.
+   *
+   * <p>The return value is present only when the tag is returned for a metadata object. A present
+   * empty array means the tag is directly or effectively assigned without values.
+   *
+   * @return The assignment values in context, or empty when no assignment context exists.
+   */
+  default Optional<String[]> assignmentValues() {
+    return Optional.empty();
+  }
+
+  /**
    * Check if the tag is inherited from a parent object or not. If the tag is inherited, it will
    * return true, if it is owned by the object itself, it will return false.
    *
