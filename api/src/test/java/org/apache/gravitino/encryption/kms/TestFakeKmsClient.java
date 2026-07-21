@@ -16,27 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-plugins {
-  `maven-publish`
-  `java-test-fixtures`
-  id("java")
-  id("idea")
-}
+package org.apache.gravitino.encryption.kms;
 
-dependencies {
-  implementation(libs.commons.lang3)
-  implementation(libs.commons.collections4)
-  implementation(libs.guava)
-  implementation(libs.jackson.annotations)
-  implementation(libs.jackson.databind)
+public class TestFakeKmsClient extends TestKmsClientContract {
 
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+  private static final String SOURCE = "test";
+  private static final String USABLE_KEY = "usable";
+  private static final String MISSING_KEY = "missing";
 
-  testFixturesApi(libs.junit.jupiter.api)
-}
+  private final FakeKmsClient client =
+      new FakeKmsClient(KmsApi.AWS_KMS, SOURCE).putKey(USABLE_KEY, true, true, true);
 
-tasks.build {
-  dependsOn("javadoc")
+  @Override
+  protected KmsClient client() {
+    return client;
+  }
+
+  @Override
+  protected KmsReference usableKey() {
+    return new KmsReference(KmsApi.AWS_KMS, SOURCE, USABLE_KEY);
+  }
+
+  @Override
+  protected KmsReference missingKey() {
+    return new KmsReference(KmsApi.AWS_KMS, SOURCE, MISSING_KEY);
+  }
 }
