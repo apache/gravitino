@@ -104,7 +104,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
   public Partition[] listPartitions() {
     try (Connection connection = getConnection(loadedTable.databaseName())) {
       Transform partitionInfo = loadedTable.partitioning()[0];
-      Map<String, Type> columnTypes = getColumnType(connection);
+      Map<String, Type> columnTypes = getColumnTypes(connection, loadedTable.name(), typeConverter);
       String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", loadedTable.name());
       try (Statement statement = connection.createStatement();
           ResultSet result = statement.executeQuery(showPartitionsSql)) {
@@ -123,7 +123,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
   public Partition getPartition(String partitionName) throws NoSuchPartitionException {
     try (Connection connection = getConnection(loadedTable.databaseName())) {
       Transform partitionInfo = loadedTable.partitioning()[0];
-      Map<String, Type> columnTypes = getColumnType(connection);
+      Map<String, Type> columnTypes = getColumnTypes(connection, loadedTable.name(), typeConverter);
       String showPartitionsSql =
           String.format(
               "SHOW PARTITIONS FROM `%s` WHERE PartitionName = \"%s\"",
@@ -220,7 +220,7 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
     }
   }
 
-  private Partition fromDorisPartition(
+  static Partition fromDorisPartition(
       ResultSet resultSet, Transform partitionInfo, Map<String, Type> columnTypes)
       throws SQLException {
     String partitionName = resultSet.getString(NAME);
@@ -271,18 +271,19 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
           partitionName, lists.build().toArray(new Literal<?>[0][0]), properties);
     } else {
       throw new UnsupportedOperationException(
-          String.format("%s is not a partitioned table", loadedTable.name()));
+          String.format("%s is not a supported partition transform", partitionInfo));
     }
   }
 
-  private Map<String, Type> getColumnType(Connection connection) throws SQLException {
+  static Map<String, Type> getColumnTypes(
+      Connection connection, String tableName, JdbcTypeConverter typeConverter)
+      throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
     try (ResultSet result =
-        metaData.getColumns(
-            connection.getCatalog(), connection.getSchema(), loadedTable.name(), null)) {
+        metaData.getColumns(connection.getCatalog(), connection.getSchema(), tableName, null)) {
       ImmutableMap.Builder<String, Type> columnTypes = ImmutableMap.builder();
       while (result.next()) {
-        if (Objects.equals(result.getString("TABLE_NAME"), loadedTable.name())) {
+        if (Objects.equals(result.getString("TABLE_NAME"), tableName)) {
           JdbcTypeConverter.JdbcTypeBean typeBean =
               new JdbcTypeConverter.JdbcTypeBean(result.getString("TYPE_NAME"));
           typeBean.setColumnSize(result.getInt("COLUMN_SIZE"));

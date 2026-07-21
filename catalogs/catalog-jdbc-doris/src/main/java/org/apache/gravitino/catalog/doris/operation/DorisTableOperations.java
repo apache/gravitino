@@ -67,7 +67,9 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.ListPartition;
+import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.rel.types.Type;
 
 /** Table operations for Apache Doris. */
 public class DorisTableOperations extends JdbcTableOperations {
@@ -633,7 +635,35 @@ public class DorisTableOperations extends JdbcTableOperations {
       }
       Optional<Transform> transform =
           DorisUtils.extractPartitionInfoFromSql(createTableSql.toString());
-      return transform.map(t -> new Transform[] {t}).orElse(Transforms.EMPTY_TRANSFORM);
+      if (!transform.isPresent()) {
+        return Transforms.EMPTY_TRANSFORM;
+      }
+
+      Transform partitioning = transform.get();
+      Map<String, Type> columnTypes =
+          DorisTablePartitionOperations.getColumnTypes(connection, tableName, typeConverter);
+      List<Partition> assignments = new ArrayList<>();
+      String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", tableName);
+      try (Statement partitionStatement = connection.createStatement();
+          ResultSet partitions = partitionStatement.executeQuery(showPartitionsSql)) {
+        while (partitions.next()) {
+          assignments.add(
+              DorisTablePartitionOperations.fromDorisPartition(
+                  partitions, partitioning, columnTypes));
+        }
+      }
+
+      if (partitioning instanceof Transforms.ListTransform) {
+        String[][] fieldNames = ((Transforms.ListTransform) partitioning).fieldNames();
+        return new Transform[] {
+          Transforms.list(fieldNames, assignments.toArray(new ListPartition[0]))
+        };
+      }
+
+      String[] fieldName = ((Transforms.RangeTransform) partitioning).fieldName();
+      return new Transform[] {
+        Transforms.range(fieldName, assignments.toArray(new RangePartition[0]))
+      };
     }
   }
 

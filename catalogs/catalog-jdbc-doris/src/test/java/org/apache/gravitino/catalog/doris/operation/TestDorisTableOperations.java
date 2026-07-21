@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.doris.converter.DorisTypeConverter;
@@ -559,6 +560,12 @@ public class TestDorisTableOperations extends TestDoris {
         distribution,
         indexes);
     JdbcTable rangePartitionTable = TABLE_OPERATIONS.load(databaseName, rangePartitionTableName);
+    RangePartition[] loadedRangeAssignments =
+        ((Transforms.RangeTransform) rangePartitionTable.partitioning()[0]).assignments();
+    assertEquals(3, loadedRangeAssignments.length);
+    assertEquals(
+        Set.of("p1", "p2", "p3"),
+        Arrays.stream(loadedRangeAssignments).map(Partition::name).collect(Collectors.toSet()));
     assertionsTableInfo(
         rangePartitionTableName,
         tableComment,
@@ -618,6 +625,12 @@ public class TestDorisTableOperations extends TestDoris {
         distribution,
         indexes);
     JdbcTable listPartitionTable = TABLE_OPERATIONS.load(databaseName, listPartitionTableName);
+    ListPartition[] loadedListAssignments =
+        ((Transforms.ListTransform) listPartitionTable.partitioning()[0]).assignments();
+    assertEquals(2, loadedListAssignments.length);
+    assertEquals(
+        Set.of("p1", "p2"),
+        Arrays.stream(loadedListAssignments).map(Partition::name).collect(Collectors.toSet()));
     assertionsTableInfo(
         listPartitionTableName,
         tableComment,
