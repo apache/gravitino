@@ -26,7 +26,8 @@ import org.junit.jupiter.api.Test;
 /** Unit tests for {@link SparkJdbcTypeConverter34}. */
 public class TestSparkJdbcTypeConverter34 {
 
-  private final SparkJdbcTypeConverter34 sparkJdbcTypeConverter34 = new SparkJdbcTypeConverter34();
+  private final SparkJdbcTypeConverter34 sparkJdbcTypeConverter34 =
+      new SparkJdbcTypeConverter34();
 
   @Test
   void testConvertTimestampTypesToSparkTimestamp() {
