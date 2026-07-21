@@ -21,6 +21,7 @@ from mcp_server.client.catalog_operation import CatalogOperation
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.model_operation import ModelOperation
+from mcp_server.client.partition_operation import PartitionOperation
 from mcp_server.client.policy_operation import PolicyOperation
 from mcp_server.client.schema_operation import SchemaOperation
 from mcp_server.client.statistic_operation import StatisticOperation
@@ -130,5 +131,15 @@ class GravitinoOperation(ABC):
 
         Returns:
             StatisticOperation: Interface for performing statistic-level operations
+        """
+        pass
+
+    @abstractmethod
+    def as_partition_operation(self) -> PartitionOperation:
+        """
+        Access the partition operation interface of this Gravitino operation.
+
+        Returns:
+            PartitionOperation: Interface for performing partition-level operations
         """
         pass
