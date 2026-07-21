@@ -37,17 +37,31 @@ dependencies {
   }
 
   implementation(libs.commons.lang3)
+  implementation(libs.google.cloud.kms)
   implementation(libs.guava)
 
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.gcs)
   compileOnly(libs.google.auth.http)
 
+  testImplementation(testFixtures(project(":api")))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.inline)
+  testImplementation(libs.slf4j.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
+  testRuntimeOnly(libs.slf4j.simple)
 }
 
 tasks.compileJava {
   dependsOn(":catalogs:catalog-fileset:runtimeJars")
+}
+
+tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn(tasks.jar)
+  }
 }

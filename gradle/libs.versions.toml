@@ -153,6 +153,7 @@ datanucleus-rdbms = "4.1.19"
 datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
+google-cloud-kms = "2.97.0"
 aliyun-credentials = "0.3.12"
 aliyun-sdk-oss = "3.10.2"
 openlineage = "1.29.0"
@@ -350,6 +351,7 @@ jettison = { group = "org.codehaus.jettison", name = "jettison", version.ref = "
 
 google-auth-http = { group = "com.google.auth", name = "google-auth-library-oauth2-http", version.ref = "google-auth" }
 google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }
+google-cloud-kms = { group = "com.google.cloud", name = "google-cloud-kms", version.ref = "google-cloud-kms" }
 
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 aliyun-sdk-oss = { module = "com.aliyun.oss:aliyun-sdk-oss", version.ref = "aliyun-sdk-oss" }
