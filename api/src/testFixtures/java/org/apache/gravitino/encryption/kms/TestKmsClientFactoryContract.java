@@ -16,27 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-plugins {
-  `maven-publish`
-  `java-test-fixtures`
-  id("java")
-  id("idea")
-}
+package org.apache.gravitino.encryption.kms;
 
-dependencies {
-  implementation(libs.commons.lang3)
-  implementation(libs.commons.collections4)
-  implementation(libs.guava)
-  implementation(libs.jackson.annotations)
-  implementation(libs.jackson.databind)
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
+/** Common contract for KMS client factories. */
+public abstract class TestKmsClientFactoryContract {
 
-  testFixturesApi(libs.junit.jupiter.api)
-}
+  /**
+   * Returns the factory under test.
+   *
+   * @return the factory
+   */
+  protected abstract KmsClientFactory factory();
 
-tasks.build {
-  dependsOn("javadoc")
+  /**
+   * Returns the API expected from the factory.
+   *
+   * @return the expected API
+   */
+  protected abstract KmsApi expectedApi();
+
+  @Test
+  void testReportsExpectedApi() {
+    Assertions.assertEquals(expectedApi(), factory().api());
+  }
 }
