@@ -43,6 +43,7 @@ from gravitino.exceptions.base import (
     NoSuchSchemaException,
     NoSuchTableException,
     NoSuchUserException,
+    NoSuchViewException,
     NotEmptyException,
     NotFoundException,
     NotInUseException,
@@ -53,6 +54,7 @@ from gravitino.exceptions.base import (
     TableAlreadyExistsException,
     UnsupportedOperationException,
     UserAlreadyExistsException,
+    ViewAlreadyExistsException,
     GroupAlreadyExistsException,
 )
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
@@ -73,6 +75,7 @@ from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
 from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
+from gravitino.exceptions.handlers.view_error_handler import VIEW_ERROR_HANDLER
 
 
 class TestErrorHandler(unittest.TestCase):
@@ -432,6 +435,86 @@ class TestErrorHandler(unittest.TestCase):
 
         with self.assertRaises(RESTException):
             TABLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
+            )
+
+    def test_view_error_handler(self):
+        with self.assertRaises(IllegalArgumentException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalArgumentException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchCatalogException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchCatalogException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchSchemaException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchSchemaException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchViewException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NoSuchViewException, "mock error")
+            )
+
+        with self.assertRaises(NotFoundException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotFoundException, "mock error")
+            )
+
+        with self.assertRaises(ViewAlreadyExistsException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    ViewAlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(RuntimeError):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(RuntimeError, "mock error")
+            )
+
+        with self.assertRaises(UnsupportedOperationException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    UnsupportedOperationException, "mock error"
+                )
+            )
+
+        with self.assertRaises(ForbiddenException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(ForbiddenException, "mock error")
+            )
+
+        with self.assertRaises(CatalogNotInUseException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    CatalogNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(MetalakeNotInUseException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    MetalakeNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotInUseException):
+            VIEW_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotInUseException, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            VIEW_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(Exception, "mock error")
             )
 
