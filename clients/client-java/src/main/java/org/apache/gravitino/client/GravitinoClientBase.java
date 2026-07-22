@@ -55,12 +55,9 @@ public abstract class GravitinoClientBase implements Closeable {
   protected static final String API_METALAKES_LIST_PATH = "api/metalakes";
   /** The REST API path prefix for load a specific metalake */
   protected static final String API_METALAKES_IDENTIFIER_PATH = API_METALAKES_LIST_PATH + "/";
-  /** The TLS configurer for the Gravitino client */
-  protected TLSConfigurer tlsConfigurer;
 
   /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider, but a
-   * default null TLS configurer.
+   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
@@ -74,26 +71,6 @@ public abstract class GravitinoClientBase implements Closeable {
       boolean checkVersion,
       Map<String, String> headers,
       Map<String, String> properties) {
-    this(uri, authDataProvider, checkVersion, headers, properties, null);
-  }
-
-  /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
-   *
-   * @param uri The base URI for the Gravitino API.
-   * @param authDataProvider The provider of the data which is used for authentication.
-   * @param checkVersion Whether to check the version of the Gravitino server.
-   * @param headers The base header of the Gravitino API.
-   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
-   * @param tlsConfigurer The TLS configurer for the Gravitino client.
-   */
-  protected GravitinoClientBase(
-      String uri,
-      AuthDataProvider authDataProvider,
-      boolean checkVersion,
-      Map<String, String> headers,
-      Map<String, String> properties,
-      TLSConfigurer tlsConfigurer) {
     ObjectMapper mapper = ObjectMapperProvider.objectMapper();
 
     if (checkVersion) {
@@ -104,7 +81,6 @@ public abstract class GravitinoClientBase implements Closeable {
               .withObjectMapper(mapper)
               .withPreConnectHandler(this::checkVersion)
               .withHeaders(headers)
-              .withTlsConfigurer(tlsConfigurer)
               .build();
 
     } else {
@@ -114,7 +90,6 @@ public abstract class GravitinoClientBase implements Closeable {
               .withAuthDataProvider(authDataProvider)
               .withObjectMapper(mapper)
               .withHeaders(headers)
-              .withTlsConfigurer(tlsConfigurer)
               .build();
     }
   }
@@ -239,8 +214,6 @@ public abstract class GravitinoClientBase implements Closeable {
     protected Map<String, String> headers = ImmutableMap.of();
     /** A map of properties (key-value pairs) used to configure the Gravitino client. */
     protected Map<String, String> properties = ImmutableMap.of();
-    /** The TLS configurer for the Gravitino client. */
-    protected TLSConfigurer tlsConfigurer;
 
     /**
      * The constructor for the Builder class.

@@ -31,8 +31,6 @@ public class GravitinoClientConfiguration {
   public static final String POSITIVE_NUMBER_ERROR_MSG = "The value must be a positive number";
   /** The configuration key prefix for the Gravitino client config. */
   public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = "gravitino.client.";
-  /** The configuration key for specifying the TLSConfigurer implementation class. */
-  private static final String REST_TLS_CONFIGURER = "rest.client.tls.configurer-impl";
 
   /**
    * A default value for max total HTTP connections in the connection pool. This is the same as the
@@ -73,8 +71,7 @@ public class GravitinoClientConfiguration {
           CLIENT_CONNECTION_TIMEOUT_MS,
           CLIENT_SOCKET_TIMEOUT_MS,
           CLIENT_MAX_CONNECTIONS,
-          CLIENT_MAX_CONNECTIONS_PER_ROUTE,
-          REST_TLS_CONFIGURER);
+          CLIENT_MAX_CONNECTIONS_PER_ROUTE);
 
   private Map<String, String> properties;
 

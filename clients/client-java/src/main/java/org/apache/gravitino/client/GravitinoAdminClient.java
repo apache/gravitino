@@ -50,8 +50,7 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 public class GravitinoAdminClient extends GravitinoClientBase implements SupportsMetalakes {
 
   /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider, but a
-   * default null TLS configurer.
+   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
@@ -66,28 +65,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       boolean checkVersion,
       Map<String, String> headers,
       Map<String, String> properties) {
-    this(uri, authDataProvider, checkVersion, headers, properties, null);
-  }
-
-  /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
-   *
-   * @param uri The base URI for the Gravitino API.
-   * @param authDataProvider The provider of the data which is used for authentication.
-   * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
-   *     support the case that the client-side version is higher than the server-side version.
-   * @param headers The base header for Gravitino API.
-   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
-   * @param tlsConfigurer The TLS configurer for the Gravitino client.
-   */
-  private GravitinoAdminClient(
-      String uri,
-      AuthDataProvider authDataProvider,
-      boolean checkVersion,
-      Map<String, String> headers,
-      Map<String, String> properties,
-      TLSConfigurer tlsConfigurer) {
-    super(uri, authDataProvider, checkVersion, headers, properties, tlsConfigurer);
+    super(uri, authDataProvider, checkVersion, headers, properties);
   }
 
   /**
@@ -271,17 +249,6 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
     }
 
     /**
-     * Sets the TLS configurer for the Gravitino client.
-     *
-     * @param tlsConfigurer The TLS configurer for the Gravitino client.
-     * @return This builder instance.
-     */
-    public AdminClientBuilder withTlsConfigurer(TLSConfigurer tlsConfigurer) {
-      this.tlsConfigurer = tlsConfigurer;
-      return this;
-    }
-
-    /**
      * Builds a new GravitinoClient instance.
      *
      * @return A new instance of GravitinoClient with the specified base URI.
@@ -292,7 +259,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
       return new GravitinoAdminClient(
-          uri, authDataProvider, isVersionCheckEnabled(), headers, properties, tlsConfigurer);
+          uri, authDataProvider, isVersionCheckEnabled(), headers, properties);
     }
   }
 }
