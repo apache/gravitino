@@ -29,6 +29,7 @@ import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -244,13 +245,16 @@ class TestClassLoaderResourceCleanerUtils {
     // Blocks the worker after it sets the ThreadLocal so the thread stays alive; a thread that
     // exits would null its own threadLocals in Thread.exit() and hide the leak.
     CountDownLatch release = new CountDownLatch(1);
-    Thread worker;
+    Thread worker = null;
     try {
       URLClassLoader child = new URLClassLoader(new URL[] {classesUrl}, platform);
       Object childOwnedValue =
           Class.forName(LeakyValue.class.getName(), true, child)
               .getDeclaredConstructor()
               .newInstance();
+      // Guard the test's premise: the value must be loaded by `child`, otherwise the sweep's
+      // value-ClassLoader check never matches and the reclamation below would prove nothing.
+      assertSame(child, childOwnedValue.getClass().getClassLoader());
       ref = new WeakReference<>(child);
 
       CountDownLatch valueSet = new CountDownLatch(1);
@@ -270,9 +274,8 @@ class TestClassLoaderResourceCleanerUtils {
               "clp-reclaim-probe");
       worker.setDaemon(true);
       worker.start();
-      valueSet.await();
+      assertTrue(valueSet.await(10, TimeUnit.SECONDS), "worker should set its ThreadLocal");
 
-      assertFalse(worker.getName().startsWith("Gravitino-webserver-"));
       ClassLoaderResourceCleanerUtils.clearThreadLocalMap(worker, child);
 
       // Drop every strong reference the test holds; the only thing that could still pin `child` is
@@ -281,15 +284,18 @@ class TestClassLoaderResourceCleanerUtils {
       child = null;
       childOwnedValue = null;
       valueHolder[0] = null;
-    } finally {
-      // nothing yet; worker is released after the assertion
-    }
 
-    assertTrue(
-        awaitCollected(ref),
-        "dropped ClassLoader must be collectable once its ThreadLocal is swept");
-    release.countDown();
-    worker.join(1000);
+      // Assert before releasing the worker: once it returns, Thread.exit() nulls its threadLocals
+      // and would let `child` be collected even if the sweep did nothing.
+      assertTrue(
+          awaitCollected(ref),
+          "dropped ClassLoader must be collectable once its ThreadLocal is swept");
+    } finally {
+      release.countDown();
+      if (worker != null) {
+        worker.join(1000);
+      }
+    }
   }
 
   private static boolean awaitCollected(WeakReference<?> ref) throws InterruptedException {
@@ -298,7 +304,6 @@ class TestClassLoaderResourceCleanerUtils {
         return true;
       }
       System.gc();
-      Runtime.getRuntime().runFinalization();
       Thread.sleep(50);
     }
     return ref.get() == null;
