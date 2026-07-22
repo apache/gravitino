@@ -71,6 +71,31 @@ public interface TagOperations {
       throws TagAlreadyExistsException;
 
   /**
+   * Create a tag under a metalake with an assignment value constraint.
+   *
+   * @param name The name of the tag.
+   * @param comment The comment of the tag.
+   * @param properties The properties of the tag.
+   * @param valueConstraint The assignment value constraint of the tag.
+   * @return The created tag.
+   * @throws TagAlreadyExistsException If the tag already exists.
+   * @throws UnsupportedOperationException If non-default value constraints are not supported.
+   */
+  default Tag createTag(
+      String name,
+      String comment,
+      Map<String, String> properties,
+      TagValueConstraint valueConstraint)
+      throws TagAlreadyExistsException {
+    if (valueConstraint == null || TagValueConstraint.anyValue().equals(valueConstraint)) {
+      return createTag(name, comment, properties);
+    }
+
+    throw new UnsupportedOperationException(
+        "Creating tags with value constraints is not supported");
+  }
+
+  /**
    * Alter a tag under a metalake.
    *
    * @param name The name of the tag.
