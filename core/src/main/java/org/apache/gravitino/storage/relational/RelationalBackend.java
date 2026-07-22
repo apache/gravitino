@@ -27,6 +27,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -199,6 +200,17 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    * @throws IOException If the store operation fails
    */
   int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeline) throws IOException;
+
+  /**
+   * Soft-deletes relation rows that reference no live metadata object of the given type.
+   *
+   * @param metadataObjectType metadata object type to collect
+   * @param limit maximum number of orphaned object IDs processed per relation table
+   * @return number of relation rows soft-deleted
+   * @throws IOException if the cleanup fails
+   */
+  int softDeleteOrphanedRelations(MetadataObject.Type metadataObjectType, int limit)
+      throws IOException;
 
   /**
    * Soft deletes the old version data that is older than or equal to the given version retention
