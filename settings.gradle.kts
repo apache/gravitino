@@ -126,6 +126,12 @@ include(":bundles:aliyun", ":bundles:aliyun-bundle", ":bundles:iceberg-aliyun-bu
 include(":bundles:tencent", ":bundles:tencent-bundle")
 include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundle")
 include(":bundles:transit")
+include(
+  ":bundles:aws-kms-bundle",
+  ":bundles:azure-kms-bundle",
+  ":bundles:gcp-kms-bundle",
+  ":bundles:transit-kms-bundle"
+)
 include(":catalogs:hadoop-common")
 include(":catalogs:hadoop-auth")
 include(":lineage")

@@ -31,6 +31,7 @@ import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.IOException
 import java.util.Locale
+import java.util.jar.JarFile
 
 Locale.setDefault(Locale.US)
 
@@ -71,6 +72,20 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
 val skipWeb: Boolean = (project.findProperty("skipWeb") as? String)?.toBoolean() ?: false
 val distributionPackageDir = layout.projectDirectory.dir("distribution/package")
 val distributionPackageAllDir = layout.projectDirectory.dir("distribution/package-all")
+val kmsProviderBundleFactories =
+  linkedMapOf(
+    ":bundles:aws-kms-bundle" to
+      setOf("org.apache.gravitino.kms.aws.AwsKmsClientFactory"),
+    ":bundles:azure-kms-bundle" to
+      setOf("org.apache.gravitino.encryption.kms.azure.AzureKeyVaultKmsClientFactory"),
+    ":bundles:gcp-kms-bundle" to
+      setOf("org.apache.gravitino.kms.gcp.GoogleCloudKmsClientFactory"),
+    ":bundles:transit-kms-bundle" to
+      setOf(
+        "org.apache.gravitino.kms.transit.OpenBaoTransitKmsClientFactory",
+        "org.apache.gravitino.kms.transit.VaultTransitKmsClientFactory"
+      )
+  )
 val subprojectJarOutputDirs = subprojects.map { it.layout.buildDirectory.dir("libs") }
 
 project.extra["extraJvmArgs"] =
@@ -107,6 +122,11 @@ licenseReport {
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
 }
 repositories { mavenCentral() }
+
+dependencies {
+  errorprone("com.google.errorprone:error_prone_core:2.10.0")
+  testImplementation(project(":api"))
+}
 
 allprojects {
   // Gravitino Python client project didn't need to apply the Spotless plugin
@@ -818,6 +838,7 @@ tasks {
     val dependencies =
       mutableListOf(
         "copyCatalogLibAndConfigs",
+        "verifyKmsProviderBundles",
         "copySubprojectDependencies",
         "copySubprojectLib",
         "copyCliLib",
@@ -834,6 +855,7 @@ tasks {
     }
     dependsOn(cleanDistributionPackage)
     dependsOn(dependencies)
+    finalizedBy("verifyPackagedKmsProviderDiscovery")
 
     group = "gravitino distribution"
     outputs.dir(distributionPackageDir)
@@ -1170,6 +1192,91 @@ tasks {
     include("gravitino-jobs-*.jar")
     exclude("*-empty.jar")
     setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+  }
+
+  register("copyKmsProviderBundles", Copy::class) {
+    group = "gravitino distribution"
+    description = "Copy shaded KMS provider bundles into the distribution package"
+
+    kmsProviderBundleFactories.keys.forEach { projectPath ->
+      val bundleProject = project(projectPath)
+      dependsOn("$projectPath:shadowJar")
+      from(bundleProject.layout.buildDirectory.dir("libs")) {
+        include("${rootProject.name.lowercase()}-${bundleProject.name}-*.jar")
+        exclude("*-empty.jar", "*-javadoc.jar", "*-sources.jar")
+      }
+    }
+
+    into("distribution/package/kms-providers")
+    setDuplicatesStrategy(DuplicatesStrategy.FAIL)
+  }
+
+  register("verifyKmsProviderBundles") {
+    group = "verification"
+    description = "Verify packaged KMS provider bundles and service descriptors"
+    dependsOn("copyKmsProviderBundles")
+
+    val providerDirectory = distributionPackageDir.dir("kms-providers")
+    inputs.dir(providerDirectory)
+    doLast {
+      val providerJars =
+        fileTree(providerDirectory).matching { include("*.jar") }.files.sortedBy { it.name }
+      check(providerJars.size == kmsProviderBundleFactories.size) {
+        "Expected ${kmsProviderBundleFactories.size} KMS provider bundles, " +
+          "but found ${providerJars.size}: ${providerJars.map { it.name }}"
+      }
+
+      val servicePath =
+        "META-INF/services/org.apache.gravitino.encryption.kms.KmsClientFactory"
+      kmsProviderBundleFactories.forEach { (projectPath, expectedFactories) ->
+        val bundleName = project(projectPath).name
+        val jarPrefix = "${rootProject.name.lowercase()}-$bundleName-"
+        val matchingJars = providerJars.filter { it.name.startsWith(jarPrefix) }
+        check(matchingJars.size == 1) {
+          "Expected one packaged bundle matching $jarPrefix, " +
+            "but found ${matchingJars.map { it.name }}"
+        }
+
+        val bundleJar = matchingJars.single()
+        check(bundleJar.length() > 0L) { "Packaged KMS provider bundle is empty: $bundleJar" }
+        JarFile(bundleJar).use { jarFile ->
+          val serviceEntry = jarFile.getJarEntry(servicePath)
+          check(serviceEntry != null) { "$bundleJar does not contain $servicePath" }
+          val factories =
+            jarFile.getInputStream(serviceEntry).bufferedReader().useLines { lines ->
+              lines
+                .map { it.substringBefore('#').trim() }
+                .filter { it.isNotEmpty() }
+                .toSet()
+            }
+          val missingFactories = expectedFactories - factories
+          check(missingFactories.isEmpty()) {
+            "$bundleJar is missing KMS client factories: $missingFactories"
+          }
+        }
+      }
+    }
+  }
+
+  register<JavaExec>("verifyPackagedKmsProviderDiscovery") {
+    group = "verification"
+    description = "Verify KMS provider discovery from the packaged server classpath"
+    dependsOn("testClasses")
+    mustRunAfter("compileDistribution")
+    onlyIf {
+      compileDistribution.get().state.let { state -> state.executed && state.failure == null }
+    }
+
+    val providerDirectory = distributionPackageDir.dir("kms-providers")
+    val launcher = distributionPackageDir.file("bin/gravitino.sh")
+    classpath =
+      files(
+        sourceSets["test"].output.classesDirs,
+        fileTree(distributionPackageDir.dir("libs")) { include("*.jar") },
+        fileTree(providerDirectory) { include("*.jar") }
+      )
+    mainClass.set("org.apache.gravitino.encryption.kms.KmsProviderDiscoveryProbe")
+    args(providerDirectory.asFile.absolutePath, launcher.asFile.absolutePath)
   }
 
   register("copySubprojectLib", Copy::class) {

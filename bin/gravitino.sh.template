@@ -182,6 +182,7 @@ fi
 #JAVA_OPTS+=" -Djava.security.krb5.conf=/etc/krb5.conf"
 
 addJarInDir "${GRAVITINO_HOME}/libs"
+addJarInDir "${GRAVITINO_HOME}/kms-providers"
 
 # By default, prefer starting the new (v2) UI war when GRAVITINO_USE_WEB_V2 is unset.
 # Users may override by setting GRAVITINO_WAR to an explicit path, or

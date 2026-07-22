@@ -205,9 +205,12 @@ instances.
 The registry is created only by `GravitinoEnv.initializeFullComponents`; base-only environments do not
 create it.
 
-Provider artifacts and their dependencies must therefore be visible to the full server's context
-classloader. Provider module tests verify their service descriptors directly. A final packaged-server
-discovery smoke test is still required before treating distribution wiring as complete.
+The distribution ships four lean shaded provider bundles under
+`distribution/package/kms-providers`: AWS KMS, Google Cloud KMS, Azure Key Vault, and Transit. The
+Transit bundle registers separate OpenBao and Vault factories. The launcher adds
+`${GRAVITINO_HOME}/kms-providers` to the application classpath, so the registry discovers all five
+factories through the application context classloader while creating clients only for configured
+named sources.
 
 ## Boundary with credential vending
 
@@ -268,6 +271,8 @@ Implemented automated coverage includes:
   lifecycle tests;
 - provider identifier validation, SDK/HTTP normalization, error mapping, configuration, and
   `ServiceLoader` discovery tests;
+- packaged-runtime verification that launches a fresh JVM with only the assembled distribution
+  classpath and discovers all five provider factories from `kms-providers`;
 - deterministic AWS SDK, GCP SDK, Azure in-memory transport, and Transit HTTP tests;
 - Docker integration tests against pinned OpenBao and Vault images;
 - an opt-in LocalStack KMS test requiring a licensed LocalStack Pro fixture; and
@@ -294,7 +299,6 @@ than by adding placeholder methods now. New capabilities must continue to:
 
 ## Remaining implementation work
 
-- Packaged-server provider discovery verification.
 - Additional KMS operations as their portable semantics are defined.
 - Authorization if KMS operations become directly user-facing.
 - A server-private authentication abstraction if provider SDK credential chains and token files no

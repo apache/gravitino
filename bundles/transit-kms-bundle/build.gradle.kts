@@ -1,0 +1,58 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
+plugins {
+  `maven-publish`
+  id("java")
+  alias(libs.plugins.shadow)
+}
+
+dependencies {
+  implementation(project(":bundles:transit")) {
+    isTransitive = false
+  }
+  implementation(libs.httpclient5)
+  implementation(libs.jackson.databind)
+}
+
+tasks.withType(ShadowJar::class.java) {
+  isZip64 = true
+  configurations = listOf(project.configurations.runtimeClasspath.get())
+  archiveClassifier.set("")
+
+  dependencies {
+    exclude(dependency("org.slf4j:slf4j-api"))
+
+    // Gravitino interfaces and utilities are supplied by the server.
+    exclude(project(":api"))
+    exclude(project(":common"))
+  }
+
+  relocate("com.fasterxml.jackson", "org.apache.gravitino.kms.transit.shaded.com.fasterxml.jackson")
+  relocate("org.apache.commons.codec", "org.apache.gravitino.kms.transit.shaded.org.apache.commons.codec")
+  relocate("org.apache.hc", "org.apache.gravitino.kms.transit.shaded.org.apache.hc")
+
+  mergeServiceFiles()
+}
+
+tasks.jar {
+  dependsOn(tasks.named("shadowJar"))
+  archiveClassifier.set("empty")
+}
