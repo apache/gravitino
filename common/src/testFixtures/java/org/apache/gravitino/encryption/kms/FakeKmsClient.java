@@ -19,23 +19,27 @@
 package org.apache.gravitino.encryption.kms;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /** In-memory KMS client for contract and consumer tests. */
 public final class FakeKmsClient implements KmsClient {
 
-  private final KmsApi api;
+  private final String api;
   private final String source;
   private final Map<String, KeyState> keys = new HashMap<>();
 
   /**
    * Creates an empty fake client.
    *
-   * @param api KMS API accepted by the client
+   * @param api canonical KMS API identifier accepted by the client
    * @param source configured source accepted by the client
    */
-  public FakeKmsClient(KmsApi api, String source) {
-    this.api = api;
+  public FakeKmsClient(String api, String source) {
+    if (api == null || api.trim().isEmpty()) {
+      throw new IllegalArgumentException("KMS API cannot be blank");
+    }
+    this.api = api.trim().toLowerCase(Locale.ROOT);
     this.source = source;
   }
 
@@ -69,7 +73,7 @@ public final class FakeKmsClient implements KmsClient {
     if (reference == null) {
       throw new IllegalArgumentException("KMS reference cannot be null");
     }
-    if (reference.api() != api) {
+    if (!reference.api().equals(api)) {
       throw new IllegalArgumentException(
           String.format("Expected KMS API %s but received %s", api, reference.api()));
     }

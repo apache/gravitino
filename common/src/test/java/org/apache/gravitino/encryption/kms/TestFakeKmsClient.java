@@ -20,12 +20,13 @@ package org.apache.gravitino.encryption.kms;
 
 public class TestFakeKmsClient extends TestKmsClientContract {
 
+  private static final String API = "test-kms";
   private static final String SOURCE = "test";
   private static final String USABLE_KEY = "usable";
   private static final String MISSING_KEY = "missing";
 
   private final FakeKmsClient client =
-      new FakeKmsClient(KmsApi.AWS_KMS, SOURCE).putKey(USABLE_KEY, true, true, true);
+      new FakeKmsClient(API, SOURCE).putKey(USABLE_KEY, true, true, true);
 
   @Override
   protected KmsClient client() {
@@ -34,11 +35,11 @@ public class TestFakeKmsClient extends TestKmsClientContract {
 
   @Override
   protected KmsReference usableKey() {
-    return new KmsReference(KmsApi.AWS_KMS, SOURCE, USABLE_KEY);
+    return new KmsReference(API, SOURCE, USABLE_KEY);
   }
 
   @Override
   protected KmsReference missingKey() {
-    return new KmsReference(KmsApi.AWS_KMS, SOURCE, MISSING_KEY);
+    return new KmsReference(API, SOURCE, MISSING_KEY);
   }
 }
