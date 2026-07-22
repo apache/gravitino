@@ -24,19 +24,28 @@ from gravitino.api.rel.expressions.distributions.distribution import Distributio
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.representation import Representation
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.table_catalog import TableCatalog
+from gravitino.api.rel.view import View
+from gravitino.api.rel.view_catalog import ViewCatalog
+from gravitino.api.rel.view_change import ViewChange
 from gravitino.client.base_schema_catalog import BaseSchemaCatalog
+from gravitino.client.generic_view import GenericView
 from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.requests.table_create_request import TableCreateRequest
 from gravitino.dto.requests.table_updates_request import TableUpdatesRequest
+from gravitino.dto.requests.view_create_request import ViewCreateRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
+from gravitino.dto.responses.view_response import ViewResponse
 from gravitino.dto.util.dto_converters import DTOConverters
+from gravitino.exceptions.base import UnsupportedOperationException
 from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
+from gravitino.exceptions.handlers.view_error_handler import VIEW_ERROR_HANDLER
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
@@ -44,13 +53,13 @@ from gravitino.utils import HTTPClient
 
 
 class RelationalCatalog(
-    BaseSchemaCatalog, TableCatalog
+    BaseSchemaCatalog, TableCatalog, ViewCatalog
 ):  # pylint: disable=too-many-ancestors
     """Relational catalog is a catalog implementation
 
-    The `RelationalCatalog` supports relational database like metadata operations,
-    for example, schemas and tables list, creation, update and deletion. A Relational
-    catalog is under the metalake.
+    The `RelationalCatalog` supports relational metadata operations such as listing,
+    creating, updating, and deleting schemas, tables, and views. A relational catalog
+    belongs to a metalake.
     """
 
     PRIVILEGES: Final[str] = "privileges"
@@ -88,6 +97,32 @@ class RelationalCatalog(
         """
         return self
 
+    def as_view_catalog(self) -> ViewCatalog:
+        """Return this relational catalog as a :class:`ViewCatalog`.
+
+        This method returns ``self`` to provide access to view-related
+        operations defined by the :class:`ViewCatalog` interface.
+
+        Returns:
+            ViewCatalog: The current catalog instance as a ``ViewCatalog``.
+        """
+        return self
+
+    def _get_entity_full_namespace(self, entity_namespace: Namespace) -> Namespace:
+        """Get the full namespace of an entity with the given short namespace.
+
+        Args:
+            entity_namespace (Namespace): The entity's short namespace, which is the schema name.
+
+        Returns:
+            Namespace: full namespace of the entity, which is "metalake.catalog.schema" format.
+        """
+        return Namespace.of(
+            self._catalog_namespace.level(0),
+            self._name,
+            entity_namespace.level(0),
+        )
+
     def _check_table_name_identifier(self, identifier: NameIdentifier) -> None:
         """Check whether the `NameIdentifier` of a table is valid.
 
@@ -119,27 +154,51 @@ class RelationalCatalog(
             f"Table namespace must be non-null and have 1 level, the input namespace is {namespace}",
         )
 
-    def _get_table_full_namespace(self, table_namespace: Namespace) -> Namespace:
-        """Get the full namespace of the table with the given table's short namespace (schema name).
-
-        Args:
-            table_namespace (Namespace): The table's short namespace, which is the schema name.
-
-        Returns:
-            Namespace: full namespace of the table, which is "metalake.catalog.schema" format.
-        """
-        return Namespace.of(
-            self._catalog_namespace.level(0),
-            self._name,
-            table_namespace.level(0),
-        )
-
     def _format_table_request_path(self, ns: Namespace) -> str:
         schema_ns = Namespace.of(ns.level(0), ns.level(1))
         return (
             f"{BaseSchemaCatalog.format_schema_request_path(schema_ns)}"
             f"/{encode_string(ns.level(2))}"
             "/tables"
+        )
+
+    def _check_view_name_identifier(self, identifier: NameIdentifier) -> None:
+        """Check whether the `NameIdentifier` of a view is valid.
+
+        Args:
+            identifier (NameIdentifier):
+                The NameIdentifier to check, which should be "schema.view" format.
+
+        Raises:
+            IllegalNameIdentifierException: If the Namespace is not valid.
+        """
+        NameIdentifier.check(identifier is not None, "NameIdentifier must not be null")
+        NameIdentifier.check(
+            identifier.name() is not None and identifier.name() != "",
+            "NameIdentifier name must not be empty",
+        )
+        self._check_view_namespace(identifier.namespace())
+
+    def _check_view_namespace(self, namespace: Namespace) -> None:
+        """Check whether the namespace of a view is valid, which should be "schema".
+
+        Args:
+            namespace (Namespace): The namespace to check.
+
+        Raises:
+            IllegalNamespaceException: If the Namespace is not valid.
+        """
+        Namespace.check(
+            namespace is not None and namespace.length() == 1,
+            f"View namespace must be non-null and have 1 level, the input namespace is {namespace}",
+        )
+
+    def _format_view_request_path(self, ns: Namespace) -> str:
+        schema_ns = Namespace.of(ns.level(0), ns.level(1))
+        return (
+            f"{BaseSchemaCatalog.format_schema_request_path(schema_ns)}"
+            f"/{encode_string(ns.level(2))}"
+            "/views"
         )
 
     def create_table(
@@ -169,7 +228,7 @@ class RelationalCatalog(
             _indexes=DTOConverters.to_dtos(indexes),
         )
         req.validate()
-        full_namespace = self._get_table_full_namespace(identifier.namespace())
+        full_namespace = self._get_entity_full_namespace(identifier.namespace())
         resp = self.rest_client.post(
             self._format_table_request_path(full_namespace),
             json=req,
@@ -181,7 +240,7 @@ class RelationalCatalog(
 
     def list_tables(self, namespace: Namespace) -> list[NameIdentifier]:
         self._check_table_namespace(namespace)
-        full_namespace = self._get_table_full_namespace(namespace)
+        full_namespace = self._get_entity_full_namespace(namespace)
         resp = self.rest_client.get(
             self._format_table_request_path(full_namespace),
             error_handler=TABLE_ERROR_HANDLER,
@@ -207,7 +266,7 @@ class RelationalCatalog(
         required_privilege_names: Optional[set[Privilege.Name]] = None,
     ) -> Table:
         self._check_table_name_identifier(identifier)
-        full_namespace = self._get_table_full_namespace(identifier.namespace())
+        full_namespace = self._get_entity_full_namespace(identifier.namespace())
         query_params = (
             {
                 RelationalCatalog.PRIVILEGES: ",".join(
@@ -244,7 +303,7 @@ class RelationalCatalog(
 
     def alter_table(self, identifier: NameIdentifier, *changes) -> Table:
         self._check_table_name_identifier(identifier)
-        full_namespace = self._get_table_full_namespace(identifier.namespace())
+        full_namespace = self._get_entity_full_namespace(identifier.namespace())
         updates_request = TableUpdatesRequest(
             updates=[
                 DTOConverters.to_table_update_request(change) for change in changes
@@ -276,12 +335,64 @@ class RelationalCatalog(
 
     def _drop_table(self, identifier: NameIdentifier, purge: bool) -> bool:
         self._check_table_name_identifier(identifier)
-        full_namespace = self._get_table_full_namespace(identifier.namespace())
+        full_namespace = self._get_entity_full_namespace(identifier.namespace())
         resp = self.rest_client.delete(
             f"{self._format_table_request_path(full_namespace)}"
             f"/{encode_string(identifier.name())}",
             error_handler=TABLE_ERROR_HANDLER,
             params={"purge": "true"} if purge else None,
+        )
+        drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
+        drop_resp.validate()
+        return drop_resp.dropped()
+
+    def list_views(self, namespace: Namespace) -> list[NameIdentifier]:
+        raise UnsupportedOperationException("Listing views is not supported")
+
+    def load_view(self, identifier: NameIdentifier) -> View:
+        raise UnsupportedOperationException("Loading views is not supported")
+
+    def create_view(
+        self,
+        identifier: NameIdentifier,
+        columns: list[Column],
+        representations: list[Representation],
+        comment: Optional[str] = None,
+        default_catalog: Optional[str] = None,
+        default_schema: Optional[str] = None,
+        properties: Optional[dict[str, str]] = None,
+    ) -> View:
+        self._check_view_name_identifier(identifier)
+        req = ViewCreateRequest(
+            _name=identifier.name(),
+            _columns=DTOConverters.to_dtos(columns),
+            _representations=DTOConverters.to_dtos(representations),
+            _comment=comment,
+            _default_catalog=default_catalog,
+            _default_schema=default_schema,
+            _properties=properties,
+        )
+        req.validate()
+        full_namespace = self._get_entity_full_namespace(identifier.namespace())
+        resp = self.rest_client.post(
+            self._format_view_request_path(full_namespace),
+            json=req,
+            error_handler=VIEW_ERROR_HANDLER,
+        )
+        view_resp = ViewResponse.from_json(resp.body, infer_missing=True)
+        view_resp.validate()
+        return GenericView(view_resp.view())
+
+    def alter_view(self, identifier: NameIdentifier, *changes: ViewChange) -> View:
+        raise UnsupportedOperationException("View alteration is not supported")
+
+    def drop_view(self, identifier: NameIdentifier) -> bool:
+        self._check_view_name_identifier(identifier)
+        full_namespace = self._get_entity_full_namespace(identifier.namespace())
+        resp = self.rest_client.delete(
+            f"{self._format_view_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}",
+            error_handler=VIEW_ERROR_HANDLER,
         )
         drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
         drop_resp.validate()
