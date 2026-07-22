@@ -210,8 +210,8 @@ public class CatalogDorisIT extends BaseIT {
     // Covers: bloom_filter_columns, compression (both writable).
     // NOTE: light_schema_change and enable_unique_key_merge_on_write are newer Doris
     // features (introduced in 2.1+) and do not appear in 1.2.x SHOW CREATE TABLE output.
-    // They are registered as reserved properties for read-back compatibility and their
-    // metadata is verified in TestDorisCatalog.testDorisTablePropertiesMetadata().
+    // They are registered as writable properties and their metadata is verified in
+    // TestDorisCatalog.testDorisTablePropertiesMetadata().
     // storage_policy requires cold-hot separation infrastructure and is covered by
     // the unit test metadata verification.
     TableCatalog tc = catalog.asTableCatalog();

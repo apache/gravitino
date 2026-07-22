@@ -212,14 +212,15 @@ Only Doris built-in table properties are supported; user-defined properties are 
 | Property Name                        | Description                                                                                                                                                                                 | Default Value | Required | Reserved | Immutable | Since Version    |
 |--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|------------------|
 | `replication_num`                    | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If BE ≥ 3, the server-side default (3) will be used. | `1` or `3`    | No       | No       | No        | 0.6.0-incubating |
-| `compression`                        | The compression type for the table. Supported values: `ZSTD`, `LZ4`, `LZ4F`, `ZLIB`. Deprecated as a table-level property in Doris 4.0+.                                                    | (none)        | No       | No       | No        | 2.0.0            |
+| `compression`                        | The compression type for the table. Supported values: `ZSTD`, `LZ4`, `LZ4F`, `ZLIB`. Deprecated as a table-level property in Doris 4.0+. Cannot be changed after table creation.            | (none)        | No       | No       | Yes       | 2.0.0            |
 | `bloom_filter_columns`               | Comma-separated list of columns for which bloom filter indexes are created.                                                                                                                 | (none)        | No       | No       | No        | 2.0.0            |
 | `storage_policy`                     | The name of the storage policy for cold-hot separation.                                                                                                                                     | (none)        | No       | No       | No        | 2.0.0            |
-| `light_schema_change`                | Whether light schema change is enabled for the table. Read-only; reflects the table's actual state and cannot be set by users.                                                              | (none)        | No       | Yes      | —         | 2.0.0            |
-| `enable_unique_key_merge_on_write`   | Whether merge-on-write is enabled for Unique Key tables. Read-only; reflects the table's actual state and cannot be set by users.                                                           | (none)        | No       | Yes      | —         | 2.0.0            |
+| `light_schema_change`                | Whether light schema change is enabled for the table. Can be modified via ALTER TABLE SET.                                                                                                  | `true`        | No       | No       | No        | 2.0.0            |
+| `enable_unique_key_merge_on_write`   | Whether merge-on-write is enabled for Unique Key tables. Must be set at CREATE TABLE time; cannot be changed after creation.                                                                | `true`        | No       | No       | Yes       | 2.0.0            |
 
 :::note
-**Reserved** properties are read-only. They reflect the table's actual state and cannot be set by users. Passing a reserved property to `createTable` will be rejected with an error.
+**Immutable** properties can be set at CREATE TABLE time but cannot be changed via ALTER TABLE.
+**Reserved** properties (none currently) are read-only and cannot be set by users.
 :::
 
 ### Table Indexes

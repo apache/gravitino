@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.EN
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.LIGHT_SCHEMA_CHANGE;
 import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -435,9 +436,8 @@ public class CatalogDoris3xIT extends BaseIT {
 
   @Test
   void testTablePropertiesRoundTrip() {
-    // Verify writable and reserved properties survive the create → Doris 3.0 → load round-trip.
-    // Covers: bloom_filter_columns, compression (writable),
-    //          light_schema_change (reserved, auto-populated by Doris 3.0.x).
+    // Verify writable properties survive the create → Doris 3.0 → load round-trip.
+    // Covers: bloom_filter_columns, compression, light_schema_change (all writable).
     // NOTE: storage_policy requires a storage policy resource in Doris (cold-hot separation
     // infrastructure) and cannot be tested end-to-end in a Docker environment. Its metadata
     // is verified in TestDorisCatalog.testDorisTablePropertiesMetadata().
@@ -448,6 +448,7 @@ public class CatalogDoris3xIT extends BaseIT {
     Map<String, String> properties = new HashMap<>();
     properties.put(BLOOM_FILTER_COLUMNS, colName1 + "," + colName2);
     properties.put(COMPRESSION, "ZSTD");
+    properties.put(LIGHT_SCHEMA_CHANGE, "true");
 
     tc.createTable(
         tid,
@@ -471,27 +472,32 @@ public class CatalogDoris3xIT extends BaseIT {
         loadedProps.containsKey(COMPRESSION),
         "compression should appear in SHOW CREATE TABLE properties on Doris 3.0.x");
 
-    // light_schema_change: reserved property auto-populated by Doris 3.0.x
+    // light_schema_change: writable property, should survive round-trip on 3.0.x
     assertTrue(
         loadedProps.containsKey(LIGHT_SCHEMA_CHANGE),
         "light_schema_change should appear in SHOW CREATE TABLE properties on Doris 3.0.x");
   }
 
   @Test
-  void testReservedPropertiesWithUniqueKey() {
-    // Verify that enable_unique_key_merge_on_write (reserved) and light_schema_change
-    // (reserved) appear in SHOW CREATE TABLE for UNIQUE KEY tables on Doris 3.0.x.
+  void testUniqueKeyTableProperties() {
+    // Verify that enable_unique_key_merge_on_write (writable, immutable) and
+    // light_schema_change (writable, mutable) can be set and read back
+    // for UNIQUE KEY tables on Doris 3.0.x.
     TableCatalog tc = catalog.asTableCatalog();
     NameIdentifier tid =
         NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_uk_props"));
     Index[] indexes =
         new Index[] {Indexes.of(Index.IndexType.UNIQUE_KEY, "uk_pk", new String[][] {{colName1}})};
 
+    Map<String, String> properties = new HashMap<>();
+    properties.put(ENABLE_UNIQUE_KEY_MERGE_ON_WRITE, "true");
+    properties.put(LIGHT_SCHEMA_CHANGE, "true");
+
     tc.createTable(
         tid,
         basicColumns(),
         tableComment,
-        Collections.emptyMap(),
+        properties,
         Transforms.EMPTY_TRANSFORM,
         hashDist(),
         null,
@@ -506,6 +512,47 @@ public class CatalogDoris3xIT extends BaseIT {
     assertTrue(
         loadedProps.containsKey(LIGHT_SCHEMA_CHANGE),
         "light_schema_change should appear in SHOW CREATE TABLE properties on Doris 3.0.x");
+  }
+
+  @Test
+  void testAlterTableProperty() {
+    // Verify that light_schema_change (mutable) can be altered via ALTER TABLE SET
+    // on a real Doris 3.0.x instance. Only false→true is tested because Doris 3.0
+    // rejects true→false ("Can not alter light_schema_change from true to false").
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_alter_props"));
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(LIGHT_SCHEMA_CHANGE, "false");
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    // When light_schema_change is "false" (the effective default), Doris does not
+    // emit it in SHOW CREATE TABLE PROPERTIES.
+    Table afterCreate = tc.loadTable(tid);
+    assertFalse(
+        afterCreate.properties().containsKey(LIGHT_SCHEMA_CHANGE),
+        "light_schema_change=false should NOT appear in PROPERTIES (default)");
+
+    tc.alterTable(tid, TableChange.setProperty(LIGHT_SCHEMA_CHANGE, "true"));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertTrue(
+                    tc.loadTable(tid).properties().containsKey(LIGHT_SCHEMA_CHANGE),
+                    "light_schema_change=true should appear after ALTER TABLE SET"));
   }
 
   private Column findColumn(Table table, String columnName) {

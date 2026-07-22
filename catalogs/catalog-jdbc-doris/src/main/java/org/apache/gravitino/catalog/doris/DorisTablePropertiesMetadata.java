@@ -34,7 +34,6 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
   public static final String COMPRESSION = "compression";
   public static final String BLOOM_FILTER_COLUMNS = "bloom_filter_columns";
   public static final String STORAGE_POLICY = "storage_policy";
-  // ---- reserved (read-only) properties ----
   public static final String LIGHT_SCHEMA_CHANGE = "light_schema_change";
   public static final String ENABLE_UNIQUE_KEY_MERGE_ON_WRITE = "enable_unique_key_merge_on_write";
 
@@ -53,8 +52,9 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
             PropertyEntry.stringOptionalPropertyEntry(
                 COMPRESSION,
                 "The compression type for the table (ZSTD, LZ4, LZ4F, ZLIB)."
-                    + " Deprecated as a table-level property in Doris 4.0+",
-                false /* immutable */,
+                    + " Deprecated as a table-level property in Doris 4.0+."
+                    + " Cannot be changed via ALTER TABLE.",
+                true /* immutable */,
                 null /* default value */,
                 false /* hidden */),
             PropertyEntry.stringOptionalPropertyEntry(
@@ -69,13 +69,19 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
                 false /* immutable */,
                 null /* default value */,
                 false /* hidden */),
-            PropertyEntry.stringReservedPropertyEntry(
+            PropertyEntry.stringOptionalPropertyEntry(
                 LIGHT_SCHEMA_CHANGE,
-                "Whether light schema change is enabled for the table (read-only)",
+                "Whether light schema change is enabled for the table. "
+                    + "Can be modified via ALTER TABLE SET",
+                false /* immutable */,
+                null /* default value */,
                 false /* hidden */),
-            PropertyEntry.stringReservedPropertyEntry(
+            PropertyEntry.stringOptionalPropertyEntry(
                 ENABLE_UNIQUE_KEY_MERGE_ON_WRITE,
-                "Whether merge-on-write is enabled for Unique Key tables (read-only)",
+                "Whether merge-on-write is enabled for Unique Key tables. "
+                    + "Must be set at CREATE TABLE time; Doris rejects ALTER TABLE SET",
+                true /* immutable */,
+                null /* default value */,
                 false /* hidden */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);

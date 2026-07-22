@@ -19,12 +19,14 @@
 
 package org.apache.gravitino.catalog.doris;
 
+import static java.util.Collections.emptyMap;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.BLOOM_FILTER_COLUMNS;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.COMPRESSION;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.ENABLE_UNIQUE_KEY_MERGE_ON_WRITE;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.LIGHT_SCHEMA_CHANGE;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.STORAGE_POLICY;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.HashMap;
@@ -64,7 +66,7 @@ public class TestDorisCatalog {
     PropertyEntry<?> compression = propertyEntryMap.get(COMPRESSION);
     Assertions.assertEquals(COMPRESSION, compression.getName());
     Assertions.assertFalse(compression.isRequired());
-    Assertions.assertFalse(compression.isImmutable());
+    Assertions.assertTrue(compression.isImmutable());
     Assertions.assertFalse(compression.isReserved());
     Assertions.assertFalse(compression.isHidden());
     Assertions.assertEquals(String.class, compression.getJavaType());
@@ -92,58 +94,64 @@ public class TestDorisCatalog {
     Assertions.assertEquals(String.class, storagePolicy.getJavaType());
     Assertions.assertNull(storagePolicy.getDefaultValue());
 
-    // ---- light_schema_change (stringReserved) ----
+    // ---- light_schema_change (stringOptional, mutable) ----
     Assertions.assertTrue(propertyEntryMap.containsKey(LIGHT_SCHEMA_CHANGE));
     PropertyEntry<?> lightSchemaChange = propertyEntryMap.get(LIGHT_SCHEMA_CHANGE);
     Assertions.assertEquals(LIGHT_SCHEMA_CHANGE, lightSchemaChange.getName());
     Assertions.assertFalse(lightSchemaChange.isRequired());
-    Assertions.assertTrue(lightSchemaChange.isImmutable());
-    Assertions.assertTrue(lightSchemaChange.isReserved());
+    Assertions.assertFalse(lightSchemaChange.isImmutable());
+    Assertions.assertFalse(lightSchemaChange.isReserved());
     Assertions.assertFalse(lightSchemaChange.isHidden());
     Assertions.assertEquals(String.class, lightSchemaChange.getJavaType());
+    Assertions.assertNull(lightSchemaChange.getDefaultValue());
 
-    // ---- enable_unique_key_merge_on_write (stringReserved) ----
+    // ---- enable_unique_key_merge_on_write (stringOptional, immutable) ----
     Assertions.assertTrue(propertyEntryMap.containsKey(ENABLE_UNIQUE_KEY_MERGE_ON_WRITE));
     PropertyEntry<?> mergeOnWrite = propertyEntryMap.get(ENABLE_UNIQUE_KEY_MERGE_ON_WRITE);
     Assertions.assertEquals(ENABLE_UNIQUE_KEY_MERGE_ON_WRITE, mergeOnWrite.getName());
     Assertions.assertFalse(mergeOnWrite.isRequired());
     Assertions.assertTrue(mergeOnWrite.isImmutable());
-    Assertions.assertTrue(mergeOnWrite.isReserved());
+    Assertions.assertFalse(mergeOnWrite.isReserved());
     Assertions.assertFalse(mergeOnWrite.isHidden());
     Assertions.assertEquals(String.class, mergeOnWrite.getJavaType());
+    Assertions.assertNull(mergeOnWrite.getDefaultValue());
   }
 
   @Test
-  void testReservedPropertiesRejectedOnCreate() {
-    // Verify that reserved (read-only) properties are rejected when passed to createTable.
+  void testWritablePropertiesAcceptedOnCreate() {
+    // Verify that all registered properties (including the formerly-reserved light_schema_change
+    // and enable_unique_key_merge_on_write) pass create-table validation.
     DorisTablePropertiesMetadata metadata = new DorisTablePropertiesMetadata();
 
-    // light_schema_change is a reserved property — setting it should be rejected.
+    // All writable properties should pass validation — no exception.
     Map<String, String> props = new HashMap<>();
-    props.put(LIGHT_SCHEMA_CHANGE, "false");
+    props.put(BLOOM_FILTER_COLUMNS, "col1,col2");
+    props.put(COMPRESSION, "ZSTD");
+    props.put(LIGHT_SCHEMA_CHANGE, "true");
+    props.put(ENABLE_UNIQUE_KEY_MERGE_ON_WRITE, "false");
+    assertDoesNotThrow(() -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, props));
+
+    // Verify that immutable properties are rejected by ALTER validation.
+    // compression is immutable (Doris rejects ALTER TABLE SET compression).
+    Map<String, String> alterProps = new HashMap<>();
+    alterProps.put(COMPRESSION, "ZLIB");
     assertThrows(
         IllegalArgumentException.class,
-        () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, props));
+        () -> PropertiesMetadataHelpers.validatePropertyForAlter(metadata, alterProps, emptyMap()));
 
-    // enable_unique_key_merge_on_write is also reserved.
-    Map<String, String> props2 = new HashMap<>();
-    props2.put(ENABLE_UNIQUE_KEY_MERGE_ON_WRITE, "false");
+    // enable_unique_key_merge_on_write is immutable (Doris rejects ALTER TABLE SET).
+    Map<String, String> alterProps2 = new HashMap<>();
+    alterProps2.put(ENABLE_UNIQUE_KEY_MERGE_ON_WRITE, "true");
     assertThrows(
         IllegalArgumentException.class,
-        () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, props2));
+        () ->
+            PropertiesMetadataHelpers.validatePropertyForAlter(metadata, alterProps2, emptyMap()));
 
-    // Reserved properties mixed with writable properties should also be rejected.
-    Map<String, String> props3 = new HashMap<>();
-    props3.put(BLOOM_FILTER_COLUMNS, "col1,col2");
-    props3.put(LIGHT_SCHEMA_CHANGE, "true");
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, props3));
-
-    // Writable properties alone must pass validation.
-    Map<String, String> props4 = new HashMap<>();
-    props4.put(BLOOM_FILTER_COLUMNS, "col1,col2");
-    props4.put(COMPRESSION, "ZSTD");
-    PropertiesMetadataHelpers.validatePropertyForCreate(metadata, props4);
+    // light_schema_change is mutable — should pass ALTER validation.
+    Map<String, String> alterProps3 = new HashMap<>();
+    alterProps3.put(LIGHT_SCHEMA_CHANGE, "false");
+    assertDoesNotThrow(
+        () ->
+            PropertiesMetadataHelpers.validatePropertyForAlter(metadata, alterProps3, emptyMap()));
   }
 }
