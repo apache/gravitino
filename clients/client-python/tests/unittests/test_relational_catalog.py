@@ -20,19 +20,28 @@ from http.client import HTTPResponse
 from unittest.mock import Mock, patch
 
 from gravitino.api.authorization.privileges import Privilege
+from gravitino.api.rel.column import Column
+from gravitino.api.rel.dialects import Dialects
+from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.table_change import TableChange
+from gravitino.api.rel.types.types import Types
 from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.audit_dto import AuditDTO
+from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
+from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.rel.view_dto import ViewDTO
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
+from gravitino.dto.responses.view_response import ViewResponse
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import (
     NoSuchSchemaException,
     NoSuchTableException,
     TableAlreadyExistsException,
+    ViewAlreadyExistsException,
 )
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
@@ -51,6 +60,8 @@ class TestRelationalCatalog(unittest.TestCase):
         cls.table_name = "test_table"
         cls.catalog_namespace = Namespace.of(cls.metalake_name)
         cls.table_identifier = NameIdentifier.of(cls.schema_name, cls.table_name)
+        cls.view_name = "test_view"
+        cls.view_identifier = NameIdentifier.of(cls.schema_name, cls.view_name)
         cls.rest_client = HTTPClient("http://localhost:8090")
         cls.catalog = RelationalCatalog(
             catalog_namespace=cls.catalog_namespace,
@@ -62,6 +73,30 @@ class TestRelationalCatalog(unittest.TestCase):
         )
         cls.TABLE_DTO_JSON_STRING = TABLE_DTO_JSON_STRING_WITH_STARTING_DATE_SORT
         cls.table_dto = TableDTO.from_json(cls.TABLE_DTO_JSON_STRING)
+        cls.view_dto = ViewDTO(
+            _name=cls.view_name,
+            _columns=[
+                ColumnDTO(
+                    _name="id",
+                    _data_type=Types.IntegerType.get(),
+                    _comment="id column",
+                    _nullable=False,
+                )
+            ],
+            _representations=[
+                SQLRepresentationDTO(
+                    _dialect=Dialects.TRINO,
+                    _sql="SELECT id FROM test_table",
+                )
+            ],
+            _comment="test view comment",
+            _default_catalog="test_catalog",
+            _default_schema="test_schema",
+            _properties={"k1": "v1"},
+            _audit=AuditDTO(
+                "creator", "2022-01-01T00:00:00Z", "modifier", "2022-01-01T00:00:00Z"
+            ),
+        )
 
     def _get_mock_http_resp(self, json_str: str, return_code: int = 200):
         mock_http_resp = Mock(HTTPResponse)
@@ -75,6 +110,10 @@ class TestRelationalCatalog(unittest.TestCase):
     def test_as_table_catalog(self):
         table_catalog = self.catalog.as_table_catalog()
         self.assertIs(table_catalog, self.catalog)
+
+    def test_as_view_catalog(self):
+        view_catalog = self.catalog.as_view_catalog()
+        self.assertIs(view_catalog, self.catalog)
 
     def test_create_table(self):
         resp_body = TableResponse(0, self.table_dto)
@@ -329,3 +368,57 @@ class TestRelationalCatalog(unittest.TestCase):
                 TableChange.update_column_nullability(["id"], nullable=True),
             )
             self.assertEqual(table.name(), self.table_dto.name())
+
+    def test_create_view(self):
+        resp_body = ViewResponse(0, self.view_dto)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            return_value=mock_resp,
+        ):
+            view = self.catalog.as_view_catalog().create_view(
+                self.view_identifier,
+                [Column.of("id", Types.IntegerType.get(), nullable=False)],
+                [SQLRepresentation(Dialects.TRINO, "SELECT id FROM test_table")],
+                comment="test view comment",
+                default_catalog="test_catalog",
+                default_schema="test_schema",
+                properties={"k1": "v1"},
+            )
+            self.assertEqual(self.view_name, view.name())
+            self.assertEqual("test view comment", view.comment())
+
+    def test_create_view_already_exists(self):
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            side_effect=ViewAlreadyExistsException("View already exists"),
+        ):
+            with self.assertRaises(ViewAlreadyExistsException):
+                self.catalog.as_view_catalog().create_view(
+                    self.view_identifier,
+                    [Column.of("id", Types.IntegerType.get())],
+                    [SQLRepresentation(Dialects.TRINO, "SELECT id FROM test_table")],
+                )
+
+    def test_drop_view(self):
+        resp_body = DropResponse(0, True)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.delete",
+            return_value=mock_resp,
+        ):
+            is_dropped = self.catalog.as_view_catalog().drop_view(self.view_identifier)
+            self.assertTrue(is_dropped)
+
+    def test_drop_view_not_exists(self):
+        resp_body = DropResponse(0, False)
+        mock_resp = self._get_mock_http_resp(resp_body.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.delete",
+            return_value=mock_resp,
+        ):
+            is_dropped = self.catalog.as_view_catalog().drop_view(self.view_identifier)
+            self.assertFalse(is_dropped)
