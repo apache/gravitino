@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.encryption.kms;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -52,6 +54,7 @@ public enum KmsApi {
    *
    * @return the configuration value
    */
+  @JsonValue
   public String wireValue() {
     return wireValue;
   }
@@ -63,6 +66,7 @@ public enum KmsApi {
    * @return the matching API
    * @throws IllegalArgumentException if the value is null, blank, or unsupported
    */
+  @JsonCreator
   public static KmsApi fromWireValue(String value) {
     if (value == null || value.trim().isEmpty()) {
       throw new IllegalArgumentException("KMS API cannot be blank");

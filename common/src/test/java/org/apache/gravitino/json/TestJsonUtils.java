@@ -36,6 +36,8 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.encryption.kms.KmsApi;
+import org.apache.gravitino.encryption.kms.KmsReference;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -252,6 +254,22 @@ public class TestJsonUtils {
     JsonNode nodeNormal = objectMapper.readTree(jsonNormal);
     Long result = JsonUtils.getLong("property", nodeNormal);
     assertEquals(1L, result);
+  }
+
+  @Test
+  void testKmsReferenceAnyFieldMapperSerde() throws JsonProcessingException {
+    KmsReference reference =
+        new KmsReference(KmsApi.GOOGLE_CLOUD_KMS, "analytics-prod", "projects/p/keys/k");
+
+    String json = JsonUtils.anyFieldMapper().writeValueAsString(reference);
+
+    assertEquals(
+        JsonUtils.anyFieldMapper()
+            .readTree(
+                "{\"api\":\"google-cloud-kms\",\"source\":\"analytics-prod\","
+                    + "\"keyId\":\"projects/p/keys/k\"}"),
+        JsonUtils.anyFieldMapper().readTree(json));
+    assertEquals(reference, JsonUtils.anyFieldMapper().readValue(json, KmsReference.class));
   }
 
   @Test
