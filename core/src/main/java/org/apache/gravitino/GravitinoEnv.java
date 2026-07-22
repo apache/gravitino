@@ -202,7 +202,7 @@ public class GravitinoEnv {
    *
    * @param config The configuration object to initialize the environment.
    */
-  public void initializeBaseComponents(Config config) {
+  public synchronized void initializeBaseComponents(Config config) {
     LOG.info("Initializing Gravitino base environment...");
     this.config = config;
     FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
@@ -216,7 +216,7 @@ public class GravitinoEnv {
    *
    * @param config The configuration object to initialize the environment.
    */
-  public void initializeFullComponents(Config config) {
+  public synchronized void initializeFullComponents(Config config) {
     LOG.info("Initializing Gravitino full environment...");
     this.config = config;
     FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
@@ -583,7 +583,7 @@ public class GravitinoEnv {
   }
 
   /** Shutdown the Gravitino environment. */
-  public void shutdown() {
+  public synchronized void shutdown() {
     LOG.info("Shutting down Gravitino Environment...");
 
     if (entityStore != null) {
