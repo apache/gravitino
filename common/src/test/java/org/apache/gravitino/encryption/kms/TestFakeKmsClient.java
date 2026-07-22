@@ -18,15 +18,29 @@
  */
 package org.apache.gravitino.encryption.kms;
 
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
 public class TestFakeKmsClient extends TestKmsClientContract {
 
   private static final String API = "test-kms";
   private static final String SOURCE = "test";
   private static final String USABLE_KEY = "usable";
+  private static final String DISABLED_KEY = "disabled";
   private static final String MISSING_KEY = "missing";
 
   private final FakeKmsClient client =
-      new FakeKmsClient(API, SOURCE).putKey(USABLE_KEY, true, true, true);
+      new FakeKmsClient(API, SOURCE)
+          .putKey(USABLE_KEY, true, true, true)
+          .putKey(DISABLED_KEY, false, true, true);
+
+  @Test
+  void testReportsDisabledKeyAsPresent() {
+    KmsKeyProperties properties =
+        client.getKeyProperties(new KmsReference(API, SOURCE, DISABLED_KEY)).orElseThrow();
+
+    Assertions.assertFalse(properties.enabled());
+  }
 
   @Override
   protected KmsClient client() {

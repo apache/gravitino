@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.encryption.kms;
 
+import java.util.Optional;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 
@@ -34,12 +35,17 @@ public interface KmsClient extends AutoCloseable {
   /**
    * Reads the provider-reported properties of a key.
    *
+   * <p>An empty result means the provider authoritatively reported that the key does not exist.
+   * Authentication, authorization, timeout, availability, and other indeterminate failures are
+   * reported as exceptions, never as an empty result.
+   *
    * @param reference key to inspect
-   * @return normalized key properties
+   * @return normalized key properties, or empty when the key authoritatively does not exist; never
+   *     null
    * @throws IllegalArgumentException if the reference does not belong to this client
    * @throws ConnectionFailedException if the provider cannot be queried
    */
-  KmsKeyProperties getKeyProperties(KmsReference reference);
+  Optional<KmsKeyProperties> getKeyProperties(KmsReference reference);
 
   /** Releases resources owned by this client. */
   @Override

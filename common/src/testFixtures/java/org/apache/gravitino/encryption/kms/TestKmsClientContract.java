@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.encryption.kms;
 
+import java.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -48,10 +49,11 @@ public abstract class TestKmsClientContract {
   @Test
   void testReportsUsableKeyProperties() {
     KmsReference reference = usableKey();
-    KmsKeyProperties properties = client().getKeyProperties(reference);
+    Optional<KmsKeyProperties> result = client().getKeyProperties(reference);
 
+    Assertions.assertNotNull(result, "KMS clients must not return null");
+    KmsKeyProperties properties = result.orElseThrow();
     Assertions.assertEquals(reference, properties.reference());
-    Assertions.assertTrue(properties.present());
     Assertions.assertTrue(properties.enabled());
     Assertions.assertTrue(properties.supportsWrapping());
     Assertions.assertTrue(properties.supportsUnwrapping());
@@ -60,10 +62,10 @@ public abstract class TestKmsClientContract {
   @Test
   void testReportsMissingKey() {
     KmsReference reference = missingKey();
-    KmsKeyProperties properties = client().getKeyProperties(reference);
+    Optional<KmsKeyProperties> result = client().getKeyProperties(reference);
 
-    Assertions.assertEquals(reference, properties.reference());
-    Assertions.assertFalse(properties.present());
+    Assertions.assertNotNull(result, "KMS clients must not return null");
+    Assertions.assertTrue(result.isEmpty());
   }
 
   @Test

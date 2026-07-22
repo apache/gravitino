@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.encryption.kms;
 
+import java.util.Optional;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -28,18 +30,44 @@ public class TestKmsClient {
   @Test
   void testReturnsProviderProperties() {
     KmsKeyProperties properties = new TestProperties();
-    KmsClient client = reference -> properties;
+    KmsClient client = reference -> Optional.of(properties);
 
-    Assertions.assertSame(properties, client.getKeyProperties(REFERENCE));
+    Assertions.assertSame(properties, client.getKeyProperties(REFERENCE).orElseThrow());
     Assertions.assertTrue(properties.supportsWrapping());
     Assertions.assertFalse(properties.supportsUnwrapping());
   }
 
   @Test
   void testDefaultClose() {
-    KmsClient client = reference -> new TestProperties();
+    KmsClient client = reference -> Optional.of(new TestProperties());
 
     Assertions.assertDoesNotThrow(client::close);
+  }
+
+  @Test
+  void testPreservesProviderFailureType() {
+    KmsAuthenticationException authenticationFailure =
+        new KmsAuthenticationException("authentication failed");
+    ConnectionFailedException unavailableFailure =
+        new ConnectionFailedException("provider unavailable");
+    KmsClient authenticationClient =
+        reference -> {
+          throw authenticationFailure;
+        };
+    KmsClient unavailableClient =
+        reference -> {
+          throw unavailableFailure;
+        };
+
+    Assertions.assertSame(
+        authenticationFailure,
+        Assertions.assertThrows(
+            KmsAuthenticationException.class,
+            () -> authenticationClient.getKeyProperties(REFERENCE)));
+    Assertions.assertSame(
+        unavailableFailure,
+        Assertions.assertThrows(
+            ConnectionFailedException.class, () -> unavailableClient.getKeyProperties(REFERENCE)));
   }
 
   private static final class TestProperties implements KmsKeyProperties {
@@ -47,11 +75,6 @@ public class TestKmsClient {
     @Override
     public KmsReference reference() {
       return REFERENCE;
-    }
-
-    @Override
-    public boolean present() {
-      return true;
     }
 
     @Override

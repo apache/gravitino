@@ -21,6 +21,7 @@ package org.apache.gravitino.encryption.kms;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /** In-memory KMS client for contract and consumer tests. */
 public final class FakeKmsClient implements KmsClient {
@@ -60,13 +61,14 @@ public final class FakeKmsClient implements KmsClient {
 
   /** {@inheritDoc} */
   @Override
-  public KmsKeyProperties getKeyProperties(KmsReference reference) {
+  public Optional<KmsKeyProperties> getKeyProperties(KmsReference reference) {
     requireReference(reference);
     KeyState state = keys.get(reference.keyId());
     return state == null
-        ? new Properties(reference, false, false, false, false)
-        : new Properties(
-            reference, true, state.enabled, state.supportsWrapping, state.supportsUnwrapping);
+        ? Optional.empty()
+        : Optional.of(
+            new Properties(
+                reference, state.enabled, state.supportsWrapping, state.supportsUnwrapping));
   }
 
   private void requireReference(KmsReference reference) {
@@ -100,19 +102,16 @@ public final class FakeKmsClient implements KmsClient {
   private static final class Properties implements KmsKeyProperties {
 
     private final KmsReference reference;
-    private final boolean present;
     private final boolean enabled;
     private final boolean supportsWrapping;
     private final boolean supportsUnwrapping;
 
     private Properties(
         KmsReference reference,
-        boolean present,
         boolean enabled,
         boolean supportsWrapping,
         boolean supportsUnwrapping) {
       this.reference = reference;
-      this.present = present;
       this.enabled = enabled;
       this.supportsWrapping = supportsWrapping;
       this.supportsUnwrapping = supportsUnwrapping;
@@ -121,11 +120,6 @@ public final class FakeKmsClient implements KmsClient {
     @Override
     public KmsReference reference() {
       return reference;
-    }
-
-    @Override
-    public boolean present() {
-      return present;
     }
 
     @Override

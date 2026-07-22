@@ -21,9 +21,11 @@ package org.apache.gravitino.encryption.kms;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
- * Common properties reported for a KMS key.
+ * Common properties reported for a successfully located KMS key.
  *
- * <p>Capabilities describe downstream use; this API does not perform cryptographic operations.
+ * <p>Provider-specific lifecycle state may describe the logical key or its selected or current
+ * version. Capabilities describe key-specific structural support; this API does not perform
+ * cryptographic operations.
  */
 @DeveloperApi
 public interface KmsKeyProperties {
@@ -36,28 +38,24 @@ public interface KmsKeyProperties {
   KmsReference reference();
 
   /**
-   * Returns whether the provider reports that the key exists.
+   * Returns the provider's normalized lifecycle state for the key.
    *
-   * @return whether the key exists
-   */
-  boolean present();
-
-  /**
-   * Returns whether the provider reports that the key is enabled.
+   * <p>This does not indicate caller authorization, service availability, or that a subsequent
+   * operation is guaranteed to succeed.
    *
    * @return whether the key is enabled
    */
   boolean enabled();
 
   /**
-   * Returns whether the key supports wrapping data-encryption keys.
+   * Returns whether the key structurally supports wrapping data-encryption keys.
    *
    * @return whether wrapping is supported
    */
   boolean supportsWrapping();
 
   /**
-   * Returns whether the key supports unwrapping data-encryption keys.
+   * Returns whether the key structurally supports unwrapping data-encryption keys.
    *
    * @return whether unwrapping is supported
    */
