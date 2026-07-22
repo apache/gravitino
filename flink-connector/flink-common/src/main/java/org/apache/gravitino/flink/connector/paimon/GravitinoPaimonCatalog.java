@@ -139,6 +139,8 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
         HadoopUtils.getHadoopConfiguration(Options.fromMap(withoutHadoopOptions(paimonOptions)));
     moveHadoopOptionsToConf(paimonOptions, hadoopConf);
     try {
+      // Keep vended credentials as Paimon options because Paimon native S3/OSS FileIO loaders
+      // declare them as required options.
       CredentialPropertyUtils.applyPaimonCredentials(
           CredentialPropertyUtils.getCredentials(catalog()), paimonOptions);
     } catch (NoSuchCatalogException e) {
