@@ -40,6 +40,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -106,14 +107,8 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
       Transform partitionInfo = loadedTable.partitioning()[0];
       Map<String, Type> columnTypes = getColumnTypes(connection, loadedTable.name(), typeConverter);
       String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", loadedTable.name());
-      try (Statement statement = connection.createStatement();
-          ResultSet result = statement.executeQuery(showPartitionsSql)) {
-        ImmutableList.Builder<Partition> partitions = ImmutableList.builder();
-        while (result.next()) {
-          partitions.add(fromDorisPartition(result, partitionInfo, columnTypes));
-        }
-        return partitions.build().toArray(new Partition[0]);
-      }
+      return loadPartitions(connection, showPartitionsSql, partitionInfo, columnTypes)
+          .toArray(new Partition[0]);
     } catch (SQLException e) {
       throw exceptionConverter.toGravitinoException(e);
     }
@@ -128,11 +123,10 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
           String.format(
               "SHOW PARTITIONS FROM `%s` WHERE PartitionName = \"%s\"",
               loadedTable.name(), partitionName);
-      try (Statement statement = connection.createStatement();
-          ResultSet result = statement.executeQuery(showPartitionsSql)) {
-        if (result.next()) {
-          return fromDorisPartition(result, partitionInfo, columnTypes);
-        }
+      List<Partition> partitions =
+          loadPartitions(connection, showPartitionsSql, partitionInfo, columnTypes);
+      if (!partitions.isEmpty()) {
+        return partitions.get(0);
       }
     } catch (SQLException e) {
       throw exceptionConverter.toGravitinoException(e);
@@ -217,6 +211,33 @@ public final class DorisTablePartitionOperations extends JdbcTablePartitionOpera
         return false;
       }
       throw exception;
+    }
+  }
+
+  /**
+   * Runs a {@code SHOW PARTITIONS} query and converts every returned row into a {@link Partition},
+   * shared by table loading and the partition read operations.
+   *
+   * @param connection an open connection to the table's database
+   * @param showPartitionsSql the {@code SHOW PARTITIONS} statement to execute
+   * @param partitionInfo the table's partition transform (list or range)
+   * @param columnTypes the partition columns' types, keyed by column name
+   * @return the partitions returned by the query, in result-set order
+   * @throws SQLException if the query fails
+   */
+  static List<Partition> loadPartitions(
+      Connection connection,
+      String showPartitionsSql,
+      Transform partitionInfo,
+      Map<String, Type> columnTypes)
+      throws SQLException {
+    try (Statement statement = connection.createStatement();
+        ResultSet result = statement.executeQuery(showPartitionsSql)) {
+      ImmutableList.Builder<Partition> partitions = ImmutableList.builder();
+      while (result.next()) {
+        partitions.add(fromDorisPartition(result, partitionInfo, columnTypes));
+      }
+      return partitions.build();
     }
   }
 

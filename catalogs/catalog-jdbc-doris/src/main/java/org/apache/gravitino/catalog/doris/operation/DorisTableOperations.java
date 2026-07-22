@@ -642,28 +642,25 @@ public class DorisTableOperations extends JdbcTableOperations {
       Transform partitioning = transform.get();
       Map<String, Type> columnTypes =
           DorisTablePartitionOperations.getColumnTypes(connection, tableName, typeConverter);
-      List<Partition> assignments = new ArrayList<>();
       String showPartitionsSql = String.format("SHOW PARTITIONS FROM `%s`", tableName);
-      try (Statement partitionStatement = connection.createStatement();
-          ResultSet partitions = partitionStatement.executeQuery(showPartitionsSql)) {
-        while (partitions.next()) {
-          assignments.add(
-              DorisTablePartitionOperations.fromDorisPartition(
-                  partitions, partitioning, columnTypes));
-        }
-      }
+      List<Partition> assignments =
+          DorisTablePartitionOperations.loadPartitions(
+              connection, showPartitionsSql, partitioning, columnTypes);
 
       if (partitioning instanceof Transforms.ListTransform) {
         String[][] fieldNames = ((Transforms.ListTransform) partitioning).fieldNames();
         return new Transform[] {
           Transforms.list(fieldNames, assignments.toArray(new ListPartition[0]))
         };
+      } else if (partitioning instanceof Transforms.RangeTransform) {
+        String[] fieldName = ((Transforms.RangeTransform) partitioning).fieldName();
+        return new Transform[] {
+          Transforms.range(fieldName, assignments.toArray(new RangePartition[0]))
+        };
       }
 
-      String[] fieldName = ((Transforms.RangeTransform) partitioning).fieldName();
-      return new Transform[] {
-        Transforms.range(fieldName, assignments.toArray(new RangePartition[0]))
-      };
+      throw new UnsupportedOperationException(
+          String.format("%s is not a supported partition transform", partitioning));
     }
   }
 
