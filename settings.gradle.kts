@@ -44,6 +44,7 @@ include(
 )
 
 include("catalogs:catalog-fileset")
+include("catalogs:catalog-fluss")
 include("catalogs:catalog-kafka")
 include("catalogs:catalog-model")
 
