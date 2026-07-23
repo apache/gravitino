@@ -21,6 +21,7 @@ package org.apache.gravitino.client.integration.test;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Collections;
 import java.util.List;
@@ -450,6 +451,115 @@ public class JobIT extends BaseIT {
       return scriptFile.getAbsolutePath();
     } catch (Exception e) {
       throw new RuntimeException("Failed to create test lib script", e);
+    }
+  }
+
+  @Test
+  public void testJobTemplateWithOptionalArguments() throws Exception {
+    String optArgTestScriptPath = generateOptionalArgTestScript();
+
+    // Template with flag/value optional pairs. The first positional arg ({{mode}})
+    // tells the validation script which flags it should or should not receive.
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("test_optional_args_template")
+            .withComment("Test template with optional flag/value pairs")
+            .withExecutable(optArgTestScriptPath)
+            .withArguments(
+                Lists.newArrayList(
+                    "{{mode}}", "?--opt1", "?{{optional_arg1}}", "?--opt2", "?{{optional_arg2}}"))
+            .withEnvironments(Collections.emptyMap())
+            .withScripts(Collections.emptyList())
+            .withCustomFields(Collections.emptyMap())
+            .build();
+
+    metalake.registerJobTemplate(template);
+    Assertions.assertNotNull(metalake.getJobTemplate(template.name()));
+
+    // Case 1: No optional args — script asserts neither flag is received.
+    runJobAndAwait(
+        template,
+        ImmutableMap.of("mode", "no_optionals"),
+        Lists.newArrayList("no_optionals"),
+        JobHandle.Status.SUCCEEDED);
+
+    // Case 2: opt1 provided, opt2 absent — script asserts --opt1 is present and --opt2 is absent.
+    runJobAndAwait(
+        template,
+        ImmutableMap.of("mode", "opt1_only", "optional_arg1", "val1"),
+        Lists.newArrayList("opt1_only", "--opt1", "val1"),
+        JobHandle.Status.SUCCEEDED);
+
+    // Case 3: Both optional args provided — script asserts both flags are received.
+    runJobAndAwait(
+        template,
+        ImmutableMap.of("mode", "both_optionals", "optional_arg1", "val1", "optional_arg2", "val2"),
+        Lists.newArrayList("both_optionals", "--opt1", "val1", "--opt2", "val2"),
+        JobHandle.Status.SUCCEEDED);
+  }
+
+  private void runJobAndAwait(
+      JobTemplate template,
+      Map<String, String> jobConf,
+      List<String> expectedArgs,
+      JobHandle.Status expectedStatus)
+      throws IOException {
+    JobHandle job = metalake.runJob(template.name(), jobConf);
+    Assertions.assertNotNull(job);
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              JobHandle handle = metalake.getJob(job.jobId());
+              return handle.jobStatus() == JobHandle.Status.SUCCEEDED
+                  || handle.jobStatus() == JobHandle.Status.FAILED;
+            });
+    Assertions.assertEquals(expectedStatus, metalake.getJob(job.jobId()).jobStatus());
+    Assertions.assertEquals(expectedArgs, readJobArgs(template.name(), job.jobId()));
+  }
+
+  private List<String> readJobArgs(String templateName, String jobId) throws IOException {
+    File outputLog =
+        new File(
+            new File(new File(new File(testStagingDir, METALAKE_NAME), templateName), jobId),
+            "output.log");
+    return Files.readAllLines(outputLog.toPath());
+  }
+
+  // $1 = mode; remaining args are parsed for --opt1 and --opt2 flags.
+  // Exits 0 when the received flags match the state encoded in mode, 1 otherwise.
+  private String generateOptionalArgTestScript() {
+    String content =
+        "#!/bin/bash\n"
+            + "printf '%s\\n' \"$@\"\n"
+            + "MODE=\"$1\"\n"
+            + "shift\n"
+            + "OPT1_PRESENT=0\n"
+            + "OPT2_PRESENT=0\n"
+            + "while [[ $# -gt 0 ]]; do\n"
+            + "  case \"$1\" in\n"
+            + "    --opt1) OPT1_PRESENT=1; shift 2;;\n"
+            + "    --opt2) OPT2_PRESENT=1; shift 2;;\n"
+            + "    *) shift;;\n"
+            + "  esac\n"
+            + "done\n"
+            + "case \"$MODE\" in\n"
+            + "  no_optionals)\n"
+            + "    [[ $OPT1_PRESENT -eq 0 && $OPT2_PRESENT -eq 0 ]] && exit 0 || exit 1;;\n"
+            + "  opt1_only)\n"
+            + "    [[ $OPT1_PRESENT -eq 1 && $OPT2_PRESENT -eq 0 ]] && exit 0 || exit 1;;\n"
+            + "  both_optionals)\n"
+            + "    [[ $OPT1_PRESENT -eq 1 && $OPT2_PRESENT -eq 1 ]] && exit 0 || exit 1;;\n"
+            + "  *) exit 1;;\n"
+            + "esac\n";
+    try {
+      File scriptFile = new File(testStagingDir, "optional-arg-test.sh");
+      Files.writeString(scriptFile.toPath(), content);
+      scriptFile.setExecutable(true);
+      return scriptFile.getAbsolutePath();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create optional arg test script", e);
     }
   }
 }
