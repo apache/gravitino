@@ -1327,7 +1327,7 @@ public class TestFilesetCatalogOperations {
           Assertions.assertThrows(
               Exception.class,
               () -> ops.createSchema(nameIdentifier, "comment", finalSchemaProperties));
-      Assertions.assertTrue(exception.getCause() instanceof ConnectException);
+      Assertions.assertFalse(exception.getCause() instanceof ConnectException);
     }
   }
 

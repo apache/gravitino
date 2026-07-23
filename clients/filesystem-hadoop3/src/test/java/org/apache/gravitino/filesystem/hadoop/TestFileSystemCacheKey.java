@@ -22,10 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils.FileSystemCacheKey;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for {@link BaseGVFSOperations.FileSystemCacheKey}. */
+/** Unit tests for {@link FileSystemCacheKey}. */
 public class TestFileSystemCacheKey {
 
   @Test
@@ -33,10 +34,8 @@ public class TestFileSystemCacheKey {
     UserGroupInformation ugi1 = UserGroupInformation.getCurrentUser();
     UserGroupInformation ugi2 = UserGroupInformation.getCurrentUser();
 
-    BaseGVFSOperations.FileSystemCacheKey key1 =
-        new BaseGVFSOperations.FileSystemCacheKey("hdfs", "namenode:8020", ugi1);
-    BaseGVFSOperations.FileSystemCacheKey key2 =
-        new BaseGVFSOperations.FileSystemCacheKey("hdfs", "namenode:8020", ugi2);
+    FileSystemCacheKey key1 = new FileSystemCacheKey("hdfs", "namenode:8020", ugi1);
+    FileSystemCacheKey key2 = new FileSystemCacheKey("hdfs", "namenode:8020", ugi2);
 
     assertEquals(key1, key2);
     assertEquals(key1.hashCode(), key2.hashCode());
@@ -46,10 +45,8 @@ public class TestFileSystemCacheKey {
   public void testInequalityWithDifferentScheme() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
-    BaseGVFSOperations.FileSystemCacheKey key1 =
-        new BaseGVFSOperations.FileSystemCacheKey("hdfs", "namenode:8020", ugi);
-    BaseGVFSOperations.FileSystemCacheKey key2 =
-        new BaseGVFSOperations.FileSystemCacheKey("s3a", "namenode:8020", ugi);
+    FileSystemCacheKey key1 = new FileSystemCacheKey("hdfs", "namenode:8020", ugi);
+    FileSystemCacheKey key2 = new FileSystemCacheKey("s3a", "namenode:8020", ugi);
 
     assertNotEquals(key1, key2);
   }
@@ -58,10 +55,8 @@ public class TestFileSystemCacheKey {
   public void testInequalityWithDifferentAuthority() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
-    BaseGVFSOperations.FileSystemCacheKey key1 =
-        new BaseGVFSOperations.FileSystemCacheKey("hdfs", "namenode1:8020", ugi);
-    BaseGVFSOperations.FileSystemCacheKey key2 =
-        new BaseGVFSOperations.FileSystemCacheKey("hdfs", "namenode2:8020", ugi);
+    FileSystemCacheKey key1 = new FileSystemCacheKey("hdfs", "namenode1:8020", ugi);
+    FileSystemCacheKey key2 = new FileSystemCacheKey("hdfs", "namenode2:8020", ugi);
 
     assertNotEquals(key1, key2);
   }
@@ -70,10 +65,8 @@ public class TestFileSystemCacheKey {
   public void testInequalityWithNullAuthority() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
-    BaseGVFSOperations.FileSystemCacheKey key1 =
-        new BaseGVFSOperations.FileSystemCacheKey("file", null, ugi);
-    BaseGVFSOperations.FileSystemCacheKey key2 =
-        new BaseGVFSOperations.FileSystemCacheKey("file", "localhost", ugi);
+    FileSystemCacheKey key1 = new FileSystemCacheKey("file", null, ugi);
+    FileSystemCacheKey key2 = new FileSystemCacheKey("file", "localhost", ugi);
 
     assertNotEquals(key1, key2);
   }
@@ -82,10 +75,8 @@ public class TestFileSystemCacheKey {
   public void testEqualityWithBothNullAuthority() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
-    BaseGVFSOperations.FileSystemCacheKey key1 =
-        new BaseGVFSOperations.FileSystemCacheKey("file", null, ugi);
-    BaseGVFSOperations.FileSystemCacheKey key2 =
-        new BaseGVFSOperations.FileSystemCacheKey("file", null, ugi);
+    FileSystemCacheKey key1 = new FileSystemCacheKey("file", null, ugi);
+    FileSystemCacheKey key2 = new FileSystemCacheKey("file", null, ugi);
 
     assertEquals(key1, key2);
     assertEquals(key1.hashCode(), key2.hashCode());
@@ -95,8 +86,7 @@ public class TestFileSystemCacheKey {
   public void testGetters() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
-    BaseGVFSOperations.FileSystemCacheKey key =
-        new BaseGVFSOperations.FileSystemCacheKey("hdfs", "namenode:8020", ugi);
+    FileSystemCacheKey key = new FileSystemCacheKey("hdfs", "namenode:8020", ugi);
 
     assertEquals("hdfs", key.scheme());
     assertEquals("namenode:8020", key.authority());
@@ -107,8 +97,7 @@ public class TestFileSystemCacheKey {
   public void testNotEqualsWithDifferentType() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
-    BaseGVFSOperations.FileSystemCacheKey key =
-        new BaseGVFSOperations.FileSystemCacheKey("hdfs", "namenode:8020", ugi);
+    FileSystemCacheKey key = new FileSystemCacheKey("hdfs", "namenode:8020", ugi);
 
     assertNotEquals(key, "not a FileSystemCacheKey");
     assertNotEquals(key, null);
