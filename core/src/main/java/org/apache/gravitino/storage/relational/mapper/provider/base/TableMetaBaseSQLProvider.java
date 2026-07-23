@@ -239,14 +239,9 @@ public class TableMetaBaseSQLProvider {
         + " current_version = #{newTableMeta.currentVersion},"
         + " last_version = #{newTableMeta.lastVersion},"
         + " deleted_at = #{newTableMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (current_version is monotonic on update).
         + " WHERE table_id = #{oldTableMeta.tableId}"
-        + " AND table_name = #{oldTableMeta.tableName}"
-        + " AND metalake_id = #{oldTableMeta.metalakeId}"
-        + " AND catalog_id = #{oldTableMeta.catalogId}"
-        + " AND schema_id = #{oldTableMeta.schemaId}"
-        + " AND audit_info = #{oldTableMeta.auditInfo}"
         + " AND current_version = #{oldTableMeta.currentVersion}"
-        + " AND last_version = #{oldTableMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 

@@ -134,6 +134,9 @@ public class PolicyMetaBaseSQLProvider {
         + " current_version = #{newPolicyMeta.currentVersion},"
         + " last_version = #{newPolicyMeta.lastVersion},"
         + " deleted_at = #{newPolicyMeta.deletedAt}"
+        // Policy uses CONDITIONAL versioning (like fileset): current_version only bumps on a
+        // versioned-field change, so a version-only CAS would miss an audit-only concurrent
+        // update. Keep the full-row compare, which is the actual OCC guard here.
         + " WHERE policy_id = #{oldPolicyMeta.policyId}"
         + " AND policy_name = #{oldPolicyMeta.policyName}"
         + " AND policy_type = #{oldPolicyMeta.policyType}"
