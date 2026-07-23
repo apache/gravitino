@@ -163,11 +163,9 @@ public class RoleMetaBaseSQLProvider {
         + " current_version = #{newRoleMeta.currentVersion},"
         + " last_version = #{newRoleMeta.lastVersion},"
         + " deleted_at = #{newRoleMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (current_version is monotonic on update).
         + " WHERE role_id = #{oldRoleMeta.roleId}"
-        + " AND role_name = #{oldRoleMeta.roleName}"
-        + " AND metalake_id = #{oldRoleMeta.metalakeId}"
         + " AND current_version = #{oldRoleMeta.currentVersion}"
-        + " AND last_version = #{oldRoleMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
