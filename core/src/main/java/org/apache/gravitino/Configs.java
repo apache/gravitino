@@ -220,6 +220,18 @@ public class Configs {
           .booleanConf()
           .createWithDefault(true);
 
+  public static final ConfigEntry<Boolean> CATALOG_CLASSLOADER_SHARING_ENABLED =
+      new ConfigBuilder("gravitino.catalog.classloader.sharing.enabled")
+          .doc(
+              "Whether to share ClassLoaders across catalogs with identical isolation-relevant "
+                  + "properties. When true (default), catalogs with the same isolation key reuse "
+                  + "a single ClassLoader, significantly reducing Metaspace memory usage. When "
+                  + "false, each catalog gets its own dedicated ClassLoader as in previous "
+                  + "releases.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(true);
+
   public static final ConfigEntry<String> AUTHENTICATOR =
       new ConfigBuilder("gravitino.authenticator")
           .doc(
