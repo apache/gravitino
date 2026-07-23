@@ -39,8 +39,12 @@ import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.web.HealthCheckPathMatcher;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AuthenticationFilter implements Filter {
+
+  private static final Logger LOG = LoggerFactory.getLogger(AuthenticationFilter.class);
 
   private final List<Authenticator> filterAuthenticators;
 
@@ -96,6 +100,13 @@ public class AuthenticationFilter implements Filter {
             break;
           }
         }
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(
+            "uri={} hasAuthHeader={} principal={}",
+            req.getRequestURI(),
+            authData != null,
+            principal == null ? "null" : principal.getName());
       }
       if (principal == null) {
         throw new UnauthorizedException("The provided credentials did not support");
