@@ -47,7 +47,11 @@ public abstract class FunctionImpl {
     /** Spark runtime. */
     SPARK,
     /** Trino runtime. */
-    TRINO;
+    TRINO,
+    /** Ray runtime. */
+    RAY,
+    /** Dask runtime. */
+    DASK;
 
     /**
      * Parse a runtime value from string.
