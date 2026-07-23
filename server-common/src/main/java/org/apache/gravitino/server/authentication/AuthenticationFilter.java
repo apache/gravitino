@@ -32,7 +32,11 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
+import org.apache.gravitino.auth.ActiveRolesParser;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.auth.IllegalActiveRolesException;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
@@ -92,7 +96,6 @@ public class AuthenticationFilter implements Filter {
         if (authenticator.supportsToken(authData) && authenticator.isDataFromToken()) {
           principal = authenticator.authenticateToken(authData);
           if (principal != null) {
-            request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
             break;
           }
         }
@@ -100,6 +103,16 @@ public class AuthenticationFilter implements Filter {
       if (principal == null) {
         throw new UnauthorizedException("The provided credentials did not support");
       }
+      // Role assumption: parse the header (syntactic only; malformed -> 400) and, only when
+      // narrowed, attach the roles to the principal. Membership 403 is checked later.
+      ActiveRoles activeRoles =
+          ActiveRolesParser.parse(req.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER));
+      if (!activeRoles.isAll() && principal instanceof UserPrincipal) {
+        principal = ((UserPrincipal) principal).withActiveRoles(activeRoles);
+      }
+      // Publish the finalized principal (already carrying any narrowed roles) so downstream
+      // re-binds from the attribute (e.g. Utils.doAs) see the same identity and roles.
+      request.setAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME, principal);
       PrincipalUtils.doAs(
           principal,
           () -> {
@@ -113,7 +126,9 @@ public class AuthenticationFilter implements Filter {
         // to let client to create correct authenticated request.
         // Refer to https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate
         for (String challenge : ue.getChallenges()) {
-          resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
+          if (!challenge.toLowerCase().startsWith("basic")) {
+            resp.setHeader(AuthConstants.HTTP_CHALLENGE_HEADER, challenge);
+          }
         }
       }
       sendAuthErrorResponse(resp, ue);
@@ -144,6 +159,11 @@ public class AuthenticationFilter implements Filter {
     } else if (exception instanceof ForbiddenException) {
       httpStatus = HttpServletResponse.SC_FORBIDDEN;
       errorResponse = ErrorResponse.forbidden(exception.getMessage(), exception);
+    } else if (exception instanceof IllegalActiveRolesException) {
+      httpStatus = HttpServletResponse.SC_BAD_REQUEST;
+      errorResponse =
+          ErrorResponse.illegalArguments(
+              exception.getClass().getSimpleName(), exception.getMessage(), exception);
     } else {
       httpStatus = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
       errorResponse = ErrorResponse.internalError(exception.getMessage(), exception);

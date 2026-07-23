@@ -271,11 +271,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
   }
 
-  @Override
-  protected boolean useDifferentClassLoader() {
-    return false;
-  }
-
   @VisibleForTesting
   protected LoadTableResponse injectCredentialConfig(
       TableIdentifier tableIdentifier,

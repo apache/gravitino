@@ -27,9 +27,15 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
+  // ---- writable properties ----
   public static final String REPLICATION_FACTOR = "replication_num";
   public static final int DEFAULT_REPLICATION_FACTOR = 1;
   public static final int DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE = 3;
+  public static final String COMPRESSION = "compression";
+  public static final String BLOOM_FILTER_COLUMNS = "bloom_filter_columns";
+  public static final String STORAGE_POLICY = "storage_policy";
+  public static final String LIGHT_SCHEMA_CHANGE = "light_schema_change";
+  public static final String ENABLE_UNIQUE_KEY_MERGE_ON_WRITE = "enable_unique_key_merge_on_write";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -38,10 +44,44 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
         ImmutableList.of(
             PropertyEntry.integerOptionalPropertyEntry(
                 REPLICATION_FACTOR,
-                "The number of replications for the table. If not specified and the number of backend server less than 3,"
-                    + " the default value will be used",
+                "The number of replications for the table. If not specified and the number"
+                    + " of backend server less than 3, the default value will be used",
                 false /* immutable */,
                 DEFAULT_REPLICATION_FACTOR, /* default value */
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                COMPRESSION,
+                "The compression type for the table (ZSTD, LZ4, LZ4F, ZLIB)."
+                    + " Deprecated as a table-level property in Doris 4.0+."
+                    + " Cannot be changed via ALTER TABLE.",
+                true /* immutable */,
+                null /* default value */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                BLOOM_FILTER_COLUMNS,
+                "Comma-separated list of columns for which bloom filter indexes are created",
+                false /* immutable */,
+                null /* default value */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                STORAGE_POLICY,
+                "The name of the storage policy for cold-hot separation",
+                false /* immutable */,
+                null /* default value */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                LIGHT_SCHEMA_CHANGE,
+                "Whether light schema change is enabled for the table. "
+                    + "Can be modified via ALTER TABLE SET",
+                false /* immutable */,
+                null /* default value */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                ENABLE_UNIQUE_KEY_MERGE_ON_WRITE,
+                "Whether merge-on-write is enabled for Unique Key tables. "
+                    + "Must be set at CREATE TABLE time; Doris rejects ALTER TABLE SET",
+                true /* immutable */,
+                null /* default value */,
                 false /* hidden */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);

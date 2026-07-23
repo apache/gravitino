@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -67,7 +68,9 @@ public class StarRocksUtils {
           "(?:^|\\s|\\))DISTRIBUTED\\s+BY\\s+(?:RANDOM\\b|\\w+\\s*\\()", Pattern.CASE_INSENSITIVE);
 
   private static final Pattern TABLE_COMMENT_PATTERN =
-      Pattern.compile("COMMENT\\s*\"([^\\(]+?)\\s*\\(From Gravitino,.*\\)\"");
+      Pattern.compile(
+          "COMMENT\\s*\"((?:\\\\.|\"\"|[^\"\\\\])*)\\s+"
+              + "\\(From Gravitino, DO NOT EDIT: gravitino\\.v\\d+\\.uid-?\\d+\\)\"");
 
   private static final String PARTITION_TYPE_VALUE_PATTERN_STRING =
       "types: \\[([^\\]]+)\\]; keys: \\[([^\\]]+)\\];";
@@ -196,7 +199,7 @@ public class StarRocksUtils {
   public static String extractTableCommentFromSql(String createTableSql) {
     Matcher matcher = TABLE_COMMENT_PATTERN.matcher(createTableSql.trim());
     if (matcher.find()) {
-      return matcher.group(1);
+      return JdbcConnectorUtils.unescapeSqlLiteral(matcher.group(1), '"');
     }
     return "";
   }

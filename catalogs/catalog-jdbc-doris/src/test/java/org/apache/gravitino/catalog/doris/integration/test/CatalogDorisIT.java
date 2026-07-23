@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.doris.integration.test;
 
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.BLOOM_FILTER_COLUMNS;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.COMPRESSION;
 import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -200,6 +202,44 @@ public class CatalogDorisIT extends BaseIT {
     assertEquals(createdSchema.name(), loadSchema.name());
 
     assertEquals(createdSchema.properties().get(propKey), propValue);
+  }
+
+  @Test
+  void testTablePropertiesRoundTrip() {
+    // Verify writable table properties survive the create → Doris 1.2 → load round-trip.
+    // Covers: bloom_filter_columns, compression (both writable).
+    // NOTE: light_schema_change and enable_unique_key_merge_on_write are newer Doris
+    // features (introduced in 2.1+) and do not appear in 1.2.x SHOW CREATE TABLE output.
+    // They are registered as writable properties and their metadata is verified in
+    // TestDorisCatalog.testDorisTablePropertiesMetadata().
+    // storage_policy requires cold-hot separation infrastructure and is covered by
+    // the unit test metadata verification.
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_props_roundtrip");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    Distribution distribution = createDistribution();
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(BLOOM_FILTER_COLUMNS, DORIS_COL_NAME1 + "," + DORIS_COL_NAME2);
+    properties.put(COMPRESSION, "ZSTD");
+
+    tc.createTable(
+        tid, columns, table_comment, properties, Transforms.EMPTY_TRANSFORM, distribution, null);
+
+    Table loaded = tc.loadTable(tid);
+    Map<String, String> loadedProps = loaded.properties();
+
+    // bloom_filter_columns: verify round-trip with Doris normalization
+    assertTrue(
+        loadedProps.containsKey(BLOOM_FILTER_COLUMNS),
+        "bloom_filter_columns should appear in SHOW CREATE TABLE properties");
+    assertEquals(DORIS_COL_NAME1 + ", " + DORIS_COL_NAME2, loadedProps.get(BLOOM_FILTER_COLUMNS));
+
+    // compression: verify round-trip on Doris 1.2.x
+    assertTrue(
+        loadedProps.containsKey(COMPRESSION),
+        "compression should appear in SHOW CREATE TABLE properties on Doris 1.2.x");
   }
 
   private Column[] createColumns() {
@@ -1149,5 +1189,94 @@ public class CatalogDorisIT extends BaseIT {
         Literals.timestampLiteral(LocalDateTime.of(2024, 1, 1, 1, 1, 1)),
         colDefaultValues[1].defaultValue());
     Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, colDefaultValues[2].defaultValue());
+  }
+
+  @Test
+  void testListPartitionRoundTrip() {
+    // Verify LIST partition with assignments round-trips correctly on Doris 1.2.x.
+    String tableName = GravitinoITUtils.genRandomName("test_list_partition");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column col = Column.of("city", Types.VarCharType.of(50), "city", false, false, null);
+    Distribution distribution = Distributions.hash(1, NamedReference.field("city"));
+    Index[] indexes = Indexes.EMPTY_INDEXES;
+
+    Transform[] partitioning = {Transforms.list(new String[][] {{"city"}})};
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        new Column[] {col},
+        table_comment,
+        Collections.emptyMap(),
+        partitioning,
+        distribution,
+        null,
+        indexes);
+
+    SupportsPartitions partitionOps = tableCatalog.loadTable(tableIdentifier).supportPartitions();
+
+    // Add partitions
+    Literal[][] p1Values = {{Literals.of("beijing", Types.VarCharType.of(50))}};
+    Literal[][] p2Values = {{Literals.of("shanghai", Types.VarCharType.of(50))}};
+    partitionOps.addPartition(Partitions.list("p1", p1Values, Collections.emptyMap()));
+    partitionOps.addPartition(Partitions.list("p2", p2Values, Collections.emptyMap()));
+
+    // Verify round-trip: reload and check partition metadata
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    SupportsPartitions loadedPartitionOps = loadedTable.supportPartitions();
+    Map<String, ListPartition> partitions =
+        Arrays.stream(loadedPartitionOps.listPartitions())
+            .collect(Collectors.toMap(Partition::name, p -> (ListPartition) p));
+    assertEquals(2, partitions.size());
+    assertPartition(Partitions.list("p1", p1Values, Collections.emptyMap()), partitions.get("p1"));
+    assertPartition(Partitions.list("p2", p2Values, Collections.emptyMap()), partitions.get("p2"));
+  }
+
+  @Test
+  void testMultiColumnListPartitionRoundTrip() {
+    // Verify multi-column LIST partition round-trip:
+    // create with assignments -> loadTable -> verify partition columns and values
+    String tableName = GravitinoITUtils.genRandomName("test_multi_col_list");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column col1 = Column.of("city", Types.VarCharType.of(50), "city", false, false, null);
+    Column col2 = Column.of("year_col", Types.IntegerType.get(), "year", false, false, null);
+    Distribution distribution = Distributions.hash(1, NamedReference.field("city"));
+    Index[] indexes = Indexes.EMPTY_INDEXES;
+
+    Transform[] partitioning = {Transforms.list(new String[][] {{"city"}, {"year_col"}})};
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        new Column[] {col1, col2},
+        table_comment,
+        Collections.emptyMap(),
+        partitioning,
+        distribution,
+        null,
+        indexes);
+
+    SupportsPartitions partitionOps = tableCatalog.loadTable(tableIdentifier).supportPartitions();
+
+    // Add multi-column partition assignments
+    Literal[][] p1Values = {
+      {Literals.of("beijing", Types.VarCharType.of(50)), Literals.integerLiteral(2024)}
+    };
+    Literal[][] p2Values = {
+      {Literals.of("shanghai", Types.VarCharType.of(50)), Literals.integerLiteral(2024)}
+    };
+    partitionOps.addPartition(Partitions.list("p1", p1Values, Collections.emptyMap()));
+    partitionOps.addPartition(Partitions.list("p2", p2Values, Collections.emptyMap()));
+
+    // Verify round-trip
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    assertEquals(1, loadedTable.partitioning().length);
+    assertEquals("list", loadedTable.partitioning()[0].name());
+
+    SupportsPartitions loadedPartitionOps = loadedTable.supportPartitions();
+    Map<String, ListPartition> partitions =
+        Arrays.stream(loadedPartitionOps.listPartitions())
+            .collect(Collectors.toMap(Partition::name, p -> (ListPartition) p));
+    assertEquals(2, partitions.size());
+    assertPartition(Partitions.list("p1", p1Values, Collections.emptyMap()), partitions.get("p1"));
+    assertPartition(Partitions.list("p2", p2Values, Collections.emptyMap()), partitions.get("p2"));
   }
 }

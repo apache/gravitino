@@ -201,6 +201,15 @@ const transform = {
         if (user) {
           config.headers.Authorization = `Basic ${Buffer.from(user).toString('base64')}`
         }
+      } else if (authType === 'basic') {
+        // Basic auth: use token from sessionStorage
+        const token = sessionStorage.getItem('accessToken')
+        if (token && config?.requestOptions?.withToken !== false) {
+          const isFullAuthHeader = token.startsWith('Basic ') || token.startsWith('Bearer ')
+
+          config.headers.Authorization =
+            isFullAuthHeader || !options.authenticationScheme ? token : `${options.authenticationScheme} ${token}`
+        }
       } else {
         // authType not yet persisted during bootstrap (before /configs resolves).
         // Fall back to persisted auth artifacts to avoid spurious 401s.
@@ -244,7 +253,7 @@ const transform = {
     }
 
     try {
-      if (code === 'ECONNABORTED' && message.indexOf('timeout') !== -1) {
+      if (code === 'ECONNABORTED' && message?.includes('timeout')) {
         errMessage = 'The interface request timed out, please refresh the page and try again!'
       }
       if (err?.includes('Network Error')) {
@@ -264,12 +273,23 @@ const transform = {
       throw new Error(error)
     }
 
+    // During a failed basic login request, don't reload the page as this would prevent error message display.
+    const isBasicLoginRequest =
+      response?.status === 401 &&
+      originConfig?.url?.includes('/api/version') &&
+      originConfig?.requestOptions?.withToken === false
+
+    if (isBasicLoginRequest) {
+      return Promise.reject(error)
+    }
+
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
-    if (response?.status === 401 && !originConfig._retry && response.config.url !== githubApis.GET) {
-      // Clear OAuth tokens
+    if (response?.status === 401 && !originConfig?._retry && response?.config?.url !== githubApis.GET) {
+      // Clear OAuth + BasicAuth tokens
       localStorage.removeItem('accessToken')
       localStorage.removeItem('authParams')
+      sessionStorage.removeItem('accessToken')
 
       // Clear simple auth data
       sessionStorage.removeItem('simpleAuthUser')
@@ -292,8 +312,8 @@ const transform = {
     }
 
     const retryRequest = new AxiosRetry()
-    const { isOpenRetry } = originConfig.requestOptions.retryRequest
-    originConfig.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
+    const { isOpenRetry } = originConfig?.requestOptions?.retryRequest
+    originConfig?.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
 
     return Promise.reject(error)
   }

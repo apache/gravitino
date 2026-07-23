@@ -36,6 +36,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.types.Types.ByteType;
 import org.apache.gravitino.rel.types.Types.ShortType;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.types.EdgeAlgorithm;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -43,6 +44,10 @@ import org.junit.jupiter.api.Test;
 
 /** Test class for {@link ConvertUtil}. */
 public class TestConvertUtil extends TestBaseConvert {
+
+  private static final int NANO_PRECISION = 9;
+  private static final int MICRO_PRECISION = 6;
+  private static final int UNSUPPORTED_PRECISION = 3;
 
   @Test
   public void testVariantType() {
@@ -52,6 +57,90 @@ public class TestConvertUtil extends TestBaseConvert {
     Assertions.assertTrue(
         CONVERTER.fromGravitino(org.apache.gravitino.rel.types.Types.VariantType.get())
             instanceof Types.VariantType);
+  }
+
+  @Test
+  public void testUnknownType() {
+    // Iceberg V3 unknown <-> Gravitino NullType, in both directions.
+    Assertions.assertTrue(
+        CONVERTER.toGravitino(Types.UnknownType.get())
+            instanceof org.apache.gravitino.rel.types.Types.NullType);
+    Assertions.assertTrue(
+        CONVERTER.fromGravitino(org.apache.gravitino.rel.types.Types.NullType.get())
+            instanceof Types.UnknownType);
+  }
+
+  @Test
+  public void testUnknownColumnToIcebergSchema() {
+    // Write path: a nullable null-typed column becomes an optional Iceberg unknown field
+    // (exercises ConvertUtil.toIcebergSchema -> ToIcebergType.struct and the nullType dispatch).
+    Column nullableColumn =
+        IcebergColumn.builder()
+            .withName("c_unknown")
+            .withType(org.apache.gravitino.rel.types.Types.NullType.get())
+            .withNullable(true)
+            .withComment(TEST_COMMENT)
+            .build();
+    Schema schema = ConvertUtil.toIcebergSchema(new Column[] {nullableColumn});
+    Types.NestedField field = schema.findField("c_unknown");
+    Assertions.assertNotNull(field);
+    Assertions.assertTrue(field.isOptional());
+    Assertions.assertTrue(field.type() instanceof Types.UnknownType);
+
+    // A required null-typed column is rejected: Iceberg unknown must be optional.
+    Column requiredColumn =
+        IcebergColumn.builder()
+            .withName("c_unknown_required")
+            .withType(org.apache.gravitino.rel.types.Types.NullType.get())
+            .withNullable(false)
+            .withComment(TEST_COMMENT)
+            .build();
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ConvertUtil.toIcebergSchema(new Column[] {requiredColumn}));
+    Assertions.assertTrue(exception.getMessage().contains("must be optional"));
+  }
+
+  @Test
+  public void testGeometryType() {
+    // Iceberg V3 geometry <-> Gravitino GeometryType, preserving the CRS in both directions.
+    org.apache.gravitino.rel.types.Type defaultFromIceberg =
+        CONVERTER.toGravitino(Types.GeometryType.crs84());
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.GeometryType.class, defaultFromIceberg);
+    Assertions.assertEquals(
+        "OGC:CRS84",
+        ((org.apache.gravitino.rel.types.Types.GeometryType) defaultFromIceberg).crs());
+
+    org.apache.gravitino.rel.types.Types.GeometryType customCrs =
+        org.apache.gravitino.rel.types.Types.GeometryType.of("srid:3857");
+    org.apache.iceberg.types.Type icebergCustom = CONVERTER.fromGravitino(customCrs);
+    Assertions.assertInstanceOf(Types.GeometryType.class, icebergCustom);
+    Assertions.assertEquals("srid:3857", ((Types.GeometryType) icebergCustom).crs());
+    Assertions.assertEquals(customCrs, CONVERTER.toGravitino(icebergCustom));
+  }
+
+  @Test
+  public void testGeographyType() {
+    // Iceberg V3 geography <-> Gravitino GeographyType, preserving CRS and algorithm both ways.
+    org.apache.gravitino.rel.types.Type defaultFromIceberg =
+        CONVERTER.toGravitino(Types.GeographyType.crs84());
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.types.Types.GeographyType.class, defaultFromIceberg);
+    org.apache.gravitino.rel.types.Types.GeographyType defaultGeography =
+        (org.apache.gravitino.rel.types.Types.GeographyType) defaultFromIceberg;
+    Assertions.assertEquals("OGC:CRS84", defaultGeography.crs());
+    Assertions.assertEquals("spherical", defaultGeography.algorithm());
+
+    org.apache.gravitino.rel.types.Types.GeographyType custom =
+        org.apache.gravitino.rel.types.Types.GeographyType.of("EPSG:4326", "karney");
+    org.apache.iceberg.types.Type icebergCustom = CONVERTER.fromGravitino(custom);
+    Assertions.assertInstanceOf(Types.GeographyType.class, icebergCustom);
+    Types.GeographyType icebergGeography = (Types.GeographyType) icebergCustom;
+    Assertions.assertEquals("EPSG:4326", icebergGeography.crs());
+    Assertions.assertEquals(EdgeAlgorithm.KARNEY, icebergGeography.algorithm());
+    Assertions.assertEquals(custom, CONVERTER.toGravitino(icebergCustom));
   }
 
   @Test
@@ -467,6 +556,57 @@ public class TestConvertUtil extends TestBaseConvert {
                 ((org.apache.gravitino.rel.types.Types.StructType) gravitinoStructType)
                     .fields()[1].type())
             .fields()[1].nullable());
+  }
+
+  @Test
+  public void testNanosecondTimestamp() {
+    // Iceberg -> Gravitino
+    org.apache.gravitino.rel.types.Type nanoWithoutZone =
+        CONVERTER.toGravitino(Types.TimestampNanoType.withoutZone());
+    Assertions.assertTrue(
+        nanoWithoutZone instanceof org.apache.gravitino.rel.types.Types.TimestampType);
+    Assertions.assertFalse(
+        ((org.apache.gravitino.rel.types.Types.TimestampType) nanoWithoutZone).hasTimeZone());
+    Assertions.assertEquals(
+        NANO_PRECISION,
+        ((org.apache.gravitino.rel.types.Types.TimestampType) nanoWithoutZone).precision());
+
+    org.apache.gravitino.rel.types.Type nanoWithZone =
+        CONVERTER.toGravitino(Types.TimestampNanoType.withZone());
+    Assertions.assertTrue(
+        nanoWithZone instanceof org.apache.gravitino.rel.types.Types.TimestampType);
+    Assertions.assertTrue(
+        ((org.apache.gravitino.rel.types.Types.TimestampType) nanoWithZone).hasTimeZone());
+    Assertions.assertEquals(
+        NANO_PRECISION,
+        ((org.apache.gravitino.rel.types.Types.TimestampType) nanoWithZone).precision());
+
+    // Gravitino -> Iceberg
+    Type icebergNanoWithoutZone =
+        CONVERTER.fromGravitino(
+            org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(NANO_PRECISION));
+    Assertions.assertTrue(icebergNanoWithoutZone instanceof Types.TimestampNanoType);
+    Assertions.assertFalse(((Types.TimestampNanoType) icebergNanoWithoutZone).shouldAdjustToUTC());
+
+    Type icebergNanoWithZone =
+        CONVERTER.fromGravitino(
+            org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(NANO_PRECISION));
+    Assertions.assertTrue(icebergNanoWithZone instanceof Types.TimestampNanoType);
+    Assertions.assertTrue(((Types.TimestampNanoType) icebergNanoWithZone).shouldAdjustToUTC());
+
+    // Regression: precision 6 still maps to the microsecond timestamp, not the nanosecond one.
+    Type icebergMicro =
+        CONVERTER.fromGravitino(
+            org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(MICRO_PRECISION));
+    Assertions.assertTrue(icebergMicro instanceof Types.TimestampType);
+
+    // Any precision other than 6 or 9 is not representable in Iceberg and must be rejected.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            CONVERTER.fromGravitino(
+                org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(
+                    UNSUPPORTED_PRECISION)));
   }
 
   @Test

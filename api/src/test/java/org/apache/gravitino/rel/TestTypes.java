@@ -159,6 +159,32 @@ public class TestTypes {
     Assertions.assertSame(variantType, Types.VariantType.get());
     Assertions.assertEquals("variant", variantType.simpleString());
 
+    Types.GeometryType geometryType = Types.GeometryType.crs84();
+    Assertions.assertEquals(Type.Name.GEOMETRY, geometryType.name());
+    Assertions.assertEquals("OGC:CRS84", geometryType.crs());
+    Assertions.assertEquals("geometry", geometryType.simpleString());
+    Assertions.assertEquals(geometryType, Types.GeometryType.of("ogc:crs84"));
+    Assertions.assertEquals("geometry", Types.GeometryType.of("ogc:crs84").simpleString());
+    Types.GeometryType customCrs = Types.GeometryType.of("srid:3857");
+    Assertions.assertEquals("geometry(srid:3857)", customCrs.simpleString());
+    Assertions.assertNotEquals(geometryType, customCrs);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> Types.GeometryType.of(""));
+
+    Types.GeographyType geographyType = Types.GeographyType.crs84();
+    Assertions.assertEquals(Type.Name.GEOGRAPHY, geographyType.name());
+    Assertions.assertEquals("OGC:CRS84", geographyType.crs());
+    Assertions.assertEquals("spherical", geographyType.algorithm());
+    Assertions.assertEquals("geography", geographyType.simpleString());
+    Assertions.assertEquals(geographyType, Types.GeographyType.of("ogc:crs84", "SPHERICAL"));
+    Types.GeographyType karney = Types.GeographyType.of("EPSG:4326", "Karney");
+    Assertions.assertEquals("karney", karney.algorithm());
+    Assertions.assertEquals("geography(EPSG:4326,karney)", karney.simpleString());
+    Assertions.assertNotEquals(geographyType, karney);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> Types.GeographyType.of("OGC:CRS84", "bogus"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> Types.GeographyType.of("", "spherical"));
+
     Types.FixedType fixedType = Types.FixedType.of(10);
     Assertions.assertEquals(Type.Name.FIXED, fixedType.name());
     Assertions.assertEquals(10, fixedType.length());

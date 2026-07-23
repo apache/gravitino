@@ -27,35 +27,19 @@ components:
         - $ref: "#/components/schemas/MapType"
         - $ref: "#/components/schemas/UnionType"
         - $ref: "#/components/schemas/UnparsedType"
+        - $ref: "#/components/schemas/ExternalType"
 
     PrimitiveType:
       type: string
-      example:
-        - "boolean"
-        - "byte"
-        - "byte unsigned"
-        - "short"
-        - "short unsigned"
-        - "integer"
-        - "integer unsigned"
-        - "long"
-        - "long unsigned"
-        - "float"
-        - "double"
-        - "decimal(10,2)"
-        - "date"
-        - "time(3)"
-        - "timestamp(3)"
-        - "timestamp_tz(3)"
-        - "string"
-        - "char(10)"
-        - "varchar(10)"
-        - "interval_day"
-        - "interval_year"
-        - "uuid"
-        - "fixed(16)"
-        - "binary"
-        - "variant"
+      description: >-
+        The string name of a primitive type. Simple names: boolean, byte,
+        byte unsigned, short, short unsigned, integer, integer unsigned, long,
+        long unsigned, float, double, date, string, binary, uuid, interval_day,
+        interval_year, variant, null, geometry, geography. Parameterized names:
+        decimal(precision,scale), time(precision), timestamp(precision),
+        timestamp_tz(precision), char(length), varchar(length), fixed(length),
+        geometry(srid), geography(crs,algorithm).
+      example: "integer"
 
     UnionType:
       type: object
@@ -197,25 +181,23 @@ components:
           description: The unparsed type
       example: {
         "type": "unparsed",
-        "unparsedType": [
-          "unknown-type"
-        ]
+        "unparsedType": "unknown-type"
       }
 
-  ExternalType:
-    type: object
-    required:
-      - type
-      - catalogString
-    properties:
-      type:
-        type: string
-        enum:
-          - "external"
-      catalogString:
-        type: string
-        description: The string representation of this type in the catalog
-    example: {
-      "type": "external",
-      "externalType": "user-defined"
-    }
+    ExternalType:
+      type: object
+      required:
+        - type
+        - catalogString
+      properties:
+        type:
+          type: string
+          enum:
+            - "external"
+        catalogString:
+          type: string
+          description: The string representation of this type in the catalog
+      example: {
+        "type": "external",
+        "catalogString": "user-defined"
+      }
