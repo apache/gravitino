@@ -18,12 +18,11 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
-import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.TABLE_NAME;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
@@ -51,7 +50,9 @@ public class OrphanedMetadataObjectRelationService {
           .put(
               MetadataObject.Type.METALAKE,
               new EntityTable(MetalakeMetaMapper.TABLE_NAME, "metalake_id"))
-          .put(MetadataObject.Type.CATALOG, new EntityTable(TABLE_NAME, "catalog_id"))
+          .put(
+              MetadataObject.Type.CATALOG,
+              new EntityTable(CatalogMetaMapper.TABLE_NAME, "catalog_id"))
           .put(
               MetadataObject.Type.SCHEMA, new EntityTable(SchemaMetaMapper.TABLE_NAME, "schema_id"))
           .put(
@@ -97,7 +98,7 @@ public class OrphanedMetadataObjectRelationService {
    * @return number of relation rows soft-deleted
    */
   public int softDeleteOrphanedRelations(MetadataObject.Type metadataObjectType, int limit) {
-    Preconditions.checkNotNull(metadataObjectType, "metadataObjectType cannot be null");
+    Preconditions.checkArgument(metadataObjectType != null, "metadataObjectType cannot be null");
     Preconditions.checkArgument(limit > 0, "limit must be positive");
     EntityTable entityTable = ENTITY_TABLES.get(metadataObjectType);
     if (entityTable == null) {
