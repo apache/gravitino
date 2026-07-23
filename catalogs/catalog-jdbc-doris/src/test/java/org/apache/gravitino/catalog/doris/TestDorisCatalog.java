@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.doris;
 
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 
 import java.util.Map;
@@ -41,5 +42,11 @@ public class TestDorisCatalog {
     Assertions.assertEquals(
         DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR, propertyEntry.getDefaultValue());
     Assertions.assertFalse(propertyEntry.isHidden());
+
+    PropertyEntry<?> replicationAllocationEntry = propertyEntryMap.get(REPLICATION_ALLOCATION);
+    Assertions.assertEquals(REPLICATION_ALLOCATION, replicationAllocationEntry.getName());
+    Assertions.assertFalse(replicationAllocationEntry.isImmutable());
+    Assertions.assertNull(replicationAllocationEntry.getDefaultValue());
+    Assertions.assertFalse(replicationAllocationEntry.isHidden());
   }
 }
