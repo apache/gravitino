@@ -137,8 +137,9 @@ public class POConverters {
   public static MetalakePO updateMetalakePOWithVersion(
       MetalakePO oldMetalakePO, BaseMetalake newMetalake) {
     Long lastVersion = oldMetalakePO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Raise the version on every successful update so OCC (version CAS) can detect a concurrent
+    // write: the racing updater's `WHERE current_version = old` matches 0 rows and loses.
+    Long nextVersion = lastVersion + 1;
     try {
       return MetalakePO.builder()
           .withMetalakeId(newMetalake.id())
@@ -234,8 +235,9 @@ public class POConverters {
   public static CatalogPO updateCatalogPOWithVersion(
       CatalogPO oldCatalogPO, CatalogEntity newCatalog, Long metalakeId) {
     Long lastVersion = oldCatalogPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Raise the version on every successful update so OCC (version CAS) can detect a concurrent
+    // write: the racing updater's `WHERE current_version = old` matches 0 rows and loses.
+    Long nextVersion = lastVersion + 1;
     try {
       return CatalogPO.builder()
           .withCatalogId(newCatalog.id())
@@ -330,8 +332,9 @@ public class POConverters {
    */
   public static SchemaPO updateSchemaPOWithVersion(SchemaPO oldSchemaPO, SchemaEntity newSchema) {
     Long lastVersion = oldSchemaPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Raise the version on every successful update so OCC (version CAS) can detect a concurrent
+    // write: the racing updater's `WHERE current_version = old` matches 0 rows and loses.
+    Long nextVersion = lastVersion + 1;
     try {
       return SchemaPO.builder()
           .withSchemaId(oldSchemaPO.getSchemaId())
@@ -922,8 +925,9 @@ public class POConverters {
 
   public static TopicPO updateTopicPOWithVersion(TopicPO oldTopicPO, TopicEntity newEntity) {
     Long lastVersion = oldTopicPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Raise the version on every successful update so OCC (version CAS) can detect a concurrent
+    // write: the racing updater's `WHERE current_version = old` matches 0 rows and loses.
+    Long nextVersion = lastVersion + 1;
     try {
       return TopicPO.builder()
           .withTopicId(oldTopicPO.getTopicId())
@@ -977,9 +981,9 @@ public class POConverters {
    */
   public static UserPO updateUserPOWithVersion(UserPO oldUserPO, UserEntity newUser) {
     Long lastVersion = oldUserPO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    // Raise the version on every successful update so OCC (version CAS) can detect a concurrent
+    // write: the racing updater's `WHERE current_version = old` matches 0 rows and loses.
+    Long nextVersion = lastVersion + 1;
     try {
       return UserPO.builder()
           .withUserId(oldUserPO.getUserId())
@@ -1259,9 +1263,9 @@ public class POConverters {
    */
   public static GroupPO updateGroupPOWithVersion(GroupPO oldGroupPO, GroupEntity newGroup) {
     Long lastVersion = oldGroupPO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    // Raise the version on every successful update so OCC (version CAS) can detect a concurrent
+    // write: the racing updater's `WHERE current_version = old` matches 0 rows and loses.
+    Long nextVersion = lastVersion + 1;
     try {
       return GroupPO.builder()
           .withGroupId(oldGroupPO.getGroupId())
@@ -1387,9 +1391,9 @@ public class POConverters {
 
   public static RolePO updateRolePOWithVersion(RolePO oldRolePO, RoleEntity newRole) {
     Long lastVersion = oldRolePO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    // Raise the version on every successful update so OCC (version CAS) can detect a concurrent
+    // write: the racing updater's `WHERE current_version = old` matches 0 rows and loses.
+    Long nextVersion = lastVersion + 1;
     try {
       return RolePO.builder()
           .withRoleId(oldRolePO.getRoleId())
@@ -1445,9 +1449,9 @@ public class POConverters {
 
   public static TagPO updateTagPOWithVersion(TagPO oldTagPO, TagEntity newEntity) {
     Long lastVersion = oldTagPO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    // Raise the version on every successful update so OCC (version CAS) can detect a concurrent
+    // write: the racing updater's `WHERE current_version = old` matches 0 rows and loses.
+    Long nextVersion = lastVersion + 1;
     try {
       return TagPO.builder()
           .withTagId(oldTagPO.getTagId())
