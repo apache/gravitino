@@ -47,6 +47,7 @@ public class ClickHouseConstants {
     public static final String ENGINE = "engine";
     public static final String ENGINE_UPPER = "ENGINE";
     public static final String SETTINGS_PREFIX = "settings.";
+    public static final String GRAPHITE_CONFIG = "graphite.config";
   }
 
   public static final class IndexConstants {

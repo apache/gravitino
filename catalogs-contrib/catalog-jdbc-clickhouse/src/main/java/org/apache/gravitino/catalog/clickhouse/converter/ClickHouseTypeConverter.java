@@ -94,6 +94,16 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       typeName = "FixedString";
     }
 
+    // ClickHouse normalizes Enum to Enum8/Enum16, so "Enum8(...)" never matches "Enum".
+    // Return directly as ExternalType to preserve the full parameterized form.
+    // Use stripped typeName (not typeBean.getTypeName()) to avoid preserving
+    // Nullable/LowCardinality
+    // wrappers that were already stripped above. Consistent with wide integer ExternalType
+    // handling.
+    if (typeName.startsWith(ENUM)) {
+      return Types.ExternalType.of(typeName);
+    }
+
     switch (typeName) {
       case INT8:
         return Types.ByteType.get();
@@ -111,10 +121,20 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
         return Types.IntegerType.unsigned();
       case UINT64:
         return Types.LongType.unsigned();
+      case INT128:
+      case INT256:
+      case UINT128:
+      case UINT256:
+        // ClickHouse native wide integer types with no corresponding Gravitino built-in type.
+        return Types.ExternalType.of(typeName);
       case FLOAT32:
         return Types.FloatType.get();
       case FLOAT64:
         return Types.DoubleType.get();
+      case BFLOAT16:
+        // Lossy: Gravitino has no half-precision float type. Use ExternalType to preserve
+        // round-trip (BFloat16 → ExternalType("BFloat16") → BFloat16).
+        return Types.ExternalType.of(BFLOAT16);
       case DECIMAL:
         int precision = typeBean.getColumnSize();
         int scale = typeBean.getScale();
@@ -141,7 +161,9 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
         return Types.FixedCharType.of(typeBean.getColumnSize());
       case DATE:
         return Types.DateType.get();
-        // No type mapping for date32, we will use external type to handle it.
+      case DATE32:
+        // Date32 supports 1900-2299 vs Date's 1970-2149. Use ExternalType to preserve round-trip.
+        return Types.ExternalType.of(DATE32);
       case DATETIME:
         // Default is 0 precision
         return Types.TimestampType.withoutTimeZone(0);
