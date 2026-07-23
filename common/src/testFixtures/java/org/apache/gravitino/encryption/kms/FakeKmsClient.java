@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 
 /** In-memory KMS client for contract and consumer tests. */
 public final class FakeKmsClient implements KmsClient {
@@ -37,7 +38,7 @@ public final class FakeKmsClient implements KmsClient {
    * @param source configured source accepted by the client
    */
   public FakeKmsClient(String api, String source) {
-    if (api == null || api.trim().isEmpty()) {
+    if (StringUtils.isBlank(api)) {
       throw new IllegalArgumentException("KMS API cannot be blank");
     }
     this.api = api.trim().toLowerCase(Locale.ROOT);

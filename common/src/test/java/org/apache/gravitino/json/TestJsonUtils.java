@@ -30,6 +30,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.dto.encryption.kms.KmsReferenceDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.rel.indexes.IndexDTO;
 import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
@@ -256,26 +257,27 @@ public class TestJsonUtils {
   }
 
   @Test
-  void testKmsReferenceAnyFieldMapperSerde() throws JsonProcessingException {
+  void testKmsReferenceDtoSerde() throws JsonProcessingException {
     KmsReference reference =
         new KmsReference("google-cloud-kms", "analytics-prod", "projects/p/keys/k");
+    KmsReferenceDTO referenceDTO = KmsReferenceDTO.fromKmsReference(reference);
 
-    String json = JsonUtils.anyFieldMapper().writeValueAsString(reference);
+    String json = objectMapper.writeValueAsString(referenceDTO);
 
     assertEquals(
-        JsonUtils.anyFieldMapper()
-            .readTree(
-                "{\"api\":\"google-cloud-kms\",\"source\":\"analytics-prod\","
-                    + "\"keyId\":\"projects/p/keys/k\"}"),
-        JsonUtils.anyFieldMapper().readTree(json));
-    assertEquals(reference, JsonUtils.anyFieldMapper().readValue(json, KmsReference.class));
+        objectMapper.readTree(
+            "{\"api\":\"google-cloud-kms\",\"source\":\"analytics-prod\","
+                + "\"keyId\":\"projects/p/keys/k\"}"),
+        objectMapper.readTree(json));
+    assertEquals(reference, objectMapper.readValue(json, KmsReferenceDTO.class).toKmsReference());
     assertEquals(
         reference,
-        JsonUtils.anyFieldMapper()
+        objectMapper
             .readValue(
                 "{\"api\":\" GOOGLE-CLOUD-KMS \",\"source\":\"analytics-prod\","
                     + "\"keyId\":\"projects/p/keys/k\"}",
-                KmsReference.class));
+                KmsReferenceDTO.class)
+            .toKmsReference());
   }
 
   @Test

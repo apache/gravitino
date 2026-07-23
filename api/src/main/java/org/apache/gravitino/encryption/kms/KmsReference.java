@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.encryption.kms;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.Objects;
@@ -47,11 +45,7 @@ public final class KmsReference {
    * @param keyId provider-native key identifier
    * @throws IllegalArgumentException if any argument is null or blank
    */
-  @JsonCreator
-  public KmsReference(
-      @JsonProperty("api") String api,
-      @JsonProperty("source") String source,
-      @JsonProperty("keyId") String keyId) {
+  public KmsReference(String api, String source, String keyId) {
     Preconditions.checkArgument(StringUtils.isNotBlank(api), "KMS API cannot be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(source), "KMS source cannot be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(keyId), "KMS key ID cannot be blank");
