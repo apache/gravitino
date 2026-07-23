@@ -233,17 +233,11 @@ public class TopicMetaBaseSQLProvider {
         + " current_version = #{newTopicMeta.currentVersion},"
         + " last_version = #{newTopicMeta.lastVersion},"
         + " deleted_at = #{newTopicMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone. Because a successful update always raises
+        // current_version, matching id + current_version uniquely identifies the row the caller
+        // read; the old full-row comparison was redundant and fragile (JSON byte equality).
         + " WHERE topic_id = #{oldTopicMeta.topicId}"
-        + " AND topic_name = #{oldTopicMeta.topicName}"
-        + " AND metalake_id = #{oldTopicMeta.metalakeId}"
-        + " AND catalog_id = #{oldTopicMeta.catalogId}"
-        + " AND schema_id = #{oldTopicMeta.schemaId}"
-        + " AND (comment = #{oldTopicMeta.comment}"
-        + "   OR (comment IS NULL and #{oldTopicMeta.comment} IS NULL))"
-        + " AND properties = #{oldTopicMeta.properties}"
-        + " AND audit_info = #{oldTopicMeta.auditInfo}"
         + " AND current_version = #{oldTopicMeta.currentVersion}"
-        + " AND last_version = #{oldTopicMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
