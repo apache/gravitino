@@ -35,6 +35,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
@@ -386,5 +387,44 @@ public class UserMetaService {
       throw re;
     }
     return newEntity;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "countUsersByMetalake")
+  public long countUsersByMetalake(String metalakeName) {
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    Long count =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class, mapper -> mapper.countUserMetasByMetalakeId(metalakeId));
+    return count == null ? 0L : count;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listUsersByMetalakePaginated")
+  public PagedResult<UserEntity> listUsersByMetalakePaginated(
+      String metalakeName, int offset, int limit) {
+    Preconditions.checkArgument(offset >= 0, "offset must be >= 0");
+    Preconditions.checkArgument(limit >= 0, "limit must be >= 0");
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+    long totalCount = countUsersByMetalake(metalakeName);
+    if (limit == 0 || offset >= totalCount) {
+      return new PagedResult<>(totalCount, Collections.emptyList());
+    }
+
+    List<ExtendedUserPO> userPOs =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.listExtendedUserPOsByMetalakeIdPaginated(metalakeId, offset, limit));
+    List<UserEntity> users =
+        userPOs.stream()
+            .map(
+                po ->
+                    POConverters.fromExtendedUserPO(
+                        po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+            .collect(Collectors.toList());
+    return new PagedResult<>(totalCount, users);
   }
 }

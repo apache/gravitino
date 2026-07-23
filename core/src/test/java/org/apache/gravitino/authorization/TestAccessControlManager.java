@@ -62,6 +62,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -570,6 +571,46 @@ public class TestAccessControlManager {
     Assertions.assertEquals(
         group, accessControlManager.getGroupByExternalId(METALAKE, extId).name());
     accessControlManager.removeGroup(METALAKE, group);
+  }
+
+  @Test
+  public void testUserPagination() {
+    long beforeCount = accessControlManager.countUsers(METALAKE);
+    for (int i = 0; i < 5; i++) {
+      accessControlManager.addUser(METALAKE, "page_user_" + i);
+    }
+
+    Assertions.assertEquals(beforeCount + 5, accessControlManager.countUsers(METALAKE));
+
+    PagedResult<User> page = accessControlManager.listUsers(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(beforeCount + 5, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+
+    PagedResult<User> lastPage =
+        accessControlManager.listUsers(METALAKE, (int) beforeCount + 4, 10);
+    Assertions.assertEquals(beforeCount + 5, lastPage.totalCount());
+    Assertions.assertEquals(1, lastPage.items().size());
+
+    for (int i = 0; i < 5; i++) {
+      accessControlManager.removeUser(METALAKE, "page_user_" + i);
+    }
+  }
+
+  @Test
+  public void testGroupPagination() {
+    long beforeCount = accessControlManager.countGroups(METALAKE);
+    for (int i = 0; i < 3; i++) {
+      accessControlManager.addGroup(METALAKE, "page_group_" + i);
+    }
+    Assertions.assertEquals(beforeCount + 3, accessControlManager.countGroups(METALAKE));
+
+    PagedResult<Group> page = accessControlManager.listGroups(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(beforeCount + 3, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+
+    for (int i = 0; i < 3; i++) {
+      accessControlManager.removeGroup(METALAKE, "page_group_" + i);
+    }
   }
 
   private void createCatalogRole(String role) {
