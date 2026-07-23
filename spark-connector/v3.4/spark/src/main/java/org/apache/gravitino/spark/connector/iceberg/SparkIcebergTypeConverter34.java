@@ -16,33 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.spark.connector;
+package org.apache.gravitino.spark.connector.iceberg;
 
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.spark.connector.SparkTypeConverter34;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.TimestampNTZType;
+import org.apache.spark.sql.types.NullType;
 
-public class SparkTypeConverter34 extends SparkTypeConverter {
+/**
+ * Converts types for Spark 3.4 and 3.5 Iceberg catalogs.
+ *
+ * <p>Iceberg 1.11 maps its V3 unknown type to Spark {@link NullType}. Other Spark catalog
+ * implementations do not share this contract, so the mapping is intentionally isolated here.
+ */
+public class SparkIcebergTypeConverter34 extends SparkTypeConverter34 {
 
   @Override
   public Type toGravitinoType(DataType sparkType) {
-    if (sparkType instanceof TimestampNTZType) {
-      return Types.TimestampType.withoutTimeZone();
-    } else {
-      return super.toGravitinoType(sparkType);
+    if (sparkType instanceof NullType) {
+      return Types.NullType.get();
     }
+    return super.toGravitinoType(sparkType);
   }
 
   @Override
   public DataType toSparkType(Type gravitinoType) {
-    if (gravitinoType instanceof Types.TimestampType
-        && !((Types.TimestampType) gravitinoType).hasTimeZone()) {
-      validateTimestampPrecision((Types.TimestampType) gravitinoType);
-      return DataTypes.TimestampNTZType;
-    } else {
-      return super.toSparkType(gravitinoType);
+    if (gravitinoType instanceof Types.NullType) {
+      return DataTypes.NullType;
     }
+    return super.toSparkType(gravitinoType);
   }
 }

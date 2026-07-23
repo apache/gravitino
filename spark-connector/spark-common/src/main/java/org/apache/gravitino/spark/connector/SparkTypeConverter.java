@@ -105,12 +105,17 @@ public class SparkTypeConverter {
               .toArray(Types.StructType.Field[]::new);
       return Types.StructType.of(fields);
     } else if (sparkType instanceof NullType) {
-      return Types.NullType.get();
+      throw new IllegalArgumentException(
+          "Spark NullType is only supported by Spark 3.4 and 3.5 Iceberg catalogs");
     }
     throw new UnsupportedOperationException("Not support " + sparkType.toString());
   }
 
   public DataType toSparkType(Type gravitinoType) {
+    if (gravitinoType instanceof Types.TimestampType) {
+      validateTimestampPrecision((Types.TimestampType) gravitinoType);
+    }
+
     if (gravitinoType instanceof Types.ByteType) {
       if (((Types.ByteType) gravitinoType).signed()) {
         return DataTypes.ByteType;
@@ -154,6 +159,12 @@ public class SparkTypeConverter {
       // Spark has no native UUID type. Represent UUID as StringType to align with
       // Spark built-in PostgreSQL JDBC mapping (uuid -> StringType).
       return DataTypes.StringType;
+    } else if (gravitinoType instanceof Types.VariantType) {
+      throw new IllegalArgumentException("Spark 3.x does not support the Gravitino variant type");
+    } else if (gravitinoType instanceof Types.GeometryType) {
+      throw new IllegalArgumentException("Spark 3.x does not support the Gravitino geometry type");
+    } else if (gravitinoType instanceof Types.GeographyType) {
+      throw new IllegalArgumentException("Spark 3.x does not support the Gravitino geography type");
     } else if (gravitinoType instanceof Types.BinaryType) {
       return DataTypes.BinaryType;
     } else if (gravitinoType instanceof Types.BooleanType) {
@@ -191,8 +202,24 @@ public class SparkTypeConverter {
               .collect(Collectors.toList());
       return DataTypes.createStructType(fields);
     } else if (gravitinoType instanceof Types.NullType) {
-      return DataTypes.NullType;
+      throw new IllegalArgumentException(
+          "Gravitino null type is only supported by Spark 3.4 and 3.5 Iceberg catalogs");
     }
     throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
+  }
+
+  /**
+   * Validates that a Gravitino timestamp precision can be represented in Spark.
+   *
+   * @param timestampType the Gravitino timestamp type
+   * @throws IllegalArgumentException if the precision exceeds Spark's microsecond precision
+   */
+  protected static void validateTimestampPrecision(Types.TimestampType timestampType) {
+    if (timestampType.hasPrecisionSet() && timestampType.precision() > 6) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Spark supports timestamp precision up to 6, but %s has precision %d",
+              timestampType.simpleString(), timestampType.precision()));
+    }
   }
 }
