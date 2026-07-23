@@ -23,14 +23,17 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
@@ -137,6 +140,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
 
         // Check if current user exists in the metalake.
         NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
+        AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
 
         if (!skipStandardCheck && metalakeIdent != null) {
           String currentUser = PrincipalUtils.getCurrentUserName();
@@ -158,6 +162,28 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
             return IcebergExceptionMapper.toRESTResponse(
                 new RuntimeException("Failed to validate user", ex));
           }
+
+          // Role assumption: reject a NAMED declaration that names roles the caller does not hold
+          // (403); ALL/NONE need no membership check.
+          ActiveRoles activeRoles = authorizationRequestContext.getActiveRoles();
+          if (activeRoles.mode() == ActiveRoles.Mode.NAMED) {
+            Set<String> unheldRoles =
+                GravitinoAuthorizerProvider.getInstance()
+                    .getGravitinoAuthorizer()
+                    .findUnheldRoles(
+                        PrincipalUtils.getCurrentPrincipal(),
+                        metalakeIdent.name(),
+                        activeRoles.roleNames(),
+                        authorizationRequestContext);
+            if (!unheldRoles.isEmpty()) {
+              String message =
+                  String.format(
+                      "User '%s' cannot assume active role(s) that are not held: %s",
+                      currentUser, unheldRoles);
+              LOG.info(message);
+              return IcebergExceptionMapper.toRESTResponse(new ForbiddenException(message));
+            }
+          }
         }
 
         // Process custom authorization if handler exists
@@ -177,10 +203,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
               new AuthorizationExpressionEvaluator(expression);
           boolean authorizeResult =
               authorizationExpressionEvaluator.evaluate(
-                  nameIdentifierMap,
-                  pathParams,
-                  new AuthorizationRequestContext(),
-                  Optional.empty());
+                  nameIdentifierMap, pathParams, authorizationRequestContext, Optional.empty());
           if (!authorizeResult) {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
             NameIdentifier accessMetadataName =

@@ -468,6 +468,59 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public Set<String> findUnheldRoles(
+      Principal principal,
+      String metalake,
+      Set<String> declaredRoleNames,
+      AuthorizationRequestContext requestContext) {
+    if (declaredRoleNames == null || declaredRoleNames.isEmpty()) {
+      return new LinkedHashSet<>();
+    }
+    String username = principal.getName();
+    Set<Long> heldRoleIds;
+    try {
+      Optional<UserUpdatedAt> userInfoOpt = loadUserInfo(metalake, username, requestContext);
+      if (!userInfoOpt.isPresent()) {
+        // No user record => the caller holds no roles, so every declared role is unheld.
+        return new LinkedHashSet<>(declaredRoleNames);
+      }
+      UserUpdatedAt userInfo = userInfoOpt.get();
+      long userId = userInfo.getUserId();
+      heldRoleIds = new HashSet<>(loadUserRoles(metalake, username, userId, userInfo));
+      for (String groupName : principalGroupNames(principal)) {
+        heldRoleIds.addAll(loadGroupRoles(metalake, groupName, userId, requestContext));
+      }
+    } catch (Exception e) {
+      // Fail closed: if membership cannot be resolved, treat every declared role as unheld.
+      LOG.warn(
+          "Failed to resolve held roles for user {} in metalake {}; rejecting role assumption",
+          username,
+          metalake,
+          e);
+      return new LinkedHashSet<>(declaredRoleNames);
+    }
+
+    Set<String> unheldRoles = new LinkedHashSet<>();
+    for (String roleName : declaredRoleNames) {
+      Optional<Long> roleId = resolveRoleId(metalake, roleName);
+      if (!roleId.isPresent() || !heldRoleIds.contains(roleId.get())) {
+        unheldRoles.add(roleName);
+      }
+    }
+    return unheldRoles;
+  }
+
+  /**
+   * Resolves a role name to its id within the metalake, or {@link Optional#empty()} when no such
+   * role exists.
+   */
+  private Optional<Long> resolveRoleId(String metalake, String roleName) {
+    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(metalake, roleName);
+    return MetadataIdConverter.getID(
+        NameIdentifierUtil.toMetadataObject(roleIdent, Entity.EntityType.ROLE), metalake);
+  }
+
+  @Override
   public boolean hasSetOwnerPermission(
       String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
