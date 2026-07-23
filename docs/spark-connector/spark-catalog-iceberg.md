@@ -9,9 +9,20 @@ license: "This software is licensed under the Apache License version 2."
 
 The Apache Gravitino Spark connector offers the capability to read and write Iceberg tables, with the metadata managed by the Gravitino server.
 
+## Access Modes
+
+The Gravitino Spark connector supports two ways to access Iceberg catalogs:
+
+| Mode | Configuration | Catalog class registered | When to use |
+|------|--------------|--------------------------|-------------|
+| **Gravitino wrapper** (default) | `spark.sql.gravitino.enableIcebergSupport=true` | `GravitinoIcebergCatalog` (wraps the native catalog) | Full Gravitino metadata management, extended DDL, function support |
+| **Native REST auto-registration** | `spark.sql.gravitino.iceberg.enableRestAccess=true` | `org.apache.iceberg.spark.SparkCatalog` with `type=rest` | Bypass the wrapper and access Iceberg tables directly through the Gravitino Iceberg REST service |
+
+The two modes are mutually exclusive for a given catalog. When both flags are set, `enableRestAccess` takes precedence for `lakehouse-iceberg` catalogs.
+
 ## Preparation
 
-1. Set `spark.sql.gravitino.enableIcebergSupport` to `true` in Spark configuration.
+1. Set `spark.sql.gravitino.enableIcebergSupport` to `true` in Spark configuration (or `spark.sql.gravitino.iceberg.enableRestAccess=true` for REST auto-registration mode, see [REST Auto-Registration Mode](#rest-auto-registration-mode) below).
 2. Download the Iceberg Spark runtime JAR and the Gravitino Spark connector runtime JAR that match your Spark minor version and Scala version, and place them in the Spark classpath.
 
 Spark clients use a different Iceberg version than the Gravitino server (1.11.0). Use the table below to choose the correct JARs for your Spark version.
@@ -117,6 +128,83 @@ DESC EXTENDED employee;
 ```
 
 For more details about `CALL`, refer to the [Spark Procedures description](https://iceberg.apache.org/docs/1.5.2/spark-procedures/#spark-procedures) in Iceberg official document.
+
+## REST Auto-Registration Mode
+
+When `spark.sql.gravitino.iceberg.enableRestAccess=true`, the Gravitino Spark plugin automatically registers each `lakehouse-iceberg` Gravitino catalog as a native Iceberg REST catalog (`org.apache.iceberg.spark.SparkCatalog` with `type=rest`) pointing to the Gravitino Iceberg REST service. No manual `spark.sql.catalog.*` configuration is required.
+
+### How it works
+
+For every `lakehouse-iceberg` catalog (e.g., `iceberg_prod`) discovered from Gravitino, the plugin injects:
+
+```properties
+spark.sql.catalog.iceberg_prod           = org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.iceberg_prod.type      = rest
+spark.sql.catalog.iceberg_prod.uri       = <resolved-rest-uri>
+spark.sql.catalog.iceberg_prod.warehouse = iceberg_prod
+```
+
+The `warehouse` value is set to the catalog name so the Gravitino Iceberg REST server (running with `dynamic-config-provider`) can route the request to the correct backend catalog.
+
+### REST URI resolution
+
+The REST URI is resolved in this order:
+
+1. **Explicit override** — `spark.sql.gravitino.iceberg.restUri` if set (e.g., `http://host:9001/iceberg/`).
+2. **Inferred from `spark.sql.gravitino.uri`** — same host, default port (`9001` for HTTP, `9433` for HTTPS), path `/iceberg/`. A WARN log is emitted when inference is used. Production deployments should set `restUri` explicitly.
+
+### Credential and storage configuration
+
+| Catalog property `data-access` | Behavior |
+|-------------------------------|----------|
+| `vended-credentials` | Sets `header.X-Iceberg-Access-Delegation=vended-credentials` so the REST server vends short-lived credentials per request. No static keys are forwarded. |
+| *(not set)* | Translates static storage properties (S3 endpoint/region/path-style, OSS endpoint, ADLS account name/key) to `spark.sql.catalog.<name>.*` keys, and fetches dynamic credentials from Gravitino via `SupportsCredentials` if available. |
+
+### Prerequisites
+
+- The Gravitino Iceberg REST auxiliary service must be running and reachable at the configured URI.
+- The REST service must be configured with `dynamic-config-provider` so it can load catalog configuration from Gravitino by catalog name:
+
+  ```properties
+  gravitino.iceberg-rest.catalog-config-provider = gravitino
+  gravitino.iceberg-rest.gravitino.metalake       = <your-metalake>
+  ```
+
+- This mode is not compatible with embedded (in-process) Gravitino tests because the Spark connector Iceberg client version may differ from the embedded server.
+
+### Differences from Gravitino wrapper mode
+
+| Feature | Gravitino wrapper (`enableIcebergSupport`) | REST auto-registration (`enableRestAccess`) |
+|---------|-------------------------------------------|---------------------------------------------|
+| Catalog class | `GravitinoIcebergCatalog` | `org.apache.iceberg.spark.SparkCatalog` |
+| Metadata operations | Via Gravitino server | Directly via Iceberg REST protocol |
+| Functions (UDF) | Supported | Not supported |
+| Extended DDL (`ADD PARTITION FIELD`, `CREATE BRANCH`, etc.) | Supported via Gravitino planner extension | Supported natively by the Iceberg REST catalog |
+| Credential vending | Via Gravitino `SupportsCredentials` | Via REST server `X-Iceberg-Access-Delegation` header |
+
+### Configuration example
+
+```shell
+./bin/spark-sql \
+  --conf spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin \
+  --conf spark.sql.gravitino.uri=http://127.0.0.1:8090 \
+  --conf spark.sql.gravitino.metalake=my_metalake \
+  --conf spark.sql.gravitino.iceberg.enableRestAccess=true \
+  --conf spark.sql.gravitino.iceberg.restUri=http://127.0.0.1:9001/iceberg/
+```
+
+After startup, `lakehouse-iceberg` catalogs are immediately available in Spark without any additional catalog configuration:
+
+```sql
+-- iceberg_prod is a lakehouse-iceberg catalog registered in Gravitino
+SHOW TABLES IN iceberg_prod.default;
+
+CREATE TABLE iceberg_prod.default.events (id BIGINT, ts TIMESTAMP) USING iceberg;
+
+INSERT INTO iceberg_prod.default.events VALUES (1, current_timestamp());
+
+SELECT * FROM iceberg_prod.default.events;
+```
 
 ## Catalog Properties
 

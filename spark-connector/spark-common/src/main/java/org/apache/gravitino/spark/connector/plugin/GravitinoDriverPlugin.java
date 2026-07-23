@@ -48,6 +48,7 @@ import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.gravitino.spark.connector.iceberg.IcebergRestCatalogRegistrar;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -86,6 +87,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           Collections.singletonList(GravitinoAuthorizationSparkSessionExtensions.class.getName()));
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
+  private boolean enableIcebergRestAccess = false;
+  @Nullable private IcebergRestCatalogRegistrar icebergRestRegistrar = null;
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -106,11 +109,25 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
     this.enablePaimonSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
+    this.enableIcebergRestAccess =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ICEBERG_ENABLE_REST_ACCESS, false);
     if (enablePaimonSupport) {
       gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
     }
     if (enableIcebergSupport) {
+      // Gravitino wrapper extensions include GravitinoIcebergSparkSessionExtensions (which
+      // intercepts Iceberg DDL and routes it through GravitinoIcebergCatalog) plus the native
+      // IcebergSparkSessionExtensions.
       gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
+    } else if (enableIcebergRestAccess) {
+      // With native REST catalogs (org.apache.iceberg.spark.SparkCatalog), only load the native
+      // Iceberg extensions.  GravitinoIcebergSparkSessionExtensions must NOT be loaded here
+      // because its IcebergExtendedDataSourceV2Strategy unconditionally casts the catalog to
+      // GravitinoIcebergCatalog and throws UnsupportedOperationException for any other type.
+      gravitinoDriverExtensions.add(ICEBERG_SPARK_EXTENSIONS);
+    }
+    if (enableIcebergRestAccess) {
+      icebergRestRegistrar = new IcebergRestCatalogRegistrar(conf);
     }
 
     this.catalogManager =
@@ -140,8 +157,20 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               String catalogName = entry.getKey();
               Catalog gravitinoCatalog = entry.getValue();
               String provider = gravitinoCatalog.provider();
-              if ("lakehouse-iceberg".equals(provider.toLowerCase(Locale.ROOT))
-                  && !enableIcebergSupport) {
+              if ("lakehouse-iceberg".equals(provider.toLowerCase(Locale.ROOT))) {
+                if (enableIcebergRestAccess) {
+                  try {
+                    icebergRestRegistrar.registerCatalog(sparkConf, catalogName, gravitinoCatalog);
+                  } catch (Exception e) {
+                    LOG.warn("Register Iceberg REST catalog {} failed.", catalogName, e);
+                  }
+                } else if (enableIcebergSupport) {
+                  try {
+                    registerCatalog(sparkConf, catalogName, provider);
+                  } catch (Exception e) {
+                    LOG.warn("Register catalog {} failed.", catalogName, e);
+                  }
+                }
                 return;
               }
               if ("lakehouse-paimon".equals(provider.toLowerCase(Locale.ROOT))
