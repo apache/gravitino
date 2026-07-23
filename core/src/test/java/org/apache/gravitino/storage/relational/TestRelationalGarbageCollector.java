@@ -25,9 +25,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import org.apache.gravitino.Config;
 import org.apache.gravitino.MetadataObject;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Tests relational garbage collector orchestration. */
@@ -35,11 +37,16 @@ public class TestRelationalGarbageCollector {
 
   @Test
   public void testCollectOrphanedRelationsUntilBatchIsEmpty() throws Exception {
-    RelationalBackend backend = mock(RelationalBackend.class);
+    RelationalBackend backend =
+        mock(
+            RelationalBackend.class,
+            withSettings().extraInterfaces(SupportsOrphanedRelationCleanup.class));
+    SupportsOrphanedRelationCleanup orphanedRelationCleanup =
+        (SupportsOrphanedRelationCleanup) backend;
     Config config = mock(Config.class);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
-    when(backend.softDeleteOrphanedRelations(
+    when(orphanedRelationCleanup.softDeleteOrphanedRelations(
             MetadataObject.Type.TABLE, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT))
         .thenReturn(2, 0);
 
@@ -47,8 +54,19 @@ public class TestRelationalGarbageCollector {
 
     for (MetadataObject.Type type : MetadataObject.Type.values()) {
       int expectedInvocations = type == MetadataObject.Type.TABLE ? 2 : 1;
-      verify(backend, times(expectedInvocations))
+      verify(orphanedRelationCleanup, times(expectedInvocations))
           .softDeleteOrphanedRelations(type, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
     }
+  }
+
+  @Test
+  public void testBackendWithoutOrphanedRelationCleanupIsSkipped() {
+    RelationalBackend backend = mock(RelationalBackend.class);
+    Config config = mock(Config.class);
+    when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(1000L);
+    when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+
+    Assertions.assertDoesNotThrow(
+        () -> new RelationalGarbageCollector(backend, config).collectAndClean());
   }
 }

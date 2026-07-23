@@ -95,7 +95,7 @@ import org.slf4j.LoggerFactory;
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
-public class JDBCBackend implements RelationalBackend {
+public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationCleanup {
 
   private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 

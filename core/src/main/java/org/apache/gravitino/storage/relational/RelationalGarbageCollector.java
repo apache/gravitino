@@ -78,17 +78,21 @@ public final class RelationalGarbageCollector implements Closeable {
     try {
       LOG.debug("Start to collect and delete legacy data by thread {}", threadId);
       long legacyTimeline = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
-      for (MetadataObject.Type metadataObjectType : MetadataObject.Type.values()) {
-        long deletedCount = Long.MAX_VALUE;
-        LOG.debug("Try to softly delete orphaned {} relations", metadataObjectType);
-        try {
-          while (deletedCount > 0) {
-            deletedCount =
-                backend.softDeleteOrphanedRelations(
-                    metadataObjectType, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      if (backend instanceof SupportsOrphanedRelationCleanup) {
+        SupportsOrphanedRelationCleanup orphanedRelationCleanup =
+            (SupportsOrphanedRelationCleanup) backend;
+        for (MetadataObject.Type metadataObjectType : MetadataObject.Type.values()) {
+          long deletedCount = Long.MAX_VALUE;
+          LOG.debug("Try to softly delete orphaned {} relations", metadataObjectType);
+          try {
+            while (deletedCount > 0) {
+              deletedCount =
+                  orphanedRelationCleanup.softDeleteOrphanedRelations(
+                      metadataObjectType, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            }
+          } catch (RuntimeException e) {
+            LOG.error("Failed to softly delete orphaned " + metadataObjectType + " relations: ", e);
           }
-        } catch (RuntimeException e) {
-          LOG.error("Failed to softly delete orphaned " + metadataObjectType + " relations: ", e);
         }
       }
 
