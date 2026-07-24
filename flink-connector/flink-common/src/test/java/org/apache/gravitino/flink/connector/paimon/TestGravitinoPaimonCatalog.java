@@ -477,9 +477,9 @@ public class TestGravitinoPaimonCatalog {
         "bos-secret-key", catalog.capturedHadoopConf.get("fs.bos.secret.access.key"));
   }
 
-  /** Verifies that vended filesystem credentials remain available to Paimon native FileIOs. */
+  /** Verifies that vended filesystem credentials are moved to Hadoop configuration. */
   @Test
-  public void testOpenKeepsStorageCredentialsInPaimonOptions() {
+  public void testOpenMovesStorageCredentialsToHadoopConf() {
     Catalog mockCatalog =
         catalogWithCredentials(
             new S3SecretKeyCredential("s3-key", "s3-secret"),
@@ -494,12 +494,41 @@ public class TestGravitinoPaimonCatalog {
     CapturingPaimonCatalog catalog = new CapturingPaimonCatalog(options, mockCatalog);
     catalog.open();
 
-    Assertions.assertEquals("s3-key", catalog.capturedOptions.get(PaimonConstants.S3_ACCESS_KEY));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey(PaimonConstants.S3_ACCESS_KEY));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey(PaimonConstants.S3_SECRET_KEY));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey(PaimonConstants.OSS_ACCESS_KEY));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey(PaimonConstants.OSS_SECRET_KEY));
+    Assertions.assertEquals("s3-key", catalog.capturedHadoopConf.get("fs.s3a.access.key"));
+    Assertions.assertEquals("s3-secret", catalog.capturedHadoopConf.get("fs.s3a.secret.key"));
     Assertions.assertEquals(
-        "s3-secret", catalog.capturedOptions.get(PaimonConstants.S3_SECRET_KEY));
-    Assertions.assertEquals("oss-key", catalog.capturedOptions.get(PaimonConstants.OSS_ACCESS_KEY));
+        "oss-key", catalog.capturedHadoopConf.get(PaimonConstants.OSS_ACCESS_KEY));
     Assertions.assertEquals(
-        "oss-secret", catalog.capturedOptions.get(PaimonConstants.OSS_SECRET_KEY));
+        "oss-secret", catalog.capturedHadoopConf.get(PaimonConstants.OSS_SECRET_KEY));
+  }
+
+  /** Verifies that Paimon native storage options are moved to Hadoop configuration. */
+  @Test
+  public void testOpenMovesPaimonStorageOptionsToHadoopConf() {
+    Catalog mockCatalog = catalogWithCredentials();
+    Map<String, String> options = new HashMap<>();
+    options.put("warehouse", "s3://bucket/path");
+    options.put(PaimonConstants.S3_ENDPOINT, "s3-endpoint");
+    options.put(PaimonConstants.S3_ACCESS_KEY, "s3-key");
+    options.put(PaimonConstants.S3_SECRET_KEY, "s3-secret");
+    options.put("s3.access.key", "s3-key-alias");
+    options.put("s3.secret.key", "s3-secret-alias");
+
+    CapturingPaimonCatalog catalog = new CapturingPaimonCatalog(options, mockCatalog);
+    catalog.open();
+
+    Assertions.assertFalse(catalog.capturedOptions.containsKey(PaimonConstants.S3_ENDPOINT));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey(PaimonConstants.S3_ACCESS_KEY));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey(PaimonConstants.S3_SECRET_KEY));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey("s3.access.key"));
+    Assertions.assertFalse(catalog.capturedOptions.containsKey("s3.secret.key"));
+    Assertions.assertEquals("s3-endpoint", catalog.capturedHadoopConf.get("fs.s3a.endpoint"));
+    Assertions.assertEquals("s3-key", catalog.capturedHadoopConf.get("fs.s3a.access.key"));
+    Assertions.assertEquals("s3-secret", catalog.capturedHadoopConf.get("fs.s3a.secret.key"));
   }
 
   /** Verifies that JDBC backend credentials remain Paimon catalog options. */

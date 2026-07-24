@@ -39,7 +39,11 @@ import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
@@ -79,6 +83,11 @@ import org.slf4j.LoggerFactory;
 public class GravitinoPaimonCatalog extends BaseCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoPaimonCatalog.class);
+  private static final String PAIMON_S3_ACCESS_KEY_ALIAS = "s3.access.key";
+  private static final String PAIMON_S3_SECRET_KEY_ALIAS = "s3.secret.key";
+  private static final String HADOOP_S3_ENDPOINT = "fs.s3a.endpoint";
+  private static final String HADOOP_S3_ACCESS_KEY = "fs.s3a.access.key";
+  private static final String HADOOP_S3_SECRET_KEY = "fs.s3a.secret.key";
 
   private final CatalogFactory.Context context;
   // Mutable copy shared with BaseCatalog.catalogOptions. The inner Paimon catalog is created from a
@@ -138,11 +147,10 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     Configuration hadoopConf =
         HadoopUtils.getHadoopConfiguration(Options.fromMap(withoutHadoopOptions(paimonOptions)));
     moveHadoopOptionsToConf(paimonOptions, hadoopConf);
+    movePaimonStorageOptionsToConf(paimonOptions, hadoopConf);
     try {
-      // Keep vended credentials as Paimon options because Paimon native S3/OSS FileIO loaders
-      // declare them as required options.
-      CredentialPropertyUtils.applyPaimonCredentials(
-          CredentialPropertyUtils.getCredentials(catalog()), paimonOptions);
+      applyCredentialsToCatalog(
+          CredentialPropertyUtils.getCredentials(catalog()), paimonOptions, hadoopConf);
     } catch (NoSuchCatalogException e) {
       LOG.warn(
           "Catalog '{}' not found in Gravitino during open(); credential injection skipped."
@@ -203,6 +211,54 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     }
 
     return null;
+  }
+
+  private static void movePaimonStorageOptionsToConf(
+      Map<String, String> paimonOptions, Configuration hadoopConf) {
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.S3_ENDPOINT, HADOOP_S3_ENDPOINT);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PAIMON_S3_ACCESS_KEY_ALIAS, HADOOP_S3_ACCESS_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.S3_ACCESS_KEY, HADOOP_S3_ACCESS_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PAIMON_S3_SECRET_KEY_ALIAS, HADOOP_S3_SECRET_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.S3_SECRET_KEY, HADOOP_S3_SECRET_KEY);
+  }
+
+  private static void moveOptionToHadoopConf(
+      Map<String, String> paimonOptions,
+      Configuration hadoopConf,
+      String paimonKey,
+      String hadoopKey) {
+    String value = paimonOptions.remove(paimonKey);
+    if (value != null) {
+      hadoopConf.set(hadoopKey, value);
+    }
+  }
+
+  private static void applyCredentialsToCatalog(
+      Credential[] credentials, Map<String, String> paimonOptions, Configuration hadoopConf) {
+    for (Credential credential : credentials) {
+      if (credential instanceof JdbcCredential) {
+        JdbcCredential jdbc = (JdbcCredential) credential;
+        paimonOptions.put(PaimonConstants.PAIMON_JDBC_USER, jdbc.jdbcUser());
+        paimonOptions.put(PaimonConstants.PAIMON_JDBC_PASSWORD, jdbc.jdbcPassword());
+      } else if (credential instanceof S3SecretKeyCredential) {
+        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
+        hadoopConf.set(HADOOP_S3_ACCESS_KEY, s3.accessKeyId());
+        hadoopConf.set(HADOOP_S3_SECRET_KEY, s3.secretAccessKey());
+      } else if (credential instanceof OSSSecretKeyCredential) {
+        OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
+        hadoopConf.set(PaimonConstants.OSS_ACCESS_KEY, oss.accessKeyId());
+        hadoopConf.set(PaimonConstants.OSS_SECRET_KEY, oss.secretAccessKey());
+      } else {
+        LOG.warn(
+            "Received unrecognized credential type '{}' for Paimon catalog, skipping",
+            credential.getClass().getName());
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
