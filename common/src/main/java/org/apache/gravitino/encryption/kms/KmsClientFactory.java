@@ -27,11 +27,11 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 public interface KmsClientFactory {
 
   /**
-   * Returns the stable, canonical KMS API identifier implemented by this factory.
+   * Returns the KMS API implemented by this factory.
    *
-   * @return the supported KMS API identifier
+   * @return the supported KMS API
    */
-  String api();
+  KmsApi api();
 
   /**
    * Creates a client bound to a configured KMS source.

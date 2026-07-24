@@ -34,9 +34,9 @@ public abstract class TestKmsClientFactoryContract {
   /**
    * Returns the API expected from the factory.
    *
-   * @return the expected API identifier
+   * @return the expected API
    */
-  protected abstract String expectedApi();
+  protected abstract KmsApi expectedApi();
 
   @Test
   void testReportsExpectedApi() {

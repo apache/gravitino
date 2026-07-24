@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestFakeKmsClient extends TestKmsClientContract {
 
-  private static final String API = "test-kms";
+  private static final KmsApi API = KmsApi.AWS_KMS;
   private static final String SOURCE = "test";
   private static final String USABLE_KEY = "usable";
   private static final String DISABLED_KEY = "disabled";
@@ -35,10 +35,8 @@ public class TestFakeKmsClient extends TestKmsClientContract {
           .putKey(DISABLED_KEY, false, true, true);
 
   @Test
-  void testRejectsBlankApi() {
+  void testRejectsNullApi() {
     Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(null, SOURCE));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient("", SOURCE));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(" ", SOURCE));
   }
 
   @Test

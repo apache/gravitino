@@ -37,6 +37,7 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.encryption.kms.KmsApi;
 import org.apache.gravitino.encryption.kms.KmsReference;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
@@ -259,7 +260,7 @@ public class TestJsonUtils {
   @Test
   void testKmsReferenceDtoSerde() throws JsonProcessingException {
     KmsReference reference =
-        new KmsReference("google-cloud-kms", "analytics-prod", "projects/p/keys/k");
+        new KmsReference(KmsApi.GOOGLE_CLOUD_KMS, "analytics-prod", "projects/p/keys/k");
     KmsReferenceDTO referenceDTO = KmsReferenceDTO.fromKmsReference(reference);
 
     String json = objectMapper.writeValueAsString(referenceDTO);
@@ -278,6 +279,18 @@ public class TestJsonUtils {
                     + "\"keyId\":\"projects/p/keys/k\"}",
                 KmsReferenceDTO.class)
             .toKmsReference());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                objectMapper
+                    .readValue(
+                        "{\"api\":\"custom-kms\",\"source\":\"analytics-prod\","
+                            + "\"keyId\":\"projects/p/keys/k\"}",
+                        KmsReferenceDTO.class)
+                    .toKmsReference());
+    Assertions.assertTrue(exception.getMessage().contains("Unsupported KMS API 'custom-kms'"));
   }
 
   @Test

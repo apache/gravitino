@@ -25,7 +25,8 @@ import org.junit.jupiter.api.Test;
 
 public class TestKmsClient {
 
-  private static final KmsReference REFERENCE = new KmsReference("test-kms", "production", "key");
+  private static final KmsReference REFERENCE =
+      new KmsReference(KmsApi.AWS_KMS, "production", "key");
 
   @Test
   void testReturnsProviderProperties() {
