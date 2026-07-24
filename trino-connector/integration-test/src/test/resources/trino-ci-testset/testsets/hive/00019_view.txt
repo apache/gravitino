@@ -37,6 +37,14 @@ DROP VIEW
 
 <QUERY_FAILED> Table already exists: 'gt_hive.gt_hive_view_db.t01'
 
+CREATE VIEW
+
+"t01"
+
+<QUERY_FAILED> Table 'gt_hive.gt_hive_view_db.native_v01' does not exist
+
+DROP VIEW
+
 DROP TABLE
 
 DROP SCHEMA

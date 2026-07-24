@@ -6,3 +6,8 @@ call gravitino.system.create_catalog(
         array['${hive_uri}']
     )
 );
+
+CREATE CATALOG native_hive USING hive
+WITH (
+    "hive.metastore.uri" = '${hive_uri}'
+);
