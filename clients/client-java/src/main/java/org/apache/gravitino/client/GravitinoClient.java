@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetadataObject;
@@ -84,7 +85,8 @@ public class GravitinoClient extends GravitinoClientBase
   private final GravitinoMetalake metalake;
 
   /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   * Constructs a new GravitinoClient with the given URI, authenticator, AuthDataProvider, and
+   * httpConfigurer.
    *
    * @param uri The base URI for the Gravitino API.
    * @param metalakeName The specified metalake name.
@@ -93,6 +95,7 @@ public class GravitinoClient extends GravitinoClientBase
    *     support the case that the client-side version is higher than the server-side version.
    * @param headers The base header for Gravitino API.
    * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
+   * @param httpConfigurer The configurer to apply for the underlying HTTP client builder.
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
   private GravitinoClient(
@@ -101,8 +104,9 @@ public class GravitinoClient extends GravitinoClientBase
       AuthDataProvider authDataProvider,
       boolean checkVersion,
       Map<String, String> headers,
-      Map<String, String> properties) {
-    super(uri, authDataProvider, checkVersion, headers, properties);
+      Map<String, String> properties,
+      Consumer<HTTPClient.Builder> httpConfigurer) {
+    super(uri, authDataProvider, checkVersion, headers, properties, httpConfigurer);
     this.metalake = loadMetalake(metalakeName);
   }
 
@@ -744,7 +748,13 @@ public class GravitinoClient extends GravitinoClientBase
           "The argument 'metalakeName' must be a valid name");
 
       return new GravitinoClient(
-          uri, metalakeName, authDataProvider, isVersionCheckEnabled(), headers, properties);
+          uri,
+          metalakeName,
+          authDataProvider,
+          isVersionCheckEnabled(),
+          headers,
+          properties,
+          httpConfigurer);
     }
   }
 }

@@ -356,6 +356,23 @@ public class TestHTTPClient {
   }
 
   @Test
+  public void testBuildWithoutTLSConfigurer() {
+    HTTPClient client = HTTPClient.builder(ImmutableMap.of()).uri("http://localhost").build();
+
+    Assertions.assertNotNull(client);
+  }
+
+  @Test
+  public void testBuildWithTLSConfigurer() {
+    HTTPClient client =
+        HTTPClient.builder(ImmutableMap.of())
+            .uri("https://localhost")
+            .withTlsConfigurer(new TLSConfigurer() {})
+            .build();
+
+    Assertions.assertNotNull(client);
+  }
+
   public void testConnectionRefusedThrowsMeaningfulException() {
     GravitinoAdminClient client = GravitinoAdminClient.builder("http://localhost:1").build();
 

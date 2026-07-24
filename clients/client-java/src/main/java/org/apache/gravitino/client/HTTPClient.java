@@ -52,6 +52,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.DefaultClientTlsStrategy;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -64,6 +65,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.net.URIBuilder;
+import org.apache.hc.core5.reactor.ssl.SSLBufferMode;
 
 /**
  * An HttpClient for usage with the REST catalog.
@@ -75,7 +77,6 @@ import org.apache.hc.core5.net.URIBuilder;
  * <p>Referred from core/src/main/java/org/apache/iceberg/rest/HTTPClient.java
  */
 public class HTTPClient implements RESTClient {
-
   private static final String VERSION_HEADER = "application/vnd.gravitino.v1+json";
 
   private final String uri;
@@ -99,7 +100,8 @@ public class HTTPClient implements RESTClient {
   private volatile HandlerStatus handlerStatus = HandlerStatus.Start;
 
   /**
-   * Constructs an instance of HTTPClient with the provided information.
+   * Constructs an instance of HTTPClient with the provided information, with a default null TLS
+   * configurer.
    *
    * @param uri The base URI of the REST API.
    * @param baseHeaders A map of base headers to be included in all HTTP requests.
@@ -115,13 +117,36 @@ public class HTTPClient implements RESTClient {
       AuthDataProvider authDataProvider,
       Runnable beforeConnectHandler,
       Map<String, String> properties) {
+    this(uri, baseHeaders, objectMapper, authDataProvider, beforeConnectHandler, properties, null);
+  }
+
+  /**
+   * Constructs an instance of HTTPClient with the provided information.
+   *
+   * @param uri The base URI of the REST API.
+   * @param baseHeaders A map of base headers to be included in all HTTP requests.
+   * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
+   * @param authDataProvider The provider of authentication data.
+   * @param beforeConnectHandler The function to be executed before connecting to the server.
+   * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
+   * @param tlsConfigurer The TLSConfigurer used to configure TLS settings for the HTTP client.
+   */
+  private HTTPClient(
+      String uri,
+      Map<String, String> baseHeaders,
+      ObjectMapper objectMapper,
+      AuthDataProvider authDataProvider,
+      Runnable beforeConnectHandler,
+      Map<String, String> properties,
+      TLSConfigurer tlsConfigurer) {
     this.uri = uri;
     this.mapper = objectMapper;
     GravitinoClientConfiguration clientConfiguration =
         GravitinoClientConfiguration.buildFromProperties(properties);
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
-    clientBuilder.setConnectionManager(configureConnectionManager(clientConfiguration));
+    clientBuilder.setConnectionManager(
+        configureConnectionManager(clientConfiguration, tlsConfigurer));
 
     if (baseHeaders != null) {
       clientBuilder.setDefaultHeaders(
@@ -746,7 +771,7 @@ public class HTTPClient implements RESTClient {
   }
 
   private static HttpClientConnectionManager configureConnectionManager(
-      GravitinoClientConfiguration clientConfiguration) {
+      GravitinoClientConfiguration clientConfiguration, TLSConfigurer tlsConfigurer) {
     PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
         PoolingHttpClientConnectionManagerBuilder.create();
 
@@ -757,6 +782,18 @@ public class HTTPClient implements RESTClient {
 
     ConnectionConfig connectionConfig = configureConnectionConfig(clientConfiguration);
     connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
+
+    // Configure custom TLS settings, if provided
+    if (tlsConfigurer != null) {
+      connectionManagerBuilder.setTlsSocketStrategy(
+          new DefaultClientTlsStrategy(
+              tlsConfigurer.sslContext(),
+              tlsConfigurer.supportedProtocols(),
+              tlsConfigurer.supportedCipherSuites(),
+              SSLBufferMode.STATIC,
+              tlsConfigurer.hostnameVerifier()));
+    }
+
     return connectionManagerBuilder.build();
   }
 
@@ -780,7 +817,7 @@ public class HTTPClient implements RESTClient {
    */
   public static class Builder {
     private final Map<String, String> properties;
-
+    private TLSConfigurer tlsConfigurer;
     private final Map<String, String> baseHeaders = Maps.newHashMap();
     private String uri;
     private ObjectMapper mapper = ObjectMapperProvider.objectMapper();
@@ -800,6 +837,17 @@ public class HTTPClient implements RESTClient {
     public Builder uri(String baseUri) {
       Preconditions.checkArgument(baseUri != null, "Invalid uri for http client: null");
       this.uri = RESTUtils.stripTrailingSlash(baseUri);
+      return this;
+    }
+
+    /**
+     * Adds TLS configuration to the HTTP client.
+     *
+     * @param tlsConfigurer The TLS configurer for custom TLS settings.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withTlsConfigurer(TLSConfigurer tlsConfigurer) {
+      this.tlsConfigurer = tlsConfigurer;
       return this;
     }
 
@@ -866,9 +914,14 @@ public class HTTPClient implements RESTClient {
      * @return An instance of HTTPClient with the configured options.
      */
     public HTTPClient build() {
-
       return new HTTPClient(
-          uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler, properties);
+          uri,
+          baseHeaders,
+          mapper,
+          authDataProvider,
+          beforeConnectHandler,
+          properties,
+          tlsConfigurer);
     }
   }
 
