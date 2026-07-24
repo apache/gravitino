@@ -164,15 +164,9 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
         + " function_latest_version = #{newFunctionMeta.functionLatestVersion},"
         + " audit_info = #{newFunctionMeta.auditInfo},"
         + " deleted_at = #{newFunctionMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (function_current_version is monotonic).
         + " WHERE function_id = #{oldFunctionMeta.functionId}"
-        + " AND function_name = #{oldFunctionMeta.functionName}"
-        + " AND metalake_id = #{oldFunctionMeta.metalakeId}"
-        + " AND catalog_id = #{oldFunctionMeta.catalogId}"
-        + " AND schema_id = #{oldFunctionMeta.schemaId}"
-        + " AND function_type = #{oldFunctionMeta.functionType}"
         + " AND function_current_version = #{oldFunctionMeta.functionCurrentVersion}"
-        + " AND function_latest_version = #{oldFunctionMeta.functionLatestVersion}"
-        + " AND audit_info = #{oldFunctionMeta.auditInfo}"
         + " AND deleted_at = 0";
   }
 }

@@ -211,12 +211,9 @@ public class GroupMetaBaseSQLProvider {
         + " current_version = #{newGroupMeta.currentVersion},"
         + " last_version = #{newGroupMeta.lastVersion},"
         + " deleted_at = #{newGroupMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (current_version is monotonic on update).
         + " WHERE group_id = #{oldGroupMeta.groupId}"
-        + " AND group_name = #{oldGroupMeta.groupName}"
-        + " AND metalake_id = #{oldGroupMeta.metalakeId}"
-        + " AND audit_info = #{oldGroupMeta.auditInfo}"
         + " AND current_version = #{oldGroupMeta.currentVersion}"
-        + " AND last_version = #{oldGroupMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 

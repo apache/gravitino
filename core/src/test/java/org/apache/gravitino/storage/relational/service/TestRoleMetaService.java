@@ -37,6 +37,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -836,6 +842,72 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testConcurrentUpdateDoesNotChangeSecurableObjectsOnConflict() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "concurrent-role",
+            AUDIT_INFO,
+            "catalog");
+    RoleMetaService.getInstance().insertRole(role, false);
+
+    CountDownLatch snapshotLoaded = new CountDownLatch(1);
+    CountDownLatch continueUpdate = new CountDownLatch(1);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<RoleEntity> staleUpdate =
+          executor.submit(
+              () ->
+                  RoleMetaService.getInstance()
+                      .updateRole(
+                          role.nameIdentifier(),
+                          (RoleEntity oldRole) -> {
+                            snapshotLoaded.countDown();
+                            awaitLatch(continueUpdate);
+                            List<SecurableObject> securableObjects =
+                                Lists.newArrayList(oldRole.securableObjects());
+                            securableObjects.add(
+                                SecurableObjects.ofMetalake(
+                                    METALAKE_NAME,
+                                    Lists.newArrayList(Privileges.CreateTable.allow())));
+                            return RoleEntity.builder()
+                                .withId(oldRole.id())
+                                .withName(oldRole.name())
+                                .withNamespace(oldRole.namespace())
+                                .withProperties(oldRole.properties())
+                                .withSecurableObjects(securableObjects)
+                                .withAuditInfo(oldRole.auditInfo())
+                                .build();
+                          }));
+
+      assertTrue(snapshotLoaded.await(10, TimeUnit.SECONDS));
+      advanceRoleVersion(role.id());
+      continueUpdate.countDown();
+
+      ExecutionException exception =
+          Assertions.assertThrows(
+              ExecutionException.class, () -> staleUpdate.get(10, TimeUnit.SECONDS));
+      assertTrue(exception.getCause() instanceof IOException);
+    } finally {
+      continueUpdate.countDown();
+      executor.shutdownNow();
+    }
+
+    RoleEntity storedRole =
+        RoleMetaService.getInstance().getRoleByIdentifier(role.nameIdentifier());
+    assertTrue(
+        CollectionUtils.isEqualCollection(
+            Lists.newArrayList(
+                SecurableObjects.ofCatalog(
+                    "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
+            storedRole.securableObjects()));
+  }
+
+  @TestTemplate
   void testDeleteMetalakeCascade() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
     createAndInsertCatalog(METALAKE_NAME, "catalog");
@@ -1126,5 +1198,29 @@ class TestRoleMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private void advanceRoleVersion(long roleId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE role_meta SET current_version = current_version + 1 WHERE role_id = "
+                  + roleId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance role version failed", e);
+    }
+  }
+
+  private void awaitLatch(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(10, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting for concurrent role update", e);
+    }
   }
 }

@@ -51,9 +51,11 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.StatisticEntity;
@@ -61,6 +63,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TableStatisticEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -79,6 +82,7 @@ import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
+import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
@@ -86,6 +90,7 @@ import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
+import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
@@ -93,6 +98,7 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -666,6 +672,9 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("this is test2", updatePO.getMetalakeComment());
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
   }
 
   @Test
@@ -680,6 +689,9 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("this is test2", updatePO.getCatalogComment());
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
   }
 
   @Test
@@ -697,6 +709,9 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("this is test2", updatePO.getSchemaComment());
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
   }
 
   @Test
@@ -715,6 +730,116 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("test", updatePO.getTableName());
+  }
+
+  @Test
+  public void testUpdateTopicPOVersionIncrements() throws JsonProcessingException {
+    TopicPO initPO =
+        createTopicPO(1L, "test", 1L, 1L, 1L, "this is test", ImmutableMap.of("key", "value"));
+    TopicEntity updatedTopic =
+        createTopic(
+            1L,
+            "test",
+            NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            "this is test2",
+            ImmutableMap.of("key", "value"));
+
+    TopicPO updatePO = POConverters.updateTopicPOWithVersion(initPO, updatedTopic);
+
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
+  }
+
+  @Test
+  public void testUpdateUserPOVersionIncrements() throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    UserEntity user =
+        UserEntity.builder().withId(1L).withName("test").withAuditInfo(auditInfo).build();
+    UserEntity updatedUser =
+        UserEntity.builder().withId(1L).withName("test2").withAuditInfo(auditInfo).build();
+    UserPO initPO =
+        POConverters.initializeUserPOWithVersion(user, UserPO.builder().withMetalakeId(1L));
+
+    UserPO updatePO = POConverters.updateUserPOWithVersion(initPO, updatedUser);
+
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
+  }
+
+  @Test
+  public void testUpdateGroupPOVersionIncrements() throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    GroupEntity group =
+        GroupEntity.builder().withId(1L).withName("test").withAuditInfo(auditInfo).build();
+    GroupEntity updatedGroup =
+        GroupEntity.builder().withId(1L).withName("test2").withAuditInfo(auditInfo).build();
+    GroupPO initPO =
+        POConverters.initializeGroupPOWithVersion(group, GroupPO.builder().withMetalakeId(1L));
+
+    GroupPO updatePO = POConverters.updateGroupPOWithVersion(initPO, updatedGroup);
+
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
+  }
+
+  @Test
+  public void testUpdateRolePOVersionIncrements() throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    RoleEntity role =
+        RoleEntity.builder().withId(1L).withName("test").withAuditInfo(auditInfo).build();
+    RoleEntity updatedRole =
+        RoleEntity.builder().withId(1L).withName("test2").withAuditInfo(auditInfo).build();
+    RolePO initPO =
+        POConverters.initializeRolePOWithVersion(role, RolePO.builder().withMetalakeId(1L));
+
+    RolePO updatePO = POConverters.updateRolePOWithVersion(initPO, updatedRole);
+
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
+  }
+
+  @Test
+  public void testUpdateModelPOVersionIncrements() throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    Namespace ns = Namespace.of("test_metalake", "test_catalog", "test_schema");
+    ModelEntity model =
+        ModelEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(ns)
+            .withComment("this is test")
+            .withProperties(ImmutableMap.of("key", "value"))
+            .withLatestVersion(1)
+            .withAuditInfo(auditInfo)
+            .build();
+    ModelEntity updatedModel =
+        ModelEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(ns)
+            .withComment("this is test2")
+            .withProperties(ImmutableMap.of("key", "value"))
+            .withLatestVersion(1)
+            .withAuditInfo(auditInfo)
+            .build();
+    ModelPO initPO =
+        POConverters.initializeModelPO(
+            model, ModelPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L));
+    assertEquals(1L, initPO.getCurrentVersion());
+
+    ModelPO updatePO = POConverters.updateModelPO(initPO, updatedModel);
+
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2L, updatePO.getCurrentVersion());
+    assertEquals(2L, updatePO.getLastVersion());
   }
 
   @Test
@@ -880,6 +1005,9 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("this is test2", updatePO.getComment());
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
   }
 
   @Test

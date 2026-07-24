@@ -109,19 +109,13 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
         + " model_comment = #{newModelMeta.modelComment},"
         + " model_properties = #{newModelMeta.modelProperties},"
         + " model_latest_version = #{newModelMeta.modelLatestVersion},"
+        + " current_version = #{newModelMeta.currentVersion},"
+        + " last_version = #{newModelMeta.lastVersion},"
         + " audit_info = #{newModelMeta.auditInfo},"
         + " deleted_at = #{newModelMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (see the base provider for rationale).
         + " WHERE model_id = #{oldModelMeta.modelId}"
-        + " AND model_name = #{oldModelMeta.modelName}"
-        + " AND metalake_id = #{oldModelMeta.metalakeId}"
-        + " AND catalog_id = #{oldModelMeta.catalogId}"
-        + " AND schema_id = #{oldModelMeta.schemaId}"
-        + " AND (model_comment = #{oldModelMeta.modelComment}"
-        + "   OR (CAST(model_comment AS VARCHAR) IS NULL"
-        + "   AND CAST(#{oldModelMeta.modelComment} AS VARCHAR) IS NULL))"
-        + " AND model_properties = #{oldModelMeta.modelProperties}"
-        + " AND model_latest_version = #{oldModelMeta.modelLatestVersion}"
-        + " AND audit_info = #{oldModelMeta.auditInfo}"
+        + " AND current_version = #{oldModelMeta.currentVersion}"
         + " AND deleted_at = 0";
   }
 }

@@ -74,16 +74,9 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
         + " schema_version = #{newMetalakeMeta.schemaVersion},"
         + " current_version = #{newMetalakeMeta.currentVersion},"
         + " last_version = #{newMetalakeMeta.lastVersion}"
+        // OCC: compare-and-set on the version alone (current_version is monotonic on update).
         + " WHERE metalake_id = #{oldMetalakeMeta.metalakeId}"
-        + " AND metalake_name = #{oldMetalakeMeta.metalakeName}"
-        + " AND (metalake_comment = #{oldMetalakeMeta.metalakeComment} "
-        + "  OR (CAST(metalake_comment AS VARCHAR) IS NULL AND "
-        + "  CAST(#{oldMetalakeMeta.metalakeComment} AS VARCHAR) IS NULL))"
-        + " AND properties = #{oldMetalakeMeta.properties}"
-        + " AND audit_info = #{oldMetalakeMeta.auditInfo}"
-        + " AND schema_version = #{oldMetalakeMeta.schemaVersion}"
         + " AND current_version = #{oldMetalakeMeta.currentVersion}"
-        + " AND last_version = #{oldMetalakeMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 

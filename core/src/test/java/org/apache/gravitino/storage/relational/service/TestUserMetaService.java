@@ -36,6 +36,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -874,6 +880,85 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testConcurrentUpdateDoesNotChangeRolesOnConflict() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "catalog");
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            "catalog");
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            AUDIT_INFO,
+            "catalog");
+    RoleMetaService.getInstance().insertRole(role1, false);
+    RoleMetaService.getInstance().insertRole(role2, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "concurrent-user",
+            AUDIT_INFO,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    UserMetaService.getInstance().insertUser(user, false);
+
+    CountDownLatch snapshotLoaded = new CountDownLatch(1);
+    CountDownLatch continueUpdate = new CountDownLatch(1);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<UserEntity> staleUpdate =
+          executor.submit(
+              () ->
+                  UserMetaService.getInstance()
+                      .updateUser(
+                          user.nameIdentifier(),
+                          (UserEntity oldUser) -> {
+                            snapshotLoaded.countDown();
+                            awaitLatch(continueUpdate);
+                            List<String> roleNames = Lists.newArrayList(oldUser.roleNames());
+                            List<Long> roleIds = Lists.newArrayList(oldUser.roleIds());
+                            roleNames.add(role2.name());
+                            roleIds.add(role2.id());
+                            return UserEntity.builder()
+                                .withId(oldUser.id())
+                                .withName(oldUser.name())
+                                .withNamespace(oldUser.namespace())
+                                .withExternalId(oldUser.externalId())
+                                .withEnabled(oldUser.enabled())
+                                .withRoleNames(roleNames)
+                                .withRoleIds(roleIds)
+                                .withAuditInfo(oldUser.auditInfo())
+                                .build();
+                          }));
+
+      assertTrue(snapshotLoaded.await(10, TimeUnit.SECONDS));
+      advanceUserVersion(user.id());
+      continueUpdate.countDown();
+
+      ExecutionException exception =
+          Assertions.assertThrows(
+              ExecutionException.class, () -> staleUpdate.get(10, TimeUnit.SECONDS));
+      assertTrue(exception.getCause() instanceof IOException);
+    } finally {
+      continueUpdate.countDown();
+      executor.shutdownNow();
+    }
+
+    UserEntity storedUser =
+        UserMetaService.getInstance().getUserByIdentifier(user.nameIdentifier());
+    assertEquals(Sets.newHashSet(role1.id()), Sets.newHashSet(storedUser.roleIds()));
+  }
+
+  @TestTemplate
   void deleteMetalake() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -1300,6 +1385,52 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testConcurrentExternalIdUpdateRollsBackOnConflict() throws Exception {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("concurrent-user", "concurrent-ext-id");
+    service.insertUser(user, false);
+
+    CountDownLatch snapshotLoaded = new CountDownLatch(1);
+    CountDownLatch continueUpdate = new CountDownLatch(1);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<UserEntity> staleUpdate =
+          executor.submit(
+              () ->
+                  service.updateUserByExternalId(
+                      userExtIdent(user.externalId()),
+                      (UserEntity oldUser) -> {
+                        snapshotLoaded.countDown();
+                        awaitLatch(continueUpdate);
+                        return UserEntity.builder()
+                            .withId(oldUser.id())
+                            .withName(oldUser.name())
+                            .withNamespace(oldUser.namespace())
+                            .withExternalId(oldUser.externalId())
+                            .withEnabled(false)
+                            .withRoleNames(oldUser.roleNames())
+                            .withRoleIds(oldUser.roleIds())
+                            .withAuditInfo(oldUser.auditInfo())
+                            .build();
+                      }));
+
+      assertTrue(snapshotLoaded.await(10, TimeUnit.SECONDS));
+      advanceUserVersion(user.id());
+      continueUpdate.countDown();
+
+      ExecutionException exception =
+          Assertions.assertThrows(
+              ExecutionException.class, () -> staleUpdate.get(10, TimeUnit.SECONDS));
+      assertTrue(exception.getCause() instanceof IOException);
+    } finally {
+      continueUpdate.countDown();
+      executor.shutdownNow();
+    }
+
+    assertTrue(queryEnabledByExtId(user.externalId()));
+  }
+
+  @TestTemplate
   void testExtEnableDel() throws IOException {
     UserMetaService svc = userMetaService();
     UserEntity user = userWithExtId("u1", "ext-del");
@@ -1440,5 +1571,29 @@ class TestUserMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private void advanceUserVersion(long userId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE user_meta SET current_version = current_version + 1 WHERE user_id = "
+                  + userId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance user version failed", e);
+    }
+  }
+
+  private void awaitLatch(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(10, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting for concurrent user update", e);
+    }
   }
 }

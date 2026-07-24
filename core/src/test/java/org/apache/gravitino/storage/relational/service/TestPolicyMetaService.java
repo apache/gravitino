@@ -34,6 +34,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -41,6 +47,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -221,6 +228,67 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertTrue(versionDeletedMap2.containsKey(3));
     assertEquals(0L, versionDeletedMap2.get(3));
     assertEquals(1, versionDeletedMap2.values().stream().filter(value -> value == 0L).count());
+  }
+
+  @TestTemplate
+  public void testVersionedUpdateRollsBackAfterConcurrentAuditUpdate() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "concurrent-policy",
+            AUDIT_INFO);
+    PolicyMetaService.getInstance().insertPolicy(policy, false);
+
+    CountDownLatch snapshotLoaded = new CountDownLatch(1);
+    CountDownLatch continueVersionedUpdate = new CountDownLatch(1);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<PolicyEntity> versionedUpdate =
+          executor.submit(
+              () ->
+                  PolicyMetaService.getInstance()
+                      .updatePolicy(
+                          policy.nameIdentifier(),
+                          (PolicyEntity oldPolicy) -> {
+                            snapshotLoaded.countDown();
+                            awaitLatch(continueVersionedUpdate);
+                            return copyPolicy(
+                                oldPolicy,
+                                "stale versioned update",
+                                (AuditInfo) oldPolicy.auditInfo());
+                          }));
+
+      assertTrue(snapshotLoaded.await(10, TimeUnit.SECONDS));
+      AuditInfo concurrentAudit =
+          AuditInfo.builder()
+              .withCreator(policy.auditInfo().creator())
+              .withCreateTime(policy.auditInfo().createTime())
+              .withLastModifier("audit-writer")
+              .withLastModifiedTime(Instant.now())
+              .build();
+      PolicyMetaService.getInstance()
+          .updatePolicy(
+              policy.nameIdentifier(),
+              (PolicyEntity oldPolicy) ->
+                  copyPolicy(oldPolicy, oldPolicy.comment(), concurrentAudit));
+      continueVersionedUpdate.countDown();
+
+      ExecutionException exception =
+          assertThrows(ExecutionException.class, () -> versionedUpdate.get(10, TimeUnit.SECONDS));
+      assertTrue(exception.getCause() instanceof IOException);
+    } finally {
+      continueVersionedUpdate.countDown();
+      executor.shutdownNow();
+    }
+
+    Map<Integer, Long> versions = listPolicyVersions(policy.id());
+    assertEquals(1, versions.size());
+    assertEquals(0L, versions.get(1));
+    PolicyEntity storedPolicy =
+        PolicyMetaService.getInstance().getPolicyByIdentifier(policy.nameIdentifier());
+    assertEquals("audit-writer", storedPolicy.auditInfo().lastModifier());
   }
 
   @TestTemplate
@@ -1076,6 +1144,28 @@ public class TestPolicyMetaService extends TestJDBCBackend {
       }
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  private PolicyEntity copyPolicy(PolicyEntity policy, String comment, AuditInfo auditInfo) {
+    return PolicyEntity.builder()
+        .withId(policy.id())
+        .withNamespace(policy.namespace())
+        .withName(policy.name())
+        .withPolicyType(policy.policyType())
+        .withComment(comment)
+        .withEnabled(policy.enabled())
+        .withContent(policy.content())
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private void awaitLatch(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(10, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting for concurrent operation", e);
     }
   }
 }

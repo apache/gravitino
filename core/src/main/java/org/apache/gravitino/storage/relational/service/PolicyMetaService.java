@@ -143,7 +143,7 @@ public class PolicyMetaService {
         updatedPolicyEntity.id(),
         oldPolicyEntity.id());
 
-    Integer updateResult;
+    int[] updateResult = new int[] {-1};
     try {
       boolean checkNeedUpdateVersion =
           POConverters.checkPolicyVersionNeedUpdate(
@@ -153,29 +153,35 @@ public class PolicyMetaService {
               oldPolicyPO, updatedPolicyEntity, checkNeedUpdateVersion);
       if (checkNeedUpdateVersion) {
         SessionUtils.doMultipleWithCommit(
+            () -> {
+              updateResult[0] =
+                  SessionUtils.getWithoutCommit(
+                      PolicyMetaMapper.class,
+                      mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
+              if (updateResult[0] == 0) {
+                throw new RuntimeException("Failed to update the entity: " + ident);
+              }
+            },
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyVersionMapper.class,
-                    mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO())),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyMetaMapper.class,
-                    mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO)));
-        // we set the updateResult to 1 to indicate that the update is successful
-        updateResult = 1;
+                    mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO())));
       } else {
-        updateResult =
+        updateResult[0] =
             SessionUtils.doWithCommitAndFetchResult(
                 PolicyMetaMapper.class,
                 mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
       }
     } catch (RuntimeException re) {
+      if (updateResult[0] == 0) {
+        throw new IOException("Failed to update the entity: " + ident, re);
+      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
+    if (updateResult[0] > 0) {
       return updatedPolicyEntity;
     } else {
       throw new IOException("Failed to update the entity: " + updatedPolicyEntity);

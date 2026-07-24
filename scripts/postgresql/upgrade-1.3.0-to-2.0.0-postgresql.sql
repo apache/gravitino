@@ -31,3 +31,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_geid_del ON group_meta (metalake_id, ex
 
 ALTER TABLE table_column_version_info
     ALTER COLUMN column_comment TYPE VARCHAR(4096);
+
+ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS current_version INT NOT NULL DEFAULT 1;
+ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS last_version INT NOT NULL DEFAULT 1;
+COMMENT ON COLUMN model_meta.current_version IS 'model current version';
+COMMENT ON COLUMN model_meta.last_version IS 'model last version';

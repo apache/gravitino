@@ -157,15 +157,9 @@ public class TagMetaBaseSQLProvider {
         + " current_version = #{newTagMeta.currentVersion},"
         + " last_version = #{newTagMeta.lastVersion},"
         + " deleted_at = #{newTagMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (current_version is monotonic on update).
         + " WHERE tag_id = #{oldTagMeta.tagId}"
-        + " AND metalake_id = #{oldTagMeta.metalakeId}"
-        + " AND tag_name = #{oldTagMeta.tagName}"
-        + " AND (tag_comment = #{oldTagMeta.comment}"
-        + "   OR (tag_comment IS NULL and #{oldTagMeta.comment} IS NULL))"
-        + " AND properties = #{oldTagMeta.properties}"
-        + " AND audit_info = #{oldTagMeta.auditInfo}"
         + " AND current_version = #{oldTagMeta.currentVersion}"
-        + " AND last_version = #{oldTagMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 

@@ -287,6 +287,9 @@ public class FilesetMetaBaseSQLProvider {
         + " current_version = #{newFilesetMeta.currentVersion},"
         + " last_version = #{newFilesetMeta.lastVersion},"
         + " deleted_at = #{newFilesetMeta.deletedAt}"
+        // Fileset uses CONDITIONAL versioning: current_version only bumps on a versioned-field
+        // change, so a version-only CAS would miss an audit-only concurrent update. Keep the
+        // full-row compare, which is the actual OCC guard here.
         + " WHERE fileset_id = #{oldFilesetMeta.filesetId}"
         + " AND fileset_name = #{oldFilesetMeta.filesetName}"
         + " AND metalake_id = #{oldFilesetMeta.metalakeId}"

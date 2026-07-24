@@ -35,6 +35,12 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -239,6 +245,57 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     assertEquals(2, versions.size());
     assertTrue(versions.containsKey(1));
     assertTrue(versions.containsKey(2));
+  }
+
+  @TestTemplate
+  public void testUpdateAfterConcurrentDropRollsBackVersionWrite() throws Exception {
+    String functionName = GravitinoITUtils.genRandomName("concurrent_function");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+
+    CountDownLatch snapshotLoaded = new CountDownLatch(1);
+    CountDownLatch continueUpdate = new CountDownLatch(1);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<FunctionEntity> staleUpdate =
+          executor.submit(
+              () ->
+                  FunctionMetaService.getInstance()
+                      .updateFunction(
+                          function.nameIdentifier(),
+                          (FunctionEntity oldFunction) -> {
+                            snapshotLoaded.countDown();
+                            awaitLatch(continueUpdate);
+                            return FunctionEntity.builder()
+                                .withId(oldFunction.id())
+                                .withName(oldFunction.name())
+                                .withNamespace(oldFunction.namespace())
+                                .withComment("stale update")
+                                .withFunctionType(oldFunction.functionType())
+                                .withDeterministic(oldFunction.deterministic())
+                                .withDefinitions(oldFunction.definitions())
+                                .withAuditInfo(oldFunction.auditInfo())
+                                .build();
+                          }));
+
+      assertTrue(snapshotLoaded.await(10, TimeUnit.SECONDS));
+      assertTrue(FunctionMetaService.getInstance().deleteFunction(function.nameIdentifier()));
+      continueUpdate.countDown();
+
+      ExecutionException exception =
+          assertThrows(ExecutionException.class, () -> staleUpdate.get(10, TimeUnit.SECONDS));
+      assertTrue(exception.getCause() instanceof IOException);
+    } finally {
+      continueUpdate.countDown();
+      executor.shutdownNow();
+    }
+
+    Map<Integer, Long> versions = listFunctionVersions(function.id());
+    assertEquals(1, versions.size());
+    assertVersionSoftDeleted(versions, 1);
   }
 
   @TestTemplate
@@ -638,5 +695,14 @@ public class TestFunctionMetaService extends TestJDBCBackend {
   private void assertVersionSoftDeleted(Map<Integer, Long> versionDeletedMap, int version) {
     assertTrue(versionDeletedMap.containsKey(version));
     assertTrue(versionDeletedMap.get(version) > 0L);
+  }
+
+  private void awaitLatch(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(10, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting for concurrent update", e);
+    }
   }
 }

@@ -203,6 +203,7 @@ public class RoleMetaService {
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkRole(identifier);
 
+    int[] updateResult = new int[] {-1};
     try {
       String metalake = NameIdentifierUtil.getMetalake(identifier);
       Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
@@ -236,12 +237,17 @@ public class RoleMetaService {
           toSecurableObjectPOs(insertObjects, oldRoleEntity, metalake);
 
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  RoleMetaMapper.class,
-                  mapper ->
-                      mapper.updateRoleMeta(
-                          POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO)),
+          () -> {
+            updateResult[0] =
+                SessionUtils.getWithoutCommit(
+                    RoleMetaMapper.class,
+                    mapper ->
+                        mapper.updateRoleMeta(
+                            POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO));
+            if (updateResult[0] == 0) {
+              throw new RuntimeException("Failed to update the entity: " + identifier);
+            }
+          },
           () -> {
             if (deleteSecurableObjectPOs.isEmpty()) {
               return;
@@ -266,6 +272,9 @@ public class RoleMetaService {
 
       return newRoleEntity;
     } catch (RuntimeException re) {
+      if (updateResult[0] == 0) {
+        throw new IOException("Failed to update the entity: " + identifier, re);
+      }
       ExceptionUtils.checkSQLException(re, Entity.EntityType.ROLE, identifier.toString());
       throw re;
     }

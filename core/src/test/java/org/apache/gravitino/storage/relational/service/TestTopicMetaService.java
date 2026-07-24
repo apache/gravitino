@@ -33,11 +33,17 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -46,12 +52,48 @@ public class TestTopicMetaService extends TestJDBCBackend {
   private final String metalakeName = "metalake_for_topic_test";
   private final String catalogName = "catalog_for_topic_test";
   private final String schemaName = "schema_for_topic_test";
+  private long schemaId;
 
   @BeforeEach
   public void prepare() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
-    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    SchemaEntity schema = createAndInsertSchema(metalakeName, catalogName, schemaName);
+    schemaId = schema.id();
+  }
+
+  @TestTemplate
+  public void testUpdateTopicMetaIsVersionCas() throws IOException {
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName),
+            "cas_topic",
+            AUDIT_INFO);
+    backend.insert(topic, false);
+
+    TopicEntity updated =
+        createTopicEntity(
+            topic.id(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName),
+            "cas_topic",
+            AUDIT_INFO);
+
+    try (SqlSession session =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      TopicMetaMapper mapper = session.getMapper(TopicMetaMapper.class);
+      TopicPO oldPO = mapper.selectTopicMetaBySchemaIdAndName(schemaId, "cas_topic");
+      Assertions.assertEquals(1L, oldPO.getCurrentVersion());
+
+      // A write against the current version succeeds and advances the version (1 -> 2).
+      TopicPO newPO = POConverters.updateTopicPOWithVersion(oldPO, updated);
+      Assertions.assertEquals(2L, newPO.getCurrentVersion());
+      Assertions.assertEquals(1, mapper.updateTopicMeta(newPO, oldPO));
+
+      // A second write reusing the now-stale snapshot (version 1) matches 0 rows: version CAS lost.
+      TopicPO staleNewPO = POConverters.updateTopicPOWithVersion(oldPO, updated);
+      Assertions.assertEquals(0, mapper.updateTopicMeta(staleNewPO, oldPO));
+    }
   }
 
   @TestTemplate

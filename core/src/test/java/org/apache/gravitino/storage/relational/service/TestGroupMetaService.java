@@ -35,6 +35,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -752,6 +758,84 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testConcurrentUpdateDoesNotChangeRolesOnConflict() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            catalogName);
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            AUDIT_INFO,
+            catalogName);
+    RoleMetaService.getInstance().insertRole(role1, false);
+    RoleMetaService.getInstance().insertRole(role2, false);
+
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "concurrent-group",
+            AUDIT_INFO,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    GroupMetaService.getInstance().insertGroup(group, false);
+
+    CountDownLatch snapshotLoaded = new CountDownLatch(1);
+    CountDownLatch continueUpdate = new CountDownLatch(1);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<GroupEntity> staleUpdate =
+          executor.submit(
+              () ->
+                  GroupMetaService.getInstance()
+                      .updateGroup(
+                          group.nameIdentifier(),
+                          (GroupEntity oldGroup) -> {
+                            snapshotLoaded.countDown();
+                            awaitLatch(continueUpdate);
+                            List<String> roleNames = Lists.newArrayList(oldGroup.roleNames());
+                            List<Long> roleIds = Lists.newArrayList(oldGroup.roleIds());
+                            roleNames.add(role2.name());
+                            roleIds.add(role2.id());
+                            return GroupEntity.builder()
+                                .withId(oldGroup.id())
+                                .withName(oldGroup.name())
+                                .withNamespace(oldGroup.namespace())
+                                .withExternalId(oldGroup.externalId())
+                                .withRoleNames(roleNames)
+                                .withRoleIds(roleIds)
+                                .withAuditInfo(oldGroup.auditInfo())
+                                .build();
+                          }));
+
+      assertTrue(snapshotLoaded.await(10, TimeUnit.SECONDS));
+      advanceGroupVersion(group.id());
+      continueUpdate.countDown();
+
+      ExecutionException exception =
+          Assertions.assertThrows(
+              ExecutionException.class, () -> staleUpdate.get(10, TimeUnit.SECONDS));
+      assertTrue(exception.getCause() instanceof IOException);
+    } finally {
+      continueUpdate.countDown();
+      executor.shutdownNow();
+    }
+
+    GroupEntity storedGroup =
+        GroupMetaService.getInstance().getGroupByIdentifier(group.nameIdentifier());
+    assertEquals(Sets.newHashSet(role1.id()), Sets.newHashSet(storedGroup.roleIds()));
+  }
+
+  @TestTemplate
   void testDeleteMetalake() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
@@ -1133,5 +1217,29 @@ class TestGroupMetaService extends TestJDBCBackend {
         .withRoleIds(null)
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  private void advanceGroupVersion(long groupId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE group_meta SET current_version = current_version + 1 WHERE group_id = "
+                  + groupId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance group version failed", e);
+    }
+  }
+
+  private void awaitLatch(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(10, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting for concurrent group update", e);
+    }
   }
 }
