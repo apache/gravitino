@@ -53,8 +53,21 @@ public class TestDataSourceUrlValidation {
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 
+<<<<<<< HEAD
     Assertions.assertThrows(
         GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+=======
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    // createDataSource re-wraps the validation failure, so assert on the cause to prove the
+    // security check fired (not some unrelated pool/driver error). The reported name is the
+    // canonical (lower-case) entry from the unsafe-parameter list.
+    Assertions.assertNotNull(gre.getCause());
+    Assertions.assertEquals(
+        "Unsafe MySQL parameter 'allowloadlocalinfile' detected in JDBC configuration",
+        gre.getCause().getMessage());
+>>>>>>> bc2b09b7a ([#12024] improvement(common): harden JDBC unsafe-parameter detection against connectionProperties smuggling (#12025))
   }
 
   @Test
@@ -67,8 +80,18 @@ public class TestDataSourceUrlValidation {
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 
+<<<<<<< HEAD
     Assertions.assertThrows(
         GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+=======
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertNotNull(gre.getCause());
+    Assertions.assertEquals(
+        "Unsafe PostgreSQL parameter 'socketFactory' detected in JDBC configuration",
+        gre.getCause().getMessage());
+>>>>>>> bc2b09b7a ([#12024] improvement(common): harden JDBC unsafe-parameter detection against connectionProperties smuggling (#12025))
   }
 
   @Test
@@ -81,8 +104,42 @@ public class TestDataSourceUrlValidation {
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 
+<<<<<<< HEAD
     Assertions.assertThrows(
         GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+=======
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertNotNull(gre.getCause());
+    Assertions.assertEquals(
+        "Unsafe MySQL parameter 'allowloadlocalinfile' detected in JDBC configuration",
+        gre.getCause().getMessage());
+  }
+
+  @Test
+  public void testRejectMysqlUnsafeParamInConnectionProperties() {
+    // DBCP2 forwards the "connectionProperties" value straight to the JDBC driver, so an unsafe
+    // MySQL parameter smuggled here must still be rejected. (In the catalog path a user reaches
+    // this key via the "gravitino.bypass." prefix, which is stripped before the config map is
+    // handed to the validator.)
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put("connectionProperties", "autoDeserialize=true");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    // createDataSource re-wraps the validation failure, so assert on the cause to prove the
+    // security check fired (not some unrelated pool/driver error).
+    Assertions.assertNotNull(gre.getCause());
+    Assertions.assertEquals(
+        "Unsafe MySQL parameter 'autoDeserialize' detected in JDBC configuration",
+        gre.getCause().getMessage());
+>>>>>>> bc2b09b7a ([#12024] improvement(common): harden JDBC unsafe-parameter detection against connectionProperties smuggling (#12025))
   }
 
   @Test
