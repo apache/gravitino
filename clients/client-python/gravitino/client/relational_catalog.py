@@ -29,7 +29,13 @@ from gravitino.api.rel.table import Table
 from gravitino.api.rel.table_catalog import TableCatalog
 from gravitino.api.rel.view import View
 from gravitino.api.rel.view_catalog import ViewCatalog
-from gravitino.api.rel.view_change import ViewChange
+from gravitino.api.rel.view_change import (
+    RemoveProperty,
+    RenameView,
+    ReplaceView,
+    SetProperty,
+    ViewChange,
+)
 from gravitino.client.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_view import GenericView
 from gravitino.client.relational_table import RelationalTable
@@ -38,12 +44,17 @@ from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.requests.table_create_request import TableCreateRequest
 from gravitino.dto.requests.table_updates_request import TableUpdatesRequest
 from gravitino.dto.requests.view_create_request import ViewCreateRequest
+from gravitino.dto.requests.view_update_request import (
+    ViewUpdateRequest,
+    ViewUpdateRequestBase,
+)
+from gravitino.dto.requests.view_updates_request import ViewUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.table_response import TableResponse
 from gravitino.dto.responses.view_response import ViewResponse
 from gravitino.dto.util.dto_converters import DTOConverters
-from gravitino.exceptions.base import UnsupportedOperationException
+from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.view_error_handler import VIEW_ERROR_HANDLER
 from gravitino.name_identifier import NameIdentifier
@@ -347,10 +358,30 @@ class RelationalCatalog(
         return drop_resp.dropped()
 
     def list_views(self, namespace: Namespace) -> list[NameIdentifier]:
-        raise UnsupportedOperationException("Listing views is not supported")
+        self._check_view_namespace(namespace)
+        full_namespace = self._get_entity_full_namespace(namespace)
+        resp = self.rest_client.get(
+            self._format_view_request_path(full_namespace),
+            error_handler=VIEW_ERROR_HANDLER,
+        )
+        entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
+        entity_list_resp.validate()
+        return [
+            NameIdentifier.of(ident.namespace().level(2), ident.name())
+            for ident in entity_list_resp.identifiers()
+        ]
 
     def load_view(self, identifier: NameIdentifier) -> View:
-        raise UnsupportedOperationException("Loading views is not supported")
+        self._check_view_name_identifier(identifier)
+        full_namespace = self._get_entity_full_namespace(identifier.namespace())
+        resp = self.rest_client.get(
+            f"{self._format_view_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}",
+            error_handler=VIEW_ERROR_HANDLER,
+        )
+        view_resp = ViewResponse.from_json(resp.body, infer_missing=True)
+        view_resp.validate()
+        return GenericView(view_resp.view())
 
     def create_view(
         self,
@@ -384,7 +415,21 @@ class RelationalCatalog(
         return GenericView(view_resp.view())
 
     def alter_view(self, identifier: NameIdentifier, *changes: ViewChange) -> View:
-        raise UnsupportedOperationException("View alteration is not supported")
+        self._check_view_name_identifier(identifier)
+        updates_request = ViewUpdatesRequest(
+            _updates=[self._to_view_update_request(change) for change in changes]
+        )
+        updates_request.validate()
+        full_namespace = self._get_entity_full_namespace(identifier.namespace())
+        resp = self.rest_client.put(
+            f"{self._format_view_request_path(full_namespace)}"
+            f"/{encode_string(identifier.name())}",
+            json=updates_request,
+            error_handler=VIEW_ERROR_HANDLER,
+        )
+        view_resp = ViewResponse.from_json(resp.body, infer_missing=True)
+        view_resp.validate()
+        return GenericView(view_resp.view())
 
     def drop_view(self, identifier: NameIdentifier) -> bool:
         self._check_view_name_identifier(identifier)
@@ -397,3 +442,31 @@ class RelationalCatalog(
         drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
         drop_resp.validate()
         return drop_resp.dropped()
+
+    @staticmethod
+    def _to_view_update_request(change: ViewChange) -> ViewUpdateRequestBase:
+        if isinstance(change, RenameView):
+            return ViewUpdateRequest.RenameViewRequest(_new_name=change.new_name())
+
+        if isinstance(change, SetProperty):
+            return ViewUpdateRequest.SetViewPropertyRequest(
+                _property=change.property(), _value=change.value()
+            )
+
+        if isinstance(change, RemoveProperty):
+            return ViewUpdateRequest.RemoveViewPropertyRequest(
+                _property=change.property()
+            )
+
+        if isinstance(change, ReplaceView):
+            return ViewUpdateRequest.ReplaceViewRequest(
+                _columns=DTOConverters.to_dtos(change.columns()),
+                _representations=DTOConverters.to_dtos(change.representations()),
+                _default_catalog=change.default_catalog(),
+                _default_schema=change.default_schema(),
+                _comment=change.comment(),
+            )
+
+        raise IllegalArgumentException(
+            f"Unknown change type: {change.__class__.__name__}"
+        )
