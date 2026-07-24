@@ -30,11 +30,13 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Per-HTTP-request scratchpad shared by {@link GravitinoAuthorizer} calls. A fresh instance is
@@ -86,10 +88,18 @@ public class AuthorizationRequestContext {
   private volatile String originalAuthorizationExpression;
 
   /**
-   * The roles the caller has declared active for this request (role assumption). Defaults to {@link
-   * ActiveRoles#all()}, which evaluates every role the caller holds (no narrowing).
+   * The roles the caller has declared active for this request (role assumption). Read from the
+   * current {@link UserPrincipal}; defaults to {@link ActiveRoles#all()} (no narrowing) when the
+   * caller declared none.
    */
-  private volatile ActiveRoles activeRoles = ActiveRoles.all();
+  private volatile ActiveRoles activeRoles = currentPrincipalActiveRoles();
+
+  private static ActiveRoles currentPrincipalActiveRoles() {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    return principal instanceof UserPrincipal
+        ? ((UserPrincipal) principal).getActiveRoles()
+        : ActiveRoles.all();
+  }
 
   /**
    * check allow

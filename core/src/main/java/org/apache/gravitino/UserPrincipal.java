@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.gravitino.auth.ActiveRoles;
 
 /**
  * A simple implementation of Principal that holds a username, optional group membership, and
@@ -38,6 +39,7 @@ public class UserPrincipal implements Principal {
   private final String username;
   private final List<UserGroup> groups;
   @Nullable private final String accessToken;
+  private final ActiveRoles activeRoles;
 
   /**
    * Constructs a UserPrincipal with the given username.
@@ -80,6 +82,14 @@ public class UserPrincipal implements Principal {
    */
   public UserPrincipal(
       final String username, final List<UserGroup> groups, @Nullable final String accessToken) {
+    this(username, groups, accessToken, ActiveRoles.all());
+  }
+
+  private UserPrincipal(
+      final String username,
+      final List<UserGroup> groups,
+      @Nullable final String accessToken,
+      final ActiveRoles activeRoles) {
     Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
     this.username = username;
     this.groups =
@@ -87,6 +97,7 @@ public class UserPrincipal implements Principal {
             ? Collections.unmodifiableList(new ArrayList<>(groups))
             : Collections.emptyList();
     this.accessToken = accessToken;
+    this.activeRoles = Objects.requireNonNull(activeRoles, "activeRoles must not be null");
   }
 
   /**
@@ -111,6 +122,27 @@ public class UserPrincipal implements Principal {
    */
   public List<UserGroup> getGroups() {
     return groups;
+  }
+
+  /**
+   * Returns the roles the caller declared active for this request (role assumption); {@link
+   * ActiveRoles#all()} when none was declared.
+   *
+   * @return the active-role declaration
+   */
+  public ActiveRoles getActiveRoles() {
+    return activeRoles;
+  }
+
+  /**
+   * Returns a copy of this principal carrying the given active-role declaration, keeping the same
+   * identity.
+   *
+   * @param activeRoles the active-role declaration to attach
+   * @return a new principal with the same identity and the given active roles
+   */
+  public UserPrincipal withActiveRoles(final ActiveRoles activeRoles) {
+    return new UserPrincipal(username, groups, accessToken, activeRoles);
   }
 
   @Override
