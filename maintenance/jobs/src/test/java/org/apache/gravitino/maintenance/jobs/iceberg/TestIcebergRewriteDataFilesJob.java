@@ -191,10 +191,10 @@ public class TestIcebergRewriteDataFilesJob {
     String[] args = {"--catalog", "iceberg_prod", "--table"};
     Map<String, String> result = IcebergRewriteDataFilesJob.parseArguments(args);
 
-    // Only catalog should be parsed, table has no value
-    assertEquals(1, result.size());
+    // catalog has a value, table is a flag at end (treated as boolean)
+    assertEquals(2, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
-    assertFalse(result.containsKey("table"));
+    assertEquals("true", result.get("table"));
   }
 
   @Test
@@ -397,7 +397,7 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_prod", "db.sample", null, null, null, null);
 
-    assertEquals("CALL iceberg_prod.system.rewrite_data_files(table => 'db.sample')", sql);
+    assertEquals("CALL `iceberg_prod`.system.rewrite_data_files(table => 'db.sample')", sql);
   }
 
   @Test
@@ -407,7 +407,7 @@ public class TestIcebergRewriteDataFilesJob {
             "iceberg_prod", "db.sample", "binpack", null, null, null);
 
     assertEquals(
-        "CALL iceberg_prod.system.rewrite_data_files(table => 'db.sample', strategy => 'binpack')",
+        "CALL `iceberg_prod`.system.rewrite_data_files(table => 'db.sample', strategy => 'binpack')",
         sql);
   }
 
@@ -418,7 +418,7 @@ public class TestIcebergRewriteDataFilesJob {
             "iceberg_prod", "db.sample", "sort", "id DESC NULLS LAST", null, null);
 
     assertEquals(
-        "CALL iceberg_prod.system.rewrite_data_files(table => 'db.sample', strategy => 'sort', sort_order => 'id DESC NULLS LAST')",
+        "CALL `iceberg_prod`.system.rewrite_data_files(table => 'db.sample', strategy => 'sort', sort_order => 'id DESC NULLS LAST')",
         sql);
   }
 
@@ -429,7 +429,7 @@ public class TestIcebergRewriteDataFilesJob {
             "iceberg_prod", "db.sample", null, null, "year = 2024", null);
 
     assertEquals(
-        "CALL iceberg_prod.system.rewrite_data_files(table => 'db.sample', where => 'year = 2024')",
+        "CALL `iceberg_prod`.system.rewrite_data_files(table => 'db.sample', where => 'year = 2024')",
         sql);
   }
 
@@ -440,7 +440,8 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_prod", "db.sample", null, null, null, optionsJson);
 
-    assertTrue(sql.startsWith("CALL iceberg_prod.system.rewrite_data_files(table => 'db.sample'"));
+    assertTrue(
+        sql.startsWith("CALL `iceberg_prod`.system.rewrite_data_files(table => 'db.sample'"));
     assertTrue(sql.contains("options => map("));
     assertTrue(sql.contains("'min-input-files', '2'"));
     assertTrue(sql.contains("'target-file-size-bytes', '536870912'"));
@@ -454,7 +455,7 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_prod", "db.sample", "sort", "id DESC NULLS LAST", "year = 2024", optionsJson);
 
-    assertTrue(sql.startsWith("CALL iceberg_prod.system.rewrite_data_files("));
+    assertTrue(sql.startsWith("CALL `iceberg_prod`.system.rewrite_data_files("));
     assertTrue(sql.contains("table => 'db.sample'"));
     assertTrue(sql.contains("strategy => 'sort'"));
     assertTrue(sql.contains("sort_order => 'id DESC NULLS LAST'"));
@@ -469,7 +470,7 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_prod", "db.sample", "", null, null, null);
 
-    assertEquals("CALL iceberg_prod.system.rewrite_data_files(table => 'db.sample')", sql);
+    assertEquals("CALL `iceberg_prod`.system.rewrite_data_files(table => 'db.sample')", sql);
   }
 
   @Test
@@ -478,7 +479,7 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "iceberg_prod", "db.sample", null, null, null, "{}");
 
-    assertEquals("CALL iceberg_prod.system.rewrite_data_files(table => 'db.sample')", sql);
+    assertEquals("CALL `iceberg_prod`.system.rewrite_data_files(table => 'db.sample')", sql);
   }
 
   @Test
@@ -488,7 +489,7 @@ public class TestIcebergRewriteDataFilesJob {
             "iceberg_prod", "db.sample", "sort", "zorder(c1,c2,c3)", null, null);
 
     assertEquals(
-        "CALL iceberg_prod.system.rewrite_data_files(table => 'db.sample', strategy => 'sort', sort_order => 'zorder(c1,c2,c3)')",
+        "CALL `iceberg_prod`.system.rewrite_data_files(table => 'db.sample', strategy => 'sort', sort_order => 'zorder(c1,c2,c3)')",
         sql);
   }
 
@@ -535,12 +536,12 @@ public class TestIcebergRewriteDataFilesJob {
 
   @Test
   public void testEscapeSqlIdentifier() {
-    // Test basic escaping of backticks
-    assertEquals("catalog``name", IcebergRewriteDataFilesJob.escapeSqlIdentifier("catalog`name"));
+    // Test basic escaping and quoting of backticks
+    assertEquals("`catalog``name`", IcebergRewriteDataFilesJob.escapeSqlIdentifier("catalog`name"));
 
-    // Test strings without backticks remain unchanged
+    // Test strings without backticks are still quoted
     assertEquals(
-        "normal_catalog", IcebergRewriteDataFilesJob.escapeSqlIdentifier("normal_catalog"));
+        "`normal_catalog`", IcebergRewriteDataFilesJob.escapeSqlIdentifier("normal_catalog"));
 
     // Test null
     assertEquals(null, IcebergRewriteDataFilesJob.escapeSqlIdentifier(null));
@@ -572,8 +573,8 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             maliciousCatalog, "db.table", null, null, null, null);
 
-    // Verify backticks are escaped
-    assertTrue(sql.contains("catalog``; DROP TABLE users; --"));
+    // Verify catalog identifier is quoted and backticks are escaped
+    assertTrue(sql.contains("`catalog``; DROP TABLE users; --`.system.rewrite_data_files"));
   }
 
   @Test
@@ -582,8 +583,8 @@ public class TestIcebergRewriteDataFilesJob {
         IcebergRewriteDataFilesJob.buildProcedureCall(
             "cat'alog", "db'.table", "sort'", "id' DESC", "year' = 2024", "{\"key'\":\"val'ue\"}");
 
-    // Catalog name uses backtick escaping (but no backticks here, so unchanged)
-    assertTrue(sql.contains("cat'alog"));
+    // Catalog name should be quoted as an identifier
+    assertTrue(sql.contains("`cat'alog`"));
     // All single quotes in string literals should be escaped
     assertTrue(sql.contains("db''.table"));
     assertTrue(sql.contains("sort''"));
