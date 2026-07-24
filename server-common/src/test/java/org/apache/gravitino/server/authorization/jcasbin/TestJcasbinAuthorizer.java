@@ -20,6 +20,7 @@ package org.apache.gravitino.server.authorization.jcasbin;
 import static org.apache.gravitino.authorization.Privilege.Name.SELECT_TABLE;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_SCHEMA;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -561,14 +562,13 @@ public class TestJcasbinAuthorizer {
     // re-primes userRoleCache before the next loadUserRoles call. This test covers
     // the defence-in-depth tier: if versionCheckAndLoadRoles is ever invoked with
     // a roleId whose version probe row is missing (e.g. cache window race, future
-    // code path bypassing the fat-JOIN), the fix must still clear that role's
-    // p-rows from both enforcers and evict its loadedRoles entry so that any
-    // residual user → deleted-role g-row grants nothing on subsequent enforce()s.
+    // code path bypassing the fat-JOIN), the fix must still evict that role's
+    // loadedRoles index entry so that any residual user → deleted-role g-row grants
+    // nothing on subsequent probes (an absent index resolves to no privilege).
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
 
-    // 1. Authorize once via the normal flow to populate loadedRoles + enforcer p-rows
-    //    for allowRole.
+    // 1. Authorize once via the normal flow to populate the loadedRoles index for allowRole.
     RoleEntity allowRole =
         mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
     long userVersion = nextUserVersion();
@@ -578,15 +578,10 @@ public class TestJcasbinAuthorizer {
         .thenReturn(ImmutableList.of(buildRolePO(ALLOW_ROLE_ID, allowRole.name())));
     assertTrue(doAuthorize(currentPrincipal));
 
-    // Sanity: loadedRoles now has an entry for ALLOW_ROLE_ID and the allowEnforcer
-    // contains a p-row whose subject (column 0) equals the role id.
+    // Sanity: loadedRoles now has an index entry for ALLOW_ROLE_ID.
     Assertions.assertTrue(
         getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
         "loadedRoles must be primed before the test");
-    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
-    Assertions.assertFalse(
-        allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
-        "allowEnforcer must hold p-rows for allowRole before the test");
 
     // 2. Simulate the bug-trigger: batchGetRoleUpdatedAt returns NO row for the role
     //    (i.e. the role row is gone from role_meta), even though something is still
@@ -600,10 +595,7 @@ public class TestJcasbinAuthorizer {
     invokeVersionCheckAndLoadRoles(
         jcasbinAuthorizer, METALAKE, ImmutableList.of(ALLOW_ROLE_ID), freshCtx);
 
-    // 3. The fix must have cleared the role's p-rows and evicted loadedRoles.
-    Assertions.assertTrue(
-        allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
-        "allowEnforcer p-rows for the deleted role must be cleared");
+    // 3. The fix must have evicted the deleted role's index entry.
     Assertions.assertFalse(
         getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
         "loadedRoles entry for the deleted role must be evicted");
@@ -1644,11 +1636,12 @@ public class TestJcasbinAuthorizer {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
     // Get the loadedRoles cache via reflection
-    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+    GravitinoCache<Long, CachedRolePolicies> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
 
     // Manually add a role to the cache
     Long testRoleId = 100L;
-    loadedRoles.put(testRoleId, System.currentTimeMillis());
+    loadedRoles.put(
+        testRoleId, new CachedRolePolicies(System.currentTimeMillis(), new HashMap<>()));
 
     // Verify it's in the cache
     assertTrue(loadedRoles.getIfPresent(testRoleId).isPresent());
@@ -1713,99 +1706,70 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testRoleCacheSynchronousRemovalListenerDeletesPolicy() throws Exception {
-    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
-
-    // Get the enforcers via reflection
+  public void testRoleCacheInvalidationPreservesUserRoleBindings() throws Exception {
     Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
-    Enforcer denyEnforcer = getDenyEnforcer(jcasbinAuthorizer);
+    GravitinoCache<Long, CachedRolePolicies> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
 
-    // Get the loadedRoles cache
-    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
-
-    // Add a role and its policy to the enforcer
     Long testRoleId = 300L;
     String roleIdStr = String.valueOf(testRoleId);
     String userIdStr = String.valueOf(USER_ID);
-
-    // Add a policy and a user-role binding for this role.
     allowEnforcer.addRoleForUser(userIdStr, roleIdStr);
-    denyEnforcer.addRoleForUser(userIdStr, roleIdStr);
-    allowEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
-    denyEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
+    loadedRoles.put(
+        testRoleId, new CachedRolePolicies(System.currentTimeMillis(), new HashMap<>()));
 
-    // Add role to cache
-    loadedRoles.put(testRoleId, System.currentTimeMillis());
-
-    // Verify role exists in enforcer (has policy and grouping).
-    assertTrue(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
-    assertTrue(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
-    assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
-    assertTrue(denyEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
-
-    // Invalidate the cache entry - this triggers the synchronous removal listener
-    // (using executor(Runnable::run) to ensure synchronous execution)
     loadedRoles.invalidate(testRoleId);
 
-    // Verify the role's policies have been deleted from enforcers (synchronous, no need to wait),
-    // but user-role bindings are preserved because loadedRoles owns role policies only.
-    assertFalse(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
-    assertFalse(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
+    assertFalse(loadedRoles.getIfPresent(testRoleId).isPresent());
     assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
-    assertTrue(denyEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
-  }
-
-  @Test
-  public void testRoleCacheReplacementDoesNotDeletePolicy() throws Exception {
-    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
-    Enforcer denyEnforcer = getDenyEnforcer(jcasbinAuthorizer);
-    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
-
-    Long testRoleId = 301L;
-    String roleIdStr = String.valueOf(testRoleId);
-    loadedRoles.put(testRoleId, 1L);
-
-    allowEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
-    denyEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
-
-    loadedRoles.put(testRoleId, 2L);
-
-    assertTrue(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
-    assertTrue(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
-  }
-
-  @Test
-  public void testClearRolePoliciesPreservesUserRoleBindings() throws Exception {
-    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
-    Enforcer denyEnforcer = getDenyEnforcer(jcasbinAuthorizer);
-
-    Long testRoleId = 302L;
-    String roleIdStr = String.valueOf(testRoleId);
-    String userIdStr = String.valueOf(USER_ID);
-    allowEnforcer.addRoleForUser(userIdStr, roleIdStr);
-    denyEnforcer.addRoleForUser(userIdStr, roleIdStr);
-    allowEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
-    denyEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
-
-    Method clearRolePolicies =
-        JcasbinAuthorizer.class.getDeclaredMethod("clearRolePolicies", long.class);
-    clearRolePolicies.setAccessible(true);
-    clearRolePolicies.invoke(jcasbinAuthorizer, testRoleId);
-
-    assertFalse(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
-    assertFalse(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
-    assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
-    assertTrue(denyEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
   }
 
   @Test
   public void testCacheInitialization() throws Exception {
     // Verify that caches are initialized
-    GravitinoCache<Long, Long> loadedRolesCache = getLoadedRolesCache(jcasbinAuthorizer);
+    GravitinoCache<Long, CachedRolePolicies> loadedRolesCache =
+        getLoadedRolesCache(jcasbinAuthorizer);
     GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
 
     assertNotNull(loadedRolesCache, "loadedRoles cache should be initialized");
     assertNotNull(ownerRelCache, "ownerRel cache should be initialized");
+  }
+
+  @Test
+  public void testPrivilegeProbesUseIndexNotEnforcerPolicies() throws Exception {
+    // Guards the O(roles_per_user) optimization: privilege probes resolve against the per-role
+    // index, and the enforcer holds only the role-membership (g) graph, never privilege (p)
+    // policies. If a future change reintroduces enforce/addPolicy on the hot path, the empty-policy
+    // assertion below fails.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(ALLOW_ROLE_ID, "allowRole")));
+
+    assertTrue(doAuthorize(currentPrincipal));
+
+    // The per-role index carries the granted privilege ...
+    CachedRolePolicies cached =
+        getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).orElse(null);
+    assertNotNull(cached, "role index must be cached after authorize");
+    assertEquals(
+        Effect.ALLOW,
+        cached.getIndex().get(new PolicyKey("CATALOG", CATALOG_ID, USE_CATALOG.name())),
+        "index must resolve the granted allow");
+
+    // ... while the enforcer holds only membership (g) rows, never privilege (p) policies.
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    assertTrue(
+        allowEnforcer.getPolicy().isEmpty(),
+        "enforcer must not store privilege (p) policies; probes use the index");
+    assertTrue(
+        allowEnforcer
+            .getRolesForUser(String.valueOf(USER_ID))
+            .contains(String.valueOf(ALLOW_ROLE_ID)),
+        "enforcer must still hold the user -> role grouping row");
   }
 
   /** Tests {@link JcasbinAuthorizer#hasMetadataPrivilegePermission} hierarchy walk */
@@ -2221,11 +2185,11 @@ public class TestJcasbinAuthorizer {
   }
 
   @SuppressWarnings("unchecked")
-  private static GravitinoCache<Long, Long> getLoadedRolesCache(JcasbinAuthorizer authorizer)
-      throws Exception {
+  private static GravitinoCache<Long, CachedRolePolicies> getLoadedRolesCache(
+      JcasbinAuthorizer authorizer) throws Exception {
     Field field = JcasbinAuthorizer.class.getDeclaredField("loadedRoles");
     field.setAccessible(true);
-    return (GravitinoCache<Long, Long>) field.get(authorizer);
+    return (GravitinoCache<Long, CachedRolePolicies>) field.get(authorizer);
   }
 
   @SuppressWarnings("unchecked")
@@ -2290,12 +2254,6 @@ public class TestJcasbinAuthorizer {
 
   private static Enforcer getAllowEnforcer(JcasbinAuthorizer authorizer) throws Exception {
     Field field = JcasbinAuthorizer.class.getDeclaredField("allowEnforcer");
-    field.setAccessible(true);
-    return (Enforcer) field.get(authorizer);
-  }
-
-  private static Enforcer getDenyEnforcer(JcasbinAuthorizer authorizer) throws Exception {
-    Field field = JcasbinAuthorizer.class.getDeclaredField("denyEnforcer");
     field.setAccessible(true);
     return (Enforcer) field.get(authorizer);
   }

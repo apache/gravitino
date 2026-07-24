@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,6 +37,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
@@ -108,34 +110,27 @@ import org.slf4j.LoggerFactory;
  * contracts they rely on (most notably that {@code entity_change_log.full_name} is the pre-mutation
  * name).
  *
- * <p>JCasbin enforcer state ({@link #allowEnforcer}/{@link #denyEnforcer}) is kept in sync with
- * {@link #loadedRoles} via the removal listener inside {@link JcasbinLoadedRolesCache} — evicting a
- * role id also deletes that role's policies from both enforcers.
+ * <p>Privilege probes do not go through {@code enforcer.enforce}, which linearly scans every policy
+ * line loaded in the enforcer (cost {@code O(total_policies)} per probe). Instead {@link
+ * #loadedRoles} caches a per-role {@link PolicyKey}→{@link Effect} index and probes resolve against
+ * only the roles the caller holds ({@code O(roles_per_user)} hash lookups). The {@link
+ * #allowEnforcer} is kept solely for the user/group→role grouping graph ({@code g} rows); it no
+ * longer stores privilege ({@code p}) policies.
  */
 public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizer.class);
 
   /**
-   * Field index of {@code sub} (the role/user/group id) in a jcasbin {@code p} policy row. See the
-   * {@code policy_definition} in {@code jcasbin_model.conf}: {@code p = sub, metadataType,
-   * metadataId, act, eft}.
+   * Jcasbin enforcer that holds the user/group→role grouping graph ({@code g} rows). Privilege
+   * ({@code p}) policies are no longer stored here; they live in the {@link #loadedRoles} index.
    */
-  private static final int POLICY_SUBJECT_FIELD_INDEX = 0;
-
-  /** Field index of {@code act} (the privilege) in a jcasbin {@code p} policy row. */
-  private static final int POLICY_ACTION_FIELD_INDEX = 3;
-
-  /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer allowEnforcer;
 
-  /** Jcasbin deny enforcer is used for metadata authorization. */
-  private Enforcer denyEnforcer;
-
-  /** allow internal authorizer */
+  /** Resolves an allow decision; narrows to the request's active roles for role assumption. */
   private InternalAuthorizer allowInternalAuthorizer;
 
-  /** deny internal authorizer */
+  /** Resolves a deny decision over every role the caller holds. */
   private InternalAuthorizer denyInternalAuthorizer;
 
   // ---- Version-validated caches (strong consistency) ----
@@ -153,9 +148,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private GravitinoCache<String, CachedGroupRoleRels> groupRoleCache;
 
   /**
-   * loadedRoles: roleId -> updated_at. If the DB updated_at is newer, evict and reload policies.
+   * loadedRoles: roleId -> {@link CachedRolePolicies} (version sentinel + per-role privilege
+   * index). If the DB updated_at is newer, the index is rebuilt from the role entity.
    */
-  private GravitinoCache<Long, Long> loadedRoles;
+  private GravitinoCache<Long, CachedRolePolicies> loadedRoles;
 
   // ---- Eventual consistency caches (poller-driven) ----
 
@@ -192,15 +188,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     long ttlMs = TimeUnit.SECONDS.toMillis(cacheExpirationSecs);
 
-    // Initialize enforcers before caches that reference them in removal listeners
+    // Single enforcer for the role-membership graph (g rows). Privilege probes resolve against the
+    // per-role index in loadedRoles, not enforce, so no second (deny) enforcer is needed.
     allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer, true);
-    denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer, false);
+    // Allow narrows to active roles (role assumption); deny always spans every role the caller
+    // holds. Both share the version-validated per-role index.
+    allowInternalAuthorizer = new InternalAuthorizer(Effect.ALLOW, true);
+    denyInternalAuthorizer = new InternalAuthorizer(Effect.DENY, false);
 
-    // loadedRoles: roleId -> updated_at.
-    // When evicted, we must clean up the corresponding JCasbin policies.
-    loadedRoles = new JcasbinLoadedRolesCache(ttlMs, roleCacheSize, this::clearRolePolicies);
+    // loadedRoles: roleId -> (role_meta.updated_at, per-role privilege index). Access-based TTL so
+    // hot roles stay indexed; correctness comes from per-request version validation, not the TTL.
+    loadedRoles = new JcasbinLoadedRolesCache(ttlMs, roleCacheSize);
 
     userRoleCache = new CaffeineGravitinoCache<>(ttlMs, roleCacheSize);
     groupRoleCache = new CaffeineGravitinoCache<>(ttlMs, roleCacheSize);
@@ -388,30 +386,26 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
     UserUpdatedAt userInfo = userInfoOpt.get();
     long userId = userInfo.getUserId();
-    // Bind the user's (direct + group-inherited) roles into the enforcers so the in-memory scan
-    // below sees every policy the user can carry. Idempotent within a request.
+    // Bind the user's (direct + group-inherited) roles and load their indexes so the scan below
+    // sees every policy the user can carry. Idempotent within a request.
     loadRolePrivilege(metalake, principal.getName(), userId, userInfo, requestContext);
 
     Set<String> privilegeNames = privileges.stream().map(Enum::name).collect(Collectors.toSet());
     String userIdStr = String.valueOf(userId);
     // This is an existence query, not a per-object check: it answers "does any deny on these
-    // privileges exist for the user's roles, at any scope?" The standard enforce path needs a
-    // concrete metadataId, so reusing it would mean iterating every listed object and defeat the
-    // short-circuit. Filtering the deny enforcer's policies by role keeps the scan bounded by the
-    // user's role/policy count, never by the number of listed objects. The match is intentionally
-    // scope-agnostic (no metadataType filter): a parent-scope deny hides the whole subtree and an
-    // object-scope deny hides one object, and both must disable the short-circuit.
-    for (String roleId : denyEnforcer.getRolesForUser(userIdStr)) {
-      // getFilteredNamedPolicy returns every "p" row (p = sub, metadataType, metadataId, act, eft)
-      // whose field at POLICY_SUBJECT_FIELD_INDEX (sub) equals roleId, i.e. all rules carried by
-      // this role. denyEnforcer is a dedicated enforcer that is only ever loaded with privileges
-      // whose condition is DENY (see loadPolicyByRoleEntity), so every row here represents a deny
-      // regardless of its stored eft string. Each returned row is the list of those five fields,
-      // so we read field POLICY_ACTION_FIELD_INDEX (act) to compare the denied privilege.
-      for (List<String> policy :
-          denyEnforcer.getFilteredNamedPolicy("p", POLICY_SUBJECT_FIELD_INDEX, roleId)) {
-        if (policy.size() > POLICY_ACTION_FIELD_INDEX
-            && privilegeNames.contains(policy.get(POLICY_ACTION_FIELD_INDEX))) {
+    // privileges exist for the user's roles, at any scope?" Scanning each role's index keeps the
+    // cost bounded by the user's role/policy count, never by the number of listed objects. The
+    // match is intentionally scope-agnostic (no metadataType/metadataId filter): a parent-scope
+    // deny hides the whole subtree and an object-scope deny hides one object, and both must
+    // disable the short-circuit.
+    for (String roleId : allowEnforcer.getRolesForUser(userIdStr)) {
+      CachedRolePolicies cached = loadedRoles.getIfPresent(Long.parseLong(roleId)).orElse(null);
+      if (cached == null) {
+        continue;
+      }
+      for (Map.Entry<PolicyKey, Effect> entry : cached.getIndex().entrySet()) {
+        if (entry.getValue() == Effect.DENY
+            && privilegeNames.contains(entry.getKey().privilege())) {
           return true;
         }
       }
@@ -696,17 +690,21 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private class InternalAuthorizer {
 
-    Enforcer enforcer;
+    /**
+     * The effect this authorizer reports as {@code true}: {@link Effect#ALLOW} or {@link
+     * Effect#DENY}.
+     */
+    private final Effect targetEffect;
 
     /**
-     * When {@code true}, evaluation considers only the request's active roles instead of every role
-     * the caller holds. Enabled for the allow authorizer so role assumption can drop allows; the
-     * deny authorizer leaves it {@code false} so denies always apply. See {@link #enforceNarrowed}.
+     * When {@code true}, the allow evaluation considers only the request's active roles instead of
+     * every role the caller holds. Enabled for the allow authorizer so role assumption can drop
+     * allows; the deny authorizer leaves it {@code false} so denies always apply.
      */
     private final boolean narrowByActiveRoles;
 
-    public InternalAuthorizer(Enforcer enforcer, boolean narrowByActiveRoles) {
-      this.enforcer = enforcer;
+    public InternalAuthorizer(Effect targetEffect, boolean narrowByActiveRoles) {
+      this.targetEffect = targetEffect;
       this.narrowByActiveRoles = narrowByActiveRoles;
     }
 
@@ -809,9 +807,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         Long metadataId,
         String privilege,
         AuthorizationRequestContext requestContext) {
-      // Step 4: JCasbin enforce (pure in-memory) — except OWNER, which is resolved via the
-      // owner cache rather than g-rows.
+      // OWNER is resolved via the owner cache rather than the role index. Ownership grants ALLOW
+      // and never constitutes a DENY, so the deny authorizer always reports false for OWNER.
       if (AuthConstants.OWNER.equals(privilege)) {
+        if (targetEffect != Effect.ALLOW) {
+          return false;
+        }
         // Cold-path: resolveOwnerId loads from DB when neither the per-request nor the shared
         // Caffeine cache has the entry, ensuring the first OWNER check doesn't spuriously deny.
         Optional<OwnerInfo> owner =
@@ -820,49 +821,47 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             owner, PrincipalUtils.getCurrentPrincipal(), metalake, requestContext);
       }
 
-      String metadataType = String.valueOf(metadataObject.type());
-      String metadataIdStr = String.valueOf(metadataId);
-
-      // Role assumption: if the caller activated only a subset of their roles, check this allow
-      // against just those roles (enforceNarrowed). ALL or an absent header falls through to the
-      // normal check over every role the caller holds.
-      ActiveRoles activeRoles = requestContext.getActiveRoles();
-      if (narrowByActiveRoles && !activeRoles.isAll()) {
-        return enforceNarrowed(
-            userId, metadataType, metadataIdStr, privilege, activeRoles, requestContext);
-      }
-
-      return enforcer.enforce(String.valueOf(userId), metadataType, metadataIdStr, privilege);
+      // Step 4: index lookup (pure in-memory) instead of enforce, which would linearly scan every
+      // policy line loaded across all roles.
+      PolicyKey key = new PolicyKey(String.valueOf(metadataObject.type()), metadataId, privilege);
+      return resolveRoleEffect(userId, key, requestContext) == targetEffect;
     }
 
     /**
-     * Enforces one object/privilege against only the active roles the caller actually holds, so
-     * narrowing can never grant access the caller lacks. {@link ActiveRoles#none()} activates no
-     * role and denies every role-derived privilege.
+     * Resolves the net effect of one object/privilege probe against the caller's per-role index.
      *
-     * <p>Deny stays global: denyEnforcer is checked over the caller's full role union first, so a
-     * deny on any held role still applies even when that role is inactive.
+     * <p>DENY is global and wins: it is evaluated over every role the caller holds (inactive roles
+     * included) and short-circuits, mirroring the jcasbin {@code policy_effect} {@code some(allow)
+     * && !some(deny)}. ALLOW may be narrowed to the request's active roles for role assumption;
+     * {@link ActiveRoles#none()} activates no role and grants nothing. Returns {@code null} when no
+     * role rule matches.
      */
-    private boolean enforceNarrowed(
-        long userId,
-        String metadataType,
-        String metadataIdStr,
-        String privilege,
-        ActiveRoles activeRoles,
-        AuthorizationRequestContext requestContext) {
-      String userIdStr = String.valueOf(userId);
-      if (denyEnforcer.enforce(userIdStr, metadataType, metadataIdStr, privilege)) {
-        return false;
-      }
-      if (activeRoles.isNone()) {
-        return false;
-      }
-      for (String roleId : activeRoleIds(userId, activeRoles, requestContext)) {
-        if (enforcer.enforce(roleId, metadataType, metadataIdStr, privilege)) {
-          return true;
+    @Nullable
+    private Effect resolveRoleEffect(
+        long userId, PolicyKey key, AuthorizationRequestContext requestContext) {
+      List<String> allRoleIds = allowEnforcer.getRolesForUser(String.valueOf(userId));
+      for (String roleId : allRoleIds) {
+        if (indexEffect(roleId, key) == Effect.DENY) {
+          return Effect.DENY;
         }
       }
-      return false;
+
+      Collection<String> allowRoleIds;
+      ActiveRoles activeRoles = requestContext.getActiveRoles();
+      if (narrowByActiveRoles && !activeRoles.isAll()) {
+        if (activeRoles.isNone()) {
+          return null;
+        }
+        allowRoleIds = activeRoleIds(userId, activeRoles, requestContext);
+      } else {
+        allowRoleIds = allRoleIds;
+      }
+      for (String roleId : allowRoleIds) {
+        if (indexEffect(roleId, key) == Effect.ALLOW) {
+          return Effect.ALLOW;
+        }
+      }
+      return null;
     }
 
     /**
@@ -877,13 +876,23 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
       Set<String> activeNames = activeRoles.roleNames();
       Set<String> result = new HashSet<>();
-      for (String roleId : enforcer.getRolesForUser(String.valueOf(userId))) {
+      for (String roleId : allowEnforcer.getRolesForUser(String.valueOf(userId))) {
         RoleUpdatedAt roleInfo = roleVersions.get(Long.parseLong(roleId));
         if (roleInfo != null && activeNames.contains(roleInfo.getRoleName())) {
           result.add(roleId);
         }
       }
       return result;
+    }
+
+    /**
+     * Returns the effect the given role's index assigns to {@code key}, or {@code null} when the
+     * role has no matching rule or its index is not currently cached.
+     */
+    @Nullable
+    private Effect indexEffect(String roleIdStr, PolicyKey key) {
+      CachedRolePolicies cached = loadedRoles.getIfPresent(Long.parseLong(roleIdStr)).orElse(null);
+      return cached == null ? null : cached.getIndex().get(key);
     }
   }
 
@@ -1093,7 +1102,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           for (String currentRole : allowEnforcer.getRolesForUser(userIdStr)) {
             if (!desiredRoleIds.contains(currentRole)) {
               allowEnforcer.deleteRoleForUser(userIdStr, currentRole);
-              denyEnforcer.deleteRoleForUser(userIdStr, currentRole);
             }
           }
 
@@ -1226,7 +1234,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               RoleMetaMapper.class, m -> m.batchGetRoleUpdatedAt(missingRoleIds)));
     }
 
-    // Any roleId asked about but not returned has been deleted in the DB; clear its policies so
+    // Any roleId asked about but not returned has been deleted in the DB; drop its cached index so
     // a stale grouping row in the enforcer can't keep granting privileges before the next
     // userRoleCache reload prunes the g-row itself.
     Set<Long> existingRoleIds = new HashSet<>(roleVersions.size());
@@ -1235,15 +1243,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
     for (Long roleId : uniqueRoleIds) {
       if (!existingRoleIds.contains(roleId)) {
-        clearRolePolicies(roleId);
         loadedRoles.invalidate(roleId);
       }
     }
 
     List<RoleUpdatedAt> staleRoleVersions = new ArrayList<>();
     for (RoleUpdatedAt rv : roleVersions) {
-      Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(rv.getRoleId());
-      if (cachedUpdatedAt.isPresent() && cachedUpdatedAt.get() >= rv.getUpdatedAt()) {
+      Optional<CachedRolePolicies> cached = loadedRoles.getIfPresent(rv.getRoleId());
+      if (cached.isPresent() && cached.get().getUpdatedAt() >= rv.getUpdatedAt()) {
         continue;
       }
       staleRoleVersions.add(rv);
@@ -1297,28 +1304,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
       long roleId = rv.getRoleId();
       long dbUpdatedAt = rv.getUpdatedAt();
-      Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(roleId);
 
-      // Refresh only permission policies. deleteRole would also remove the current user's freshly
-      // bound grouping links.
-      if (cachedUpdatedAt.isPresent()) {
-        clearRolePolicies(roleId);
-      }
-      loadPolicyByRoleEntity(roleEntity, requestContext);
-      loadedRoles.put(roleId, dbUpdatedAt);
+      // Rebuild the role's privilege index from the freshly loaded entity. put() atomically
+      // replaces any previous index, so there is no stale-policy window and grouping links are
+      // untouched.
+      Map<PolicyKey, Effect> index = loadPolicyByRoleEntity(roleEntity, requestContext);
+      loadedRoles.put(roleId, new CachedRolePolicies(dbUpdatedAt, index));
     }
-  }
-
-  private void clearRolePolicies(long roleId) {
-    String roleIdStr = String.valueOf(roleId);
-    allowEnforcer.removeFilteredPolicy(0, roleIdStr);
-    denyEnforcer.removeFilteredPolicy(0, roleIdStr);
   }
 
   private void bindUserRoles(long userId, List<Long> roleIds) {
     for (Long roleId : roleIds) {
       allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-      denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
     }
   }
 
@@ -1326,10 +1323,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   //  Policy loading from role entity
   // ---------------------------------------------------------------------------
 
-  private void loadPolicyByRoleEntity(
+  /**
+   * Builds the per-role privilege index from a role entity's securable objects. Each {@code (type,
+   * metadataId, privilege)} maps to {@link Effect#ALLOW} or {@link Effect#DENY}, with DENY taking
+   * precedence over ALLOW within the role so the index agrees with the jcasbin {@code
+   * policy_effect}. Privilege names are normalized (legacy names replaced, upper-cased) exactly as
+   * the previous {@code addPolicy} path stored them.
+   */
+  private Map<PolicyKey, Effect> loadPolicyByRoleEntity(
       RoleEntity roleEntity, AuthorizationRequestContext requestContext) {
     String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
     List<SecurableObject> securableObjects = roleEntity.securableObjects();
+    Map<PolicyKey, Effect> index = new HashMap<>();
 
     for (SecurableObject securableObject : securableObjects) {
       Optional<Long> metadataId =
@@ -1338,28 +1343,21 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       if (!metadataId.isPresent()) {
         continue;
       }
+      String typeName = securableObject.type().name();
+      long id = metadataId.get();
       for (Privilege privilege : securableObject.privileges()) {
         Privilege.Condition condition = privilege.condition();
-        if (AuthConstants.DENY.equalsIgnoreCase(condition.name())) {
-          denyEnforcer.addPolicy(
-              String.valueOf(roleEntity.id()),
-              securableObject.type().name(),
-              String.valueOf(metadataId.get()),
-              AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
-                  .name()
-                  .toUpperCase(Locale.ROOT),
-              AuthConstants.ALLOW);
-        }
-
-        allowEnforcer.addPolicy(
-            String.valueOf(roleEntity.id()),
-            securableObject.type().name(),
-            String.valueOf(metadataId.get()),
+        String privilegeName =
             AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
                 .name()
-                .toUpperCase(Locale.ROOT),
-            condition.name().toLowerCase(Locale.ROOT));
+                .toUpperCase(Locale.ROOT);
+        boolean isDeny = AuthConstants.DENY.equalsIgnoreCase(condition.name());
+        PolicyKey key = new PolicyKey(typeName, id, privilegeName);
+        Effect effect = isDeny ? Effect.DENY : Effect.ALLOW;
+        index.merge(
+            key, effect, (existing, incoming) -> existing == Effect.DENY ? existing : incoming);
       }
     }
+    return index;
   }
 }
