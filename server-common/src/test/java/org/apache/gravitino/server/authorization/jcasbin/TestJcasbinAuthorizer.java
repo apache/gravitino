@@ -1524,25 +1524,33 @@ public class TestJcasbinAuthorizer {
     // Add a role and its policy to the enforcer
     Long testRoleId = 300L;
     String roleIdStr = String.valueOf(testRoleId);
+    String userIdStr = String.valueOf(USER_ID);
 
-    // Add a policy for this role
+    // Add a policy and a user-role binding for this role.
+    allowEnforcer.addRoleForUser(userIdStr, roleIdStr);
+    denyEnforcer.addRoleForUser(userIdStr, roleIdStr);
     allowEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
     denyEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
 
     // Add role to cache
     loadedRoles.put(testRoleId, System.currentTimeMillis());
 
-    // Verify role exists in enforcer (has policy)
+    // Verify role exists in enforcer (has policy and grouping).
     assertTrue(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
     assertTrue(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
+    assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
+    assertTrue(denyEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
 
     // Invalidate the cache entry - this triggers the synchronous removal listener
     // (using executor(Runnable::run) to ensure synchronous execution)
     loadedRoles.invalidate(testRoleId);
 
-    // Verify the role's policies have been deleted from enforcers (synchronous, no need to wait)
+    // Verify the role's policies have been deleted from enforcers (synchronous, no need to wait),
+    // but user-role bindings are preserved because loadedRoles owns role policies only.
     assertFalse(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
     assertFalse(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
+    assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
+    assertTrue(denyEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
   }
 
   @Test

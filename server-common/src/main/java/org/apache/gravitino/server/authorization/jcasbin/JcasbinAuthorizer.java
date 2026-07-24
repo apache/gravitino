@@ -188,7 +188,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     // loadedRoles: roleId -> updated_at.
     // When evicted, we must clean up the corresponding JCasbin policies.
-    loadedRoles = new JcasbinLoadedRolesCache(ttlMs, roleCacheSize, allowEnforcer, denyEnforcer);
+    loadedRoles = new JcasbinLoadedRolesCache(ttlMs, roleCacheSize, this::clearRolePolicies);
 
     userRoleCache = new CaffeineGravitinoCache<>(ttlMs, roleCacheSize);
     groupRoleCache = new CaffeineGravitinoCache<>(ttlMs, roleCacheSize);
