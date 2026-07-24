@@ -381,7 +381,7 @@ class RelationalCatalog(
         )
         view_resp = ViewResponse.from_json(resp.body, infer_missing=True)
         view_resp.validate()
-        return GenericView(view_resp.view())
+        return GenericView(view_resp.view(), self.rest_client, full_namespace)
 
     def create_view(
         self,
@@ -412,7 +412,7 @@ class RelationalCatalog(
         )
         view_resp = ViewResponse.from_json(resp.body, infer_missing=True)
         view_resp.validate()
-        return GenericView(view_resp.view())
+        return GenericView(view_resp.view(), self.rest_client, full_namespace)
 
     def alter_view(self, identifier: NameIdentifier, *changes: ViewChange) -> View:
         self._check_view_name_identifier(identifier)
@@ -429,7 +429,7 @@ class RelationalCatalog(
         )
         view_resp = ViewResponse.from_json(resp.body, infer_missing=True)
         view_resp.validate()
-        return GenericView(view_resp.view())
+        return GenericView(view_resp.view(), self.rest_client, full_namespace)
 
     def drop_view(self, identifier: NameIdentifier) -> bool:
         self._check_view_name_identifier(identifier)
