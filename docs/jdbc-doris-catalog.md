@@ -125,7 +125,7 @@ Refer to
 | `Double`                   | `Double`             |
 | `Decimal`                  | `Decimal`            |
 | `Date`                     | `Date`/`DateV2`      |
-| `Timestamp[(p)]`           | `Datetime[(p)]`      |
+| `Timestamp[(p)]`           | `Datetime[(p)]`, p in [0, 6] |
 | `VarChar`                  | `VarChar`            |
 | `FixedChar`                | `Char`               |
 | `String`                   | `String`             |
@@ -138,7 +138,26 @@ Refer to
 | `ExternalType("bitmap")`   | `Bitmap`             |
 | `ExternalType("hll")`      | `HLL`                |
 
-Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+Apache Doris `DATETIME` supports fractional-second precision from 0 through 6 and does not store
+time-zone information. The catalog rejects `Timestamp` precision from 7 through 9 and all
+`Timestamp_tz` types before executing DDL.
+
+Although Doris 2.1 and later have a native `VARIANT` type, MySQL JDBC metadata reports it as
+`UNKNOWN`. The catalog therefore rejects Gravitino `Variant` before executing DDL because a
+create/get round-trip cannot preserve the type family. `ExternalType("variant")` remains the raw
+Doris type escape hatch.
+
+Gravitino `Null` (the V3 unknown type) is rejected before executing DDL because it is a null-only
+placeholder, not a Doris column type.
+
+Gravitino `Geometry` is rejected before executing DDL. Doris GEO is not a column type; it stores
+geospatial values in `String`/`VarChar`, which cannot preserve Gravitino CRS metadata as part of the
+type.
+
+Gravitino `Geography` is also rejected before executing DDL because Doris has no geography column
+type that preserves both its CRS and edge-algorithm metadata.
+
+Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` `Geometry` `Geography` type.
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 
 :::note

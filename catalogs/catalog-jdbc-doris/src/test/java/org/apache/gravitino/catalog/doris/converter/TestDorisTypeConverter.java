@@ -116,6 +116,82 @@ public class TestDorisTypeConverter {
   }
 
   @Test
+  public void testRejectNanosecondTimestampTypes() {
+    checkGravitinoTypeToJdbcType("datetime(6)", Types.TimestampType.withoutTimeZone(6));
+
+    IllegalArgumentException timestampException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.TimestampType.withoutTimeZone(9)));
+    Assertions.assertTrue(
+        timestampException
+            .getMessage()
+            .contains("fractional-second precision must be between 0 and 6"));
+
+    IllegalArgumentException timestampTzException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.TimestampType.withTimeZone(9)));
+    Assertions.assertTrue(
+        timestampTzException
+            .getMessage()
+            .contains("Doris DATETIME does not store time-zone information"));
+  }
+
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.VariantType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "MySQL JDBC metadata reports Doris VARIANT as UNKNOWN, so the catalog cannot "
+                    + "preserve the type on round-trip"));
+  }
+
+  @Test
+  public void testRejectNullType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.NullType.get()));
+    Assertions.assertTrue(
+        exception.getMessage().contains("the null-only placeholder has no Doris column type"));
+  }
+
+  @Test
+  public void testRejectGeometryType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DORIS_TYPE_CONVERTER.fromGravitino(Types.GeometryType.of("SRID:3857")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Doris GEO uses String/Varchar storage and cannot preserve Geometry CRS metadata "
+                    + "as a column type"));
+  }
+
+  @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                DORIS_TYPE_CONVERTER.fromGravitino(Types.GeographyType.of("EPSG:4326", "karney")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Doris GEO has no Geography column type that preserves CRS and edge-algorithm "
+                    + "metadata"));
+  }
+
+  @Test
   public void testExternalTypeRoundTrip() {
     // ExternalType round-trip: fromGravitino(ExternalType) → toGravitino
     String[] externalTypes = {
