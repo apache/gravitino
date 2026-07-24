@@ -213,4 +213,56 @@ public class TestGravitinoSampleBuilder {
         sample.labelValues);
     Assertions.assertEquals(value, sample.value);
   }
+
+  @Test
+  public void testCreateSampleWithHiveCatalogDatasourceMetrics() {
+    String dropwizardName =
+        "gravitino-catalog.hive.metalake1.catalog1." + MetricNames.DATASOURCE_ACTIVE_CONNECTIONS;
+    double value = 2.0;
+
+    Collector.MetricFamilySamples.Sample sample =
+        sampleBuilder.createSample(
+            dropwizardName, "", Collections.emptyList(), Collections.emptyList(), value);
+
+    Assertions.assertEquals(
+        "gravitino_catalog_"
+            + Collector.sanitizeMetricName(MetricNames.DATASOURCE_ACTIVE_CONNECTIONS),
+        sample.name);
+    Assertions.assertEquals(ImmutableList.of("provider", "metalake", "catalog"), sample.labelNames);
+    Assertions.assertEquals(ImmutableList.of("hive", "metalake1", "catalog1"), sample.labelValues);
+    Assertions.assertEquals(value, sample.value);
+
+    // Verify idle connections
+    dropwizardName =
+        "gravitino-catalog.hive.metalake1.catalog1." + MetricNames.DATASOURCE_IDLE_CONNECTIONS;
+    value = 3.0;
+
+    sample =
+        sampleBuilder.createSample(
+            dropwizardName, "", Collections.emptyList(), Collections.emptyList(), value);
+
+    Assertions.assertEquals(
+        "gravitino_catalog_"
+            + Collector.sanitizeMetricName(MetricNames.DATASOURCE_IDLE_CONNECTIONS),
+        sample.name);
+    Assertions.assertEquals(ImmutableList.of("provider", "metalake", "catalog"), sample.labelNames);
+    Assertions.assertEquals(ImmutableList.of("hive", "metalake1", "catalog1"), sample.labelValues);
+    Assertions.assertEquals(value, sample.value);
+
+    // Verify max connections
+    dropwizardName =
+        "gravitino-catalog.hive.metalake1.catalog1." + MetricNames.DATASOURCE_MAX_CONNECTIONS;
+    value = 10.0;
+
+    sample =
+        sampleBuilder.createSample(
+            dropwizardName, "", Collections.emptyList(), Collections.emptyList(), value);
+
+    Assertions.assertEquals(
+        "gravitino_catalog_" + Collector.sanitizeMetricName(MetricNames.DATASOURCE_MAX_CONNECTIONS),
+        sample.name);
+    Assertions.assertEquals(ImmutableList.of("provider", "metalake", "catalog"), sample.labelNames);
+    Assertions.assertEquals(ImmutableList.of("hive", "metalake1", "catalog1"), sample.labelValues);
+    Assertions.assertEquals(value, sample.value);
+  }
 }
