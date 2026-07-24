@@ -56,6 +56,12 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.DistributionMode;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.types.Types.IntegerType;
+import org.apache.iceberg.types.Types.NestedField;
+import org.apache.iceberg.types.Types.StringType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -726,5 +732,47 @@ public class TestIcebergTable {
 
   protected static String genRandomName() {
     return UUID.randomUUID().toString().replace("-", "");
+  }
+
+  @Test
+  void testFromIcebergTablePopulatesAuditInfoWithOwner() {
+    Schema icebergSchema =
+        new Schema(
+            NestedField.required(1, "id", IntegerType.get()),
+            NestedField.optional(2, "name", StringType.get()));
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.OWNER, "test_user");
+
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            icebergSchema, PartitionSpec.unpartitioned(), "/tmp/test_table", properties);
+
+    IcebergTable table = IcebergTable.fromIcebergTable(metadata, "test_table");
+
+    Assertions.assertNotNull(table.auditInfo());
+    Assertions.assertEquals("test_user", table.auditInfo().creator());
+    Assertions.assertNotNull(table.auditInfo().createTime());
+    Assertions.assertTrue(table.auditInfo().createTime().toEpochMilli() > 0);
+  }
+
+  @Test
+  void testFromIcebergTableWithoutOwnerProperty() {
+    Schema icebergSchema =
+        new Schema(
+            NestedField.required(1, "id", IntegerType.get()),
+            NestedField.optional(2, "name", StringType.get()));
+
+    Map<String, String> properties = new HashMap<>();
+
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            icebergSchema, PartitionSpec.unpartitioned(), "/tmp/test_table", properties);
+
+    IcebergTable table = IcebergTable.fromIcebergTable(metadata, "test_table");
+
+    Assertions.assertNotNull(table.auditInfo());
+    Assertions.assertNull(table.auditInfo().creator());
+    Assertions.assertNotNull(table.auditInfo().createTime());
   }
 }
