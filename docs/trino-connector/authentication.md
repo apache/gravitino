@@ -184,7 +184,14 @@ gravitino.client.oauth2.scope=gravitino
 gravitino.client.session.forwardUser=true
 ```
 
-With `authType=oauth2`, the end user's IdP access token is presented to Gravitino directly instead of the shared client-credentials identity. The token is read from the Trino session's extra-credentials under the key `token`, which requires a Trino coordinator configured with `http-server.authentication.oauth2.forward-token-to-connectors=true` and an `OAuth2Authenticator` that populates that extra credential with the caller's access token; without it, `buildForSession` fails with an error explaining the missing token. The `gravitino.client.oauth2.*` properties above still configure the shared bootstrap/admin client used for catalog discovery — they are unrelated to the per-user forwarded token.
+With `authType=oauth2`, the end user's IdP access token is presented to Gravitino directly instead of the shared client-credentials identity. This requires the Trino coordinator to populate the session's extra-credentials with the caller's access token under the key `token`; the connector reads it from there, and `buildForSession` fails with a clear error if it's missing.
+
+Whether the coordinator can populate this extra-credential depends on the Trino distribution:
+
+- **Starburst Enterprise** supports this via `http-server.authentication.type=DELEGATED-OAUTH2` — see [OAuth 2.0 token pass-through](https://docs.starburst.io/latest/security/oauth2-passthrough.html).
+- **Open-source Trino does not support this yet.** There is no equivalent coordinator-side mechanism to forward the caller's OAuth2 token into the connector session; see [trinodb/trino discussion #24403](https://github.com/trinodb/trino/discussions/24403) and [issue #27917](https://github.com/trinodb/trino/issues/27917) tracking this feature request upstream.
+
+The `gravitino.client.oauth2.*` properties above still configure the shared bootstrap/admin client used for catalog discovery — they are unrelated to the per-user forwarded token.
 
 For an Iceberg catalog with `catalog-backend=rest` (backed by an Iceberg REST Catalog), the connector does not set `iceberg.rest-catalog.security`/`iceberg.rest-catalog.session` on its own — that catalog's own `gravitino.client.*` config is unrelated to how its underlying Iceberg REST catalog authenticates. To also forward the end user's token to the REST catalog itself, set `trino.bypass.iceberg.rest-catalog.security=OAUTH2` and `trino.bypass.iceberg.rest-catalog.session=USER` explicitly on that catalog's properties, alongside its bootstrap `trino.bypass.iceberg.rest-catalog.oauth2.*` credentials; see the worked example below.
 
@@ -202,16 +209,25 @@ This example walks through a full setup where each Trino user's own OAuth2 acces
 forwarded to Gravitino and to an Iceberg REST catalog (IRC), instead of a single shared service
 identity.
 
-**1. Trino coordinator: forward the logged-in user's token to connectors** (in `etc/config.properties`):
+**1. Trino coordinator: forward the logged-in user's token to connectors.** This is the
+prerequisite that makes `authType=oauth2` forwarding possible at all — the coordinator must
+populate the session's extra-credentials with the caller's access token under the key `token`.
 
-```properties
-http-server.authentication.type=oauth2
-http-server.authentication.oauth2.forward-token-to-connectors=true
-```
+- **Starburst Enterprise**: set the following in `etc/config.properties`:
 
-This requires a Trino coordinator whose `OAuth2Authenticator` populates the session's
-extra-credentials with the user's IdP access token under the key `token` when this flag is set;
-stock Trino does not do this yet.
+  ```properties
+  http-server.authentication.type=DELEGATED-OAUTH2
+  ```
+
+  See [OAuth 2.0 token pass-through](https://docs.starburst.io/latest/security/oauth2-passthrough.html)
+  for details, including its limitation that pass-through tokens are not refreshed and must
+  outlive the query.
+
+- **Open-source Trino**: there is currently no equivalent coordinator setting. Track
+  [trinodb/trino discussion #24403](https://github.com/trinodb/trino/discussions/24403) and
+  [issue #27917](https://github.com/trinodb/trino/issues/27917) for this feature request. Until
+  it lands upstream, this connector's `authType=oauth2` forwardUser path requires a Trino
+  distribution that provides this extra-credential itself.
 
 **2. Gravitino server: enable OAuth2** (in `conf/gravitino.conf`):
 
