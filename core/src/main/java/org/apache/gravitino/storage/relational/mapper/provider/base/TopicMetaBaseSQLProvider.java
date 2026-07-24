@@ -249,12 +249,16 @@ public class TopicMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId) {
+  public String softDeleteTopicMetasByTopicId(
+      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE topic_id = #{topicId} AND deleted_at = 0";
+        // OCC: version-checked delete. 0 rows means the caller's version is stale (the row was
+        // updated or already deleted concurrently); the service re-reads to tell the two apart.
+        + " WHERE topic_id = #{topicId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId) {

@@ -97,6 +97,31 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testSoftDeleteTopicIsVersionCas() throws IOException {
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName),
+            "drop_cas_topic",
+            AUDIT_INFO);
+    backend.insert(topic, false);
+    long topicId = topic.id();
+
+    try (SqlSession session =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      TopicMetaMapper mapper = session.getMapper(TopicMetaMapper.class);
+
+      // A drop carrying a stale version matches 0 rows and leaves the topic live.
+      Assertions.assertEquals(0, mapper.softDeleteTopicMetasByTopicId(topicId, 999L));
+      assertTrue(backend.exists(topic.nameIdentifier(), Entity.EntityType.TOPIC));
+
+      // A drop carrying the current version (1) soft-deletes exactly one row.
+      Assertions.assertEquals(1, mapper.softDeleteTopicMetasByTopicId(topicId, 1L));
+      assertFalse(backend.exists(topic.nameIdentifier(), Entity.EntityType.TOPIC));
+    }
+  }
+
+  @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {
     TopicEntity topic =
         createTopicEntity(

@@ -49,11 +49,13 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteTopicMetasByTopicId(Long topicId) {
+  public String softDeleteTopicMetasByTopicId(Long topicId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE topic_id = #{topicId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE topic_id = #{topicId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

@@ -103,8 +103,9 @@ public class TopicMetaSQLProviderFactory {
     return getProvider().selectTopicIdBySchemaIdAndName(schemaId, name);
   }
 
-  public static String softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId) {
-    return getProvider().softDeleteTopicMetasByTopicId(topicId);
+  public static String softDeleteTopicMetasByTopicId(
+      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteTopicMetasByTopicId(topicId, currentVersion);
   }
 
   public static String softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId) {
