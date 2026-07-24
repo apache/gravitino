@@ -98,6 +98,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1123,6 +1124,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
     for (Column column : columns) {
+      if (column.dataType() instanceof Types.NullType && !column.nullable()) {
+        throw new IllegalArgumentException(
+            "Flink NULL columns must be nullable because NULL has no non-null value");
+      }
       DataType flinkType = TypeUtils.toFlinkType(column.dataType());
       builder
           .column(column.name(), column.nullable() ? flinkType.nullable() : flinkType.notNull())

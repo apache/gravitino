@@ -26,4 +26,11 @@ import org.junit.jupiter.api.condition.DisabledIf;
 // embedded MiniGravitino server shares the JVM with the Flink Iceberg runtime. Run in deploy mode
 // only. @DisabledIf is not @Inherited, so each concrete subclass must declare it explicitly.
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
-public class FlinkIcebergJdbcCatalogIT120 extends FlinkIcebergJdbcCatalogIT {}
+public class FlinkIcebergJdbcCatalogIT120 extends FlinkIcebergJdbcCatalogIT {
+
+  /** {@inheritDoc} */
+  @Override
+  protected boolean supportsNanosecondTimestampRoundTrip() {
+    return true;
+  }
+}

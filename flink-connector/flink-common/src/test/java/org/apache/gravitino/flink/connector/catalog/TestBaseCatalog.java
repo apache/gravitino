@@ -25,17 +25,22 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.flink.FlinkVersion;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
+import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.CatalogView;
 import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.TableChange;
+import org.apache.flink.table.types.DataType;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -47,6 +52,7 @@ import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -135,6 +141,163 @@ public class TestBaseCatalog {
     List<org.apache.gravitino.rel.TableChange> expected =
         ImmutableList.of(org.apache.gravitino.rel.TableChange.updateComment("new comment"));
     Assertions.assertArrayEquals(expected.toArray(), tableChanges);
+  }
+
+  @Test
+  public void testNanosecondTimestampSchemaUsesRuntimeVersion() {
+    org.apache.gravitino.rel.Column[] columns = {
+      org.apache.gravitino.rel.Column.of("timestamp_ns", Types.TimestampType.withoutTimeZone(9)),
+      org.apache.gravitino.rel.Column.of("timestamp_tz_ns", Types.TimestampType.withTimeZone(9))
+    };
+
+    if (isCurrentFlinkAtLeast(1, 20)) {
+      Schema schema = BaseCatalog.buildSchemaFromColumns(columns).build();
+      Assertions.assertEquals(
+          DataTypes.TIMESTAMP(9),
+          ((Schema.UnresolvedPhysicalColumn) schema.getColumns().get(0)).getDataType());
+      Assertions.assertEquals(
+          DataTypes.TIMESTAMP_LTZ(9),
+          ((Schema.UnresolvedPhysicalColumn) schema.getColumns().get(1)).getDataType());
+    } else {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> BaseCatalog.buildSchemaFromColumns(columns));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains(
+                  "Flink "
+                      + FlinkVersion.current()
+                      + " cannot safely round-trip timestamp precision 9"));
+    }
+  }
+
+  @Test
+  public void testRejectOffsetTimestampBeforeTableMutation() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    BaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    Schema schema =
+        Schema.newBuilder()
+            .column("timestamp_tz_ns", DataTypes.TIMESTAMP_WITH_TIME_ZONE(9))
+            .build();
+    CatalogTable unresolvedTable =
+        DefaultCatalogCompat.INSTANCE.createCatalogTable(
+            schema, "test", ImmutableList.of(), ImmutableMap.of());
+    ResolvedCatalogTable resolvedTable =
+        new ResolvedCatalogTable(
+            unresolvedTable,
+            ResolvedSchema.of(
+                Column.physical("timestamp_tz_ns", DataTypes.TIMESTAMP_WITH_TIME_ZONE(9))));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog.createTable(
+                    new ObjectPath("database", "timestamp_tz_table"), resolvedTable, false));
+    Assertions.assertTrue(exception.getMessage().contains("cannot be losslessly represented"));
+    Mockito.verifyNoInteractions(tableCatalog);
+  }
+
+  @Test
+  public void testRejectVariantBeforeSchemaExposure() {
+    org.apache.gravitino.rel.Column[] columns = {
+      org.apache.gravitino.rel.Column.of("variant_column", Types.VariantType.get())
+    };
+
+    if (isCurrentFlinkAtLeast(2, 1)) {
+      Schema schema = BaseCatalog.buildSchemaFromColumns(columns).build();
+      Assertions.assertEquals(
+          "VARIANT",
+          ((DataType) ((Schema.UnresolvedPhysicalColumn) schema.getColumns().get(0)).getDataType())
+              .getLogicalType()
+              .getTypeRoot()
+              .name());
+    } else {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> BaseCatalog.buildSchemaFromColumns(columns));
+      Assertions.assertEquals(
+          "Flink "
+              + FlinkVersion.current()
+              + " has no VARIANT logical type for Gravitino variant; VARIANT requires Flink 2.1 "
+              + "or later",
+          exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testBuildSchemaWithNullableUnknown() {
+    Schema schema =
+        BaseCatalog.buildSchemaFromColumns(
+                new org.apache.gravitino.rel.Column[] {
+                  org.apache.gravitino.rel.Column.of("unknown_column", Types.NullType.get())
+                })
+            .build();
+
+    Assertions.assertEquals(
+        DataTypes.NULL(),
+        ((Schema.UnresolvedPhysicalColumn) schema.getColumns().get(0)).getDataType());
+  }
+
+  @Test
+  public void testRejectNonNullableUnknownBeforeSchemaExposure() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BaseCatalog.buildSchemaFromColumns(
+                    new org.apache.gravitino.rel.Column[] {
+                      org.apache.gravitino.rel.Column.of(
+                          "unknown_column", Types.NullType.get(), null, false, false, null)
+                    }));
+
+    Assertions.assertEquals(
+        "Flink NULL columns must be nullable because NULL has no non-null value",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testRejectGeometryBeforeSchemaExposure() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BaseCatalog.buildSchemaFromColumns(
+                    new org.apache.gravitino.rel.Column[] {
+                      org.apache.gravitino.rel.Column.of(
+                          "geometry_column", Types.GeometryType.crs84())
+                    }));
+
+    Assertions.assertEquals(
+        "Flink "
+            + FlinkVersion.current()
+            + " has no geometry logical type that preserves CRS metadata",
+        exception.getMessage());
+  }
+
+  @Test
+  public void testRejectGeographyBeforeSchemaExposure() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                BaseCatalog.buildSchemaFromColumns(
+                    new org.apache.gravitino.rel.Column[] {
+                      org.apache.gravitino.rel.Column.of(
+                          "geography_column", Types.GeographyType.crs84())
+                    }));
+
+    Assertions.assertEquals(
+        "Flink "
+            + FlinkVersion.current()
+            + " has no geography logical type that preserves CRS and edge algorithm "
+            + "metadata",
+        exception.getMessage());
   }
 
   @Test
@@ -322,6 +485,13 @@ public class TestBaseCatalog {
     SQLRepresentation second = (SQLRepresentation) reps[1];
     Assertions.assertEquals(PaimonConstants.VIEW_QUERY_DIALECT, second.dialect());
     Assertions.assertEquals("SELECT id FROM t", second.sql());
+  }
+
+  private static boolean isCurrentFlinkAtLeast(int requiredMajor, int requiredMinor) {
+    String[] versionParts = FlinkVersion.current().toString().split("\\.");
+    int major = Integer.parseInt(versionParts[0]);
+    int minor = Integer.parseInt(versionParts[1]);
+    return major > requiredMajor || (major == requiredMajor && minor >= requiredMinor);
   }
 
   /**
