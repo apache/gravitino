@@ -699,6 +699,10 @@ Gravitino caches scan plan results to speed up repeated queries with identical p
 
 Plan scan responses follow the Iceberg 1.11 REST API: completed plans return structured `file-scan-tasks` only. Legacy `plan-tasks` JSON strings (used by some Iceberg 1.9.x–1.10.x clients) are not emitted.
 
+Scan planning is synchronous. `POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan` always returns status `COMPLETED` with the full set of `file-scan-tasks` inline, so a client never needs a second round trip to collect results.
+
+The second step of the protocol, `POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/tasks`, is implemented and advertised in `/v1/config` because clients such as pyiceberg only enable server-side scan planning when both endpoints are advertised. Since no `plan-task` tokens are ever issued, any token presented to this endpoint is unknown and the request returns `404` with a `NoSuchPlanTaskException` error. In normal operation clients read all tasks from the plan response and never call it.
+
 | Configuration item                                      | Description                                              | Default value | Required |
 |---------------------------------------------------------|----------------------------------------------------------|---------------|----------|
 | `gravitino.iceberg-rest.scan-plan-cache-impl`           | The implementation of the scan plan cache.               | (none)        | No       |
