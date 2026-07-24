@@ -2651,4 +2651,432 @@ public class CatalogClickHouseIT extends BaseIT {
     // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
     Assertions.assertEquals(1, settingsCount);
   }
+
+  // ---------------------------------------------------------------------------
+  // PROJECTION sort-key extraction integration tests
+  // ---------------------------------------------------------------------------
+
+  @Test
+  void testLoadTableWithNormalProjectionSortKeyCorrect() {
+    // Scenario: Normal projection with ORDER BY. Table-level sort key must not
+    // be corrupted by the projection's internal ORDER BY.
+    String name = GravitinoITUtils.genRandomName("proj_normal");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY dt\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(2, sortOrders.length, "Should extract table-level sort keys: (id, dt)");
+    Assertions.assertTrue(
+        sortOrders[0].expression() instanceof NamedReference,
+        "First sort key should be a named reference, not garbled projection text");
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertTrue(
+        sortOrders[1].expression() instanceof NamedReference,
+        "Second sort key should be a named reference");
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+  }
+
+  @Test
+  void testLoadTableWithAggregateProjectionSortKeyCorrect() {
+    // Scenario: Aggregate projection with GROUP BY only (no ORDER BY).
+    // This already works correctly, but we must verify no regression.
+    String name = GravitinoITUtils.genRandomName("proj_agg");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_agg\n"
+                + "  (\n"
+                + "      SELECT\n"
+                + "          dt,\n"
+                + "          count() AS cnt\n"
+                + "      GROUP BY dt\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(2, sortOrders.length);
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+  }
+
+  @Test
+  void testLoadTableWithMultipleProjectionsSortKeyCorrect() {
+    // Scenario: Multiple projections (normal + aggregate) on the same table.
+    // All projection-internal ORDER BYs must be ignored.
+    String name = GravitinoITUtils.genRandomName("proj_multi");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY dt\n"
+                + "  ),\n"
+                + "  PROJECTION p_agg\n"
+                + "  (\n"
+                + "      SELECT\n"
+                + "          dt,\n"
+                + "          count() AS cnt\n"
+                + "      GROUP BY dt\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(
+        2,
+        sortOrders.length,
+        "Should extract table-level sort keys regardless of multiple projections");
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+  }
+
+  @Test
+  void testLoadTableWithProjectionAndIndexSortKeysBothCorrect() {
+    // Scenario: Table with both an INDEX and a PROJECTION.
+    // Sort keys must be correct and INDEX must not be affected.
+    String name = GravitinoITUtils.genRandomName("proj_w_index");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  INDEX idx_val val TYPE minmax GRANULARITY 1,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY dt\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+
+    // Verify sort orders
+    SortOrder[] sortOrders = loaded.sortOrder();
+    Assertions.assertEquals(2, sortOrders.length);
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+
+    // Verify index is preserved
+    Index[] indexes = loaded.index();
+    Assertions.assertTrue(
+        Arrays.stream(indexes)
+            .anyMatch(
+                idx ->
+                    idx.type() == Index.IndexType.DATA_SKIPPING_MINMAX
+                        && "idx_val".equals(idx.name())
+                        && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"val"}})),
+        "Data skipping index must be preserved alongside projection");
+  }
+
+  @Test
+  void testLoadTableWithProjectionAddedViaAlterTable() {
+    // Scenario: Projection added via ALTER TABLE ADD PROJECTION (not inline).
+    // SHOW CREATE TABLE output format is identical regardless of how projection was added.
+    String name = GravitinoITUtils.genRandomName("proj_alter_add");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+    clickhouseService.executeQuery(
+        String.format(
+            "ALTER TABLE `%s`.`%s` ADD PROJECTION p_normal (\n"
+                + "  SELECT *\n"
+                + "  ORDER BY dt\n"
+                + ")",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(
+        2, sortOrders.length, "ALTER-added projection should not corrupt sort key extraction");
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+  }
+
+  @Test
+  void testLoadTableProjectionWithPartitionByAndPrimaryKey() {
+    // Scenario: Complex DDL with PARTITION BY, PRIMARY KEY, and a projection.
+    // All clauses must be parsed correctly.
+    String name = GravitinoITUtils.genRandomName("proj_complex");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `event_time` DateTime,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY event_time\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "PARTITION BY toYYYYMM(event_time)\n"
+                + "PRIMARY KEY (id, event_time)\n"
+                + "ORDER BY (id, event_time)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+
+    // Verify sort orders are table-level, not projection-internal
+    SortOrder[] sortOrders = loaded.sortOrder();
+    Assertions.assertEquals(2, sortOrders.length);
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"event_time"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+
+    // Verify partitioning is preserved
+    Transform[] partitioning = loaded.partitioning();
+    Assertions.assertEquals(1, partitioning.length);
+    Assertions.assertEquals(Transforms.NAME_OF_MONTH, partitioning[0].name());
+
+    // Verify primary key is preserved (each column is a separate Index entry)
+    Index[] indexes = loaded.index();
+    Assertions.assertTrue(
+        Arrays.stream(indexes)
+            .anyMatch(
+                idx ->
+                    idx.type() == Index.IndexType.PRIMARY_KEY
+                        && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"id"}})),
+        "Primary key should include 'id'");
+    Assertions.assertTrue(
+        Arrays.stream(indexes)
+            .anyMatch(
+                idx ->
+                    idx.type() == Index.IndexType.PRIMARY_KEY
+                        && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"event_time"}})),
+        "Primary key should include 'event_time'");
+  }
+
+  @Test
+  void testLoadTableNoProjectionNoRegression() {
+    // Scenario: Table without any projections. Verify no regression in basic sort key
+    // and partition parsing.
+    String name = GravitinoITUtils.genRandomName("no_proj");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(2, sortOrders.length);
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+  }
+
+  @Test
+  void testLoadTableProjectionWithSingleColumnOrderBy() {
+    // Scenario: Single-column ORDER BY (no parentheses) with a projection.
+    // Table DDL: ORDER BY col (not ORDER BY (col)).
+    String name = GravitinoITUtils.genRandomName("proj_single");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY dt\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY id\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(
+        1,
+        sortOrders.length,
+        "Single-column ORDER BY with projection should extract exactly one sort key");
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+  }
+
+  @Test
+  void testLoadTableProjectionWithReplacingMergeTree() {
+    // Scenario: ReplacingMergeTree engine with projection. The engine variant should not
+    // affect projection stripping. ClickHouse 24.8+ requires deduplicate_merge_projection_mode
+    // for ReplacingMergeTree with projections.
+    String name = GravitinoITUtils.genRandomName("proj_repl");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY dt\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = ReplacingMergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192, deduplicate_merge_projection_mode = 'rebuild'",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(
+        2, sortOrders.length, "ReplacingMergeTree with projection: sort keys must be table-level");
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+  }
+
+  @Test
+  void testLoadTableProjectionWithDescAndComplexSortKey() {
+    // Scenario: Complex table-level sort key with function expression + projection.
+    // This verifies that complex sort expressions are not affected by projection stripping.
+    String name = GravitinoITUtils.genRandomName("proj_complex_sort");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `event_time` DateTime,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY event_time\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, toDate(event_time))\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(2, sortOrders.length);
+    // First is a simple column
+    Assertions.assertTrue(sortOrders[0].expression() instanceof NamedReference);
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    // Second is a function expression
+    Assertions.assertTrue(
+        sortOrders[1].expression() instanceof FuncExpressionImpl,
+        "Function expression sort key should not be corrupted by projection stripping");
+  }
+
+  @Test
+  void testLoadTableProjectionAtDifferentPositions() {
+    // Scenario: Three projections at different column-list positions (first, middle, last)
+    // to ensure strip logic handles all positions correctly.
+    String name = GravitinoITUtils.genRandomName("proj_positions");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  PROJECTION p_first\n"
+                + "  (\n"
+                + "      SELECT id, dt ORDER BY id\n"
+                + "  ),\n"
+                + "  `id` Int64,\n"
+                + "  PROJECTION p_mid\n"
+                + "  (\n"
+                + "      SELECT * ORDER BY id\n"
+                + "  ),\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_last\n"
+                + "  (\n"
+                + "      SELECT * ORDER BY val\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(
+        2,
+        sortOrders.length,
+        "Projections at all positions (first/mid/last) must be stripped; "
+            + "table sort keys must be parsed correctly");
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+  }
 }

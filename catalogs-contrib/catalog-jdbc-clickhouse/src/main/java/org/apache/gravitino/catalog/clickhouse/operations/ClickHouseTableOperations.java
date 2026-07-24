@@ -1319,23 +1319,174 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
   }
 
+  /**
+   * Strips PROJECTION definition blocks from a {@code SHOW CREATE TABLE} DDL string so that
+   * internal {@code ORDER BY} / {@code PARTITION BY} clauses inside projection bodies are not
+   * mistaken for the table-level sort key or partitioning expression.
+   *
+   * <p>A projection block has the form {@code PROJECTION name ( SELECT ... )} and sits inside the
+   * column-definition body of the DDL. This method removes every such block including the optional
+   * trailing comma, while preserving string literals and respecting nested parentheses.
+   *
+   * @param createSql raw {@code SHOW CREATE TABLE} output
+   * @return the DDL with all PROJECTION blocks removed, or the original string if none are found
+   */
+  @VisibleForTesting
+  String stripProjections(String createSql) {
+    if (StringUtils.isBlank(createSql)) {
+      return createSql;
+    }
+
+    StringBuilder result = new StringBuilder(createSql.length());
+    int i = 0;
+    int len = createSql.length();
+
+    while (i < len) {
+      char ch = createSql.charAt(i);
+
+      // ----- skip single-quoted string literals (preserve as-is) -----
+      if (ch == '\'') {
+        result.append(ch);
+        i++;
+        while (i < len) {
+          char c = createSql.charAt(i);
+          result.append(c);
+          if (c == '\'') {
+            // escaped single quote: ''
+            if (i + 1 < len && createSql.charAt(i + 1) == '\'') {
+              result.append('\'');
+              i += 2;
+              continue;
+            }
+            i++;
+            break;
+          }
+          i++;
+        }
+        continue;
+      }
+
+      // ----- skip backtick-quoted identifiers (preserve as-is) -----
+      // NOTE: does not handle ClickHouse double-backtick escaping (``col``name`).
+      // This is safe because SHOW CREATE TABLE output uses only simple ASCII
+      // identifiers where escaping is never necessary, and PROJECTION is always
+      // a keyword (never backtick-quoted).
+      if (ch == '`') {
+        result.append(ch);
+        i++;
+        while (i < len && createSql.charAt(i) != '`') {
+          result.append(createSql.charAt(i));
+          i++;
+        }
+        if (i < len) {
+          result.append(createSql.charAt(i)); // closing backtick
+          i++;
+        }
+        continue;
+      }
+
+      // ----- detect PROJECTION keyword -----
+      if (i + "PROJECTION".length() <= len) {
+        String candidate = createSql.substring(i, i + "PROJECTION".length());
+        if ("PROJECTION".equalsIgnoreCase(candidate)) {
+          // word boundary before
+          boolean boundaryBefore =
+              i == 0 || !Character.isJavaIdentifierPart(createSql.charAt(i - 1));
+          int afterKw = i + "PROJECTION".length();
+          // word boundary after (or end-of-string)
+          boolean boundaryAfter =
+              afterKw >= len || !Character.isJavaIdentifierPart(createSql.charAt(afterKw));
+          if (boundaryBefore && boundaryAfter) {
+            // Skip PROJECTION keyword and whitespace
+            i = afterKw;
+            while (i < len && Character.isWhitespace(createSql.charAt(i))) {
+              i++;
+            }
+            // Skip projection name (backtick-quoted or simple identifier)
+            if (i < len && createSql.charAt(i) == '`') {
+              i++;
+              while (i < len && createSql.charAt(i) != '`') {
+                i++;
+              }
+              if (i < len) i++; // closing backtick
+            } else {
+              while (i < len
+                  && (Character.isJavaIdentifierPart(createSql.charAt(i))
+                      || createSql.charAt(i) == '_')) {
+                i++;
+              }
+            }
+            // Skip whitespace to reach '('
+            while (i < len && Character.isWhitespace(createSql.charAt(i))) {
+              i++;
+            }
+            // Skip the projection body — bracket-counting aware
+            if (i < len && createSql.charAt(i) == '(') {
+              int depth = 1;
+              i++;
+              while (i < len && depth > 0) {
+                char bodyCh = createSql.charAt(i);
+                if (bodyCh == '\'') {
+                  // skip string literal inside projection body
+                  i++;
+                  while (i < len) {
+                    if (createSql.charAt(i) == '\'') {
+                      if (i + 1 < len && createSql.charAt(i + 1) == '\'') {
+                        i += 2;
+                        continue;
+                      }
+                      i++;
+                      break;
+                    }
+                    i++;
+                  }
+                } else {
+                  if (bodyCh == '(') depth++;
+                  else if (bodyCh == ')') depth--;
+                  i++;
+                }
+              }
+              // Skip trailing whitespace and optional comma
+              while (i < len && Character.isWhitespace(createSql.charAt(i))) {
+                i++;
+              }
+              if (i < len && createSql.charAt(i) == ',') {
+                i++;
+              }
+            }
+            continue;
+          }
+        }
+      }
+
+      result.append(ch);
+      i++;
+    }
+
+    return result.toString();
+  }
+
   private ShowCreateTableMetadata parseCreateStatement(String createSql) {
     ShowCreateTableMetadata metadata = new ShowCreateTableMetadata();
     if (StringUtils.isBlank(createSql)) {
       return metadata;
     }
 
-    Matcher orderMatcher = ORDER_BY_PATTERN.matcher(createSql);
+    // Strip PROJECTION blocks first so their internal ORDER BY / PARTITION BY
+    // clauses are not mistaken for the table-level sort key or partitioning.
+    String cleanedSql = stripProjections(createSql);
+
+    Matcher orderMatcher = ORDER_BY_PATTERN.matcher(cleanedSql);
     if (orderMatcher.find()) {
       metadata.sortOrders = parseOrderByClause(orderMatcher.group(1));
     }
 
-    Matcher partitionMatcher = PARTITION_BY_PATTERN.matcher(createSql);
+    Matcher partitionMatcher = PARTITION_BY_PATTERN.matcher(cleanedSql);
     if (partitionMatcher.find()) {
       metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
     }
 
-    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(createSql);
+    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(cleanedSql);
     if (settingsMatcher.find()) {
       metadata.settings = parseSettingsClause(settingsMatcher.group(1));
     }
