@@ -212,6 +212,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
+      validateAlterTableTypes(connection, databaseName, tableName, changes);
       for (TableChange change : changes) {
         String sql = generateAlterTableSql(databaseName, tableName, change);
         if (StringUtils.isEmpty(sql)) {
