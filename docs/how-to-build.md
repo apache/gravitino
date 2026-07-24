@@ -202,7 +202,6 @@ Updating the package list ensures you have the latest information on the newest 
 **On Ubuntu (WSL):**
 
 ```shell
-curl -fsSL https
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
 sudo apt update
