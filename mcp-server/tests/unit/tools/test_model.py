@@ -107,6 +107,40 @@ class TestModelTool(unittest.TestCase):
 
         asyncio.run(_test_load_model_version_by_alias(self.mcp))
 
+    def test_write_model_tools_enabled_by_default(self):
+        async def _test_write_model_tools_enabled_by_default(mcp_server):
+            tool_names = {tool.name for tool in await mcp_server.list_tools()}
+
+            self.assertIn("load_model", tool_names)
+            self.assertIn("update_model_version_aliases", tool_names)
+
+        asyncio.run(_test_write_model_tools_enabled_by_default(self.mcp))
+
+    def test_update_model_version_aliases(self):
+        async def _test_update_model_version_aliases(mcp_server):
+            self.mcp.enable(
+                names={"update_model_version_aliases"}, components={"tool"}
+            )
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "update_model_version_aliases",
+                    {
+                        "catalog_name": "mock",
+                        "schema_name": "mock",
+                        "model_name": "mock",
+                        "version": 0,
+                        "aliases_to_add": ["alias1"],
+                        "aliases_to_remove": ["alias2"],
+                    },
+                )
+                self.assertEqual(
+                    "mock_model_version_aliases_updated: mock, mock, mock, 0, "
+                    "['alias1'], ['alias2']",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test_update_model_version_aliases(self.mcp))
+
     def test_register_model(self):
         async def _test(mcp_server):
             async with Client(mcp_server) as client:

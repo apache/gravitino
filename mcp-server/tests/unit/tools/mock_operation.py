@@ -212,6 +212,29 @@ class MockFilesetOperation(FilesetOperation):
 
 
 class MockPolicyOperation(PolicyOperation):
+    # pylint: disable=R0917
+    async def create_policy(
+        self,
+        policy_name: str,
+        policy_type: str,
+        comment: str,
+        enabled: bool,
+        content: dict,
+    ) -> str:
+        return (
+            f"mock_policy_created: {policy_name}, {policy_type}, {comment}, "
+            f"{enabled}, {content}"
+        )
+
+    async def alter_policy(self, policy_name: str, updates: list) -> str:
+        return f"mock_policy_altered: {policy_name} with updates {updates}"
+
+    async def delete_policy(self, policy_name: str) -> str:
+        return f"mock_policy_deleted: {policy_name}"
+
+    async def set_policy(self, policy_name: str, enable: bool) -> str:
+        return f"mock_policy_set: {policy_name}, enable={enable}"
+
     async def associate_policy_with_metadata(
         self,
         metadata_full_name: str,
@@ -339,6 +362,21 @@ class MockModelOperation(ModelOperation):
             f"with updates {updates}"
         )
 
+    # pylint: disable=R0917
+    async def update_model_version_aliases(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        model_name: str,
+        version: int,
+        aliases_to_add: list,
+        aliases_to_remove: list,
+    ) -> str:
+        return (
+            f"mock_model_version_aliases_updated: {catalog_name}, {schema_name}, "
+            f"{model_name}, {version}, {aliases_to_add}, {aliases_to_remove}"
+        )
+
 
 class MockTopicOperation(TopicOperation):
     async def list_of_topics(self, catalog_name: str, schema_name: str) -> str:
@@ -416,6 +454,15 @@ class MockJobOperation(JobOperation):
     async def get_job_template_by_name(self, name: str) -> str:
         return f"mock_job_template: {name}"
 
+    async def register_job_template(self, job_template: dict) -> str:
+        return f"mock_job_template_registered: {job_template}"
+
+    async def delete_job_template(self, name: str) -> str:
+        return f"mock_job_template_deleted: {name}"
+
+    async def alter_job_template(self, name: str, updates: list) -> str:
+        return f"mock_job_template_altered: {name} with updates {updates}"
+
     async def run_job(self, job_template_name: str, job_config: dict) -> str:
         return f"mock_job_run: {job_template_name} with parameters {job_config}"
 
@@ -428,6 +475,52 @@ class MockStatisticOperation(StatisticOperation):
         self, metalake_name: str, metadata_type: str, metadata_fullname: str
     ) -> str:
         return f"mock_statistics: {metalake_name}, {metadata_type}, {metadata_fullname}"
+
+    async def update_statistics(
+        self,
+        metadata_type: str,
+        metadata_fullname: str,
+        statistics: dict,
+    ) -> str:
+        return (
+            f"mock_statistics_updated: {metadata_type}, "
+            f"{metadata_fullname}, {statistics}"
+        )
+
+    async def drop_statistics(
+        self,
+        metadata_type: str,
+        metadata_fullname: str,
+        statistic_names: list,
+    ) -> str:
+        return (
+            f"mock_statistics_dropped: {metadata_type}, "
+            f"{metadata_fullname}, {statistic_names}"
+        )
+
+    # pylint: disable=R0917
+    async def update_partition_statistics(
+        self,
+        metadata_type: str,
+        metadata_fullname: str,
+        partition_updates: list,
+    ) -> str:
+        return (
+            f"mock_partition_statistics_updated: {metadata_type}, "
+            f"{metadata_fullname}, {partition_updates}"
+        )
+
+    # pylint: disable=R0917
+    async def drop_partition_statistics(
+        self,
+        metadata_type: str,
+        metadata_fullname: str,
+        partition_drops: list,
+    ) -> str:
+        return (
+            f"mock_partition_statistics_dropped: {metadata_type}, "
+            f"{metadata_fullname}, {partition_drops}"
+        )
 
     # pylint: disable=R0917
     async def list_statistic_for_partition(
