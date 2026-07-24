@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational;
 
+import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 
@@ -31,6 +32,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +78,24 @@ public final class RelationalGarbageCollector implements Closeable {
     try {
       LOG.debug("Start to collect and delete legacy data by thread {}", threadId);
       long legacyTimeline = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
+      if (backend instanceof SupportsOrphanedRelationCleanup) {
+        SupportsOrphanedRelationCleanup orphanedRelationCleanup =
+            (SupportsOrphanedRelationCleanup) backend;
+        for (MetadataObject.Type metadataObjectType : MetadataObject.Type.values()) {
+          long deletedCount = Long.MAX_VALUE;
+          LOG.debug("Try to softly delete orphaned {} relations", metadataObjectType);
+          try {
+            while (deletedCount > 0) {
+              deletedCount =
+                  orphanedRelationCleanup.softDeleteOrphanedRelations(
+                      metadataObjectType, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+            }
+          } catch (RuntimeException e) {
+            LOG.error("Failed to softly delete orphaned " + metadataObjectType + " relations: ", e);
+          }
+        }
+      }
+
       for (Entity.EntityType entityType : Entity.EntityType.values()) {
         long deletedCount = Long.MAX_VALUE;
         LOG.debug(
