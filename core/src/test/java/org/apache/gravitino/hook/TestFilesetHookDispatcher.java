@@ -116,12 +116,13 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(mockWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Capability caseInsensitiveCap = new CaseInsensitiveCapability();
-    Mockito.when(mockWrapper.doWithCapabilityOps(any()))
+    Mockito.when(mockWrapper.doWithCapabilityOps(Mockito.any()))
         .thenAnswer(
-            inv ->
-                ((ThrowableFunction<Capability, ?>) inv.getArgument(0)).apply(caseInsensitiveCap));
+            inv -> {
+              @SuppressWarnings("unchecked")
+              org.apache.gravitino.utils.ThrowableFunction<Capability, ?> fn = inv.getArgument(0);
+              return fn.apply(new CaseInsensitiveCapability());
+            });
     Mockito.when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockWrapper);
 
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);

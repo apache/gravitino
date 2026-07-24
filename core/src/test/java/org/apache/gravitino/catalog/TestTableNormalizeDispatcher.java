@@ -28,6 +28,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestColumn;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -224,8 +225,13 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(mockWrapper.capabilities())
-        .thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+    Mockito.when(mockWrapper.doWithCapabilityOps(Mockito.any()))
+        .thenAnswer(
+            inv -> {
+              @SuppressWarnings("unchecked")
+              org.apache.gravitino.utils.ThrowableFunction<Capability, ?> fn = inv.getArgument(0);
+              return fn.apply(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+            });
     Mockito.when(mockCatalogManager.loadCatalogAndWrap(Mockito.any(NameIdentifier.class)))
         .thenReturn(mockWrapper);
 

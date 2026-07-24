@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog;
 
 import com.google.common.collect.Maps;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -109,8 +110,13 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(mockWrapper.capabilities())
-        .thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+    Mockito.when(mockWrapper.doWithCapabilityOps(Mockito.any()))
+        .thenAnswer(
+            inv -> {
+              @SuppressWarnings("unchecked")
+              org.apache.gravitino.utils.ThrowableFunction<Capability, ?> fn = inv.getArgument(0);
+              return fn.apply(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+            });
     Mockito.when(mockCatalogManager.loadCatalogAndWrap(Mockito.any(NameIdentifier.class)))
         .thenReturn(mockWrapper);
 
