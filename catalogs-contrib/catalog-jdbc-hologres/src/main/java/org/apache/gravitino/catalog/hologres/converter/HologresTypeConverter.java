@@ -62,6 +62,8 @@ public class HologresTypeConverter extends JdbcTypeConverter {
   static final String BYTEA = "bytea";
   @VisibleForTesting static final String JDBC_ARRAY_PREFIX = "_";
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
+  @VisibleForTesting static final int MAX_TIMESTAMP_PRECISION = 6;
+  @VisibleForTesting static final int MAX_TIMESTAMPTZ_PRECISION = 3;
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
@@ -90,11 +92,17 @@ public class HologresTypeConverter extends JdbcTypeConverter {
             .orElseGet(Types.TimeType::get);
       case TIMESTAMP:
         return Optional.ofNullable(typeBean.getDatetimePrecision())
-            .map(Types.TimestampType::withoutTimeZone)
+            .map(
+                precision ->
+                    Types.TimestampType.withoutTimeZone(
+                        Math.min(precision, MAX_TIMESTAMP_PRECISION)))
             .orElseGet(Types.TimestampType::withoutTimeZone);
       case TIMESTAMP_TZ:
         return Optional.ofNullable(typeBean.getDatetimePrecision())
-            .map(Types.TimestampType::withTimeZone)
+            .map(
+                precision ->
+                    Types.TimestampType.withTimeZone(
+                        Math.min(precision, MAX_TIMESTAMPTZ_PRECISION)))
             .orElseGet(Types.TimestampType::withTimeZone);
       case NUMERIC:
         return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
@@ -134,9 +142,17 @@ public class HologresTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.TimeType) {
       return type.simpleString();
     } else if (type instanceof Types.TimestampType) {
-      // Hologres does not support precision for TIMESTAMP/TIMESTAMPTZ (e.g. timestamptz(6)),
-      // so we always emit the base type without precision.
       Types.TimestampType timestampType = (Types.TimestampType) type;
+      int maxPrecision =
+          timestampType.hasTimeZone() ? MAX_TIMESTAMPTZ_PRECISION : MAX_TIMESTAMP_PRECISION;
+      if (timestampType.hasPrecisionSet() && timestampType.precision() > maxPrecision) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Hologres %s supports precision up to %d and cannot preserve Gravitino type %s",
+                timestampType.hasTimeZone() ? TIMESTAMP_TZ : TIMESTAMP,
+                maxPrecision,
+                type.simpleString()));
+      }
       return timestampType.hasTimeZone() ? TIMESTAMP_TZ : TIMESTAMP;
     } else if (type instanceof Types.DecimalType) {
       return NUMERIC
@@ -151,6 +167,22 @@ public class HologresTypeConverter extends JdbcTypeConverter {
       return BPCHAR + "(" + ((Types.FixedCharType) type).length() + ")";
     } else if (type instanceof Types.BinaryType) {
       return BYTEA;
+    } else if (type instanceof Types.NullType) {
+      throw new IllegalArgumentException(
+          "Hologres table columns cannot represent Gravitino Unknown (NullType); cannot convert Gravitino type null");
+    } else if (type instanceof Types.VariantType) {
+      throw new IllegalArgumentException(
+          "Hologres JSON and JSONB do not preserve Gravitino Variant semantics; cannot convert Gravitino type variant");
+    } else if (type instanceof Types.GeometryType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Hologres PostGIS geometry metadata does not preserve Gravitino Geometry CRS semantics; cannot convert Gravitino type %s",
+              type.simpleString()));
+    } else if (type instanceof Types.GeographyType) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Hologres PostGIS geography metadata does not preserve Gravitino Geography CRS and edge-algorithm semantics; cannot convert Gravitino type %s",
+              type.simpleString()));
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
     } else if (type instanceof Types.ExternalType) {

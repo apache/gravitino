@@ -53,6 +53,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -948,5 +949,69 @@ public class CatalogHologresIT extends BaseIT {
     // Verify logical partition property
     Map<String, String> loadedProps = loadedTable.properties();
     Assertions.assertEquals("true", loadedProps.get("is_logical_partitioned_table"));
+  }
+
+  @Test
+  void testRejectNanosecondTimestampTypesWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "timestamp_ns",
+        Types.TimestampType.withoutTimeZone(9),
+        "Hologres timestamp supports precision up to 6");
+    assertCreateRejectedWithoutSideEffects(
+        "timestamptz_ns",
+        Types.TimestampType.withTimeZone(9),
+        "Hologres timestamptz supports precision up to 3");
+  }
+
+  @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "variant",
+        Types.VariantType.get(),
+        "Hologres JSON and JSONB do not preserve Gravitino Variant semantics");
+  }
+
+  @Test
+  void testRejectUnknownWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "unknown",
+        Types.NullType.get(),
+        "Hologres table columns cannot represent Gravitino Unknown (NullType)");
+  }
+
+  @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geometry",
+        Types.GeometryType.of("EPSG:3857"),
+        "Hologres PostGIS geometry metadata does not preserve Gravitino Geometry CRS semantics");
+  }
+
+  @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertCreateRejectedWithoutSideEffects(
+        "geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "Hologres PostGIS geography metadata does not preserve Gravitino Geography CRS and edge-algorithm semantics");
+  }
+
+  private void assertCreateRejectedWithoutSideEffects(
+      String typeName, Type type, String expectedMessage) {
+    String rejectedTableName = GravitinoITUtils.genRandomName("rejected_" + typeName);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, rejectedTableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    tableIdentifier,
+                    new Column[] {Column.of("unsupported_col", type)},
+                    null,
+                    ImmutableMap.of()));
+
+    Assertions.assertTrue(exception.getMessage().contains(expectedMessage));
+    Assertions.assertFalse(tableCatalog.tableExists(tableIdentifier));
   }
 }
