@@ -30,12 +30,8 @@ import com.google.common.collect.Sets;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -43,21 +39,27 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.SupportsRelationOperations;
-import org.apache.gravitino.meta.GenericEntity;
-import org.apache.gravitino.meta.ModelVersionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** This class implements the {@link org.apache.gravitino.cache.EntityCache} using Caffeine */
+/**
+ * This class implements the {@link org.apache.gravitino.cache.EntityCache} using Caffeine.
+ *
+ * <p>The cache stores one entry per entity, keyed by the entity's {@code NameIdentifier} and type.
+ * A radix-tree prefix index over the cache keys implements cascading removal: invalidating an
+ * entity also drops every cached descendant entry (e.g. invalidating a catalog drops the cached
+ * schemas and tables under it).
+ *
+ * <p>Relation query results are NOT cached by this implementation; relation and list operations
+ * always fall back to the {@code EntityStore}. Only the self-contained metadata objects listed in
+ * {@link #CACHEABLE_TYPES} are cached; every other type (user/group/role, model/model version,
+ * function, and operational entities) is read straight from the {@code EntityStore}.
+ */
 public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_CLEANUP_CORE_THREADS = 1;
   private static final int CACHE_CLEANUP_MAX_THREADS = 1;
@@ -80,32 +82,39 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
 
+  /**
+   * Entity types this cache is allowed to hold. Only self-contained entities are cacheable: a stale
+   * copy of one is at worst cosmetically old (an old comment, property, or job status), never a
+   * wrong pointer, and each can be invalidated with a single one-to-one key drop.
+   *
+   * <p>Every other type is read straight from the store. user/group/role embed relation-derived
+   * data (a role's securable objects, a user's / group's role names) that a per-node cache cannot
+   * invalidate; model/model version and function carry a load-bearing pointer (a version URI, the
+   * latest version, the function implementation) that would be silently wrong if served stale.
+   */
+  private static final Set<Entity.EntityType> CACHEABLE_TYPES =
+      Sets.immutableEnumSet(
+          Entity.EntityType.METALAKE,
+          Entity.EntityType.CATALOG,
+          Entity.EntityType.SCHEMA,
+          Entity.EntityType.TABLE,
+          Entity.EntityType.TOPIC,
+          Entity.EntityType.VIEW,
+          Entity.EntityType.FILESET,
+          Entity.EntityType.TAG,
+          Entity.EntityType.POLICY,
+          Entity.EntityType.JOB);
+
   /** Segmented locking for better concurrency */
   private final SegmentedLock segmentedLock;
 
   /** Cache data structure. */
-  private final Cache<EntityCacheRelationKey, List<Entity>> cacheData;
+  private final Cache<EntityCacheKey, Entity> cacheData;
 
-  /** Cache reverse index structure. */
-  private ReverseIndexCache reverseIndex;
-
-  /** Cache Index structure. */
-  private RadixTree<EntityCacheRelationKey> cacheIndex;
+  /** Prefix index over cache keys, used for cascading removal of descendant entries. */
+  private RadixTree<EntityCacheKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
-
-  @VisibleForTesting
-  public ReverseIndexCache getReverseIndex() {
-    return reverseIndex;
-  }
-
-  private static final Set<SupportsRelationOperations.Type> RELATION_TYPES =
-      Sets.newHashSet(
-          SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
-          SupportsRelationOperations.Type.ROLE_USER_REL,
-          SupportsRelationOperations.Type.ROLE_GROUP_REL,
-          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
 
   /**
    * Constructs a new {@link CaffeineEntityCache}.
@@ -115,13 +124,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public CaffeineEntityCache(Config cacheConfig) {
     super(cacheConfig);
     this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-    this.reverseIndex = new ReverseIndexCache();
 
     // Initialize segmented lock
     int lockSegments = cacheConfig.get(Configs.CACHE_LOCK_SEGMENTS);
     this.segmentedLock = new SegmentedLock(lockSegments);
 
-    Caffeine<EntityCacheKey, List<Entity>> cacheDataBuilder = newBaseBuilder(cacheConfig);
+    Caffeine<EntityCacheKey, Entity> cacheDataBuilder = newBaseBuilder(cacheConfig);
 
     cacheDataBuilder
         .executor(CLEANUP_EXECUTOR)
@@ -151,21 +159,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   @VisibleForTesting
-  public Cache<EntityCacheRelationKey, List<Entity>> getCacheData() {
+  public Cache<EntityCacheKey, Entity> getCacheData() {
     return this.cacheData;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
-    checkArguments(nameIdentifier, identType, relType);
-
-    List<Entity> entitiesFromCache =
-        cacheData.getIfPresent(EntityCacheRelationKey.of(nameIdentifier, identType, relType));
-    return Optional.ofNullable(entitiesFromCache).map(BaseEntityCache::convertEntities);
   }
 
   /** {@inheritDoc} */
@@ -174,111 +169,29 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type));
+    Entity entityFromCache = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
 
-    return Optional.ofNullable(entitiesFromCache)
-        .filter(l -> !l.isEmpty())
-        .map(entities -> convertEntity(entities.get(0)));
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public boolean invalidate(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    checkArguments(ident, type, relType);
-
-    return segmentedLock.withLock(
-        EntityCacheRelationKey.of(ident, type, relType),
-        () -> {
-          invalidateEntities(ident, type, Optional.of(relType));
-          return true;
-        });
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public boolean invalidateRelationEntry(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    checkArguments(ident, type, relType);
-    EntityCacheRelationKey key = EntityCacheRelationKey.of(ident, type, relType);
-    return segmentedLock.withLock(
-        key,
-        () -> {
-          // Drop the cached relation result, its index entry, and the reverse-index bookkeeping
-          // for this relation key only. Do NOT cascade through the reverse index to other
-          // entities: the reverse index is shared (e.g. all roles bound to one metadata object),
-          // and a BFS cascade would evict their mappings. cacheData.invalidate is explicit so it
-          // bypasses the removal listener; reverseIndex.remove(key) then cleans up only this
-          // entry's own bookkeeping (entityToReverseIndexMap + reverseIndex references to it).
-          cacheData.invalidate(key);
-          reverseIndex.remove(key);
-          cacheIndex.remove(key.toString());
-          return true;
-        });
+    return Optional.ofNullable(entityFromCache).map(BaseEntityCache::convertEntity);
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
+    EntityCacheKey key = EntityCacheKey.of(ident, type);
     return segmentedLock.withLock(
-        EntityCacheRelationKey.of(ident, type),
+        key,
         () -> {
-          // Clear possible relation first, then clear the main entity cache.
-          // For example, if a tag has been updated, apart from invalidating the relation:
-          // metadata_object_to_tag_rel, we also need to invalidate the tag_to_metadata_object_rel.
-          // Assuming a tag "tag1" is related to a metadata object "catalog", when "catalog" is
-          // renamed to `catalog_new`, we need to invalidate both relations to avoid stale data.
-          // that is: before: tag1:TAG_METADATA_OBJECT_REL -> catalog,
-          // catalog:TAG_METADATA_OBJECT_REL -> tag1, after: tag1:TAG_METADATA_OBJECT_REL -> null,
-          // catalog:TAG_METADATA_OBJECT_REL -> null.
-          RELATION_TYPES.forEach(
-              relType -> {
-                List<Entity> relatedEntities =
-                    cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type, relType));
-                if (relatedEntities != null) {
-                  relatedEntities.stream()
-                      .filter(e -> StringUtils.isNotBlank(((HasIdentifier) e).name()))
-                      .forEach(
-                          entity -> {
-                            NameIdentifier identifier = ((HasIdentifier) entity).nameIdentifier();
-                            if (entity instanceof GenericEntity) {
-                              String metalakeName = ident.namespace().level(0);
-                              String[] names =
-                                  ArrayUtils.addFirst(
-                                      identifier.namespace().levels(), metalakeName);
-                              names = ArrayUtils.add(names, identifier.name());
-                              identifier = NameIdentifier.of(names);
-                            }
-
-                            invalidateEntities(identifier, entity.type(), Optional.of(relType));
-                          });
-                }
-              });
-
-          RELATION_TYPES.forEach(
-              relType -> {
-                invalidateEntities(ident, type, Optional.of(relType));
-              });
-
-          invalidateEntities(ident, type, Optional.empty());
+          invalidateHierarchy(key);
           return true;
         });
   }
 
   /** {@inheritDoc} */
   @Override
-  public boolean contains(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    checkArguments(ident, type, relType);
-    return cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type, relType)) != null;
-  }
-
-  /** {@inheritDoc} */
-  @Override
   public boolean contains(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
-    return cacheData.getIfPresent(EntityCacheRelationKey.of(ident, type)) != null;
+    return cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null;
   }
 
   /** {@inheritDoc} */
@@ -293,24 +206,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     segmentedLock.withGlobalLock(
         () -> {
           cacheData.invalidateAll();
-        });
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> void put(
-      NameIdentifier ident,
-      Entity.EntityType type,
-      SupportsRelationOperations.Type relType,
-      List<E> entities) {
-    checkArguments(ident, type, relType);
-    Preconditions.checkArgument(entities != null, "Entities cannot be null");
-    EntityCacheRelationKey entityCacheKey = EntityCacheRelationKey.of(ident, type, relType);
-    segmentedLock.withLock(
-        entityCacheKey,
-        () -> {
-          syncEntitiesToCache(
-              entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
+          cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
         });
   }
 
@@ -319,27 +215,30 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public <E extends Entity & HasIdentifier> void put(E entity) {
     Preconditions.checkArgument(entity != null, "Entity cannot be null");
 
+    if (!CACHEABLE_TYPES.contains(entity.type())) {
+      return;
+    }
+
     NameIdentifier identifier = getIdentFromEntity(entity);
-    EntityCacheRelationKey entityCacheKey = EntityCacheRelationKey.of(identifier, entity.type());
+    EntityCacheKey entityCacheKey = EntityCacheKey.of(identifier, entity.type());
 
     segmentedLock.withLock(
         entityCacheKey,
         () -> {
-          invalidateOnKeyChange(entity);
-          syncEntitiesToCache(entityCacheKey, Lists.newArrayList(entity));
+          cacheData.put(entityCacheKey, entity);
+          // If the entry was rejected (e.g. it exceeds the maximum weight), skip indexing it.
+          if (cacheData.policy().getIfPresentQuietly(entityCacheKey) != null) {
+            cacheIndex.put(entityCacheKey.toString(), entityCacheKey);
+          }
         });
   }
 
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity) {
-    // Invalidate the cache if inserting the entity may affect related cache keys.
-    // For example, inserting a model version changes the latest version of the model,
-    // so the corresponding model cache entry should be invalidated.
-    if (Objects.requireNonNull(entity.type()) == Entity.EntityType.MODEL_VERSION) {
-      NameIdentifier modelIdent = ((ModelVersionEntity) entity).modelIdentifier();
-      invalidate(modelIdent, Entity.EntityType.MODEL);
-    }
+    // Every cacheable entity is self-contained (see CACHEABLE_TYPES), so inserting one never
+    // requires invalidating a different key. Kept for the SPI contract; implementations that cache
+    // derived entries can override this.
   }
 
   /** {@inheritDoc} */
@@ -383,35 +282,28 @@ public class CaffeineEntityCache extends BaseEntityCache {
     segmentedLock.withLock(
         key,
         () -> {
-          reverseIndex.remove(key);
           cacheIndex.remove(key.toString());
         });
   }
 
   /**
-   * Syncs the entities to the cache, if entities are too big and cannot put to the cache, then it
-   * will be removed from the cache, and cacheIndex will not be updated.
+   * Removes the entry for the given key and all cached descendant entries. Descendants are found
+   * through the prefix index: every child identifier starts with {@code parent identifier + "."},
+   * so the scan is exact for children and never matches siblings sharing a name prefix (e.g. {@code
+   * catalog1} vs {@code catalog10}).
    *
-   * @param key The key of the entities.
-   * @param newEntities The new entities to sync to the cache.
+   * @param key The key of the entity whose subtree should be invalidated
    */
-  private void syncEntitiesToCache(EntityCacheRelationKey key, List<Entity> newEntities) {
-    List<Entity> existingEntities = cacheData.getIfPresent(key);
+  private void invalidateHierarchy(EntityCacheKey key) {
+    cacheData.invalidate(key);
+    cacheIndex.remove(key.toString());
 
-    if (existingEntities != null && key.relationType() != null) {
-      Set<Entity> merged = Sets.newLinkedHashSet(existingEntities);
-      merged.addAll(newEntities);
-      newEntities = new ArrayList<>(merged);
-    }
-
-    cacheData.put(key, newEntities);
-
-    for (Entity entity : newEntities) {
-      reverseIndex.indexEntity(entity, key);
-    }
-
-    if (cacheData.policy().getIfPresentQuietly(key) != null) {
-      cacheIndex.put(key.toString(), key);
+    String childPrefix = key.identifier().toString() + ".";
+    List<EntityCacheKey> childKeys =
+        Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(childPrefix));
+    for (EntityCacheKey childKey : childKeys) {
+      cacheData.invalidate(childKey);
+      cacheIndex.remove(childKey.toString());
     }
   }
 
@@ -446,80 +338,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return (Caffeine<KEY, VALUE>) builder;
   }
 
-  /**
-   * Invalidate entities with iterative BFS algorithm.
-   *
-   * @param identifier The identifier of the entity to invalidate
-   */
-  private boolean invalidateEntities(
-      NameIdentifier identifier,
-      Entity.EntityType type,
-      Optional<SupportsRelationOperations.Type> relTypeOpt) {
-    Queue<EntityCacheKey> queue = new ArrayDeque<>();
-
-    EntityCacheRelationKey valueForExactKey =
-        cacheIndex.getValueForExactKey(
-            relTypeOpt.isEmpty()
-                ? EntityCacheRelationKey.of(identifier, type).toString()
-                : EntityCacheRelationKey.of(identifier, type, relTypeOpt.get()).toString());
-
-    if (valueForExactKey == null) {
-      // It means the key does not exist in the cache. However, we still need to handle some cases.
-      // For example, we have stored a role entity in the cache and entity to role mapping in the
-      // reverse index. This is: cache data: role identifier -> role entity, reverse index:
-      // the securable object -> role. When we update the securable object, we need to invalidate
-      // the role entity from the cache though the securable object is not in the cache data.
-      valueForExactKey = EntityCacheRelationKey.of(identifier, type, relTypeOpt.orElse(null));
-    }
-
-    // The visited set to avoid processing the same key multiple times and thus causing infinite
-    // loop.
-    Set<EntityCacheKey> visited = Sets.newHashSet();
-    queue.offer(valueForExactKey);
-    while (!queue.isEmpty()) {
-      EntityCacheKey currentKeyToRemove = queue.poll();
-      if (visited.contains(currentKeyToRemove)) {
-        continue;
-      }
-      visited.add(currentKeyToRemove);
-
-      cacheData.invalidate(currentKeyToRemove);
-      cacheIndex.remove(currentKeyToRemove.toString());
-
-      // Remove related entity keys
-      List<EntityCacheKey> relatedEntityKeysToRemove =
-          Lists.newArrayList(
-              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.identifier().toString()));
-      queue.addAll(relatedEntityKeysToRemove);
-
-      // Look up from reverse index to go to next depth
-      List<List<EntityCacheKey>> reverseKeysToRemove =
-          Lists.newArrayList(
-              reverseIndex.getValuesForKeysStartingWith(
-                  currentKeyToRemove.identifier().toString()));
-
-      reverseKeysToRemove.forEach(
-          key -> {
-            // Remove from reverse index
-            // Convert EntityCacheRelationKey to EntityCacheKey
-            key.stream()
-                .forEach(
-                    k ->
-                        reverseIndex
-                            .getValuesForKeysStartingWith(k.toString())
-                            .forEach(rsk -> rsk.forEach(v -> reverseIndex.remove(v))));
-          });
-
-      reverseIndex.remove(currentKeyToRemove);
-      Set<EntityCacheKey> toAdd =
-          Sets.newHashSet(
-              reverseKeysToRemove.stream().flatMap(List::stream).collect(Collectors.toList()));
-      queue.addAll(toAdd);
-    }
-
-    return true;
-  }
-
   /** Starts the cache stats monitor. */
   private void startCacheStatsMonitor() {
     scheduler.scheduleAtFixedRate(
@@ -537,19 +355,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
         CACHE_MONITOR_INITIAL_DELAY_MINUTES,
         CACHE_MONITOR_PERIOD_MINUTES,
         TimeUnit.MINUTES);
-  }
-
-  /**
-   * Checks the arguments for the methods. All arguments must not be null.
-   *
-   * @param ident The identifier of the entity to check
-   * @param type The type of the entity to check
-   * @param relType The relation type of the entity to check
-   */
-  private void checkArguments(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    checkArguments(ident, type);
-    Preconditions.checkArgument(relType != null, "relType cannot be null");
   }
 
   /**

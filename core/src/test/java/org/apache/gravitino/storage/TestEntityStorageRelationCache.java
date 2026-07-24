@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.storage;
 
-import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
@@ -41,10 +40,6 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.cache.CaffeineEntityCache;
-import org.apache.gravitino.cache.EntityCacheKey;
-import org.apache.gravitino.cache.EntityCacheRelationKey;
-import org.apache.gravitino.cache.ReverseIndexCache;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionDefinitions;
 import org.apache.gravitino.function.FunctionImpl;
@@ -71,7 +66,6 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -211,35 +205,15 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
       store.delete(readRole.nameIdentifier(), Entity.EntityType.ROLE);
 
-      ReverseIndexCache reverseIndexCache =
-          ((CaffeineEntityCache) ((RelationalEntityStore) store).getCache()).getReverseIndex();
-      List<EntityCacheKey> reverseIndexValue =
-          reverseIndexCache.get(
-              NameIdentifier.of("metalake", "newCatalogName", "schema", "fileset"),
-              Entity.EntityType.FILESET);
-      Assertions.assertEquals(1, reverseIndexValue.size());
-      Assertions.assertEquals(writeRole.nameIdentifier(), reverseIndexValue.get(0).identifier());
+      Role reloadedWriteRole =
+          store.get(writeRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+      Assertions.assertEquals(1, reloadedWriteRole.securableObjects().size());
 
       store.put(readRole, true);
       store.get(readRole.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
-      reverseIndexValue =
-          reverseIndexCache.get(
-              NameIdentifier.of("metalake", "newCatalogName", "schema", "fileset"),
-              Entity.EntityType.FILESET);
-      Assertions.assertEquals(2, reverseIndexValue.size());
-      List<NameIdentifier> ids =
-          reverseIndexValue.stream().map(EntityCacheKey::identifier).collect(Collectors.toList());
-      Assertions.assertTrue(ids.contains(readRole.nameIdentifier()));
-      Assertions.assertTrue(ids.contains(writeRole.nameIdentifier()));
 
       store.delete(readRole.nameIdentifier(), Entity.EntityType.ROLE);
       store.delete(writeRole.nameIdentifier(), Entity.EntityType.ROLE);
-
-      reverseIndexValue =
-          reverseIndexCache.get(
-              NameIdentifier.of("metalake", "newCatalogName", "schema", "fileset"),
-              Entity.EntityType.FILESET);
-      Assertions.assertNull(reverseIndexValue);
 
       store.put(readRole, true);
       store.put(writeRole, true);
@@ -374,23 +348,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
       Assertions.assertEquals(1, tags.size());
       Assertions.assertEquals(tag1, tags.get(0));
 
-      RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
-      CaffeineEntityCache caffeineEntityCache =
-          (CaffeineEntityCache) relationalEntityStore.getCache();
-      Cache<EntityCacheRelationKey, List<Entity>> cache = caffeineEntityCache.getCacheData();
-
-      List<Entity> cachedTags =
-          cache.get(
-              EntityCacheRelationKey.of(
-                  catalog.nameIdentifier(),
-                  Entity.EntityType.CATALOG,
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              k -> null);
-
-      Assertions.assertNotNull(cachedTags);
-      Assertions.assertEquals(1, cachedTags.size());
-      Assertions.assertEquals(tag1, cachedTags.get(0));
-
       List<GenericEntity> genericEntities =
           relationOperations.listEntitiesByRelation(
               SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
@@ -417,23 +374,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
           CatalogEntity.class,
           Entity.EntityType.CATALOG,
           e -> updatedCatalog);
-      List<Entity> cachedTagsAfterCatalogUpdate =
-          cache.get(
-              EntityCacheRelationKey.of(
-                  catalog.nameIdentifier(),
-                  Entity.EntityType.CATALOG,
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              k -> null);
-      Assertions.assertNull(cachedTagsAfterCatalogUpdate);
-
-      List<Entity> cachedTagsByTagAfterCatalogUpdate =
-          cache.get(
-              EntityCacheRelationKey.of(
-                  tag1.nameIdentifier(),
-                  Entity.EntityType.TAG,
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              k -> null);
-      Assertions.assertNull(cachedTagsByTagAfterCatalogUpdate);
 
       List<TagEntity> tagsAfterCatalogUpdate =
           relationOperations.listEntitiesByRelation(
@@ -443,17 +383,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
               true);
       Assertions.assertEquals(1, tagsAfterCatalogUpdate.size());
       Assertions.assertEquals(tag1, tagsAfterCatalogUpdate.get(0));
-
-      List<Entity> cachedTagsAfterReload =
-          cache.get(
-              EntityCacheRelationKey.of(
-                  updatedCatalog.nameIdentifier(),
-                  Entity.EntityType.CATALOG,
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              k -> null);
-      Assertions.assertNotNull(cachedTagsAfterReload);
-      Assertions.assertEquals(1, cachedTagsAfterReload.size());
-      Assertions.assertEquals(tag1, cachedTagsAfterReload.get(0));
 
       List<GenericEntity> genericEntitiesAfterCatalogUpdate =
           relationOperations.listEntitiesByRelation(
@@ -466,20 +395,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
       Assertions.assertEquals(
           updatedCatalog.name(), genericEntitiesAfterCatalogUpdate.get(0).name());
 
-      List<Entity> cachedTagsByTagAfterReload =
-          cache.get(
-              EntityCacheRelationKey.of(
-                  tag1.nameIdentifier(),
-                  Entity.EntityType.TAG,
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              k -> null);
-      Assertions.assertNotNull(cachedTagsByTagAfterReload);
-      Assertions.assertEquals(1, cachedTagsByTagAfterReload.size());
-      Assertions.assertEquals(
-          updatedCatalog.id(), ((GenericEntity) cachedTagsByTagAfterReload.get(0)).id());
-      Assertions.assertEquals(
-          updatedCatalog.name(), ((GenericEntity) cachedTagsByTagAfterReload.get(0)).name());
-
       TagEntity updatedTag1 =
           TagEntity.builder()
               .withId(tag1.id())
@@ -490,24 +405,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
               .build();
       store.update(tag1.nameIdentifier(), TagEntity.class, Entity.EntityType.TAG, e -> updatedTag1);
 
-      List<Entity> cachedTagsAfterTagUpdate =
-          cache.get(
-              EntityCacheRelationKey.of(
-                  updatedCatalog.nameIdentifier(),
-                  Entity.EntityType.CATALOG,
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              k -> null);
-      Assertions.assertNull(cachedTagsAfterTagUpdate);
-
-      List<Entity> cachedEntitiesAfterTagUpdate =
-          cache.get(
-              EntityCacheRelationKey.of(
-                  tag1.nameIdentifier(),
-                  Entity.EntityType.TAG,
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              k -> null);
-      Assertions.assertNull(cachedEntitiesAfterTagUpdate);
-
       List<TagEntity> tagsAfterTagUpdate =
           relationOperations.listEntitiesByRelation(
               SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
@@ -516,17 +413,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
               true);
       Assertions.assertEquals(1, tagsAfterTagUpdate.size());
       Assertions.assertEquals(updatedTag1, tagsAfterTagUpdate.get(0));
-
-      List<Entity> cachedTagsAfterTagReload =
-          cache.get(
-              EntityCacheRelationKey.of(
-                  updatedCatalog.nameIdentifier(),
-                  Entity.EntityType.CATALOG,
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              k -> null);
-      Assertions.assertNotNull(cachedTagsAfterTagReload);
-      Assertions.assertEquals(1, cachedTagsAfterTagReload.size());
-      Assertions.assertEquals(updatedTag1, cachedTagsAfterTagReload.get(0));
 
       List<GenericEntity> genericEntitiesAfterTagUpdate =
           relationOperations.listEntitiesByRelation(
@@ -537,19 +423,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
       Assertions.assertEquals(1, genericEntitiesAfterTagUpdate.size());
       Assertions.assertEquals(catalog.id(), genericEntitiesAfterTagUpdate.get(0).id());
       Assertions.assertEquals(updatedCatalog.name(), genericEntitiesAfterTagUpdate.get(0).name());
-      List<Entity> cachedTagsByTagAfterTagReload =
-          cache.get(
-              EntityCacheRelationKey.of(
-                  updatedTag1.nameIdentifier(),
-                  Entity.EntityType.TAG,
-                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
-              k -> null);
-      Assertions.assertNotNull(cachedTagsByTagAfterTagReload);
-      Assertions.assertEquals(1, cachedTagsByTagAfterTagReload.size());
-      Assertions.assertEquals(
-          updatedCatalog.id(), ((GenericEntity) cachedTagsByTagAfterTagReload.get(0)).id());
-      Assertions.assertEquals(
-          updatedCatalog.name(), ((GenericEntity) cachedTagsByTagAfterTagReload.get(0)).name());
       destroy(type);
     }
   }
@@ -878,16 +751,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
           Entity.EntityType.FUNCTION,
           e -> renamedFunction);
 
-      if (enableCache && store instanceof RelationalEntityStore) {
-        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
-        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
-          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
-          ReverseIndexCache reverseIndexCache = cache.getReverseIndex();
-          Assertions.assertNull(
-              reverseIndexCache.get(function.nameIdentifier(), Entity.EntityType.FUNCTION));
-        }
-      }
-
       List<TagEntity> tagsAfterRename =
           relationOperations.listEntitiesByRelation(
               SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
@@ -914,7 +777,7 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testViewNotIndexedInReverseCache(String type, boolean enableCache) throws Exception {
+  void testViewCachedForSingleEntityLookup(String type, boolean enableCache) throws Exception {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
     init(type, config);
@@ -960,27 +823,15 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
               .withAuditInfo(auditInfo)
               .build();
 
-      // Use store.put() to trigger the actual cache + reverse index flow
+      // Use store.put() to trigger the single-entity cache flow
       store.put(view, false);
 
-      // Verify view IS in forward cache (performance cache for get operations)
+      // Verify the view can be read back through the store (served from cache when enabled)
       ViewEntity retrievedView =
           store.get(view.nameIdentifier(), Entity.EntityType.VIEW, ViewEntity.class);
       Assertions.assertNotNull(retrievedView);
       Assertions.assertEquals(view.id(), retrievedView.id());
       Assertions.assertEquals(view.name(), retrievedView.name());
-
-      // Get reverse index cache to verify view is NOT indexed
-      ReverseIndexCache reverseIndexCache =
-          ((CaffeineEntityCache) ((RelationalEntityStore) store).getCache()).getReverseIndex();
-
-      // Verify view is NOT in reverse index cache
-      // Views have namespace and should be skipped by GENERIC_METADATA_OBJECT_REVERSE_RULE
-      List<EntityCacheKey> reverseIndexValue =
-          reverseIndexCache.get(view.nameIdentifier(), Entity.EntityType.VIEW);
-      Assertions.assertNull(
-          reverseIndexValue,
-          "Views should NOT be indexed in reverse cache - they have namespace and don't support tags/policies");
 
       destroy(type);
     }
@@ -1022,25 +873,7 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
               true);
       Assertions.assertTrue(tags.isEmpty());
 
-      // 2. Verify cache has empty list if cache is enabled
-      if (enableCache && store instanceof RelationalEntityStore) {
-        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
-        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
-          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
-          List<Entity> cachedEntities =
-              cache
-                  .getCacheData()
-                  .getIfPresent(
-                      EntityCacheRelationKey.of(
-                          catalog.nameIdentifier(),
-                          Entity.EntityType.CATALOG,
-                          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL));
-          Assertions.assertNotNull(cachedEntities);
-          Assertions.assertTrue(cachedEntities.isEmpty());
-        }
-      }
-
-      // 3. Create a tag and add relation
+      // 2. Create a tag and add relation
       Namespace tagNamespace = NameIdentifierUtil.ofTag("metalake", "tag1").namespace();
       TagEntity tag1 =
           TagEntity.builder()
@@ -1076,23 +909,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
               Entity.EntityType.CATALOG,
               true);
       Assertions.assertTrue(owners.isEmpty());
-
-      if (enableCache && store instanceof RelationalEntityStore) {
-        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
-        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
-          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
-          List<Entity> cachedOwners =
-              cache
-                  .getCacheData()
-                  .getIfPresent(
-                      EntityCacheRelationKey.of(
-                          catalog.nameIdentifier(),
-                          Entity.EntityType.CATALOG,
-                          SupportsRelationOperations.Type.OWNER_REL));
-          Assertions.assertNotNull(cachedOwners);
-          Assertions.assertTrue(cachedOwners.isEmpty());
-        }
-      }
 
       UserEntity ownerUser =
           createUserEntity(
@@ -1172,25 +988,7 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
               true);
       Assertions.assertTrue(entities.isEmpty());
 
-      // 2. Verify cache has empty list if cache is enabled
-      if (enableCache && store instanceof RelationalEntityStore) {
-        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
-        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
-          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
-          List<Entity> cachedEntities =
-              cache
-                  .getCacheData()
-                  .getIfPresent(
-                      EntityCacheRelationKey.of(
-                          tag1.nameIdentifier(),
-                          Entity.EntityType.TAG,
-                          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL));
-          Assertions.assertNotNull(cachedEntities);
-          Assertions.assertTrue(cachedEntities.isEmpty());
-        }
-      }
-
-      // 3. Add relation from Catalog (Source side)
+      // 2. Add relation from Catalog (Source side)
       relationOperations.updateEntityRelations(
           SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
           catalog.nameIdentifier(),
@@ -1198,7 +996,7 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
           new NameIdentifier[] {tag1.nameIdentifier()},
           new NameIdentifier[] {});
 
-      // 4. Fetch relation for Tag again, it should NOT be empty
+      // 3. Fetch relation for Tag again, it should NOT be empty
       entities =
           relationOperations.listEntitiesByRelation(
               SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
@@ -1276,39 +1074,13 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
                 .build();
         store.put(role, false);
 
-        // Read role to populate cache; ROLE_SECURABLE_OBJECT_REVERSE_RULE writes:
-        // funcIdent:FUNCTION -> [roleIdent:ROLE] into the reverse index.
+        // Read the role once so a stale copy would be observable if it were cached.
         RoleEntity cachedRole =
             store.get(role.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
         Assertions.assertEquals(3, cachedRole.securableObjects().size());
 
-        if (enableCache && store instanceof RelationalEntityStore) {
-          RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
-          if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
-            ReverseIndexCache reverseIndex =
-                ((CaffeineEntityCache) relationalEntityStore.getCache()).getReverseIndex();
-            List<EntityCacheKey> reverseKeys =
-                reverseIndex.get(function.nameIdentifier(), Entity.EntityType.FUNCTION);
-            Assertions.assertNotNull(reverseKeys);
-            Assertions.assertTrue(
-                reverseKeys.stream().anyMatch(k -> k.identifier().equals(role.nameIdentifier())));
-          }
-        }
-
-        // Delete the function; BFS invalidation should evict the role from cache via reverse index.
+        // Delete the function; the next role read must not serve a stale securable object list.
         store.delete(function.nameIdentifier(), Entity.EntityType.FUNCTION, false);
-
-        if (enableCache && store instanceof RelationalEntityStore) {
-          RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
-          if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
-            CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
-            Assertions.assertNull(
-                cache
-                    .getCacheData()
-                    .getIfPresent(
-                        EntityCacheRelationKey.of(role.nameIdentifier(), Entity.EntityType.ROLE)));
-          }
-        }
 
         // Re-read role; the function securable object should have been removed from DB via cascade.
         RoleEntity reloadedRole =
@@ -1379,24 +1151,7 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
                 true);
         Assertions.assertTrue(owners.isEmpty());
 
-        if (enableCache && store instanceof RelationalEntityStore) {
-          RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
-          if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
-            CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
-            List<Entity> cachedOwners =
-                cache
-                    .getCacheData()
-                    .getIfPresent(
-                        EntityCacheRelationKey.of(
-                            function.nameIdentifier(),
-                            Entity.EntityType.FUNCTION,
-                            SupportsRelationOperations.Type.OWNER_REL));
-            Assertions.assertNotNull(cachedOwners);
-            Assertions.assertTrue(cachedOwners.isEmpty());
-          }
-        }
-
-        // 2. Set an owner; cache for OWNER_REL should be invalidated
+        // 2. Set an owner; the next read must reflect it
         UserEntity ownerUser =
             createUserEntity(
                 RandomIdGenerator.INSTANCE.nextId(),
@@ -1413,7 +1168,7 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
             Entity.EntityType.USER,
             true);
 
-        // 3. Query owner again - should return the owner and be re-cached
+        // 3. Query owner again - should return the owner
         owners =
             relationOperations.listEntitiesByRelation(
                 SupportsRelationOperations.Type.OWNER_REL,
@@ -1423,7 +1178,7 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
         Assertions.assertEquals(1, owners.size());
         Assertions.assertEquals(ownerUser.name(), owners.get(0).name());
 
-        // 4. Rename the function; old OWNER_REL cache entry should be evicted via BFS invalidation
+        // 4. Rename the function; owner lookups via the new name must keep working
         FunctionEntity renamedFunction =
             createFunctionEntity(
                 function.id(),
@@ -1435,23 +1190,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
             FunctionEntity.class,
             Entity.EntityType.FUNCTION,
             e -> renamedFunction);
-
-        if (enableCache && store instanceof RelationalEntityStore) {
-          RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
-          if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
-            CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
-            // The old function's OWNER_REL cache should have been evicted by BFS invalidation
-            List<Entity> cachedOwners =
-                cache
-                    .getCacheData()
-                    .getIfPresent(
-                        EntityCacheRelationKey.of(
-                            function.nameIdentifier(),
-                            Entity.EntityType.FUNCTION,
-                            SupportsRelationOperations.Type.OWNER_REL));
-            Assertions.assertNull(cachedOwners);
-          }
-        }
 
         // 5. Query owner via new name - should still return the correct owner
         owners =
@@ -1540,27 +1278,8 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
         Assertions.assertEquals(1, rolesBeforeRevoke.size());
         Assertions.assertEquals("test_role", rolesBeforeRevoke.get(0).name());
 
-        // Verify the relation is in cache when cache is enabled
-        if (enableCache && store instanceof RelationalEntityStore) {
-          RelationalEntityStore relStore = (RelationalEntityStore) store;
-          if (relStore.getCache() instanceof CaffeineEntityCache) {
-            CaffeineEntityCache caffeineCache = (CaffeineEntityCache) relStore.getCache();
-            List<Entity> cachedRoles =
-                caffeineCache
-                    .getCacheData()
-                    .getIfPresent(
-                        EntityCacheRelationKey.of(
-                            schema.nameIdentifier(),
-                            Entity.EntityType.SCHEMA,
-                            SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL));
-            Assertions.assertNotNull(cachedRoles, "Cache should be populated after first fetch");
-            Assertions.assertEquals(1, cachedRoles.size());
-          }
-        }
-
         // Simulate revokePrivilegesFromRole: update the role to remove the schema securable object.
-        // RelationalEntityStore.update() calls cache.invalidate(roleIdent, ROLE) afterwards,
-        // which must also invalidate the schema's METADATA_OBJECT_ROLE_REL cache entry.
+        // The next listEntitiesByRelation must reflect the change immediately.
         store.update(
             role.nameIdentifier(),
             RoleEntity.class,
@@ -1574,25 +1293,6 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
                     .withAuditInfo(existing.auditInfo())
                     .withSecurableObjects(Lists.newArrayList()) // all privileges revoked
                     .build());
-
-        // Verify METADATA_OBJECT_ROLE_REL cache is gone when cache is enabled
-        if (enableCache && store instanceof RelationalEntityStore) {
-          RelationalEntityStore relStore = (RelationalEntityStore) store;
-          if (relStore.getCache() instanceof CaffeineEntityCache) {
-            CaffeineEntityCache caffeineCache = (CaffeineEntityCache) relStore.getCache();
-            List<Entity> cachedAfterRevoke =
-                caffeineCache
-                    .getCacheData()
-                    .getIfPresent(
-                        EntityCacheRelationKey.of(
-                            schema.nameIdentifier(),
-                            Entity.EntityType.SCHEMA,
-                            SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL));
-            Assertions.assertNull(
-                cachedAfterRevoke,
-                "METADATA_OBJECT_ROLE_REL cache must be invalidated after role update");
-          }
-        }
 
         // The key correctness check: listEntitiesByRelation must not return the revoked role
         List<RoleEntity> rolesAfterRevoke =
