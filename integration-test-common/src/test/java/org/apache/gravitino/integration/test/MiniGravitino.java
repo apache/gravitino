@@ -24,6 +24,7 @@ import static org.apache.gravitino.lance.common.config.LanceConfig.LANCE_CONFIG_
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND_URI;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
@@ -40,6 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -68,10 +70,10 @@ public class MiniGravitino {
   private static final Logger LOG = LoggerFactory.getLogger(MiniGravitino.class);
   private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
   private MiniGravitinoContext context;
-  private RESTClient restClient;
+  @Nullable private RESTClient restClient;
   private final File mockConfDir;
   private final ServerConfig serverConfig = new ServerConfig();
-  private final ExecutorService executor = Executors.newSingleThreadExecutor();
+  private final ExecutorService executor;
   private Properties properties;
 
   private String host;
@@ -79,8 +81,23 @@ public class MiniGravitino {
   private int port;
 
   public MiniGravitino(MiniGravitinoContext context) throws IOException {
+    this(
+        context,
+        Files.createTempDirectory("MiniGravitino").toFile(),
+        Executors.newSingleThreadExecutor(),
+        null);
+  }
+
+  @VisibleForTesting
+  MiniGravitino(
+      MiniGravitinoContext context,
+      File mockConfDir,
+      ExecutorService executor,
+      @Nullable RESTClient restClient) {
     this.context = context;
-    this.mockConfDir = Files.createTempDirectory("MiniGravitino").toFile();
+    this.mockConfDir = mockConfDir;
+    this.executor = executor;
+    this.restClient = restClient;
     mockConfDir.mkdirs();
   }
 
@@ -216,31 +233,39 @@ public class MiniGravitino {
   public void stop() throws IOException, InterruptedException {
     LOG.debug("MiniGravitino shutDown...");
 
-    executor.shutdown();
-    sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
-    executor.shutdownNow();
-
-    long beginTime = System.currentTimeMillis();
-    boolean started = true;
-
-    String url = String.format("http://%s:%d/metrics", host, port);
-    while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-      sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
-      started = HttpUtils.isHttpServerUp(url);
-      if (!started) {
-        break;
-      }
-    }
-
-    restClient.close();
+    Throwable failure = null;
     try {
-      FileUtils.deleteDirectory(mockConfDir);
-    } catch (Exception e) {
-      // Ignore
-    }
+      executor.shutdown();
+      sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
+      executor.shutdownNow();
 
-    if (started) {
-      throw new RuntimeException("Can not stop Gravitino server");
+      // The HTTP port may be closed before GravitinoServer.main() finishes shutting down the
+      // singleton GravitinoEnv. Wait for the server task to terminate so the next embedded server
+      // cannot initialize the same environment while this shutdown is still in progress.
+      if (!executor.awaitTermination(3, TimeUnit.MINUTES)) {
+        throw new RuntimeException("Can not terminate MiniGravitino server task");
+      }
+
+      long beginTime = System.currentTimeMillis();
+      boolean started = true;
+
+      String url = String.format("http://%s:%d/metrics", host, port);
+      while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
+        sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
+        started = HttpUtils.isHttpServerUp(url);
+        if (!started) {
+          break;
+        }
+      }
+
+      if (started) {
+        throw new RuntimeException("Can not stop Gravitino server");
+      }
+    } catch (InterruptedException | RuntimeException | Error e) {
+      failure = e;
+      throw e;
+    } finally {
+      cleanupResources(failure);
     }
 
     LOG.debug("MiniGravitino terminated.");
@@ -298,6 +323,25 @@ public class MiniGravitino {
       customConfigs.put(LANCE_CONFIG_PREFIX + NAMESPACE_BACKEND_URI.getKey(), gravitinoUri);
     }
     return ImmutableMap.copyOf(customConfigs);
+  }
+
+  private void cleanupResources(@Nullable Throwable failure) throws IOException {
+    try {
+      if (restClient != null) {
+        restClient.close();
+      }
+    } catch (IOException e) {
+      if (failure == null) {
+        throw e;
+      }
+      failure.addSuppressed(e);
+    } finally {
+      try {
+        FileUtils.deleteDirectory(mockConfDir);
+      } catch (Exception e) {
+        LOG.warn("Failed to delete MiniGravitino configuration directory {}", mockConfDir, e);
+      }
+    }
   }
 
   // Customize the config file
