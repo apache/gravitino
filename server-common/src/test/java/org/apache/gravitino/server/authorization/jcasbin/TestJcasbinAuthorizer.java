@@ -889,6 +889,46 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testIsSelfGroupViaPrincipalGroup() throws Exception {
+    NameIdentifier groupIdent = NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME);
+
+    setCurrentPrincipalWithGroup(GROUP_NAME);
+    Mockito.clearInvocations(groupMetaMapper);
+    assertTrue(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+    Mockito.verify(groupMetaMapper, Mockito.never()).getGroupUpdatedAt(anyString(), anyString());
+
+    setCurrentPrincipalWithGroup("otherGroup");
+    assertFalse(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+    Mockito.verify(groupMetaMapper, Mockito.never()).getGroupUpdatedAt(anyString(), anyString());
+
+    restoreDefaultPrincipal();
+  }
+
+  @Test
+  public void testIsSelfGroupDoesNotRequireCurrentUserName() throws Exception {
+    NameIdentifier groupIdent = NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME);
+
+    UserPrincipal groupPrincipal = mock(UserPrincipal.class);
+    when(groupPrincipal.getGroups())
+        .thenReturn(ImmutableList.of(new UserGroup(Optional.empty(), GROUP_NAME)));
+    when(groupPrincipal.getName())
+        .thenThrow(new AssertionError("GROUP self check should only use principal groups"));
+    principalUtilsMockedStatic.when(PrincipalUtils::getCurrentPrincipal).thenReturn(groupPrincipal);
+
+    try {
+      assertTrue(
+          jcasbinAuthorizer.isSelf(
+              Entity.EntityType.GROUP, groupIdent, new AuthorizationRequestContext()));
+    } finally {
+      restoreDefaultPrincipal();
+    }
+  }
+
+  @Test
   public void testIsSelfRoleReusesCacheAcrossCalls() throws Exception {
     // Acceptance criterion for #11088: repeated isSelf(ROLE) calls in the same logical request
     // must not re-issue the role-list DB queries (listRolesByUserId / listRolesByGroupId).
