@@ -112,7 +112,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     }
 
     // Parse named arguments
-    Map<String, String> argMap = parseArguments(args);
+    Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
     // Validate required arguments
     String catalogName = argMap.get("catalog");
@@ -147,7 +147,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     // Apply custom Spark configurations if provided
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       try {
-        Map<String, String> customConfigs = parseCustomSparkConfigs(sparkConfJson);
+        Map<String, String> customConfigs = IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
         for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
           sparkBuilder.config(entry.getKey(), entry.getValue());
         }
@@ -231,20 +231,22 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
 
     StringBuilder sql = new StringBuilder();
     sql.append("CALL ")
-        .append(escapeSqlIdentifier(catalogName))
+        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
         .append(".system.rewrite_data_files(");
-    sql.append("table => '").append(escapeSqlString(tableIdentifier)).append("'");
+    sql.append("table => '").append(IcebergJobUtils.escapeSqlString(tableIdentifier)).append("'");
 
     if (strategy != null && !strategy.isEmpty()) {
-      sql.append(", strategy => '").append(escapeSqlString(strategy)).append("'");
+      sql.append(", strategy => '").append(IcebergJobUtils.escapeSqlString(strategy)).append("'");
     }
 
     if (sortOrder != null && !sortOrder.isEmpty()) {
-      sql.append(", sort_order => '").append(escapeSqlString(sortOrder)).append("'");
+      sql.append(", sort_order => '")
+          .append(IcebergJobUtils.escapeSqlString(sortOrder))
+          .append("'");
     }
 
     if (whereClause != null && !whereClause.isEmpty()) {
-      sql.append(", where => '").append(escapeSqlString(whereClause)).append("'");
+      sql.append(", where => '").append(IcebergJobUtils.escapeSqlString(whereClause)).append("'");
     }
 
     if (optionsJson != null && !optionsJson.isEmpty()) {
@@ -258,9 +260,9 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
             sql.append(", ");
           }
           sql.append("'")
-              .append(escapeSqlString(entry.getKey()))
+              .append(IcebergJobUtils.escapeSqlString(entry.getKey()))
               .append("', '")
-              .append(escapeSqlString(entry.getValue()))
+              .append(IcebergJobUtils.escapeSqlString(entry.getValue()))
               .append("'");
           first = false;
         }
@@ -272,61 +274,19 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     return sql.toString();
   }
 
-  /**
-   * Escape single quotes in SQL string literals by replacing ' with ''.
-   *
-   * @param value the string value to escape
-   * @return escaped string safe for use in SQL string literals
-   */
+  /** Delegates to {@link IcebergJobUtils#escapeSqlString(String)}. */
   static String escapeSqlString(String value) {
-    if (value == null) {
-      return null;
-    }
-    return value.replace("'", "''");
+    return IcebergJobUtils.escapeSqlString(value);
   }
 
-  /**
-   * Escape SQL identifiers by replacing backticks and validating format.
-   *
-   * @param identifier the SQL identifier to escape
-   * @return escaped identifier safe for use in SQL
-   */
+  /** Delegates to {@link IcebergJobUtils#escapeSqlIdentifier(String)}. */
   static String escapeSqlIdentifier(String identifier) {
-    if (identifier == null) {
-      return null;
-    }
-    // Replace backticks to prevent breaking out of identifier quotes
-    return identifier.replace("`", "``");
+    return IcebergJobUtils.escapeSqlIdentifier(identifier);
   }
 
-  /**
-   * Parse command line arguments in --key value format.
-   *
-   * @param args command line arguments
-   * @return map of argument names to values
-   */
+  /** Delegates to {@link IcebergJobUtils#parseArguments(String[])}. */
   static Map<String, String> parseArguments(String[] args) {
-    Map<String, String> argMap = new HashMap<>();
-
-    for (int i = 0; i < args.length; i++) {
-      if (args[i].startsWith("--")) {
-        String key = args[i].substring(2); // Remove "--" prefix
-
-        // Check if there's a value for this key
-        if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
-          String value = args[i + 1];
-          // Only add non-empty values
-          if (value != null && !value.trim().isEmpty()) {
-            argMap.put(key, value);
-          }
-          i++; // Skip the value in next iteration
-        } else {
-          System.err.println("Warning: Flag " + args[i] + " has no value, ignoring");
-        }
-      }
-    }
-
-    return argMap;
+    return IcebergJobUtils.parseArguments(args);
   }
 
   /**
@@ -352,38 +312,9 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     }
   }
 
-  /**
-   * Parse custom Spark configurations from JSON string.
-   *
-   * @param sparkConfJson JSON string containing Spark configurations
-   * @return map of Spark configuration keys to values
-   * @throws IllegalArgumentException if JSON parsing fails
-   */
+  /** Delegates to {@link IcebergJobUtils#parseCustomSparkConfigs(String)}. */
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    if (sparkConfJson == null || sparkConfJson.isEmpty()) {
-      return new HashMap<>();
-    }
-
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      Map<String, Object> parsedMap =
-          mapper.readValue(sparkConfJson, new TypeReference<Map<String, Object>>() {});
-
-      Map<String, String> configs = new HashMap<>();
-      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        String key = entry.getKey();
-        Object value = entry.getValue();
-        configs.put(key, value == null ? "" : value.toString());
-      }
-      return configs;
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Failed to parse Spark configurations JSON: "
-              + sparkConfJson
-              + ". Error: "
-              + e.getMessage(),
-          e);
-    }
+    return IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
   }
 
   /** Print usage information. */

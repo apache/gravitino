@@ -74,7 +74,7 @@ public class TestIcebergExpireSnapshotsJob {
     SparkJobTemplate template = job.jobTemplate();
 
     assertNotNull(template.arguments());
-    assertEquals(12, template.arguments().size()); // 6 flags * 2 (flag + value)
+    assertEquals(11, template.arguments().size());
 
     // Verify all expected arguments are present
     assertTrue(template.arguments().contains("--catalog"));
@@ -85,7 +85,7 @@ public class TestIcebergExpireSnapshotsJob {
     assertTrue(template.arguments().contains("{{older_than}}"));
     assertTrue(template.arguments().contains("--retain-last"));
     assertTrue(template.arguments().contains("{{retain_last}}"));
-    assertTrue(template.arguments().contains("--stream-results"));
+    // --stream-results is a boolean flag, value is the template variable itself
     assertTrue(template.arguments().contains("{{stream_results}}"));
     assertTrue(template.arguments().contains("--spark-conf"));
     assertTrue(template.arguments().contains("{{spark_conf}}"));
@@ -148,7 +148,7 @@ public class TestIcebergExpireSnapshotsJob {
   @Test
   public void testParseArgumentsWithAllRequired() {
     String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample"};
-    Map<String, String> result = IcebergExpireSnapshotsJob.parseArguments(args);
+    Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     assertEquals(2, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
@@ -163,7 +163,7 @@ public class TestIcebergExpireSnapshotsJob {
       "--older-than", "2024-01-01 00:00:00",
       "--retain-last", "5"
     };
-    Map<String, String> result = IcebergExpireSnapshotsJob.parseArguments(args);
+    Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     assertEquals(4, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
@@ -175,7 +175,7 @@ public class TestIcebergExpireSnapshotsJob {
   @Test
   public void testParseArgumentsWithEmptyValues() {
     String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample", "--older-than", ""};
-    Map<String, String> result = IcebergExpireSnapshotsJob.parseArguments(args);
+    Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     // Empty values should be ignored
     assertEquals(2, result.size());
@@ -185,27 +185,33 @@ public class TestIcebergExpireSnapshotsJob {
   }
 
   @Test
-  public void testParseArgumentsWithMissingValues() {
-    String[] args = {"--catalog", "iceberg_prod", "--table"};
-    Map<String, String> result = IcebergExpireSnapshotsJob.parseArguments(args);
+  public void testParseArgumentsFlagOnly() {
+    // --stream-results as a flag (no value) should be treated as "true"
+    String[] args = {"--catalog", "iceberg_prod", "--table", "db.sample", "--stream-results"};
+    Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
-    // Only catalog should be parsed, table has no value
-    assertEquals(1, result.size());
+    assertEquals(3, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
-    assertFalse(result.containsKey("table"));
+    assertEquals("db.sample", result.get("table"));
+    assertEquals("true", result.get("stream-results"));
   }
 
   @Test
   public void testParseArgumentsWithAllOptions() {
     String[] args = {
-      "--catalog", "iceberg_prod",
-      "--table", "db.sample",
-      "--older-than", "2024-06-01 00:00:00",
-      "--retain-last", "3",
-      "--stream-results", "true",
-      "--spark-conf", "{\"spark.executor.memory\":\"4g\"}"
+      "--catalog",
+      "iceberg_prod",
+      "--table",
+      "db.sample",
+      "--older-than",
+      "2024-06-01 00:00:00",
+      "--retain-last",
+      "3",
+      "--stream-results",
+      "--spark-conf",
+      "{\"spark.executor.memory\":\"4g\"}"
     };
-    Map<String, String> result = IcebergExpireSnapshotsJob.parseArguments(args);
+    Map<String, String> result = IcebergJobUtils.parseArguments(args);
 
     assertEquals(6, result.size());
     assertEquals("iceberg_prod", result.get("catalog"));
@@ -221,8 +227,8 @@ public class TestIcebergExpireSnapshotsJob {
     String[] args1 = {"--catalog", "cat1", "--table", "tbl1", "--retain-last", "5"};
     String[] args2 = {"--retain-last", "5", "--table", "tbl1", "--catalog", "cat1"};
 
-    Map<String, String> result1 = IcebergExpireSnapshotsJob.parseArguments(args1);
-    Map<String, String> result2 = IcebergExpireSnapshotsJob.parseArguments(args2);
+    Map<String, String> result1 = IcebergJobUtils.parseArguments(args1);
+    Map<String, String> result2 = IcebergJobUtils.parseArguments(args2);
 
     assertEquals(result1, result2);
   }
@@ -232,19 +238,20 @@ public class TestIcebergExpireSnapshotsJob {
   @Test
   public void testBuildProcedureCallMinimal() {
     String sql =
-        IcebergExpireSnapshotsJob.buildProcedureCall("iceberg_prod", "db.sample", null, null, null);
+        IcebergExpireSnapshotsJob.buildProcedureCall(
+            "iceberg_prod", "db.sample", null, null, false);
 
-    assertEquals("CALL iceberg_prod.system.expire_snapshots(table => 'db.sample')", sql);
+    assertEquals("CALL `iceberg_prod`.system.expire_snapshots(table => 'db.sample')", sql);
   }
 
   @Test
   public void testBuildProcedureCallWithOlderThan() {
     String sql =
         IcebergExpireSnapshotsJob.buildProcedureCall(
-            "iceberg_prod", "db.sample", "2024-01-01 00:00:00", null, null);
+            "iceberg_prod", "db.sample", "2024-01-01 00:00:00", null, false);
 
     assertEquals(
-        "CALL iceberg_prod.system.expire_snapshots(table => 'db.sample', "
+        "CALL `iceberg_prod`.system.expire_snapshots(table => 'db.sample', "
             + "older_than => TIMESTAMP '2024-01-01 00:00:00')",
         sql);
   }
@@ -252,20 +259,19 @@ public class TestIcebergExpireSnapshotsJob {
   @Test
   public void testBuildProcedureCallWithRetainLast() {
     String sql =
-        IcebergExpireSnapshotsJob.buildProcedureCall("iceberg_prod", "db.sample", null, "5", null);
+        IcebergExpireSnapshotsJob.buildProcedureCall("iceberg_prod", "db.sample", null, "5", false);
 
     assertEquals(
-        "CALL iceberg_prod.system.expire_snapshots(table => 'db.sample', retain_last => 5)", sql);
+        "CALL `iceberg_prod`.system.expire_snapshots(table => 'db.sample', retain_last => 5)", sql);
   }
 
   @Test
   public void testBuildProcedureCallWithStreamResults() {
     String sql =
-        IcebergExpireSnapshotsJob.buildProcedureCall(
-            "iceberg_prod", "db.sample", null, null, "true");
+        IcebergExpireSnapshotsJob.buildProcedureCall("iceberg_prod", "db.sample", null, null, true);
 
     assertEquals(
-        "CALL iceberg_prod.system.expire_snapshots(table => 'db.sample', "
+        "CALL `iceberg_prod`.system.expire_snapshots(table => 'db.sample', "
             + "stream_results => true)",
         sql);
   }
@@ -274,9 +280,9 @@ public class TestIcebergExpireSnapshotsJob {
   public void testBuildProcedureCallWithAllParameters() {
     String sql =
         IcebergExpireSnapshotsJob.buildProcedureCall(
-            "iceberg_prod", "db.sample", "2024-01-01 00:00:00", "3", "true");
+            "iceberg_prod", "db.sample", "2024-01-01 00:00:00", "3", true);
 
-    assertTrue(sql.startsWith("CALL iceberg_prod.system.expire_snapshots("));
+    assertTrue(sql.startsWith("CALL `iceberg_prod`.system.expire_snapshots("));
     assertTrue(sql.contains("table => 'db.sample'"));
     assertTrue(sql.contains("older_than => TIMESTAMP '2024-01-01 00:00:00'"));
     assertTrue(sql.contains("retain_last => 3"));
@@ -287,17 +293,17 @@ public class TestIcebergExpireSnapshotsJob {
   @Test
   public void testBuildProcedureCallWithEmptyOlderThan() {
     String sql =
-        IcebergExpireSnapshotsJob.buildProcedureCall("iceberg_prod", "db.sample", "", null, null);
+        IcebergExpireSnapshotsJob.buildProcedureCall("iceberg_prod", "db.sample", "", null, false);
 
-    assertEquals("CALL iceberg_prod.system.expire_snapshots(table => 'db.sample')", sql);
+    assertEquals("CALL `iceberg_prod`.system.expire_snapshots(table => 'db.sample')", sql);
   }
 
   @Test
   public void testBuildProcedureCallWithEmptyRetainLast() {
     String sql =
-        IcebergExpireSnapshotsJob.buildProcedureCall("iceberg_prod", "db.sample", null, "", null);
+        IcebergExpireSnapshotsJob.buildProcedureCall("iceberg_prod", "db.sample", null, "", false);
 
-    assertEquals("CALL iceberg_prod.system.expire_snapshots(table => 'db.sample')", sql);
+    assertEquals("CALL `iceberg_prod`.system.expire_snapshots(table => 'db.sample')", sql);
   }
 
   // Test SQL escaping
@@ -305,28 +311,27 @@ public class TestIcebergExpireSnapshotsJob {
   @Test
   public void testEscapeSqlString() {
     // Test basic escaping of single quotes
-    assertEquals("O''Brien", IcebergExpireSnapshotsJob.escapeSqlString("O'Brien"));
-    assertEquals(
-        "test''with''quotes", IcebergExpireSnapshotsJob.escapeSqlString("test'with'quotes"));
+    assertEquals("O''Brien", IcebergJobUtils.escapeSqlString("O'Brien"));
+    assertEquals("test''with''quotes", IcebergJobUtils.escapeSqlString("test'with'quotes"));
 
     // Test strings without quotes remain unchanged
-    assertEquals("normal_string", IcebergExpireSnapshotsJob.escapeSqlString("normal_string"));
+    assertEquals("normal_string", IcebergJobUtils.escapeSqlString("normal_string"));
 
     // Test null and empty
-    assertEquals(null, IcebergExpireSnapshotsJob.escapeSqlString(null));
-    assertEquals("", IcebergExpireSnapshotsJob.escapeSqlString(""));
+    assertEquals(null, IcebergJobUtils.escapeSqlString(null));
+    assertEquals("", IcebergJobUtils.escapeSqlString(""));
   }
 
   @Test
   public void testEscapeSqlIdentifier() {
-    // Test basic escaping of backticks
-    assertEquals("catalog``name", IcebergExpireSnapshotsJob.escapeSqlIdentifier("catalog`name"));
+    // Test basic escaping and quoting of backticks
+    assertEquals("`catalog``name`", IcebergJobUtils.escapeSqlIdentifier("catalog`name"));
 
-    // Test strings without backticks remain unchanged
-    assertEquals("normal_catalog", IcebergExpireSnapshotsJob.escapeSqlIdentifier("normal_catalog"));
+    // Test strings without backticks are still quoted
+    assertEquals("`normal_catalog`", IcebergJobUtils.escapeSqlIdentifier("normal_catalog"));
 
     // Test null
-    assertEquals(null, IcebergExpireSnapshotsJob.escapeSqlIdentifier(null));
+    assertEquals(null, IcebergJobUtils.escapeSqlIdentifier(null));
   }
 
   @Test
@@ -335,7 +340,7 @@ public class TestIcebergExpireSnapshotsJob {
     String maliciousTable = "db.table' OR '1'='1";
     String sql =
         IcebergExpireSnapshotsJob.buildProcedureCall(
-            "iceberg_catalog", maliciousTable, null, null, null);
+            "iceberg_catalog", maliciousTable, null, null, false);
 
     // Verify single quotes are escaped (becomes '')
     assertTrue(sql.contains("db.table'' OR ''1''=''1"));
@@ -345,7 +350,7 @@ public class TestIcebergExpireSnapshotsJob {
     String maliciousOlderThan = "2024-01-01' OR '1'='1";
     sql =
         IcebergExpireSnapshotsJob.buildProcedureCall(
-            "iceberg_catalog", "db.table", maliciousOlderThan, null, null);
+            "iceberg_catalog", "db.table", maliciousOlderThan, null, false);
 
     assertTrue(sql.contains("2024-01-01'' OR ''1''=''1"));
 
@@ -353,20 +358,20 @@ public class TestIcebergExpireSnapshotsJob {
     String maliciousCatalog = "catalog`; DROP TABLE users; --";
     sql =
         IcebergExpireSnapshotsJob.buildProcedureCall(
-            maliciousCatalog, "db.table", null, null, null);
+            maliciousCatalog, "db.table", null, null, false);
 
-    // Verify backticks are escaped
-    assertTrue(sql.contains("catalog``; DROP TABLE users; --"));
+    // Verify catalog identifier is quoted and backticks are escaped
+    assertTrue(sql.contains("`catalog``; DROP TABLE users; --`.system.expire_snapshots"));
   }
 
   @Test
   public void testBuildProcedureCallEscapesTableIdentifier() {
     String sql =
         IcebergExpireSnapshotsJob.buildProcedureCall(
-            "cat'alog", "db'.table", "2024-01-01' DROP TABLE", null, null);
+            "cat'alog", "db'.table", "2024-01-01' DROP TABLE", null, false);
 
-    // Catalog name uses backtick escaping (but no backticks here, so unchanged)
-    assertTrue(sql.contains("cat'alog"));
+    // Catalog name should be quoted as an identifier
+    assertTrue(sql.contains("`cat'alog`"));
     // All single quotes in string literals should be escaped
     assertTrue(sql.contains("db''.table"));
     assertTrue(sql.contains("2024-01-01'' DROP TABLE"));
@@ -426,46 +431,12 @@ public class TestIcebergExpireSnapshotsJob {
     }
   }
 
-  // Tests for validateStreamResults
-
-  @Test
-  public void testValidateStreamResultsWithValidValues() {
-    // Should not throw exception
-    IcebergExpireSnapshotsJob.validateStreamResults("true");
-    IcebergExpireSnapshotsJob.validateStreamResults("false");
-    IcebergExpireSnapshotsJob.validateStreamResults("TRUE");
-    IcebergExpireSnapshotsJob.validateStreamResults("False");
-  }
-
-  @Test
-  public void testValidateStreamResultsWithNull() {
-    // Should not throw exception - stream-results is optional
-    IcebergExpireSnapshotsJob.validateStreamResults(null);
-  }
-
-  @Test
-  public void testValidateStreamResultsWithEmptyString() {
-    // Should not throw exception - stream-results is optional
-    IcebergExpireSnapshotsJob.validateStreamResults("");
-  }
-
-  @Test
-  public void testValidateStreamResultsWithInvalidValue() {
-    try {
-      IcebergExpireSnapshotsJob.validateStreamResults("yes");
-      fail("Expected IllegalArgumentException for invalid stream-results");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Invalid stream-results value 'yes'"));
-      assertTrue(e.getMessage().contains("'true' or 'false'"));
-    }
-  }
-
   // Tests for custom Spark configurations
 
   @Test
   public void testParseCustomSparkConfigsWithValidJson() {
     String json = "{\"spark.sql.shuffle.partitions\":\"200\",\"spark.executor.memory\":\"4g\"}";
-    Map<String, String> configs = IcebergExpireSnapshotsJob.parseCustomSparkConfigs(json);
+    Map<String, String> configs = IcebergJobUtils.parseCustomSparkConfigs(json);
 
     assertEquals(2, configs.size());
     assertEquals("200", configs.get("spark.sql.shuffle.partitions"));
@@ -475,7 +446,7 @@ public class TestIcebergExpireSnapshotsJob {
   @Test
   public void testParseCustomSparkConfigsWithNumericValues() {
     String json = "{\"spark.sql.shuffle.partitions\":200,\"spark.executor.cores\":4}";
-    Map<String, String> configs = IcebergExpireSnapshotsJob.parseCustomSparkConfigs(json);
+    Map<String, String> configs = IcebergJobUtils.parseCustomSparkConfigs(json);
 
     assertEquals(2, configs.size());
     assertEquals("200", configs.get("spark.sql.shuffle.partitions"));
@@ -484,20 +455,20 @@ public class TestIcebergExpireSnapshotsJob {
 
   @Test
   public void testParseCustomSparkConfigsWithEmptyString() {
-    Map<String, String> configs = IcebergExpireSnapshotsJob.parseCustomSparkConfigs("");
+    Map<String, String> configs = IcebergJobUtils.parseCustomSparkConfigs("");
     assertTrue(configs.isEmpty());
   }
 
   @Test
   public void testParseCustomSparkConfigsWithNull() {
-    Map<String, String> configs = IcebergExpireSnapshotsJob.parseCustomSparkConfigs(null);
+    Map<String, String> configs = IcebergJobUtils.parseCustomSparkConfigs(null);
     assertTrue(configs.isEmpty());
   }
 
   @Test
   public void testParseCustomSparkConfigsWithInvalidJson() {
     try {
-      IcebergExpireSnapshotsJob.parseCustomSparkConfigs("{invalid json}");
+      IcebergJobUtils.parseCustomSparkConfigs("{invalid json}");
       fail("Expected IllegalArgumentException for invalid JSON");
     } catch (IllegalArgumentException e) {
       assertTrue(e.getMessage().contains("Failed to parse Spark configurations JSON"));

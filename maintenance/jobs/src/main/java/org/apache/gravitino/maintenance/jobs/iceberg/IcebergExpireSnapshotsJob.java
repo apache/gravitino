@@ -18,11 +18,8 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
@@ -69,7 +66,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
    *   <li>--older-than &lt;timestamp&gt; Optional. Expire snapshots older than this timestamp
    *       (e.g., '2024-01-01 00:00:00')
    *   <li>--retain-last &lt;count&gt; Optional. Number of most recent snapshots to retain
-   *   <li>--stream-results &lt;boolean&gt; Optional. Whether to stream intermediate results
+   *   <li>--stream-results Optional. Flag to enable streaming of intermediate results
    *   <li>--spark-conf &lt;spark_conf_json&gt; Optional. JSON map of custom Spark configurations
    * </ul>
    *
@@ -103,7 +100,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     }
 
     // Parse named arguments
-    Map<String, String> argMap = parseArguments(args);
+    Map<String, String> argMap = IcebergJobUtils.parseArguments(args);
 
     // Validate required arguments
     String catalogName = argMap.get("catalog");
@@ -118,21 +115,13 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     // Optional arguments
     String olderThan = argMap.get("older-than");
     String retainLast = argMap.get("retain-last");
-    String streamResults = argMap.get("stream-results");
+    // --stream-results is a boolean flag (presence = true)
+    boolean streamResults = argMap.containsKey("stream-results");
     String sparkConfJson = argMap.get("spark-conf");
 
     // Validate retain-last if provided
     try {
       validateRetainLast(retainLast);
-    } catch (IllegalArgumentException e) {
-      System.err.println("Error: " + e.getMessage());
-      printUsage();
-      System.exit(1);
-    }
-
-    // Validate stream-results if provided
-    try {
-      validateStreamResults(streamResults);
     } catch (IllegalArgumentException e) {
       System.err.println("Error: " + e.getMessage());
       printUsage();
@@ -146,7 +135,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     // Apply custom Spark configurations if provided
     if (sparkConfJson != null && !sparkConfJson.isEmpty()) {
       try {
-        Map<String, String> customConfigs = parseCustomSparkConfigs(sparkConfJson);
+        Map<String, String> customConfigs = IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
         for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
           sparkBuilder.config(entry.getKey(), entry.getValue());
         }
@@ -206,85 +195,30 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
       String tableIdentifier,
       String olderThan,
       String retainLast,
-      String streamResults) {
+      boolean streamResults) {
 
     StringBuilder sql = new StringBuilder();
     sql.append("CALL ")
-        .append(escapeSqlIdentifier(catalogName))
+        .append(IcebergJobUtils.escapeSqlIdentifier(catalogName))
         .append(".system.expire_snapshots(");
-    sql.append("table => '").append(escapeSqlString(tableIdentifier)).append("'");
+    sql.append("table => '").append(IcebergJobUtils.escapeSqlString(tableIdentifier)).append("'");
 
     if (olderThan != null && !olderThan.isEmpty()) {
-      sql.append(", older_than => TIMESTAMP '").append(escapeSqlString(olderThan)).append("'");
+      sql.append(", older_than => TIMESTAMP '")
+          .append(IcebergJobUtils.escapeSqlString(olderThan))
+          .append("'");
     }
 
     if (retainLast != null && !retainLast.isEmpty()) {
       sql.append(", retain_last => ").append(Integer.parseInt(retainLast));
     }
 
-    if (streamResults != null && !streamResults.isEmpty()) {
-      sql.append(", stream_results => ").append(Boolean.parseBoolean(streamResults));
+    if (streamResults) {
+      sql.append(", stream_results => true");
     }
 
     sql.append(")");
     return sql.toString();
-  }
-
-  /**
-   * Escape single quotes in SQL string literals by replacing ' with ''.
-   *
-   * @param value the string value to escape
-   * @return escaped string safe for use in SQL string literals
-   */
-  static String escapeSqlString(String value) {
-    if (value == null) {
-      return null;
-    }
-    return value.replace("'", "''");
-  }
-
-  /**
-   * Escape SQL identifiers by replacing backticks and validating format.
-   *
-   * @param identifier the SQL identifier to escape
-   * @return escaped identifier safe for use in SQL
-   */
-  static String escapeSqlIdentifier(String identifier) {
-    if (identifier == null) {
-      return null;
-    }
-    // Replace backticks to prevent breaking out of identifier quotes
-    return identifier.replace("`", "``");
-  }
-
-  /**
-   * Parse command line arguments in --key value format.
-   *
-   * @param args command line arguments
-   * @return map of argument names to values
-   */
-  static Map<String, String> parseArguments(String[] args) {
-    Map<String, String> argMap = new HashMap<>();
-
-    for (int i = 0; i < args.length; i++) {
-      if (args[i].startsWith("--")) {
-        String key = args[i].substring(2); // Remove "--" prefix
-
-        // Check if there's a value for this key
-        if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
-          String value = args[i + 1];
-          // Only add non-empty values
-          if (value != null && !value.trim().isEmpty()) {
-            argMap.put(key, value);
-          }
-          i++; // Skip the value in next iteration
-        } else {
-          System.err.println("Warning: Flag " + args[i] + " has no value, ignoring");
-        }
-      }
-    }
-
-    return argMap;
   }
 
   /**
@@ -310,57 +244,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     }
   }
 
-  /**
-   * Validate the stream-results parameter value.
-   *
-   * @param streamResults the stream-results value to validate
-   * @throws IllegalArgumentException if the value is invalid
-   */
-  static void validateStreamResults(String streamResults) {
-    if (streamResults == null || streamResults.isEmpty()) {
-      return; // stream-results is optional
-    }
-
-    if (!"true".equalsIgnoreCase(streamResults) && !"false".equalsIgnoreCase(streamResults)) {
-      throw new IllegalArgumentException(
-          "Invalid stream-results value '" + streamResults + "'. Must be 'true' or 'false'");
-    }
-  }
-
-  /**
-   * Parse custom Spark configurations from JSON string.
-   *
-   * @param sparkConfJson JSON string containing Spark configurations
-   * @return map of Spark configuration keys to values
-   * @throws IllegalArgumentException if JSON parsing fails
-   */
-  static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    if (sparkConfJson == null || sparkConfJson.isEmpty()) {
-      return new HashMap<>();
-    }
-
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      Map<String, Object> parsedMap =
-          mapper.readValue(sparkConfJson, new TypeReference<Map<String, Object>>() {});
-
-      Map<String, String> configs = new HashMap<>();
-      for (Map.Entry<String, Object> entry : parsedMap.entrySet()) {
-        String key = entry.getKey();
-        Object value = entry.getValue();
-        configs.put(key, value == null ? "" : value.toString());
-      }
-      return configs;
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Failed to parse Spark configurations JSON: "
-              + sparkConfJson
-              + ". Error: "
-              + e.getMessage(),
-          e);
-    }
-  }
-
   /** Print usage information. */
   private static void printUsage() {
     System.err.println(
@@ -377,11 +260,10 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
             + "  --retain-last <count>     Number of most recent snapshots to retain\n"
             + "                              Must be a positive integer (>= 1)\n"
             + "                              Default: 1 (Iceberg default)\n"
-            + "  --stream-results <bool>   Whether to stream intermediate delete results\n"
-            + "                              Valid values: true, false\n"
+            + "  --stream-results          Enable streaming of intermediate delete results\n"
             + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
             + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
-            + "                              Note: Cannot override catalog, extensions, or app name configs\n"
+            + "                              Note: Overriding required catalog/extensions/app-name configs is unsupported\n"
             + "\n"
             + "Examples:\n"
             + "  # Basic expire with defaults (5 days, retain 1)\n"
@@ -393,9 +275,9 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
             + "  # Retain the last 5 snapshots\n"
             + "  --catalog iceberg_prod --table db.sample --retain-last 5\n"
             + "\n"
-            + "  # Expire with all options\n"
+            + "  # Expire with all options and streaming\n"
             + "  --catalog iceberg_prod --table db.sample --older-than '2024-06-01 00:00:00' \\\n"
-            + "    --retain-last 3 --stream-results true");
+            + "    --retain-last 3 --stream-results");
   }
 
   /**
@@ -413,7 +295,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
         "{{older_than}}",
         "--retain-last",
         "{{retain_last}}",
-        "--stream-results",
         "{{stream_results}}",
         "--spark-conf",
         "{{spark_conf}}");
