@@ -163,6 +163,18 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 2. Since version 1.0.0, using the `struct` data type with field comments will throw an error, as it does not work for Hive tables (see [HIVE-26593](https://issues.apache.org/jira/browse/HIVE-26593)).
 :::
 
+#### Iceberg V3 type interoperability
+
+Hive types are accepted only when their Gravitino semantics can be preserved. Unsupported V3
+types return an invalid-argument response before Hive Metastore metadata is changed.
+
+| Gravitino type | Hive outcome | Reason |
+|----------------|--------------|--------|
+| `variant` | Rejected | Hive has no equivalent type that preserves arbitrary semi-structured values. |
+| `unknown` | Converted to `void` | Both types accept only null values and round-trip without changing semantics. |
+| `geometry` | Rejected | Hive has no geometry type that preserves coordinate-reference-system metadata. |
+| `geography` | Rejected | Hive has no geography type that preserves CRS and edge-interpolation semantics. |
+
 ### Table Properties
 
 Table properties supply or set metadata for the underlying Hive tables.
