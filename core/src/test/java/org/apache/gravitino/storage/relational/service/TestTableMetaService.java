@@ -27,6 +27,12 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -175,6 +181,61 @@ public class TestTableMetaService extends TestJDBCBackend {
       backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
     }
     assertFalse(legacyRecordExistsInDB(table.id(), Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
+  public void testConcurrentUpdateRollsBackLosingVersionWrite() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "concurrent-table",
+            AUDIT_INFO);
+    TableMetaService.getInstance().insertTable(table, false);
+
+    CountDownLatch snapshotsLoaded = new CountDownLatch(2);
+    CountDownLatch startUpdates = new CountDownLatch(1);
+    Queue<TableEntity> successfulUpdates = new ConcurrentLinkedQueue<>();
+    Queue<Throwable> failedUpdates = new ConcurrentLinkedQueue<>();
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      executor.submit(
+          concurrentTableUpdate(
+              table.nameIdentifier(),
+              "first update",
+              snapshotsLoaded,
+              startUpdates,
+              successfulUpdates,
+              failedUpdates));
+      executor.submit(
+          concurrentTableUpdate(
+              table.nameIdentifier(),
+              "second update",
+              snapshotsLoaded,
+              startUpdates,
+              successfulUpdates,
+              failedUpdates));
+
+      assertTrue(snapshotsLoaded.await(10, TimeUnit.SECONDS));
+      startUpdates.countDown();
+      executor.shutdown();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    } finally {
+      startUpdates.countDown();
+      executor.shutdownNow();
+    }
+
+    Assertions.assertEquals(1, successfulUpdates.size());
+    Assertions.assertEquals(1, failedUpdates.size());
+    assertTrue(failedUpdates.peek() instanceof IOException);
+
+    TableEntity storedTable =
+        TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier());
+    Assertions.assertEquals(successfulUpdates.peek().comment(), storedTable.comment());
   }
 
   @TestTemplate
@@ -451,5 +512,46 @@ public class TestTableMetaService extends TestJDBCBackend {
           Assertions.assertEquals(expectedColumn.defaultValue(), column.defaultValue());
           Assertions.assertEquals(expectedColumn.auditInfo(), column.auditInfo());
         });
+  }
+
+  private Runnable concurrentTableUpdate(
+      NameIdentifier identifier,
+      String comment,
+      CountDownLatch snapshotsLoaded,
+      CountDownLatch startUpdates,
+      Queue<TableEntity> successfulUpdates,
+      Queue<Throwable> failedUpdates) {
+    return () -> {
+      try {
+        TableEntity result =
+            TableMetaService.getInstance()
+                .updateTable(
+                    identifier,
+                    (TableEntity oldTable) -> {
+                      snapshotsLoaded.countDown();
+                      awaitLatch(startUpdates);
+                      return TableEntity.builder()
+                          .withId(oldTable.id())
+                          .withName(oldTable.name())
+                          .withNamespace(oldTable.namespace())
+                          .withComment(comment)
+                          .withColumns(oldTable.columns())
+                          .withAuditInfo(oldTable.auditInfo())
+                          .build();
+                    });
+        successfulUpdates.add(result);
+      } catch (Throwable t) {
+        failedUpdates.add(t);
+      }
+    };
+  }
+
+  private void awaitLatch(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(10, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while waiting for concurrent update", e);
+    }
   }
 }

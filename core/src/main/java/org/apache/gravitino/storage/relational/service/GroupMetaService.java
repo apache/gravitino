@@ -267,15 +267,21 @@ public class GroupMetaService {
     if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
       return newEntity;
     }
+    int[] updateResult = new int[] {-1};
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  GroupMetaMapper.class,
-                  mapper ->
-                      mapper.updateGroupMeta(
-                          POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
-                          oldGroupPO)),
+          () -> {
+            updateResult[0] =
+                SessionUtils.getWithoutCommit(
+                    GroupMetaMapper.class,
+                    mapper ->
+                        mapper.updateGroupMeta(
+                            POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
+                            oldGroupPO));
+            if (updateResult[0] == 0) {
+              throw new RuntimeException("Failed to update the entity: " + identifier);
+            }
+          },
           () -> {
             if (insertRoleIds.isEmpty()) {
               return;
@@ -302,6 +308,9 @@ public class GroupMetaService {
                   GroupMetaMapper.class,
                   mapper -> mapper.touchGroupUpdatedAt(oldGroupPO.getGroupId())));
     } catch (RuntimeException re) {
+      if (updateResult[0] == 0) {
+        throw new IOException("Failed to update the entity: " + identifier, re);
+      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
       throw re;
