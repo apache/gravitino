@@ -295,8 +295,10 @@ catalog keeps its own default security setting, independent of
 `gravitino.client.session.forwardUser`, and the end user's token never reaches the IRC.
 
 **5. Query as a specific user.** With a real OIDC login flow, Trino populates the forwarded token
-automatically after the user signs in. For manual testing, the same extra-credential can be set
-directly on the CLI:
+automatically after the user signs in — this automatic population is the part that requires
+Starburst's DELEGATED-OAUTH2 (step 1). For manual testing on any Trino distribution, including
+open-source Trino, the same extra-credential can instead be set directly on the CLI, independent
+of how the coordinator is configured:
 
 ```shell
 trino --server http://localhost:8080 \
