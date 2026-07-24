@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Version;
 import org.apache.gravitino.auth.AuthConstants;
@@ -52,6 +53,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.DefaultClientTlsStrategy;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -64,6 +66,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.net.URIBuilder;
+import org.apache.hc.core5.reactor.ssl.SSLBufferMode;
 
 /**
  * An HttpClient for usage with the REST catalog.
@@ -107,6 +110,7 @@ public class HTTPClient implements RESTClient {
    * @param authDataProvider The provider of authentication data.
    * @param beforeConnectHandler The function to be executed before connecting to the server.
    * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
+   * @param tlsConfigurer The TLS configurer, or null to use the default TLS behavior.
    */
   private HTTPClient(
       String uri,
@@ -114,14 +118,16 @@ public class HTTPClient implements RESTClient {
       ObjectMapper objectMapper,
       AuthDataProvider authDataProvider,
       Runnable beforeConnectHandler,
-      Map<String, String> properties) {
+      Map<String, String> properties,
+      @Nullable TLSConfigurer tlsConfigurer) {
     this.uri = uri;
     this.mapper = objectMapper;
     GravitinoClientConfiguration clientConfiguration =
         GravitinoClientConfiguration.buildFromProperties(properties);
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
-    clientBuilder.setConnectionManager(configureConnectionManager(clientConfiguration));
+    clientBuilder.setConnectionManager(
+        configureConnectionManager(clientConfiguration, tlsConfigurer));
 
     if (baseHeaders != null) {
       clientBuilder.setDefaultHeaders(
@@ -746,7 +752,7 @@ public class HTTPClient implements RESTClient {
   }
 
   private static HttpClientConnectionManager configureConnectionManager(
-      GravitinoClientConfiguration clientConfiguration) {
+      GravitinoClientConfiguration clientConfiguration, @Nullable TLSConfigurer tlsConfigurer) {
     PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
         PoolingHttpClientConnectionManagerBuilder.create();
 
@@ -757,6 +763,16 @@ public class HTTPClient implements RESTClient {
 
     ConnectionConfig connectionConfig = configureConnectionConfig(clientConfiguration);
     connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
+
+    if (tlsConfigurer != null) {
+      connectionManagerBuilder.setTlsSocketStrategy(
+          new DefaultClientTlsStrategy(
+              tlsConfigurer.sslContext(),
+              tlsConfigurer.supportedProtocols(),
+              tlsConfigurer.supportedCipherSuites(),
+              SSLBufferMode.STATIC,
+              tlsConfigurer.hostnameVerifier()));
+    }
     return connectionManagerBuilder.build();
   }
 
@@ -772,6 +788,16 @@ public class HTTPClient implements RESTClient {
     return connConfigBuilder.build();
   }
 
+  @VisibleForTesting
+  @Nullable
+  static TLSConfigurer resolveTLSConfigurer(
+      @Nullable TLSConfigurer explicitConfigurer, Map<String, String> environment) {
+    if (explicitConfigurer != null) {
+      return explicitConfigurer;
+    }
+    return EnvironmentTLSConfigurer.fromEnvironment(environment).orElse(null);
+  }
+
   /**
    * Builder class for configuring and creating instances of HTTPClient.
    *
@@ -782,6 +808,7 @@ public class HTTPClient implements RESTClient {
     private final Map<String, String> properties;
 
     private final Map<String, String> baseHeaders = Maps.newHashMap();
+    @Nullable private TLSConfigurer tlsConfigurer;
     private String uri;
     private ObjectMapper mapper = ObjectMapperProvider.objectMapper();
     private AuthDataProvider authDataProvider;
@@ -861,14 +888,31 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
+     * Sets the TLS configuration used by the HTTP client.
+     *
+     * @param tlsConfigurer The TLS configurer, or null to use environment or JVM defaults.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withTlsConfigurer(@Nullable TLSConfigurer tlsConfigurer) {
+      this.tlsConfigurer = tlsConfigurer;
+      return this;
+    }
+
+    /**
      * Builds and returns an instance of the HTTPClient with the configured options.
      *
      * @return An instance of HTTPClient with the configured options.
      */
     public HTTPClient build() {
-
+      TLSConfigurer effectiveTlsConfigurer = resolveTLSConfigurer(tlsConfigurer, System.getenv());
       return new HTTPClient(
-          uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler, properties);
+          uri,
+          baseHeaders,
+          mapper,
+          authDataProvider,
+          beforeConnectHandler,
+          properties,
+          effectiveTlsConfigurer);
     }
   }
 

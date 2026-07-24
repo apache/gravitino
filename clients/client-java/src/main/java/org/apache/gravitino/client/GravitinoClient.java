@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetadataObject;
@@ -93,6 +94,7 @@ public class GravitinoClient extends GravitinoClientBase
    *     support the case that the client-side version is higher than the server-side version.
    * @param headers The base header for Gravitino API.
    * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
+   * @param tlsConfigurer The TLS configurer, or null to use environment or JVM defaults.
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
   private GravitinoClient(
@@ -101,8 +103,9 @@ public class GravitinoClient extends GravitinoClientBase
       AuthDataProvider authDataProvider,
       boolean checkVersion,
       Map<String, String> headers,
-      Map<String, String> properties) {
-    super(uri, authDataProvider, checkVersion, headers, properties);
+      Map<String, String> properties,
+      @Nullable TLSConfigurer tlsConfigurer) {
+    super(uri, authDataProvider, checkVersion, headers, properties, tlsConfigurer);
     this.metalake = loadMetalake(metalakeName);
   }
 
@@ -744,7 +747,13 @@ public class GravitinoClient extends GravitinoClientBase
           "The argument 'metalakeName' must be a valid name");
 
       return new GravitinoClient(
-          uri, metalakeName, authDataProvider, isVersionCheckEnabled(), headers, properties);
+          uri,
+          metalakeName,
+          authDataProvider,
+          isVersionCheckEnabled(),
+          headers,
+          properties,
+          tlsConfigurer);
     }
   }
 }

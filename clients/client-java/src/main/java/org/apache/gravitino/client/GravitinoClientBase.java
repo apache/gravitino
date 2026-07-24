@@ -29,6 +29,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -71,6 +72,27 @@ public abstract class GravitinoClientBase implements Closeable {
       boolean checkVersion,
       Map<String, String> headers,
       Map<String, String> properties) {
+    this(uri, authDataProvider, checkVersion, headers, properties, null);
+  }
+
+  /**
+   * Constructs a new GravitinoClient with the given URI, authenticator, AuthDataProvider and TLS
+   * configurer.
+   *
+   * @param uri The base URI for the Gravitino API.
+   * @param authDataProvider The provider of the data which is used for authentication.
+   * @param checkVersion Whether to check the version of the Gravitino server.
+   * @param headers The base header of the Gravitino API.
+   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
+   * @param tlsConfigurer The TLS configurer, or null to use environment or JVM defaults.
+   */
+  protected GravitinoClientBase(
+      String uri,
+      AuthDataProvider authDataProvider,
+      boolean checkVersion,
+      Map<String, String> headers,
+      Map<String, String> properties,
+      @Nullable TLSConfigurer tlsConfigurer) {
     ObjectMapper mapper = ObjectMapperProvider.objectMapper();
 
     if (checkVersion) {
@@ -81,6 +103,7 @@ public abstract class GravitinoClientBase implements Closeable {
               .withObjectMapper(mapper)
               .withPreConnectHandler(this::checkVersion)
               .withHeaders(headers)
+              .withTlsConfigurer(tlsConfigurer)
               .build();
 
     } else {
@@ -90,6 +113,7 @@ public abstract class GravitinoClientBase implements Closeable {
               .withAuthDataProvider(authDataProvider)
               .withObjectMapper(mapper)
               .withHeaders(headers)
+              .withTlsConfigurer(tlsConfigurer)
               .build();
     }
   }
@@ -214,6 +238,8 @@ public abstract class GravitinoClientBase implements Closeable {
     protected Map<String, String> headers = ImmutableMap.of();
     /** A map of properties (key-value pairs) used to configure the Gravitino client. */
     protected Map<String, String> properties = ImmutableMap.of();
+    /** The TLS configurer for HTTPS connections. */
+    @Nullable protected TLSConfigurer tlsConfigurer;
 
     /**
      * The constructor for the Builder class.
@@ -367,6 +393,20 @@ public abstract class GravitinoClientBase implements Closeable {
       if (properties != null) {
         this.properties = ImmutableMap.copyOf(properties);
       }
+      return this;
+    }
+
+    /**
+     * Sets the TLS configuration used by the Gravitino client.
+     *
+     * <p>An explicitly supplied configurer takes precedence over environment-based TLS settings.
+     * Passing null uses environment-based TLS settings when present, otherwise the JVM defaults.
+     *
+     * @param tlsConfigurer The TLS configurer, or null to use environment or JVM defaults.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withTlsConfigurer(@Nullable TLSConfigurer tlsConfigurer) {
+      this.tlsConfigurer = tlsConfigurer;
       return this;
     }
 
