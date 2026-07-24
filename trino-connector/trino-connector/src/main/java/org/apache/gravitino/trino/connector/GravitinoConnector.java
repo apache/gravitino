@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static io.trino.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 
@@ -227,7 +228,8 @@ public class GravitinoConnector implements Connector {
     catalogConnectorContext.close();
   }
 
-  private CatalogConnectorMetadata resolveSessionMetadata(ConnectorSession session) {
+  @VisibleForTesting
+  CatalogConnectorMetadata resolveSessionMetadata(ConnectorSession session) {
     String authType =
         catalogConnectorContext
             .getConfig()
@@ -249,16 +251,24 @@ public class GravitinoConnector implements Connector {
               })
           .metadata;
     } catch (ExecutionException | UncheckedExecutionException e) {
-      Throwable cause = e.getCause();
+      Throwable cause = e.getCause() == null ? e : e.getCause();
       LOG.warn(
-          "Failed to create per-user Gravitino client for user '{}': {}",
-          session.getUser(),
-          cause.getMessage());
+          "Failed to create per-user Gravitino client for user '{}'", session.getUser(), cause);
+      if (cause instanceof IllegalArgumentException
+          || cause instanceof UnsupportedOperationException) {
+        throw new TrinoException(
+            PERMISSION_DENIED,
+            "Failed to authenticate user '"
+                + session.getUser()
+                + "' with Gravitino: "
+                + cause.getMessage(),
+            cause);
+      }
       throw new TrinoException(
-          PERMISSION_DENIED,
-          "Failed to authenticate user '"
+          GENERIC_INTERNAL_ERROR,
+          "Unexpected error while creating per-user Gravitino client for user '"
               + session.getUser()
-              + "' with Gravitino: "
+              + "': "
               + cause.getMessage(),
           cause);
     }
