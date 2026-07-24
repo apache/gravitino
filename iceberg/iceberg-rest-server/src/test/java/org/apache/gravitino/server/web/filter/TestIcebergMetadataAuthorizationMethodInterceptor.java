@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import javax.ws.rs.core.Response;
@@ -37,15 +38,20 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.ForbiddenException;
@@ -55,6 +61,7 @@ import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /** Test for {@link IcebergMetadataAuthorizationMethodInterceptor}. */
@@ -472,6 +479,55 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     assertEquals("RuntimeException", errorResponse.type());
     assertTrue(
         errorResponse.message().contains("Authorization failed due to system internal error"));
+  }
+
+  @Test
+  public void testInvokeRejectsUnheldActiveRolesWith403() throws Throwable {
+    // Standard authorization runs (not proxying to a REST backend), so the membership check
+    // applies.
+    resetContext(null, false);
+
+    Method method =
+        TestOperations.class.getMethod(
+            "testTableOperationWithAuthorizationExpression",
+            String.class,
+            String.class,
+            String.class);
+    MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
+    Mockito.when(invocation.getMethod()).thenReturn(method);
+    Mockito.when(invocation.getArguments())
+        .thenReturn(new Object[] {TEST_CATALOG + "/", TEST_SCHEMA, "tbl"});
+
+    // The caller declares an active role via the header; the authorizer reports it as unheld.
+    UserPrincipal principal =
+        new UserPrincipal("tester")
+            .withActiveRoles(ActiveRoles.of(Collections.singletonList("ghostRole")));
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    Mockito.when(
+            authorizer.findUnheldRoles(
+                Mockito.any(), Mockito.eq(TEST_METALAKE), Mockito.any(), Mockito.any()))
+        .thenReturn(Collections.singleton("ghostRole"));
+
+    try (MockedStatic<PrincipalUtils> principalUtils = Mockito.mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> providerStatic =
+            Mockito.mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtils.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
+      principalUtils.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      GravitinoAuthorizerProvider provider = Mockito.mock(GravitinoAuthorizerProvider.class);
+      providerStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+      Mockito.when(provider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      IcebergMetadataAuthorizationMethodInterceptor interceptor =
+          new IcebergMetadataAuthorizationMethodInterceptor();
+      Object result = interceptor.invoke(invocation);
+
+      assertTrue(result instanceof Response);
+      Response response = (Response) result;
+      assertEquals(403, response.getStatus());
+      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+      assertTrue(errorResponse.message().contains("ghostRole"));
+      Mockito.verify(invocation, Mockito.never()).proceed();
+    }
   }
 
   /** Test operations class to provide method annotations for testing. */
