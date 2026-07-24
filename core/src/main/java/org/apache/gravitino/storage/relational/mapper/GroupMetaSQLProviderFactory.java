@@ -72,8 +72,9 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().insertGroupMetaOnDuplicateKeyUpdate(groupPO);
   }
 
-  public static String softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId) {
-    return getProvider().softDeleteGroupMetaByGroupId(groupId);
+  public static String softDeleteGroupMetaByGroupId(
+      @Param("groupId") Long groupId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteGroupMetaByGroupId(groupId, currentVersion);
   }
 
   public static String softDeleteGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

@@ -82,7 +82,8 @@ public interface RoleMetaMapper {
       @Param("newRoleMeta") RolePO newRolePO, @Param("oldRoleMeta") RolePO oldRolePO);
 
   @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "softDeleteRoleMetaByRoleId")
-  void softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId);
+  Integer softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = RoleMetaSQLProviderFactory.class,

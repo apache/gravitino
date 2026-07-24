@@ -69,8 +69,9 @@ public class UserMetaSQLProviderFactory {
     return getProvider().insertUserMetaOnDuplicateKeyUpdate(userPO);
   }
 
-  public static String softDeleteUserMetaByUserId(@Param("userId") Long userId) {
-    return getProvider().softDeleteUserMetaByUserId(userId);
+  public static String softDeleteUserMetaByUserId(
+      @Param("userId") Long userId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteUserMetaByUserId(userId, currentVersion);
   }
 
   public static String softDeleteUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

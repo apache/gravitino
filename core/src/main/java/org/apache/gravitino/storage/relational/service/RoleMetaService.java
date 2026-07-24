@@ -317,12 +317,17 @@ public class RoleMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long roleId = getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long roleId = rolePO.getRoleId();
+    Long currentVersion = rolePO.getCurrentVersion();
+    int[] roleDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                RoleMetaMapper.class, mapper -> mapper.softDeleteRoleMetaByRoleId(roleId)),
+            roleDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    RoleMetaMapper.class,
+                    mapper -> mapper.softDeleteRoleMetaByRoleId(roleId, currentVersion)),
         () ->
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByRoleId(roleId)),
@@ -339,7 +344,8 @@ public class RoleMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         roleId, MetadataObject.Type.ROLE.name())));
-    return true;
+    // OCC: false when the role's version changed between read and delete.
+    return roleDeletedCount[0] > 0;
   }
 
   @Monitored(

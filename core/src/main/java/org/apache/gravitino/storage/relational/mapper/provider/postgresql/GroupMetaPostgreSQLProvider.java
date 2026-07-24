@@ -29,11 +29,13 @@ import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   @Override
-  public String softDeleteGroupMetaByGroupId(Long groupId) {
+  public String softDeleteGroupMetaByGroupId(Long groupId, Long currentVersion) {
     return "UPDATE "
         + GROUP_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE group_id = #{groupId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

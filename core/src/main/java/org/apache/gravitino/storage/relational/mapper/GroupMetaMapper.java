@@ -76,7 +76,8 @@ public interface GroupMetaMapper {
   void insertGroupMetaOnDuplicateKeyUpdate(@Param("groupMeta") GroupPO groupPO);
 
   @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "softDeleteGroupMetaByGroupId")
-  void softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId);
+  Integer softDeleteGroupMetaByGroupId(
+      @Param("groupId") Long groupId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = GroupMetaSQLProviderFactory.class,

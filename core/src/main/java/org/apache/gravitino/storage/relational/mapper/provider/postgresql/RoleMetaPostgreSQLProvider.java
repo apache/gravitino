@@ -26,11 +26,14 @@ import org.apache.ibatis.annotations.Param;
 
 public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   @Override
-  public String softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId) {
+  public String softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + ROLE_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE role_id = #{roleId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override
