@@ -46,7 +46,6 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.EntityCache;
-import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -317,37 +316,31 @@ public class RelationalEntityStore
       return new ArrayList<>();
     }
 
-    List<EntityCacheKey> lockKeys = new ArrayList<>();
-    for (NameIdentifier id : nameIdentifiers) {
-      lockKeys.add(EntityCacheRelationKey.of(id, identType, relType));
+    // Cache-aside: never hold a cache lock across the backend call. getIfPresent is lock-free and
+    // cache.put takes its own brief per-key lock, so loading uncached entries from the backend does
+    // not block concurrent cache mutations for the duration of the DB round-trip.
+    List<RelationalEntity<?>> result = new ArrayList<>();
+    List<NameIdentifier> uncachedIdentifiers = new ArrayList<>();
+
+    for (NameIdentifier nameIdentifier : nameIdentifiers) {
+      Optional<List<RelationalEntity<?>>> cachedRelations =
+          getCachedRelations(relType, nameIdentifier, identType);
+      if (cachedRelations.isPresent()) {
+        result.addAll(cachedRelations.get());
+      } else {
+        uncachedIdentifiers.add(nameIdentifier);
+      }
     }
 
-    return cache.withMultipleKeyCacheLock(
-        lockKeys,
-        () -> {
-          List<RelationalEntity<?>> result = new ArrayList<>();
-          List<NameIdentifier> uncachedIdentifiers = new ArrayList<>();
+    if (!uncachedIdentifiers.isEmpty()) {
+      List<RelationalEntity<?>> backendRelations =
+          backend.batchListEntitiesByRelation(relType, uncachedIdentifiers, identType);
+      result.addAll(backendRelations);
 
-          for (NameIdentifier nameIdentifier : nameIdentifiers) {
-            Optional<List<RelationalEntity<?>>> cachedRelations =
-                getCachedRelations(relType, nameIdentifier, identType);
-            if (cachedRelations.isPresent()) {
-              result.addAll(cachedRelations.get());
-            } else {
-              uncachedIdentifiers.add(nameIdentifier);
-            }
-          }
+      batchPopulateRelationCache(relType, identType, uncachedIdentifiers, backendRelations);
+    }
 
-          if (!uncachedIdentifiers.isEmpty()) {
-            List<RelationalEntity<?>> backendRelations =
-                backend.batchListEntitiesByRelation(relType, uncachedIdentifiers, identType);
-            result.addAll(backendRelations);
-
-            batchPopulateRelationCache(relType, identType, uncachedIdentifiers, backendRelations);
-          }
-
-          return result;
-        });
+    return result;
   }
 
   @Override
