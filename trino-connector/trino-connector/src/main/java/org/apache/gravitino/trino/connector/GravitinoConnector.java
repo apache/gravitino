@@ -241,9 +241,7 @@ public class GravitinoConnector implements Connector {
       return perUserSessionCache.get(
               credKey,
               () -> {
-                GravitinoAdminClient userClient =
-                    GravitinoAuthProvider.buildForSession(
-                        catalogConnectorContext.getConfig(), session);
+                GravitinoAdminClient userClient = buildAuthClient(session);
                 GravitinoMetalake userMetalake =
                     userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
                 return new UserSession(
@@ -272,6 +270,19 @@ public class GravitinoConnector implements Connector {
               + cause.getMessage(),
           cause);
     }
+  }
+
+  /**
+   * Builds the per-user Gravitino admin client for a forwarded session. Extracted as an overridable
+   * seam so tests can substitute the client-building behavior without needing to mock the static
+   * {@link GravitinoAuthProvider#buildForSession}.
+   *
+   * @param session the current Trino connector session
+   * @return the per-user Gravitino admin client
+   */
+  @VisibleForTesting
+  GravitinoAdminClient buildAuthClient(ConnectorSession session) {
+    return GravitinoAuthProvider.buildForSession(catalogConnectorContext.getConfig(), session);
   }
 
   @VisibleForTesting

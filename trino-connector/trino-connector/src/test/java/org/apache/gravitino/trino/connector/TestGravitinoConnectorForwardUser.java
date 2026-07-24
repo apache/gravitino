@@ -28,14 +28,14 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.security.ConnectorIdentity;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsSchemas;
@@ -47,7 +47,6 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 
 /** Tests for forwardUser startup validation in {@link GravitinoConnector}. */
 class TestGravitinoConnectorForwardUser {
@@ -144,25 +143,20 @@ class TestGravitinoConnectorForwardUser {
             ImmutableMap.of(
                 GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
                 GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2"));
-    GravitinoConnector connector = new GravitinoConnector(ctx);
+    AtomicInteger buildCount = new AtomicInteger();
+    GravitinoConnector connector =
+        newConnectorWithAuthClient(ctx, session -> mockAdminClient(ctx.getMetalake(), buildCount));
 
-    try (MockedStatic<GravitinoAuthProvider> authProvider =
-        mockStatic(GravitinoAuthProvider.class)) {
-      authProvider
-          .when(() -> GravitinoAuthProvider.buildForSession(any(), any()))
-          .thenAnswer(invocation -> mockAdminClient(ctx.getMetalake()));
+    CatalogConnectorMetadata first =
+        connector.resolveSessionMetadata(mockSession("alice", "token-a"));
+    CatalogConnectorMetadata second =
+        connector.resolveSessionMetadata(mockSession("alice", "token-a"));
+    CatalogConnectorMetadata third =
+        connector.resolveSessionMetadata(mockSession("alice", "token-b"));
 
-      CatalogConnectorMetadata first =
-          connector.resolveSessionMetadata(mockSession("alice", "token-a"));
-      CatalogConnectorMetadata second =
-          connector.resolveSessionMetadata(mockSession("alice", "token-a"));
-      CatalogConnectorMetadata third =
-          connector.resolveSessionMetadata(mockSession("alice", "token-b"));
-
-      assertSame(first, second, "same user/token should reuse the cached client");
-      assertNotSame(first, third, "a rotated token must not reuse the stale cached client");
-      authProvider.verify(() -> GravitinoAuthProvider.buildForSession(any(), any()), times(2));
-    }
+    assertSame(first, second, "same user/token should reuse the cached client");
+    assertNotSame(first, third, "a rotated token must not reuse the stale cached client");
+    assertEquals(2, buildCount.get(), "a rotated token must trigger a fresh client build");
   }
 
   @Test
@@ -172,20 +166,18 @@ class TestGravitinoConnectorForwardUser {
             ImmutableMap.of(
                 GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
                 GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2"));
-    GravitinoConnector connector = new GravitinoConnector(ctx);
+    GravitinoConnector connector =
+        newConnectorWithAuthClient(
+            ctx,
+            session -> {
+              throw new IllegalArgumentException("No forwarded user token found");
+            });
 
-    try (MockedStatic<GravitinoAuthProvider> authProvider =
-        mockStatic(GravitinoAuthProvider.class)) {
-      authProvider
-          .when(() -> GravitinoAuthProvider.buildForSession(any(), any()))
-          .thenThrow(new IllegalArgumentException("No forwarded user token found"));
-
-      TrinoException ex =
-          assertThrows(
-              TrinoException.class,
-              () -> connector.resolveSessionMetadata(mockSession("alice", "token-a")));
-      assertEquals(PERMISSION_DENIED.toErrorCode(), ex.getErrorCode());
-    }
+    TrinoException ex =
+        assertThrows(
+            TrinoException.class,
+            () -> connector.resolveSessionMetadata(mockSession("alice", "token-a")));
+    assertEquals(PERMISSION_DENIED.toErrorCode(), ex.getErrorCode());
   }
 
   @Test
@@ -195,23 +187,39 @@ class TestGravitinoConnectorForwardUser {
             ImmutableMap.of(
                 GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
                 GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2"));
-    GravitinoConnector connector = new GravitinoConnector(ctx);
+    GravitinoConnector connector =
+        newConnectorWithAuthClient(
+            ctx,
+            session -> {
+              throw new RuntimeException("connection refused");
+            });
 
-    try (MockedStatic<GravitinoAuthProvider> authProvider =
-        mockStatic(GravitinoAuthProvider.class)) {
-      authProvider
-          .when(() -> GravitinoAuthProvider.buildForSession(any(), any()))
-          .thenThrow(new RuntimeException("connection refused"));
-
-      TrinoException ex =
-          assertThrows(
-              TrinoException.class,
-              () -> connector.resolveSessionMetadata(mockSession("alice", "token-a")));
-      assertEquals(GENERIC_INTERNAL_ERROR.toErrorCode(), ex.getErrorCode());
-    }
+    TrinoException ex =
+        assertThrows(
+            TrinoException.class,
+            () -> connector.resolveSessionMetadata(mockSession("alice", "token-a")));
+    assertEquals(GENERIC_INTERNAL_ERROR.toErrorCode(), ex.getErrorCode());
   }
 
-  private static GravitinoAdminClient mockAdminClient(GravitinoMetalake metalake) {
+  /**
+   * Creates a {@link GravitinoConnector} whose {@code buildAuthClient} is overridden with the given
+   * function, so tests can control what building the per-user client does without mocking the
+   * static {@link GravitinoAuthProvider#buildForSession}.
+   */
+  private static GravitinoConnector newConnectorWithAuthClient(
+      CatalogConnectorContext ctx,
+      Function<ConnectorSession, GravitinoAdminClient> authClientBuilder) {
+    return new GravitinoConnector(ctx) {
+      @Override
+      GravitinoAdminClient buildAuthClient(ConnectorSession session) {
+        return authClientBuilder.apply(session);
+      }
+    };
+  }
+
+  private static GravitinoAdminClient mockAdminClient(
+      GravitinoMetalake metalake, AtomicInteger buildCount) {
+    buildCount.incrementAndGet();
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
     when(client.loadMetalake(any())).thenReturn(metalake);
     return client;
