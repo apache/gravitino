@@ -59,13 +59,16 @@ import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchPlanTaskException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -487,6 +490,46 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       throw new RuntimeException(
           "Scan planning failed for table " + tableIdentifier + ": " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Fetch the scan tasks associated with a {@code plan-task} token previously handed out by {@link
+   * #planTableScan}.
+   *
+   * <p>Scan planning here is synchronous: {@link #planTableScan} always returns {@code COMPLETED}
+   * with the full set of {@code file-scan-tasks} inline and never emits {@code plan-tasks} tokens.
+   * A client therefore has no token to present, and any token reaching this method did not
+   * originate from this server (or came from a server generation that no longer retains it). Per
+   * the Iceberg REST specification that case is an unknown plan task, so this method always throws
+   * {@link NoSuchPlanTaskException}, which the REST layer maps to 404.
+   *
+   * <p>The endpoint still exists and is advertised in {@code /v1/config} because clients such as
+   * pyiceberg refuse to use server-side scan planning at all unless {@code POST
+   * .../tables/{table}/tasks} is advertised as supported. Implementing it keeps the two-step
+   * protocol contract intact and gives batched planning a place to land if {@link #planTableScan}
+   * later starts emitting {@code plan-tasks}.
+   *
+   * @param tableIdentifier the table the plan task belongs to.
+   * @param request the request carrying the {@code plan-task} token.
+   * @return never returns normally.
+   * @throws org.apache.iceberg.exceptions.NoSuchTableException if the table doesn't exist.
+   * @throws NoSuchPlanTaskException always, since no {@code plan-task} tokens are ever issued.
+   */
+  public FetchScanTasksResponse fetchScanTasks(
+      TableIdentifier tableIdentifier, FetchScanTasksRequest request) {
+    // Validate the table exists first, so a bad table reports 404 for the table rather than
+    // masking it as an unknown plan task. Consistent with planTableScan behavior.
+    getCatalog().loadTable(tableIdentifier);
+
+    LOG.info(
+        "Rejecting unknown plan task '{}' for table {}: scan planning is synchronous and does not "
+            + "issue plan-task tokens.",
+        request.planTask(),
+        tableIdentifier);
+    throw new NoSuchPlanTaskException(
+        "Plan task %s not found for table %s. Scan planning completes synchronously and returns "
+            + "all file scan tasks in the plan response, so no plan-task tokens are issued.",
+        request.planTask(), tableIdentifier);
   }
 
   /**

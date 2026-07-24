@@ -62,6 +62,7 @@ public class TestCompatibilityUtils {
       {OperationType.LOAD_TABLE, Operation.LOAD_TABLE},
       {OperationType.LOAD_TABLE_CREDENTIAL, Operation.LOAD_TABLE_CREDENTIAL},
       {OperationType.PLAN_TABLE_SCAN, Operation.PLAN_TABLE_SCAN},
+      {OperationType.FETCH_SCAN_TASKS, Operation.FETCH_SCAN_TASKS},
       {OperationType.TABLE_EXISTS, Operation.TABLE_EXISTS},
       {OperationType.LIST_TABLE, Operation.LIST_TABLE},
       {OperationType.RENAME_TABLE, Operation.RENAME_TABLE},

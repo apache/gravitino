@@ -76,6 +76,7 @@ public class IcebergConfigOperations {
           .add(Endpoint.V1_REPORT_METRICS)
           .add(Endpoint.V1_TABLE_CREDENTIALS)
           .add(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN)
+          .add(Endpoint.V1_FETCH_TABLE_SCAN_PLAN_TASKS)
           .build();
 
   private static final List<Endpoint> DEFAULT_VIEW_ENDPOINTS =
