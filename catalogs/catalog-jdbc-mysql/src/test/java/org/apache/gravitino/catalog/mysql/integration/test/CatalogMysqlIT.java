@@ -72,6 +72,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -2382,6 +2383,48 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testRejectNanosecondTimestampsWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_timestamp_ns",
+        Types.TimestampType.withoutTimeZone(9),
+        "fractional-second precision must be between 0 and 6");
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_timestamp_tz_ns",
+        Types.TimestampType.withTimeZone(9),
+        "fractional-second precision must be between 0 and 6");
+  }
+
+  @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_variant",
+        Types.VariantType.get(),
+        "MySQL JSON does not represent the complete Variant value domain");
+  }
+
+  @Test
+  void testRejectNullTypeWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_null", Types.NullType.get(), "the null-only placeholder has no MySQL column type");
+  }
+
+  @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geometry",
+        Types.GeometryType.of("SRID:3857"),
+        "the JDBC catalog cannot round-trip Geometry CRS/SRID metadata");
+  }
+
+  @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "MySQL has no Geography type that preserves CRS and edge-algorithm metadata");
+  }
+
+  @Test
   void testObjectNamesWithDots() {
     // Create a MySQL database with a dot in its name directly (bypassing Gravitino)
     String dottedSchemaName = GravitinoITUtils.genRandomName("db") + ".nested";
@@ -2425,5 +2468,23 @@ public class CatalogMysqlIT extends BaseIT {
     } finally {
       mysqlService.executeQuery("DROP DATABASE IF EXISTS `" + dottedSchemaName + "`");
     }
+  }
+
+  private void assertUnsupportedV3TypeDoesNotCreateTable(
+      String tablePrefix, Type type, String expectedMessage) {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(tablePrefix));
+    Column[] columns = {Column.of("v3_column", type, "V3 column")};
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(tableIdent, columns, null, Collections.emptyMap()));
+
+    Assertions.assertTrue(exception.getMessage().contains(expectedMessage), exception::getMessage);
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
   }
 }

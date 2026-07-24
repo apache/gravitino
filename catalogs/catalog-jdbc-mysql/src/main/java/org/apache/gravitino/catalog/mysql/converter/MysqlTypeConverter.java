@@ -26,6 +26,8 @@ import org.apache.gravitino.rel.types.Types;
 /** Type converter for MySQL. */
 public class MysqlTypeConverter extends JdbcTypeConverter {
 
+  private static final int MAX_DATETIME_PRECISION = 6;
+
   static final String BIT = "bit";
   static final String TINYINT = "tinyint";
   static final String TINYINT_UNSIGNED = "tinyint unsigned";
@@ -146,6 +148,9 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       // from UTC to the current time zone for retrieval. (This does not occur for other types
       // such as DATETIME.) see more details: https://dev.mysql.com/doc/refman/8.0/en/datetime.html
       Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasPrecisionSet() && timestampType.precision() > MAX_DATETIME_PRECISION) {
+        throw unsupportedType(type, "fractional-second precision must be between 0 and 6");
+      }
       String baseType = timestampType.hasTimeZone() ? TIMESTAMP : DATETIME;
       return timestampType.hasPrecisionSet()
           ? String.format("%s(%d)", baseType, timestampType.precision())
@@ -160,10 +165,25 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       return type.simpleString();
     } else if (type instanceof Types.BooleanType) {
       return BIT;
+    } else if (type instanceof Types.VariantType) {
+      throw unsupportedType(
+          type, "MySQL JSON does not represent the complete Variant value domain");
+    } else if (type instanceof Types.NullType) {
+      throw unsupportedType(type, "the null-only placeholder has no MySQL column type");
+    } else if (type instanceof Types.GeometryType) {
+      throw unsupportedType(type, "the JDBC catalog cannot round-trip Geometry CRS/SRID metadata");
+    } else if (type instanceof Types.GeographyType) {
+      throw unsupportedType(
+          type, "MySQL has no Geography type that preserves CRS and edge-algorithm metadata");
     } else if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to MySQL type", type.simpleString()));
+  }
+
+  private static IllegalArgumentException unsupportedType(Type type, String reason) {
+    return new IllegalArgumentException(
+        String.format("MySQL does not support Gravitino type %s: %s", type.simpleString(), reason));
   }
 }
