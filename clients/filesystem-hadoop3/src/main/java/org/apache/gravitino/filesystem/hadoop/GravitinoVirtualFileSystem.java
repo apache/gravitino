@@ -25,6 +25,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
+import java.nio.file.AccessDeniedException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
@@ -322,7 +323,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   private <R, E extends IOException> R runWithExceptionTranslation(
-      Executable<R, E> executable, FilesetDataOperation operation) throws FileNotFoundException, E {
+      Executable<R, E> executable, FilesetDataOperation operation) throws IOException {
     try {
       return executable.execute();
     } catch (NoSuchCatalogException | CatalogNotInUseException e) {
@@ -341,6 +342,20 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       throw (FileNotFoundException) new FileNotFoundException(message).initCause(e);
 
     } catch (IOException e) {
+      // Credential failures (e.g. missing AKSK) surface as AccessDeniedException. When the client
+      // neither provides static credentials nor enables credential vending, the server-side
+      // credentials are hidden and unreachable, so guide the user to the right configuration.
+      if (e instanceof AccessDeniedException && !operations.enableCredentialVending()) {
+        String message =
+            String.format(
+                "Access denied during %s. If this fileset relies on server-side credentials, set "
+                    + "'%s=true', or provide the storage credentials (e.g. s3-access-key-id and "
+                    + "s3-secret-access-key) in the client configuration.",
+                operation,
+                GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING);
+        LOG.warn(message, e);
+        throw (AccessDeniedException) new AccessDeniedException(message).initCause(e);
+      }
       throw e;
     }
   }

@@ -732,11 +732,14 @@ public abstract class BaseGVFSOperations implements Closeable {
               targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
 
       if (enableCredentialVending()) {
-        allProperties.putAll(
-            getCredentialProperties(
-                getFileSystemProviderByScheme(targetLocation.toUri().getScheme()),
-                filesetIdent,
-                locationName));
+        FileSystemProvider provider =
+            getFileSystemProviderByScheme(targetLocation.toUri().getScheme());
+        // Client-provided credentials take precedence over server-side vended credentials. Only
+        // vend when the client did not configure its own storage credentials; otherwise the vended
+        // credential provider would override the client's credentials.
+        if (!clientProvidedStorageCredentials(provider, allProperties)) {
+          allProperties.putAll(getCredentialProperties(provider, filesetIdent, locationName));
+        }
       }
 
       FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
@@ -984,12 +987,32 @@ public abstract class BaseGVFSOperations implements Closeable {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
+  /**
+   * Returns whether the client already configured its own static storage credentials for the given
+   * provider, in which case server-side credential vending must be skipped so the client-provided
+   * credentials take precedence.
+   *
+   * @param provider the file system provider resolved for the target location
+   * @param properties the merged properties (including the client configuration)
+   * @return true if the client supplied its own credentials, false otherwise
+   */
+  private boolean clientProvidedStorageCredentials(
+      FileSystemProvider provider, Map<String, String> properties) {
+    return provider instanceof SupportsCredentialVending
+        && ((SupportsCredentialVending) provider).containsClientCredentials(properties);
+  }
+
   private Map<String, String> getCredentialProperties(
       FileSystemProvider fileSystemProvider,
       NameIdentifier filesetIdentifier,
       String locationName) {
     // Do not support credential vending, we do not need to add any credential properties.
     if (!(fileSystemProvider instanceof SupportsCredentialVending)) {
+      LOG.debug(
+          "File system provider {} does not support credential vending for fileset {}, "
+              + "skip adding credential properties.",
+          fileSystemProvider.getClass().getSimpleName(),
+          filesetIdentifier);
       return ImmutableMap.of();
     }
 
@@ -1009,6 +1032,14 @@ public abstract class BaseGVFSOperations implements Closeable {
         SupportsCredentialVending supportsCredentialVending =
             (SupportsCredentialVending) fileSystemProvider;
         mapBuilder.putAll(supportsCredentialVending.getFileSystemCredentialConf(credentials));
+      } else {
+        LOG.warn(
+            "Credential vending is enabled but no credential was returned for fileset {} "
+                + "(locationName={}). The underlying file system may fail with access denied. "
+                + "Check that the catalog has static credentials configured or a credential "
+                + "provider set via 'credential-providers'.",
+            filesetIdentifier,
+            locationName);
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
