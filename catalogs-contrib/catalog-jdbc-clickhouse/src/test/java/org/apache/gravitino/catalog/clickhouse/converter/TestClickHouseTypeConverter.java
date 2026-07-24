@@ -107,6 +107,17 @@ public class TestClickHouseTypeConverter {
     Assertions.assertEquals(
         Types.TimestampType.withoutTimeZone(3),
         CLICKHOUSE_TYPE_CONVERTER.toGravitino(dateTime64WithPrecision));
+    checkJdbcTypeToGravitinoType(
+        Types.TimestampType.withoutTimeZone(9), "DateTime64(9)", null, null);
+    checkJdbcTypeToGravitinoType(
+        Types.TimestampType.withTimeZone(9), "DateTime64(9, 'UTC')", null, null);
+    checkJdbcTypeToGravitinoType(
+        Types.TimestampType.withTimeZone(0), "DateTime('UTC')", null, null);
+    checkJdbcTypeToGravitinoType(
+        Types.ExternalType.of("DateTime64(9, 'America/Los_Angeles')"),
+        "DateTime64(9, 'America/Los_Angeles')",
+        null,
+        null);
 
     // LowCardinality(Nullable(String)) should map to StringType
     JdbcTypeConverter.JdbcTypeBean lowCardNullable =
@@ -154,6 +165,9 @@ public class TestClickHouseTypeConverter {
     checkGravitinoTypeToJdbcType("DateTime", Types.TimestampType.withoutTimeZone(0));
     // DateTime64(3) round-trip
     checkGravitinoTypeToJdbcType(DATETIME64 + "(3)", Types.TimestampType.withoutTimeZone(3));
+    checkGravitinoTypeToJdbcType(DATETIME64 + "(9)", Types.TimestampType.withoutTimeZone(9));
+    checkGravitinoTypeToJdbcType(DATETIME64 + "(9, 'UTC')", Types.TimestampType.withTimeZone(9));
+    checkGravitinoTypeToJdbcType(DATETIME + "('UTC')", Types.TimestampType.withTimeZone(0));
     // IPv4/IPv6 round-trip
     checkGravitinoTypeToJdbcType(IPV4, Types.ExternalType.of(IPV4));
     checkGravitinoTypeToJdbcType(IPV6, Types.ExternalType.of(IPV6));
@@ -161,6 +175,64 @@ public class TestClickHouseTypeConverter {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
+    IllegalArgumentException precisionException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.TimestampType.withoutTimeZone(10)));
+    Assertions.assertTrue(
+        precisionException.getMessage().contains("DateTime64 precision must be between 0 and 9"));
+  }
+
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.VariantType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "ClickHouse Variant requires a closed list of alternative types and cannot "
+                    + "preserve the open-ended Gravitino Variant contract"));
+  }
+
+  @Test
+  public void testRejectNullType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.NullType.get()));
+    Assertions.assertTrue(
+        exception.getMessage().contains("the null-only placeholder has no ClickHouse column type"));
+  }
+
+  @Test
+  public void testRejectGeometryType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> CLICKHOUSE_TYPE_CONVERTER.fromGravitino(Types.GeometryType.of("SRID:3857")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("ClickHouse Geo types do not preserve Gravitino Geometry CRS metadata"));
+  }
+
+  @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CLICKHOUSE_TYPE_CONVERTER.fromGravitino(
+                    Types.GeographyType.of("EPSG:4326", "karney")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "ClickHouse Geo types do not preserve Gravitino Geography CRS and "
+                    + "edge-algorithm metadata"));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {

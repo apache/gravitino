@@ -77,6 +77,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -2650,5 +2651,107 @@ public class CatalogClickHouseIT extends BaseIT {
     // ClickHouse 24.8 always includes default SETTINGS (index_granularity = 8192) in
     // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
     Assertions.assertEquals(1, settingsCount);
+  }
+
+  @Test
+  void testNanosecondTimestampRoundTrip() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("timestamp_ns_round_trip"));
+    Column[] columns = {
+      Column.of("id", Types.IntegerType.get(), "sort column", false, false, DEFAULT_VALUE_NOT_SET),
+      Column.of(
+          "timestamp_ns",
+          Types.TimestampType.withoutTimeZone(9),
+          "nanosecond timestamp",
+          false,
+          false,
+          DEFAULT_VALUE_NOT_SET),
+      Column.of(
+          "timestamp_tz_ns",
+          Types.TimestampType.withTimeZone(9),
+          "nanosecond timestamp with time zone",
+          false,
+          false,
+          DEFAULT_VALUE_NOT_SET)
+    };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            "nanosecond timestamp round-trip",
+            createProperties(),
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(9), loaded.columns()[1].dataType());
+    Assertions.assertEquals(Types.TimestampType.withTimeZone(9), loaded.columns()[2].dataType());
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableIdentifier.name()));
+    Assertions.assertTrue(createSql.contains("DateTime64(9)"), createSql);
+    Assertions.assertTrue(createSql.contains("DateTime64(9, 'UTC')"), createSql);
+  }
+
+  @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_variant",
+        Types.VariantType.get(),
+        "ClickHouse Variant requires a closed list of alternative types");
+  }
+
+  @Test
+  void testRejectNullTypeWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_null",
+        Types.NullType.get(),
+        "the null-only placeholder has no ClickHouse column type");
+  }
+
+  @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geometry",
+        Types.GeometryType.of("SRID:3857"),
+        "ClickHouse Geo types do not preserve Gravitino Geometry CRS metadata");
+  }
+
+  @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "ClickHouse Geo types do not preserve Gravitino Geography CRS and edge-algorithm metadata");
+  }
+
+  private void assertUnsupportedV3TypeDoesNotCreateTable(
+      String tablePrefix, Type type, String expectedMessage) {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(tablePrefix));
+    Column[] columns = {
+      Column.of("id", Types.IntegerType.get(), "sort column", false, false, DEFAULT_VALUE_NOT_SET),
+      Column.of("v3_column", type, "V3 column", false, false, DEFAULT_VALUE_NOT_SET)
+    };
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        columns,
+                        null,
+                        createProperties(),
+                        Distributions.NONE,
+                        getSortOrders("id")));
+
+    Assertions.assertTrue(exception.getMessage().contains(expectedMessage), exception::getMessage);
+    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdentifier));
   }
 }
