@@ -18,20 +18,31 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -360,6 +371,129 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         METALAKE_NAME,
         Entity.EntityType.MODEL,
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "model2").toString(),
+        OperateType.DROP);
+  }
+
+  @TestTemplate
+  void testTagChangeLogOnAlterAndDrop() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagEntity tag = createAndInsertTagEntity("tag1", "tag comment", METALAKE_NAME);
+
+    long maxIdBeforeTagAlter = maxEntityChangeId();
+    TagMetaService.getInstance()
+        .updateTag(
+            tag.nameIdentifier(),
+            entity ->
+                TagEntity.builder()
+                    .withId(tag.id())
+                    .withName(tag.name())
+                    .withNamespace(tag.namespace())
+                    .withComment("tag comment updated")
+                    .withProperties(ImmutableMap.of())
+                    .withAuditInfo(AUDIT_INFO)
+                    .build());
+    assertEntityChange(
+        maxIdBeforeTagAlter,
+        METALAKE_NAME,
+        Entity.EntityType.TAG,
+        NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1").toString(),
+        OperateType.ALTER);
+
+    long maxIdBeforeTagDrop = maxEntityChangeId();
+    Assertions.assertTrue(TagMetaService.getInstance().deleteTag(tag.nameIdentifier()));
+    assertEntityChange(
+        maxIdBeforeTagDrop,
+        METALAKE_NAME,
+        Entity.EntityType.TAG,
+        NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1").toString(),
+        OperateType.DROP);
+  }
+
+  @TestTemplate
+  void testPolicyChangeLogOnAlterAndDrop() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyContent content =
+        PolicyContents.custom(
+            ImmutableMap.of("field1", 1), ImmutableSet.of(MetadataObject.Type.TABLE), null);
+    PolicyEntity policy =
+        createAndInsertPolicyEntity("policy1", "policy comment", content, METALAKE_NAME);
+
+    long maxIdBeforePolicyAlter = maxEntityChangeId();
+    PolicyMetaService.getInstance()
+        .updatePolicy(
+            policy.nameIdentifier(),
+            entity ->
+                PolicyEntity.builder()
+                    .withId(policy.id())
+                    .withName(policy.name())
+                    .withNamespace(policy.namespace())
+                    .withPolicyType(Policy.BuiltInType.CUSTOM)
+                    .withComment("policy comment updated")
+                    .withEnabled(true)
+                    .withContent(content)
+                    .withAuditInfo(AUDIT_INFO)
+                    .build());
+    assertEntityChange(
+        maxIdBeforePolicyAlter,
+        METALAKE_NAME,
+        Entity.EntityType.POLICY,
+        NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy1").toString(),
+        OperateType.ALTER);
+
+    long maxIdBeforePolicyDrop = maxEntityChangeId();
+    Assertions.assertTrue(PolicyMetaService.getInstance().deletePolicy(policy.nameIdentifier()));
+    assertEntityChange(
+        maxIdBeforePolicyDrop,
+        METALAKE_NAME,
+        Entity.EntityType.POLICY,
+        NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy1").toString(),
+        OperateType.DROP);
+  }
+
+  @TestTemplate
+  void testJobChangeLogOnOverwriteAndDrop() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    JobTemplateEntity jobTemplate =
+        TestJobTemplateMetaService.newShellJobTemplateEntity(
+            "job_template_for_change_log", "comment", METALAKE_NAME);
+    JobTemplateMetaService.getInstance().insertJobTemplate(jobTemplate, false);
+
+    JobEntity job =
+        TestJobTemplateMetaService.newJobEntity(
+            jobTemplate.name(), JobHandle.Status.QUEUED, METALAKE_NAME);
+
+    // A plain insert (create) must not emit a change-log row: list bypasses the cache and there is
+    // no negative caching.
+    long maxIdBeforeCreate = maxEntityChangeId();
+    JobMetaService.getInstance().insertJob(job, false);
+    Assertions.assertEquals(maxIdBeforeCreate, maxEntityChangeId());
+
+    // An overwrite is an in-place status update, so it emits an ALTER row.
+    long maxIdBeforeOverwrite = maxEntityChangeId();
+    JobEntity runningJob =
+        JobEntity.builder()
+            .withId(job.id())
+            .withJobExecutionId(job.jobExecutionId())
+            .withNamespace(job.namespace())
+            .withJobTemplateName(job.jobTemplateName())
+            .withStatus(JobHandle.Status.STARTED)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    JobMetaService.getInstance().insertJob(runningJob, true);
+    assertEntityChange(
+        maxIdBeforeOverwrite,
+        METALAKE_NAME,
+        Entity.EntityType.JOB,
+        job.nameIdentifier().toString(),
+        OperateType.ALTER);
+
+    long maxIdBeforeJobDrop = maxEntityChangeId();
+    Assertions.assertTrue(JobMetaService.getInstance().deleteJob(job.nameIdentifier()));
+    assertEntityChange(
+        maxIdBeforeJobDrop,
+        METALAKE_NAME,
+        Entity.EntityType.JOB,
+        job.nameIdentifier().toString(),
         OperateType.DROP);
   }
 }

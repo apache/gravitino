@@ -29,10 +29,8 @@ import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.openjdk.jcstress.annotations.Actor;
 import org.openjdk.jcstress.annotations.Arbiter;
 import org.openjdk.jcstress.annotations.Description;
@@ -78,13 +76,13 @@ public class TestCacheIndexCoherence {
           + "atomicity or thread-safety guarantees.")
   @State
   public static class InsertSameKeyCoherenceTest {
-    private final RadixTree<EntityCacheRelationKey> indexTree =
+    private final RadixTree<EntityCacheKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident = NameIdentifier.of("metalake1", "catalog1", "schema1");
     private final Entity entity =
         getTestSchemaEntity(123L, "schema1", Namespace.of("metalake1", "catalog1"), "ident1");
-    private final EntityCacheRelationKey key = EntityCacheRelationKey.of(ident, entity.type());
+    private final EntityCacheKey key = EntityCacheKey.of(ident, entity.type());
     private final String keyStr = key.toString();
 
     @Actor
@@ -99,50 +97,7 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      EntityCacheRelationKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
-      r.r1 =
-          (valueForExactKey != null
-                  && Objects.equals(valueForExactKey, key)
-                  && indexTree.size() == 1)
-              ? 1
-              : 0;
-    }
-  }
-
-  @JCStressTest
-  @Outcome.Outcomes({
-    @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Key inserted and visible"),
-    @Outcome(id = "0", expect = Expect.FORBIDDEN, desc = "Key not found")
-  })
-  @Description(
-      "Tests that ConcurrentRadixTree handles concurrent put() operations for the same key with a "
-          + "relation type. Both threads insert the same key-value pair where the key includes a "
-          + "relation type (ROLE_USER_REL). The test expects the tree to maintain a single entry. A "
-          + "forbidden result indicates incorrect key handling or data loss under concurrency.")
-  @State
-  public static class InsertSameKeyWithRelationTypeCoherenceTest {
-    private final RadixTree<EntityCacheRelationKey> indexTree =
-        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-
-    private final NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role");
-    private final EntityCacheRelationKey key =
-        EntityCacheRelationKey.of(
-            ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
-    private final String keyStr = key.toString();
-
-    @Actor
-    public void actor1() {
-      indexTree.put(keyStr, key);
-    }
-
-    @Actor
-    public void actor2() {
-      indexTree.put(keyStr, key);
-    }
-
-    @Arbiter
-    public void arbiter(I_Result r) {
-      EntityCacheRelationKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
+      EntityCacheKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
       r.r1 =
           (valueForExactKey != null
                   && Objects.equals(valueForExactKey, key)
@@ -164,7 +119,7 @@ public class TestCacheIndexCoherence {
           + "indicates data loss or broken concurrency guarantees.")
   @State
   public static class InsertMultipleKeyCoherenceTest {
-    private final RadixTree<EntityCacheRelationKey> indexTree =
+    private final RadixTree<EntityCacheKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident1 = NameIdentifier.of("metalake1", "catalog1", "schema1");
@@ -173,8 +128,8 @@ public class TestCacheIndexCoherence {
     private final NameIdentifier ident2 = NameIdentifier.of("metalake1", "catalog1", "schema2");
     private final Entity entity2 =
         getTestSchemaEntity(456L, "schema2", Namespace.of("metalake1", "catalog1"), "ident2");
-    private final EntityCacheRelationKey key1 = EntityCacheRelationKey.of(ident1, entity1.type());
-    private final EntityCacheRelationKey key2 = EntityCacheRelationKey.of(ident2, entity2.type());
+    private final EntityCacheKey key1 = EntityCacheKey.of(ident1, entity1.type());
+    private final EntityCacheKey key2 = EntityCacheKey.of(ident2, entity2.type());
     private final String key1Str = key1.toString();
     private final String key2Str = key2.toString();
 
@@ -190,60 +145,8 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      EntityCacheRelationKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
-      EntityCacheRelationKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
-      r.r1 =
-          (valueForExactKey1 != null
-                  && valueForExactKey2 != null
-                  && Objects.equals(valueForExactKey1, key1)
-                  && Objects.equals(valueForExactKey2, key2)
-                  && indexTree.size() == 2)
-              ? 1
-              : 0;
-    }
-  }
-
-  @JCStressTest
-  @Outcome.Outcomes({
-    @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "multiple Key inserted and visible"),
-    @Outcome(id = "0", expect = Expect.FORBIDDEN, desc = "some Key not found")
-  })
-  @Description(
-      "Tests ConcurrentRadixTree under concurrent insertions of different keys with relation types. "
-          + "Thread 1 inserts a key with ROLE_USER_REL, and Thread 2 inserts a key with ROLE_GROUP_REL. "
-          + "Both keys share the same NameIdentifier but differ by relation type. The tree should retain "
-          + "both entries. A forbidden result indicates relation type is not correctly distinguished.")
-  @State
-  public static class InsertMultipleKeyWithRelationTypeCoherenceTest {
-    private final RadixTree<EntityCacheRelationKey> indexTree =
-        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-
-    private final NameIdentifier ident1 = NameIdentifierUtil.ofRole("metalake", "role1");
-    private final NameIdentifier ident2 = NameIdentifierUtil.ofRole("metalake", "role1");
-
-    private final EntityCacheRelationKey key1 =
-        EntityCacheRelationKey.of(
-            ident1, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
-    private final EntityCacheRelationKey key2 =
-        EntityCacheRelationKey.of(
-            ident2, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
-    private final String key1Str = key1.toString();
-    private final String key2Str = key2.toString();
-
-    @Actor
-    public void actor1() {
-      indexTree.put(key1Str, key1);
-    }
-
-    @Actor
-    public void actor2() {
-      indexTree.put(key2Str, key2);
-    }
-
-    @Arbiter
-    public void arbiter(I_Result r) {
-      EntityCacheRelationKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
-      EntityCacheRelationKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
+      EntityCacheKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
+      EntityCacheKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
       r.r1 =
           (valueForExactKey1 != null
                   && valueForExactKey2 != null
@@ -288,49 +191,6 @@ public class TestCacheIndexCoherence {
     @Arbiter
     public void arbiter(I_Result r) {
       String value = indexTree.getValueForExactKey(key);
-      r.r1 = (value == null) ? 1 : 0;
-    }
-  }
-
-  @JCStressTest
-  @Outcome.Outcomes({
-    @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Key does not exist after remove."),
-    @Outcome(
-        id = "0",
-        expect = Expect.ACCEPTABLE_INTERESTING,
-        desc = "Key still exists due to put/remove race.")
-  })
-  @Description(
-      "Tests the race condition between put() and remove() on a key with relation type in "
-          + "ConcurrentRadixTree. Thread 1 inserts a key that includes a relation type "
-          + "(ROLE_USER_REL), while Thread 2 concurrently removes the same key. If remove "
-          + "happens after put, the key is deleted, which is acceptable. If put happens after remove, "
-          + "the key remains, which is interesting but not forbidden.")
-  @State
-  public static class PutRemoveSameKeyWithRelationTypeCoherenceTest {
-
-    private final RadixTree<EntityCacheRelationKey> indexTree =
-        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-
-    private final NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role");
-    private final EntityCacheRelationKey key =
-        EntityCacheRelationKey.of(
-            ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
-    private final String keyStr = key.toString();
-
-    @Actor
-    public void actorPut() {
-      indexTree.put(keyStr, key);
-    }
-
-    @Actor
-    public void actorRemove() {
-      indexTree.remove(keyStr);
-    }
-
-    @Arbiter
-    public void arbiter(I_Result r) {
-      EntityCacheRelationKey value = indexTree.getValueForExactKey(keyStr);
       r.r1 = (value == null) ? 1 : 0;
     }
   }
@@ -390,68 +250,6 @@ public class TestCacheIndexCoherence {
 
   @JCStressTest
   @Outcome.Outcomes({
-    @Outcome(
-        id = "1, 1",
-        expect = Expect.ACCEPTABLE,
-        desc = "Both values are visible — correct and expected."),
-    @Outcome(
-        id = "1, 0",
-        expect = Expect.FORBIDDEN,
-        desc = "Only v1 is visible — inconsistent cache state."),
-    @Outcome(
-        id = "0, 1",
-        expect = Expect.FORBIDDEN,
-        desc = "Only v2 is visible — inconsistent cache state."),
-    @Outcome(
-        id = "0, 0",
-        expect = Expect.FORBIDDEN,
-        desc = "No value visible — inconsistent cache state.")
-  })
-  @Description(
-      "Tests race conditions between concurrent put() operations on keys with different relation "
-          + "types and a prefix-based scan. Thread 1 inserts a ROLE_USER_REL key, Thread 2 inserts "
-          + "a ROLE_GROUP_REL key. The arbiter uses getValuesForKeysStartingWith() to verify both "
-          + "entries are visible. Visibility of only one is a race condition and forbidden. Missing "
-          + "both values indicates an inconsistent cache state and is also forbidden.")
-  @State
-  public static class PutAndPrefixScanWithRelationTypeCoherenceTest {
-
-    private final RadixTree<EntityCacheRelationKey> indexTree =
-        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-
-    private final NameIdentifier ident1 = NameIdentifierUtil.ofRole("metalake", "role1");
-    private final NameIdentifier ident2 = NameIdentifierUtil.ofRole("metalake", "role2");
-
-    private final EntityCacheRelationKey key1 =
-        EntityCacheRelationKey.of(
-            ident1, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
-    private final EntityCacheRelationKey key2 =
-        EntityCacheRelationKey.of(
-            ident2, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
-    private final String key1Str = key1.toString();
-    private final String key2Str = key2.toString();
-
-    @Actor
-    public void actorPut1() {
-      indexTree.put(key1Str, key1);
-    }
-
-    @Actor
-    public void actorPut2() {
-      indexTree.put(key2Str, key2);
-    }
-
-    @Arbiter
-    public void arbiter(II_Result r) {
-      ImmutableList<EntityCacheRelationKey> values =
-          ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake"));
-      r.r1 = values.contains(key1) ? 1 : 0;
-      r.r2 = values.contains(key2) ? 1 : 0;
-    }
-  }
-
-  @JCStressTest
-  @Outcome.Outcomes({
     @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Get sees the value"),
     @Outcome(
         id = "0",
@@ -477,40 +275,6 @@ public class TestCacheIndexCoherence {
     @Actor
     public void actorGet(I_Result r) {
       r.r1 = indexTree.getValueForExactKey(key) != null ? 1 : 0;
-    }
-  }
-
-  @JCStressTest
-  @Outcome.Outcomes({
-    @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Get sees the value"),
-    @Outcome(
-        id = "0",
-        expect = Expect.ACCEPTABLE_INTERESTING,
-        desc = "Get sees nothing due to timing")
-  })
-  @Description(
-      "Tests race condition between put() and getValueForExactKey() for relation-typed cache keys. "
-          + "Thread 1 inserts a ROLE_USER_REL key into the radix tree. Thread 2 concurrently attempts to "
-          + "retrieve the same key. If the get observes the result of the put, it returns a non-null value. "
-          + "Missing value is interesting but not forbidden, depending on execution timing.")
-  @State
-  public static class PutAndGetWithRelationTypeCoherenceTest {
-    private final RadixTree<EntityCacheRelationKey> indexTree =
-        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-    private final NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role");
-    private final EntityCacheRelationKey key =
-        EntityCacheRelationKey.of(
-            ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
-    private final String keyStr = key.toString();
-
-    @Actor
-    public void actorPut() {
-      indexTree.put(keyStr, key);
-    }
-
-    @Actor
-    public void actorGet(I_Result r) {
-      r.r1 = indexTree.getValueForExactKey(keyStr) != null ? 1 : 0;
     }
   }
 }

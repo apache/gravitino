@@ -24,12 +24,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -42,21 +41,15 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsExternalIdOperations;
 import org.apache.gravitino.SupportsRelationOperations;
-import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
+import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
-import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.GroupEntity;
-import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.utils.Executable;
-import org.apache.gravitino.utils.MetadataObjectUtil;
-import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,6 +71,11 @@ public class RelationalEntityStore
   private RelationalGarbageCollector garbageCollector;
   private EntityChangeLogPoller entityChangeLogPoller;
   private EntityCache cache;
+
+  // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. A SHARED cache
+  // has a single cluster-wide copy, so there is nothing per-node to invalidate and no listener is
+  // registered.
+  @Nullable private EntityCacheChangeLogListener entityCacheChangeLogListener;
 
   @VisibleForTesting
   public EntityCache getCache() {
@@ -108,6 +106,14 @@ public class RelationalEntityStore
             config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
+
+    // The coherence gate: a LOCAL_PER_NODE cache keeps its own copy per node, so changes made on
+    // other nodes must be replayed here through the change log. A SHARED cache (or a disabled
+    // NoOpsCache) has nothing per-node to invalidate, so no listener is registered.
+    if (cache.coherence() == Coherence.LOCAL_PER_NODE && !(cache instanceof NoOpsCache)) {
+      this.entityCacheChangeLogListener = new EntityCacheChangeLogListener(cache);
+      this.entityChangeLogPoller.registerListener(entityCacheChangeLogListener);
+    }
     this.entityChangeLogPoller.start();
   }
 
@@ -154,7 +160,6 @@ public class RelationalEntityStore
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
     cache.put(e);
-    invalidateAggregatedRoleRelationCache(e);
   }
 
   @Override
@@ -163,7 +168,6 @@ public class RelationalEntityStore
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
     cache.invalidate(ident, entityType);
-    invalidateAggregatedRoleRelationCache(updatedEntity);
     return updatedEntity;
   }
 
@@ -172,7 +176,7 @@ public class RelationalEntityStore
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
     return cache.withCacheLock(
-        EntityCacheRelationKey.of(ident, entityType),
+        EntityCacheKey.of(ident, entityType),
         () -> {
           Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
           if (entityFromCache.isPresent()) {
@@ -291,22 +295,7 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
-    return cache.withCacheLock(
-        EntityCacheRelationKey.of(nameIdentifier, identType, relType),
-        () -> {
-          Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
-          if (entities.isPresent()) {
-            return entities.get();
-          }
-
-          // Use allFields=true to cache complete entities
-          List<E> backendEntities =
-              backend.listEntitiesByRelation(relType, nameIdentifier, identType, true);
-
-          cache.put(nameIdentifier, identType, relType, backendEntities);
-
-          return backendEntities;
-        });
+    return backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
   }
 
   @Override
@@ -316,38 +305,7 @@ public class RelationalEntityStore
     if (nameIdentifiers == null || nameIdentifiers.isEmpty()) {
       return new ArrayList<>();
     }
-
-    List<EntityCacheKey> lockKeys = new ArrayList<>();
-    for (NameIdentifier id : nameIdentifiers) {
-      lockKeys.add(EntityCacheRelationKey.of(id, identType, relType));
-    }
-
-    return cache.withMultipleKeyCacheLock(
-        lockKeys,
-        () -> {
-          List<RelationalEntity<?>> result = new ArrayList<>();
-          List<NameIdentifier> uncachedIdentifiers = new ArrayList<>();
-
-          for (NameIdentifier nameIdentifier : nameIdentifiers) {
-            Optional<List<RelationalEntity<?>>> cachedRelations =
-                getCachedRelations(relType, nameIdentifier, identType);
-            if (cachedRelations.isPresent()) {
-              result.addAll(cachedRelations.get());
-            } else {
-              uncachedIdentifiers.add(nameIdentifier);
-            }
-          }
-
-          if (!uncachedIdentifiers.isEmpty()) {
-            List<RelationalEntity<?>> backendRelations =
-                backend.batchListEntitiesByRelation(relType, uncachedIdentifiers, identType);
-            result.addAll(backendRelations);
-
-            batchPopulateRelationCache(relType, identType, uncachedIdentifiers, backendRelations);
-          }
-
-          return result;
-        });
+    return backend.batchListEntitiesByRelation(relType, nameIdentifiers, identType);
   }
 
   @Override
@@ -357,37 +315,12 @@ public class RelationalEntityStore
       Entity.EntityType srcType,
       NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException {
-    return cache.withCacheLock(
-        EntityCacheRelationKey.of(srcIdentifier, srcType, relType),
-        () -> {
-          Optional<List<E>> entities = cache.getIfPresent(relType, srcIdentifier, srcType);
-          if (entities.isPresent()) {
-            return entities.get().stream()
-                .filter(e -> e.nameIdentifier().equals(destEntityIdent))
-                .findFirst()
-                .orElseThrow(
-                    () ->
-                        new NoSuchEntityException(
-                            "No such entity with ident: %s", destEntityIdent));
-          }
-
-          // Use allFields=true to cache complete entities
-          List<E> backendEntities =
-              backend.listEntitiesByRelation(relType, srcIdentifier, srcType, true);
-
-          E r =
-              backendEntities.stream()
-                  .filter(e -> e.nameIdentifier().equals(destEntityIdent))
-                  .findFirst()
-                  .orElseThrow(
-                      () ->
-                          new NoSuchEntityException(
-                              "No such entity with ident: %s", destEntityIdent));
-
-          cache.put(srcIdentifier, srcType, relType, backendEntities);
-
-          return r;
-        });
+    List<E> backendEntities = backend.listEntitiesByRelation(relType, srcIdentifier, srcType, true);
+    return backendEntities.stream()
+        .filter(e -> e.nameIdentifier().equals(destEntityIdent))
+        .findFirst()
+        .orElseThrow(
+            () -> new NoSuchEntityException("No such entity with ident: %s", destEntityIdent));
   }
 
   @Override
@@ -400,8 +333,10 @@ public class RelationalEntityStore
       boolean override)
       throws IOException {
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
-    cache.invalidate(srcIdentifier, srcType, relType);
-    cache.invalidate(dstIdentifier, dstType, relType);
+    // Relation results are no longer cached, but the entities on both sides may embed
+    // relation-derived data (e.g. a user's role names), so drop their single-entity entries.
+    cache.invalidate(srcIdentifier, srcType);
+    cache.invalidate(dstIdentifier, dstType);
   }
 
   @Override
@@ -419,9 +354,9 @@ public class RelationalEntityStore
     backend.batchInsertRelations(
         relType, srcIdentifiers, srcType, dstIdentifier, dstType, override);
     for (NameIdentifier ident : srcIdentifiers) {
-      cache.invalidate(ident, srcType, relType);
+      cache.invalidate(ident, srcType);
     }
-    cache.invalidate(dstIdentifier, dstType, relType);
+    cache.invalidate(dstIdentifier, dstType);
   }
 
   @Override
@@ -432,20 +367,19 @@ public class RelationalEntityStore
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-
-    // Invalidate after the backend write, not before. Invalidating before creates a window where
-    // a concurrent read can repopulate the cache with stale pre-commit data.
     List<E> result =
         backend.updateEntityRelations(
             relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
 
-    cache.invalidate(srcEntityIdent, srcEntityType, relType);
+    // Invalidate after the backend write, not before: invalidating first opens a window where a
+    // concurrent read could repopulate the cache with stale pre-commit data.
+    cache.invalidate(srcEntityIdent, srcEntityType);
     for (NameIdentifier destToAdd : destEntitiesToAdd) {
-      cache.invalidate(destToAdd, srcEntityType, relType);
+      cache.invalidate(destToAdd, srcEntityType);
     }
 
     for (NameIdentifier destToRemove : destEntitiesToRemove) {
-      cache.invalidate(destToRemove, srcEntityType, relType);
+      cache.invalidate(destToRemove, srcEntityType);
     }
 
     return result;
@@ -462,112 +396,5 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
-  }
-
-  private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>> getCachedRelations(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
-    Optional<List<E>> entitiesOpt = cache.getIfPresent(relType, nameIdentifier, identType);
-    if (entitiesOpt.isPresent()) {
-      List<RelationalEntity<?>> cachedRelations = new ArrayList<>();
-      for (E entity : entitiesOpt.get()) {
-        cachedRelations.add(new RelationalEntity<>(relType, nameIdentifier, identType, entity));
-      }
-      return Optional.of(cachedRelations);
-    }
-    return Optional.empty();
-  }
-
-  private <E extends Entity & HasIdentifier> void batchPopulateRelationCache(
-      SupportsRelationOperations.Type relType,
-      Entity.EntityType identType,
-      List<NameIdentifier> uncachedIdentifiers,
-      List<RelationalEntity<?>> backendRelations) {
-    Map<NameIdentifier, List<RelationalEntity<?>>> relationsBySource = new HashMap<>();
-    for (RelationalEntity<?> relation : backendRelations) {
-      relationsBySource.computeIfAbsent(relation.source(), k -> new ArrayList<>()).add(relation);
-    }
-
-    for (NameIdentifier sourceId : uncachedIdentifiers) {
-      List<RelationalEntity<?>> sourceRelations = relationsBySource.get(sourceId);
-      List<E> entityList = new ArrayList<>();
-      if (sourceRelations != null) {
-        for (RelationalEntity<?> rel : sourceRelations) {
-          @SuppressWarnings("unchecked")
-          E entity = (E) rel.targetEntity();
-          entityList.add(entity);
-        }
-      }
-
-      cache.put(sourceId, identType, relType, entityList);
-    }
-  }
-
-  /**
-   * Invalidates the relation cache entries keyed by the counterpart of a role-aggregating entity
-   * after that entity is written, so that reverse lookups reflect the change immediately.
-   *
-   * <p>Three entity types aggregate role relations and are mutated through {@code store.update} /
-   * {@code store.put}, which only invalidate the entity itself:
-   *
-   * <ul>
-   *   <li>{@link RoleEntity} via {@code securableObjects} -> {@code METADATA_OBJECT_ROLE_REL},
-   *       invalidated per metadata object (catalog/schema/table/...);
-   *   <li>{@link UserEntity} via {@code roleNames} -> {@code ROLE_USER_REL}, invalidated per role;
-   *   <li>{@link GroupEntity} via {@code roleNames} -> {@code ROLE_GROUP_REL}, invalidated per
-   *       role.
-   * </ul>
-   *
-   * <p>The role-side BFS invalidation ({@code invalidate(roleIdent, ROLE)}) only reaches a
-   * counterpart's relation entry when the entity had previously been cached against it; a freshly
-   * granted binding was never cached there, so without this explicit invalidation the stale
-   * relation result is served until the entry's TTL elapses. Each entry is dropped via {@link
-   * EntityCache#invalidateRelationEntry} (no BFS cascade), preserving other entities' mappings.
-   */
-  private void invalidateAggregatedRoleRelationCache(Entity entity) {
-    if (entity instanceof RoleEntity) {
-      RoleEntity roleEntity = (RoleEntity) entity;
-      List<SecurableObject> securableObjects = roleEntity.securableObjects();
-      if (securableObjects == null || securableObjects.isEmpty()) {
-        return;
-      }
-      String metalake = roleEntity.namespace().level(0);
-      for (SecurableObject securableObject : securableObjects) {
-        cache.invalidateRelationEntry(
-            MetadataObjectUtil.toEntityIdent(metalake, securableObject),
-            MetadataObjectUtil.toEntityType(securableObject.type()),
-            SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL);
-      }
-    } else if (entity instanceof UserEntity) {
-      UserEntity userEntity = (UserEntity) entity;
-      invalidateRoleGranteeRelations(
-          userEntity.namespace().level(0),
-          userEntity.roleNames(),
-          SupportsRelationOperations.Type.ROLE_USER_REL);
-    } else if (entity instanceof GroupEntity) {
-      GroupEntity groupEntity = (GroupEntity) entity;
-      invalidateRoleGranteeRelations(
-          groupEntity.namespace().level(0),
-          groupEntity.roleNames(),
-          SupportsRelationOperations.Type.ROLE_GROUP_REL);
-    }
-  }
-
-  /**
-   * Invalidates the {@code ROLE_USER_REL} / {@code ROLE_GROUP_REL} cache entries keyed by each role
-   * the grantee (user/group) is aggregated against.
-   */
-  private void invalidateRoleGranteeRelations(
-      String metalake, List<String> roleNames, SupportsRelationOperations.Type relType) {
-    if (roleNames == null || roleNames.isEmpty()) {
-      return;
-    }
-    for (String roleName : roleNames) {
-      cache.invalidateRelationEntry(
-          NameIdentifier.of(NamespaceUtil.ofRole(metalake), roleName),
-          Entity.EntityType.ROLE,
-          relType);
-    }
   }
 }

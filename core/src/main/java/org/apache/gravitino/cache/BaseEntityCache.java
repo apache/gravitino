@@ -46,6 +46,18 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
+   * {@inheritDoc}
+   *
+   * <p>Defaults to {@link Coherence#LOCAL_PER_NODE}: an in-memory, per-node cache whose changes
+   * must be propagated to the other nodes. A shared implementation must override this to return
+   * {@link Coherence#SHARED}.
+   */
+  @Override
+  public Coherence coherence() {
+    return Coherence.LOCAL_PER_NODE;
+  }
+
+  /**
    * Returns the {@link NameIdentifier} of the entity based on its type.
    *
    * @param entity The {@link Entity} instance.
