@@ -40,6 +40,21 @@ public class TestFakeKmsClient extends TestKmsClientContract {
   }
 
   @Test
+  void testRejectsBlankSource() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(API, null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(API, ""));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(API, " "));
+  }
+
+  @Test
+  void testNormalizesSource() {
+    FakeKmsClient client = new FakeKmsClient(API, " " + SOURCE + " ");
+
+    Assertions.assertDoesNotThrow(
+        () -> client.getKeyProperties(new KmsReference(API, SOURCE, MISSING_KEY)));
+  }
+
+  @Test
   void testReportsDisabledKeyAsPresent() {
     KmsKeyProperties properties =
         client.getKeyProperties(new KmsReference(API, SOURCE, DISABLED_KEY)).orElseThrow();
