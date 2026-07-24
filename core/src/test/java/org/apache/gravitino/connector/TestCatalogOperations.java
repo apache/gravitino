@@ -80,6 +80,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
@@ -809,7 +810,10 @@ public class TestCatalogOperations
 
   @Override
   public Topic createTopic(
-      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      NameIdentifier ident,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -817,6 +821,7 @@ public class TestCatalogOperations
         TestTopic.builder()
             .withName(ident.name())
             .withComment(comment)
+            .withDataLayouts(dataLayouts)
             .withProperties(properties)
             .withAuditInfo(auditInfo)
             .build();
@@ -849,6 +854,7 @@ public class TestCatalogOperations
     Map<String, String> newProps =
         topic.properties() != null ? Maps.newHashMap(topic.properties()) : Maps.newHashMap();
     String newComment = topic.comment();
+    Map<String, DataLayout> newDataLayouts = topic.dataLayouts();
 
     for (TopicChange change : changes) {
       if (change instanceof TopicChange.SetProperty) {
@@ -859,6 +865,8 @@ public class TestCatalogOperations
         newProps.remove(((TopicChange.RemoveProperty) change).getProperty());
       } else if (change instanceof TopicChange.UpdateTopicComment) {
         newComment = ((TopicChange.UpdateTopicComment) change).getNewComment();
+      } else if (DataLayouts.isLayoutChange(change)) {
+        newDataLayouts = DataLayouts.applyChanges(newDataLayouts, change);
       } else {
         throw new IllegalArgumentException("Unsupported topic change: " + change);
       }
@@ -868,6 +876,7 @@ public class TestCatalogOperations
         TestTopic.builder()
             .withName(ident.name())
             .withComment(newComment)
+            .withDataLayouts(newDataLayouts)
             .withProperties(newProps)
             .withAuditInfo(updatedAuditInfo)
             .build();

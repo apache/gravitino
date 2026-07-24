@@ -170,11 +170,65 @@ components:
         comment:
           type: string
           description: The comment of the topic
+        dataLayouts:
+          type: object
+          description: >
+            Named message schemas for the topic. Conventional names are `key` for the record key
+            and `value` for the record value.
+          additionalProperties:
+            $ref: "#/components/schemas/DataLayout"
         properties:
           type: object
           description: The properties of the topic
           nullable: true
           default: {}
+          additionalProperties:
+            type: string
+
+    DataLayout:
+      type: object
+      description: >
+        Message schema metadata for a topic. Persisted in Gravitino's entity store;
+        Kafka and other brokers do not store this value.
+      properties:
+        format:
+          type: string
+          description: Payload format. Values are matched case-insensitively on requests;
+            responses always use the lowercase form.
+          enum:
+            - "unknown"
+            - "protobuf"
+            - "avro"
+            - "json"
+          default: "unknown"
+        typeName:
+          type: string
+          description: Fully-qualified type / record name (e.g. protobuf message FQN)
+          nullable: true
+        schemaId:
+          type: string
+          description: Schema Registry (or equivalent) schema id
+          nullable: true
+        schemaVersion:
+          type: string
+          description: Schema version string
+          nullable: true
+        schemaUri:
+          type: string
+          description: Schema Registry base URL or schema location URI
+          nullable: true
+        schemaSubject:
+          type: string
+          description: Schema Registry subject name
+          nullable: true
+        schemaText:
+          type: string
+          description: Inline schema text (Avro JSON, .proto, JSON Schema)
+          nullable: true
+        properties:
+          type: object
+          description: Additional vendor-specific properties
+          nullable: true
           additionalProperties:
             type: string
 
@@ -190,6 +244,13 @@ components:
           type: string
           description: The comment of the topic
           nullable: true
+        dataLayouts:
+          type: object
+          description: >
+            Named message schemas for the topic. Conventional names are `key` for the record key
+            and `value` for the record value.
+          additionalProperties:
+            $ref: "#/components/schemas/DataLayout"
         properties:
           type: object
           description: The properties of the topic
@@ -211,12 +272,18 @@ components:
     TopicUpdateRequest:
       oneOf:
         - $ref: "#/components/schemas/UpdateTopicCommentRequest"
+        - $ref: "#/components/schemas/UpdateTopicDataLayoutRequest"
+        - $ref: "#/components/schemas/RemoveTopicDataLayoutRequest"
+        - $ref: "#/components/schemas/RemoveTopicDataLayoutsRequest"
         - $ref: "#/components/schemas/SetTopicPropertyRequest"
         - $ref: "#/components/schemas/RemoveTopicPropertyRequest"
       discriminator:
         propertyName: "@type"
         mapping:
           updateComment: "#/components/schemas/UpdateTopicCommentRequest"
+          updateDataLayout: "#/components/schemas/UpdateTopicDataLayoutRequest"
+          removeDataLayout: "#/components/schemas/RemoveTopicDataLayoutRequest"
+          removeDataLayouts: "#/components/schemas/RemoveTopicDataLayoutsRequest"
           setProperty: "#/components/schemas/SetTopicPropertyRequest"
           removeProperty: "#/components/schemas/RemoveTopicPropertyRequest"
 
@@ -236,6 +303,64 @@ components:
       example: {
         "@type": "updateComment",
         "newComment": "This is the new comment"
+      }
+
+    UpdateTopicDataLayoutRequest:
+      type: object
+      required:
+        - "@type"
+        - name
+        - newDataLayout
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateDataLayout"
+        name:
+          type: string
+          description: The data layout name to update
+        newDataLayout:
+          $ref: "#/components/schemas/DataLayout"
+      example: {
+        "@type": "updateDataLayout",
+        "name": "value",
+        "newDataLayout": {
+          "format": "protobuf",
+          "typeName": "com.example.Order",
+          "schemaSubject": "order-value",
+          "schemaUri": "http://localhost:8081"
+        }
+      }
+
+    RemoveTopicDataLayoutRequest:
+      type: object
+      required:
+        - "@type"
+        - name
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "removeDataLayout"
+        name:
+          type: string
+          description: The data layout name to remove
+      example: {
+        "@type": "removeDataLayout",
+        "name": "value"
+      }
+
+    RemoveTopicDataLayoutsRequest:
+      type: object
+      required:
+        - "@type"
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "removeDataLayouts"
+      example: {
+        "@type": "removeDataLayouts"
       }
 
     SetTopicPropertyRequest:
@@ -304,6 +429,14 @@ components:
       value: {
         "name": "topic1",
         "comment": "This is a topic",
+        "dataLayouts": {
+          "value": {
+            "format": "protobuf",
+            "typeName": "com.example.Order",
+            "schemaSubject": "order-value",
+            "schemaUri": "http://localhost:8081"
+          }
+        },
         "properties": {
           "partition-count": "1",
           "replication-factor": "1"
@@ -316,6 +449,14 @@ components:
         "topic": {
           "name": "topic1",
           "comment": "This is a topic",
+          "dataLayouts": {
+            "value": {
+              "format": "protobuf",
+              "typeName": "com.example.Order",
+              "schemaSubject": "order-value",
+              "schemaUri": "http://localhost:8081"
+            }
+          },
           "properties": {
             "partition-count": "1",
             "replication-factor": "1"

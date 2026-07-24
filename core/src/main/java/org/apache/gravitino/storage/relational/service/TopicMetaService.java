@@ -83,7 +83,7 @@ public class TopicMetaService {
               mapper.insertTopicMeta(po);
             }
           });
-      // TODO: insert topic dataLayout version after supporting it
+      // DataLayout is serialized into topic_meta.properties under DataLayouts.ENTITY_STORAGE_KEY.
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, topicEntity.nameIdentifier().toString());

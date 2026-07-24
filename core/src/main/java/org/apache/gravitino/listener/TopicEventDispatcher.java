@@ -141,13 +141,17 @@ public class TopicEventDispatcher implements TopicDispatcher {
 
   @Override
   public Topic createTopic(
-      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      NameIdentifier ident,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties)
       throws NoSuchTopicException, TopicAlreadyExistsException {
-    TopicInfo createTopicRequest = new TopicInfo(ident.name(), comment, properties, null);
+    TopicInfo createTopicRequest =
+        new TopicInfo(ident.name(), comment, dataLayouts, properties, null);
     eventBus.dispatchEvent(
         new CreateTopicPreEvent(PrincipalUtils.getCurrentUserName(), ident, createTopicRequest));
     try {
-      Topic topic = dispatcher.createTopic(ident, comment, dataLayout, properties);
+      Topic topic = dispatcher.createTopic(ident, comment, dataLayouts, properties);
       eventBus.dispatchEvent(
           new CreateTopicEvent(PrincipalUtils.getCurrentUserName(), ident, new TopicInfo(topic)));
       return topic;

@@ -43,6 +43,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.TopicResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.metrics.MetricNames;
@@ -143,7 +144,7 @@ public class TopicOperations {
                 dispatcher.createTopic(
                     ident,
                     request.getComment(),
-                    null /* dataLayout, always null because it's not supported yet.*/,
+                    DataLayouts.copyOrNull(request.getDataLayouts()),
                     request.getProperties());
             Response response = Utils.ok(new TopicResponse(DTOConverters.toDTO(topic)));
             LOG.info("Topic created: {}.{}.{}.{}", metalake, catalog, schema, topic.name());

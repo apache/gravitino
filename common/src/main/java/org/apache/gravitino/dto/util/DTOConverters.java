@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.util;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.ArrayUtils;
@@ -56,6 +57,7 @@ import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
+import org.apache.gravitino.dto.messaging.DataLayoutDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
@@ -97,6 +99,7 @@ import org.apache.gravitino.function.Function;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
@@ -781,8 +784,19 @@ public class DTOConverters {
         .withName(topic.name())
         .withComment(topic.comment())
         .withProperties(topic.properties())
+        .withDataLayouts(toDataLayoutDTOs(topic.dataLayouts()))
         .withAudit(toDTO(topic.auditInfo()))
         .build();
+  }
+
+  private static Map<String, DataLayoutDTO> toDataLayoutDTOs(Map<String, DataLayout> dataLayouts) {
+    if (dataLayouts == null || dataLayouts.isEmpty()) {
+      return null;
+    }
+    Map<String, DataLayoutDTO> dataLayoutDTOs = new LinkedHashMap<>();
+    dataLayouts.forEach(
+        (name, layout) -> dataLayoutDTOs.put(name, DataLayoutDTO.fromDataLayout(layout)));
+    return dataLayoutDTOs;
   }
 
   /**

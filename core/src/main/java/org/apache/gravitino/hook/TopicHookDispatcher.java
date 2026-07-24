@@ -63,9 +63,12 @@ public class TopicHookDispatcher implements TopicDispatcher {
 
   @Override
   public Topic createTopic(
-      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      NameIdentifier ident,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    Topic topic = dispatcher.createTopic(ident, comment, dataLayout, properties);
+    Topic topic = dispatcher.createTopic(ident, comment, dataLayouts, properties);
 
     // Set the creator as the owner of the topic.
     OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();

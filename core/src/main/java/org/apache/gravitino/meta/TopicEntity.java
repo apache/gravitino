@@ -28,6 +28,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
 
 /** A class representing a topic metadata entity in Apache Gravitino. */
 @ToString
@@ -42,6 +44,8 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
       Field.required("audit_info", AuditInfo.class, "The audit details of the topic entity.");
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the topic entity.");
+  public static final Field DATA_LAYOUTS =
+      Field.optional("dataLayouts", Map.class, "The named message schemas of the topic entity.");
 
   public static Builder builder() {
     return new Builder();
@@ -53,6 +57,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
   private String comment;
   private AuditInfo auditInfo;
   private Map<String, String> properties;
+  private Map<String, DataLayout> dataLayouts;
 
   private TopicEntity() {}
 
@@ -69,6 +74,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
     fields.put(COMMENT, comment);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
+    fields.put(DATA_LAYOUTS, dataLayouts);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -141,6 +147,15 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
     return properties;
   }
 
+  /**
+   * Returns the named message schemas of the topic entity.
+   *
+   * @return The data layouts of the topic entity.
+   */
+  public Map<String, DataLayout> dataLayouts() {
+    return dataLayouts == null ? Collections.emptyMap() : dataLayouts;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -152,12 +167,13 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(comment, that.comment)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(properties, that.properties);
+        && Objects.equals(properties, that.properties)
+        && Objects.equals(dataLayouts, that.dataLayouts);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, comment, auditInfo, properties);
+    return Objects.hash(id, name, comment, auditInfo, properties, dataLayouts);
   }
 
   public static class Builder {
@@ -230,6 +246,17 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
      */
     public TopicEntity.Builder withProperties(Map<String, String> properties) {
       topic.properties = properties;
+      return this;
+    }
+
+    /**
+     * Sets the data layouts of the topic entity.
+     *
+     * @param dataLayouts The data layouts of the topic entity.
+     * @return The builder instance.
+     */
+    public TopicEntity.Builder withDataLayouts(Map<String, DataLayout> dataLayouts) {
+      topic.dataLayouts = DataLayouts.copyOrNull(dataLayouts);
       return this;
     }
 
