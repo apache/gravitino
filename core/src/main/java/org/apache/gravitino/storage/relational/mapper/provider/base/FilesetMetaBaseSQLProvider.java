@@ -332,12 +332,15 @@ public class FilesetMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId) {
+  public String softDeleteFilesetMetasByFilesetId(
+      @Param("filesetId") Long filesetId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+        // OCC: version-checked delete (0 rows = stale version; the service returns false).
+        + " WHERE fileset_id = #{filesetId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String deleteFilesetMetasByLegacyTimeline(

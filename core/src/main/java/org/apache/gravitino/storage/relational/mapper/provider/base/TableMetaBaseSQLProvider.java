@@ -245,12 +245,15 @@ public class TableMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
+  public String softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+        // OCC: version-checked delete (0 rows = stale version; the service returns false).
+        + " WHERE table_id = #{tableId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

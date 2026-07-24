@@ -269,7 +269,9 @@ public class TableMetaService {
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
                     TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByTableId(tablePO.getTableId()))),
+                    mapper ->
+                        mapper.softDeleteTableMetasByTableId(
+                            tablePO.getTableId(), tablePO.getCurrentVersion()))),
         () -> {
           if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(

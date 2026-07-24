@@ -326,7 +326,9 @@ public class FilesetMetaService {
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
                     FilesetMetaMapper.class,
-                    mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId))),
+                    mapper ->
+                        mapper.softDeleteFilesetMetasByFilesetId(
+                            filesetId, filesetPO.getCurrentVersion()))),
         () -> {
           if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(

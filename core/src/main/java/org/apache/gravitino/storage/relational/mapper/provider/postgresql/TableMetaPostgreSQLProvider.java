@@ -56,11 +56,13 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteTableMetasByTableId(Long tableId) {
+  public String softDeleteTableMetasByTableId(Long tableId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE table_id = #{tableId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override
