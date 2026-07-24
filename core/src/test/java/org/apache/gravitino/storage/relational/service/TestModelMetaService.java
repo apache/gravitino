@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
@@ -34,6 +35,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.po.ModelPO;
@@ -51,6 +54,56 @@ public class TestModelMetaService extends TestJDBCBackend {
   private static final String SCHEMA_NAME = "schema_for_model_meta_test";
 
   private static final Namespace MODEL_NS = Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+
+  @TestTemplate
+  public void testModelUpdateAndVersionAddRaiseCurrentVersion() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "cas_model",
+            "comment",
+            0,
+            ImmutableMap.of(),
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    Assertions.assertEquals(
+        1L, ModelMetaService.getInstance().getModelPOById(model.id()).getCurrentVersion());
+
+    // updateModel raises current_version (1 -> 2).
+    ModelEntity updated =
+        createModelEntity(
+            model.id(),
+            model.namespace(),
+            model.name(),
+            "comment2",
+            0,
+            ImmutableMap.of(),
+            AUDIT_INFO);
+    Function<ModelEntity, ModelEntity> updater = old -> updated;
+    ModelMetaService.getInstance().updateModel(model.nameIdentifier(), updater);
+    Assertions.assertEquals(
+        2L, ModelMetaService.getInstance().getModelPOById(model.id()).getCurrentVersion());
+
+    // Adding a model version modifies the model, so it also raises current_version (2 -> 3).
+    ModelVersionEntity version =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(model.nameIdentifier())
+            .withVersion(0)
+            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"))
+            .withAliases(ImmutableList.of())
+            .withComment("version comment")
+            .withProperties(ImmutableMap.of())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    ModelVersionMetaService.getInstance().insertModelVersion(version);
+    Assertions.assertEquals(
+        3L, ModelMetaService.getInstance().getModelPOById(model.id()).getCurrentVersion());
+  }
 
   @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {

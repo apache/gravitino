@@ -591,11 +591,15 @@ CREATE TABLE IF NOT EXISTS model_meta (
     model_comment VARCHAR(65535) DEFAULT NULL,
     model_properties TEXT DEFAULT NULL,
     model_latest_version INT NOT NULL DEFAULT 0,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (model_id),
     UNIQUE (schema_id, model_name, deleted_at)
 );
+COMMENT ON COLUMN model_meta.current_version IS 'model current version';
+COMMENT ON COLUMN model_meta.last_version IS 'model last version';
 
 CREATE INDEX IF NOT EXISTS model_meta_idx_metalake_id ON model_meta (metalake_id);
 CREATE INDEX IF NOT EXISTS model_meta_idx_catalog_id ON model_meta (catalog_id);

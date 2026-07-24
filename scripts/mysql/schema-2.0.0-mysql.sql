@@ -337,6 +337,8 @@ CREATE TABLE IF NOT EXISTS `model_meta` (
     `model_comment` TEXT DEFAULT NULL COMMENT 'model comment',
     `model_properties` MEDIUMTEXT DEFAULT NULL COMMENT 'model properties',
     `model_latest_version` INT UNSIGNED DEFAULT 0 COMMENT 'model latest version',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last version',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'model audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model deleted at',
     PRIMARY KEY (`model_id`),

@@ -1627,6 +1627,8 @@ public class POConverters {
           .withModelName(modelEntity.name())
           .withModelComment(modelEntity.comment())
           .withModelLatestVersion(modelEntity.latestVersion())
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
           .withModelProperties(
               JsonUtils.anyFieldMapper().writeValueAsString(modelEntity.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(modelEntity.auditInfo()))
@@ -1688,6 +1690,10 @@ public class POConverters {
           .withSchemaId(oldModelPO.getSchemaId())
           .withModelComment(newModel.comment())
           .withModelLatestVersion(newModel.latestVersion())
+          // Raise the version on every successful update so OCC (version CAS) can detect a
+          // concurrent write: the racing updater's `WHERE current_version = old` matches 0 rows.
+          .withCurrentVersion(oldModelPO.getLastVersion() + 1)
+          .withLastVersion(oldModelPO.getLastVersion() + 1)
           .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(newModel.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newModel.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)

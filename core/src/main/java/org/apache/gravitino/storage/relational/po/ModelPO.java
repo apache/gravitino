@@ -41,6 +41,10 @@ public class ModelPO {
 
   private Integer modelLatestVersion;
 
+  private Long currentVersion;
+
+  private Long lastVersion;
+
   private String modelProperties;
 
   private String auditInfo;
@@ -93,6 +97,16 @@ public class ModelPO {
 
     public Builder withModelLatestVersion(Integer modelLatestVersion) {
       modelPO.modelLatestVersion = modelLatestVersion;
+      return this;
+    }
+
+    public Builder withCurrentVersion(Long currentVersion) {
+      modelPO.currentVersion = currentVersion;
+      return this;
+    }
+
+    public Builder withLastVersion(Long lastVersion) {
+      modelPO.lastVersion = lastVersion;
       return this;
     }
 

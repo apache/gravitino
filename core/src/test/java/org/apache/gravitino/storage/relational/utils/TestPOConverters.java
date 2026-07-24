@@ -806,6 +806,43 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testUpdateModelPOVersionIncrements() throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    Namespace ns = Namespace.of("test_metalake", "test_catalog", "test_schema");
+    ModelEntity model =
+        ModelEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(ns)
+            .withComment("this is test")
+            .withProperties(ImmutableMap.of("key", "value"))
+            .withLatestVersion(1)
+            .withAuditInfo(auditInfo)
+            .build();
+    ModelEntity updatedModel =
+        ModelEntity.builder()
+            .withId(1L)
+            .withName("test")
+            .withNamespace(ns)
+            .withComment("this is test2")
+            .withProperties(ImmutableMap.of("key", "value"))
+            .withLatestVersion(1)
+            .withAuditInfo(auditInfo)
+            .build();
+    ModelPO initPO =
+        POConverters.initializeModelPO(
+            model, ModelPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L));
+    assertEquals(1L, initPO.getCurrentVersion());
+
+    ModelPO updatePO = POConverters.updateModelPO(initPO, updatedModel);
+
+    // A successful update must raise the version so OCC (version CAS) can detect concurrent writes.
+    assertEquals(2L, updatePO.getCurrentVersion());
+    assertEquals(2L, updatePO.getLastVersion());
+  }
+
+  @Test
   public void testUpdateFilesetPOVersion() throws JsonProcessingException {
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
