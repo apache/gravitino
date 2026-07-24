@@ -108,11 +108,13 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
           "Doesn't support setting schema comment: " + originComment);
     }
 
+    validateSqlIdentifier(databaseName);
     StringBuilder createDatabaseSql =
         new StringBuilder(String.format("CREATE DATABASE `%s`", databaseName));
 
     if (onCluster(properties)) {
       String clusterName = properties.get(ClusterConstants.CLUSTER_NAME);
+      validateSqlIdentifier(clusterName);
       createDatabaseSql.append(String.format(" ON CLUSTER `%s`", clusterName));
       // Embed the cluster name into the COMMENT so it can be retrieved later (e.g., at DROP time).
       // ClickHouse does not persist ON CLUSTER info in SHOW CREATE DATABASE for Atomic databases.
@@ -226,8 +228,10 @@ public class ClickHouseDatabaseOperations extends JdbcDatabaseOperations {
    */
   @VisibleForTesting
   String generateDropDatabaseSql(String databaseName, String clusterName) {
+    validateSqlIdentifier(databaseName);
     StringBuilder sql = new StringBuilder(String.format("DROP DATABASE `%s`", databaseName));
     if (StringUtils.isNotBlank(clusterName)) {
+      validateSqlIdentifier(clusterName);
       sql.append(String.format(" ON CLUSTER `%s`", clusterName));
     }
     LOG.info("Generated drop database:{} sql: {}", databaseName, sql);

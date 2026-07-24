@@ -99,6 +99,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
           "PostgreSQL does not support properties on database create.");
     }
 
+    validateSqlIdentifier(schema);
     StringBuilder sqlBuilder = new StringBuilder("CREATE SCHEMA \"" + schema + "\";");
     if (StringUtils.isNotEmpty(comment)) {
       sqlBuilder
@@ -136,6 +137,7 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
 
   @Override
   public String generateDropDatabaseSql(String schema, boolean cascade) {
+    validateSqlIdentifier(schema);
     StringBuilder sqlBuilder =
         new StringBuilder(String.format("DROP SCHEMA %s%s%s", PG_QUOTE, schema, PG_QUOTE));
     if (cascade) {

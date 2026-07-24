@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.jdbc.operation;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -47,6 +49,8 @@ import org.slf4j.LoggerFactory;
 public abstract class JdbcDatabaseOperations implements DatabaseOperation {
 
   public static final Logger LOG = LoggerFactory.getLogger(JdbcDatabaseOperations.class);
+
+  private static final Pattern SQL_IDENTIFIER_PATTERN = Pattern.compile("^[\\w\\p{L}$/=-]{1,64}$");
 
   protected DataSource dataSource;
   protected JdbcExceptionConverter exceptionMapper;
@@ -149,6 +153,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    */
   protected String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
+    validateSqlIdentifier(databaseName);
     String createDatabaseSql = String.format("CREATE DATABASE `%s`", databaseName);
     if (MapUtils.isNotEmpty(properties)) {
       throw new UnsupportedOperationException("Properties are not supported yet.");
@@ -166,6 +171,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * @return the SQL statement to drop a database with the given name.
    */
   protected String generateDropDatabaseSql(String databaseName, boolean cascade) {
+    validateSqlIdentifier(databaseName);
     final String dropDatabaseSql = String.format("DROP DATABASE `%s`", databaseName);
     if (cascade) {
       return dropDatabaseSql;
@@ -188,6 +194,18 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
       throw this.exceptionMapper.toGravitinoException(sqlException);
     }
     return dropDatabaseSql;
+  }
+
+  /**
+   * Validates a name before embedding it in a SQL identifier.
+   *
+   * @param identifier The identifier to validate.
+   */
+  protected static void validateSqlIdentifier(String identifier) {
+    Preconditions.checkArgument(
+        identifier != null && SQL_IDENTIFIER_PATTERN.matcher(identifier).matches(),
+        "Invalid SQL identifier: %s",
+        identifier);
   }
 
   /**
