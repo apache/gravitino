@@ -39,10 +39,10 @@ public interface KmsClient extends AutoCloseable {
    * Authentication, authorization, timeout, availability, and other indeterminate failures are
    * reported as exceptions, never as an empty result.
    *
-   * @param reference key to inspect
+   * @param reference non-null key to inspect
    * @return normalized key properties, or empty when the key authoritatively does not exist; never
    *     null
-   * @throws IllegalArgumentException if the reference does not belong to this client
+   * @throws IllegalArgumentException if the reference is null or does not belong to this client
    * @throws ConnectionFailedException if the provider cannot be queried
    */
   Optional<KmsKeyProperties> getKeyProperties(KmsReference reference);
