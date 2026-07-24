@@ -27,3 +27,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS `uk_mid_geid_del` ON `group_meta` (`metalake_i
 
 ALTER TABLE `table_column_version_info`
     ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
+    `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
+    `audit_info` CLOB NOT NULL COMMENT 'policy tag relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy tag relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_pi_ti_del` (`policy_id`, `tag_id`, `deleted_at`),
+    KEY `idx_ptr_pid` (`policy_id`),
+    KEY `idx_ptr_tid` (`tag_id`)
+) ENGINE=InnoDB;

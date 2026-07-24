@@ -29,6 +29,7 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyDispatcher;
+import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -102,6 +103,16 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
   @Override
   public MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName) {
     return dispatcher.listMetadataObjectsForPolicy(metalake, policyName);
+  }
+
+  @Override
+  public String[] listTagsForPolicy(String metalake, String policyName) {
+    return dispatcher.listTagsForPolicy(metalake, policyName);
+  }
+
+  @Override
+  public Tag[] listTagInfosForPolicy(String metalake, String policyName) {
+    return dispatcher.listTagInfosForPolicy(metalake, policyName);
   }
 
   @Override

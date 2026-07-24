@@ -105,7 +105,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
           SupportsRelationOperations.Type.ROLE_USER_REL,
           SupportsRelationOperations.Type.ROLE_GROUP_REL,
           SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          SupportsRelationOperations.Type.POLICY_TAG_REL);
 
   /**
    * Constructs a new {@link CaffeineEntityCache}.

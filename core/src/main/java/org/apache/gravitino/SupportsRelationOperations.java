@@ -42,6 +42,8 @@ public interface SupportsRelationOperations {
     POLICY_METADATA_OBJECT_REL,
     /** Metadata object to tag relationship */
     TAG_METADATA_OBJECT_REL,
+    /** Policy and tag relationship */
+    POLICY_TAG_REL,
   }
 
   /**

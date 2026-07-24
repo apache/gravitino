@@ -40,12 +40,14 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
@@ -234,6 +236,101 @@ public class TagManager implements TagDispatcher {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  @Override
+  public PolicyEntity[] listPolicyInfosForTag(String metalake, String name)
+      throws NoSuchTagException {
+    NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, name);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+
+    return TreeLockUtils.doWithTreeLock(
+        tagIdent,
+        LockType.READ,
+        () -> {
+          try {
+            List<PolicyEntity> policies =
+                entityStore
+                    .relationOperations()
+                    .listEntitiesByRelation(
+                        SupportsRelationOperations.Type.POLICY_TAG_REL,
+                        tagIdent,
+                        Entity.EntityType.TAG,
+                        true /* allFields */);
+            return policies.toArray(new PolicyEntity[0]);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchTagException(
+                e, "Tag with name %s under metalake %s does not exist", name, metalake);
+          } catch (IOException e) {
+            LOG.error("Failed to list policies for tag {} under metalake {}", name, metalake, e);
+            throw new RuntimeException(e);
+          }
+        });
+  }
+
+  @Override
+  public String[] associatePoliciesForTag(
+      String metalake, String name, String[] policiesToAdd, String[] policiesToRemove)
+      throws NoSuchTagException, PolicyAlreadyAssociatedException {
+    NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, name);
+
+    Set<String> policiesToAddSet =
+        policiesToAdd == null ? Sets.newHashSet() : Sets.newHashSet(policiesToAdd);
+    Set<String> policiesToRemoveSet =
+        policiesToRemove == null ? Sets.newHashSet() : Sets.newHashSet(policiesToRemove);
+    Set<String> common = Sets.intersection(policiesToAddSet, policiesToRemoveSet).immutableCopy();
+    policiesToAddSet.removeAll(common);
+    policiesToRemoveSet.removeAll(common);
+
+    NameIdentifier[] policiesToAddIdent =
+        policiesToAddSet.stream()
+            .map(policy -> NameIdentifierUtil.ofPolicy(metalake, policy))
+            .toArray(NameIdentifier[]::new);
+    NameIdentifier[] policiesToRemoveIdent =
+        policiesToRemoveSet.stream()
+            .map(policy -> NameIdentifierUtil.ofPolicy(metalake, policy))
+            .toArray(NameIdentifier[]::new);
+
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    return TreeLockUtils.doWithTreeLock(
+        tagIdent,
+        LockType.READ,
+        () ->
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of(NamespaceUtil.ofPolicy(metalake).levels()),
+                LockType.WRITE,
+                () -> {
+                  try {
+                    List<PolicyEntity> policies =
+                        entityStore
+                            .relationOperations()
+                            .updateEntityRelations(
+                                SupportsRelationOperations.Type.POLICY_TAG_REL,
+                                tagIdent,
+                                Entity.EntityType.TAG,
+                                policiesToAddIdent,
+                                policiesToRemoveIdent);
+
+                    return policies.stream().map(PolicyEntity::name).toArray(String[]::new);
+                  } catch (NoSuchEntityException e) {
+                    throw new NoSuchTagException(
+                        e, "Tag with name %s under metalake %s does not exist", name, metalake);
+                  } catch (EntityAlreadyExistsException e) {
+                    throw new PolicyAlreadyAssociatedException(
+                        e,
+                        "Failed to associate policies for tag due to some policies %s already "
+                            + "associated to the tag %s",
+                        Arrays.toString(policiesToAdd),
+                        name);
+                  } catch (IOException e) {
+                    LOG.error(
+                        "Failed to associate policies for tag {} under metalake {}",
+                        name,
+                        metalake,
+                        e);
+                    throw new RuntimeException(e);
+                  }
+                }));
   }
 
   public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject)
