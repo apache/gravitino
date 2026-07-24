@@ -1105,6 +1105,160 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  @EnabledIf("supportColumnDefaultValueExpression")
+  void testMATERIALIZEDAndALIASColumnDefaultKinds() {
+    // Verify that MATERIALIZED and ALIAS columns are correctly distinguished from DEFAULT
+    // columns on round-trip through the Gravitino API. The ClickHouse JDBC driver hardcodes
+    // IS_GENERATEDCOLUMN to 'NO', so the catalog must query system.columns.default_kind
+    // to correctly identify these column kinds.
+    String tableName = GravitinoITUtils.genRandomName("test_default_kind");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  id Int64,\n"
+            + "  created_date Date DEFAULT today(),\n"
+            + "  computed_date Date MATERIALIZED today(),\n"
+            + "  alias_date Date ALIAS today(),\n"
+            + "  computed_int Int64 MATERIALIZED id + 1,\n"
+            + "  alias_int Int64 ALIAS id * 2,\n"
+            + "  materialized_str String MATERIALIZED concat('prefix_', toString(id)),\n"
+            + "  alias_str String ALIAS concat('suffix_', toString(id)),\n"
+            + "  nullable_default Nullable(Date) DEFAULT today(),\n"
+            + "  nullable_materialized Nullable(Date) MATERIALIZED today(),\n"
+            + "  nullable_alias Nullable(Date) ALIAS today()\n"
+            + ") ENGINE = MergeTree ORDER BY id;\n";
+
+    clickhouseService.executeQuery(sql);
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "id":
+          // No default value
+          Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "created_date":
+          // DEFAULT column: today() is an expression, not a literal
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          Assertions.assertEquals(
+              "today()", ((UnparsedExpression) column.defaultValue()).unparsedExpression());
+          break;
+        case "computed_date":
+          // MATERIALIZED column: must resolve to UnparsedExpression, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          Assertions.assertEquals(
+              "today()", ((UnparsedExpression) column.defaultValue()).unparsedExpression());
+          break;
+        case "alias_date":
+          // ALIAS column: must resolve to UnparsedExpression, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          Assertions.assertEquals(
+              "today()", ((UnparsedExpression) column.defaultValue()).unparsedExpression());
+          break;
+        case "computed_int":
+          // MATERIALIZED with arithmetic expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "alias_int":
+          // ALIAS with arithmetic expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "materialized_str":
+          // MATERIALIZED with function expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "alias_str":
+          // ALIAS with function expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "nullable_default":
+          // Nullable + DEFAULT: should have a default value
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "nullable_materialized":
+          // Nullable + MATERIALIZED: should have a default value, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "nullable_alias":
+          // Nullable + ALIAS: should have a default value, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        default:
+          Assertions.fail(
+              "Unexpected column name: "
+                  + column.name()
+                  + ", default value: "
+                  + column.defaultValue());
+      }
+    }
+  }
+
+  @Test
+  @EnabledIf("supportColumnDefaultValueExpression")
+  void testDefaultColumnsNotMismarkedAsMaterialized() {
+    // Regression guard: columns with DEFAULT (not MATERIALIZED/ALIAS) must remain as DEFAULT
+    // on round-trip. The getDefaultKinds() query should not cause plain DEFAULT columns to be
+    // re-processed through the expression branch intended for MATERIALIZED/ALIAS.
+    String tableName = GravitinoITUtils.genRandomName("test_default_only");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  id Int64,\n"
+            + "  status UInt8 DEFAULT 0,\n"
+            + "  name String DEFAULT 'unknown',\n"
+            + "  created_at DateTime DEFAULT now()\n"
+            + ") ENGINE = MergeTree ORDER BY id;\n";
+
+    clickhouseService.executeQuery(sql);
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "id":
+          Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "status":
+          // DEFAULT literal 0 — must NOT be UnparsedExpression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertFalse(
+              column.defaultValue() instanceof UnparsedExpression,
+              "DEFAULT column 'status' should not be treated as MATERIALIZED/ALIAS");
+          break;
+        case "name":
+          // DEFAULT literal 'unknown' — must NOT be UnparsedExpression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertFalse(
+              column.defaultValue() instanceof UnparsedExpression,
+              "DEFAULT column 'name' should not be treated as MATERIALIZED/ALIAS");
+          break;
+        case "created_at":
+          // DEFAULT now() is a function expression → UnparsedExpression is acceptable here
+          // (falls back because now() is not a valid timestamp literal).
+          // The key assertion: it must NOT be DEFAULT_VALUE_NOT_SET.
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        default:
+          Assertions.fail("Unexpected column: " + column.name());
+      }
+    }
+  }
+
+  @Test
   void testColumnTypeConverter() {
     // test convert from ClickHouse to Gravitino
     String tableName = GravitinoITUtils.genRandomName("test_type_converter");

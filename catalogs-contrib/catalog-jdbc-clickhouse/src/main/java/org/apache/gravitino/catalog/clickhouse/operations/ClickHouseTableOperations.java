@@ -61,6 +61,7 @@ import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -727,15 +728,42 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       ResultSet tables = getTable(connection, databaseName, tableName);
       JdbcTable.Builder jdbcTableBuilder = getTableBuilder(tables, databaseName, tableName);
 
+      // Query system.columns for default_kind to correctly identify MATERIALIZED/ALIAS columns.
+      // The ClickHouse JDBC driver hardcodes IS_GENERATEDCOLUMN to 'NO' for all columns.
+      // Stored as a local variable (not instance field) to avoid thread-safety issues,
+      // since ClickHouseTableOperations is a shared singleton across concurrent requests.
+      Map<String, String> defaultKinds = getDefaultKinds(connection, databaseName, tableName);
+
+      // NOTE: Cannot use getColumnBuilder() here because we need to override the default
+      // value for MATERIALIZED/ALIAS columns between getBasicJdbcColumnInfo() and build().
       List<JdbcColumn> jdbcColumns = new ArrayList<>();
       ResultSet columns = getColumns(connection, databaseName, tableName);
       while (columns.next()) {
-        JdbcColumn.Builder columnBuilder = getColumnBuilder(columns, databaseName, tableName);
-        if (columnBuilder != null) {
-          boolean autoIncrement = getAutoIncrementInfo(columns);
-          columnBuilder.withAutoIncrement(autoIncrement);
-          jdbcColumns.add(columnBuilder.build());
+        if (!Objects.equals(columns.getString("TABLE_NAME"), tableName)) {
+          continue;
         }
+        JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
+        // Correct default value for MATERIALIZED/ALIAS columns: the JDBC driver
+        // hardcodes IS_GENERATEDCOLUMN to 'NO', so re-derive with isExpression=true.
+        String columnName = columns.getString("COLUMN_NAME");
+        String defaultKind = defaultKinds.getOrDefault(columnName, "");
+        if ("MATERIALIZED".equals(defaultKind) || "ALIAS".equals(defaultKind)) {
+          String columnDef = columns.getString("COLUMN_DEF");
+          boolean nullable = columns.getBoolean("NULLABLE");
+          String typeName = columns.getString("TYPE_NAME");
+          int columnSize = columns.getInt("COLUMN_SIZE");
+          int scale = columns.getInt("DECIMAL_DIGITS");
+          JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean(typeName);
+          typeBean.setColumnSize(columnSize);
+          typeBean.setScale(scale);
+          typeBean.setDatetimePrecision(calculateDatetimePrecision(typeName, columnSize, scale));
+          Expression correctDefault =
+              columnDefaultValueConverter.toGravitino(typeBean, columnDef, true, nullable);
+          columnBuilder.withDefaultValue(correctDefault);
+        }
+        boolean autoIncrement = getAutoIncrementInfo(columns);
+        columnBuilder.withAutoIncrement(autoIncrement);
+        jdbcColumns.add(columnBuilder.build());
       }
       jdbcTableBuilder.withColumns(jdbcColumns.toArray(new JdbcColumn[0]));
 
@@ -771,6 +799,23 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     } catch (SQLException e) {
       throw exceptionMapper.toGravitinoException(e);
     }
+  }
+
+  @VisibleForTesting
+  Map<String, String> getDefaultKinds(Connection connection, String database, String table)
+      throws SQLException {
+    Map<String, String> kinds = new HashMap<>();
+    String sql = "SELECT name, default_kind FROM system.columns WHERE database = ? AND table = ?";
+    try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      stmt.setString(1, database);
+      stmt.setString(2, table);
+      try (ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+          kinds.put(rs.getString("name"), rs.getString("default_kind"));
+        }
+      }
+    }
+    return kinds;
   }
 
   @Override

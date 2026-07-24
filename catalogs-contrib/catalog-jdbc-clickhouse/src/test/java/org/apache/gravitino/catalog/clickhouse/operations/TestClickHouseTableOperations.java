@@ -23,6 +23,9 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesM
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,6 +46,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -489,6 +493,68 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
     assertionsTableInfo(
         tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, loaded);
+  }
+
+  @Test
+  public void testLoadTableWithMaterializedAndAliasColumns() throws Exception {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_default_kind";
+
+    // Create table with MATERIALIZED and ALIAS columns via raw SQL.
+    // Using DriverManager.getConnection directly because Gravitino's create() API
+    // does not support specifying MATERIALIZED/ALIAS default value kinds.
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection conn =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement stmt = conn.createStatement()) {
+      stmt.execute(
+          String.format(
+              "CREATE TABLE %s.%s ("
+                  + "  id Int64,"
+                  + "  created_date Date DEFAULT today(),"
+                  + "  computed_date Date MATERIALIZED today(),"
+                  + "  alias_date Date ALIAS today()"
+                  + ") ENGINE = MergeTree ORDER BY id",
+              TEST_DB_NAME, tableName));
+    }
+
+    // Load via table operations
+    JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Column[] columns = loaded.columns();
+
+    // Find each column and verify default values
+    Column createdDateCol = findColumn(columns, "created_date");
+    Column computedDateCol = findColumn(columns, "computed_date");
+    Column aliasDateCol = findColumn(columns, "alias_date");
+
+    // DEFAULT column: should have a default value (Literal or UnparsedExpression)
+    Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, createdDateCol.defaultValue());
+    // Verify the default value content is today()
+    UnparsedExpression createdDefault = (UnparsedExpression) createdDateCol.defaultValue();
+    Assertions.assertEquals("today()", createdDefault.unparsedExpression());
+
+    // MATERIALIZED column: should have UnparsedExpression (not DEFAULT_VALUE_NOT_SET)
+    Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, computedDateCol.defaultValue());
+    Assertions.assertTrue(computedDateCol.defaultValue() instanceof UnparsedExpression);
+    UnparsedExpression computedDefault = (UnparsedExpression) computedDateCol.defaultValue();
+    Assertions.assertEquals("today()", computedDefault.unparsedExpression());
+
+    // ALIAS column: should have UnparsedExpression (not DEFAULT_VALUE_NOT_SET)
+    Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, aliasDateCol.defaultValue());
+    Assertions.assertTrue(aliasDateCol.defaultValue() instanceof UnparsedExpression);
+    UnparsedExpression aliasDefault = (UnparsedExpression) aliasDateCol.defaultValue();
+    Assertions.assertEquals("today()", aliasDefault.unparsedExpression());
+  }
+
+  private static Column findColumn(Column[] columns, String name) {
+    for (Column col : columns) {
+      if (col.name().equals(name)) {
+        return col;
+      }
+    }
+    throw new AssertionError("Column not found: " + name);
   }
 
   @Test
