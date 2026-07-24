@@ -35,10 +35,12 @@ from gravitino.api.rel.table import Table
 from gravitino.api.rel.table_change import TableChange
 from gravitino.api.rel.types.types import Types
 from gravitino.api.rel.view import View
+from gravitino.api.rel.view_change import ViewChange
 from gravitino.client.relational_table import RelationalTable
 from gravitino.exceptions.base import (
     NoSuchSchemaException,
     NoSuchTableException,
+    NoSuchViewException,
     TableAlreadyExistsException,
     ViewAlreadyExistsException,
 )
@@ -382,6 +384,61 @@ class TestRelationalCatalog(IntegrationTestEnv):
                 ],
             )
 
+    def test_relational_catalog_list_views(self):
+        """Test listing views in the relational catalog."""
+        self._create_test_table()
+        self._create_test_view()
+        view_catalog = self.catalog.as_view_catalog()
+
+        view_identifiers = view_catalog.list_views(
+            Namespace.of(TestRelationalCatalog.SCHEMA_NAME)
+        )
+        self.assertEqual(len(view_identifiers), 1)
+        self.assertEqual(view_identifiers[0], self.view_ident)
+
+    def test_relational_catalog_list_views_invalid_namespace(self):
+        """Test listing views with invalid namespace."""
+        view_catalog = self.catalog.as_view_catalog()
+        invalid_namespace = NameIdentifier.of(
+            "non_existent_schema", "dummy"
+        ).namespace()
+
+        with self.assertRaises(NoSuchSchemaException):
+            view_catalog.list_views(namespace=invalid_namespace)
+
+    def test_relational_catalog_load_view(self):
+        """Test loading a view from the relational catalog."""
+        self._create_test_table()
+        self._create_test_view()
+        view_catalog = self.catalog.as_view_catalog()
+
+        view = view_catalog.load_view(identifier=self.view_ident)
+        self.assertEqual(view.name(), self.view_name)
+        self.assertEqual(view.comment(), TestRelationalCatalog.VIEW_COMMENT)
+
+    def test_relational_catalog_load_view_not_exists(self):
+        """Test loading a view that doesn't exist should raise exception."""
+        view_catalog = self.catalog.as_view_catalog()
+        non_existent_view = NameIdentifier.of(
+            TestRelationalCatalog.SCHEMA_NAME, "non_existent_view"
+        )
+
+        with self.assertRaises(NoSuchViewException):
+            view_catalog.load_view(identifier=non_existent_view)
+
+    def test_relational_catalog_view_exists(self):
+        """Test checking if a view exists."""
+        self._create_test_table()
+        view_catalog = self.catalog.as_view_catalog()
+
+        self.assertFalse(view_catalog.view_exists(identifier=self.view_ident))
+
+        self._create_test_view()
+
+        self.assertTrue(view_catalog.view_exists(identifier=self.view_ident))
+        view_catalog.drop_view(self.view_ident)
+        self.assertFalse(view_catalog.view_exists(self.view_ident))
+
     def test_relational_catalog_drop_view(self):
         """Test dropping a view from the relational catalog."""
         self._create_test_table()
@@ -397,3 +454,31 @@ class TestRelationalCatalog(IntegrationTestEnv):
 
         is_dropped = view_catalog.drop_view(self.view_ident)
         self.assertFalse(is_dropped)
+
+    def test_relational_catalog_alter_view(self):
+        """Test altering a view from the relational catalog."""
+        self._create_test_table()
+        self._create_test_view()
+        view_catalog = self.catalog.as_view_catalog()
+
+        new_property_value = "new_property_value"
+        changes = [
+            ViewChange.set_property("view_property1", new_property_value),
+            ViewChange.remove_property("view_property2"),
+        ]
+
+        altered_view = view_catalog.alter_view(self.view_ident, *changes)
+
+        self.assertEqual(
+            altered_view.properties().get("view_property1"),
+            new_property_value,
+        )
+        self.assertNotIn("view_property2", altered_view.properties())
+
+    def test_relational_catalog_alter_view_not_exists(self):
+        """Test altering a view that doesn't exist should raise NoSuchViewException."""
+        view_catalog = self.catalog.as_view_catalog()
+        ident = NameIdentifier.of(TestRelationalCatalog.SCHEMA_NAME, "invalid_view")
+
+        with self.assertRaises(NoSuchViewException):
+            view_catalog.alter_view(ident, ViewChange.set_property("property", "value"))
