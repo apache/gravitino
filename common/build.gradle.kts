@@ -22,6 +22,7 @@ import java.util.Date
 
 plugins {
   `maven-publish`
+  `java-test-fixtures`
   id("java")
   id("idea")
 }
@@ -50,6 +51,9 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+
+  testFixturesApi(project(":api"))
+  testFixturesApi(libs.junit.jupiter.api)
 }
 
 fun getGitCommitId(): String {

@@ -30,12 +30,15 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.dto.encryption.kms.KmsReferenceDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.rel.indexes.IndexDTO;
 import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.encryption.kms.KmsApi;
+import org.apache.gravitino.encryption.kms.KmsReference;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -252,6 +255,42 @@ public class TestJsonUtils {
     JsonNode nodeNormal = objectMapper.readTree(jsonNormal);
     Long result = JsonUtils.getLong("property", nodeNormal);
     assertEquals(1L, result);
+  }
+
+  @Test
+  void testKmsReferenceDtoSerde() throws JsonProcessingException {
+    KmsReference reference =
+        new KmsReference(KmsApi.GOOGLE_CLOUD_KMS, "analytics-prod", "projects/p/keys/k");
+    KmsReferenceDTO referenceDTO = KmsReferenceDTO.fromKmsReference(reference);
+
+    String json = objectMapper.writeValueAsString(referenceDTO);
+
+    assertEquals(
+        objectMapper.readTree(
+            "{\"api\":\"google-cloud-kms\",\"source\":\"analytics-prod\","
+                + "\"keyId\":\"projects/p/keys/k\"}"),
+        objectMapper.readTree(json));
+    assertEquals(reference, objectMapper.readValue(json, KmsReferenceDTO.class).toKmsReference());
+    assertEquals(
+        reference,
+        objectMapper
+            .readValue(
+                "{\"api\":\" GOOGLE-CLOUD-KMS \",\"source\":\"analytics-prod\","
+                    + "\"keyId\":\"projects/p/keys/k\"}",
+                KmsReferenceDTO.class)
+            .toKmsReference());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                objectMapper
+                    .readValue(
+                        "{\"api\":\"custom-kms\",\"source\":\"analytics-prod\","
+                            + "\"keyId\":\"projects/p/keys/k\"}",
+                        KmsReferenceDTO.class)
+                    .toKmsReference());
+    Assertions.assertTrue(exception.getMessage().contains("Unsupported KMS API 'custom-kms'"));
   }
 
   @Test
