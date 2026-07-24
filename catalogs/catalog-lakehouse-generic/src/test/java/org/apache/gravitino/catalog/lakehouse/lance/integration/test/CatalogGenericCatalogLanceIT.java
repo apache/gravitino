@@ -44,6 +44,7 @@ import org.apache.arrow.vector.IntVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowReader;
+import org.apache.arrow.vector.types.TimeUnit;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
@@ -411,6 +412,203 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
     Assertions.assertThrows(
         RuntimeException.class, () -> catalog.asTableCatalog().loadTable(newNameIdentifier));
+  }
+
+  @Test
+  public void testNanosecondTimestampTypeRoundTrip() {
+    String phase2TableName = GravitinoITUtils.genRandomName("lance_timestamp_ns");
+    NameIdentifier identifier = NameIdentifier.of(schemaName, phase2TableName);
+    String location = tempDirectory + "/" + phase2TableName;
+    Column[] columns = {
+      Column.of("timestamp_ns", Types.TimestampType.withoutTimeZone(9), "nanosecond timestamp"),
+      Column.of("timestamptz_ns", Types.TimestampType.withTimeZone(9), "nanosecond instant")
+    };
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Table created =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                identifier,
+                columns,
+                "timestamp nanosecond round-trip",
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+    Table loaded = catalog.asTableCatalog().loadTable(identifier);
+
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(9), created.columns()[0].dataType());
+    Assertions.assertEquals(Types.TimestampType.withTimeZone(9), created.columns()[1].dataType());
+    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(9), loaded.columns()[0].dataType());
+    Assertions.assertEquals(Types.TimestampType.withTimeZone(9), loaded.columns()[1].dataType());
+
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      List<Field> fields = dataset.getSchema().getFields();
+      Assertions.assertEquals(
+          new ArrowType.Timestamp(TimeUnit.NANOSECOND, null), fields.get(0).getType());
+      Assertions.assertEquals(
+          new ArrowType.Timestamp(TimeUnit.NANOSECOND, "UTC"), fields.get(1).getType());
+    }
+  }
+
+  @Test
+  public void testVariantOverwriteRejectedWithoutSideEffects() {
+    String phase2TableName = GravitinoITUtils.genRandomName("lance_variant_rejection");
+    NameIdentifier identifier = NameIdentifier.of(schemaName, phase2TableName);
+    String location = tempDirectory + "/" + phase2TableName;
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    Column[] originalColumns = {
+      Column.of("id", Types.IntegerType.get(), "original integer column")
+    };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            identifier,
+            originalColumns,
+            "original table",
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            null,
+            null);
+
+    Map<String, String> overwriteProperties = Maps.newHashMap(properties);
+    overwriteProperties.put(LANCE_CREATION_MODE, "OVERWRITE");
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        identifier,
+                        new Column[] {Column.of("payload", Types.VariantType.get(), "variant")},
+                        "invalid overwrite",
+                        overwriteProperties,
+                        Transforms.EMPTY_TRANSFORM,
+                        null,
+                        null));
+
+    Assertions.assertTrue(exception.getMessage().contains("exact native representation"));
+    Assertions.assertTrue(catalog.asTableCatalog().tableExists(identifier));
+    Assertions.assertEquals(
+        Types.IntegerType.get(),
+        catalog.asTableCatalog().loadTable(identifier).columns()[0].dataType());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals(
+          new ArrowType.Int(32, true), dataset.getSchema().getFields().get(0).getType());
+    }
+  }
+
+  @Test
+  public void testUnknownTypeRoundTrip() {
+    String phase2TableName = GravitinoITUtils.genRandomName("lance_unknown");
+    NameIdentifier identifier = NameIdentifier.of(schemaName, phase2TableName);
+    String location = tempDirectory + "/" + phase2TableName;
+    Column[] columns = {Column.of("unknown_value", Types.NullType.get(), "null-only value")};
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Table created =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                identifier,
+                columns,
+                "unknown type round-trip",
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+    Table loaded = catalog.asTableCatalog().loadTable(identifier);
+
+    Assertions.assertEquals(Types.NullType.get(), created.columns()[0].dataType());
+    Assertions.assertEquals(Types.NullType.get(), loaded.columns()[0].dataType());
+    Assertions.assertTrue(created.columns()[0].nullable());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Field field = dataset.getSchema().getFields().get(0);
+      Assertions.assertEquals(ArrowType.Null.INSTANCE, field.getType());
+      Assertions.assertTrue(field.isNullable());
+    }
+  }
+
+  @Test
+  public void testGeometryTypeRoundTrip() {
+    String phase2TableName = GravitinoITUtils.genRandomName("lance_geometry");
+    NameIdentifier identifier = NameIdentifier.of(schemaName, phase2TableName);
+    String location = tempDirectory + "/" + phase2TableName;
+    Types.GeometryType geometry = Types.GeometryType.of("EPSG:3857");
+    Column[] columns = {Column.of("shape", geometry, "planar WKB geometry")};
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Table created =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                identifier,
+                columns,
+                "geometry type round-trip",
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+    Table loaded = catalog.asTableCatalog().loadTable(identifier);
+
+    Assertions.assertEquals(geometry, created.columns()[0].dataType());
+    Assertions.assertEquals(geometry, loaded.columns()[0].dataType());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Field field = dataset.getSchema().getFields().get(0);
+      Assertions.assertEquals(ArrowType.Binary.INSTANCE, field.getType());
+      Assertions.assertEquals("geoarrow.wkb", field.getMetadata().get("ARROW:extension:name"));
+      Assertions.assertEquals(
+          "{\"crs\":\"EPSG:3857\"}", field.getMetadata().get("ARROW:extension:metadata"));
+    }
+  }
+
+  @Test
+  public void testGeographyTypeRoundTrip() {
+    String phase2TableName = GravitinoITUtils.genRandomName("lance_geography");
+    NameIdentifier identifier = NameIdentifier.of(schemaName, phase2TableName);
+    String location = tempDirectory + "/" + phase2TableName;
+    Types.GeographyType geography = Types.GeographyType.of("EPSG:4326", "karney");
+    Column[] columns = {Column.of("shape", geography, "ellipsoidal WKB geography")};
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, location);
+
+    Table created =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                identifier,
+                columns,
+                "geography type round-trip",
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                null,
+                null);
+    Table loaded = catalog.asTableCatalog().loadTable(identifier);
+
+    Assertions.assertEquals(geography, created.columns()[0].dataType());
+    Assertions.assertEquals(geography, loaded.columns()[0].dataType());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Field field = dataset.getSchema().getFields().get(0);
+      Assertions.assertEquals(ArrowType.Binary.INSTANCE, field.getType());
+      Assertions.assertEquals("geoarrow.wkb", field.getMetadata().get("ARROW:extension:name"));
+      Assertions.assertEquals(
+          "{\"crs\":\"EPSG:4326\",\"edges\":\"karney\"}",
+          field.getMetadata().get("ARROW:extension:metadata"));
+    }
   }
 
   @Test
