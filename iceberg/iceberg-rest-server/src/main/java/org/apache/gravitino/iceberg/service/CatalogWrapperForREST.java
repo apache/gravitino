@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -32,6 +34,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -59,6 +63,7 @@ import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchPlanIdException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
@@ -66,6 +71,7 @@ import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.responses.FetchPlanningResultResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -81,6 +87,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private final Object catalogConfigToClientsLock = new Object();
 
   private final ScanPlanCache scanPlanCache;
+
+  /**
+   * Registry of submitted scan plans keyed by plan id, backing the async scan-plan lifecycle
+   * ({@code fetchPlanningResult} and {@code cancelPlanning}). Each {@link #planTableScan} call
+   * registers its completed result under a generated plan id so clients can later poll or cancel
+   * it.
+   */
+  private final Cache<String, PlanTableScanResponse> planIdRegistry;
 
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
@@ -113,6 +127,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
     this.scanPlanCache = loadScanPlanCache(config);
+    this.planIdRegistry =
+        Caffeine.newBuilder()
+            .maximumSize(config.get(IcebergConfig.SCAN_PLAN_CACHE_CAPACITY))
+            .expireAfterAccess(
+                config.get(IcebergConfig.SCAN_PLAN_CACHE_EXPIRE_MINUTES), TimeUnit.MINUTES)
+            .executor(Runnable::run)
+            .build();
   }
 
   public LoadTableResponse createTable(
@@ -469,7 +490,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       if (requestCredentialVending && !isLocalOrHdfsLocation(table.location())) {
         response = injectScanCredentials(tableIdentifier, table, response, privilege);
       }
-      return response;
+
+      // Register the completed plan under a generated plan id so clients can later poll it via
+      // fetchPlanningResult or cancel it via cancelPlanning (Iceberg async scan-plan lifecycle).
+      return registerPlan(response);
 
     } catch (IllegalArgumentException e) {
       LOG.error("Invalid scan request for table {}: {}", tableIdentifier, e.getMessage());
@@ -482,6 +506,81 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       throw new RuntimeException(
           "Scan planning failed for table " + tableIdentifier + ": " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Fetch the result of a previously submitted scan plan.
+   *
+   * <p>Scan planning completes synchronously, so {@link #planTableScan} registers each result under
+   * a generated plan id (returned as {@code plan-id} in the {@code COMPLETED} response). This
+   * method returns the registered result for that plan id.
+   *
+   * @param tableIdentifier the table the plan belongs to.
+   * @param planId the plan id returned by a prior {@link #planTableScan} call.
+   * @return the registered {@link FetchPlanningResultResponse} with status {@code COMPLETED}.
+   * @throws org.apache.gravitino.exceptions.NoSuchTableException if the table doesn't exist.
+   * @throws NoSuchPlanIdException if the plan id is unknown or has expired.
+   */
+  @SuppressWarnings("deprecation")
+  public FetchPlanningResultResponse fetchPlanningResult(
+      TableIdentifier tableIdentifier, String planId) {
+    // Validate the table exists first (consistent with planTableScan behavior).
+    getCatalog().loadTable(tableIdentifier);
+    PlanTableScanResponse plan = planIdRegistry.getIfPresent(planId);
+    if (plan == null) {
+      throw new NoSuchPlanIdException(
+          "Plan %s not found for table %s. It may have expired or already been cancelled.",
+          planId, tableIdentifier);
+    }
+    return FetchPlanningResultResponse.builder()
+        .withPlanStatus(PlanStatus.COMPLETED)
+        .withPlanTasks(plan.planTasks())
+        .withFileScanTasks(plan.fileScanTasks())
+        .withDeleteFiles(plan.deleteFiles())
+        .withSpecsById(plan.specsById())
+        .withCredentials(plan.credentials())
+        .build();
+  }
+
+  /**
+   * Cancel a previously submitted scan plan, removing it from the registry.
+   *
+   * @param tableIdentifier the table the plan belongs to.
+   * @param planId the plan id returned by a prior {@link #planTableScan} call.
+   * @throws org.apache.gravitino.exceptions.NoSuchTableException if the table doesn't exist.
+   * @throws NoSuchPlanIdException if the plan id is unknown or has expired.
+   */
+  public void cancelPlanning(TableIdentifier tableIdentifier, String planId) {
+    // Validate the table exists first (consistent with planTableScan behavior).
+    getCatalog().loadTable(tableIdentifier);
+    if (planIdRegistry.getIfPresent(planId) == null) {
+      throw new NoSuchPlanIdException(
+          "Plan %s not found for table %s. It may have expired or already been cancelled.",
+          planId, tableIdentifier);
+    }
+    planIdRegistry.invalidate(planId);
+  }
+
+  /**
+   * Registers a completed scan plan under a freshly generated plan id and returns a copy of the
+   * response carrying that plan id, enabling the async fetch/cancel lifecycle.
+   */
+  @SuppressWarnings("deprecation")
+  private PlanTableScanResponse registerPlan(PlanTableScanResponse response) {
+    String planId = UUID.randomUUID().toString();
+    PlanTableScanResponse withPlanId =
+        PlanTableScanResponse.builder()
+            .withPlanStatus(response.planStatus())
+            .withPlanId(planId)
+            .withPlanTasks(response.planTasks())
+            .withFileScanTasks(response.fileScanTasks())
+            .withDeleteFiles(response.deleteFiles())
+            .withSpecsById(response.specsById())
+            .withErrorResponse(response.errorResponse())
+            .withCredentials(response.credentials())
+            .build();
+    planIdRegistry.put(planId, withPlanId);
+    return withPlanId;
   }
 
   /**
