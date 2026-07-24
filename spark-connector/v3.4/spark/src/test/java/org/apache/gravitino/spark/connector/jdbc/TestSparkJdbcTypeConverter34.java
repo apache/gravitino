@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.spark.connector.jdbc;
 
 import org.apache.gravitino.rel.types.Types;
@@ -24,35 +23,37 @@ import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for {@link SparkJdbcTypeConverter}. */
-public class TestSparkJdbcTypeConverter {
+/** Unit tests for {@link SparkJdbcTypeConverter34}. */
+public class TestSparkJdbcTypeConverter34 {
 
-  private final SparkJdbcTypeConverter sparkJdbcTypeConverter = new SparkJdbcTypeConverter();
+  private final SparkJdbcTypeConverter34 sparkJdbcTypeConverter34 =
+      new SparkJdbcTypeConverter34();
 
   @Test
   void testConvertTimestampTypesToSparkTimestamp() {
     Assertions.assertEquals(
         DataTypes.TimestampType,
-        sparkJdbcTypeConverter.toSparkType(Types.TimestampType.withTimeZone()));
+        sparkJdbcTypeConverter34.toSparkType(Types.TimestampType.withoutTimeZone()));
     Assertions.assertEquals(
         DataTypes.TimestampType,
-        sparkJdbcTypeConverter.toSparkType(Types.TimestampType.withoutTimeZone()));
+        sparkJdbcTypeConverter34.toSparkType(Types.TimestampType.withTimeZone()));
   }
 
   @Test
   void testConvertVarCharTypeToSparkString() {
     Assertions.assertEquals(
-        DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.VarCharType.of(10)));
+        DataTypes.StringType, sparkJdbcTypeConverter34.toSparkType(Types.VarCharType.of(10)));
   }
 
   @Test
   void testConvertExternalTypeToSparkString() {
     Assertions.assertEquals(
         DataTypes.StringType,
-        sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of("LARGEINT")));
+        sparkJdbcTypeConverter34.toSparkType(Types.ExternalType.of("LARGEINT")));
     Assertions.assertEquals(
-        DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of("BITMAP")));
+        DataTypes.StringType,
+        sparkJdbcTypeConverter34.toSparkType(Types.ExternalType.of("BITMAP")));
     Assertions.assertEquals(
-        DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of("IPv4")));
+        DataTypes.StringType, sparkJdbcTypeConverter34.toSparkType(Types.ExternalType.of("IPv4")));
   }
 }
