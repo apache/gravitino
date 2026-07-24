@@ -106,6 +106,11 @@ See: [Iceberg REST catalog service](https://gravitino.apache.org/docs/latest/ice
 Gravitino provides a native Lance REST catalog service.  
 See: [Lance REST catalog service](https://gravitino.apache.org/docs/latest/lance-rest-service/)
 
+## 📋 Changelog
+
+A detailed release history is available in [CHANGELOG.md](CHANGELOG.md).  
+For the latest release notes, see [GitHub Releases](https://github.com/apache/gravitino/releases).
+
 ## 🔌 Trino Integration
 
 Gravitino includes a Trino connector for federated metadata access.  
