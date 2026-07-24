@@ -208,9 +208,10 @@ public class GravitinoAuthProvider {
           if (StringUtils.isBlank(userToken)) {
             throw new IllegalArgumentException(
                 "No forwarded user token found in session extra-credentials under key 'token'. "
-                    + "Ensure Trino is configured with "
-                    + "http-server.authentication.oauth2.forward-token-to-connectors=true and the "
-                    + "patched OAuth2Authenticator that injects the user token is in use.");
+                    + "The Trino coordinator must populate this extra-credential with the caller's "
+                    + "OAuth2 access token, e.g. Starburst Enterprise's "
+                    + "http-server.authentication.type=DELEGATED-OAUTH2; open-source Trino does not "
+                    + "support this yet.");
           }
           builder.withOAuth(new StaticUserTokenProvider(userToken));
         }

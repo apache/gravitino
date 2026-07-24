@@ -45,7 +45,6 @@ dependencies {
   }
   testImplementation(libs.awaitility)
   testImplementation(libs.mockito.core)
-  testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
   testImplementation("io.trino:trino-memory:$trinoVersion") {
     exclude("org.antlr")
