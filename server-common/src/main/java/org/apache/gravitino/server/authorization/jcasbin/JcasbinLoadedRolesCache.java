@@ -20,56 +20,53 @@ package org.apache.gravitino.server.authorization.jcasbin;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.RemovalCause;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.function.LongConsumer;
 import org.apache.gravitino.cache.GravitinoCache;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * A {@link GravitinoCache} of {@code roleId -> updated_at} that synchronously deletes the role's
- * JCasbin policies from both enforcers when a key is evicted (by TTL, size, or explicit
- * invalidate).
+ * A {@link GravitinoCache} of {@code roleId -> }{@link CachedRolePolicies}, the per-role privilege
+ * index consulted on the authorization hot path.
  *
- * <p>This cache owns role permission policies only. Therefore, eviction must clear only {@code
- * p(roleId, ...)} policies and must not delete the role itself, because JCasbin's {@code
- * deleteRole(roleId)} also removes {@code g(user/group, roleId)} bindings that are managed
- * separately by {@link JcasbinAuthorizer}.
+ * <p><b>Policy ownership:</b> before privilege policies moved into {@link CachedRolePolicies}, this
+ * cache stored only {@code role_meta.updated_at}, while the corresponding {@code p(roleId, ...)}
+ * policies lived separately in JCasbin enforcers. Eviction therefore needed a synchronous removal
+ * listener to delete those orphaned {@code p} rows without deleting the independently managed
+ * {@code g(user/group, roleId)} bindings.
+ *
+ * <p>Now each cache value owns both the version sentinel and the role's complete privilege index,
+ * and the JCasbin enforcer owns only the {@code g} bindings; it contains no {@code p} policies.
+ * Eviction discards the policy index together with its cache entry, leaving no second policy copy
+ * to clean up. On the next request, {@link JcasbinAuthorizer} observes the cache miss, reloads the
+ * role from the database, and rebuilds the index. A removal listener must not delete the role from
+ * the enforcer because doing so would also remove valid {@code g} bindings whose lifecycle is
+ * managed by the user/group role caches.
+ *
+ * <p>Unlike {@link org.apache.gravitino.cache.CaffeineGravitinoCache} this cache is <b>access</b>
+ * based ({@code expireAfterAccess}): the index of a role that keeps being authorized against stays
+ * hot instead of being reloaded from the DB every TTL. Correctness never relies on the TTL — {@link
+ * JcasbinAuthorizer} version-validates each entry against {@code role_meta.updated_at} on every
+ * read, so eviction by TTL, size, or explicit invalidation only frees memory and forces a rebuild.
  */
-class JcasbinLoadedRolesCache implements GravitinoCache<Long, Long> {
+class JcasbinLoadedRolesCache implements GravitinoCache<Long, CachedRolePolicies> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(JcasbinLoadedRolesCache.class);
+  private final Cache<Long, CachedRolePolicies> cache;
 
-  private final Cache<Long, Long> cache;
-
-  JcasbinLoadedRolesCache(long ttlMs, long maxSize, LongConsumer rolePolicyCleaner) {
+  JcasbinLoadedRolesCache(long ttlMs, long maxSize) {
     this.cache =
         Caffeine.newBuilder()
             .expireAfterAccess(ttlMs, TimeUnit.MILLISECONDS)
             .maximumSize(maxSize)
-            .executor(Runnable::run)
-            .removalListener(
-                (Long roleId, Long value, RemovalCause cause) -> {
-                  LOG.debug(
-                      "Removed JCasbin loaded role cache entry, roleId={}, cause={}",
-                      roleId,
-                      cause);
-                  if (roleId != null && cause != RemovalCause.REPLACED) {
-                    rolePolicyCleaner.accept(roleId);
-                  }
-                })
             .build();
   }
 
   @Override
-  public Optional<Long> getIfPresent(Long key) {
+  public Optional<CachedRolePolicies> getIfPresent(Long key) {
     return Optional.ofNullable(cache.getIfPresent(key));
   }
 
   @Override
-  public void put(Long key, Long value) {
+  public void put(Long key, CachedRolePolicies value) {
     cache.put(key, value);
   }
 
