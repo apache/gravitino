@@ -50,7 +50,7 @@ public final class KmsReference {
     Preconditions.checkArgument(StringUtils.isNotBlank(keyId), "KMS key ID cannot be blank");
 
     this.api = api;
-    this.source = source;
+    this.source = source.trim();
     this.keyId = keyId;
   }
 

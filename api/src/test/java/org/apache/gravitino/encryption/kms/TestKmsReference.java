@@ -25,7 +25,8 @@ public class TestKmsReference {
 
   @Test
   void testStoresApiAndPreservesProviderKey() {
-    KmsReference reference = new KmsReference(KmsApi.AWS_KMS, "production", " alias/Customer-Key ");
+    KmsReference reference =
+        new KmsReference(KmsApi.AWS_KMS, " production ", " alias/Customer-Key ");
 
     Assertions.assertEquals(KmsApi.AWS_KMS, reference.api());
     Assertions.assertEquals("production", reference.source());
