@@ -174,12 +174,19 @@ public class UserMetaService {
   public boolean deleteUser(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
-    Long userId = EntityIdService.getEntityId(identifier, Entity.EntityType.USER);
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long userId = userPO.getUserId();
+    Long currentVersion = userPO.getCurrentVersion();
+    int[] userDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                UserMetaMapper.class, mapper -> mapper.softDeleteUserMetaByUserId(userId)),
+            userDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    UserMetaMapper.class,
+                    mapper -> mapper.softDeleteUserMetaByUserId(userId, currentVersion)),
         () ->
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)),
@@ -189,7 +196,8 @@ public class UserMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
                         userId, Entity.EntityType.USER.name())));
-    return true;
+    // OCC: false when the user's version changed between read and delete.
+    return userDeletedCount[0] > 0;
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateUser")
@@ -224,14 +232,20 @@ public class UserMetaService {
       return newEntity;
     }
 
+    int[] updateResult = new int[] {-1};
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper ->
-                      mapper.updateUserMeta(
-                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+          () -> {
+            updateResult[0] =
+                SessionUtils.getWithoutCommit(
+                    UserMetaMapper.class,
+                    mapper ->
+                        mapper.updateUserMeta(
+                            POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO));
+            if (updateResult[0] == 0) {
+              throw new RuntimeException("Failed to update the entity: " + identifier);
+            }
+          },
           () -> {
             if (insertRoleIds.isEmpty()) {
               return;
@@ -258,6 +272,9 @@ public class UserMetaService {
                   UserMetaMapper.class,
                   mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
     } catch (RuntimeException re) {
+      if (updateResult[0] == 0) {
+        throw new IOException("Failed to update the entity: " + identifier, re);
+      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
       throw re;
@@ -368,19 +385,28 @@ public class UserMetaService {
         newEntity.id(),
         oldEntity.id());
 
+    int[] updateResult = new int[] {-1};
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper ->
-                      mapper.updateUserMetaByExternalId(
-                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+          () -> {
+            updateResult[0] =
+                SessionUtils.getWithoutCommit(
+                    UserMetaMapper.class,
+                    mapper ->
+                        mapper.updateUserMetaByExternalId(
+                            POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO));
+            if (updateResult[0] == 0) {
+              throw new RuntimeException("Failed to update the entity: " + ident);
+            }
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   UserMetaMapper.class,
                   mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
     } catch (RuntimeException re) {
+      if (updateResult[0] == 0) {
+        throw new IOException("Failed to update the entity: " + ident, re);
+      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
       throw re;

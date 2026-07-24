@@ -233,17 +233,11 @@ public class TopicMetaBaseSQLProvider {
         + " current_version = #{newTopicMeta.currentVersion},"
         + " last_version = #{newTopicMeta.lastVersion},"
         + " deleted_at = #{newTopicMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone. Because a successful update always raises
+        // current_version, matching id + current_version uniquely identifies the row the caller
+        // read; the old full-row comparison was redundant and fragile (JSON byte equality).
         + " WHERE topic_id = #{oldTopicMeta.topicId}"
-        + " AND topic_name = #{oldTopicMeta.topicName}"
-        + " AND metalake_id = #{oldTopicMeta.metalakeId}"
-        + " AND catalog_id = #{oldTopicMeta.catalogId}"
-        + " AND schema_id = #{oldTopicMeta.schemaId}"
-        + " AND (comment = #{oldTopicMeta.comment}"
-        + "   OR (comment IS NULL and #{oldTopicMeta.comment} IS NULL))"
-        + " AND properties = #{oldTopicMeta.properties}"
-        + " AND audit_info = #{oldTopicMeta.auditInfo}"
         + " AND current_version = #{oldTopicMeta.currentVersion}"
-        + " AND last_version = #{oldTopicMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -255,12 +249,16 @@ public class TopicMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId) {
+  public String softDeleteTopicMetasByTopicId(
+      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE topic_id = #{topicId} AND deleted_at = 0";
+        // OCC: version-checked delete. 0 rows means the caller's version is stale (the row was
+        // updated or already deleted concurrently); the service re-reads to tell the two apart.
+        + " WHERE topic_id = #{topicId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId) {

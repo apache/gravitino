@@ -202,14 +202,17 @@ public class TableMetaService {
     boolean isFullNameChanged =
         isSchemaChanged || !Objects.equals(oldTableEntity.name(), newTableEntity.name());
 
-    final AtomicInteger updateResult = new AtomicInteger(0);
+    final AtomicInteger updateResult = new AtomicInteger(-1);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      TableMetaMapper.class,
-                      mapper -> ops.updatePO(mapper, newTablePO, oldTablePO))),
+          () -> {
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    TableMetaMapper.class, mapper -> ops.updatePO(mapper, newTablePO, oldTablePO)));
+            if (updateResult.get() == 0) {
+              throw new RuntimeException(UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + identifier);
+            }
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   TableVersionMapper.class,
@@ -238,16 +241,15 @@ public class TableMetaService {
           });
 
     } catch (RuntimeException re) {
+      if (updateResult.get() == 0) {
+        throw new IOException(UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + identifier, re);
+      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TABLE, newTableEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newTableEntity;
-    } else {
-      throw new IOException(UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + identifier);
-    }
+    return newTableEntity;
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
@@ -267,7 +269,9 @@ public class TableMetaService {
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
                     TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByTableId(tablePO.getTableId()))),
+                    mapper ->
+                        mapper.softDeleteTableMetasByTableId(
+                            tablePO.getTableId(), tablePO.getCurrentVersion()))),
         () -> {
           if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(

@@ -97,17 +97,9 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " current_version = #{newSchemaMeta.currentVersion},"
         + " last_version = #{newSchemaMeta.lastVersion},"
         + " deleted_at = #{newSchemaMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (current_version is monotonic on update).
         + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
-        + " AND schema_name = #{oldSchemaMeta.schemaName}"
-        + " AND metalake_id = #{oldSchemaMeta.metalakeId}"
-        + " AND catalog_id = #{oldSchemaMeta.catalogId}"
-        + " AND (schema_comment = #{oldSchemaMeta.schemaComment}"
-        + "   OR (CAST(schema_comment AS VARCHAR) IS NULL"
-        + "   AND CAST(#{oldSchemaMeta.schemaComment} AS VARCHAR) IS NULL))"
-        + " AND properties = #{oldSchemaMeta.properties}"
-        + " AND audit_info = #{oldSchemaMeta.auditInfo}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
-        + " AND last_version = #{oldSchemaMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -123,6 +115,16 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + "</foreach>"
         + ") AND deleted_at = 0"
         + "</script>";
+  }
+
+  @Override
+  public String softDeleteSchemaMetaBySchemaIdAndVersion(Long schemaId, Long currentVersion) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        // OCC: version-checked delete for the non-cascade single-schema drop.
+        + " WHERE schema_id = #{schemaId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

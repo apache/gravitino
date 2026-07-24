@@ -188,7 +188,7 @@ public class TestAuthMappers {
   void testRoleMetaTouchUpdatedAtSkipsSoftDeleted() {
     insertMetalake(1L, "metalake1");
     insertRole(13L, "role13", 1L);
-    roleMetaMapper.softDeleteRoleMetaByRoleId(13L);
+    roleMetaMapper.softDeleteRoleMetaByRoleId(13L, 1L);
 
     long beforeUpdatedAt = queryUpdatedAt("role_meta", "role_id", 13L);
     roleMetaMapper.touchRoleUpdatedAt(13L);
@@ -219,7 +219,7 @@ public class TestAuthMappers {
   void testUserMetaTouchUpdatedAtSkipsSoftDeleted() {
     insertMetalake(1L, "metalake1");
     insertUser(22L, "user22", 1L);
-    userMetaMapper.softDeleteUserMetaByUserId(22L);
+    userMetaMapper.softDeleteUserMetaByUserId(22L, 1L);
 
     long beforeUpdatedAt = queryUpdatedAt("user_meta", "user_id", 22L);
     userMetaMapper.touchUserUpdatedAt(22L);
@@ -264,7 +264,7 @@ public class TestAuthMappers {
   void testGroupMetaTouchUpdatedAtSkipsSoftDeleted() {
     insertMetalake(1L, "metalake1");
     insertGroup(31L, "group31", 1L);
-    groupMetaMapper.softDeleteGroupMetaByGroupId(31L);
+    groupMetaMapper.softDeleteGroupMetaByGroupId(31L, 1L);
 
     long beforeUpdatedAt = queryUpdatedAt("group_meta", "group_id", 31L);
     groupMetaMapper.touchGroupUpdatedAt(31L);

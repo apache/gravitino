@@ -57,11 +57,13 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteFilesetMetasByFilesetId(Long filesetId) {
+  public String softDeleteFilesetMetasByFilesetId(Long filesetId, Long currentVersion) {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE fileset_id = #{filesetId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

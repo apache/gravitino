@@ -26,11 +26,13 @@ import org.apache.ibatis.annotations.Param;
 
 public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   @Override
-  public String softDeleteCatalogMetasByCatalogId(Long catalogId) {
+  public String softDeleteCatalogMetasByCatalogId(Long catalogId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE catalog_id = #{catalogId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override
@@ -100,18 +102,9 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
         + " current_version = #{newCatalogMeta.currentVersion},"
         + " last_version = #{newCatalogMeta.lastVersion},"
         + " deleted_at = #{newCatalogMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (current_version is monotonic on update).
         + " WHERE catalog_id = #{oldCatalogMeta.catalogId}"
-        + " AND catalog_name = #{oldCatalogMeta.catalogName}"
-        + " AND metalake_id = #{oldCatalogMeta.metalakeId}"
-        + " AND type = #{oldCatalogMeta.type}"
-        + " AND provider = #{oldCatalogMeta.provider}"
-        + " AND (catalog_comment = #{oldCatalogMeta.catalogComment} "
-        + "   OR (CAST(catalog_comment AS VARCHAR) IS NULL AND "
-        + "   CAST(#{oldCatalogMeta.catalogComment} AS VARCHAR) IS NULL))"
-        + " AND properties = #{oldCatalogMeta.properties}"
-        + " AND audit_info = #{oldCatalogMeta.auditInfo}"
         + " AND current_version = #{oldCatalogMeta.currentVersion}"
-        + " AND last_version = #{oldCatalogMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 }

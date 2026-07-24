@@ -200,7 +200,7 @@ public class ViewMetaService {
     String viewFullName =
         NameIdentifierUtil.ofView(metalakeName, catalogName, schemaName, viewPO.getViewName())
             .toString();
-    return deleteView(viewPO.getViewId(), metalakeName, viewFullName);
+    return deleteView(viewPO.getViewId(), viewPO.getCurrentVersion(), metalakeName, viewFullName);
   }
 
   @Monitored(
@@ -224,13 +224,15 @@ public class ViewMetaService {
     return ops;
   }
 
-  private boolean deleteView(Long viewId, String metalakeName, String viewFullName) {
+  private boolean deleteView(
+      Long viewId, Long currentVersion, String metalakeName, String viewFullName) {
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
-                    ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByViewId(viewId))),
+                    ViewMetaMapper.class,
+                    mapper -> mapper.softDeleteViewMetasByViewId(viewId, currentVersion))),
         () -> {
           if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(

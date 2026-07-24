@@ -82,7 +82,8 @@ public interface TopicMetaMapper {
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,
       method = "softDeleteTopicMetasByTopicId")
-  Integer softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId);
+  Integer softDeleteTopicMetasByTopicId(
+      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,

@@ -242,12 +242,17 @@ public class FunctionMetaBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND function_name = #{functionName} AND deleted_at = 0";
   }
 
-  public String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
+  public String softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId,
+      @Param("functionCurrentVersion") Integer functionCurrentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE function_id = #{functionId} AND deleted_at = 0";
+        // OCC: version-checked delete (0 rows = stale version; the service returns false).
+        + " WHERE function_id = #{functionId}"
+        + " AND function_current_version = #{functionCurrentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteFunctionMetasByCatalogId(@Param("catalogId") Long catalogId) {
@@ -302,15 +307,9 @@ public class FunctionMetaBaseSQLProvider {
         + " function_latest_version = #{newFunctionMeta.functionLatestVersion},"
         + " audit_info = #{newFunctionMeta.auditInfo},"
         + " deleted_at = #{newFunctionMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (function_current_version is monotonic).
         + " WHERE function_id = #{oldFunctionMeta.functionId}"
-        + " AND function_name = #{oldFunctionMeta.functionName}"
-        + " AND metalake_id = #{oldFunctionMeta.metalakeId}"
-        + " AND catalog_id = #{oldFunctionMeta.catalogId}"
-        + " AND schema_id = #{oldFunctionMeta.schemaId}"
-        + " AND function_type = #{oldFunctionMeta.functionType}"
         + " AND function_current_version = #{oldFunctionMeta.functionCurrentVersion}"
-        + " AND function_latest_version = #{oldFunctionMeta.functionLatestVersion}"
-        + " AND audit_info = #{oldFunctionMeta.auditInfo}"
         + " AND deleted_at = 0";
   }
 }

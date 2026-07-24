@@ -287,6 +287,9 @@ public class FilesetMetaBaseSQLProvider {
         + " current_version = #{newFilesetMeta.currentVersion},"
         + " last_version = #{newFilesetMeta.lastVersion},"
         + " deleted_at = #{newFilesetMeta.deletedAt}"
+        // Fileset uses CONDITIONAL versioning: current_version only bumps on a versioned-field
+        // change, so a version-only CAS would miss an audit-only concurrent update. Keep the
+        // full-row compare, which is the actual OCC guard here.
         + " WHERE fileset_id = #{oldFilesetMeta.filesetId}"
         + " AND fileset_name = #{oldFilesetMeta.filesetName}"
         + " AND metalake_id = #{oldFilesetMeta.metalakeId}"
@@ -329,12 +332,15 @@ public class FilesetMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId) {
+  public String softDeleteFilesetMetasByFilesetId(
+      @Param("filesetId") Long filesetId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+        // OCC: version-checked delete (0 rows = stale version; the service returns false).
+        + " WHERE fileset_id = #{filesetId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String deleteFilesetMetasByLegacyTimeline(

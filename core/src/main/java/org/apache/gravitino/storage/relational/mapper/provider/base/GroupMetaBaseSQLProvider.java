@@ -184,12 +184,15 @@ public class GroupMetaBaseSQLProvider {
         + " deleted_at = #{groupMeta.deletedAt}";
   }
 
-  public String softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId) {
+  public String softDeleteGroupMetaByGroupId(
+      @Param("groupId") Long groupId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + GROUP_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        // OCC: version-checked delete (0 rows = stale version; the service returns false).
+        + " WHERE group_id = #{groupId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -211,12 +214,9 @@ public class GroupMetaBaseSQLProvider {
         + " current_version = #{newGroupMeta.currentVersion},"
         + " last_version = #{newGroupMeta.lastVersion},"
         + " deleted_at = #{newGroupMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (current_version is monotonic on update).
         + " WHERE group_id = #{oldGroupMeta.groupId}"
-        + " AND group_name = #{oldGroupMeta.groupName}"
-        + " AND metalake_id = #{oldGroupMeta.metalakeId}"
-        + " AND audit_info = #{oldGroupMeta.auditInfo}"
         + " AND current_version = #{oldGroupMeta.currentVersion}"
-        + " AND last_version = #{oldGroupMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 

@@ -90,7 +90,8 @@ public interface TableMetaMapper {
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,
       method = "softDeleteTableMetasByTableId")
-  Integer softDeleteTableMetasByTableId(@Param("tableId") Long tableId);
+  Integer softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,

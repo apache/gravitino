@@ -306,7 +306,9 @@ public class TopicMetaService {
             deleteResult.set(
                 SessionUtils.getWithoutCommit(
                     TopicMetaMapper.class,
-                    mapper -> mapper.softDeleteTopicMetasByTopicId(topicId))),
+                    mapper ->
+                        mapper.softDeleteTopicMetasByTopicId(
+                            topicId, topicPO.getCurrentVersion()))),
         () -> {
           if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(

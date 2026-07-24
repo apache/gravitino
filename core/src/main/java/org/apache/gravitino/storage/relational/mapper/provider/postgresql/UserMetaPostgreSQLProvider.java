@@ -28,11 +28,13 @@ import org.apache.ibatis.annotations.Param;
 
 public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   @Override
-  public String softDeleteUserMetaByUserId(Long userId) {
+  public String softDeleteUserMetaByUserId(Long userId, Long currentVersion) {
     return "UPDATE "
         + USER_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE user_id = #{userId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

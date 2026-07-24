@@ -151,7 +151,9 @@ public interface FunctionMetaMapper {
   @UpdateProvider(
       type = FunctionMetaSQLProviderFactory.class,
       method = "softDeleteFunctionMetaByFunctionId")
-  Integer softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId);
+  Integer softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId,
+      @Param("functionCurrentVersion") Integer functionCurrentVersion);
 
   @UpdateProvider(
       type = FunctionMetaSQLProviderFactory.class,

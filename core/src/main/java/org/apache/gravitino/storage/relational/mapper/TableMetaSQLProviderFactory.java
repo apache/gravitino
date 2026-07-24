@@ -104,8 +104,9 @@ public class TableMetaSQLProviderFactory {
     return getProvider().updateTableMeta(newTablePO, oldTablePO, newSchemaId);
   }
 
-  public static String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
-    return getProvider().softDeleteTableMetasByTableId(tableId);
+  public static String softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteTableMetasByTableId(tableId, currentVersion);
   }
 
   public static String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

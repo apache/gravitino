@@ -214,12 +214,19 @@ public class GroupMetaService {
   public boolean deleteGroup(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long groupId = EntityIdService.getEntityId(identifier, Entity.EntityType.GROUP);
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long groupId = groupPO.getGroupId();
+    Long currentVersion = groupPO.getCurrentVersion();
+    int[] groupDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                GroupMetaMapper.class, mapper -> mapper.softDeleteGroupMetaByGroupId(groupId)),
+            groupDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    GroupMetaMapper.class,
+                    mapper -> mapper.softDeleteGroupMetaByGroupId(groupId, currentVersion)),
         () ->
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class,
@@ -230,7 +237,8 @@ public class GroupMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
                         groupId, Entity.EntityType.GROUP.name())));
-    return true;
+    // OCC: false when the group's version changed between read and delete.
+    return groupDeletedCount[0] > 0;
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateGroup")
@@ -267,15 +275,21 @@ public class GroupMetaService {
     if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
       return newEntity;
     }
+    int[] updateResult = new int[] {-1};
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  GroupMetaMapper.class,
-                  mapper ->
-                      mapper.updateGroupMeta(
-                          POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
-                          oldGroupPO)),
+          () -> {
+            updateResult[0] =
+                SessionUtils.getWithoutCommit(
+                    GroupMetaMapper.class,
+                    mapper ->
+                        mapper.updateGroupMeta(
+                            POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
+                            oldGroupPO));
+            if (updateResult[0] == 0) {
+              throw new RuntimeException("Failed to update the entity: " + identifier);
+            }
+          },
           () -> {
             if (insertRoleIds.isEmpty()) {
               return;
@@ -302,6 +316,9 @@ public class GroupMetaService {
                   GroupMetaMapper.class,
                   mapper -> mapper.touchGroupUpdatedAt(oldGroupPO.getGroupId())));
     } catch (RuntimeException re) {
+      if (updateResult[0] == 0) {
+        throw new IOException("Failed to update the entity: " + identifier, re);
+      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
       throw re;

@@ -90,8 +90,9 @@ public class RoleMetaSQLProviderFactory {
     return getProvider().updateRoleMeta(newRolePO, oldRolePO);
   }
 
-  public static String softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId) {
-    return getProvider().softDeleteRoleMetaByRoleId(roleId);
+  public static String softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteRoleMetaByRoleId(roleId, currentVersion);
   }
 
   public static String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

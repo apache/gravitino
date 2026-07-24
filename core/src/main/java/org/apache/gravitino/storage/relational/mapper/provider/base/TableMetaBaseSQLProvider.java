@@ -239,23 +239,21 @@ public class TableMetaBaseSQLProvider {
         + " current_version = #{newTableMeta.currentVersion},"
         + " last_version = #{newTableMeta.lastVersion},"
         + " deleted_at = #{newTableMeta.deletedAt}"
+        // OCC: compare-and-set on the version alone (current_version is monotonic on update).
         + " WHERE table_id = #{oldTableMeta.tableId}"
-        + " AND table_name = #{oldTableMeta.tableName}"
-        + " AND metalake_id = #{oldTableMeta.metalakeId}"
-        + " AND catalog_id = #{oldTableMeta.catalogId}"
-        + " AND schema_id = #{oldTableMeta.schemaId}"
-        + " AND audit_info = #{oldTableMeta.auditInfo}"
         + " AND current_version = #{oldTableMeta.currentVersion}"
-        + " AND last_version = #{oldTableMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
+  public String softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+        // OCC: version-checked delete (0 rows = stale version; the service returns false).
+        + " WHERE table_id = #{tableId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

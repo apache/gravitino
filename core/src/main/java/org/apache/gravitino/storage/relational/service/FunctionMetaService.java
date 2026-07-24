@@ -149,7 +149,9 @@ public class FunctionMetaService {
             functionDeletedCount.set(
                 SessionUtils.getWithoutCommit(
                     FunctionMetaMapper.class,
-                    mapper -> mapper.softDeleteFunctionMetaByFunctionId(functionId))),
+                    mapper ->
+                        mapper.softDeleteFunctionMetaByFunctionId(
+                            functionId, functionPO.functionCurrentVersion()))),
 
         // delete function versions, owner rels, and securable object rels after meta deletion
         () -> {
@@ -259,21 +261,30 @@ public class FunctionMetaService {
         newEntity.id(),
         oldFunctionEntity.id());
 
+    AtomicInteger updateResult = new AtomicInteger(-1);
     try {
       FunctionPO newFunctionPO = updateFunctionPO(oldFunctionPO, newEntity);
-      // Insert a new version and update function meta
+      // Update the function meta first so a stale writer rolls back before writing a version row.
       SessionUtils.doMultipleWithCommit(
+          () -> {
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    FunctionMetaMapper.class,
+                    mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO)));
+            if (updateResult.get() == 0) {
+              throw new RuntimeException("Failed to update the entity: " + identifier);
+            }
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   FunctionVersionMetaMapper.class,
-                  mapper -> mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionMetaMapper.class,
-                  mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO)));
+                  mapper -> mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())));
 
       return newEntity;
     } catch (RuntimeException re) {
+      if (updateResult.get() == 0) {
+        throw new IOException("Failed to update the entity: " + identifier, re);
+      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FUNCTION, newEntity.nameIdentifier().toString());
       throw re;
