@@ -270,7 +270,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         .thenReturn(new NameIdentifier[] {NameIdentifier.of(tableNs, physicalName)});
     NameIdentifier[] listed = dispatcher.listTables(tableNs);
     Assertions.assertEquals(1, listed.length);
-    Assertions.assertEquals("My Table", listed[0].name());
+    Assertions.assertEquals("MY TABLE", listed[0].name());
 
     // 3. Loading the table again requires re-quoting the listed name.
     NameIdentifier quotedLoadIdent = NameIdentifier.of(tableNs, "\"" + listed[0].name() + "\"");
@@ -279,7 +279,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     ArgumentCaptor<NameIdentifier> loadedIdentCaptor =
         ArgumentCaptor.forClass(NameIdentifier.class);
     Mockito.verify(mockDispatcher).loadTable(loadedIdentCaptor.capture());
-    Assertions.assertEquals("My Table", loadedIdentCaptor.getValue().name());
+    Assertions.assertEquals("MY TABLE", loadedIdentCaptor.getValue().name());
   }
 
   private void assertTableCaseInsensitive(
