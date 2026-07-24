@@ -144,6 +144,19 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `FixedChar`         | `FixedChar`         |
 | `Binary`            | `Binary`            |
 
+#### Iceberg V3 type interoperability
+
+The OceanBase catalog either preserves an Iceberg V3 type exactly or rejects it before executing
+DDL. The pinned OceanBase 4.2.1 test environment uses MySQL compatibility mode.
+
+| Gravitino type family                   | OceanBase behavior                                                                                   |
+|-----------------------------------------|------------------------------------------------------------------------------------------------------|
+| `Timestamp(9)`, `Timestamp_tz(9)`       | Rejected because MySQL-mode `DATETIME` and `TIMESTAMP` preserve at most microsecond precision (0–6). |
+| `Variant`                               | Rejected because OceanBase `JSON` cannot losslessly preserve the complete Gravitino variant domain. |
+| `Unknown` (`NullType`)                  | Rejected because OceanBase has no corresponding column type.                                        |
+| `Geometry(crs)`                         | Rejected because the connector cannot currently reload OceanBase spatial subtype and SRID metadata. |
+| `Geography(crs, algorithm)`             | Rejected because OceanBase has no type preserving geography edge semantics.                         |
+
 :::info
 OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.

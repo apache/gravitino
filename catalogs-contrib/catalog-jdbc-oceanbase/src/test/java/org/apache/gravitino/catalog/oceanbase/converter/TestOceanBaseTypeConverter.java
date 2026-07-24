@@ -99,8 +99,57 @@ public class TestOceanBaseTypeConverter {
         () -> OCEANBASE_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
   }
 
+  @Test
+  public void testRejectNanosecondTimestampTypes() {
+    assertFromGravitinoRejected(
+        Types.TimestampType.withoutTimeZone(9),
+        "OceanBase MySQL mode cannot preserve timestamp precision 9; "
+            + "the maximum supported precision is 6");
+    assertFromGravitinoRejected(
+        Types.TimestampType.withTimeZone(9),
+        "OceanBase MySQL mode cannot preserve timestamp precision 9; "
+            + "the maximum supported precision is 6");
+  }
+
+  @Test
+  public void testRejectVariantType() {
+    assertFromGravitinoRejected(
+        Types.VariantType.get(),
+        "OceanBase JSON cannot losslessly preserve the Gravitino variant type");
+  }
+
+  @Test
+  public void testRejectUnknownType() {
+    assertFromGravitinoRejected(
+        Types.NullType.get(),
+        "OceanBase has no column type that preserves the Gravitino unknown type");
+  }
+
+  @Test
+  public void testRejectGeometryTypes() {
+    String expectedMessage =
+        "OceanBase JDBC metadata cannot preserve Gravitino geometry CRS/SRID metadata";
+    assertFromGravitinoRejected(Types.GeometryType.crs84(), expectedMessage);
+    assertFromGravitinoRejected(Types.GeometryType.of("EPSG:3857"), expectedMessage);
+  }
+
+  @Test
+  public void testRejectGeographyTypes() {
+    String expectedMessage =
+        "OceanBase has no geography column type that preserves CRS and edge algorithm metadata";
+    assertFromGravitinoRejected(Types.GeographyType.crs84(), expectedMessage);
+    assertFromGravitinoRejected(Types.GeographyType.of("EPSG:4326", "karney"), expectedMessage);
+  }
+
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
     Assertions.assertEquals(jdbcTypeName, OCEANBASE_TYPE_CONVERTER.fromGravitino(gravitinoType));
+  }
+
+  private void assertFromGravitinoRejected(Type type, String expectedMessage) {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> OCEANBASE_TYPE_CONVERTER.fromGravitino(type));
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
   }
 
   protected void checkJdbcTypeToGravitinoType(
