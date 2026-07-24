@@ -55,6 +55,9 @@ from mcp_server.client.plain.plain_rest_client_tag_operation import (
 from mcp_server.client.plain.plain_rest_client_topic_operation import (
     PlainRESTClientTopicOperation,
 )
+from mcp_server.client.plain.plain_rest_client_view_operation import (
+    PlainRESTClientViewOperation,
+)
 
 
 def _make_mock_client(response_json: dict):
@@ -545,6 +548,24 @@ class TestPartitionOperationUrlEncoding(unittest.TestCase):
         asyncio.run(
             op.get_partition("catalog", "schema", "table", _QUERY_INJECTION)
         )
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+
+class TestViewOperationUrlEncoding(unittest.TestCase):
+    def test_list_of_views_encodes_schema_name(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.list_of_views("catalog", _PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_load_view_encodes_view_name(self):
+        client = _make_mock_client({"view": {}})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.load_view("catalog", "schema", _QUERY_INJECTION))
         url = _called_url(client.get)
         self.assertIn(_ENCODED_QUERY_INJECTION, url)
         self.assertNotIn("?admin=true", url)
