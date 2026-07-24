@@ -83,6 +83,7 @@ import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
@@ -1555,6 +1556,27 @@ public class POConverters {
           .withPolicyId(policyId)
           .withMetadataObjectId(metadataObjectId)
           .withMetadataObjectType(metadataObjectType)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static PolicyTagRelPO initializePolicyTagRelPOWithVersion(Long policyId, Long tagId) {
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder()
+              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+              .withCreateTime(Instant.now())
+              .build();
+
+      return PolicyTagRelPO.builder()
+          .withPolicyId(policyId)
+          .withTagId(tagId)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)

@@ -440,12 +440,13 @@ public class RelationalEntityStore
             relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
 
     cache.invalidate(srcEntityIdent, srcEntityType, relType);
+    Entity.EntityType destEntityType = relationDestinationType(relType, srcEntityType);
     for (NameIdentifier destToAdd : destEntitiesToAdd) {
-      cache.invalidate(destToAdd, srcEntityType, relType);
+      cache.invalidate(destToAdd, destEntityType, relType);
     }
 
     for (NameIdentifier destToRemove : destEntitiesToRemove) {
-      cache.invalidate(destToRemove, srcEntityType, relType);
+      cache.invalidate(destToRemove, destEntityType, relType);
     }
 
     return result;
@@ -502,6 +503,27 @@ public class RelationalEntityStore
 
       cache.put(sourceId, identType, relType, entityList);
     }
+  }
+
+  private Entity.EntityType relationDestinationType(
+      SupportsRelationOperations.Type relType, Entity.EntityType srcEntityType) {
+    switch (relType) {
+      case POLICY_METADATA_OBJECT_REL:
+        return Entity.EntityType.POLICY;
+      case TAG_METADATA_OBJECT_REL:
+        return Entity.EntityType.TAG;
+      case POLICY_TAG_REL:
+        if (srcEntityType == Entity.EntityType.TAG) {
+          return Entity.EntityType.POLICY;
+        } else if (srcEntityType == Entity.EntityType.POLICY) {
+          return Entity.EntityType.TAG;
+        }
+        break;
+      default:
+        break;
+    }
+    throw new IllegalArgumentException(
+        String.format("Doesn't support the relation type %s", relType));
   }
 
   /**

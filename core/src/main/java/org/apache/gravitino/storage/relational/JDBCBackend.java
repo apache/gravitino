@@ -732,6 +732,15 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
           return (List<E>)
               TagMetaService.getInstance().listTagsForMetadataObject(nameIdentifier, identType);
         }
+      case POLICY_TAG_REL:
+        if (identType == Entity.EntityType.TAG) {
+          return (List<E>) PolicyMetaService.getInstance().listPoliciesForTag(nameIdentifier);
+        } else if (identType == Entity.EntityType.POLICY) {
+          return (List<E>) PolicyMetaService.getInstance().listTagsForPolicy(nameIdentifier);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("POLICY_TAG_REL doesn't support type %s", identType.name()));
+        }
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -811,6 +820,15 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             TagMetaService.getInstance()
                 .associateTagsWithMetadataObject(
                     srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+      case POLICY_TAG_REL:
+        if (srcEntityType == Entity.EntityType.TAG) {
+          return (List<E>)
+              PolicyMetaService.getInstance()
+                  .associatePoliciesWithTag(
+                      srcEntityIdent, destEntitiesToAdd, destEntitiesToRemove);
+        }
+        throw new IllegalArgumentException(
+            String.format("POLICY_TAG_REL doesn't support type %s", srcEntityType.name()));
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -833,6 +851,13 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E)
             TagMetaService.getInstance()
                 .getTagForMetadataObject(srcIdentifier, srcType, destEntityIdent);
+      case POLICY_TAG_REL:
+        if (srcType == Entity.EntityType.TAG) {
+          return (E)
+              PolicyMetaService.getInstance().getPolicyForTag(srcIdentifier, destEntityIdent);
+        }
+        throw new IllegalArgumentException(
+            String.format("POLICY_TAG_REL doesn't support type %s", srcType.name()));
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
