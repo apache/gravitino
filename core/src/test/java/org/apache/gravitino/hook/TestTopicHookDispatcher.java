@@ -40,6 +40,7 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -72,6 +73,10 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
         Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(catalogWrapper.catalog()).thenReturn(catalog);
     Mockito.when(catalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
+    Mockito.when(catalogWrapper.doWithCapabilityOps(any()))
+        .thenAnswer(
+            inv ->
+                ((ThrowableFunction<Capability, ?>) inv.getArgument(0)).apply(Capability.DEFAULT));
     Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
     Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
@@ -87,7 +92,13 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(mockWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
+    Mockito.when(mockWrapper.doWithCapabilityOps(Mockito.any()))
+        .thenAnswer(
+            inv -> {
+              @SuppressWarnings("unchecked")
+              org.apache.gravitino.utils.ThrowableFunction<Capability, ?> fn = inv.getArgument(0);
+              return fn.apply(new CaseInsensitiveCapability());
+            });
     Mockito.when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockWrapper);
 
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);

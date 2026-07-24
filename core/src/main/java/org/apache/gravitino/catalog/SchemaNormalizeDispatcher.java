@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -97,17 +97,23 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   }
 
   private boolean supportsHierarchicalSchema(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return capabilities.supportsHierarchicalSchema().supported();
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        cap -> cap.supportsHierarchicalSchema().supported());
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {
-    Capability capabilities = getCapability(schemaIdent, catalogManager);
-    return applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        cap -> applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, cap));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier schemaIdent) {
-    Capability capabilities = getCapability(schemaIdent, catalogManager);
-    return applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities);
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        cap -> applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, cap));
   }
 }

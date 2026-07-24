@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import com.google.common.base.Preconditions;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
@@ -42,15 +43,12 @@ public class HiveCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult caseSensitiveOnName(Scope scope) {
-    switch (scope) {
-      case SCHEMA:
-      case TABLE:
-      case COLUMN:
-        // Hive is case insensitive, see
-        // https://cwiki.apache.org/confluence/display/Hive/User+FAQ#UserFAQ-AreHiveSQLidentifiers(e.g.tablenames,columnnames,etc)casesensitive?
-        return CapabilityResult.unsupported("Hive is case insensitive.");
-      default:
-        return CapabilityResult.SUPPORTED;
+    Preconditions.checkArgument(scope != null, "scope cannot be null");
+    if (scope == Scope.SCHEMA || scope == Scope.TABLE || scope == Scope.COLUMN) {
+      // Hive is case insensitive, see
+      // https://cwiki.apache.org/confluence/display/Hive/User+FAQ#UserFAQ-AreHiveSQLidentifiers(e.g.tablenames,columnnames,etc)casesensitive?
+      return CapabilityResult.unsupported("Hive is case insensitive.");
     }
+    return CapabilityResult.SUPPORTED;
   }
 }
