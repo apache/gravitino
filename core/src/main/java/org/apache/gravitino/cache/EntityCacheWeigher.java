@@ -23,13 +23,10 @@ import com.github.benmanes.caffeine.cache.Weigher;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.util.List;
 import java.util.Map;
 import lombok.NonNull;
 import org.apache.gravitino.Entity;
 import org.checkerframework.checker.index.qual.NonNegative;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A {@link Weigher} implementation that calculates the weight of an entity based on its type. In
@@ -53,14 +50,13 @@ import org.slf4j.LoggerFactory;
  * <p>Note: Caffeine's W-TinyLFU algorithm considers both access frequency and weight. Frequently
  * accessed heavier entries may still be retained over infrequently accessed lighter entries.
  */
-public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>> {
+public class EntityCacheWeigher implements Weigher<EntityCacheKey, Entity> {
   public static final int METALAKE_WEIGHT = 0; // 0 means never evict
   public static final int CATALOG_WEIGHT = 0;
   public static final int SCHEMA_WEIGHT = 100; // Lower weight = higher retention priority
   public static final int OTHER_WEIGHT = 200;
   public static final int TAG_WEIGHT = 500;
   public static final int POLICY_WEIGHT = 500;
-  private static final Logger LOG = LoggerFactory.getLogger(EntityCacheWeigher.class.getName());
   private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
   private static final Map<Entity.EntityType, Integer> ENTITY_WEIGHTS =
       ImmutableMap.of(
@@ -124,17 +120,8 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>>
   /** {@inheritDoc} */
   @Override
   public @NonNegative int weigh(
-      @NonNull EntityCacheKey storeEntityCacheKey, @NonNull List<Entity> entities) {
-    int weight = 0;
-    for (Entity entity : entities) {
-      weight += calculateWeight(entity.type());
-    }
-
-    if (weight > getMaxWeight()) {
-      LOG.warn("Entity group exceeds max weight: {}", weight);
-    }
-
-    return weight;
+      @NonNull EntityCacheKey storeEntityCacheKey, @NonNull Entity entity) {
+    return calculateWeight(entity.type());
   }
 
   private int calculateWeight(Entity.EntityType entityType) {

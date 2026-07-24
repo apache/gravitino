@@ -23,7 +23,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
-import java.util.List;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
@@ -62,7 +61,7 @@ public class TestCacheConfig {
     Caffeine<Object, Object> builder = Caffeine.newBuilder();
     builder.maximumWeight(5000);
     builder.weigher(EntityCacheWeigher.getInstance());
-    Cache<EntityCacheRelationKey, List<Entity>> cache = builder.build();
+    Cache<EntityCacheKey, Entity> cache = builder.build();
 
     BaseMetalake baseMetalake =
         BaseMetalake.builder()
@@ -72,8 +71,8 @@ public class TestCacheConfig {
             .withAuditInfo(AuditInfo.EMPTY)
             .build();
     cache.put(
-        EntityCacheRelationKey.of(NameIdentifier.of("metalake1"), Entity.EntityType.METALAKE),
-        List.of(baseMetalake));
+        EntityCacheKey.of(NameIdentifier.of("metalake1"), Entity.EntityType.METALAKE),
+        baseMetalake);
     CatalogEntity catalogEntity =
         CatalogEntity.builder()
             .withNamespace(Namespace.of("metalake1"))
@@ -84,9 +83,9 @@ public class TestCacheConfig {
             .withType(Catalog.Type.RELATIONAL)
             .build();
     cache.put(
-        EntityCacheRelationKey.of(
+        EntityCacheKey.of(
             NameIdentifier.of(new String[] {"metalake1", "catalog1"}), Entity.EntityType.CATALOG),
-        List.of(catalogEntity));
+        catalogEntity);
 
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
@@ -96,10 +95,10 @@ public class TestCacheConfig {
             .withId(1000L)
             .build();
     cache.put(
-        EntityCacheRelationKey.of(
+        EntityCacheKey.of(
             NameIdentifier.of(new String[] {"metalake1", "catalog1", "schema1"}),
             Entity.EntityType.SCHEMA),
-        List.of(schemaEntity));
+        schemaEntity);
 
     for (int i = 0; i < 5; i++) {
       String filesetName = "fileset" + i;
@@ -113,10 +112,10 @@ public class TestCacheConfig {
               .withFilesetType(Fileset.Type.MANAGED)
               .build();
       cache.put(
-          EntityCacheRelationKey.of(
+          EntityCacheKey.of(
               NameIdentifier.of(new String[] {"metalake1", "catalog1", "schema1", filesetName}),
               Entity.EntityType.FILESET),
-          List.of(fileset));
+          fileset);
     }
 
     for (int i = 0; i < 10; i++) {
@@ -129,7 +128,7 @@ public class TestCacheConfig {
               .withAuditInfo(AuditInfo.EMPTY)
               .withId((long) (i + 1) * 100_000)
               .build();
-      cache.put(EntityCacheRelationKey.of(tagNameIdent, Entity.EntityType.TAG), List.of(tagEntity));
+      cache.put(EntityCacheKey.of(tagNameIdent, Entity.EntityType.TAG), tagEntity);
     }
 
     // The weight of the cache has exceeded 2000, some entities will be evicted if we continue to
@@ -146,10 +145,10 @@ public class TestCacheConfig {
               .withFilesetType(Fileset.Type.MANAGED)
               .build();
       cache.put(
-          EntityCacheRelationKey.of(
+          EntityCacheKey.of(
               NameIdentifier.of("metalake1", "catalog1", "schema1", filesetName),
               Entity.EntityType.FILESET),
-          List.of(fileset));
+          fileset);
     }
 
     // Access filesets 5-14 twice to increase their frequency to 5 (insert + 4 gets)
@@ -157,7 +156,7 @@ public class TestCacheConfig {
       for (int i = 5; i < 15; i++) {
         String filesetName = "fileset" + i;
         cache.getIfPresent(
-            EntityCacheRelationKey.of(
+            EntityCacheKey.of(
                 NameIdentifier.of(new String[] {"metalake1", "catalog1", "schema1", filesetName}),
                 Entity.EntityType.FILESET));
       }
@@ -175,7 +174,7 @@ public class TestCacheConfig {
             .filter(
                 filesetName ->
                     cache.getIfPresent(
-                            EntityCacheRelationKey.of(
+                            EntityCacheKey.of(
                                 NameIdentifier.of(
                                     new String[] {"metalake1", "catalog1", "schema1", filesetName}),
                                 Entity.EntityType.FILESET))
@@ -188,8 +187,7 @@ public class TestCacheConfig {
             .mapToObj(i -> NameIdentifierUtil.ofTag("metalake", "tag" + i))
             .filter(
                 tagNameIdent ->
-                    cache.getIfPresent(
-                            EntityCacheRelationKey.of(tagNameIdent, Entity.EntityType.TAG))
+                    cache.getIfPresent(EntityCacheKey.of(tagNameIdent, Entity.EntityType.TAG))
                         != null)
             .count();
 
@@ -217,7 +215,7 @@ public class TestCacheConfig {
     Caffeine<Object, Object> builder = Caffeine.newBuilder();
     builder.maximumWeight(5000);
     builder.weigher(EntityCacheWeigher.getInstance());
-    Cache<EntityCacheRelationKey, List<Entity>> cache = builder.build();
+    Cache<EntityCacheKey, Entity> cache = builder.build();
 
     // Insert 3 metalakes
     for (int i = 0; i < 3; i++) {
@@ -229,8 +227,8 @@ public class TestCacheConfig {
               .withAuditInfo(AuditInfo.EMPTY)
               .build();
       cache.put(
-          EntityCacheRelationKey.of(NameIdentifier.of("metalake" + i), Entity.EntityType.METALAKE),
-          List.of(baseMetalake));
+          EntityCacheKey.of(NameIdentifier.of("metalake" + i), Entity.EntityType.METALAKE),
+          baseMetalake);
     }
 
     // Insert 10 catalogs
@@ -245,9 +243,8 @@ public class TestCacheConfig {
               .withType(Catalog.Type.RELATIONAL)
               .build();
       cache.put(
-          EntityCacheRelationKey.of(
-              NameIdentifier.of("metalake1.catalog" + i), Entity.EntityType.CATALOG),
-          List.of(catalogEntity));
+          EntityCacheKey.of(NameIdentifier.of("metalake1.catalog" + i), Entity.EntityType.CATALOG),
+          catalogEntity);
     }
 
     // insert 100 schemas
@@ -261,24 +258,23 @@ public class TestCacheConfig {
               .build();
 
       cache.put(
-          EntityCacheRelationKey.of(
+          EntityCacheKey.of(
               NameIdentifier.of("metalake1.catalog1.schema" + i), Entity.EntityType.SCHEMA),
-          List.of(schemaEntity));
+          schemaEntity);
     }
 
     // Three 3 metalakes still in cache.
     for (int i = 0; i < 3; i++) {
       Assertions.assertNotNull(
           cache.getIfPresent(
-              EntityCacheRelationKey.of(
-                  NameIdentifier.of("metalake" + 1), Entity.EntityType.METALAKE)));
+              EntityCacheKey.of(NameIdentifier.of("metalake" + 1), Entity.EntityType.METALAKE)));
     }
 
     // 10 catalogs still in cache.
     for (int i = 0; i < 10; i++) {
       Assertions.assertNotNull(
           cache.getIfPresent(
-              EntityCacheRelationKey.of(
+              EntityCacheKey.of(
                   NameIdentifier.of("metalake1.catalog" + i), Entity.EntityType.CATALOG)));
     }
 

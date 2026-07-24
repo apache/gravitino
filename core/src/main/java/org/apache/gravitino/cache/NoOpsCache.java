@@ -25,7 +25,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.SupportsRelationOperations;
 
 /** A cache implementation that does not cache anything. */
 public class NoOpsCache extends BaseEntityCache {
@@ -106,46 +105,6 @@ public class NoOpsCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity) {
-    // do nothing
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
-    return Optional.empty();
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public boolean invalidate(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return false;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public boolean invalidateRelationEntry(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return false;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public boolean contains(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return false;
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> void put(
-      NameIdentifier ident,
-      Entity.EntityType type,
-      SupportsRelationOperations.Type relType,
-      List<E> entities) {
     // do nothing
   }
 }
