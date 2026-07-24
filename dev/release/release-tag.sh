@@ -136,6 +136,9 @@ sed -i".tmp13" 's/^version: .*$/version: '"$NEXT_LRC_CHART_VERSION"'/g' dev/char
 # update docs version
 "$SELF/update-java-doc-version.sh" "$RELEASE_VERSION" "$SELF/gravitino"
 
+# Regenerate the committed OpenAPI bundles with the release version before tagging.
+$GRADLE :docs:bundleOpenApi
+
 git commit -a -m "Preparing Gravitino release $RELEASE_TAG"
 echo "Creating tag $RELEASE_TAG at the head of $GIT_BRANCH"
 git tag $RELEASE_TAG

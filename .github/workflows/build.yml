@@ -214,6 +214,22 @@ jobs:
 
           ./gradlew "${gradle_args[@]}"
 
+      - name: Verify generated OpenAPI bundles are current
+        run: |
+          openapi_status=$(git status --porcelain --untracked-files=all -- \
+            docs/open-api/default/openapi.json \
+            docs/open-api/default/openapi.yaml)
+
+          if [ -n "${openapi_status}" ]; then
+            echo "The generated OpenAPI bundles are not current."
+            echo "Run './gradlew :docs:bundleOpenApi' and commit both generated files."
+            echo "${openapi_status}"
+            git diff -- \
+              docs/open-api/default/openapi.json \
+              docs/open-api/default/openapi.yaml
+            exit 1
+          fi
+
       - name: Fetch base branch for coverage diff
         if: github.event_name == 'pull_request'
         run: git fetch origin ${{ github.base_ref }} --depth=1
