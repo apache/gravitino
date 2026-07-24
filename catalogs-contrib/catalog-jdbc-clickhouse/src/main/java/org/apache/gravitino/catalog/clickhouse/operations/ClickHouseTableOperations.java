@@ -18,10 +18,16 @@
  */
 package org.apache.gravitino.catalog.clickhouse.operations;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.BLOOM_FILTER_SIZE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_NGRAMBFV1;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_TOKENBFV1;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.HASH_FUNCTIONS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.NGRAM_SIZE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.RANDOM_SEED;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
@@ -618,6 +624,36 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                       "set(" + resolveSetMaxValues(index.properties()) + ")",
                       resolveGranularity(index.properties(), 1)));
           break;
+        case DATA_SKIPPING_NGRAMBFV1:
+          {
+            String typeClause =
+                buildBloomFilterTypeClause(
+                    index.properties(), DATA_SKIPPING_NGRAMBFV1, index.name());
+            sqlBuilder
+                .append(" ")
+                .append(
+                    buildDataSkippingIndexDdl(
+                        index.name(),
+                        fieldStr,
+                        typeClause,
+                        resolveGranularity(index.properties(), 1)));
+          }
+          break;
+        case DATA_SKIPPING_TOKENBFV1:
+          {
+            String typeClause =
+                buildBloomFilterTypeClause(
+                    index.properties(), DATA_SKIPPING_TOKENBFV1, index.name());
+            sqlBuilder
+                .append(" ")
+                .append(
+                    buildDataSkippingIndexDdl(
+                        index.name(),
+                        fieldStr,
+                        typeClause,
+                        resolveGranularity(index.properties(), 1)));
+          }
+          break;
         default:
           throw new IllegalArgumentException(
               "Gravitino Clickhouse doesn't support index : " + index.type());
@@ -1039,6 +1075,24 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 fieldStr,
                 "set(" + resolveSetMaxValues(properties) + ")",
                 resolveGranularity(properties, 1));
+
+      case DATA_SKIPPING_NGRAMBFV1:
+        {
+          String typeClause =
+              buildBloomFilterTypeClause(properties, DATA_SKIPPING_NGRAMBFV1, addIndex.getName());
+          return "ADD "
+              + buildDataSkippingIndexDdl(
+                  addIndex.getName(), fieldStr, typeClause, resolveGranularity(properties, 1));
+        }
+
+      case DATA_SKIPPING_TOKENBFV1:
+        {
+          String typeClause =
+              buildBloomFilterTypeClause(properties, DATA_SKIPPING_TOKENBFV1, addIndex.getName());
+          return "ADD "
+              + buildDataSkippingIndexDdl(
+                  addIndex.getName(), fieldStr, typeClause, resolveGranularity(properties, 1));
+        }
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
@@ -1567,14 +1621,114 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_BLOOM_FILTER;
       case DATA_SKIPPING_SET:
         return Index.IndexType.DATA_SKIPPING_SET;
+      case DATA_SKIPPING_NGRAMBFV1:
+        return Index.IndexType.DATA_SKIPPING_NGRAMBFV1;
+      case DATA_SKIPPING_TOKENBFV1:
+        return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
       default:
-        // ClickHouse may return "set(N)" with parameter in some versions;
-        // match on prefix to handle both "set" and "set(N)" formats.
+        // ClickHouse may return type with parameters in some versions (e.g. "set(0)",
+        // "ngrambf_v1(3, 512, 3, 0)"). Match on prefix to handle both bare and
+        // parameterized formats.
         if (rawType.startsWith(DATA_SKIPPING_SET + "(")) {
           return Index.IndexType.DATA_SKIPPING_SET;
         }
+        if (rawType.startsWith(DATA_SKIPPING_NGRAMBFV1 + "(")) {
+          return Index.IndexType.DATA_SKIPPING_NGRAMBFV1;
+        }
+        if (rawType.startsWith(DATA_SKIPPING_TOKENBFV1 + "(")) {
+          return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+        }
         throw new IllegalArgumentException("Unsupported data skipping index type: " + rawType);
     }
+  }
+
+  /**
+   * Validates that a property value is an integer with a given minimum bound, returning it as a
+   * string for DDL interpolation. Unlike {@link #resolveIntProperty(Map, String, int, int)}, this
+   * method treats the value as required — a missing or blank value throws {@link
+   * IllegalArgumentException} rather than returning a default. Used for bloom-filter parameters
+   * (e.g. {@code bloom_filter_size}, {@code ngram_size} require &ge; 1; {@code random_seed}
+   * requires &ge; 0).
+   *
+   * @param value the raw string value from the properties map
+   * @param paramName the parameter name for error messages
+   * @param indexType the index type name (e.g. "ngrambf_v1")
+   * @param indexName the index name for error messages
+   * @param minValue the minimum allowed value (inclusive)
+   * @return the validated value as a string
+   * @throws IllegalArgumentException if the value is null, blank, not an integer, or below minValue
+   */
+  private static String requireIntWithMin(
+      String value, String paramName, String indexType, String indexName, int minValue) {
+    Preconditions.checkArgument(
+        value != null && !value.isBlank(),
+        "%s is required for %s index '%s'",
+        paramName,
+        indexType,
+        indexName);
+    try {
+      int intVal = Integer.parseInt(value.strip());
+      Preconditions.checkArgument(
+          intVal >= minValue,
+          "%s must be >= %s for %s index '%s', but got '%s'",
+          paramName,
+          minValue,
+          indexType,
+          indexName,
+          value);
+      return String.valueOf(intVal);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "%s must be a valid integer for %s index '%s', but got '%s'",
+              paramName, indexType, indexName, value),
+          e);
+    }
+  }
+
+  /**
+   * Builds the full type clause for bloom-filter-based data skipping indexes, combining the type
+   * name (e.g. "ngrambf_v1") with the validated parameter clause. Extracted to eliminate
+   * duplication between the CREATE TABLE path ({@link #appendIndexesSql}) and the ALTER TABLE ADD
+   * INDEX path ({@link #addIndexDefinition}).
+   *
+   * @param props the index properties map
+   * @param indexType the index type name (one of the {@code DATA_SKIPPING_*} constants)
+   * @param indexName the index name, used in error messages
+   * @return the full type clause, e.g. "ngrambf_v1(3, 512, 3, 0)"
+   */
+  private static String buildBloomFilterTypeClause(
+      Map<String, String> props, String indexType, String indexName) {
+    return indexType + resolveBloomFilterParams(props, indexType, indexName);
+  }
+
+  /**
+   * Resolves bloom-filter-based data skipping index parameters from index properties for {@code
+   * ngrambf_v1} and {@code tokenbf_v1} index types. Used by both CREATE TABLE (via {@link
+   * Index#properties()}) and ALTER TABLE ADD INDEX (via {@link
+   * TableChange.AddIndex#getProperties()}).
+   *
+   * @param props the index properties map
+   * @param indexType "ngrambf_v1" or "tokenbf_v1" (determines whether ngram_size is required)
+   * @param indexName the index name, used in error messages
+   * @return the DDL parameter clause, e.g. "(3, 512, 3, 0)" for ngrambf_v1
+   * @throws IllegalArgumentException if any required parameter is missing or invalid
+   */
+  private static String resolveBloomFilterParams(
+      Map<String, String> props, String indexType, String indexName) {
+    String size =
+        requireIntWithMin(
+            props.get(BLOOM_FILTER_SIZE), "bloom_filter_size", indexType, indexName, 1);
+    String hashFuncs =
+        requireIntWithMin(props.get(HASH_FUNCTIONS), "hash_functions", indexType, indexName, 1);
+    String seed = requireIntWithMin(props.get(RANDOM_SEED), "random_seed", indexType, indexName, 0);
+
+    if (DATA_SKIPPING_NGRAMBFV1.equals(indexType)) {
+      String ngramSize =
+          requireIntWithMin(props.get(NGRAM_SIZE), "ngram_size", indexType, indexName, 1);
+      return String.format("(%s, %s, %s, %s)", ngramSize, size, hashFuncs, seed);
+    }
+    return String.format("(%s, %s, %s)", size, hashFuncs, seed);
   }
 
   private String buildDataSkippingIndexDdl(

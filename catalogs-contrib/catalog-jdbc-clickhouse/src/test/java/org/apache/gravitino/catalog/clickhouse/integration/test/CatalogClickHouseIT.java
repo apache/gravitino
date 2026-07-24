@@ -2651,4 +2651,95 @@ public class CatalogClickHouseIT extends BaseIT {
     // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
     Assertions.assertEquals(1, settingsCount);
   }
+
+  @Test
+  @Tag("gravitino-docker-test")
+  void testCreateAndLoadTableWithNgrambfAndTokenbfIndexes() {
+    String tableName = GravitinoITUtils.genRandomName("ch_ngram_tokenbf_idx_");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              CLICKHOUSE_COL_NAME1,
+              Types.IntegerType.get(),
+              "col_1_comment",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              CLICKHOUSE_COL_NAME3,
+              Types.StringType.get(),
+              "col_3_comment",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+        };
+    SortOrder[] sortOrders = getSortOrders(CLICKHOUSE_COL_NAME1);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create table with ngrambf_v1 index
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_ngram",
+              new String[][] {{CLICKHOUSE_COL_NAME3}},
+              Map.of(
+                  "ngram_size", "3",
+                  "bloom_filter_size", "512",
+                  "hash_functions", "3",
+                  "random_seed", "0")),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_token",
+              new String[][] {{CLICKHOUSE_COL_NAME3}},
+              Map.of(
+                  "bloom_filter_size", "256",
+                  "hash_functions", "2",
+                  "random_seed", "0",
+                  "granularity", "4")),
+        };
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        sortOrders,
+        indexes);
+
+    // Load and verify round-trip
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Index[] loadedIndexes = loaded.index();
+    Assertions.assertNotNull(loadedIndexes);
+
+    // ClickHouse's system.data_skipping_indices only returns the bare type name (e.g.
+    // "ngrambf_v1") without the parameter clause (e.g. "ngrambf_v1(3,512,3,0)"), so
+    // index.properties() on the loaded table will not contain bloom_filter_size,
+    // hash_functions, random_seed, or ngram_size. Only verify type, name, and field names.
+    //
+    // Verify ngrambf_v1 index
+    boolean hasNgrambf =
+        Arrays.stream(loadedIndexes)
+            .anyMatch(
+                idx ->
+                    Objects.equals(idx.name(), "idx_ngram")
+                        && idx.type() == Index.IndexType.DATA_SKIPPING_NGRAMBFV1
+                        && Arrays.deepEquals(
+                            idx.fieldNames(), new String[][] {{CLICKHOUSE_COL_NAME3}}));
+    Assertions.assertTrue(hasNgrambf, "Loaded table should contain ngrambf_v1 index 'idx_ngram'");
+
+    // Verify tokenbf_v1 index
+    boolean hasTokenbf =
+        Arrays.stream(loadedIndexes)
+            .anyMatch(
+                idx ->
+                    Objects.equals(idx.name(), "idx_token")
+                        && idx.type() == Index.IndexType.DATA_SKIPPING_TOKENBFV1
+                        && Arrays.deepEquals(
+                            idx.fieldNames(), new String[][] {{CLICKHOUSE_COL_NAME3}}));
+    Assertions.assertTrue(hasTokenbf, "Loaded table should contain tokenbf_v1 index 'idx_token'");
+  }
 }

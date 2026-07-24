@@ -1698,13 +1698,511 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(0)"));
     Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(100)"));
 
+    // ngrambf_v1 and tokenbf_v1 bloom filter data skipping indexes
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_NGRAMBFV1, ops.getClickHouseIndexType("ngrambf_v1"));
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_TOKENBFV1, ops.getClickHouseIndexType("tokenbf_v1"));
+
     // Blank/null defaults to MINMAX
     Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(""));
     Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(null));
 
+    // Parameterized formats (C2 prefix matching)
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_NGRAMBFV1, ops.getClickHouseIndexType("ngrambf_v1(3, 512, 3, 0)"));
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_TOKENBFV1, ops.getClickHouseIndexType("tokenbf_v1(256, 2, 0)"));
+
     // Unsupported type
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> ops.getClickHouseIndexType("unknown_type"));
+  }
+
+  @Test
+  public void testCreateTableWithNgrambfAndTokenbfIndexes() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.LongType.get())
+              .withNullable(true)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c2")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+
+    // ngrambf_v1 with full parameters
+    Index[] indexes1 =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_ngram",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size",
+                  "3",
+                  "bloom_filter_size",
+                  "512",
+                  "hash_functions",
+                  "3",
+                  "random_seed",
+                  "1")),
+        };
+
+    String sql1 =
+        ops.buildCreateSql(
+            "t_ngram",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[0],
+            Distributions.NONE,
+            indexes1,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    Assertions.assertTrue(
+        sql1.contains("INDEX `idx_ngram` `c2` TYPE ngrambf_v1(3, 512, 3, 1) GRANULARITY 1"),
+        "DDL should contain ngrambf_v1 with parameters: " + sql1);
+
+    // tokenbf_v1 with full parameters
+    Index[] indexes2 =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_token",
+              new String[][] {{"c2"}},
+              Map.of("bloom_filter_size", "256", "hash_functions", "2", "random_seed", "0")),
+        };
+
+    String sql2 =
+        ops.buildCreateSql(
+            "t_token",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[0],
+            Distributions.NONE,
+            indexes2,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    Assertions.assertTrue(
+        sql2.contains("INDEX `idx_token` `c2` TYPE tokenbf_v1(256, 2, 0) GRANULARITY 1"),
+        "DDL should contain tokenbf_v1 with parameters: " + sql2);
+
+    // ngrambf_v1 with custom GRANULARITY from properties
+    Index[] indexes3 =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_ngram_g",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size",
+                  "4",
+                  "bloom_filter_size",
+                  "1024",
+                  "hash_functions",
+                  "3",
+                  "random_seed",
+                  "1",
+                  "granularity",
+                  "8")),
+        };
+
+    String sql3 =
+        ops.buildCreateSql(
+            "t_ngram_g",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[0],
+            Distributions.NONE,
+            indexes3,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    Assertions.assertTrue(
+        sql3.contains("INDEX `idx_ngram_g` `c2` TYPE ngrambf_v1(4, 1024, 3, 1) GRANULARITY 8"),
+        "DDL should contain custom GRANULARITY: " + sql3);
+  }
+
+  @Test
+  public void testNgrambfTokenbfMissingParameters() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.LongType.get())
+              .withNullable(true)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c2")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+
+    // ngrambf_v1 without ngram_size — should throw
+    Index[] noNgramSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_bad",
+              new String[][] {{"c2"}},
+              Map.of("bloom_filter_size", "512", "hash_functions", "3", "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                noNgramSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // tokenbf_v1 without bloom_filter_size — should throw
+    Index[] noBloomSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad2",
+              new String[][] {{"c2"}},
+              Map.of("hash_functions", "3", "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad2",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                noBloomSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // ngrambf_v1 without hash_functions — should throw
+    Index[] noHashFuncs =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_bad3",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size", "3",
+                  "bloom_filter_size", "512",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad3",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                noHashFuncs,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // tokenbf_v1 without hash_functions — should throw
+    Index[] tokenbfNoHash =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad4",
+              new String[][] {{"c2"}},
+              Map.of("bloom_filter_size", "256", "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad4",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                tokenbfNoHash,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // tokenbf_v1 without random_seed — should throw
+    Index[] noSeed =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad5",
+              new String[][] {{"c2"}},
+              Map.of("bloom_filter_size", "256", "hash_functions", "2")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad5",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                noSeed,
+                ClickHouseUtils.getSortOrders("c1")));
+  }
+
+  @Test
+  public void testNgrambfTokenbfInvalidParameterValues() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.LongType.get())
+              .withNullable(true)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c2")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+
+    // Non-numeric bloom_filter_size should throw
+    Index[] nonNumericSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "bloom_filter_size", "abc",
+                  "hash_functions", "3",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                nonNumericSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Negative bloom_filter_size should throw
+    Index[] negativeSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad2",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "bloom_filter_size", "-1",
+                  "hash_functions", "3",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad2",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                negativeSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Zero bloom_filter_size should throw (>= 1 required)
+    Index[] zeroSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad3",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "bloom_filter_size", "0",
+                  "hash_functions", "3",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad3",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                zeroSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Non-numeric hash_functions should throw
+    Index[] nonNumericHash =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_bad4",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size", "3",
+                  "bloom_filter_size", "512",
+                  "hash_functions", "abc",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad4",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                nonNumericHash,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Negative random_seed should throw (>= 0 required)
+    Index[] negativeSeed =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad5",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "bloom_filter_size", "256",
+                  "hash_functions", "3",
+                  "random_seed", "-1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad5",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                negativeSeed,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Non-numeric ngram_size should throw (ngrambf_v1 specific)
+    Index[] nonNumericNgram =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_bad6",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size", "xyz",
+                  "bloom_filter_size", "512",
+                  "hash_functions", "3",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad6",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                nonNumericNgram,
+                ClickHouseUtils.getSortOrders("c1")));
+  }
+
+  @Test
+  public void testAlterTableAddIndexWithNgrambfAndTokenbf() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    // ALTER TABLE ADD INDEX for ngrambf_v1 with full properties
+    String ngrambfSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  IndexType.DATA_SKIPPING_NGRAMBFV1,
+                  "idx_ngram",
+                  new String[][] {{"c2"}},
+                  Map.of(
+                      "ngram_size", "3",
+                      "bloom_filter_size", "512",
+                      "hash_functions", "3",
+                      "random_seed", "0"))
+            });
+    Assertions.assertTrue(
+        ngrambfSql.contains(
+            "ADD INDEX `idx_ngram` `c2` TYPE ngrambf_v1(3, 512, 3, 0) GRANULARITY 1"),
+        "DDL should contain ngrambf_v1 with parameters: " + ngrambfSql);
+
+    // ALTER TABLE ADD INDEX for tokenbf_v1 with full properties
+    String tokenbfSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  IndexType.DATA_SKIPPING_TOKENBFV1,
+                  "idx_token",
+                  new String[][] {{"c2"}},
+                  Map.of(
+                      "bloom_filter_size", "256",
+                      "hash_functions", "2",
+                      "random_seed", "1",
+                      "granularity", "4"))
+            });
+    Assertions.assertTrue(
+        tokenbfSql.contains("ADD INDEX `idx_token` `c2` TYPE tokenbf_v1(256, 2, 1) GRANULARITY 4"),
+        "DDL should contain tokenbf_v1 with custom GRANULARITY: " + tokenbfSql);
   }
 
   @Test

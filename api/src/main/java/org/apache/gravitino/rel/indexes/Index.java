@@ -122,8 +122,7 @@ public interface Index {
     /** IVF_HNSW_PQ */
     IVF_HNSW_PQ,
 
-    // The following index types are data skipping indexes in ClickHouse, ngrambf_v1 and tokenbf_v1
-    // Will be supported later.
+    // The following index types are data skipping indexes in ClickHouse.
     /** minmax data skipping index */
     DATA_SKIPPING_MINMAX,
 
@@ -132,5 +131,18 @@ public interface Index {
 
     /** Set data skipping index */
     DATA_SKIPPING_SET,
+
+    /**
+     * Ngram bloom filter data skipping index. Uses n-gram tokenization of string columns for
+     * bloom-filter-based text search acceleration. Available since ClickHouse v19.x.
+     */
+    DATA_SKIPPING_NGRAMBFV1,
+
+    /**
+     * Token bloom filter data skipping index. Uses tokenization (by non-alphanumeric delimiters) of
+     * string columns for bloom-filter-based text search acceleration. Available since ClickHouse
+     * v19.x.
+     */
+    DATA_SKIPPING_TOKENBFV1,
   }
 }
