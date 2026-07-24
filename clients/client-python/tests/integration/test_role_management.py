@@ -15,70 +15,20 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
-import os
 import uuid
 
-from gravitino import GravitinoAdminClient, GravitinoClient
 from gravitino.api.authorization.privileges import Privileges
 from gravitino.api.authorization.securable_objects import SecurableObjects
 from gravitino.exceptions.base import (
     NoSuchRoleException,
     RoleAlreadyExistsException,
 )
-from tests.integration.integration_test_env import IntegrationTestEnv
-
-logger = logging.getLogger(__name__)
+from tests.integration.integration_test_env import AuthorizationIntegrationTestEnv
 
 
-class TestRoleManagement(IntegrationTestEnv):
+class TestRoleManagement(AuthorizationIntegrationTestEnv):
     _metalake_name: str = f"test_role_metalake_{uuid.uuid4().hex[:8]}"
-    _gravitino_admin_client: GravitinoAdminClient = None
-    _gravitino_client: GravitinoClient = None
-
-    @classmethod
-    def setUpClass(cls):
-        cls._get_gravitino_home()
-        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        auth_confs = {
-            "gravitino.authorization.enable": "true",
-            "gravitino.authorization.serviceAdmins": "anonymous",
-        }
-        cls._reset_conf(auth_confs, conf_path)
-        cls._append_conf(auth_confs, conf_path)
-        if cls.use_external_gravitino():
-            cls.restart_server()
-        else:
-            super().setUpClass()
-        cls._gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
-
-    @classmethod
-    def tearDownClass(cls):
-        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        reset_confs = {
-            "gravitino.authorization.enable": "false",
-            "gravitino.authorization.serviceAdmins": "anonymous",
-        }
-        cls._reset_conf(reset_confs, conf_path)
-        cls._append_conf(reset_confs, conf_path)
-        if cls.use_external_gravitino():
-            cls.restart_server()
-        else:
-            super().tearDownClass()
-
-    def setUp(self):
-        self._gravitino_admin_client.create_metalake(
-            self._metalake_name, comment="test role management", properties={}
-        )
-        self._gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self._metalake_name
-        )
-
-    def tearDown(self):
-        try:
-            self._gravitino_admin_client.drop_metalake(self._metalake_name, force=True)
-        except Exception:  # pylint: disable=broad-except
-            logger.warning("Failed to drop metalake %s", self._metalake_name)
+    _metalake_comment: str = "test role management"
 
     def test_create_and_get_role(self):
         privileges = [Privileges.allow("USE_CATALOG")]
