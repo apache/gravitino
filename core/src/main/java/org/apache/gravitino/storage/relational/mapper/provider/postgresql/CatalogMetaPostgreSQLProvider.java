@@ -26,11 +26,13 @@ import org.apache.ibatis.annotations.Param;
 
 public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   @Override
-  public String softDeleteCatalogMetasByCatalogId(Long catalogId) {
+  public String softDeleteCatalogMetasByCatalogId(Long catalogId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE catalog_id = #{catalogId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

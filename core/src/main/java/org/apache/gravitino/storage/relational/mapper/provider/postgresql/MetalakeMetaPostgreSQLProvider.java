@@ -26,11 +26,13 @@ import org.apache.ibatis.annotations.Param;
 
 public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider {
   @Override
-  public String softDeleteMetalakeMetaByMetalakeId(Long metalakeId) {
+  public String softDeleteMetalakeMetaByMetalakeId(Long metalakeId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE metalake_id = #{metalakeId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

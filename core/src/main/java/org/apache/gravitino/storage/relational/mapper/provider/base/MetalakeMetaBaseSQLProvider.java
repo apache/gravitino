@@ -148,12 +148,15 @@ public class MetalakeMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String softDeleteMetalakeMetaByMetalakeId(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        // OCC: version-checked delete (0 rows = stale version; the service returns false).
+        + " WHERE metalake_id = #{metalakeId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String deleteMetalakeMetasByLegacyTimeline(

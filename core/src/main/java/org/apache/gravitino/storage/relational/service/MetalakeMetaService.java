@@ -218,14 +218,21 @@ public class MetalakeMetaService {
       baseMetricName = "deleteMetalake")
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
     NameIdentifierUtil.checkMetalake(ident);
-    Long metalakeId = getMetalakeIdByName(ident.name());
-    if (metalakeId != null) {
+    MetalakePO metalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
+    AtomicInteger deleteCount = new AtomicInteger(0);
+    if (metalakePO != null) {
+      Long metalakeId = metalakePO.getMetalakeId();
+      Long currentVersion = metalakePO.getCurrentVersion();
       if (cascade) {
         SessionUtils.doMultipleWithCommit(
             () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+                deleteCount.set(
+                    SessionUtils.getWithoutCommit(
+                        MetalakeMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion))),
             () ->
                 SessionUtils.doWithoutCommit(
                     CatalogMetaMapper.class,
@@ -354,9 +361,11 @@ public class MetalakeMetaService {
         }
         SessionUtils.doMultipleWithCommit(
             () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+                deleteCount.set(
+                    SessionUtils.getWithoutCommit(
+                        MetalakeMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion))),
             () ->
                 SessionUtils.doWithoutCommit(
                     UserRoleRelMapper.class,
@@ -417,7 +426,8 @@ public class MetalakeMetaService {
             });
       }
     }
-    return true;
+    // OCC: false when the metalake was absent, or its version changed between read and delete.
+    return deleteCount.get() > 0;
   }
 
   @Monitored(

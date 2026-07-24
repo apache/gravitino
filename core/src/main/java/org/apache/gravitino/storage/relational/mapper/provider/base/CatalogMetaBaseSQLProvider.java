@@ -211,12 +211,15 @@ public class CatalogMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
+  public String softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        // OCC: version-checked delete (0 rows = stale version; the service returns false).
+        + " WHERE catalog_id = #{catalogId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

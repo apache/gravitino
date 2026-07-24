@@ -73,7 +73,8 @@ public interface MetalakeMetaMapper {
   @UpdateProvider(
       type = MetalakeMetaSQLProviderFactory.class,
       method = "softDeleteMetalakeMetaByMetalakeId")
-  Integer softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId);
+  Integer softDeleteMetalakeMetaByMetalakeId(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion);
 
   @DeleteProvider(
       type = MetalakeMetaSQLProviderFactory.class,

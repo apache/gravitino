@@ -270,15 +270,20 @@ public class CatalogMetaService {
     NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
-    long catalogId = EntityIdService.getEntityId(identifier, Entity.EntityType.CATALOG);
     String metalakeName = identifier.namespace().level(0);
+    CatalogPO catalogPO = getCatalogPOByName(metalakeName, catalogName);
+    Long catalogId = catalogPO.getCatalogId();
+    Long currentVersion = catalogPO.getCurrentVersion();
+    AtomicInteger deleteCount = new AtomicInteger(0);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
           () ->
-              SessionUtils.doWithoutCommit(
-                  CatalogMetaMapper.class,
-                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
+              deleteCount.set(
+                  SessionUtils.getWithoutCommit(
+                      CatalogMetaMapper.class,
+                      mapper ->
+                          mapper.softDeleteCatalogMetasByCatalogId(catalogId, currentVersion))),
           () ->
               SessionUtils.doWithoutCommit(
                   SchemaMetaMapper.class,
@@ -369,9 +374,11 @@ public class CatalogMetaService {
       }
       SessionUtils.doMultipleWithCommit(
           () ->
-              SessionUtils.doWithoutCommit(
-                  CatalogMetaMapper.class,
-                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
+              deleteCount.set(
+                  SessionUtils.getWithoutCommit(
+                      CatalogMetaMapper.class,
+                      mapper ->
+                          mapper.softDeleteCatalogMetasByCatalogId(catalogId, currentVersion))),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -412,7 +419,8 @@ public class CatalogMetaService {
           });
     }
 
-    return true;
+    // OCC: false when the catalog's version changed between read and delete.
+    return deleteCount.get() > 0;
   }
 
   @Monitored(
