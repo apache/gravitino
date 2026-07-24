@@ -411,12 +411,15 @@ public class SchemaMetaService {
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
 
-      List<Long> singleSchemaId = Collections.singletonList(schemaId);
+      int[] schemaDeletedCount = new int[] {0};
       SessionUtils.doMultipleWithCommit(
           () ->
-              SessionUtils.doWithoutCommit(
-                  SchemaMetaMapper.class,
-                  mapper -> mapper.softDeleteSchemaMetasBySchemaIds(singleSchemaId)),
+              schemaDeletedCount[0] =
+                  SessionUtils.getWithoutCommit(
+                      SchemaMetaMapper.class,
+                      mapper ->
+                          mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                              schemaId, schemaPO.getCurrentVersion())),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -455,6 +458,8 @@ public class SchemaMetaService {
                         schemaFullName,
                         OperateType.DROP));
           });
+      // OCC: false when the schema's version changed between read and delete.
+      return schemaDeletedCount[0] > 0;
     }
     return true;
   }

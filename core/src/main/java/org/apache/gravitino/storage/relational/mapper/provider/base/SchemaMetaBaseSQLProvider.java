@@ -292,6 +292,18 @@ public class SchemaMetaBaseSQLProvider {
         + "</script>";
   }
 
+  public String softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        // OCC: version-checked delete for the non-cascade single-schema drop (0 rows = stale
+        // version; the service returns false). The hierarchical cascade batch stays unversioned.
+        + " WHERE schema_id = #{schemaId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
+  }
+
   public String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME

@@ -118,6 +118,16 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   }
 
   @Override
+  public String softDeleteSchemaMetaBySchemaIdAndVersion(Long schemaId, Long currentVersion) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        // OCC: version-checked delete for the non-cascade single-schema drop.
+        + " WHERE schema_id = #{schemaId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
+  }
+
+  @Override
   public String softDeleteSchemaMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
