@@ -21,6 +21,7 @@ package org.apache.gravitino.lance;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 
 import java.lang.reflect.Constructor;
+import java.util.HashMap;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
@@ -65,7 +66,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
-    LanceConfig lanceConfig = new LanceConfig(properties);
+    LanceConfig lanceConfig = new LanceConfig(new HashMap<>(properties));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
 
     server = new LanceJettyServer();
@@ -74,7 +75,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     server.initialize(serverConfig, SERVICE_NAME, false);
 
-    this.lanceNamespace = loadNamespaceImpl(lanceConfig);
+    this.lanceNamespace = loadNamespaceImpl(lanceConfig, auxMode);
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JacksonFeature.class);
@@ -138,15 +139,15 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
   }
 
-  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig) {
+  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig, boolean auxMode) {
     String backendType = lanceConfig.get(NAMESPACE_BACKEND);
     LanceNamespaceBackend lanceNamespaceBackend = LanceNamespaceBackend.fromType(backendType);
 
     try {
       Constructor<? extends NamespaceWrapper> constructor =
-          lanceNamespaceBackend.getWrapperClass().getConstructor(LanceConfig.class);
+          lanceNamespaceBackend.getWrapperClass().getConstructor(LanceConfig.class, boolean.class);
 
-      return constructor.newInstance(lanceConfig);
+      return constructor.newInstance(lanceConfig, auxMode);
     } catch (Exception e) {
       LOG.error("Error loading namespace implementation for backend type: {}", backendType, e);
       throw new RuntimeException("Failed to load namespace implementation", e);

@@ -24,13 +24,19 @@ public abstract class NamespaceWrapper {
 
   public static final String NAMESPACE_DELIMITER_DEFAULT = "$";
   private final LanceConfig config;
+  private final boolean auxMode;
 
   private volatile boolean initialized = false;
   private LanceNamespaceOperations namespaceOps;
   private LanceTableOperations tableOps;
 
   public NamespaceWrapper(LanceConfig config) {
+    this(config, false);
+  }
+
+  public NamespaceWrapper(LanceConfig config, boolean auxMode) {
     this.config = config;
+    this.auxMode = auxMode;
   }
 
   protected abstract void initialize();
@@ -59,6 +65,15 @@ public abstract class NamespaceWrapper {
 
   public LanceConfig config() {
     return config;
+  }
+
+  /**
+   * Whether Lance REST runs as an auxiliary service embedded in the Gravitino server.
+   *
+   * @return {@code true} when running in auxiliary mode, {@code false} in standalone mode.
+   */
+  public boolean isAuxMode() {
+    return auxMode;
   }
 
   private void initAll() {
