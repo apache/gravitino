@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -601,11 +600,22 @@ public class CatalogConnectorMetadata {
           throw new TrinoException(
               GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists");
         }
+        if (hasNonTrinoRepresentation(existingView.representations())) {
+          // Trino cannot regenerate SQL for other engines' dialects, so replacing here would
+          // leave those representations referring to a schema/body that no longer matches.
+          throw new TrinoException(
+              GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+              "Cannot replace view "
+                  + view.getSchemaName()
+                  + "."
+                  + view.getName()
+                  + " because it has SQL representations in other dialects");
+        }
         viewCatalog.alterView(
             identifier,
             ViewChange.replaceView(
                 view.getRawColumns(),
-                mergeWithNonTrinoRepresentations(existingView.representations(), representations),
+                representations,
                 view.getDefaultCatalog(),
                 view.getDefaultSchema(),
                 view.getComment()));
@@ -711,28 +721,18 @@ public class CatalogConnectorMetadata {
   }
 
   /**
-   * Merges the Trino dialect representations into the non-Trino dialect representations of an
-   * existing view.
+   * Checks whether any of the given representations belongs to a dialect other than {@link
+   * Dialects#TRINO}.
    *
-   * <p>{@link ViewChange#replaceView} treats the supplied representations as a full replacement of
-   * the view body, so replacing a view from Trino without this merge would silently discard any
-   * representations created by other engines (e.g. Spark or Hive).
-   *
-   * @param existingRepresentations the representations currently stored on the view
-   * @param trinoRepresentations the new Trino dialect representations to apply
-   * @return the representations to pass to {@link ViewChange#replaceView}
+   * @param representations the representations to check
+   * @return true if a non-Trino dialect representation is present
    */
-  private static Representation[] mergeWithNonTrinoRepresentations(
-      Representation[] existingRepresentations, SQLRepresentation[] trinoRepresentations) {
-    List<Representation> merged = new ArrayList<>();
-    for (Representation representation : existingRepresentations) {
-      if (representation instanceof SQLRepresentation
-          && Dialects.TRINO.equalsIgnoreCase(((SQLRepresentation) representation).dialect())) {
-        continue;
-      }
-      merged.add(representation);
-    }
-    merged.addAll(Arrays.asList(trinoRepresentations));
-    return merged.toArray(new Representation[0]);
+  private static boolean hasNonTrinoRepresentation(Representation[] representations) {
+    return Arrays.stream(representations)
+        .anyMatch(
+            representation ->
+                representation instanceof SQLRepresentation
+                    && !Dialects.TRINO.equalsIgnoreCase(
+                        ((SQLRepresentation) representation).dialect()));
   }
 }

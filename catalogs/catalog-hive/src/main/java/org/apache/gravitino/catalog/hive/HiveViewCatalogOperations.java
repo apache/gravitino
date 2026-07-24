@@ -124,9 +124,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
       Map<String, String> params = Maps.newHashMap(safeProperties);
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
       if (Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())) {
-        params.put(HiveView.TRINO_VIEW_MARKER_KEY, "true");
+        params.put(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY, "true");
       } else {
-        params.remove(HiveView.TRINO_VIEW_MARKER_KEY);
+        params.remove(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY);
       }
       String viewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
 
@@ -227,9 +227,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
           updatedComment = replace.getComment();
           updatedViewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
           if (Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())) {
-            updatedProperties.put(HiveView.TRINO_VIEW_MARKER_KEY, "true");
+            updatedProperties.put(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY, "true");
           } else {
-            updatedProperties.remove(HiveView.TRINO_VIEW_MARKER_KEY);
+            updatedProperties.remove(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY);
           }
         } else {
           throw new IllegalArgumentException(
@@ -377,7 +377,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
     Map<String, String> params =
         Maps.newHashMap(properties != null ? properties : ImmutableMap.of());
     String representationSql = viewOriginalText;
-    String detectedDialect = HiveView.detectDialect(representationSql, params);
+    String detectedDialect = HiveView.detectDialect(params);
     switch (detectedDialect.toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
       case Dialects.TRINO:

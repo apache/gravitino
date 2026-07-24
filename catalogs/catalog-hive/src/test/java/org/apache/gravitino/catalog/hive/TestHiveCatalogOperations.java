@@ -234,8 +234,6 @@ class TestHiveCatalogOperations {
             });
     op.clientPool = clientPool;
 
-    // No presto_view marker is supplied here; createView must derive it automatically from the
-    // "trino" dialect on the supplied SQLRepresentation.
     View view =
         op.createView(
             NameIdentifier.of("db", "v_trino"),
@@ -253,11 +251,12 @@ class TestHiveCatalogOperations {
     SQLRepresentation rep = (SQLRepresentation) view.representations()[0];
     Assertions.assertEquals("trino", rep.dialect());
     Assertions.assertEquals("SELECT 1", rep.sql());
-    Assertions.assertEquals("true", hiveTableCaptor.getValue().properties().get("presto_view"));
+    Assertions.assertEquals(
+        "true", hiveTableCaptor.getValue().properties().get("gravitino.view.trino_dialect"));
   }
 
   @Test
-  void testCreateViewClearsStalePrestoViewMarkerForNonTrinoDialect() throws Exception {
+  void testCreateViewClearsStaleTrinoMarkerForNonTrinoDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
 
@@ -277,7 +276,7 @@ class TestHiveCatalogOperations {
     op.clientPool = clientPool;
 
     Map<String, String> propertiesWithStaleMarker = Maps.newHashMap();
-    propertiesWithStaleMarker.put("presto_view", "true");
+    propertiesWithStaleMarker.put("gravitino.view.trino_dialect", "true");
 
     op.createView(
         NameIdentifier.of("db", "v_hive"),
@@ -290,7 +289,8 @@ class TestHiveCatalogOperations {
         null,
         propertiesWithStaleMarker);
 
-    Assertions.assertNull(hiveTableCaptor.getValue().properties().get("presto_view"));
+    Assertions.assertNull(
+        hiveTableCaptor.getValue().properties().get("gravitino.view.trino_dialect"));
   }
 
   @Test
@@ -544,7 +544,7 @@ class TestHiveCatalogOperations {
                         ImmutableMap.of(
                             HiveConstants.TABLE_TYPE,
                             TableType.VIRTUAL_VIEW.name(),
-                            "presto_view",
+                            "gravitino.view.trino_dialect",
                             "true")))
                 .withViewOriginalText("SELECT 1")
                 .build());
@@ -561,6 +561,46 @@ class TestHiveCatalogOperations {
     SQLRepresentation representation = (SQLRepresentation) loaded.representations()[0];
     Assertions.assertEquals("trino", representation.dialect());
     Assertions.assertEquals("SELECT 1", representation.sql());
+  }
+
+  @Test
+  void testLoadViewTreatsNativeTrinoViewAsHiveDialect() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    // Native Presto/Trino views (created outside Gravitino) carry the "presto_view" HMS property
+    // and encode their body as a base64-wrapped comment, not plain SQL. Without the
+    // gravitino.view.trino_dialect marker, this must not be identified as (readable) Trino dialect.
+    when(hiveClient.getTable(anyString(), anyString(), anyString()))
+        .thenReturn(
+            HiveTable.builder()
+                .withName("v_native_trino")
+                .withCatalogName("hive")
+                .withDatabaseName("db")
+                .withColumns(new Column[0])
+                .withProperties(
+                    Maps.newHashMap(
+                        ImmutableMap.of(
+                            HiveConstants.TABLE_TYPE,
+                            TableType.VIRTUAL_VIEW.name(),
+                            "presto_view",
+                            "true")))
+                .withViewOriginalText("/* Presto View: base64encodedpayload */")
+                .build());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    View loaded = op.loadView(NameIdentifier.of("db", "v_native_trino"));
+
+    SQLRepresentation representation = (SQLRepresentation) loaded.representations()[0];
+    Assertions.assertEquals("hive", representation.dialect());
   }
 
   @Test
@@ -641,9 +681,6 @@ class TestHiveCatalogOperations {
 
     CachedClientPool clientPool = mock(CachedClientPool.class);
     HiveClient hiveClient = mock(HiveClient.class);
-    // alterView's ReplaceView branch derives the presto_view marker automatically from the new
-    // "trino" dialect representation, so it is (re-)set here even though the pre-existing table
-    // already carries it.
     HiveTable currentTable =
         HiveTable.builder()
             .withName("v_hive")
@@ -655,7 +692,7 @@ class TestHiveCatalogOperations {
                     ImmutableMap.of(
                         HiveConstants.TABLE_TYPE,
                         TableType.VIRTUAL_VIEW.name(),
-                        "presto_view",
+                        "gravitino.view.trino_dialect",
                         "true")))
             .withViewOriginalText("SELECT 1")
             .build();
@@ -692,7 +729,7 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testAlterViewReplaceClearsPrestoViewMarkerForNonTrinoDialect() throws Exception {
+  void testAlterViewReplaceClearsTrinoMarkerForNonTrinoDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
 
@@ -709,7 +746,7 @@ class TestHiveCatalogOperations {
                     ImmutableMap.of(
                         HiveConstants.TABLE_TYPE,
                         TableType.VIRTUAL_VIEW.name(),
-                        "presto_view",
+                        "gravitino.view.trino_dialect",
                         "true")))
             .withViewOriginalText("SELECT 1")
             .build();
@@ -738,7 +775,8 @@ class TestHiveCatalogOperations {
             null,
             null));
 
-    Assertions.assertNull(hiveTableCaptor.getValue().properties().get("presto_view"));
+    Assertions.assertNull(
+        hiveTableCaptor.getValue().properties().get("gravitino.view.trino_dialect"));
   }
 
   @Test

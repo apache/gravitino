@@ -33,7 +33,6 @@ import static org.mockito.Mockito.when;
 
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +54,6 @@ import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoView;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 public class TestCatalogConnectorMetadataView {
 
@@ -247,7 +245,7 @@ public class TestCatalogConnectorMetadataView {
   }
 
   @Test
-  public void testCreateViewReplacePreservesNonTrinoRepresentations() {
+  public void testCreateViewReplaceRejectsWhenOtherDialectRepresentationsPresent() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.viewExists(any())).thenReturn(true);
     View existingView = mock(View.class);
@@ -263,27 +261,11 @@ public class TestCatalogConnectorMetadataView {
 
     CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
     GravitinoView view = createGravitinoView("db", "v1", "select 2");
-    metadata.createView(view, true);
-
-    ArgumentCaptor<ViewChange.ReplaceView> captor =
-        ArgumentCaptor.forClass(ViewChange.ReplaceView.class);
-    verify(viewCatalog, times(1)).alterView(eq(NameIdentifier.of("db", "v1")), captor.capture());
-    Representation[] newRepresentations = captor.getValue().getRepresentations();
-    assertEquals(2, newRepresentations.length);
-    assertTrue(
-        Arrays.stream(newRepresentations)
-            .anyMatch(
-                r ->
-                    r instanceof SQLRepresentation
-                        && Dialects.HIVE.equalsIgnoreCase(((SQLRepresentation) r).dialect())
-                        && "select 1 from t".equals(((SQLRepresentation) r).sql())));
-    assertTrue(
-        Arrays.stream(newRepresentations)
-            .anyMatch(
-                r ->
-                    r instanceof SQLRepresentation
-                        && Dialects.TRINO.equalsIgnoreCase(((SQLRepresentation) r).dialect())
-                        && "select 2".equals(((SQLRepresentation) r).sql())));
+    TrinoException exception =
+        assertThrows(TrinoException.class, () -> metadata.createView(view, true));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
+    verify(viewCatalog, never()).alterView(any(), any(ViewChange.ReplaceView.class));
   }
 
   @Test
