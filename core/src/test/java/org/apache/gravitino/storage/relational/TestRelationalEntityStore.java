@@ -22,7 +22,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -30,7 +36,9 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.junit.jupiter.api.Assertions;
@@ -227,5 +235,62 @@ public class TestRelationalEntityStore {
             destToRemove,
             Entity.EntityType.TABLE,
             SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+  }
+
+  /**
+   * Verifies that {@link RelationalEntityStore#batchListEntitiesByRelation} does not hold a cache
+   * lock across the backend call: with the backend blocked mid-call, a concurrent {@code invalidate}
+   * on the same key must still complete.
+   */
+  @Test
+  void testBatchListDoesNotHoldCacheLockAcrossBackendCall()
+      throws IOException, IllegalAccessException, InterruptedException {
+    SupportsRelationOperations.Type relType =
+        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL;
+    Entity.EntityType identType = Entity.EntityType.TABLE;
+    NameIdentifier src = NameIdentifier.of("metalake", "catalog", "schema", "table1");
+
+    Config config = new Config(false) {};
+    CaffeineEntityCache realCache = new CaffeineEntityCache(config);
+    FieldUtils.writeField(store, "cache", realCache, true);
+
+    CountDownLatch backendEntered = new CountDownLatch(1);
+    CountDownLatch releaseBackend = new CountDownLatch(1);
+    Mockito.when(backend.batchListEntitiesByRelation(eq(relType), any(List.class), eq(identType)))
+        .thenAnswer(
+            invocation -> {
+              backendEntered.countDown();
+              // Hold the backend "DB" call open to simulate a slow round-trip.
+              releaseBackend.await(10, TimeUnit.SECONDS);
+              return new ArrayList<RelationalEntity<?>>();
+            });
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<List<RelationalEntity<?>>> listFuture =
+          executor.submit(
+              () -> store.batchListEntitiesByRelation(relType, List.of(src), identType));
+
+      // Wait until the list is blocked inside the backend call.
+      Assertions.assertTrue(
+          backendEntered.await(5, TimeUnit.SECONDS), "backend call should have been entered");
+
+      // A concurrent cache mutation on the same key must not be blocked by the in-flight list.
+      Future<Boolean> invalidateFuture =
+          executor.submit(
+              () -> {
+                realCache.invalidate(src, identType, relType);
+                return Boolean.TRUE;
+              });
+      Assertions.assertDoesNotThrow(
+          () -> invalidateFuture.get(5, TimeUnit.SECONDS),
+          "concurrent cache invalidate must not block on the in-flight batch list");
+
+      releaseBackend.countDown();
+      Assertions.assertDoesNotThrow(() -> listFuture.get(5, TimeUnit.SECONDS));
+    } finally {
+      releaseBackend.countDown();
+      executor.shutdownNow();
+    }
   }
 }
