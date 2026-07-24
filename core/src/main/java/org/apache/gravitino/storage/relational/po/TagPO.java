@@ -30,6 +30,9 @@ public class TagPO {
   private Long metalakeId;
   private String comment;
   private String properties;
+  private String allowedValues;
+  private String assignmentValue;
+  private Integer valueOrder;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -53,6 +56,9 @@ public class TagPO {
         && Objects.equal(metalakeId, tagPO.metalakeId)
         && Objects.equal(comment, tagPO.comment)
         && Objects.equal(properties, tagPO.properties)
+        && Objects.equal(allowedValues, tagPO.allowedValues)
+        && Objects.equal(assignmentValue, tagPO.assignmentValue)
+        && Objects.equal(valueOrder, tagPO.valueOrder)
         && Objects.equal(auditInfo, tagPO.auditInfo)
         && Objects.equal(currentVersion, tagPO.currentVersion)
         && Objects.equal(lastVersion, tagPO.lastVersion)
@@ -67,6 +73,9 @@ public class TagPO {
         metalakeId,
         comment,
         properties,
+        allowedValues,
+        assignmentValue,
+        valueOrder,
         auditInfo,
         currentVersion,
         lastVersion,
@@ -102,6 +111,21 @@ public class TagPO {
 
     public Builder withProperties(String properties) {
       tagPO.properties = properties;
+      return this;
+    }
+
+    public Builder withAllowedValues(String allowedValues) {
+      tagPO.allowedValues = allowedValues;
+      return this;
+    }
+
+    public Builder withAssignmentValue(String assignmentValue) {
+      tagPO.assignmentValue = assignmentValue;
+      return this;
+    }
+
+    public Builder withValueOrder(Integer valueOrder) {
+      tagPO.valueOrder = valueOrder;
       return this;
     }
 

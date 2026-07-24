@@ -30,6 +30,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
+import org.apache.gravitino.tag.TagValuePair;
 
 /**
  * Metadata object authorization for {@link
@@ -75,25 +76,25 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
 
   /**
    * Performs batch authorization for a given field (e.g., "tagsToAdd" or "tagsToRemove") containing
-   * an array of tag names.
+   * an array of tag-value pairs.
    *
-   * @param tagNames tagNames
+   * @param tagPairs tag-value pairs
    * @param context The shared authorization request context.
    * @param targetType The entity type being authorized (expected to be TAG).
    * @return {@code true} if all tags in the field pass authorization; {@code false} otherwise.
    */
   private boolean authorizeTag(
-      String[] tagNames, AuthorizationRequestContext context, Entity.EntityType targetType) {
+      TagValuePair[] tagPairs, AuthorizationRequestContext context, Entity.EntityType targetType) {
 
     // Treat null or empty arrays as no-op (implicitly authorized)
-    if (tagNames == null) {
+    if (tagPairs == null) {
       return true;
     }
 
-    for (String tagName : tagNames) {
+    for (TagValuePair tagPair : tagPairs) {
       // Use a fresh context copy for each tag to avoid cross-contamination
       Map<Entity.EntityType, NameIdentifier> currentContext = new HashMap<>(this.metadataContext);
-      buildNameIdentifierForBatchAuthorization(currentContext, tagName, targetType);
+      buildNameIdentifierForBatchAuthorization(currentContext, tagPair.name(), targetType);
 
       boolean authorized =
           authorizationExpressionEvaluator.evaluate(

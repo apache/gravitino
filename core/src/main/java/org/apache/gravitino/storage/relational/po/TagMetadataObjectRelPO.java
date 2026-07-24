@@ -28,6 +28,8 @@ public class TagMetadataObjectRelPO {
   private Long tagId;
   private Long metadataObjectId;
   private String metadataObjectType;
+  private String tagValue;
+  private Integer valueOrder;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -49,6 +51,8 @@ public class TagMetadataObjectRelPO {
     return Objects.equal(tagId, tagRelPO.tagId)
         && Objects.equal(metadataObjectId, tagRelPO.metadataObjectId)
         && Objects.equal(metadataObjectType, tagRelPO.metadataObjectType)
+        && Objects.equal(tagValue, tagRelPO.tagValue)
+        && Objects.equal(valueOrder, tagRelPO.valueOrder)
         && Objects.equal(auditInfo, tagRelPO.auditInfo)
         && Objects.equal(currentVersion, tagRelPO.currentVersion)
         && Objects.equal(lastVersion, tagRelPO.lastVersion)
@@ -61,6 +65,8 @@ public class TagMetadataObjectRelPO {
         tagId,
         metadataObjectId,
         metadataObjectType,
+        tagValue,
+        valueOrder,
         auditInfo,
         currentVersion,
         lastVersion,
@@ -86,6 +92,16 @@ public class TagMetadataObjectRelPO {
 
     public Builder withMetadataObjectType(String metadataObjectType) {
       tagRelPO.metadataObjectType = metadataObjectType;
+      return this;
+    }
+
+    public Builder withTagValue(String tagValue) {
+      tagRelPO.tagValue = tagValue;
+      return this;
+    }
+
+    public Builder withValueOrder(Integer valueOrder) {
+      tagRelPO.valueOrder = valueOrder;
       return this;
     }
 
@@ -116,6 +132,7 @@ public class TagMetadataObjectRelPO {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(tagRelPO.metadataObjectType),
           "Metadata object type should not be empty");
+      Preconditions.checkArgument(tagRelPO.valueOrder != null, "Value order is required");
       Preconditions.checkArgument(tagRelPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(tagRelPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(tagRelPO.lastVersion != null, "Last version is required");

@@ -27,9 +27,11 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -105,6 +107,16 @@ public class TagManager implements TagDispatcher {
 
   public Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
       throws TagAlreadyExistsException {
+    return createTag(metalake, name, comment, properties, null);
+  }
+
+  public Tag createTag(
+      String metalake,
+      String name,
+      String comment,
+      Map<String, String> properties,
+      String[] allowedValues)
+      throws TagAlreadyExistsException {
     Map<String, String> tagProperties = properties == null ? Collections.emptyMap() : properties;
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
@@ -119,6 +131,7 @@ public class TagManager implements TagDispatcher {
                   .withNamespace(NamespaceUtil.ofTag(metalake))
                   .withComment(comment)
                   .withProperties(tagProperties)
+                  .withAllowedValues(allowedValues)
                   .withAuditInfo(
                       AuditInfo.builder()
                           .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -208,6 +221,12 @@ public class TagManager implements TagDispatcher {
 
   public MetadataObject[] listMetadataObjectsForTag(String metalake, String name)
       throws NoSuchTagException {
+    return listMetadataObjectsForTag(metalake, name, null);
+  }
+
+  @Override
+  public MetadataObject[] listMetadataObjectsForTag(
+      String metalake, String name, @Nullable String value) throws NoSuchTagException {
     NameIdentifier tagId = NameIdentifierUtil.ofTag(metalake, name);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
@@ -221,12 +240,7 @@ public class TagManager implements TagDispatcher {
             }
 
             List<GenericEntity> entities =
-                entityStore
-                    .relationOperations()
-                    .listEntitiesByRelation(
-                        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                        tagId,
-                        Entity.EntityType.TAG);
+                entityStore.relationOperations().listMetadataObjectsForTag(tagId, value);
             return MetadataObjectService.fromGenericEntities(entities)
                 .toArray(new MetadataObject[0]);
           } catch (IOException e) {
@@ -313,6 +327,17 @@ public class TagManager implements TagDispatcher {
   public String[] associateTagsForMetadataObject(
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
+    return associateTagsForMetadataObject(
+        metalake, metadataObject, toValuelessPairs(tagsToAdd), toValuelessPairs(tagsToRemove));
+  }
+
+  @Override
+  public String[] associateTagsForMetadataObject(
+      String metalake,
+      MetadataObject metadataObject,
+      TagValuePair[] tagsToAdd,
+      TagValuePair[] tagsToRemove)
+      throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     Preconditions.checkArgument(
         SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type()),
         "Cannot associate tags for unsupported metadata object type %s",
@@ -323,22 +348,18 @@ public class TagManager implements TagDispatcher {
 
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
-    // Remove all the tags that are both set to add and remove
-    Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);
-    Set<String> tagsToRemoveSet =
-        tagsToRemove == null ? Sets.newHashSet() : Sets.newHashSet(tagsToRemove);
-    Set<String> common = Sets.intersection(tagsToAddSet, tagsToRemoveSet).immutableCopy();
+    Set<TagValuePair> tagsToAddSet =
+        tagsToAdd == null ? new LinkedHashSet<>() : new LinkedHashSet<>(Arrays.asList(tagsToAdd));
+    Set<TagValuePair> tagsToRemoveSet =
+        tagsToRemove == null
+            ? new LinkedHashSet<>()
+            : new LinkedHashSet<>(Arrays.asList(tagsToRemove));
+    Set<TagValuePair> common = Sets.intersection(tagsToAddSet, tagsToRemoveSet).immutableCopy();
     tagsToAddSet.removeAll(common);
     tagsToRemoveSet.removeAll(common);
 
-    NameIdentifier[] tagsToAddIdent =
-        tagsToAddSet.stream()
-            .map(tag -> NameIdentifierUtil.ofTag(metalake, tag))
-            .toArray(NameIdentifier[]::new);
-    NameIdentifier[] tagsToRemoveIdent =
-        tagsToRemoveSet.stream()
-            .map(tag -> NameIdentifierUtil.ofTag(metalake, tag))
-            .toArray(NameIdentifier[]::new);
+    TagValuePair[] tagPairsToAdd = tagsToAddSet.toArray(new TagValuePair[0]);
+    TagValuePair[] tagPairsToRemove = tagsToRemoveSet.toArray(new TagValuePair[0]);
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
@@ -352,14 +373,10 @@ public class TagManager implements TagDispatcher {
                     List<TagEntity> tags =
                         entityStore
                             .relationOperations()
-                            .updateEntityRelations(
-                                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                                entityIdent,
-                                entityType,
-                                tagsToAddIdent,
-                                tagsToRemoveIdent);
+                            .updateTagRelations(
+                                entityIdent, entityType, tagPairsToAdd, tagPairsToRemove);
 
-                    return tags.stream().map(Tag::name).toArray(String[]::new);
+                    return tags.stream().map(Tag::name).distinct().toArray(String[]::new);
                   } catch (NoSuchEntityException e) {
                     throw new NoSuchMetadataObjectException(
                         e,
@@ -368,7 +385,7 @@ public class TagManager implements TagDispatcher {
                   } catch (EntityAlreadyExistsException e) {
                     throw new TagAlreadyAssociatedException(
                         e,
-                        "Failed to associate tags for metadata object due to some tags %s already "
+                        "Failed to associate tags for metadata object due to some tag-value pairs %s already "
                             + "associated to the metadata object %s",
                         Arrays.toString(tagsToAdd),
                         metadataObject);
@@ -377,6 +394,14 @@ public class TagManager implements TagDispatcher {
                     throw new RuntimeException(e);
                   }
                 }));
+  }
+
+  private static TagValuePair[] toValuelessPairs(String[] tags) {
+    if (tags == null) {
+      return null;
+    }
+
+    return Arrays.stream(tags).map(TagValuePair::valueless).toArray(TagValuePair[]::new);
   }
 
   private TagEntity updateTagEntity(TagEntity tagEntity, TagChange... changes) {
@@ -409,6 +434,7 @@ public class TagManager implements TagDispatcher {
         .withNamespace(tagEntity.namespace())
         .withComment(newComment)
         .withProperties(props)
+        .withAllowedValues(tagEntity.allowedValues().orElse(null))
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(tagEntity.auditInfo().creator())

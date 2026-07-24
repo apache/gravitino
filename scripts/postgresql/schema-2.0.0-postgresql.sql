@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS metalake_meta (
     metalake_name VARCHAR(128) NOT NULL,
     metalake_comment VARCHAR(256) DEFAULT '',
     properties TEXT DEFAULT NULL,
+    allowed_values TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     schema_version TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
@@ -515,6 +516,7 @@ COMMENT ON COLUMN tag_meta.tag_name IS 'tag name';
 COMMENT ON COLUMN tag_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN tag_meta.tag_comment IS 'tag comment';
 COMMENT ON COLUMN tag_meta.properties IS 'tag properties';
+COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values';
 COMMENT ON COLUMN tag_meta.audit_info IS 'tag audit info';
 
 
@@ -523,6 +525,8 @@ CREATE TABLE IF NOT EXISTS tag_relation_meta (
     tag_id BIGINT NOT NULL,
     metadata_object_id BIGINT NOT NULL,
     metadata_object_type VARCHAR(64) NOT NULL,
+    tag_value VARCHAR(256) DEFAULT NULL,
+    value_order INT NOT NULL DEFAULT 0,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
@@ -533,11 +537,14 @@ CREATE TABLE IF NOT EXISTS tag_relation_meta (
 
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id ON tag_relation_meta (tag_id);
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_metadata_object_id ON tag_relation_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id_value ON tag_relation_meta (tag_id, tag_value);
 COMMENT ON TABLE tag_relation_meta IS 'tag metadata object relation';
 COMMENT ON COLUMN tag_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN tag_relation_meta.tag_id IS 'tag id';
 COMMENT ON COLUMN tag_relation_meta.metadata_object_id IS 'metadata object id';
 COMMENT ON COLUMN tag_relation_meta.metadata_object_type IS 'metadata object type';
+COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag relation value';
+COMMENT ON COLUMN tag_relation_meta.value_order IS 'tag relation value order';
 COMMENT ON COLUMN tag_relation_meta.audit_info IS 'tag relation audit info';
 COMMENT ON COLUMN tag_relation_meta.current_version IS 'tag relation current version';
 COMMENT ON COLUMN tag_relation_meta.last_version IS 'tag relation last version';
