@@ -1,0 +1,50 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+CREATE VIEW
+
+"t01"
+"v01"
+
+"2","bob"
+
+"CREATE VIEW gt_hive.gt_hive_view_db.v01 SECURITY INVOKER AS
+SELECT
+  id
+, name
+FROM
+  gt_hive.gt_hive_view_db.t01
+WHERE (salary > 100)"
+
+CREATE VIEW
+
+"1","alice","100"
+"2","bob","200"
+
+RENAME VIEW
+
+"t01"
+"v02"
+
+DROP VIEW
+
+"t01"
+
+<QUERY_FAILED> View 'gt_hive.gt_hive_view_db.nonexistent_view' does not exist
+
+<QUERY_FAILED> Table already exists: 'gt_hive.gt_hive_view_db.t01'
+
+CREATE VIEW
+
+"t01"
+
+<QUERY_FAILED> Table 'gt_hive.gt_hive_view_db.native_v01' does not exist
+
+DROP VIEW
+
+DROP TABLE
+
+DROP SCHEMA

@@ -40,9 +40,15 @@ import org.apache.gravitino.rel.View;
 
 /**
  * Represents a view stored in Hive Metastore (VIRTUAL_VIEW table type). The SQL dialect is detected
- * from table properties: Trino views start with "/* Presto View:", Spark views carry {@code
- * spark.sql.create.version}, Flink views carry properties prefixed with {@code flink.}, and all
- * other views are treated as native Hive SQL views.
+ * from table properties: Trino views (written by this catalog) carry {@code
+ * gravitino.view.trino_dialect}, Spark views carry {@code spark.sql.create.version}, Flink views
+ * carry properties prefixed with {@code flink.}, and all other views are treated as native Hive SQL
+ * views.
+ *
+ * <p>Native Presto/Trino views created outside Gravitino use the {@code presto_view} HMS property
+ * and encode their body as a base64-wrapped comment rather than plain SQL text; since decoding that
+ * native format requires Trino's own serialization logic, this catalog does not attempt to read it
+ * and such views are treated as Hive dialect (i.e. not exposed as Trino-readable SQL).
  */
 @Unstable
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -54,8 +60,7 @@ public class HiveView implements View {
 
   static final String SPARK_VERSION_KEY = "spark.sql.create.version";
   static final String FLINK_PROPERTY_PREFIX = "flink.";
-  private static final String TRINO_VIEW_MARKER_KEY = "presto_view";
-  private static final String TRINO_VIEW_PREFIX = "/* Presto View:";
+  static final String GRAVITINO_TRINO_VIEW_MARKER_KEY = "gravitino.view.trino_dialect";
 
   private String name;
   private String comment;
@@ -109,17 +114,14 @@ public class HiveView implements View {
   }
 
   /**
-   * Detects the SQL dialect from HMS table properties and view text.
+   * Detects the SQL dialect from HMS table properties.
    *
-   * @param viewOriginalText The original view text from HMS.
    * @param parameters The HMS table parameters map.
    * @return The detected dialect string: "trino", "spark", "flink", or "hive".
    */
-  static String detectDialect(String viewOriginalText, Map<String, String> parameters) {
-    if (parameters != null && "true".equalsIgnoreCase(parameters.get(TRINO_VIEW_MARKER_KEY))) {
-      return Dialects.TRINO;
-    }
-    if (StringUtils.startsWith(viewOriginalText, TRINO_VIEW_PREFIX)) {
+  static String detectDialect(Map<String, String> parameters) {
+    if (parameters != null
+        && "true".equalsIgnoreCase(parameters.get(GRAVITINO_TRINO_VIEW_MARKER_KEY))) {
       return Dialects.TRINO;
     }
     if (parameters != null && parameters.containsKey(SPARK_VERSION_KEY)) {
