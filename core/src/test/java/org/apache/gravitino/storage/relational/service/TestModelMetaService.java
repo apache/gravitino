@@ -28,8 +28,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -44,6 +48,7 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 public class TestModelMetaService extends TestJDBCBackend {
 
@@ -54,6 +59,49 @@ public class TestModelMetaService extends TestJDBCBackend {
   private static final String SCHEMA_NAME = "schema_for_model_meta_test";
 
   private static final Namespace MODEL_NS = Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+
+  @TestTemplate
+  public void testUpdateModelWithCacheDisabled() throws IOException, IllegalAccessException {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(false);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
+
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "cache_disabled_model",
+            "comment",
+            0,
+            ImmutableMap.of(),
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+
+    ModelMetaService.getInstance()
+        .updateModel(
+            model.nameIdentifier(),
+            entity -> {
+              ModelEntity oldModel = (ModelEntity) entity;
+              return ModelEntity.builder()
+                  .withId(oldModel.id())
+                  .withName(oldModel.name())
+                  .withNamespace(oldModel.namespace())
+                  .withComment("updated comment")
+                  .withLatestVersion(oldModel.latestVersion())
+                  .withProperties(oldModel.properties())
+                  .withAuditInfo(oldModel.auditInfo())
+                  .build();
+            });
+
+    ModelPO updatedModel =
+        ModelMetaService.getInstance().getModelPOByIdentifier(model.nameIdentifier());
+    Assertions.assertEquals(2L, updatedModel.getCurrentVersion());
+    Assertions.assertEquals(2L, updatedModel.getLastVersion());
+  }
 
   @TestTemplate
   public void testModelUpdateAndVersionAddRaiseCurrentVersion() throws IOException {

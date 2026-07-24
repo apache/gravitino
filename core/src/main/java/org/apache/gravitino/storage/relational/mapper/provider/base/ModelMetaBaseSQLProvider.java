@@ -85,6 +85,8 @@ public class ModelMetaBaseSQLProvider {
             mo.model_comment AS modelComment,
             mo.model_properties AS modelProperties,
             mo.model_latest_version AS modelLatestVersion,
+            mo.current_version AS currentVersion,
+            mo.last_version AS lastVersion,
             mo.audit_info AS auditInfo,
             mo.deleted_at AS deletedAt
         FROM
@@ -156,6 +158,8 @@ public class ModelMetaBaseSQLProvider {
             mo.model_comment AS modelComment,
             mo.model_properties AS modelProperties,
             mo.model_latest_version AS modelLatestVersion,
+            mo.current_version AS currentVersion,
+            mo.last_version AS lastVersion,
             mo.audit_info AS auditInfo,
             mo.deleted_at AS deletedAt
         FROM
@@ -289,7 +293,9 @@ public class ModelMetaBaseSQLProvider {
         + "SELECT mm.model_id as modelId, mm.model_name as modelName,"
         + " mm.metalake_id as metalakeId, mm.catalog_id as catalogId, mm.schema_id as schemaId,"
         + " mm.model_comment as modelComment, mm.model_properties as modelProperties,"
-        + " mm.model_latest_version as modelLatestVersion, mm.audit_info as auditInfo,"
+        + " mm.model_latest_version as modelLatestVersion,"
+        + " mm.current_version as currentVersion, mm.last_version as lastVersion,"
+        + " mm.audit_info as auditInfo,"
         + " mm.deleted_at as deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
