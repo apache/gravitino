@@ -148,6 +148,15 @@ public class FullName {
   }
 
   /**
+   * Retrieves the function name from the third part of the full name option.
+   *
+   * @return The function name, or null if not found.
+   */
+  public String getFunctionName() {
+    return getNamePart(2);
+  }
+
+  /**
    * Retrieves the column name from the fourth part of the full name option.
    *
    * @return The column name, or null if not found.
