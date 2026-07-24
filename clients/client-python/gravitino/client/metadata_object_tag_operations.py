@@ -36,9 +36,8 @@ from gravitino.utils.string_utils import StringUtils
 
 class MetadataObjectTagOperations(SupportsTags):
     """
-    The implementation of SupportsTags. This helper is composed into metadata objects,
-    including catalog, schema, table, column, fileset, and topic, to provide tag
-    operations for these objects.
+    The implementation of SupportsTags. This helper is composed into supported metadata
+    objects to provide tag operations.
     """
 
     TAG_REQUEST_PATH = "api/metalakes/{}/objects/{}/{}/tags"

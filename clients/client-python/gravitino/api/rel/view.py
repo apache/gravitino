@@ -22,6 +22,8 @@ from gravitino.api.auditable import Auditable
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.representation import Representation
 from gravitino.api.rel.sql_representation import SQLRepresentation
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class View(Auditable):
@@ -66,3 +68,14 @@ class View(Auditable):
     def properties(self) -> dict[str, str]:
         """Returns the view properties."""
         return {}
+
+    def supports_tags(self) -> SupportsTags:
+        """Return tag operations if the view supports tags.
+
+        Raises:
+            UnsupportedOperationException: If the view does not support tag operations.
+
+        Returns:
+            SupportsTags: The tag operations supported by the view.
+        """
+        raise UnsupportedOperationException("View does not support tag operations.")
