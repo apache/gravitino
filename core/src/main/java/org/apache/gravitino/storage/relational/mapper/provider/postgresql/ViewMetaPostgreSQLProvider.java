@@ -94,11 +94,14 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteViewMetasByViewId(@Param("viewId") Long viewId) {
+  public String softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE view_id = #{viewId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE view_id = #{viewId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

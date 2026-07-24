@@ -154,7 +154,8 @@ public class ModelMetaService {
                 SessionUtils.getWithoutCommit(
                     ModelMetaMapper.class,
                     mapper ->
-                        mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name()))),
+                        mapper.softDeleteModelMetaBySchemaIdAndModelName(
+                            schemaId, ident.name(), modelPO.getCurrentVersion()))),
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,

@@ -149,7 +149,9 @@ public class FunctionMetaService {
             functionDeletedCount.set(
                 SessionUtils.getWithoutCommit(
                     FunctionMetaMapper.class,
-                    mapper -> mapper.softDeleteFunctionMetaByFunctionId(functionId))),
+                    mapper ->
+                        mapper.softDeleteFunctionMetaByFunctionId(
+                            functionId, functionPO.functionCurrentVersion()))),
 
         // delete function versions, owner rels, and securable object rels after meta deletion
         () -> {

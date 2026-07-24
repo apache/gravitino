@@ -101,11 +101,16 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
   }
 
   @Override
-  public String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
+  public String softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId,
+      @Param("functionCurrentVersion") Integer functionCurrentVersion) {
     return "UPDATE "
         + FunctionMetaMapper.TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE function_id = #{functionId} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE function_id = #{functionId}"
+        + " AND function_current_version = #{functionCurrentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

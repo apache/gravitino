@@ -207,12 +207,16 @@ public class ModelMetaBaseSQLProvider {
   }
 
   public String softDeleteModelMetaBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName,
+      @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
+        // OCC: version-checked delete (0 rows = stale version; the service returns false).
+        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteModelMetasByCatalogId(@Param("catalogId") Long catalogId) {

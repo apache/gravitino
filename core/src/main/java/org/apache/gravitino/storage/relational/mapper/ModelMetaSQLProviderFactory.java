@@ -98,8 +98,11 @@ public class ModelMetaSQLProviderFactory {
   }
 
   public static String softDeleteModelMetaBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
-    return getProvider().softDeleteModelMetaBySchemaIdAndModelName(schemaId, modelName);
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName,
+      @Param("currentVersion") Long currentVersion) {
+    return getProvider()
+        .softDeleteModelMetaBySchemaIdAndModelName(schemaId, modelName, currentVersion);
   }
 
   public static String softDeleteModelMetasByCatalogId(@Param("catalogId") Long catalogId) {

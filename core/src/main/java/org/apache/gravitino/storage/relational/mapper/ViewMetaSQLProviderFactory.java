@@ -98,8 +98,9 @@ public class ViewMetaSQLProviderFactory {
     return getProvider().updateViewMeta(newViewPO, oldViewPO);
   }
 
-  public static String softDeleteViewMetasByViewId(@Param("viewId") Long viewId) {
-    return getProvider().softDeleteViewMetasByViewId(viewId);
+  public static String softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteViewMetasByViewId(viewId, currentVersion);
   }
 
   public static String softDeleteViewMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

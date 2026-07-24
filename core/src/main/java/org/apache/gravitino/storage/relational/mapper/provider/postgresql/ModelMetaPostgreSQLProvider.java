@@ -50,11 +50,15 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
 
   @Override
   public String softDeleteModelMetaBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName,
+      @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
+        // OCC: version-checked delete (see the base provider for rationale).
+        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override

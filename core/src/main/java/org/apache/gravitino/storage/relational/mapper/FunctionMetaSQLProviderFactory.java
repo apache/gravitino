@@ -95,8 +95,10 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().selectFunctionIdBySchemaIdAndFunctionName(schemaId, functionName);
   }
 
-  public static String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
-    return getProvider().softDeleteFunctionMetaByFunctionId(functionId);
+  public static String softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId,
+      @Param("functionCurrentVersion") Integer functionCurrentVersion) {
+    return getProvider().softDeleteFunctionMetaByFunctionId(functionId, functionCurrentVersion);
   }
 
   public static String softDeleteFunctionMetasByCatalogId(@Param("catalogId") Long catalogId) {

@@ -128,7 +128,8 @@ public interface ViewMetaMapper {
       @Param("newViewMeta") ViewPO newViewPO, @Param("oldViewMeta") ViewPO oldViewPO);
 
   @UpdateProvider(type = ViewMetaSQLProviderFactory.class, method = "softDeleteViewMetasByViewId")
-  Integer softDeleteViewMetasByViewId(@Param("viewId") Long viewId);
+  Integer softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = ViewMetaSQLProviderFactory.class,
