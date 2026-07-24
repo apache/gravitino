@@ -55,6 +55,25 @@ public interface Tag extends Auditable {
   Map<String, String> properties();
 
   /**
+   * @return The assignment value constraint of the tag.
+   */
+  default TagValueConstraint valueConstraint() {
+    return TagValueConstraint.anyValue();
+  }
+
+  /**
+   * Returns the tag assignment in the current metadata-object context.
+   *
+   * <p>The return value is present only when the tag is returned for a metadata object. A present
+   * assignment without values means the tag is directly or effectively assigned without values.
+   *
+   * @return The assignment in context, or empty when no assignment context exists.
+   */
+  default Optional<TagAssignment> assignment() {
+    return Optional.empty();
+  }
+
+  /**
    * Check if the tag is inherited from a parent object or not. If the tag is inherited, it will
    * return true, if it is owned by the object itself, it will return false.
    *
@@ -88,5 +107,15 @@ public interface Tag extends Auditable {
      * @return The list of objects that are associated with this tag.
      */
     MetadataObject[] objects();
+
+    /**
+     * List objects associated with this tag and assignment value.
+     *
+     * @param value The exact assignment value to filter by.
+     * @return The list of objects that are associated with this tag and value.
+     */
+    default MetadataObject[] objects(String value) {
+      throw new UnsupportedOperationException("The objects(value) method is not supported.");
+    }
   }
 }
