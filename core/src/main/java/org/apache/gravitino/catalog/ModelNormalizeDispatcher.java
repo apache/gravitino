@@ -174,14 +174,19 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    return withCapability(NameIdentifier.of(namespace.levels()), catalogManager, cap -> applyCaseSensitive(namespace, Capability.Scope.MODEL, cap));
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        cap -> applyCaseSensitive(namespace, Capability.Scope.MODEL, cap));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier ident) {
-    return withCapability(ident, catalogManager, cap -> applyCaseSensitive(ident, Capability.Scope.MODEL, cap));
+    return withCapability(
+        ident, catalogManager, cap -> applyCaseSensitive(ident, Capability.Scope.MODEL, cap));
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
-    return withCapability(ident, catalogManager, cap -> applyCapabilities(ident, Capability.Scope.MODEL, capability));
+    return withCapability(
+        ident, catalogManager, cap -> applyCapabilities(ident, Capability.Scope.MODEL, cap));
   }
 }

@@ -95,14 +95,23 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    return withCapability(NameIdentifier.of(namespace.levels()), catalogManager, cap -> applyCaseSensitive(namespace, Capability.Scope.FUNCTION, cap));
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        cap -> applyCaseSensitive(namespace, Capability.Scope.FUNCTION, cap));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier functionIdent) {
-    return withCapability(functionIdent, catalogManager, cap -> applyCaseSensitive(functionIdent, Capability.Scope.FUNCTION, cap));
+    return withCapability(
+        functionIdent,
+        catalogManager,
+        cap -> applyCaseSensitive(functionIdent, Capability.Scope.FUNCTION, cap));
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier functionIdent) {
-    return withCapability(functionIdent, catalogManager, cap -> applyCapabilities(functionIdent, Capability.Scope.FUNCTION, capability));
+    return withCapability(
+        functionIdent,
+        catalogManager,
+        cap -> applyCapabilities(functionIdent, Capability.Scope.FUNCTION, cap));
   }
 }

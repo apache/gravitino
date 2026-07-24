@@ -97,14 +97,23 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   }
 
   private boolean supportsHierarchicalSchema(Namespace namespace) {
-    return withCapability(NameIdentifier.of(namespace.levels()), catalogManager, cap -> cap.supportsHierarchicalSchema().supported());
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        cap -> cap.supportsHierarchicalSchema().supported());
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {
-    return withCapability(schemaIdent, catalogManager, cap -> applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, cap));
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        cap -> applyCapabilities(schemaIdent, Capability.Scope.SCHEMA, cap));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier schemaIdent) {
-    return withCapability(schemaIdent, catalogManager, cap -> applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, cap));
+    return withCapability(
+        schemaIdent,
+        catalogManager,
+        cap -> applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, cap));
   }
 }

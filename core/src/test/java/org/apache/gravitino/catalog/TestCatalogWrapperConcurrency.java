@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -42,11 +43,28 @@ import org.mockito.Mockito;
  */
 public class TestCatalogWrapperConcurrency {
 
-  /**
-   * close() must block until a concurrent doWithCapabilityOps() call finishes (both methods are
-   * synchronized on the same monitor), and subsequent doWithCapabilityOps() calls after close()
-   * must throw IllegalStateException.
-   */
+  private static final Field CATALOG_FIELD;
+
+  static {
+    try {
+      CATALOG_FIELD = CatalogManager.CatalogWrapper.class.getDeclaredField("catalog");
+      CATALOG_FIELD.setAccessible(true);
+    } catch (NoSuchFieldException e) {
+      throw new ExceptionInInitializerError(e);
+    }
+  }
+
+  private static CatalogManager.CatalogWrapper createWrapper(
+      BaseCatalog catalog, IsolatedClassLoader classLoader) {
+    CatalogManager.CatalogWrapper wrapper = new CatalogManager.CatalogWrapper(classLoader);
+    try {
+      CATALOG_FIELD.set(wrapper, catalog);
+    } catch (IllegalAccessException e) {
+      throw new RuntimeException(e);
+    }
+    return wrapper;
+  }
+
   @Test
   public void testCloseBlocksUntilInFlightCapabilityOpsComplete() throws Exception {
     BaseCatalog mockCatalog = Mockito.mock(BaseCatalog.class);
@@ -59,7 +77,7 @@ public class TestCatalogWrapperConcurrency {
                 ((ThrowableFunction<ClassLoader, ?>) inv.getArgument(0))
                     .apply(Thread.currentThread().getContextClassLoader()));
 
-    CatalogManager.CatalogWrapper wrapper = new CatalogManager.CatalogWrapper(mockCatalog, mockCl);
+    CatalogManager.CatalogWrapper wrapper = createWrapper(mockCatalog, mockCl);
 
     CountDownLatch opStarted = new CountDownLatch(1);
     CountDownLatch permitClose = new CountDownLatch(1);
@@ -67,7 +85,6 @@ public class TestCatalogWrapperConcurrency {
 
     ExecutorService exec = Executors.newFixedThreadPool(2);
     try {
-      // One in-flight capability op that holds the synchronized lock while waiting.
       Callable<Void> op =
           () -> {
             wrapper.doWithCapabilityOps(
@@ -82,10 +99,8 @@ public class TestCatalogWrapperConcurrency {
 
       Future<Void> f1 = exec.submit(op);
 
-      // Wait for the op to acquire the synchronized lock.
       Assertions.assertTrue(opStarted.await(5, TimeUnit.SECONDS));
 
-      // Start close() on a separate thread; it must block waiting for the op to release the lock.
       Future<Void> closeFuture =
           exec.submit(
               () -> {
@@ -93,7 +108,6 @@ public class TestCatalogWrapperConcurrency {
                 return null;
               });
 
-      // Spin-wait (bounded) for close() to attempt acquiring the lock, then verify it is blocked.
       long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(200);
       while (!closeFuture.isDone() && System.nanoTime() < deadline) {
         Thread.yield();
@@ -101,29 +115,22 @@ public class TestCatalogWrapperConcurrency {
       Assertions.assertFalse(
           closeFuture.isDone(), "close() must not complete while op holds the lock");
 
-      // Release the in-flight op.
       permitClose.countDown();
       f1.get(5, TimeUnit.SECONDS);
 
-      // Now close() should complete.
       closeFuture.get(5, TimeUnit.SECONDS);
       Assertions.assertTrue(closeFuture.isDone());
 
-      // The op finished before close() completed.
       Assertions.assertEquals(1, opCompleted.get());
 
-      // Subsequent capability ops must be rejected.
       Assertions.assertThrows(
-          IllegalStateException.class, () -> wrapper.doWithCapabilityOps(cap -> null));
+          CatalogManager.CatalogWrapperClosedException.class,
+          () -> wrapper.doWithCapabilityOps(cap -> null));
     } finally {
       exec.shutdownNow();
     }
   }
 
-  /**
-   * close() is idempotent: calling it a second time must not throw and must not call
-   * classLoader.close() again.
-   */
   @Test
   public void testCloseIsIdempotent() throws Exception {
     BaseCatalog mockCatalog = Mockito.mock(BaseCatalog.class);
@@ -136,36 +143,28 @@ public class TestCatalogWrapperConcurrency {
                 ((ThrowableFunction<ClassLoader, ?>) inv.getArgument(0))
                     .apply(Thread.currentThread().getContextClassLoader()));
 
-    CatalogManager.CatalogWrapper wrapper = new CatalogManager.CatalogWrapper(mockCatalog, mockCl);
+    CatalogManager.CatalogWrapper wrapper = createWrapper(mockCatalog, mockCl);
 
     wrapper.close();
-    wrapper.close(); // must not throw
+    wrapper.close();
 
-    // classLoader.close() should be called exactly once.
     Mockito.verify(mockCl, Mockito.times(1)).close();
   }
 
-  /**
-   * doWithCapabilityOps() after close() throws IllegalStateException, not a cryptic
-   * NullPointerException or NoClassDefFoundError.
-   */
   @Test
-  public void testCapabilityOpsAfterCloseThrowIllegalStateException() throws Exception {
+  public void testCapabilityOpsAfterCloseThrowCatalogWrapperClosedException() throws Exception {
     BaseCatalog mockCatalog = Mockito.mock(BaseCatalog.class);
     IsolatedClassLoader mockCl = Mockito.mock(IsolatedClassLoader.class);
 
-    CatalogManager.CatalogWrapper wrapper = new CatalogManager.CatalogWrapper(mockCatalog, mockCl);
+    CatalogManager.CatalogWrapper wrapper = createWrapper(mockCatalog, mockCl);
     Mockito.when(mockCl.withClassLoader(Mockito.any())).thenReturn(null);
     wrapper.close();
 
     Assertions.assertThrows(
-        IllegalStateException.class, () -> wrapper.doWithCapabilityOps(cap -> null));
+        CatalogManager.CatalogWrapperClosedException.class,
+        () -> wrapper.doWithCapabilityOps(cap -> null));
   }
 
-  /**
-   * Multiple concurrent close() calls must not result in multiple classLoader.close() invocations
-   * (synchronized idempotency under concurrency).
-   */
   @Test
   public void testConcurrentCloseCallsAreIdempotent() throws Exception {
     BaseCatalog mockCatalog = Mockito.mock(BaseCatalog.class);
@@ -178,7 +177,7 @@ public class TestCatalogWrapperConcurrency {
                 ((ThrowableFunction<ClassLoader, ?>) inv.getArgument(0))
                     .apply(Thread.currentThread().getContextClassLoader()));
 
-    CatalogManager.CatalogWrapper wrapper = new CatalogManager.CatalogWrapper(mockCatalog, mockCl);
+    CatalogManager.CatalogWrapper wrapper = createWrapper(mockCatalog, mockCl);
 
     int threads = 8;
     ExecutorService exec = Executors.newFixedThreadPool(threads);
@@ -208,7 +207,6 @@ public class TestCatalogWrapperConcurrency {
       exec.shutdownNow();
     }
 
-    // classLoader.close() called exactly once regardless of concurrency.
     Mockito.verify(mockCl, Mockito.times(1)).close();
   }
 }

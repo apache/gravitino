@@ -75,28 +75,28 @@ public class TableNormalizeDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    NameIdentifier normalizedIdent =
+    // Bundle all normalizations into one withCapability call to minimize TCCL switches.
+    NormalizedCreateArgs norm =
         withCapability(
-            ident, catalogManager, cap -> applyCapabilities(ident, Capability.Scope.TABLE, cap));
-    Column[] normalizedColumns =
-        withCapability(ident, catalogManager, cap -> applyCapabilities(columns, cap));
-    Transform[] normalizedPartitions =
-        withCapability(ident, catalogManager, cap -> applyCapabilities(partitions, cap));
-    Distribution normalizedDistribution =
-        withCapability(ident, catalogManager, cap -> applyCapabilities(distribution, cap));
-    SortOrder[] normalizedSortOrders =
-        withCapability(ident, catalogManager, cap -> applyCapabilities(sortOrders, cap));
-    Index[] normalizedIndexes =
-        withCapability(ident, catalogManager, cap -> applyCapabilities(indexes, cap));
+            ident,
+            catalogManager,
+            cap ->
+                new NormalizedCreateArgs(
+                    applyCapabilities(ident, Capability.Scope.TABLE, cap),
+                    applyCapabilities(columns, cap),
+                    applyCapabilities(partitions, cap),
+                    applyCapabilities(distribution, cap),
+                    applyCapabilities(sortOrders, cap),
+                    applyCapabilities(indexes, cap)));
     return dispatcher.createTable(
-        normalizedIdent,
-        normalizedColumns,
+        norm.ident,
+        norm.columns,
         comment,
         properties,
-        normalizedPartitions,
-        normalizedDistribution,
-        normalizedSortOrders,
-        normalizedIndexes);
+        norm.partitions,
+        norm.distribution,
+        norm.sortOrders,
+        norm.indexes);
   }
 
   @Override
@@ -162,5 +162,33 @@ public class TableNormalizeDispatcher implements TableDispatcher {
         tableIdent,
         catalogManager,
         cap -> applyCapabilities(tableIdent, Capability.Scope.TABLE, cap));
+  }
+
+  /**
+   * Bundles all normalized createTable arguments so they can be computed in a single {@code
+   * withCapability} call, minimizing TCCL switches.
+   */
+  private static final class NormalizedCreateArgs {
+    final NameIdentifier ident;
+    final Column[] columns;
+    final Transform[] partitions;
+    final Distribution distribution;
+    final SortOrder[] sortOrders;
+    final Index[] indexes;
+
+    NormalizedCreateArgs(
+        NameIdentifier ident,
+        Column[] columns,
+        Transform[] partitions,
+        Distribution distribution,
+        SortOrder[] sortOrders,
+        Index[] indexes) {
+      this.ident = ident;
+      this.columns = columns;
+      this.partitions = partitions;
+      this.distribution = distribution;
+      this.sortOrders = sortOrders;
+      this.indexes = indexes;
+    }
   }
 }

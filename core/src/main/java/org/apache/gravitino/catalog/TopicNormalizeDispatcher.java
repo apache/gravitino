@@ -91,14 +91,23 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    return withCapability(NameIdentifier.of(namespace.levels()), catalogManager, cap -> applyCaseSensitive(namespace, Capability.Scope.TOPIC, cap));
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        cap -> applyCaseSensitive(namespace, Capability.Scope.TOPIC, cap));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier topicIdent) {
-    return withCapability(topicIdent, catalogManager, cap -> applyCaseSensitive(topicIdent, Capability.Scope.TOPIC, cap));
+    return withCapability(
+        topicIdent,
+        catalogManager,
+        cap -> applyCaseSensitive(topicIdent, Capability.Scope.TOPIC, cap));
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier topicIdent) {
-    return withCapability(topicIdent, catalogManager, cap -> applyCapabilities(topicIdent, Capability.Scope.TOPIC, capability));
+    return withCapability(
+        topicIdent,
+        catalogManager,
+        cap -> applyCapabilities(topicIdent, Capability.Scope.TOPIC, cap));
   }
 }

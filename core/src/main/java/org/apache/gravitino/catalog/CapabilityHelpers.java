@@ -60,12 +60,15 @@ public class CapabilityHelpers {
    * <p>If the first attempt encounters a stale (already-closed) {@link
    * CatalogManager.CatalogWrapper}, the wrapper is evicted from the cache and the call is retried
    * once with a freshly loaded wrapper. Retry is safe because {@code fn} is restricted to pure
-   * normalization and never performs external I/O, so re-execution is idempotent. The retry is
-   * triggered only on {@link CatalogManager.CatalogWrapperClosedException}, which is thrown
-   * exclusively at wrapper-entry before {@code fn} has run, preventing accidental replay of
-   * partially-executed non-idempotent operations.
+   * normalization and never performs external I/O. Retry is triggered only on {@link
+   * CatalogManager.CatalogWrapperClosedException}, which is thrown exclusively at wrapper-entry
+   * before {@code fn} has run.
    *
-   * <p>Callers should use this method instead of calling {@code capabilities()} on a raw wrapper
+   * <p>With {@link org.apache.gravitino.utils.ClassLoaderPool} managing ClassLoader lifecycle via
+   * reference counting, eviction-triggered close is infrequent in pooled mode, but the retry
+   * remains necessary for non-pooled deployments ({@code classloader.sharing.enabled=false}).
+   *
+   * <p>Callers should use this method instead of calling {@code capabilities()} on a raw wrapper to
    * invoke {@link Capability} methods so that the classloader lifecycle is properly bounded.
    *
    * @param ident any {@link NameIdentifier} that belongs to the target catalog
