@@ -123,13 +123,14 @@ public class TestJettyServer {
   }
 
   @Test
-  public void testClientAuthRequiresTrustStore() throws IOException {
+  public void testClientAuthRequiresTrustStore() throws Exception {
     Config config = new Config(false) {};
 
     config.set(JettyServerConfig.ENABLE_HTTPS, true);
     config.set(JettyServerConfig.WEBSERVER_HTTPS_PORT, RESTUtils.findAvailablePort(6000, 7000));
 
-    config.set(JettyServerConfig.SSL_KEYSTORE_PATH, "/tmp/server.p12");
+    config.set(
+        JettyServerConfig.SSL_KEYSTORE_PATH, testResource("test-server-keystore.p12").toString());
     config.set(JettyServerConfig.SSL_KEYSTORE_PASSWORD, TEST_STORE_PASSWORD);
     config.set(JettyServerConfig.SSL_MANAGER_PASSWORD, TEST_STORE_PASSWORD);
     config.set(JettyServerConfig.ENABLE_CLIENT_AUTH, true);
@@ -212,12 +213,7 @@ public class TestJettyServer {
 
     HttpClient client = createHttpsClient(testResource("test-client-truststore.p12"), null);
 
-    HttpRequest request =
-        HttpRequest.newBuilder()
-            .uri(URI.create("https://localhost:" + port + TEST_PATH))
-            .timeout(Duration.ofSeconds(10))
-            .GET()
-            .build();
+    HttpRequest request = createHttpsRequest(port);
 
     HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
