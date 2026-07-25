@@ -175,9 +175,10 @@ class TestRelationalTable(unittest.TestCase):
         self.assertEqual(index.type(), Index.IndexType.PRIMARY_KEY)
 
     def test_get_audit_info(self):
+        from datetime import datetime
         audit_info = self.relational_table.audit_info()
         self.assertEqual(audit_info.creator(), "Apache Gravitino")
-        self.assertEqual(audit_info.create_time(), "2025-10-10T00:00:00")
+        self.assertEqual(audit_info.create_time(), datetime.fromisoformat("2025-10-10T00:00:00"))
 
     def test_get_properties(self):
         properties = self.relational_table.properties()
