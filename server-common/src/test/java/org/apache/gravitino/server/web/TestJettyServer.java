@@ -221,6 +221,33 @@ public class TestJettyServer {
     assertEquals(TEST_RESPONSE, response.body());
   }
 
+  @Test
+  public void testHttpWithoutCustomTlsConfiguration() throws Exception {
+    int port = RESTUtils.findAvailablePort(5000, 6000);
+
+    Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+
+    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
+
+    jettyServer.initialize(serverConfig, "test", false);
+    jettyServer.start();
+    jettyServer.addServlet(createTestServlet(), TEST_PATH);
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create("http://localhost:" + port + TEST_PATH))
+            .timeout(Duration.ofSeconds(10))
+            .GET()
+            .build();
+
+    HttpResponse<String> response =
+        HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+
+    assertEquals(HttpServletResponse.SC_OK, response.statusCode());
+    assertEquals(TEST_RESPONSE, response.body());
+  }
+
   private int startHttpsServer(boolean requireClientAuthentication) throws Exception {
     int port = RESTUtils.findAvailablePort(6000, 7000);
 
