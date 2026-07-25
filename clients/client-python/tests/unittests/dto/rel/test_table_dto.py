@@ -90,11 +90,10 @@ class TestTableDTO(unittest.TestCase):
         }
         """
 
-        from datetime import datetime
         dto = TableDTO.from_json(json_string)
         self.assertEqual(dto.name(), "example_table")
         self.assertEqual(dto.audit_info().creator(), "Apache Gravitino")
-        self.assertEqual(dto.audit_info().create_time(), datetime.fromisoformat("2025-10-10T00:00:00"))
+        self.assertEqual(dto.audit_info().create_time(), "2025-10-10T00:00:00")
         self.assertEqual(len(dto.columns()), 1)
         self.assertIsInstance(dto.columns()[0], ColumnDTO)
 
