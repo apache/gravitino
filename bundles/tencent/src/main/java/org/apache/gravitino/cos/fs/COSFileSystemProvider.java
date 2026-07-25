@@ -30,6 +30,7 @@ import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.credential.COSSecretKeyCredential;
+import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.storage.COSProperties;
 import org.apache.hadoop.conf.Configuration;
@@ -84,7 +85,7 @@ public class COSFileSystemProvider implements FileSystemProvider, SupportsCreden
   public Map<String, String> getFileSystemCredentialConf(Credential[] credentials) {
     Credential credential = COSUtils.getSuitableCredential(credentials);
     Map<String, String> result = Maps.newHashMap();
-    if (credential instanceof COSSecretKeyCredential) {
+    if (credential instanceof COSSecretKeyCredential || credential instanceof COSTokenCredential) {
       result.put(
           CosNConfigKeys.COSN_CREDENTIALS_PROVIDER,
           COSCredentialsProvider.class.getCanonicalName());
