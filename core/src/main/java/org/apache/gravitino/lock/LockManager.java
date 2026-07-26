@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.lock;
 
+import static org.apache.gravitino.Configs.LOCK_BACKEND_TYPE;
+import static org.apache.gravitino.Configs.LOCK_BACKEND_TYPE_INPROCESS;
+import static org.apache.gravitino.Configs.LOCK_BACKEND_TYPE_JDBC;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -63,6 +66,11 @@ public class LockManager {
 
   // The interval in seconds to clean up the stale tree lock nodes.
   @VisibleForTesting long cleanTreeNodeIntervalInSecs;
+
+  // The lock backend selected at construction time. The default 'inprocess' backend wraps the
+  // existing in-JVM TreeLock machinery owned by this manager; the 'jdbc' backend coordinates
+  // locks across nodes via a relational store. See design-docs/treelock-ha.md.
+  private final LockBackend backend;
 
   private void initParameters(Config config) {
     long maxNodesInMemory = config.get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -191,6 +199,47 @@ public class LockManager {
 
     // Start deadlock checker.
     startDeadLockChecker();
+
+    // Select the lock backend. The in-process backend wraps the in-JVM tree above; alternative
+    // backends (currently only 'jdbc') ignore that tree and coordinate via their own mechanism.
+    // A null/empty value is treated as 'inprocess' to remain compatible with the many test
+    // fixtures that construct LockManager from a mocked Config without stubbing the new key.
+    String backendType = config.get(LOCK_BACKEND_TYPE);
+    if (backendType == null
+        || backendType.isEmpty()
+        || LOCK_BACKEND_TYPE_INPROCESS.equalsIgnoreCase(backendType)) {
+      this.backend = new InProcessLockBackend(this);
+    } else if (LOCK_BACKEND_TYPE_JDBC.equalsIgnoreCase(backendType)) {
+      this.backend = new JdbcLockBackend(config);
+      LOG.info(
+          "Lock backend 'jdbc' selected. The in-memory tree-lock cleaner and dead-lock checker"
+              + " continue to run but operate on an unused tree.");
+    } else {
+      throw new IllegalArgumentException(
+          "Unsupported value for "
+              + LOCK_BACKEND_TYPE.getKey()
+              + ": '"
+              + backendType
+              + "'. Supported values: '"
+              + LOCK_BACKEND_TYPE_INPROCESS
+              + "', '"
+              + LOCK_BACKEND_TYPE_JDBC
+              + "'");
+    }
+  }
+
+  /** Return the active {@link LockBackend}. */
+  public LockBackend backend() {
+    return backend;
+  }
+
+  /** Release backend-owned resources (connection pools, schedulers, etc.). Idempotent. */
+  public void close() {
+    try {
+      backend.close();
+    } catch (Exception e) {
+      LOG.warn("Failed to close lock backend '{}'", backend.name(), e);
+    }
   }
 
   /**

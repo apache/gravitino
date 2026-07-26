@@ -323,6 +323,81 @@ public class Configs {
           .longConf()
           .createWithDefault(CLEAN_INTERVAL_IN_SECS);
 
+  // The followings are configurations for the pluggable lock backend (see
+  // design-docs/treelock-ha.md). The default 'inprocess' backend preserves the historical
+  // single-JVM TreeLock behavior; 'jdbc' coordinates locks across nodes via the relational
+  // store and is intended for HA deployments.
+
+  public static final String LOCK_BACKEND_TYPE_INPROCESS = "inprocess";
+  public static final String LOCK_BACKEND_TYPE_JDBC = "jdbc";
+
+  public static final ConfigEntry<String> LOCK_BACKEND_TYPE =
+      new ConfigBuilder("gravitino.lock.backend.type")
+          .doc(
+              "The lock backend implementation: '"
+                  + LOCK_BACKEND_TYPE_INPROCESS
+                  + "' (default; in-JVM TreeLock) or '"
+                  + LOCK_BACKEND_TYPE_JDBC
+                  + "' (cross-node, requires a relational lock store)")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .createWithDefault(LOCK_BACKEND_TYPE_INPROCESS);
+
+  public static final ConfigEntry<String> LOCK_BACKEND_JDBC_URL =
+      new ConfigBuilder("gravitino.lock.backend.jdbc.url")
+          .doc(
+              "JDBC URL for the JDBC lock backend. When unset, falls back to "
+                  + ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY)
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .createWithDefault("");
+
+  public static final ConfigEntry<String> LOCK_BACKEND_JDBC_USER =
+      new ConfigBuilder("gravitino.lock.backend.jdbc.user")
+          .doc(
+              "Username for the JDBC lock backend. When unset, falls back to "
+                  + ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY)
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .createWithDefault("");
+
+  public static final ConfigEntry<String> LOCK_BACKEND_JDBC_PASSWORD =
+      new ConfigBuilder("gravitino.lock.backend.jdbc.password")
+          .doc(
+              "Password for the JDBC lock backend. When unset, falls back to "
+                  + ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY)
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .createWithDefault("");
+
+  public static final ConfigEntry<String> LOCK_BACKEND_JDBC_DRIVER =
+      new ConfigBuilder("gravitino.lock.backend.jdbc.driver")
+          .doc(
+              "JDBC driver class name for the JDBC lock backend. When unset, falls back to "
+                  + ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY)
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .createWithDefault("");
+
+  public static final ConfigEntry<Integer> LOCK_BACKEND_JDBC_POOL_SIZE =
+      new ConfigBuilder("gravitino.lock.backend.jdbc.poolSize")
+          .doc(
+              "Maximum number of JDBC connections held by the JDBC lock backend. Each in-flight"
+                  + " lock holds one connection for the duration of the operation, so this caps"
+                  + " concurrent lock-holding operations on this server.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .createWithDefault(8);
+
+  public static final ConfigEntry<Long> LOCK_BACKEND_JDBC_ACQUIRE_TIMEOUT_MS =
+      new ConfigBuilder("gravitino.lock.backend.jdbc.acquireTimeoutMs")
+          .doc(
+              "Maximum time in milliseconds to wait for a single row lock to be granted before"
+                  + " the JDBC lock backend gives up and the operation fails")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .createWithDefault(30_000L);
+
   public static final ConfigEntry<Boolean> ENABLE_AUTHORIZATION =
       new ConfigBuilder("gravitino.authorization.enable")
           .doc("Enable the authorization")
