@@ -40,7 +40,7 @@ public class TestGravitinoEnvKmsClientRegistry {
 
     env.shutdown();
 
-    Assertions.assertThrows(IllegalStateException.class, env::kmsClientRegistry);
+    Assertions.assertSame(registry, env.kmsClientRegistry());
     Assertions.assertThrows(IllegalStateException.class, () -> registry.getClient(reference));
   }
 
@@ -52,7 +52,7 @@ public class TestGravitinoEnvKmsClientRegistry {
     KmsClientRegistry registry = env.kmsClientRegistry();
     env.shutdown();
 
-    Assertions.assertThrows(IllegalStateException.class, env::kmsClientRegistry);
+    Assertions.assertSame(registry, env.kmsClientRegistry());
     Assertions.assertThrows(
         IllegalStateException.class,
         () -> registry.getClient(new KmsReference("aws-kms", "missing", "key")));

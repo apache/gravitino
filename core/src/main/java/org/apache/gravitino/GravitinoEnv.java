@@ -424,6 +424,9 @@ public class GravitinoEnv {
   /**
    * Get the metadata-only KMS client registry associated with the Gravitino environment.
    *
+   * <p>The environment owns this registry. Callers may inject it into dependent components but must
+   * not close it.
+   *
    * @return The KMS client registry instance.
    * @throws IllegalStateException if the environment has not been initialized
    */
@@ -650,21 +653,11 @@ public class GravitinoEnv {
       }
     }
 
-    closeKmsClientRegistry();
+    if (kmsClientRegistry != null) {
+      kmsClientRegistry.close();
+    }
 
     LOG.info("Gravitino Environment is shut down.");
-  }
-
-  private void closeKmsClientRegistry() {
-    KmsClientRegistry registry = kmsClientRegistry;
-    kmsClientRegistry = null;
-    if (registry != null) {
-      try {
-        registry.close();
-      } catch (RuntimeException e) {
-        LOG.warn("Failed to close KmsClientRegistry.", e);
-      }
-    }
   }
 
   private void initBaseComponents() {
