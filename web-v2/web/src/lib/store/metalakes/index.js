@@ -108,19 +108,31 @@ const mergeWithViewNodes = ({ tree, key, entities }) => {
   return _.uniqBy([...subSchemas, ...tables, ...functions, ...entities], 'key')
 }
 
-export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
-  const [err, res] = await to(getMetalakesApi())
+const isAuthReady = state => {
+  const { authType, authToken } = state.auth
 
-  if (err || !res) {
-    throw new Error(err)
+  return !!authType && (authType !== 'oauth' || !!authToken)
+}
+
+export const fetchMetalakes = createAsyncThunk(
+  'appMetalakes/fetchMetalakes',
+  async () => {
+    const [err, res] = await to(getMetalakesApi())
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    const { metalakes } = res
+
+    metalakes.sort((a, b) => new Date(b.audit.createTime) - new Date(a.audit.createTime))
+
+    return { metalakes }
+  },
+  {
+    condition: (_, { getState }) => isAuthReady(getState())
   }
-
-  const { metalakes } = res
-
-  metalakes.sort((a, b) => new Date(b.audit.createTime) - new Date(a.audit.createTime))
-
-  return { metalakes }
-})
+)
 
 export const createMetalake = createAsyncThunk('appMetalakes/createMetalake', async (data, { getState, dispatch }) => {
   const [err, res] = await to(createMetalakeApi(data))
