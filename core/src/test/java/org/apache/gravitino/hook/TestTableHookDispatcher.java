@@ -88,21 +88,24 @@ public class TestTableHookDispatcher {
 
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    Table createdTable = Mockito.mock(Table.class);
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Mockito.mock(Table.class));
+        .thenReturn(createdTable);
     TableHookDispatcher hook =
         new TableHookDispatcher(dispatcher, () -> ownerDispatcher, catalogManager);
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "SCHEMA_NORM", "MY_TABLE");
 
-    hook.createTable(
-        ident,
-        new Column[0],
-        "comment",
-        ImmutableMap.of(),
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
+    assertSame(
+        createdTable,
+        hook.createTable(
+            ident,
+            new Column[0],
+            "comment",
+            ImmutableMap.of(),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0],
+            new Index[0]));
 
     ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
     Mockito.verify(ownerDispatcher)
@@ -115,19 +118,22 @@ public class TestTableHookDispatcher {
   public void testCreateTableSkipsOwnerWhenAuthorizationDisabled() {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    Table createdTable = Mockito.mock(Table.class);
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Mockito.mock(Table.class));
+        .thenReturn(createdTable);
     TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null, catalogManager);
 
-    hook.createTable(
-        NameIdentifier.of(METALAKE, CATALOG, "schema", "table"),
-        new Column[0],
-        "comment",
-        ImmutableMap.of(),
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
+    assertSame(
+        createdTable,
+        hook.createTable(
+            NameIdentifier.of(METALAKE, CATALOG, "schema", "table"),
+            new Column[0],
+            "comment",
+            ImmutableMap.of(),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0],
+            new Index[0]));
 
     Mockito.verifyNoInteractions(catalogManager);
   }
