@@ -73,6 +73,10 @@ public class TestKmsConfig {
   @Test
   void testRejectsMalformedOrUnlistedSourceProperties() {
     assertInvalid(Map.of("gravitino.kms.unexpected", "value"), "Invalid KMS configuration key");
+    assertInvalid(Map.of("gravitino.kms.source.primary", "value"), "Invalid KMS configuration key");
+    assertInvalid(Map.of("gravitino.kms.source..api", AWS_API), "Invalid KMS configuration key");
+    assertInvalid(
+        Map.of("gravitino.kms.source.bad$name.api", AWS_API), "Invalid KMS configuration key");
     assertInvalid(
         Map.of(
             "gravitino.kms.sources", "primary",

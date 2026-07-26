@@ -25,7 +25,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.Config;
 
@@ -38,8 +37,6 @@ final class KmsConfig {
   private static final String SOURCE_PREFIX = "source.";
   private static final String API = "api";
   private static final Pattern SOURCE_NAME_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
-  private static final Pattern SOURCE_PROPERTY_PATTERN =
-      Pattern.compile("source\\.([A-Za-z0-9][A-Za-z0-9_-]*)\\.(.+)");
 
   private final Map<String, SourceConfig> sources;
 
@@ -50,7 +47,6 @@ final class KmsConfig {
 
     Map<String, String> values = config.getConfigsWithPrefix(KMS_CONFIG_PREFIX);
     List<String> configuredSources = parseSources(values.get(SOURCES));
-    validateKeys(values, configuredSources);
     this.sources = parseSourceConfigs(values, configuredSources);
   }
 
@@ -79,33 +75,49 @@ final class KmsConfig {
     return Collections.unmodifiableList(sources);
   }
 
-  private static void validateKeys(Map<String, String> values, List<String> configuredSources) {
-    Set<String> sourceSet = new LinkedHashSet<>(configuredSources);
-    for (String key : values.keySet()) {
+  private static Map<String, SourceConfig> parseSourceConfigs(
+      Map<String, String> values, List<String> configuredSources) {
+    Map<String, Map<String, String>> propertiesBySource = new LinkedHashMap<>();
+    for (String source : configuredSources) {
+      propertiesBySource.put(source, new LinkedHashMap<>());
+    }
+
+    for (Map.Entry<String, String> entry : values.entrySet()) {
+      String key = entry.getKey();
       if (SOURCES.equals(key)) {
         continue;
       }
+      if (!key.startsWith(SOURCE_PREFIX)) {
+        throw invalidConfigurationKey(key);
+      }
 
-      Matcher matcher = SOURCE_PROPERTY_PATTERN.matcher(key);
-      if (!matcher.matches()) {
-        throw new KmsConfigurationException(
-            "Invalid KMS configuration key '%s%s'", KMS_CONFIG_PREFIX, key);
+      String sourceAndProperty = key.substring(SOURCE_PREFIX.length());
+      int separator = sourceAndProperty.indexOf('.');
+      if (separator <= 0 || separator == sourceAndProperty.length() - 1) {
+        throw invalidConfigurationKey(key);
       }
-      if (!sourceSet.contains(matcher.group(1))) {
-        throw new KmsConfigurationException(
-            "KMS configuration references unlisted source '%s'", matcher.group(1));
+
+      String source = sourceAndProperty.substring(0, separator);
+      if (!SOURCE_NAME_PATTERN.matcher(source).matches()) {
+        throw invalidConfigurationKey(key);
       }
+
+      Map<String, String> properties = propertiesBySource.get(source);
+      if (properties == null) {
+        throw new KmsConfigurationException(
+            "KMS configuration references unlisted source '%s'", source);
+      }
+
+      String property = sourceAndProperty.substring(separator + 1);
+      properties.put(property, entry.getValue());
     }
-  }
 
-  private static Map<String, SourceConfig> parseSourceConfigs(
-      Map<String, String> values, List<String> configuredSources) {
     Map<String, SourceConfig> sourceConfigs = new LinkedHashMap<>();
 
     for (String source : configuredSources) {
-      String propertyPrefix = SOURCE_PREFIX + source + ".";
-      String apiKey = propertyPrefix + API;
-      String apiValue = values.get(apiKey);
+      String apiKey = SOURCE_PREFIX + source + "." + API;
+      Map<String, String> properties = propertiesBySource.get(source);
+      String apiValue = properties.remove(API);
       if (apiValue == null || apiValue.trim().isEmpty()) {
         throw new KmsConfigurationException(
             "KMS API property '%s%s' cannot be blank", KMS_CONFIG_PREFIX, apiKey);
@@ -118,18 +130,15 @@ final class KmsConfig {
             e, "Invalid KMS API property '%s%s': %s", KMS_CONFIG_PREFIX, apiKey, e.getMessage());
       }
 
-      Map<String, String> properties = new LinkedHashMap<>();
-      values.forEach(
-          (key, value) -> {
-            if (key.startsWith(propertyPrefix) && !apiKey.equals(key)) {
-              String sourceProperty = key.substring(propertyPrefix.length());
-              properties.put(sourceProperty, value);
-            }
-          });
       sourceConfigs.put(source, new SourceConfig(api, properties));
     }
 
     return Collections.unmodifiableMap(sourceConfigs);
+  }
+
+  private static KmsConfigurationException invalidConfigurationKey(String key) {
+    return new KmsConfigurationException(
+        "Invalid KMS configuration key '%s%s'", KMS_CONFIG_PREFIX, key);
   }
 
   static final class SourceConfig {

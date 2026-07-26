@@ -210,13 +210,7 @@ public class GravitinoEnv {
     this.config = config;
     FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
     this.manageFullComponents = false;
-    this.kmsClientRegistry = new KmsClientRegistry(config);
-    try {
-      initBaseComponents();
-    } catch (RuntimeException | Error e) {
-      closeKmsClientRegistry();
-      throw e;
-    }
+    initBaseComponents();
     LOG.info("Gravitino base environment is initialized.");
   }
 
@@ -230,14 +224,8 @@ public class GravitinoEnv {
     this.config = config;
     FileFetcher.get().initialize(config.get(Configs.BLOCK_UNSAFE_REMOTE_URI));
     this.manageFullComponents = true;
-    this.kmsClientRegistry = new KmsClientRegistry(config);
-    try {
-      initBaseComponents();
-      initGravitinoServerComponents();
-    } catch (RuntimeException | Error e) {
-      closeKmsClientRegistry();
-      throw e;
-    }
+    initBaseComponents();
+    initGravitinoServerComponents();
     LOG.info("Gravitino full environment is initialized.");
   }
 
@@ -613,59 +601,56 @@ public class GravitinoEnv {
   public void shutdown() {
     LOG.info("Shutting down Gravitino Environment...");
 
-    try {
-      if (entityStore != null) {
-        try {
-          entityStore.close();
-        } catch (Exception e) {
-          LOG.warn("Failed to close EntityStore.", e);
-        }
+    if (entityStore != null) {
+      try {
+        entityStore.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close EntityStore.", e);
       }
-
-      if (catalogManager != null) {
-        catalogManager.close();
-      }
-
-      if (auxServiceManager != null) {
-        try {
-          auxServiceManager.serviceStop();
-        } catch (Exception e) {
-          LOG.warn("Failed to stop AuxServiceManager", e);
-        }
-      }
-
-      if (metricsSystem != null) {
-        metricsSystem.close();
-      }
-
-      if (eventListenerManager != null) {
-        eventListenerManager.stop();
-      }
-
-      if (metalakeManager != null) {
-        metalakeManager.close();
-      }
-
-      if (jobOperationDispatcher != null) {
-        try {
-          jobOperationDispatcher.close();
-          jobOperationDispatcher = null;
-        } catch (Exception e) {
-          LOG.warn("Failed to close JobOperationDispatcher", e);
-        }
-      }
-
-      if (statisticDispatcher != null) {
-        try {
-          statisticDispatcher.close();
-        } catch (Exception e) {
-          LOG.warn("Failed to close StatisticDispatcher", e);
-        }
-      }
-
-    } finally {
-      closeKmsClientRegistry();
     }
+
+    if (catalogManager != null) {
+      catalogManager.close();
+    }
+
+    if (auxServiceManager != null) {
+      try {
+        auxServiceManager.serviceStop();
+      } catch (Exception e) {
+        LOG.warn("Failed to stop AuxServiceManager", e);
+      }
+    }
+
+    if (metricsSystem != null) {
+      metricsSystem.close();
+    }
+
+    if (eventListenerManager != null) {
+      eventListenerManager.stop();
+    }
+
+    if (metalakeManager != null) {
+      metalakeManager.close();
+    }
+
+    if (jobOperationDispatcher != null) {
+      try {
+        jobOperationDispatcher.close();
+        jobOperationDispatcher = null;
+      } catch (Exception e) {
+        LOG.warn("Failed to close JobOperationDispatcher", e);
+      }
+    }
+
+    if (statisticDispatcher != null) {
+      try {
+        statisticDispatcher.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close StatisticDispatcher", e);
+      }
+    }
+
+    closeKmsClientRegistry();
 
     LOG.info("Gravitino Environment is shut down.");
   }
@@ -683,6 +668,8 @@ public class GravitinoEnv {
   }
 
   private void initBaseComponents() {
+    this.kmsClientRegistry = new KmsClientRegistry(config);
+
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
 

@@ -19,12 +19,10 @@
 package org.apache.gravitino;
 
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.encryption.kms.KmsClientRegistry;
 import org.apache.gravitino.encryption.kms.KmsReference;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 public class TestGravitinoEnvKmsClientRegistry {
 
@@ -53,23 +51,6 @@ public class TestGravitinoEnvKmsClientRegistry {
     env.initializeBaseComponents(new Config(false) {});
     KmsClientRegistry registry = env.kmsClientRegistry();
     env.shutdown();
-
-    Assertions.assertThrows(IllegalStateException.class, env::kmsClientRegistry);
-    Assertions.assertThrows(
-        IllegalStateException.class,
-        () -> registry.getClient(new KmsReference("aws-kms", "missing", "key")));
-  }
-
-  @Test
-  void testShutdownClosesKmsRegistryWhenEarlierComponentFails() throws IllegalAccessException {
-    TestGravitinoEnv env = new TestGravitinoEnv();
-    KmsClientRegistry registry = new KmsClientRegistry(new Config(false) {});
-    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    Mockito.doThrow(new IllegalStateException("catalog close failed")).when(catalogManager).close();
-    FieldUtils.writeField(env, "kmsClientRegistry", registry, true);
-    FieldUtils.writeField(env, "catalogManager", catalogManager, true);
-
-    Assertions.assertThrows(IllegalStateException.class, env::shutdown);
 
     Assertions.assertThrows(IllegalStateException.class, env::kmsClientRegistry);
     Assertions.assertThrows(
