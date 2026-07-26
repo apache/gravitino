@@ -22,16 +22,19 @@ import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 
-/** Creates server-side KMS clients for one supported KMS API. */
+/** Creates server-side KMS clients for one KMS API. */
 @DeveloperApi
 public interface KmsClientFactory {
 
   /**
-   * Returns the KMS API implemented by this factory.
+   * Returns the exact KMS API identifier implemented by this factory.
    *
-   * @return the supported KMS API
+   * <p>Identifiers use lowercase kebab-case with no surrounding whitespace ({@link
+   * KmsApiIdentifiers}) and are matched exactly against {@link KmsReference#api()}.
+   *
+   * @return the KMS API identifier
    */
-  KmsApi api();
+  String api();
 
   /**
    * Creates a client bound to a configured KMS source.

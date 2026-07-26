@@ -25,7 +25,6 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.apache.gravitino.encryption.kms.KmsApi;
 import org.apache.gravitino.encryption.kms.KmsReference;
 
 /** Data transfer object for a KMS key reference. */
@@ -48,10 +47,13 @@ public class KmsReferenceDTO {
   /**
    * Converts this DTO to a {@link KmsReference}.
    *
+   * <p>{@code api} is validated by {@link KmsReference}: it must already be lowercase kebab-case
+   * with no surrounding whitespace and is matched exactly.
+   *
    * @return the KMS key reference
    */
   public KmsReference toKmsReference() {
-    return new KmsReference(KmsApi.fromWireValue(api), source, keyId);
+    return new KmsReference(api, source, keyId);
   }
 
   /**
@@ -61,6 +63,6 @@ public class KmsReferenceDTO {
    * @return the KMS key reference DTO
    */
   public static KmsReferenceDTO fromKmsReference(KmsReference reference) {
-    return new KmsReferenceDTO(reference.api().wireValue(), reference.source(), reference.keyId());
+    return new KmsReferenceDTO(reference.api(), reference.source(), reference.keyId());
   }
 }

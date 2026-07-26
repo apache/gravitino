@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestFakeKmsClient extends TestKmsClientContract {
 
-  private static final KmsApi API = KmsApi.AWS_KMS;
+  private static final String API = "test-kms";
   private static final String SOURCE = "test";
   private static final String USABLE_KEY = "usable";
   private static final String DISABLED_KEY = "disabled";
@@ -35,8 +35,33 @@ public class TestFakeKmsClient extends TestKmsClientContract {
           .putKey(DISABLED_KEY, false, true, true);
 
   @Test
-  void testRejectsNullApi() {
+  void testRejectsBlankApi() {
     Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(null, SOURCE));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient("", SOURCE));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(" ", SOURCE));
+  }
+
+  @Test
+  void testRejectsPaddedApi() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new FakeKmsClient(" " + API, SOURCE));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new FakeKmsClient(API + " ", SOURCE));
+  }
+
+  @Test
+  void testRejectsInvalidApiFormat() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new FakeKmsClient("TEST-KMS", SOURCE));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new FakeKmsClient("test_kms", SOURCE));
+  }
+
+  @Test
+  void testMatchesApiExactly() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> client.getKeyProperties(new KmsReference("other-kms", SOURCE, USABLE_KEY)));
   }
 
   @Test
@@ -48,10 +73,10 @@ public class TestFakeKmsClient extends TestKmsClientContract {
 
   @Test
   void testNormalizesSource() {
-    FakeKmsClient client = new FakeKmsClient(API, " " + SOURCE + " ");
+    FakeKmsClient paddedSourceClient = new FakeKmsClient(API, " " + SOURCE + " ");
 
     Assertions.assertDoesNotThrow(
-        () -> client.getKeyProperties(new KmsReference(API, SOURCE, MISSING_KEY)));
+        () -> paddedSourceClient.getKeyProperties(new KmsReference(API, SOURCE, MISSING_KEY)));
   }
 
   @Test

@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.encryption.kms;
 
-import java.util.Arrays;
 import java.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -87,12 +86,8 @@ public abstract class TestKmsClientContract {
   @Test
   void testRejectsMismatchedApi() {
     KmsReference reference = usableKey();
-    KmsApi otherApi =
-        Arrays.stream(KmsApi.values())
-            .filter(api -> api != reference.api())
-            .findFirst()
-            .orElseThrow(IllegalStateException::new);
-    KmsReference mismatched = new KmsReference(otherApi, reference.source(), reference.keyId());
+    KmsReference mismatched =
+        new KmsReference(reference.api() + "-other", reference.source(), reference.keyId());
 
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> client().getKeyProperties(mismatched));

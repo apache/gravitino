@@ -28,38 +28,43 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * Identifies a key owned by a configured KMS source.
  *
  * <p>Contains no credentials or key material.
+ *
+ * <p>KMS API identifiers use exact string matching. Callers must supply lowercase kebab-case values
+ * with no leading or trailing whitespace (for example {@code aws-kms}). This type does not
+ * normalize the identifier.
  */
 @DeveloperApi
 public final class KmsReference {
 
-  private final KmsApi api;
+  private final String api;
   private final String source;
   private final String keyId;
 
   /**
    * Creates a structurally valid key reference without contacting the provider.
    *
-   * @param api explicitly selected KMS API
+   * @param api explicitly selected KMS API identifier; must be lowercase kebab-case with no
+   *     surrounding whitespace
    * @param source configured KMS client-instance name
    * @param keyId provider-native key identifier
-   * @throws IllegalArgumentException if the API is null or either string is null or blank
+   * @throws IllegalArgumentException if any argument is null or blank, or if {@code api} is not a
+   *     valid KMS API identifier
    */
-  public KmsReference(KmsApi api, String source, String keyId) {
-    Preconditions.checkArgument(api != null, "KMS API cannot be null");
+  public KmsReference(String api, String source, String keyId) {
+    this.api = KmsApiIdentifiers.requireValid(api);
     Preconditions.checkArgument(StringUtils.isNotBlank(source), "KMS source cannot be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(keyId), "KMS key ID cannot be blank");
 
-    this.api = api;
     this.source = source.trim();
     this.keyId = keyId;
   }
 
   /**
-   * Returns the explicitly selected KMS API.
+   * Returns the explicitly selected KMS API identifier.
    *
-   * @return the KMS API
+   * @return the exact KMS API identifier
    */
-  public KmsApi api() {
+  public String api() {
     return api;
   }
 
@@ -90,7 +95,7 @@ public final class KmsReference {
       return false;
     }
     KmsReference that = (KmsReference) other;
-    return api == that.api && source.equals(that.source) && keyId.equals(that.keyId);
+    return api.equals(that.api) && source.equals(that.source) && keyId.equals(that.keyId);
   }
 
   @Override
@@ -100,6 +105,6 @@ public final class KmsReference {
 
   @Override
   public String toString() {
-    return String.format("KmsReference{api=%s, source='%s', keyId='%s'}", api, source, keyId);
+    return String.format("KmsReference{api='%s', source='%s', keyId='%s'}", api, source, keyId);
   }
 }

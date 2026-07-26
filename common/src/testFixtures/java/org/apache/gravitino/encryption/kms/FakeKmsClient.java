@@ -25,24 +25,22 @@ import java.util.Optional;
 /** In-memory KMS client for contract and consumer tests. */
 public final class FakeKmsClient implements KmsClient {
 
-  private final KmsApi api;
+  private final String api;
   private final String source;
   private final Map<String, KeyState> keys = new HashMap<>();
 
   /**
    * Creates an empty fake client.
    *
-   * @param api KMS API accepted by the client
+   * @param api exact KMS API identifier accepted by the client; lowercase kebab-case with no
+   *     surrounding whitespace
    * @param source configured source accepted by the client
    */
-  public FakeKmsClient(KmsApi api, String source) {
-    if (api == null) {
-      throw new IllegalArgumentException("KMS API cannot be null");
-    }
+  public FakeKmsClient(String api, String source) {
+    this.api = KmsApiIdentifiers.requireValid(api);
     if (source == null || source.trim().isEmpty()) {
       throw new IllegalArgumentException("KMS source cannot be blank");
     }
-    this.api = api;
     this.source = source.trim();
   }
 
@@ -77,9 +75,9 @@ public final class FakeKmsClient implements KmsClient {
     if (reference == null) {
       throw new IllegalArgumentException("KMS reference cannot be null");
     }
-    if (reference.api() != api) {
+    if (!reference.api().equals(api)) {
       throw new IllegalArgumentException(
-          String.format("Expected KMS API %s but received %s", api, reference.api()));
+          String.format("Expected KMS API '%s' but received '%s'", api, reference.api()));
     }
     if (!source.equals(reference.source())) {
       throw new IllegalArgumentException(
