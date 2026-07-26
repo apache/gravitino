@@ -228,7 +228,7 @@ public abstract class OperationDispatcher {
   boolean isManagedEntity(NameIdentifier catalogIdent, Capability.Scope scope) {
     return doWithCatalog(
         catalogIdent,
-        c -> c.capabilities().managedStorage(scope).supported(),
+        c -> c.doWithCapabilityOps(cap -> cap.managedStorage(scope).supported()),
         IllegalArgumentException.class);
   }
 

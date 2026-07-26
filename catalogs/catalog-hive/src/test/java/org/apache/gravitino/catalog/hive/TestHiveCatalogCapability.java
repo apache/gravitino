@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.glue;
+package org.apache.gravitino.catalog.hive;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -24,55 +24,44 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.EnumSet;
+import java.util.Set;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-class TestGlueCatalogCapability {
+class TestHiveCatalogCapability {
 
-  private GlueCatalogCapability capability;
+  private HiveCatalogCapability capability;
 
   @BeforeEach
   void setUp() {
-    capability = new GlueCatalogCapability();
+    capability = new HiveCatalogCapability();
   }
 
   @Test
-  void testColumnNotNullIsUnsupported() {
-    CapabilityResult result = capability.columnNotNull();
-    assertFalse(result.supported(), "Glue does not enforce NOT NULL constraints");
-    assertNotNull(result.unsupportedMessage());
-    assertFalse(result.unsupportedMessage().isEmpty());
+  void testCaseSensitiveOnHiveNamesIsUnsupported() {
+    Set<Capability.Scope> unsupportedScopes =
+        EnumSet.of(Capability.Scope.SCHEMA, Capability.Scope.TABLE, Capability.Scope.COLUMN);
+
+    for (Capability.Scope scope : unsupportedScopes) {
+      CapabilityResult result = capability.caseSensitiveOnName(scope);
+      assertFalse(result.supported(), "Hive is case-insensitive for " + scope + " names");
+      assertNotNull(result.unsupportedMessage());
+    }
   }
 
   @Test
-  void testColumnDefaultValueIsUnsupported() {
-    CapabilityResult result = capability.columnDefaultValue();
-    assertFalse(result.supported(), "Glue does not support DEFAULT values on columns");
-    assertNotNull(result.unsupportedMessage());
-    assertFalse(result.unsupportedMessage().isEmpty());
-  }
+  void testCaseSensitiveOnOtherScopesIsSupported() {
+    Set<Capability.Scope> unsupportedScopes =
+        EnumSet.of(Capability.Scope.SCHEMA, Capability.Scope.TABLE, Capability.Scope.COLUMN);
 
-  @Test
-  void testCaseSensitiveOnSchemaIsUnsupported() {
-    CapabilityResult result = capability.caseSensitiveOnName(Capability.Scope.SCHEMA);
-    assertFalse(result.supported(), "Glue folds schema names to lowercase");
-    assertNotNull(result.unsupportedMessage());
-  }
-
-  @Test
-  void testCaseSensitiveOnTableIsUnsupported() {
-    CapabilityResult result = capability.caseSensitiveOnName(Capability.Scope.TABLE);
-    assertFalse(result.supported(), "Glue folds table names to lowercase");
-    assertNotNull(result.unsupportedMessage());
-  }
-
-  @Test
-  void testCaseSensitiveOnColumnIsSupported() {
-    // Column name case folding is not documented in Glue Column API — treated as supported.
-    CapabilityResult result = capability.caseSensitiveOnName(Capability.Scope.COLUMN);
-    assertTrue(result.supported());
+    for (Capability.Scope scope : Capability.Scope.values()) {
+      if (!unsupportedScopes.contains(scope)) {
+        assertTrue(capability.caseSensitiveOnName(scope).supported());
+      }
+    }
   }
 
   @Test
@@ -83,14 +72,14 @@ class TestGlueCatalogCapability {
   @Test
   void testNoSwitchOnEnumSyntheticClass() {
     // Verifies that the if/else rewrite eliminated the compiler-generated $1 switch-map class.
-    // If switch-on-enum were still present, javac would produce GlueCatalogCapability$1.class,
+    // If switch-on-enum were still present, javac would produce HiveCatalogCapability$1.class,
     // which is loaded lazily on the first switch execution by the defining IsolatedClassLoader.
     // Closing that classloader before the first switch call would then cause a permanent
     // NoClassDefFoundError. The absence of $1 confirms this trigger is eliminated.
     String syntheticClassResource =
-        GlueCatalogCapability.class.getName().replace('.', '/') + "$1.class";
+        HiveCatalogCapability.class.getName().replace('.', '/') + "$1.class";
     assertNull(
-        GlueCatalogCapability.class.getClassLoader().getResource(syntheticClassResource),
-        "GlueCatalogCapability$1 switch-map class must not exist after if/else rewrite");
+        HiveCatalogCapability.class.getClassLoader().getResource(syntheticClassResource),
+        "HiveCatalogCapability$1 switch-map class must not exist after if/else rewrite");
   }
 }
