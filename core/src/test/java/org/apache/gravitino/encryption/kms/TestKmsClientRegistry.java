@@ -41,6 +41,22 @@ public class TestKmsClientRegistry {
   private static final String AZURE_API = "azure-key-vault";
 
   @Test
+  void testEmptyRegistryDoesNotEnumerateFactories() {
+    Iterable<KmsClientFactory> factories =
+        () -> {
+          throw new AssertionError("Factories must not be enumerated without configured sources");
+        };
+    KmsClientRegistry registry = new KmsClientRegistry(config(), factories);
+    KmsReference reference = new KmsReference(AWS_API, "primary", "alias/orders");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> registry.getClient(reference));
+    Assertions.assertEquals(
+        "No KMS client is configured for source 'primary'", exception.getMessage());
+  }
+
+  @Test
   void testCreatesAndDispatchesConfiguredClients() {
     RecordingFactory awsFactory = new RecordingFactory(AWS_API);
     RecordingFactory gcpFactory = new RecordingFactory(GCP_API);

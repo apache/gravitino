@@ -44,11 +44,16 @@ public final class KmsClientRegistry implements AutoCloseable {
   }
 
   KmsClientRegistry(Config config, Iterable<KmsClientFactory> factories) {
+    KmsConfig kmsConfig = new KmsConfig(config);
+    if (kmsConfig.sources().isEmpty()) {
+      this.clients = Collections.emptyMap();
+      return;
+    }
+
     if (factories == null) {
       throw new IllegalArgumentException("KMS client factories cannot be null");
     }
 
-    KmsConfig kmsConfig = new KmsConfig(config);
     Map<String, KmsClientFactory> factoriesByApi = indexFactories(factories);
     this.clients = createClients(kmsConfig.sources(), factoriesByApi);
   }
@@ -163,7 +168,7 @@ public final class KmsClientRegistry implements AutoCloseable {
     ConfiguredClient configuredClient = clients.get(reference.source());
     if (configuredClient == null) {
       throw new IllegalArgumentException(
-          String.format("Unknown KMS source '%s'", reference.source()));
+          String.format("No KMS client is configured for source '%s'", reference.source()));
     }
     if (!configuredClient.api.equals(reference.api())) {
       throw new IllegalArgumentException(
