@@ -30,7 +30,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -1430,13 +1429,24 @@ public class TestJcasbinAuthorizer {
     Principal principal = setCurrentPrincipalWithGroup(null);
     RoleEntity held = mockRoleInStore(ALLOW_ROLE_ID, "heldRole", ImmutableList.of());
     mockDirectUserRoles(held);
-    mockRoleNameToId("heldRole", ALLOW_ROLE_ID);
+    Mockito.clearInvocations(userMetaMapper);
+    metadataIdConverterMockedStatic.clearInvocations();
 
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
     Set<String> unheld =
         jcasbinAuthorizer.findUnheldRoles(
-            principal, METALAKE, ImmutableSet.of("heldRole"), new AuthorizationRequestContext());
+            principal, METALAKE, ImmutableSet.of("heldRole"), requestContext);
 
     assertTrue(unheld.isEmpty());
+    metadataIdConverterMockedStatic.verify(
+        () -> MetadataIdConverter.getID(any(), eq(METALAKE)), Mockito.never());
+    jcasbinAuthorizer.authorize(
+        principal,
+        METALAKE,
+        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+        USE_CATALOG,
+        requestContext);
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
     restoreDefaultPrincipal();
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
   }
@@ -1448,8 +1458,6 @@ public class TestJcasbinAuthorizer {
     Principal principal = setCurrentPrincipalWithGroup(null);
     RoleEntity held = mockRoleInStore(ALLOW_ROLE_ID, "heldRole", ImmutableList.of());
     mockDirectUserRoles(held);
-    mockRoleNameToId("heldRole", ALLOW_ROLE_ID);
-    mockRoleNameToId("otherRole", 999L);
 
     Set<String> unheld =
         jcasbinAuthorizer.findUnheldRoles(
@@ -1470,8 +1478,6 @@ public class TestJcasbinAuthorizer {
     Principal principal = setCurrentPrincipalWithGroup(null);
     RoleEntity held = mockRoleInStore(ALLOW_ROLE_ID, "heldRole", ImmutableList.of());
     mockDirectUserRoles(held);
-    mockRoleNameToId("heldRole", ALLOW_ROLE_ID);
-    mockRoleNameMissing("ghostRole");
 
     Set<String> unheld =
         jcasbinAuthorizer.findUnheldRoles(
@@ -1491,7 +1497,8 @@ public class TestJcasbinAuthorizer {
     mockRoleInStore(groupRoleId, "groupRole", ImmutableList.of());
     mockNoDirectUserRoles();
     mockGroupWithRoles(GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of("groupRole"));
-    mockRoleNameToId("groupRole", groupRoleId);
+    Mockito.clearInvocations(userMetaMapper);
+    metadataIdConverterMockedStatic.clearInvocations();
 
     Set<String> unheld =
         jcasbinAuthorizer.findUnheldRoles(
@@ -1501,28 +1508,11 @@ public class TestJcasbinAuthorizer {
             new AuthorizationRequestContext());
 
     assertTrue(unheld.isEmpty());
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
+    metadataIdConverterMockedStatic.verify(
+        () -> MetadataIdConverter.getID(any(), eq(METALAKE)), Mockito.never());
     restoreDefaultPrincipal();
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
-  }
-
-  /** Stubs the role name -> id resolution used by {@code findUnheldRoles}. */
-  private static void mockRoleNameToId(String roleName, Long roleId) {
-    metadataIdConverterMockedStatic
-        .when(
-            () ->
-                MetadataIdConverter.getID(
-                    argThat(obj -> obj != null && roleName.equals(obj.name())), eq(METALAKE)))
-        .thenReturn(Optional.of(roleId));
-  }
-
-  /** Stubs a role name as non-existent (no id) for {@code findUnheldRoles}. */
-  private static void mockRoleNameMissing(String roleName) {
-    metadataIdConverterMockedStatic
-        .when(
-            () ->
-                MetadataIdConverter.getID(
-                    argThat(obj -> obj != null && roleName.equals(obj.name())), eq(METALAKE)))
-        .thenReturn(Optional.empty());
   }
 
   /**

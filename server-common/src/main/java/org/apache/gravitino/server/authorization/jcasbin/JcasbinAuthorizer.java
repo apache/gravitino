@@ -477,19 +477,21 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return new LinkedHashSet<>();
     }
     String username = principal.getName();
-    Set<Long> heldRoleIds;
+    Set<String> heldRoleNames;
     try {
-      Optional<UserUpdatedAt> userInfoOpt = loadUserInfo(metalake, username, requestContext);
+      List<String> groupNames = principalGroupNames(principal);
+      // Prime the role caches and versions that the downstream authorize() call will reuse.
+      Optional<UserUpdatedAt> userInfoOpt =
+          prefetchUserAndGroupInfo(metalake, username, groupNames, requestContext);
       if (!userInfoOpt.isPresent()) {
         // No user record => the caller holds no roles, so every declared role is unheld.
         return new LinkedHashSet<>(declaredRoleNames);
       }
-      UserUpdatedAt userInfo = userInfoOpt.get();
-      long userId = userInfo.getUserId();
-      heldRoleIds = new HashSet<>(loadUserRoles(metalake, username, userId, userInfo));
-      for (String groupName : principalGroupNames(principal)) {
-        heldRoleIds.addAll(loadGroupRoles(metalake, groupName, userId, requestContext));
-      }
+      Map<Long, RoleUpdatedAt> roleVersions = requestContext.getPrefetchedRoleVersions();
+      heldRoleNames =
+          roleVersions.values().stream()
+              .map(RoleUpdatedAt::getRoleName)
+              .collect(Collectors.toSet());
     } catch (Exception e) {
       // Fail closed: if membership cannot be resolved, treat every declared role as unheld.
       LOG.warn(
@@ -502,22 +504,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     Set<String> unheldRoles = new LinkedHashSet<>();
     for (String roleName : declaredRoleNames) {
-      Optional<Long> roleId = resolveRoleId(metalake, roleName);
-      if (!roleId.isPresent() || !heldRoleIds.contains(roleId.get())) {
+      if (!heldRoleNames.contains(roleName)) {
         unheldRoles.add(roleName);
       }
     }
     return unheldRoles;
-  }
-
-  /**
-   * Resolves a role name to its id within the metalake, or {@link Optional#empty()} when no such
-   * role exists.
-   */
-  private Optional<Long> resolveRoleId(String metalake, String roleName) {
-    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(metalake, roleName);
-    return MetadataIdConverter.getID(
-        NameIdentifierUtil.toMetadataObject(roleIdent, Entity.EntityType.ROLE), metalake);
   }
 
   @Override
