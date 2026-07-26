@@ -27,7 +27,6 @@ dependencies {
   implementation(project(":common")) {
     exclude(group = "org.apache.logging.log4j")
   }
-  implementation(project(":catalogs:hive-metastore-common"))
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.datatype.jdk8)
