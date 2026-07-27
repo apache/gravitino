@@ -82,8 +82,16 @@ public class ParameterUtil {
     if (fullName.isPresent() && metadataObjectType.isPresent()) {
       String metalake = entities.get(Entity.EntityType.METALAKE);
       if (metalake != null) {
-        MetadataObject.Type type =
-            MetadataObject.Type.valueOf(metadataObjectType.get().toUpperCase(Locale.ROOT));
+        MetadataObject.Type type;
+        try {
+          type = MetadataObject.Type.valueOf(metadataObjectType.get().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+          throw new IllegalArgumentException(
+              "Invalid metadata object type: "
+                  + metadataObjectType.get()
+                  + ". Valid types are: METALAKE, CATALOG, SCHEMA, FILESET, TABLE, VIEW, TOPIC, COLUMN, ROLE, MODEL, TAG, POLICY, JOB, JOB_TEMPLATE",
+              e);
+        }
         NameIdentifier nameIdentifier =
             MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName.get(), type));
         nameIdentifierMap.putAll(
