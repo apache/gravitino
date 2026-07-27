@@ -27,6 +27,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -35,6 +36,7 @@ import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -42,6 +44,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -371,5 +374,82 @@ class TestAuthorizationUtils {
       Mockito.verify(authorizer)
           .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
     }
+  }
+
+  @Test
+  void testRenameTablePrivilegesNotifiesAuthorizationPluginWithExpectedChange() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier catalogIdent = NameIdentifier.of("metalake", "catalog");
+    List<String> locations = Lists.newArrayList("/warehouse/schema/table");
+
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    Mockito.when(catalogManager.loadCatalog(catalogIdent)).thenReturn(baseCatalog);
+    Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.TABLE, "renamed_table", locations);
+    }
+
+    ArgumentCaptor<MetadataObjectChange[]> changesCaptor =
+        ArgumentCaptor.forClass(MetadataObjectChange[].class);
+    Mockito.verify(authorizationPlugin).onMetadataUpdated(changesCaptor.capture());
+    Assertions.assertEquals(1, changesCaptor.getValue().length);
+
+    MetadataObjectChange.RenameMetadataObject renameChange =
+        Assertions.assertInstanceOf(
+            MetadataObjectChange.RenameMetadataObject.class, changesCaptor.getValue()[0]);
+    Assertions.assertEquals(MetadataObject.Type.TABLE, renameChange.metadataObject().type());
+    Assertions.assertEquals("catalog.schema.table", renameChange.metadataObject().fullName());
+    Assertions.assertEquals(MetadataObject.Type.TABLE, renameChange.newMetadataObject().type());
+    Assertions.assertEquals(
+        "catalog.schema.renamed_table", renameChange.newMetadataObject().fullName());
+    Assertions.assertEquals(locations, renameChange.locations());
+  }
+
+  @Test
+  void testRemoveTablePrivilegesNotifiesAuthorizationPluginWithExpectedChange() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier catalogIdent = NameIdentifier.of("metalake", "catalog");
+    List<String> locations = Lists.newArrayList("/warehouse/schema/table");
+
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    Mockito.when(catalogManager.loadCatalog(catalogIdent)).thenReturn(baseCatalog);
+    Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, locations);
+    }
+
+    ArgumentCaptor<MetadataObjectChange[]> changesCaptor =
+        ArgumentCaptor.forClass(MetadataObjectChange[].class);
+    Mockito.verify(authorizationPlugin).onMetadataUpdated(changesCaptor.capture());
+    Assertions.assertEquals(1, changesCaptor.getValue().length);
+
+    MetadataObjectChange.RemoveMetadataObject removeChange =
+        Assertions.assertInstanceOf(
+            MetadataObjectChange.RemoveMetadataObject.class, changesCaptor.getValue()[0]);
+    Assertions.assertEquals(MetadataObject.Type.TABLE, removeChange.metadataObject().type());
+    Assertions.assertEquals("catalog.schema.table", removeChange.metadataObject().fullName());
+    Assertions.assertEquals(locations, removeChange.getLocations());
   }
 }
