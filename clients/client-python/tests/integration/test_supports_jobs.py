@@ -376,6 +376,69 @@ class TestSupportsJobs(IntegrationTestEnv):
         with self.assertRaises(NoSuchJobException):
             self._metalake.cancel_job("non_existent_job_id")
 
+    def test_job_template_with_optional_arguments(self):
+        opt_arg_test_script_path = self.generate_optional_arg_test_script()
+
+        # Template with flag/value optional pairs. {{mode}} tells the validation
+        # script which flags it should or should not receive.
+        template = (
+            ShellJobTemplate.builder()
+            .with_name("test_optional_args_template")
+            .with_comment("Test template with optional flag/value pairs")
+            .with_executable(opt_arg_test_script_path)
+            .with_arguments(
+                [
+                    "{{mode}}",
+                    "?--opt1",
+                    "?{{optional_arg1}}",
+                    "?--opt2",
+                    "?{{optional_arg2}}",
+                ]
+            )
+            .with_environments({})
+            .with_scripts([])
+            .with_custom_fields({})
+            .build()
+        )
+
+        self._metalake.register_job_template(template)
+        self.assertIsNotNone(self._metalake.get_job_template(template.name))
+
+        # Case 1: No optional args — script asserts neither flag is received.
+        self._run_job_and_await(
+            template, {"mode": "no_optionals"}, JobHandle.Status.SUCCEEDED
+        )
+
+        # Case 2: opt1 provided, opt2 absent — script asserts --opt1 present, --opt2 absent.
+        self._run_job_and_await(
+            template,
+            {"mode": "opt1_only", "optional_arg1": "val1"},
+            JobHandle.Status.SUCCEEDED,
+        )
+
+        # Case 3: Both optional args — script asserts both flags are received.
+        self._run_job_and_await(
+            template,
+            {
+                "mode": "both_optionals",
+                "optional_arg1": "val1",
+                "optional_arg2": "val2",
+            },
+            JobHandle.Status.SUCCEEDED,
+        )
+
+    def _run_job_and_await(self, template, job_conf, expected_status):
+        job = self._metalake.run_job(template.name, job_conf)
+        self.assertIsNotNone(job)
+        self._wait_until(
+            lambda: self._metalake.get_job(job.job_id()).job_status()
+            in (JobHandle.Status.SUCCEEDED, JobHandle.Status.FAILED),
+            timeout=30,
+        )
+        self.assertEqual(
+            expected_status, self._metalake.get_job(job.job_id()).job_status()
+        )
+
     def _wait_until(self, condition, timeout=180, interval=0.5):
         end_time = time.time() + timeout
         while time.time() < end_time:
@@ -425,6 +488,37 @@ fi
 echo "in common script"
 """
         script_path = Path(cls.test_staging_dir) / "common.sh"
+        script_path.write_text(content, encoding="utf-8")
+        script_path.chmod(0o755)
+        return str(script_path)
+
+    # $1 = mode; remaining args are parsed for --opt1 and --opt2 flags.
+    # Exits 0 when the received flags match the state encoded in mode, 1 otherwise.
+    @classmethod
+    def generate_optional_arg_test_script(cls):
+        content = """#!/bin/bash
+MODE="$1"
+shift
+OPT1_PRESENT=0
+OPT2_PRESENT=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --opt1) OPT1_PRESENT=1; shift 2;;
+    --opt2) OPT2_PRESENT=1; shift 2;;
+    *) shift;;
+  esac
+done
+case "$MODE" in
+  no_optionals)
+    [[ $OPT1_PRESENT -eq 0 && $OPT2_PRESENT -eq 0 ]] && exit 0 || exit 1;;
+  opt1_only)
+    [[ $OPT1_PRESENT -eq 1 && $OPT2_PRESENT -eq 0 ]] && exit 0 || exit 1;;
+  both_optionals)
+    [[ $OPT1_PRESENT -eq 1 && $OPT2_PRESENT -eq 1 ]] && exit 0 || exit 1;;
+  *) exit 1;;
+esac
+"""
+        script_path = Path(cls.test_staging_dir) / "optional-arg-test.sh"
         script_path.write_text(content, encoding="utf-8")
         script_path.chmod(0o755)
         return str(script_path)
