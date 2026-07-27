@@ -38,6 +38,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -132,7 +133,8 @@ public class TagMetaService {
                       POConverters.updateTagPOWithVersion(tagPO, updatedTagEntity), tagPO));
 
       if (result == null || result == 0) {
-        throw new IOException("Failed to update the entity: " + identifier);
+        throw new OptimisticLockException(
+            "Failed to update entity %s because it was modified concurrently", identifier);
       }
 
       return updatedTagEntity;

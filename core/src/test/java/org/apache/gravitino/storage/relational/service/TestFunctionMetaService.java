@@ -50,6 +50,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -287,7 +288,7 @@ public class TestFunctionMetaService extends TestJDBCBackend {
 
       ExecutionException exception =
           assertThrows(ExecutionException.class, () -> staleUpdate.get(10, TimeUnit.SECONDS));
-      assertTrue(exception.getCause() instanceof IOException);
+      assertTrue(exception.getCause() instanceof OptimisticLockException);
     } finally {
       continueUpdate.countDown();
       executor.shutdownNow();

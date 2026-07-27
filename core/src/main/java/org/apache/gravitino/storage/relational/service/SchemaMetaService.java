@@ -40,6 +40,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
@@ -260,7 +261,8 @@ public class SchemaMetaService {
     if (updateResult.get() > 0) {
       return newEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + identifier);
+      throw new OptimisticLockException(
+          "Failed to update entity %s because it was modified concurrently", identifier);
     }
   }
 

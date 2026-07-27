@@ -33,6 +33,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -209,7 +210,8 @@ public class MetalakeMetaService {
     if (updateResult.get() > 0) {
       return newMetalakeEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + ident);
+      throw new OptimisticLockException(
+          "Failed to update entity %s because it was modified concurrently", ident);
     }
   }
 

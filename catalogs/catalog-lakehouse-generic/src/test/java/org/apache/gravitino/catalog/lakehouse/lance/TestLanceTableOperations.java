@@ -34,7 +34,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +47,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -174,10 +174,10 @@ public class TestLanceTableOperations {
   /**
    * Reproduces the concurrent repair-on-load race seen in {@code LanceSparkRESTServiceIT}. When two
    * loads repair the same table at once, the optimistic-locked {@code store.update} of the slower
-   * one matches zero rows and {@code TableMetaService} surfaces it as {@code IOException("Failed to
-   * update the entity")}. Before the CAS retry, {@code repairTableMetadata} rethrew it as a fatal
-   * {@code RuntimeException} (HTTP 500) instead of tolerating the concurrent update. This test
-   * asserts that the lost race is benign and load returns a usable table.
+   * one matches zero rows and surfaces an {@link OptimisticLockException}. Before the CAS retry,
+   * {@code repairTableMetadata} rethrew it as a fatal {@code RuntimeException} (HTTP 500) instead
+   * of tolerating the concurrent update. This test asserts that the lost race is benign and load
+   * returns a usable table.
    */
   @Test
   public void testLoadTableSurvivesConcurrentRepairVersionRace() throws Exception {
@@ -219,10 +219,12 @@ public class TestLanceTableOperations {
     when(idGenerator.nextId()).thenReturn(10L, 11L);
 
     // First repair attempt loses the optimistic-lock CAS (a concurrent load already bumped the
-    // version): TableMetaService surfaces exactly this IOException. The retry re-reads the winner's
-    // already-repaired entity, against which the idempotent updater succeeds.
+    // version). The retry re-reads the winner's already-repaired entity, against which the
+    // idempotent updater succeeds.
     when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenThrow(new IOException("Failed to update the entity: " + ident))
+        .thenThrow(
+            new OptimisticLockException(
+                "Failed to update entity %s because it was modified concurrently", ident))
         .thenAnswer(
             invocation -> {
               @SuppressWarnings("unchecked")

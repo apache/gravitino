@@ -37,6 +37,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -279,7 +280,8 @@ public class GroupMetaService {
                             POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
                             oldGroupPO));
             if (updateResult[0] == 0) {
-              throw new RuntimeException("Failed to update the entity: " + identifier);
+              throw new OptimisticLockException(
+                  "Failed to update entity %s because it was modified concurrently", identifier);
             }
           },
           () -> {
@@ -309,7 +311,8 @@ public class GroupMetaService {
                   mapper -> mapper.touchGroupUpdatedAt(oldGroupPO.getGroupId())));
     } catch (RuntimeException re) {
       if (updateResult[0] == 0) {
-        throw new IOException("Failed to update the entity: " + identifier, re);
+        throw new OptimisticLockException(
+            re, "Failed to update entity %s because it was modified concurrently", identifier);
       }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());

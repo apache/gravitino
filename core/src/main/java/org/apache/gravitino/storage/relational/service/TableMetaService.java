@@ -34,6 +34,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -56,15 +57,6 @@ import org.apache.gravitino.utils.NamespaceUtil;
 
 /** The service class for table metadata. It provides the basic database operations for table. */
 public class TableMetaService {
-
-  /**
-   * Message prefix of the {@link java.io.IOException} thrown by {@link #updateTable} when the
-   * optimistic-lock CAS matches zero rows (the stored version advanced under a concurrent update).
-   * Exposed so callers that retry the lost race (e.g. the Lance repair-on-load path) can recognize
-   * the conflict without re-declaring the literal.
-   */
-  public static final String UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX =
-      "Failed to update the entity: ";
 
   private static final TableMetaService INSTANCE = new TableMetaService();
   private BasePOStorageOps<TablePO, TableMetaMapper> ops;
@@ -210,7 +202,8 @@ public class TableMetaService {
                 SessionUtils.getWithoutCommit(
                     TableMetaMapper.class, mapper -> ops.updatePO(mapper, newTablePO, oldTablePO)));
             if (updateResult.get() == 0) {
-              throw new RuntimeException(UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + identifier);
+              throw new OptimisticLockException(
+                  "Failed to update entity %s because it was modified concurrently", identifier);
             }
           },
           () ->
@@ -242,7 +235,8 @@ public class TableMetaService {
 
     } catch (RuntimeException re) {
       if (updateResult.get() == 0) {
-        throw new IOException(UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + identifier, re);
+        throw new OptimisticLockException(
+            re, "Failed to update entity %s because it was modified concurrently", identifier);
       }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TABLE, newTableEntity.nameIdentifier().toString());

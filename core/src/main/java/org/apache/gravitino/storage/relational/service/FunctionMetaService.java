@@ -38,6 +38,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
@@ -270,7 +271,8 @@ public class FunctionMetaService {
                     FunctionMetaMapper.class,
                     mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO)));
             if (updateResult.get() == 0) {
-              throw new RuntimeException("Failed to update the entity: " + identifier);
+              throw new OptimisticLockException(
+                  "Failed to update entity %s because it was modified concurrently", identifier);
             }
           },
           () ->
@@ -281,7 +283,8 @@ public class FunctionMetaService {
       return newEntity;
     } catch (RuntimeException re) {
       if (updateResult.get() == 0) {
-        throw new IOException("Failed to update the entity: " + identifier, re);
+        throw new OptimisticLockException(
+            re, "Failed to update entity %s because it was modified concurrently", identifier);
       }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FUNCTION, newEntity.nameIdentifier().toString());

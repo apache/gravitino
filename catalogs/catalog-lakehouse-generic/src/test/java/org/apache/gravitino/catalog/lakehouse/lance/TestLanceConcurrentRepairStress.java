@@ -50,6 +50,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Table;
@@ -66,16 +67,16 @@ import org.mockito.Mockito;
 /**
  * Real multi-threaded reproduction of the repair-on-load optimistic-lock race behind #11891. Unlike
  * {@code TestLanceTableOperations#testLoadTableSurvivesConcurrentRepairVersionRace} (a
- * deterministic mock that throws one scripted {@code IOException}), this test drives {@link
- * LanceTableOperations#loadTable} from several threads at once against a {@link CasEntityStore}
- * that models the production relational store's compare-and-set semantics faithfully: every {@code
- * update} bumps a version guarded by the base version, so concurrent updates from the same base
- * conflict and exactly one wins per generation — just like {@code TableMetaService.updateTable}
- * ({@code UPDATE ... WHERE current_version = old}).
+ * deterministic mock that throws one scripted {@link OptimisticLockException}), this test drives
+ * {@link LanceTableOperations#loadTable} from several threads at once against a {@link
+ * CasEntityStore} that models the production relational store's compare-and-set semantics
+ * faithfully: every {@code update} bumps a version guarded by the base version, so concurrent
+ * updates from the same base conflict and exactly one wins per generation — just like {@code
+ * TableMetaService.updateTable} ({@code UPDATE ... WHERE current_version = old}).
  *
- * <p>Before the CAS retry, the loser of the race got {@code IOException("Failed to update the
- * entity")}, rethrown as a fatal {@code RuntimeException} (HTTP 500). This test asserts every
- * concurrent load returns the repaired table instead.
+ * <p>Before the CAS retry, the loser of the race got an {@link OptimisticLockException}, rethrown
+ * as a fatal {@code RuntimeException} (HTTP 500). This test asserts every concurrent load returns
+ * the repaired table instead.
  */
 public class TestLanceConcurrentRepairStress {
 
@@ -230,7 +231,8 @@ public class TestLanceConcurrentRepairStress {
       if (ref.compareAndSet(base, next)) {
         return updated;
       }
-      throw new IOException("Failed to update the entity: " + ident);
+      throw new OptimisticLockException(
+          "Failed to update entity %s because it was modified concurrently", ident);
     }
 
     // --- unused surface ---------------------------------------------------

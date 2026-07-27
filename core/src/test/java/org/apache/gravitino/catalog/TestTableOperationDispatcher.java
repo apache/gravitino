@@ -58,6 +58,7 @@ import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -474,7 +475,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("test", alteredTable2.auditInfo().creator());
     Assertions.assertEquals("test", alteredTable2.auditInfo().lastModifier());
 
-    // Case 3: Test if the entity store is failed to update the table entity
+    // Case 3: An optimistic-lock conflict must propagate so REST can return HTTP 409.
+    reset(entityStore);
+    doThrow(new OptimisticLockException("Conflict"))
+        .when(entityStore)
+        .update(any(), any(), any(), any());
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () -> tableOperationDispatcher.alterTable(tableIdent, changes));
+
+    // Case 4: Test if the entity store is failed to update the table entity
     reset(entityStore);
     doThrow(new IOException()).when(entityStore).update(any(), any(), any(), any());
     Table alteredTable3 = tableOperationDispatcher.alterTable(tableIdent, changes);
@@ -482,7 +492,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("test", alteredTable3.auditInfo().creator());
     Assertions.assertEquals("test", alteredTable3.auditInfo().lastModifier());
 
-    // Case 4: Test if the table entity is not matched
+    // Case 5: Test if the table entity is not matched
     reset(entityStore);
     TableEntity unmatchedEntity =
         TableEntity.builder()

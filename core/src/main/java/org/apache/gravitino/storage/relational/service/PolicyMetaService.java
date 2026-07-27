@@ -35,6 +35,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -159,7 +160,8 @@ public class PolicyMetaService {
                       PolicyMetaMapper.class,
                       mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
               if (updateResult[0] == 0) {
-                throw new RuntimeException("Failed to update the entity: " + ident);
+                throw new OptimisticLockException(
+                    "Failed to update entity %s because it was modified concurrently", ident);
               }
             },
             () ->
@@ -174,7 +176,8 @@ public class PolicyMetaService {
       }
     } catch (RuntimeException re) {
       if (updateResult[0] == 0) {
-        throw new IOException("Failed to update the entity: " + ident, re);
+        throw new OptimisticLockException(
+            re, "Failed to update entity %s because it was modified concurrently", ident);
       }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
@@ -184,7 +187,8 @@ public class PolicyMetaService {
     if (updateResult[0] > 0) {
       return updatedPolicyEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + updatedPolicyEntity);
+      throw new OptimisticLockException(
+          "Failed to update entity %s because it was modified concurrently", ident);
     }
   }
 

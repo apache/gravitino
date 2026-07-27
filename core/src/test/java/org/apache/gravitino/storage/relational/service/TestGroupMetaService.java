@@ -48,6 +48,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
@@ -824,7 +825,7 @@ class TestGroupMetaService extends TestJDBCBackend {
       ExecutionException exception =
           Assertions.assertThrows(
               ExecutionException.class, () -> staleUpdate.get(10, TimeUnit.SECONDS));
-      assertTrue(exception.getCause() instanceof IOException);
+      assertTrue(exception.getCause() instanceof OptimisticLockException);
     } finally {
       continueUpdate.countDown();
       executor.shutdownNow();

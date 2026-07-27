@@ -34,6 +34,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -259,7 +260,8 @@ public class CatalogMetaService {
     if (updateResult.get() > 0) {
       return newEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + identifier);
+      throw new OptimisticLockException(
+          "Failed to update entity %s because it was modified concurrently", identifier);
     }
   }
 

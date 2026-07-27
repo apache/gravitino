@@ -47,6 +47,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -429,7 +430,7 @@ public class TestFilesetMetaService extends TestJDBCBackend {
 
     Exception exception =
         Assertions.assertThrows(
-            IOException.class,
+            OptimisticLockException.class,
             () ->
                 FilesetMetaService.getInstance()
                     .updateFileset(
@@ -455,8 +456,7 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                           }
                           return updatedFilesetEntity;
                         }));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Failed to update the entity: " + filesetIdent));
+    Assertions.assertTrue(exception.getMessage().contains("because it was modified concurrently"));
 
     FilesetEntity persistedEntity =
         FilesetMetaService.getInstance().getFilesetByIdentifier(filesetIdent);

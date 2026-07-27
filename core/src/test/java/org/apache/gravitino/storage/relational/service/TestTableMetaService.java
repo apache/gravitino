@@ -40,6 +40,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -231,7 +232,7 @@ public class TestTableMetaService extends TestJDBCBackend {
 
     Assertions.assertEquals(1, successfulUpdates.size());
     Assertions.assertEquals(1, failedUpdates.size());
-    assertTrue(failedUpdates.peek() instanceof IOException);
+    assertTrue(failedUpdates.peek() instanceof OptimisticLockException);
 
     TableEntity storedTable =
         TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier());
