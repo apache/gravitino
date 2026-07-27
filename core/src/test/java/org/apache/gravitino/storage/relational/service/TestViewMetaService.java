@@ -37,6 +37,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TagEntity;
@@ -185,7 +186,7 @@ public class TestViewMetaService extends TestJDBCBackend {
             .build();
 
     assertThrows(
-        IOException.class,
+        OptimisticLockException.class,
         () ->
             ViewMetaService.getInstance()
                 .updateView(
