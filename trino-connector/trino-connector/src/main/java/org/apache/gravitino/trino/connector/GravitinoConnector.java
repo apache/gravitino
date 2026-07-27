@@ -235,7 +235,14 @@ public class GravitinoConnector implements Connector {
             .getConfig()
             .getClientConfig()
             .getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "simple");
-    String token = session.getIdentity().getExtraCredentials().get("token");
+    String credentialKey =
+        catalogConnectorContext
+            .getConfig()
+            .getClientConfig()
+            .getOrDefault(
+                GravitinoAuthProvider.USER_TOKEN_CREDENTIAL_KEY,
+                GravitinoAuthProvider.DEFAULT_USER_TOKEN_CREDENTIAL_KEY);
+    String token = session.getIdentity().getExtraCredentials().get(credentialKey);
     String credKey = sessionCacheKey(authType, session.getUser(), token);
     try {
       return perUserSessionCache.get(
@@ -252,6 +259,11 @@ public class GravitinoConnector implements Connector {
       Throwable cause = e.getCause() == null ? e : e.getCause();
       LOG.warn(
           "Failed to create per-user Gravitino client for user '{}'", session.getUser(), cause);
+      if (cause instanceof TrinoException) {
+        // Already carries a specific Trino error code (e.g. from buildForSession); re-wrapping
+        // would swallow it.
+        throw (TrinoException) cause;
+      }
       if (cause instanceof IllegalArgumentException
           || cause instanceof UnsupportedOperationException) {
         throw new TrinoException(

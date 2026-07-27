@@ -181,6 +181,28 @@ class TestGravitinoConnectorForwardUser {
   }
 
   @Test
+  void testResolveSessionMetadataPreservesTrinoExceptionErrorCode() {
+    CatalogConnectorContext ctx =
+        mockContextWithConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2"));
+    GravitinoConnector connector =
+        newConnectorWithAuthClient(
+            ctx,
+            session -> {
+              throw new TrinoException(
+                  GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT, "No forwarded user token found");
+            });
+
+    TrinoException ex =
+        assertThrows(
+            TrinoException.class,
+            () -> connector.resolveSessionMetadata(mockSession("alice", "token-a")));
+    assertEquals(GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), ex.getErrorCode());
+  }
+
+  @Test
   void testResolveSessionMetadataMapsUnexpectedFailureToGenericInternalError() {
     CatalogConnectorContext ctx =
         mockContextWithConfig(
