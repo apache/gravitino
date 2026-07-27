@@ -186,6 +186,9 @@ public class CatalogConnectorMetadataAdapter {
                         Optional.ofNullable(column.getComment())))
             .collect(Collectors.toList());
 
+    // Known limitation: in multi-metalake mode, catalogName is the bare Gravitino catalog name,
+    // not the metalake-prefixed name Trino actually resolves catalogs by, so this fallback only
+    // produces a resolvable catalog in (the default) single-metalake mode.
     String defaultCatalog = view.getDefaultCatalog();
     if (defaultCatalog == null && view.getDefaultSchema() != null) {
       defaultCatalog = catalogName;
