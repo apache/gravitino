@@ -49,8 +49,9 @@ public final class WebIdentityTokenSources {
   static WebIdentityTokenSource create(
       Map<String, String> properties, Iterable<WebIdentityTokenSource> candidates) {
     String type =
-        properties.getOrDefault(
-            WebIdentityTokenSourceConfig.SOURCE, WebIdentityTokenSourceConfig.DEFAULT_SOURCE);
+        StringUtils.defaultIfBlank(
+            properties.get(WebIdentityTokenSourceConfig.SOURCE),
+            WebIdentityTokenSourceConfig.DEFAULT_SOURCE);
 
     List<String> available = new ArrayList<>();
     List<WebIdentityTokenSource> matched = new ArrayList<>();

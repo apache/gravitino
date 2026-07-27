@@ -33,7 +33,7 @@ public class TestDorisDatabaseOperations extends TestDoris {
   @Test
   public void testBaseOperationDatabase() {
     String databaseName = RandomNameUtils.genRandomName("it_db");
-    String comment = "comment";
+    String comment = "owner's \"comment\" C:\\tmp; DROP DATABASE marker; --";
 
     Map<String, String> properties = new HashMap<>();
     properties.put("property1", "value1");

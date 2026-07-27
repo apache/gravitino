@@ -31,6 +31,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -63,6 +65,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
@@ -78,6 +81,18 @@ import org.slf4j.LoggerFactory;
 
 public class LanceTableOperations extends ManagedTableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(LanceTableOperations.class);
+
+  /**
+   * Max attempts for the optimistic-locked repair-on-load {@code store.update}. Concurrent loads
+   * can repair the same table at once; the loser of the version CAS re-reads and retries.
+   */
+  private static final int REPAIR_UPDATE_MAX_ATTEMPTS = 5;
+
+  /** Lower bound (inclusive) of the randomized backoff slept between lost-CAS retries. */
+  private static final long REPAIR_RETRY_MIN_BACKOFF_MS = 10;
+
+  /** Upper bound (inclusive) of the randomized backoff slept between lost-CAS retries. */
+  private static final long REPAIR_RETRY_MAX_BACKOFF_MS = 100;
 
   public enum CreationMode {
     CREATE,
@@ -527,10 +542,8 @@ public class LanceTableOperations extends ManagedTableOperations {
   private Table repairTableMetadata(NameIdentifier ident, Column[] columns, long datasetVersion) {
     try {
       TableEntity tableEntity =
-          store.update(
+          updateTableWithCasRetry(
               ident,
-              TableEntity.class,
-              Entity.EntityType.TABLE,
               current -> {
                 if (!needsSchemaRefresh(current, datasetVersion)) {
                   return current;
@@ -547,13 +560,76 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
   }
 
+  /**
+   * Applies an idempotent update to the stored table, retrying when the optimistic-lock CAS is lost
+   * to a concurrent update. The repair-on-load path runs on every {@code loadTable}, so concurrent
+   * loads of the same table race on the version CAS; {@code store.update} surfaces the lost race as
+   * an {@link IOException} whose message starts with {@link
+   * TableMetaService#UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX}. Because the updater is idempotent, the
+   * loser sleeps a short randomized backoff (to avoid re-colliding), re-reads the latest (already
+   * repaired) entity, and retries instead of failing the whole load with a fatal error. Other IO
+   * failures (DB outage, serialization errors, etc.) are not conflicts and fail fast.
+   */
+  private TableEntity updateTableWithCasRetry(
+      NameIdentifier ident, Function<TableEntity, TableEntity> updater) throws IOException {
+    IOException lastConflict = null;
+    for (int attempt = 1; attempt <= REPAIR_UPDATE_MAX_ATTEMPTS; attempt++) {
+      try {
+        return store.update(ident, TableEntity.class, Entity.EntityType.TABLE, updater);
+      } catch (IOException e) {
+        // Only retry when the update matched 0 rows (lost optimistic-lock CAS). Other IO failures
+        // (DB outage, serialization errors, etc.) should fail fast.
+        String message = e.getMessage();
+        if (message == null
+            || !message.startsWith(TableMetaService.UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX)) {
+          throw e;
+        }
+
+        lastConflict = e;
+        LOG.debug(
+            "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), {}",
+            ident,
+            attempt,
+            REPAIR_UPDATE_MAX_ATTEMPTS,
+            attempt < REPAIR_UPDATE_MAX_ATTEMPTS ? "retrying" : "retries exhausted",
+            e);
+
+        if (attempt < REPAIR_UPDATE_MAX_ATTEMPTS) {
+          backoffBeforeRetry(ident);
+        }
+      }
+    }
+    throw new IOException(
+        String.format(
+            "Failed to update table %s after %d optimistic-lock retries",
+            ident, REPAIR_UPDATE_MAX_ATTEMPTS),
+        lastConflict);
+  }
+
+  /**
+   * Sleeps a short randomized backoff between two lost-CAS retries so that racing loads de-sync
+   * instead of immediately colliding again. Package-private so tests can neutralize the sleep.
+   *
+   * @param ident the table being updated, used only for the interrupt error message
+   * @throws IOException if the thread is interrupted while backing off
+   */
+  void backoffBeforeRetry(NameIdentifier ident) throws IOException {
+    long backoffMillis =
+        ThreadLocalRandom.current()
+            .nextLong(REPAIR_RETRY_MIN_BACKOFF_MS, REPAIR_RETRY_MAX_BACKOFF_MS + 1);
+    try {
+      Thread.sleep(backoffMillis);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted while retrying metadata update for " + ident, ie);
+    }
+  }
+
   private Table recordCheckedEmptyVersion(NameIdentifier ident, long datasetVersion) {
     try {
       TableEntity tableEntity =
-          store.update(
+          updateTableWithCasRetry(
               ident,
-              TableEntity.class,
-              Entity.EntityType.TABLE,
               current -> {
                 if (!isDatasetVersionChanged(current.properties(), datasetVersion)) {
                   return current;

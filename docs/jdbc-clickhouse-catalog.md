@@ -172,7 +172,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Engines             | **MergeTree family** (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`): fully supported, data persists across restarts. **Log family** (`TinyLog`, `StripeLog`, `Log`): supported, data and table definition persist across restarts. **`Null`**: supported, table persists, data is always discarded by design. **`Set`**: supported, table definition persists. **`Memory`**: ⚠️ table definition persists but data is lost on ClickHouse restart (volatile). **Distributed**: cluster mode with remote database/table and sharding key. **Not directly creatable via Gravitino** (`Join`, `Buffer`, `View`, `KeeperMap`, `File`): require parameterized ENGINE clauses or external dependencies not supported by the CREATE TABLE API. |
 | Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                                                                                                                    |
-| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (fixed granularities).                                                                                                                                                                                                                                                                                                                                                         |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX`, `DATA_SKIPPING_BLOOM_FILTER`, and `DATA_SKIPPING_SET` (configurable granularity via `Index.properties()`).                                                                                                                                                                                                                                                                                                                                   |
 | Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                                                                                                                               |
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -240,8 +240,11 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 
 - `PRIMARY_KEY`
 - Data-skipping indexes:
-  - `DATA_SKIPPING_MINMAX` (`GRANULARITY` fixed to 1)
-  - `DATA_SKIPPING_BLOOM_FILTER` (`GRANULARITY` fixed to 3)
+  - `DATA_SKIPPING_MINMAX` (default `GRANULARITY 1`)
+  - `DATA_SKIPPING_BLOOM_FILTER` (default `GRANULARITY 1`)
+  - `DATA_SKIPPING_SET` (default `GRANULARITY 1`, plus configurable `set(N)` max values)
+
+  Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
 
 ### Partitioning, Sorting, and Distribution
 
@@ -347,7 +350,7 @@ Supported:
 - Rename column.
 - Update column type/comment/default/position/nullability.
 - Delete columns (with `IF EXISTS` support).
-- Add data-skipping indexes; drop data-skipping indexes. Adding/dropping primary key is not supported.
+- Add data-skipping indexes with custom `GRANULARITY` and `set(N)` via `Index.properties()`; drop data-skipping indexes. Adding/dropping primary key is not supported.
 - Update table comment.
 
 Unsupported:

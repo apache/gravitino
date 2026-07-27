@@ -127,6 +127,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
         .executor(CLEANUP_EXECUTOR)
         .removalListener(
             (key, value, cause) -> {
+              LOG.debug("Removed entity cache entry, key={}, cause={}", key, cause);
               if (cause == RemovalCause.EXPLICIT || cause == RemovalCause.REPLACED) {
                 return;
               }
@@ -134,9 +135,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
                 invalidateExpiredItem(key);
               } catch (Throwable t) {
                 LOG.error(
-                    "Failed to remove entity key={} value={} from cache asynchronously, cause={}",
+                    "Failed to remove entity key={} from cache asynchronously, cause={}",
                     key,
-                    value,
                     cause,
                     t);
               }

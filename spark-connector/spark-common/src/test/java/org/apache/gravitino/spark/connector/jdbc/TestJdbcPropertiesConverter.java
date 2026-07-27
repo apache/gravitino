@@ -29,6 +29,29 @@ public class TestJdbcPropertiesConverter {
       JdbcPropertiesConverter.getInstance();
 
   @Test
+  void testGetNoTablePropertiesInstance() {
+    JdbcPropertiesConverter instance = JdbcPropertiesConverter.getNoTablePropertiesInstance();
+    Assertions.assertNotNull(instance);
+    Assertions.assertSame(instance, JdbcPropertiesConverter.getNoTablePropertiesInstance());
+    Assertions.assertNotSame(instance, JdbcPropertiesConverter.getInstance());
+
+    Map<String, String> emptyProps = instance.toGravitinoTableProperties(ImmutableMap.of());
+    Assertions.assertTrue(emptyProps.isEmpty());
+
+    Map<String, String> ownerProps =
+        instance.toGravitinoTableProperties(ImmutableMap.of("owner", "alice"));
+    Assertions.assertTrue(ownerProps.isEmpty());
+
+    Map<String, String> upperOwnerProps =
+        instance.toGravitinoTableProperties(ImmutableMap.of("OWNER", "bob"));
+    Assertions.assertTrue(upperOwnerProps.isEmpty());
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> instance.toGravitinoTableProperties(ImmutableMap.of("someKey", "value")));
+  }
+
+  @Test
   void testCatalogProperties() {
     String url = "jdbc-url";
     String user = "user1";

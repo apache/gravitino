@@ -281,7 +281,21 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
           "Table not found: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
     }
     Map<String, String> properties = t.properties();
-    // TODO Support real deregister API.
+
+    // Verify the table is external before deregistering. For non-external (managed) tables,
+    // dropTable would delete the underlying Lance data, violating the deregister contract
+    // ("It will not delete the underlying lance data"). The TableCatalog interface does not
+    // expose a metadata-only removal path, so we fail fast rather than risk silent data loss.
+    boolean external =
+        Optional.ofNullable(properties.get(Table.PROPERTY_EXTERNAL))
+            .map(Boolean::parseBoolean)
+            .orElse(false);
+    if (!external) {
+      throw new UnsupportedOperationException(
+          "deregisterTable only supports external tables, but table " + tableId + " is managed");
+    }
+
+    // External tables: dropTable removes catalog metadata only, preserving Lance data.
     boolean result = catalog.asTableCatalog().dropTable(tableIdentifier);
     if (!result) {
       throw new TableNotFoundException(

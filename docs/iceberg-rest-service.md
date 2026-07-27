@@ -163,6 +163,8 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 | `gravitino.iceberg-rest.warehouse`                                        | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                                                           | (none)                                                                         | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.catalog-backend-name`                             | The catalog backend name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `hive` for Hive backend, `jdbc` for JDBC backend, `memory` for memory backend  | No       | 0.5.2         |
 
+For Kerberos-secured Hive Metastore and HDFS, see [Backend Authentication](#backend-authentication).
+
 #### JDBC Backend Configuration
 
 | Configuration item                            | Description                                                                                                                                                                                                                                            | Default value           | Required | Since Version |
@@ -179,6 +181,8 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 | `gravitino.iceberg-rest.jdbc.strict-mode`     | Whether the JDBC catalog runs in strict mode. Defaults to `true` so that creating a table or view in a namespace that does not exist fails with `NoSuchNamespace` (HTTP 404), matching the Iceberg REST specification. Set to `false` to restore the legacy behavior of implicitly creating the namespace.  | `true`                  | No       | 1.3.0         |
 
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
+
+Use `gravitino.iceberg-rest.jdbc-user` and `gravitino.iceberg-rest.jdbc-password` to authenticate the JDBC catalog metadata store. When the warehouse is on Kerberos-secured HDFS, set `gravitino.iceberg-rest.authentication.type` to `kerberos` and configure the Kerberos properties in [Backend Authentication](#backend-authentication) to access warehouse paths.
 
 :::caution
 Download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
@@ -428,18 +432,62 @@ Refer to [HTTPS Configuration](./security/how-to-use-https.md#apache-iceberg-res
 
 #### Backend Authentication
 
-For JDBC backend, you can use the `gravitino.iceberg-rest.jdbc-user` and `gravitino.iceberg-rest.jdbc-password` to authenticate the JDBC connection. For Hive backend, you can use the `gravitino.iceberg-rest.authentication.type` to specify the authentication type, and use the `gravitino.iceberg-rest.authentication.kerberos.principal` and `gravitino.iceberg-rest.authentication.kerberos.keytab-uri` to authenticate the Kerberos connection.
+For the JDBC catalog backend, use `gravitino.iceberg-rest.jdbc-user` and `gravitino.iceberg-rest.jdbc-password` to authenticate the JDBC metadata store connection. Use `gravitino.iceberg-rest.authentication.type` to specify how the catalog backend accesses the warehouse storage. When the warehouse is on HDFS, set it to `kerberos` or `simple`, and configure `gravitino.iceberg-rest.authentication.kerberos.principal` and `gravitino.iceberg-rest.authentication.kerberos.keytab-uri` for Kerberos authentication.
+
+For the Hive catalog backend, `gravitino.iceberg-rest.authentication.type` controls both Hive Metastore and HDFS access. When using Kerberos, also configure `gravitino.iceberg-rest.hive.metastore.sasl.enabled` and related Hive Metastore Kerberos properties.
+
 The detailed configuration items are as follows:
 
-| Configuration item                                                        | Description                                                                                                                                                                                                                                           | Default value | Required                                                                                                                                                             | Since Version    |
-|---------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `gravitino.iceberg-rest.authentication.type`                              | The type of authentication for Iceberg rest catalog backend. This configuration only applicable for Hive backend, and only supports `Kerberos`, `simple` currently. As for JDBC backend, only username/password authentication was supported now. | `simple`      | No                                                                                                                                                                   | 0.7.0-incubating |
-| `gravitino.iceberg-rest.authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                               | `false`       | No                                                                                                                                                                   | 0.7.0-incubating |
-| `gravitino.iceberg-rest.hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore.                                                                                                                                                               | `false`       | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.7.0-incubating |
-| `gravitino.iceberg-rest.authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                          | (none)        | required if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos.                                                                                   | 0.7.0-incubating |
-| `gravitino.iceberg-rest.authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                                | (none)        | required if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos.                                                                                   | 0.7.0-incubating |
-| `gravitino.iceberg-rest.authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                        | 60            | No                                                                                                                                                                   | 0.7.0-incubating |
-| `gravitino.iceberg-rest.authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                            | 60            | No                                                                                                                                                                   | 0.7.0-incubating |
+| Configuration item                                                            | Description                                                                                                                                                                                                                                               | Default value     | Required                                                                                                                                                                 | Since Version        |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| `gravitino.iceberg-rest.authentication.type`                                  | The authentication type for HDFS warehouse access. Supports `kerberos` and `simple` for Hive and JDBC catalog backends.                                                                                                                                   | `simple`          | No                                                                                                                                                                       | 0.7.0-incubating     |
+| `gravitino.iceberg-rest.authentication.impersonation-enable`                  | Whether to enable impersonation for the Iceberg catalog.                                                                                                                                                                                                  | `false`           | No                                                                                                                                                                       | 0.7.0-incubating     |
+| `gravitino.iceberg-rest.hive.metastore.sasl.enabled`                          | Whether to enable SASL when connecting to a Kerberos Hive Metastore.                                                                                                                                                                                      | `false`           | No. Set to true in most cases when `gravitino.iceberg-rest.authentication.type` is `kerberos` (some deployments use SSL instead, but that is rare).                      | 0.7.0-incubating     |
+| `gravitino.iceberg-rest.authentication.kerberos.principal`                    | The principal for Kerberos authentication.                                                                                                                                                                                                                | (none)            | Yes, if `gravitino.iceberg-rest.authentication.type` is `kerberos`.                                                                                                      | 0.7.0-incubating     |
+| `gravitino.iceberg-rest.authentication.kerberos.keytab-uri`                   | The URI of the keytab for Kerberos authentication.                                                                                                                                                                                                        | (none)            | Yes, if `gravitino.iceberg-rest.authentication.type` is `kerberos`.                                                                                                      | 0.7.0-incubating     |
+| `gravitino.iceberg-rest.authentication.kerberos.check-interval-sec`           | The check interval of Kerberos credential for the Iceberg catalog.                                                                                                                                                                                        | 60                | No                                                                                                                                                                       | 0.7.0-incubating     |
+| `gravitino.iceberg-rest.authentication.kerberos.keytab-fetch-timeout-sec`     | The fetch timeout for retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                               | 60                | No                                                                                                                                                                       | 0.7.0-incubating     |
+
+Kerberos applies to **HDFS warehouse** access.
+
+**Hive backend with Kerberos** — authenticates to both Hive Metastore and HDFS:
+
+```text
+gravitino.iceberg-rest.catalog-backend = hive
+gravitino.iceberg-rest.uri = thrift://127.0.0.1:9083
+gravitino.iceberg-rest.warehouse = hdfs://127.0.0.1:9000/user/hive/warehouse-hive
+
+gravitino.iceberg-rest.authentication.type = kerberos
+gravitino.iceberg-rest.authentication.kerberos.principal = iceberg@EXAMPLE.COM
+gravitino.iceberg-rest.authentication.kerberos.keytab-uri = file:///etc/security/keytabs/iceberg.keytab
+
+gravitino.iceberg-rest.hive.metastore.sasl.enabled = true
+gravitino.iceberg-rest.hive.metastore.kerberos.principal = hive/host.example.com@EXAMPLE.COM
+
+gravitino.iceberg-rest.hadoop.security.authentication = kerberos
+gravitino.iceberg-rest.dfs.namenode.kerberos.principal = hdfs/host.example.com@EXAMPLE.COM
+```
+
+**JDBC backend with Kerberos-secured HDFS warehouse** — JDBC credentials authenticate the metadata store; Kerberos authenticates HDFS access only:
+
+```text
+gravitino.iceberg-rest.catalog-backend = jdbc
+gravitino.iceberg-rest.jdbc-driver = org.postgresql.Driver
+gravitino.iceberg-rest.uri = jdbc:postgresql://127.0.0.1:5432/iceberg
+gravitino.iceberg-rest.jdbc-user = iceberg
+gravitino.iceberg-rest.jdbc-password = secret
+gravitino.iceberg-rest.jdbc-initialize = true
+gravitino.iceberg-rest.warehouse = hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc
+
+gravitino.iceberg-rest.authentication.type = kerberos
+gravitino.iceberg-rest.authentication.kerberos.principal = iceberg@EXAMPLE.COM
+gravitino.iceberg-rest.authentication.kerberos.keytab-uri = file:///etc/security/keytabs/iceberg.keytab
+
+gravitino.iceberg-rest.hadoop.security.authentication = kerberos
+gravitino.iceberg-rest.dfs.namenode.kerberos.principal = hdfs/host.example.com@EXAMPLE.COM
+```
+
+Replace `host.example.com` and `EXAMPLE.COM` with your Hive/HDFS host name and Kerberos realm. Hive Metastore SASL properties are not required for the JDBC backend.
 
 #### Credential Vending
 

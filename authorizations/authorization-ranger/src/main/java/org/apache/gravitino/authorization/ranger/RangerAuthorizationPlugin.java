@@ -324,7 +324,7 @@ public abstract class RangerAuthorizationPlugin
         LOG.info("Ranger delete role: {} failed!", role, e);
       } else {
         throw new AuthorizationPluginException(
-            "Fail to delete role %s exception: %s", role, e.getMessage());
+            "Failed to delete role %s, exception: %s", role, e.getMessage());
       }
     }
     return Boolean.TRUE;
@@ -622,7 +622,7 @@ public abstract class RangerAuthorizationPlugin
                 rangerClient.grantRole(rangerServiceName, grantRevokeRoleRequest);
               } catch (RangerServiceException e) {
                 throw new AuthorizationPluginException(
-                    "Fail to grant role %s to user %s, exception: %s",
+                    "Failed to grant role %s to user %s, exception: %s",
                     role.name(), user.name(), e.getMessage());
               }
             });
@@ -658,7 +658,7 @@ public abstract class RangerAuthorizationPlugin
                 rangerClient.revokeRole(rangerServiceName, grantRevokeRoleRequest);
               } catch (RangerServiceException e) {
                 throw new AuthorizationPluginException(
-                    "Fail to revoke role %s from user %s, exception: %s",
+                    "Failed to revoke role %s from user %s, exception: %s",
                     role.name(), user.name(), e.getMessage());
               }
             });
@@ -694,7 +694,7 @@ public abstract class RangerAuthorizationPlugin
                 rangerClient.grantRole(rangerServiceName, grantRevokeRoleRequest);
               } catch (RangerServiceException e) {
                 throw new AuthorizationPluginException(
-                    "Fail to grant role: %s to group %s, exception: %s.",
+                    "Failed to grant role %s to group %s, exception: %s",
                     role, group, e.getMessage());
               }
             });
@@ -727,7 +727,7 @@ public abstract class RangerAuthorizationPlugin
                 rangerClient.revokeRole(rangerServiceName, grantRevokeRoleRequest);
               } catch (RangerServiceException e) {
                 throw new AuthorizationPluginException(
-                    "Fail to revoke role %s from group %s, exception: %s",
+                    "Failed to revoke role %s from group %s, exception: %s",
                     role.name(), group.name(), e.getMessage());
               }
             });
@@ -821,11 +821,11 @@ public abstract class RangerAuthorizationPlugin
           }
         } catch (RangerServiceException crse) {
           throw new AuthorizationPluginException(
-              "Fail to create ranger service %s, exception: %s", serviceName, crse.getMessage());
+              "Failed to create Ranger service %s, exception: %s", serviceName, crse.getMessage());
         }
       } else {
         throw new AuthorizationPluginException(
-            "Fail to get ranger service name %s, exception: %s", serviceName, rse.getMessage());
+            "Failed to get Ranger service name %s, exception: %s", serviceName, rse.getMessage());
       }
     }
   }
@@ -1094,7 +1094,7 @@ public abstract class RangerAuthorizationPlugin
         }
       }
     } catch (Exception e) {
-      throw new AuthorizationPluginException("Fail to get the field name of class VXGroup");
+      throw new AuthorizationPluginException("Failed to get the field name of class VXGroup");
     }
     return Optional.empty();
   }

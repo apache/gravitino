@@ -38,7 +38,7 @@ Mixing Iceberg JARs from different versions on the client classpath is not compa
 - Supports DDL operations for Iceberg schemas and tables.
 - Doesn't support snapshot or table management operations.
 - Supports multi storage, including S3, GCS, ADLS, OSS and HDFS.
-- Supports Kerberos or simple authentication for Iceberg catalog with Hive backend.
+- Supports Kerberos or simple authentication for warehouse storage access on HDFS for Hive and JDBC catalog backends.
 - Supports table metadata cache.
 
 ### Catalog Properties
@@ -60,7 +60,7 @@ If you are using the Gravitino with Spark, you can pass the Spark Iceberg connec
 
 #### JDBC Backend
 
-If you are using JDBC backend, you must provide properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`.
+If you are using JDBC backend, you must provide properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`. Use `jdbc-user` and `jdbc-password` for the JDBC metadata store connection. When the warehouse is on Kerberos-secured HDFS, set `authentication.type` to `kerberos` and configure the Kerberos properties in [Catalog Backend Security](#catalog-backend-security).
 
 | Property name     | Description                                                                                             | Default value | Required | Since Version |
 |-------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -228,17 +228,17 @@ Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${pref
 
 #### Catalog Backend Security
 
-Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
+Users can use the following properties to configure warehouse storage security when needed. For example, if you are using a Hive or JDBC catalog backend with a Kerberos-secured HDFS warehouse, set `authentication.type` to `kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`. For JDBC backend, JDBC username/password authentication for the metadata store is configured separately via `jdbc-user` and `jdbc-password`.
 
-| Property name                                      | Description                                                                                                                                                                                                                                      | Default value | Required                                                                                                                                                             | Since Version    |
-|----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `authentication.type`                              | The type of authentication for Iceberg catalog backend. This configuration only applicable for for Hive backend, and only supports `Kerberos`, `simple` currently. As for JDBC backend, only username/password authentication was supported now. | `simple`      | No                                                                                                                                                                   | 0.6.0-incubating |
-| `authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                          | `false`       | No                                                                                                                                                                   | 0.6.0-incubating |
-| `hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore. This is a raw Hive configuration                                                                                                                         | `false`       | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.6.0-incubating |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                     | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                           | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                   | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                       | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
+| Property name                                          | Description                                                                                                                                                                                                                                              | Default value     | Required                                                                                                                                                                 | Since Version        |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| `authentication.type`                                  | The authentication type for HDFS warehouse access. Supports `kerberos` and `simple` for Hive and JDBC catalog backends.                                                                                                                                  | `simple`          | No                                                                                                                                                                       | 0.6.0-incubating     |
+| `authentication.impersonation-enable`                  | Whether to enable impersonation for the Iceberg catalog.                                                                                                                                                                                                 | `false`           | No                                                                                                                                                                       | 0.6.0-incubating     |
+| `hive.metastore.sasl.enabled`                          | Whether to enable SASL when connecting to a Kerberos Hive Metastore. This is a raw Hive configuration.                                                                                                                                                   | `false`           | No. Set to true in most cases when `authentication.type` is `kerberos` (some deployments use SSL instead, but that is rare).                                             | 0.6.0-incubating     |
+| `authentication.kerberos.principal`                    | The principal for Kerberos authentication.                                                                                                                                                                                                               | (none)            | Yes, if `authentication.type` is `kerberos`.                                                                                                                             | 0.6.0-incubating     |
+| `authentication.kerberos.keytab-uri`                   | The URI of the keytab for Kerberos authentication.                                                                                                                                                                                                       | (none)            | Yes, if `authentication.type` is `kerberos`.                                                                                                                             | 0.6.0-incubating     |
+| `authentication.kerberos.check-interval-sec`           | The check interval of Kerberos credential for the Iceberg catalog.                                                                                                                                                                                       | 60                | No                                                                                                                                                                       | 0.6.0-incubating     |
+| `authentication.kerberos.keytab-fetch-timeout-sec`     | The fetch timeout for retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                              | 60                | No                                                                                                                                                                       | 0.6.0-incubating     |
 
 #### Table Metadata Cache
 
@@ -428,12 +428,25 @@ If you doesn't specify distribution expressions, the table distribution will be 
 | `String`          | `String`                    |
 | `Date`            | `Date`                      |
 | `Time(6)`         | `Time`                      |
-| `Timestamp(6)`    | `TimestampType withZone`    |
-| `Timestamp_tz(6)` | `TimestampType withoutZone` |
+| `Timestamp(6)`    | `TimestampType withoutZone`     |
+| `Timestamp_tz(6)` | `TimestampType withZone`        |
+| `Timestamp(9)`    | `TimestampNanoType withoutZone` |
+| `Timestamp_tz(9)` | `TimestampNanoType withZone`    |
 | `Decimal`         | `Decimal`                   |
 | `Fixed`           | `Fixed`                     |
 | `Binary`          | `Binary`                    |
 | `UUID`            | `UUID`                      |
+| `Variant`         | `Variant`                   |
+| `Null`            | `Unknown`                   |
+| `Geometry`        | `Geometry`                  |
+| `Geography`       | `Geography`                 |
+
+:::note
+Gravitino `Null` maps to Apache Iceberg's V3 `unknown` type — a null-only placeholder for a column
+whose type is not yet known. It requires table `format-version` 3, must be an optional (nullable)
+column, and can be promoted to a concrete type via schema evolution. This is the recommended way to
+represent an Iceberg `unknown` column in Gravitino.
+:::
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
@@ -450,19 +463,19 @@ Pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configurat
 **Immutable**: Fields that cannot be modified once set.
 :::
 
-| Configuration item        | Description                                                                           | Default value | Required | Reserved | Immutable | Since Version |
-|---------------------------|---------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
-| `location`                | Iceberg location for table storage.                                                   | (none)        | No       | No       | Yes       | 0.2.0         |
-| `provider`                | The storage provider for table storage.                                               | (none)        | No       | No       | Yes       | 0.2.0         |
-| `format`                  | The format of table storage.                                                          | (none)        | No       | No       | Yes       | 0.2.0         |
-| `format-version`          | The format version of table storage.                                                  | (none)        | No       | No       | Yes       | 0.2.0         |
-| `comment`                 | The table comment; use the `comment` field in table meta instead.                     | (none)        | No       | Yes      | No        | 0.2.0         |
-| `creator`                 | The table creator.                                                                    | (none)        | No       | Yes      | No        | 0.2.0         |
-| `current-snapshot-id`     | The snapshot represents the current state of the table.                               | (none)        | No       | Yes      | No        | 0.2.0         |
-| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                   | (none)        | No       | Yes      | No        | 0.2.0         |
-| `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.                      | (none)        | No       | Yes      | No        | 0.2.0         |
-| `identifier-fields`       | The identifier fields for defining the table.                                         | (none)        | No       | Yes      | No        | 0.2.0         |
-| `write.distribution-mode` | Defines distribution of write data; use `distribution` in table meta instead.         | (none)        | No       | Yes      | No        | 0.2.0         |
+| Configuration item        | Description                                                                                                                                                       | Default value | Required | Reserved | Immutable | Since Version |
+|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
+| `location`                | Iceberg location for table storage.                                                                                                                               | (none)        | No       | No       | Yes       | 0.2.0         |
+| `provider`                | The storage provider for table storage.                                                                                                                           | (none)        | No       | No       | Yes       | 0.2.0         |
+| `format`                  | The format of table storage.                                                                                                                                      | (none)        | No       | No       | Yes       | 0.2.0         |
+| `format-version`          | The Iceberg table format version. Gravitino supports creating tables at versions `1`–`4` (the range the bundled Iceberg version can write) and defaults to `2` when unset. Version `3` is required for V3 types such as `variant`; version `4` is not yet a finalized Iceberg spec. | `2`           | No       | No       | Yes       | 0.2.0         |
+| `comment`                 | The table comment; use the `comment` field in table meta instead.                                                                                                 | (none)        | No       | Yes      | No        | 0.2.0         |
+| `creator`                 | The table creator.                                                                                                                                                | (none)        | No       | Yes      | No        | 0.2.0         |
+| `current-snapshot-id`     | The snapshot represents the current state of the table.                                                                                                           | (none)        | No       | Yes      | No        | 0.2.0         |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                                                                                               | (none)        | No       | Yes      | No        | 0.2.0         |
+| `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.                                                                                                  | (none)        | No       | Yes      | No        | 0.2.0         |
+| `identifier-fields`       | The identifier fields for defining the table.                                                                                                                     | (none)        | No       | Yes      | No        | 0.2.0         |
+| `write.distribution-mode` | Defines distribution of write data; use `distribution` in table meta instead.                                                                                     | (none)        | No       | Yes      | No        | 0.2.0         |
 
 ### Table Indexes
 

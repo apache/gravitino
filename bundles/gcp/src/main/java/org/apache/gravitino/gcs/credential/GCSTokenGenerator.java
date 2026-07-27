@@ -248,7 +248,7 @@ public class GCSTokenGenerator implements CredentialGenerator<GCSTokenCredential
     try (InputStream fileInputStream = Files.newInputStream(credentialsFilePath)) {
       return GoogleCredentials.fromStream(fileInputStream);
     } catch (NoSuchFileException e) {
-      throw new IOException("GCS credential file does not exist." + gcsCredentialFilePath, e);
+      throw new IOException("GCS credential file does not exist: " + gcsCredentialFilePath, e);
     }
   }
 

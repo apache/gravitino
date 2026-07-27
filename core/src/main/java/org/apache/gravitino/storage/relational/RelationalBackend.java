@@ -114,6 +114,35 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws IOException;
 
   /**
+   * Retrieves the entity associated with the external id name identifier.
+   *
+   * @param <E> The type of the entity returned.
+   * @param ident The external id name identifier.
+   * @param entityType The type of the entity.
+   * @return The entity associated with the external id name identifier.
+   * @throws NoSuchEntityException If the entity does not exist.
+   * @throws IOException If an I/O exception occurs during retrieval.
+   */
+  <E extends Entity & HasIdentifier> E getByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType) throws NoSuchEntityException, IOException;
+
+  /**
+   * Updates an entity by external id.
+   *
+   * @param <E> the type of the entity returned
+   * @param ident the external id name identifier
+   * @param entityType the type of the entity
+   * @param updater a {@link Function} that takes the current entity instance and returns the
+   *     updated instance
+   * @return the updated entity
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IOException if the update operation fails
+   */
+  <E extends Entity & HasIdentifier> E updateByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws NoSuchEntityException, IOException;
+
+  /**
    * Batch retrieves the entities associated with the identifiers and the entity type.
    *
    * @param <E> The type of the entity returned.

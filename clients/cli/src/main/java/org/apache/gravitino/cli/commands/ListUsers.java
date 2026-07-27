@@ -74,6 +74,16 @@ public class ListUsers extends Command {
       }
 
       @Override
+      public String externalId() {
+        return null;
+      }
+
+      @Override
+      public boolean enabled() {
+        return true;
+      }
+
+      @Override
       public List<String> roles() {
         return null;
       }

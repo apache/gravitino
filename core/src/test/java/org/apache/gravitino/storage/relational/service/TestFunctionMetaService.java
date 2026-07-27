@@ -47,6 +47,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -280,6 +281,23 @@ public class TestFunctionMetaService extends TestJDBCBackend {
             ImmutableMap.of());
     RoleMetaService.getInstance().insertRole(role, false);
 
+    // Set up tag relation
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag1")
+            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagMetaService.getInstance().insertTag(tag, false);
+    TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(
+            function.nameIdentifier(),
+            function.type(),
+            new NameIdentifier[] {NameIdentifierUtil.ofTag(metalakeName, tag.name())},
+            new NameIdentifier[0]);
+    assertEquals(1, countActiveTagRelForMetadataObject(function.id(), "FUNCTION"));
+
     NameIdentifier functionIdent =
         NameIdentifier.of(metalakeName, catalogName, schemaName, functionName);
     assertTrue(FunctionMetaService.getInstance().deleteFunction(functionIdent));
@@ -294,6 +312,9 @@ public class TestFunctionMetaService extends TestJDBCBackend {
 
     // Verify securable object (role) relation is cleaned up
     assertEquals(0, countActiveObjectRelForRole(role.id()));
+
+    // Verify tag relation is cleaned up
+    assertEquals(0, countActiveTagRelForMetadataObject(function.id(), "FUNCTION"));
   }
 
   @TestTemplate
@@ -563,6 +584,27 @@ public class TestFunctionMetaService extends TestJDBCBackend {
         return rs.getInt(1);
       }
       throw new RuntimeException("No result for countActiveObjectRelForRole");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
+
+  private int countActiveTagRelForMetadataObject(Long metadataObjectId, String metadataObjectType) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM tag_relation_meta"
+                        + " WHERE metadata_object_id = %d AND metadata_object_type = '%s'"
+                        + " AND deleted_at = 0",
+                    metadataObjectId, metadataObjectType))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      throw new RuntimeException("No result for countActiveTagRelForMetadataObject");
     } catch (SQLException e) {
       throw new RuntimeException("SQL execution failed", e);
     }

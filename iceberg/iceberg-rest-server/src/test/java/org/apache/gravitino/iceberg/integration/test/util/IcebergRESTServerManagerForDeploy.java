@@ -23,6 +23,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Future;
@@ -35,9 +36,15 @@ import org.apache.gravitino.integration.test.util.ProcessData.TypesOfData;
 public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager {
 
   private static final String SCRIPT_NAME = "gravitino-iceberg-rest-server.sh";
-  private Path icebergRESTServerHome;
+  private static final String KRB5_CONF_PLACEHOLDER =
+      "#JAVA_OPTS+=\" -Djava.security.krb5.conf=/etc/krb5.conf\"";
+  private static final String KRB5_CONF_PROPERTY = "java.security.krb5.conf";
+  private static final String KRB5_REALM_PROPERTY = "java.security.krb5.realm";
+  private static final String KRB5_KDC_PROPERTY = "java.security.krb5.kdc";
   private static final String SQLITE_DRIVER_DOWNLOAD_URL =
       "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar";
+
+  private final Path icebergRESTServerHome;
 
   public IcebergRESTServerManagerForDeploy() {
     String gravitinoRootDir = System.getenv("GRAVITINO_ROOT_DIR");
@@ -56,48 +63,64 @@ public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager 
         Paths.get(icebergRESTServerHome.toString(), "iceberg-rest-server", "libs").toString());
 
     String gravitinoRestStartShell = icebergRESTServerHome.toString() + "/bin/" + SCRIPT_NAME;
-    String krb5Path = System.getProperty("java.security.krb5.conf");
+    String startShell = gravitinoRestStartShell;
+    String krb5Path = System.getProperty(KRB5_CONF_PROPERTY);
     if (krb5Path != null) {
       LOG.info("java.security.krb5.conf: {}", krb5Path);
-      String modifiedGravitinoStartShell =
-          String.format(
-              "%s/bin/gravitino-iceberg-rest-server_%s.sh",
-              icebergRESTServerHome.toString(), UUID.randomUUID());
-      // Replace '/etc/krb5.conf' with the one in the test
-      try {
-        String content =
-            FileUtils.readFileToString(new File(gravitinoRestStartShell), StandardCharsets.UTF_8);
-        content =
-            content.replace(
-                "#JAVA_OPTS+=\" -Djava.security.krb5.conf=/etc/krb5.conf\"",
-                String.format("JAVA_OPTS+=\" -Djava.security.krb5.conf=%s\"", krb5Path));
-        File tmp = new File(modifiedGravitinoStartShell);
-        FileUtils.write(tmp, content, StandardCharsets.UTF_8);
-        tmp.setExecutable(true);
-        LOG.info("modifiedGravitinoStartShell content: \n{}", content);
-        CommandExecutor.executeCommandLocalHost(
-            modifiedGravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
-      } catch (Exception e) {
-        LOG.error("Can replace /etc/krb5.conf with real kerberos configuration", e);
-      }
-    } else {
-      String cmd = String.format("%s/bin/%s start", icebergRESTServerHome.toString(), SCRIPT_NAME);
-      CommandExecutor.executeCommandLocalHost(
-          cmd,
-          false,
-          ProcessData.TypesOfData.OUTPUT,
-          ImmutableMap.of("GRAVITINO_HOME", icebergRESTServerHome.toString()));
+      startShell = prepareKerberosStartShell(gravitinoRestStartShell, krb5Path);
     }
+
+    CommandExecutor.executeCommandLocalHost(
+        startShell + " start", false, ProcessData.TypesOfData.OUTPUT, deployEnvironment());
     return Optional.empty();
   }
 
   @Override
   public void doStopIcebergRESTServer() {
     String cmd = String.format("%s/bin/%s stop", icebergRESTServerHome.toString(), SCRIPT_NAME);
-    CommandExecutor.executeCommandLocalHost(
-        cmd,
-        false,
-        TypesOfData.ERROR,
-        ImmutableMap.of("GRAVITINO_HOME", icebergRESTServerHome.toString()));
+    CommandExecutor.executeCommandLocalHost(cmd, false, TypesOfData.ERROR, deployEnvironment());
+  }
+
+  private Map<String, String> deployEnvironment() {
+    return ImmutableMap.of("GRAVITINO_HOME", icebergRESTServerHome.toString());
+  }
+
+  private String prepareKerberosStartShell(String gravitinoRestStartShell, String krb5Path)
+      throws Exception {
+    String modifiedGravitinoStartShell =
+        String.format(
+            "%s/bin/gravitino-iceberg-rest-server_%s.sh",
+            icebergRESTServerHome.toString(), UUID.randomUUID());
+    String content =
+        FileUtils.readFileToString(new File(gravitinoRestStartShell), StandardCharsets.UTF_8);
+    if (!content.contains(KRB5_CONF_PLACEHOLDER)) {
+      throw new IllegalStateException(
+          String.format(
+              "Failed to patch Kerberos options in %s: missing placeholder %s",
+              gravitinoRestStartShell, KRB5_CONF_PLACEHOLDER));
+    }
+    content =
+        content.replace(
+            KRB5_CONF_PLACEHOLDER,
+            String.format("JAVA_OPTS+=\"%s\"", buildKerberosJavaOpts(krb5Path)));
+    File tmp = new File(modifiedGravitinoStartShell);
+    FileUtils.write(tmp, content, StandardCharsets.UTF_8);
+    tmp.setExecutable(true);
+    LOG.info("modifiedGravitinoStartShell content: \n{}", content);
+    return modifiedGravitinoStartShell;
+  }
+
+  private String buildKerberosJavaOpts(String krb5Path) {
+    StringBuilder opts = new StringBuilder();
+    opts.append(String.format(" -Djava.security.krb5.conf=%s", krb5Path));
+    String realm = System.getProperty(KRB5_REALM_PROPERTY);
+    if (realm != null) {
+      opts.append(String.format(" -Djava.security.krb5.realm=%s", realm));
+    }
+    String kdc = System.getProperty(KRB5_KDC_PROPERTY);
+    if (kdc != null) {
+      opts.append(String.format(" -Djava.security.krb5.kdc=%s", kdc));
+    }
+    return opts.toString();
   }
 }

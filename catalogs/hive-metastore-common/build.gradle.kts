@@ -47,6 +47,9 @@ dependencies {
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
+  implementation(project(":catalogs:hadoop-auth")) {
+    exclude("*")
+  }
 
   annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)

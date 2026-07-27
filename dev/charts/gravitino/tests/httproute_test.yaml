@@ -1,0 +1,154 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino httproute
+templates:
+  - httproute.yaml
+tests:
+  - it: does not render httproute by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render httproute when type is the default ingress
+    set:
+      ingress:
+        enabled: true
+        type: ingress
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a Gateway API HTTPRoute when type is gateway
+    release:
+      name: gravitino
+    set:
+      ingress:
+        enabled: true
+        type: gateway
+        annotations:
+          example.com/route: "true"
+        hosts:
+          - host: gravitino.example.com
+            paths:
+              - path: /gravitino
+                pathType: Prefix
+              - path: /exact
+                pathType: Exact
+        gateway:
+          parentRefs:
+            - name: external
+              namespace: gateway-system
+              sectionName: https
+    asserts:
+      - isAPIVersion:
+          of: gateway.networking.k8s.io/v1
+      - isKind:
+          of: HTTPRoute
+      - equal:
+          path: metadata.name
+          value: gravitino-gravitino-helm
+      - equal:
+          path: metadata.annotations["example.com/route"]
+          value: "true"
+      - equal:
+          path: spec.parentRefs[0].name
+          value: external
+      - equal:
+          path: spec.parentRefs[0].namespace
+          value: gateway-system
+      - equal:
+          path: spec.parentRefs[0].sectionName
+          value: https
+      - contains:
+          path: spec.hostnames
+          content: gravitino.example.com
+      - equal:
+          path: spec.rules[0].matches[0].path.type
+          value: PathPrefix
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /gravitino
+      - equal:
+          path: spec.rules[1].matches[0].path.type
+          value: Exact
+      - equal:
+          path: spec.rules[1].matches[0].path.value
+          value: /exact
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
+          value: gravitino-gravitino-helm
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 8090
+
+  - it: maps ImplementationSpecific pathType to PathPrefix in gateway mode
+    set:
+      ingress:
+        enabled: true
+        type: gateway
+        hosts:
+          - host: gravitino.example.com
+            paths:
+              - path: /
+                pathType: ImplementationSpecific
+        gateway:
+          parentRefs:
+            - name: external
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].path.type
+          value: PathPrefix
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /
+
+  - it: defaults pathType to PathPrefix when unset in gateway mode
+    set:
+      ingress:
+        enabled: true
+        type: gateway
+        hosts:
+          - host: gravitino.example.com
+            paths:
+              - path: /api
+        gateway:
+          parentRefs:
+            - name: external
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].path.type
+          value: PathPrefix
+
+  - it: fails rendering on an unsupported pathType in gateway mode
+    set:
+      ingress:
+        enabled: true
+        type: gateway
+        hosts:
+          - host: gravitino.example.com
+            paths:
+              - path: /re
+                pathType: RegularExpression
+        gateway:
+          parentRefs:
+            - name: external
+    asserts:
+      - failedTemplate:
+          errorMessage: 'ingress.hosts[].paths[].pathType "RegularExpression" is not supported when ingress.type is "gateway"; use Exact, Prefix, or ImplementationSpecific'

@@ -24,6 +24,7 @@ import { LogoutOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Dropdown, Tooltip } from 'antd'
 import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/tailwind'
+import { normalizeServiceAdmins } from '@/lib/utils/serviceAdmins'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import Loading from '@/components/Loading'
 import { fetchMetalakes, resetMetalakeStore } from '@/lib/store/metalakes'
@@ -41,7 +42,7 @@ export default function UserSetting() {
   const [showLogoutButton, setShowLogoutButton] = useState(false)
   const auth = useAppSelector(state => state.auth)
   const { serviceAdmins, authUser, anthEnable } = auth
-  const admins = Array.isArray(serviceAdmins) ? serviceAdmins : (serviceAdmins || '').split(',')
+  const admins = normalizeServiceAdmins(serviceAdmins)
   const isServiceAdmin = admins.includes(authUser?.name)
   const [session, setSession] = useState({})
   const router = useRouter()

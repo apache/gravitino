@@ -57,6 +57,7 @@ dependencies {
   compileOnly(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.apache.logging.log4j")
   }
 
   testImplementation(project(":api"))

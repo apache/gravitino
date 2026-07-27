@@ -257,3 +257,127 @@ def load_table_tools(mcp: FastMCP):
         return await client.as_table_operation().load_table(
             catalog_name, schema_name, table_name
         )
+
+    @mcp.tool(tags={"table"})
+    # pylint: disable=too-many-positional-arguments
+    async def create_table(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        columns: list,
+        properties: dict,
+        partitioning: list = None,
+        distribution: dict = None,
+        sort_orders: list = None,
+        indexes: list = None,
+    ) -> str:
+        """
+        Create a new table within a schema.
+
+        Authorization is enforced by Gravitino: a principal without the
+        required grant receives an authorization denial.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            name (str): Name of the table to create.
+            comment (str): Human-readable description.
+            columns (list): List of column definitions. Each column is a dict:
+                {
+                  "name": "id",
+                  "type": "integer",
+                  "comment": "primary id",
+                  "nullable": false,
+                  "autoIncrement": false
+                }
+            properties (dict): Table configuration properties.
+            partitioning (list): Optional partitioning strategies. Example:
+                [{"strategy": "identity", "fieldName": ["dt"]}]
+            distribution (dict): Optional distribution (bucketing). Example:
+                {"strategy": "hash", "number": 4,
+                 "funcArgs": [{"type": "field", "fieldName": ["id"]}]}
+            sort_orders (list): Optional sort orders. Example:
+                [{"sortTerm": {"type": "field", "fieldName": ["id"]},
+                  "direction": "asc", "nullOrdering": "nulls_first"}]
+            indexes (list): Optional indexes. Example:
+                [{"indexType": "primary_key", "name": "pk",
+                  "fieldNames": [["id"]]}]
+
+        Returns:
+            str: JSON-formatted string containing the created table.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_table_operation().create_table(
+            catalog_name,
+            schema_name,
+            name,
+            comment,
+            columns,
+            properties,
+            partitioning,
+            distribution,
+            sort_orders,
+            indexes,
+        )
+
+    @mcp.tool(tags={"table"})
+    async def alter_table(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        updates: list,
+    ) -> str:
+        """
+        Alter an existing table.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            table_name (str): Name of the table to alter.
+            updates (list): List of update operations. Example:
+                [
+                  {"@type": "rename", "newName": "new_table"},
+                  {"@type": "updateComment", "newComment": "updated"},
+                  {"@type": "setProperty", "property": "k", "value": "v"}
+                ]
+
+        Returns:
+            str: JSON-formatted string containing the altered table.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_table_operation().alter_table(
+            catalog_name, schema_name, table_name, updates
+        )
+
+    @mcp.tool(tags={"table"})
+    async def drop_table(
+        ctx: Context,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        purge: bool = False,
+    ) -> str:
+        """
+        Drop a table by its name.
+
+        Args:
+            ctx (Context): The request context object.
+            catalog_name (str): Name of the catalog.
+            schema_name (str): Name of the schema.
+            table_name (str): Name of the table to drop.
+            purge (bool): Whether to purge the table data in addition to
+                removing the metadata. Defaults to False. Not all catalogs
+                support purging.
+
+        Returns:
+            str: JSON-formatted string indicating whether the table was dropped.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_table_operation().drop_table(
+            catalog_name, schema_name, table_name, purge
+        )

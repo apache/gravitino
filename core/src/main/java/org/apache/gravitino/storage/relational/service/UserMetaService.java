@@ -320,4 +320,71 @@ public class UserMetaService {
 
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
+
+  private UserPO getUserPOByMetalakeNameAndExternalId(String metalakeName, String externalId) {
+    UserPO userPO =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId));
+
+    if (userPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.USER.name().toLowerCase(),
+          externalId);
+    }
+    return userPO;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getUserByExternalId")
+  public UserEntity getUserByExternalId(NameIdentifier ident) {
+    AuthorizationUtils.checkUserExternalId(ident);
+    String metalake = ident.namespace().level(0);
+    String externalId = ident.name();
+    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
+    UserPO userPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    return POConverters.fromUserPO(userPO, rolePOs, userNamespace);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateUserByExternalId")
+  public <E extends Entity & HasIdentifier> UserEntity updateUserByExternalId(
+      NameIdentifier ident, Function<E, E> updater) throws IOException {
+    AuthorizationUtils.checkUserExternalId(ident);
+    String metalake = ident.namespace().level(0);
+    String externalId = ident.name();
+    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
+    UserPO oldUserPO = getUserPOByMetalakeNameAndExternalId(metalake, externalId);
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
+    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, userNamespace);
+    UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldEntity.id(), newEntity.id()),
+        "The updated user entity id: %s should be same with the user entity id before: %s",
+        newEntity.id(),
+        oldEntity.id());
+
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper ->
+                      mapper.updateUserMetaByExternalId(
+                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+      throw re;
+    }
+    return newEntity;
+  }
 }

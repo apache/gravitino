@@ -20,15 +20,25 @@
 package org.apache.iceberg.jdbc;
 
 import com.google.common.collect.ImmutableMap;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestJdbcCatalogWithMetadataLocationSupport {
+
+  private static final Schema SCHEMA =
+      new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
 
   @Test
   void testLoadFields() {
@@ -63,5 +73,42 @@ public class TestJdbcCatalogWithMetadataLocationSupport {
 
     Assertions.assertEquals(
         expectedSupportsViews, catalog.supportsViewsWithSchemaVersion(), message);
+  }
+
+  @Test
+  void testRegisterTableOverwrite() throws Exception {
+    String warehouse = Files.createTempDirectory("jdbc-register-overwrite").toString();
+    JdbcCatalogWithMetadataLocationSupport catalog =
+        new JdbcCatalogWithMetadataLocationSupport(true);
+    catalog.initialize(
+        "jdbc_overwrite",
+        ImmutableMap.of(
+            CatalogProperties.URI,
+            "jdbc:h2:mem:register_overwrite;DB_CLOSE_DELAY=-1",
+            CatalogProperties.WAREHOUSE_LOCATION,
+            warehouse));
+
+    Namespace namespace = Namespace.of("ns");
+    catalog.createNamespace(namespace);
+    TableIdentifier ident = TableIdentifier.of(namespace, "t");
+
+    BaseTable table = (BaseTable) catalog.createTable(ident, SCHEMA);
+    String metadataV1 = table.operations().current().metadataFileLocation();
+
+    table.updateProperties().set("version", "v2").commit();
+    String metadataV2 = table.operations().current().metadataFileLocation();
+
+    catalog.registerTable(ident, metadataV1, true);
+    Assertions.assertEquals(metadataV1, catalog.metadataLocation(ident));
+    Assertions.assertFalse(
+        ((BaseTable) catalog.loadTable(ident)).properties().containsKey("version"));
+
+    catalog.registerTable(ident, metadataV2, true);
+    Assertions.assertEquals(metadataV2, catalog.metadataLocation(ident));
+    Assertions.assertEquals(
+        "v2", ((BaseTable) catalog.loadTable(ident)).properties().get("version"));
+
+    Assertions.assertThrows(
+        AlreadyExistsException.class, () -> catalog.registerTable(ident, metadataV2, false));
   }
 }

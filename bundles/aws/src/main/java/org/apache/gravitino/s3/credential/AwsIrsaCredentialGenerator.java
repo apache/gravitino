@@ -335,10 +335,17 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
       throw new IllegalStateException(
           "No role ARN available. Either configure s3-role-arn or ensure AWS_ROLE_ARN environment variable is set.");
     }
-    if (!effectiveRoleArn.startsWith("arn:aws")) {
+    if (!isSupportedRoleArn(effectiveRoleArn)) {
       throw new IllegalArgumentException("Invalid role ARN format: " + effectiveRoleArn);
     }
     return effectiveRoleArn;
+  }
+
+  private boolean isSupportedRoleArn(String effectiveRoleArn) {
+    // Support both AWS and MinIO role ARNs. MinIO role ARNs start with "arn:minio:" and require a
+    // custom STS endpoint.
+    return effectiveRoleArn.startsWith("arn:aws")
+        || (StringUtils.isNotBlank(stsEndpoint) && effectiveRoleArn.startsWith("arn:minio:"));
   }
 
   private Credentials assumeRoleWithWebIdentity(

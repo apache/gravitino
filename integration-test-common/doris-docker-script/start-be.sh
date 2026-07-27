@@ -25,11 +25,16 @@ DORIS_HOME="$(dirname "${BASH_SOURCE-$0}")"
 DORIS_HOME="$(cd "${DORIS_HOME}" >/dev/null; pwd)"
 DORIS_BE_HOME="${DORIS_HOME}/be/"
 
-# Patch BE startup script: skip vm.max_map_count and ulimit checks, remove slow chmod
+# Skip vm.max_map_count and ulimit checks via env var (supported by Doris 3.0+ images).
+# For older CI images that don't support this env var, fall back to sed patching.
+export SKIP_CHECK_ULIMIT=true
+
 DORIS_BE_SCRIPT="${DORIS_BE_HOME}/bin/start_be.sh"
-sed -i '/Please set vm.max_map_count/,/exit 1/{s/exit 1/#exit 1\n        echo "skip this"/}' ${DORIS_BE_SCRIPT}
-sed -i '/Please set the maximum number of open file descriptors/,/exit 1/{s/exit 1/#exit 1\n        echo "skip this"/}' ${DORIS_BE_SCRIPT}
-sed -i 's/chmod 755 "${DORIS_HOME}\/lib\/doris_be"/#&/' ${DORIS_BE_SCRIPT}
+# Fallback sed patches for CI images without SKIP_CHECK_ULIMIT support
+sed -i '/Please set vm.max_map_count/,/exit 1/{s/exit 1/#exit 1\n        echo "skip this"/}' ${DORIS_BE_SCRIPT} 2>/dev/null || true
+sed -i '/Set kernel parameter.*vm.max_map_count/,/exit 1/{s/exit 1/#exit 1\n        echo "skip this"/}' ${DORIS_BE_SCRIPT} 2>/dev/null || true
+sed -i '/Please set the maximum number of open file descriptors/,/exit 1/{s/exit 1/#exit 1\n        echo "skip this"/}' ${DORIS_BE_SCRIPT} 2>/dev/null || true
+sed -i 's/chmod 755 "${DORIS_HOME}\/lib\/doris_be"/#&/' ${DORIS_BE_SCRIPT} 2>/dev/null || true
 
 # Configure priority_networks and report interval in be.conf
 CONTAINER_IP=$(hostname -i)

@@ -37,6 +37,11 @@ dependencies {
   implementation(project(":catalogs:hadoop-common")) {
     exclude(group = "*")
   }
+  // hadoop-common's Kerberos path lives in :catalogs:hadoop-auth; bundle it into the
+  // catalog runtime libs (the hadoop-common dependency above is non-transitive).
+  implementation(project(":catalogs:hadoop-auth")) {
+    exclude(group = "*")
+  }
 
   implementation(libs.caffeine)
   implementation(libs.cglib)
@@ -53,6 +58,7 @@ dependencies {
   testImplementation(project(":bundles:aws-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:tencent-bundle", configuration = "shadow"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
@@ -141,6 +147,7 @@ tasks.test {
   dependsOn(":bundles:aws-bundle:jar")
   dependsOn(":bundles:aliyun-bundle:jar")
   dependsOn(":bundles:gcp-bundle:jar")
+  dependsOn(":bundles:tencent-bundle:jar")
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {

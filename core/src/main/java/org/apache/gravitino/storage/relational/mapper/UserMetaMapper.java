@@ -98,6 +98,16 @@ public interface UserMetaMapper {
   UserUpdatedAt getUserUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("userName") String userName);
 
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "selectUserMetaByMetalakeNameAndExternalId")
+  UserPO selectUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId);
+
+  @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "updateUserMetaByExternalId")
+  Integer updateUserMetaByExternalId(
+      @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO);
+
   /**
    * Single-round-trip auth prefetch for the JCasbin authorize hot path. Returns every version
    * sentinel the request needs:

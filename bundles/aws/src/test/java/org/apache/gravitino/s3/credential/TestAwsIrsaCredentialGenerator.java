@@ -20,6 +20,7 @@ package org.apache.gravitino.s3.credential;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpExchange;
@@ -31,11 +32,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.credential.AwsIrsaCredential;
+import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.s3.credential.webidentity.WebIdentityTokenSourceConfig;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,6 +94,40 @@ class TestAwsIrsaCredentialGenerator {
     }
 
     assertEquals(1, requestCount.get());
+  }
+
+  @Test
+  void minioRoleArnAcceptedWhenCustomStsEndpointConfigured(@TempDir Path dir) throws IOException {
+    Map<String, String> properties = createProperties(dir);
+    properties.put("s3-role-arn", "arn:minio:iam:::role/test-role");
+
+    try (AwsIrsaCredentialGenerator generator = new AwsIrsaCredentialGenerator()) {
+      generator.initialize(properties);
+
+      AwsIrsaCredential credential = generator.generate(() -> "test-user");
+
+      assertEquals("access-key", credential.accessKeyId());
+      assertEquals("secret-key", credential.secretAccessKey());
+      assertEquals("session-token", credential.sessionToken());
+    }
+  }
+
+  @Test
+  void minioRoleArnRejectedWhenStsEndpointMissing(@TempDir Path dir) throws IOException {
+    Map<String, String> properties = createProperties(dir);
+    properties.put("s3-role-arn", "arn:minio:iam:::role/test-role");
+    // Without a custom STS endpoint a MinIO role ARN is not a valid target.
+    properties.remove("s3-token-service-endpoint");
+
+    try (AwsIrsaCredentialGenerator generator = new AwsIrsaCredentialGenerator()) {
+      generator.initialize(properties);
+
+      PathBasedCredentialContext context =
+          new PathBasedCredentialContext(
+              "test-user", Collections.emptySet(), Collections.singleton("s3://bucket/object"));
+
+      assertThrows(IllegalArgumentException.class, () -> generator.generate(context));
+    }
   }
 
   private Map<String, String> createProperties(Path dir) throws IOException {

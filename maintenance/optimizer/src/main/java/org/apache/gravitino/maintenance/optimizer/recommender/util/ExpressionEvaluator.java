@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.optimizer.recommender.util;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Evaluates rule expressions against a provided context map.
@@ -46,4 +47,18 @@ public interface ExpressionEvaluator {
    * @return evaluation result as a {@code long}
    */
   long evaluateLong(String expression, Map<String, Object> context);
+
+  /**
+   * Evaluates an expression that returns a boolean value and returns a {@link java.util.Optional}
+   * containing the result if the evaluation is successful, or an empty {@link java.util.Optional}
+   * if it fails.
+   *
+   * <p>Evaluation may fail if there are syntax errors in a specified expression or if a variable
+   * referenced in the expression is not present in the context.
+   *
+   * @param expression expression to evaluate
+   * @param context variable bindings for the expression
+   * @return evaluation result as an {@link java.util.Optional} containing a {@code boolean}
+   */
+  Optional<Boolean> tryToEvaluateBool(String expression, Map<String, Object> context);
 }

@@ -31,6 +31,8 @@ import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeCo
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.INT32;
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.INT64;
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.INT8;
+import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.IPV4;
+import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.IPV6;
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.STRING;
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.UINT16;
 import static org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter.UINT32;
@@ -95,6 +97,28 @@ public class TestClickHouseTypeConverter {
     Assertions.assertEquals(
         Types.ExternalType.of("IPv4"), CLICKHOUSE_TYPE_CONVERTER.toGravitino(ipv4));
 
+    JdbcTypeConverter.JdbcTypeBean ipv6 = createTypeBean("IPv6", null, null);
+    Assertions.assertEquals(
+        Types.ExternalType.of("IPv6"), CLICKHOUSE_TYPE_CONVERTER.toGravitino(ipv6));
+
+    // DateTime64(3) should map to TimestampType.withoutTimeZone(3)
+    JdbcTypeConverter.JdbcTypeBean dateTime64WithPrecision =
+        createTypeBean("DateTime64(3)", null, null);
+    Assertions.assertEquals(
+        Types.TimestampType.withoutTimeZone(3),
+        CLICKHOUSE_TYPE_CONVERTER.toGravitino(dateTime64WithPrecision));
+
+    // LowCardinality(Nullable(String)) should map to StringType
+    JdbcTypeConverter.JdbcTypeBean lowCardNullable =
+        createTypeBean("LowCardinality(Nullable(String))", null, null);
+    Assertions.assertEquals(
+        Types.StringType.get(), CLICKHOUSE_TYPE_CONVERTER.toGravitino(lowCardNullable));
+
+    // Decimal(50, 10) should map to ExternalType (not crash, since precision > 38)
+    JdbcTypeConverter.JdbcTypeBean decimal50 = createTypeBean("Decimal", 50, 10);
+    Assertions.assertEquals(
+        Types.ExternalType.of("Decimal(50,10)"), CLICKHOUSE_TYPE_CONVERTER.toGravitino(decimal50));
+
     JdbcTypeConverter.JdbcTypeBean decimalTooLarge = createTypeBean("Decimal", 77, 2);
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -128,6 +152,11 @@ public class TestClickHouseTypeConverter {
     checkGravitinoTypeToJdbcType(UUID, Types.UUIDType.get());
     checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
     checkGravitinoTypeToJdbcType("DateTime", Types.TimestampType.withoutTimeZone(0));
+    // DateTime64(3) round-trip
+    checkGravitinoTypeToJdbcType(DATETIME64 + "(3)", Types.TimestampType.withoutTimeZone(3));
+    // IPv4/IPv6 round-trip
+    checkGravitinoTypeToJdbcType(IPV4, Types.ExternalType.of(IPV4));
+    checkGravitinoTypeToJdbcType(IPV6, Types.ExternalType.of(IPV6));
     checkGravitinoTypeToJdbcType(TIME, Types.TimeType.get());
     Assertions.assertThrows(
         IllegalArgumentException.class,

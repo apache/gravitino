@@ -87,14 +87,14 @@ public class CatalogNameAdaptor {
   }
 
   private static String getCatalogName(String provider, int majorVersion, int minorVersion) {
+    String versionKey = String.format("%d.%d", majorVersion, minorVersion);
     if (provider.startsWith("jdbc")) {
       if (provider.startsWith("jdbc-postgresql")) {
-        return pgCatalogNames.get(String.format("%d.%d", majorVersion, minorVersion));
+        return pgCatalogNames.get(versionKey);
       }
-      return jdbcCatalogNames.get(String.format("%d.%d", majorVersion, minorVersion));
+      return jdbcCatalogNames.get(versionKey);
     }
-    String key =
-        String.format("%s-%d.%d", provider.toLowerCase(Locale.ROOT), majorVersion, minorVersion);
+    String key = String.format("%s-%s", provider.toLowerCase(Locale.ROOT), versionKey);
     return catalogNames.get(key);
   }
 

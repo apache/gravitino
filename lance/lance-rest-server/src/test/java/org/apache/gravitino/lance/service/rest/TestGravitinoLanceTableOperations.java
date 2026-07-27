@@ -21,11 +21,17 @@ package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceNamespaceWrapper;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
+import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableOperations;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -91,5 +97,33 @@ class TestGravitinoLanceTableOperations {
             UnsupportedOperationException.class, () -> handler.buildGravitinoTableChange(request));
     Assertions.assertEquals(
         "Only RENAME alteration is supported currently.", exception.getMessage());
+  }
+
+  @Test
+  void testDeregisterTableRejectsManagedTable() {
+    // Mock a managed table (no PROPERTY_EXTERNAL=true)
+    Table managedTable = Mockito.mock(Table.class);
+    Mockito.when(managedTable.properties()).thenReturn(new HashMap<>());
+
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class)))
+        .thenReturn(managedTable);
+
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Mockito.when(catalog.asTableCatalog()).thenReturn(tableCatalog);
+
+    GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
+    Mockito.when(wrapper.loadAndValidateLakehouseCatalog(Mockito.anyString())).thenReturn(catalog);
+
+    GravitinoLanceTableOperations ops = new GravitinoLanceTableOperations(wrapper);
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> ops.deregisterTable("catalog.schema.table", "."));
+    Assertions.assertTrue(exception.getMessage().contains("only supports external tables"));
+
+    // Verify dropTable was never called — the guard must reject before reaching the catalog layer.
+    Mockito.verify(tableCatalog, Mockito.never()).dropTable(Mockito.any());
   }
 }

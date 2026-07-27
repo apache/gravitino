@@ -197,6 +197,8 @@ allprojects {
       param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
       param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.6")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
+      param.environment("GRAVITINO_CI_DORIS_FE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_FE_IMAGE") ?: "")
+      param.environment("GRAVITINO_CI_DORIS_BE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_BE_IMAGE") ?: "")
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
       param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.2")
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
@@ -262,9 +264,16 @@ allprojects {
 
       val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
       param.environment("dockerTest", dockerTest.toString())
+      val dorisMultiVersion = project.hasProperty("dorisMultiVersionTest")
       param.useJUnitPlatform {
         if (!dockerTest) {
           excludeTags("gravitino-docker-test")
+        }
+        if (!dorisMultiVersion) {
+          // Running multiple Doris versions in one CI runner exhausts memory.
+          // CI runs only the default 1.2.x suite; run all versions locally with
+          // -PdorisMultiVersionTest.
+          excludeTags("doris-multi-version")
         }
       }
     }
@@ -357,6 +366,7 @@ subprojects {
     ":api",
     ":common",
     ":catalogs:catalog-common",
+    ":catalogs:hadoop-auth",
     ":catalogs:hadoop-common",
     ":maintenance:jobs",
     ":maintenance:optimizer-api",
@@ -1180,6 +1190,7 @@ tasks {
         !it.name.startsWith("optimizer") &&
         it.name != "hive-metastore-common" &&
         it.name != "docs" &&
+        it.name != "hadoop-auth" &&
         it.name != "hadoop-common" &&
         it.name != "web" &&
         it.name != "web-v2" &&

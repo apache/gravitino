@@ -36,6 +36,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
@@ -72,6 +73,7 @@ import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
+import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
@@ -93,7 +95,7 @@ import org.slf4j.LoggerFactory;
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
-public class JDBCBackend implements RelationalBackend {
+public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationCleanup {
 
   private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
@@ -313,6 +315,34 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> E getByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        return (E) UserMetaService.getInstance().getUserByExternalId(ident);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().getGroupByExternalId(ident);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for get by external id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        return (E) UserMetaService.getInstance().updateUserByExternalId(ident, updater);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for update enabled by external id operation", entityType);
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> identifiers, Entity.EntityType entityType) {
     if (identifiers == null || identifiers.isEmpty()) {
@@ -519,6 +549,12 @@ public class JDBCBackend implements RelationalBackend {
         throw new IllegalArgumentException(
             "Unsupported entity type when collectAndRemoveLegacyData: " + entityType);
     }
+  }
+
+  @Override
+  public int softDeleteOrphanedRelations(MetadataObject.Type metadataObjectType, int limit) {
+    return OrphanedMetadataObjectRelationService.getInstance()
+        .softDeleteOrphanedRelations(metadataObjectType, limit);
   }
 
   @Override

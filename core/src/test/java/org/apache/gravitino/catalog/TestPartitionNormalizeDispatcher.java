@@ -30,6 +30,8 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
 
@@ -89,5 +91,75 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(
         partitionNormalizeDispatcher.dropPartition(TABLE, partition.name().toUpperCase()));
     Assertions.assertFalse(partitionNormalizeDispatcher.partitionExists(TABLE, partition.name()));
+  }
+
+  @Test
+  public void testAddPartitionListPartitionsGetPartitionRoundTrip() throws Exception {
+    // Mirrors the correct usage pattern for a quote-aware catalog (e.g. Oracle):
+    // 1. addPartition is issued with a quoted, case-sensitive name, so the catalog stores the
+    //    physical partition with its case preserved: My Partition.
+    // 2. listPartitionNames()/listPartitions() surface that physical name unquoted (My
+    //    Partition) -- names are not re-folded by the core layer.
+    // 3. Getting the partition again requires re-quoting the case-sensitive name
+    //    ("My Partition"), not passing the bare listed name back in: normalizeName cannot tell
+    //    an already-canonical name apart from raw user input.
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(metalake, catalog, "schema", "quotedTable");
+    PartitionDispatcher mockDispatcher = Mockito.mock(PartitionDispatcher.class);
+
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Mockito.when(mockWrapper.capabilities())
+        .thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+    Mockito.when(mockCatalogManager.loadCatalogAndWrap(Mockito.any(NameIdentifier.class)))
+        .thenReturn(mockWrapper);
+
+    PartitionNormalizeDispatcher dispatcher =
+        new PartitionNormalizeDispatcher(mockDispatcher, mockCatalogManager);
+
+    // 1. Add the partition with a quoted, case-sensitive name.
+    Partition quotedPartition =
+        Partitions.identity(
+            "\"My Partition\"",
+            new String[][] {{"col1"}},
+            new Literal[] {Literals.stringLiteral("v1")},
+            Maps.newHashMap());
+    Mockito.when(mockDispatcher.addPartition(Mockito.any(NameIdentifier.class), Mockito.any()))
+        .thenReturn(quotedPartition);
+    dispatcher.addPartition(tableIdent, quotedPartition);
+
+    ArgumentCaptor<Partition> addedPartitionCaptor = ArgumentCaptor.forClass(Partition.class);
+    Mockito.verify(mockDispatcher)
+        .addPartition(Mockito.any(NameIdentifier.class), addedPartitionCaptor.capture());
+    String physicalName = addedPartitionCaptor.getValue().name();
+    Assertions.assertEquals("My Partition", physicalName);
+
+    // 2. listPartitionNames()/listPartitions() must surface that physical name unchanged.
+    Partition physicalPartition =
+        Partitions.identity(
+            physicalName,
+            new String[][] {{"col1"}},
+            new Literal[] {Literals.stringLiteral("v1")},
+            Maps.newHashMap());
+    Mockito.when(mockDispatcher.listPartitionNames(Mockito.any(NameIdentifier.class)))
+        .thenReturn(new String[] {physicalName});
+    Mockito.when(mockDispatcher.listPartitions(Mockito.any(NameIdentifier.class)))
+        .thenReturn(new Partition[] {physicalPartition});
+
+    String[] listedNames = dispatcher.listPartitionNames(tableIdent);
+    Assertions.assertEquals(1, listedNames.length);
+    Assertions.assertEquals("My Partition", listedNames[0]);
+
+    Partition[] listedPartitions = dispatcher.listPartitions(tableIdent);
+    Assertions.assertEquals(1, listedPartitions.length);
+    Assertions.assertEquals("My Partition", listedPartitions[0].name());
+
+    // 3. Getting the partition again requires re-quoting the listed name.
+    dispatcher.getPartition(tableIdent, "\"" + listedNames[0] + "\"");
+
+    ArgumentCaptor<String> gotPartitionNameCaptor = ArgumentCaptor.forClass(String.class);
+    Mockito.verify(mockDispatcher)
+        .getPartition(Mockito.any(NameIdentifier.class), gotPartitionNameCaptor.capture());
+    Assertions.assertEquals("My Partition", gotPartitionNameCaptor.getValue());
   }
 }

@@ -16,19 +16,22 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# No fixed ports or named networks — Testcontainers auto-generates a unique
+# project name and random host-port mappings, allowing multiple Doris clusters
+# (e.g. 1.2.x and 3.0.x) to coexist in the same JVM lifecycle.
+
 services:
 
   doris-fe:
-    image: ${GRAVITINO_CI_DORIS_DOCKER_IMAGE:-apache/gravitino-ci:doris-0.1.5}
+    image: ${GRAVITINO_CI_DORIS_FE_IMAGE:-${GRAVITINO_CI_DORIS_DOCKER_IMAGE:-apache/gravitino-ci:doris-0.1.5}}
     hostname: doris-fe
-    networks:
-      - doris-net
+    entrypoint: ["bash"]
+    ports:
+      - "8030"
+      - "9030"
     volumes:
       - ./start-fe.sh:/opt/apache-doris/start-fe.sh
-    command: ["bash", "start-fe.sh"]
-    ports:
-      - "8030:8030"
-      - "9030:9030"
+    command: ["start-fe.sh"]
     healthcheck:
       test: ["CMD", "bash", "-c", "curl -s http://localhost:8030/api/bootstrap | grep -q '\"msg\":\"success\"'"]
       interval: 10s
@@ -37,12 +40,14 @@ services:
       start_period: 30s
 
   doris-be:
-    image: ${GRAVITINO_CI_DORIS_DOCKER_IMAGE:-apache/gravitino-ci:doris-0.1.5}
-    networks:
-      - doris-net
+    image: ${GRAVITINO_CI_DORIS_BE_IMAGE:-${GRAVITINO_CI_DORIS_DOCKER_IMAGE:-apache/gravitino-ci:doris-0.1.5}}
+    entrypoint: ["bash"]
+    ports:
+      - "8040"
+      - "9050"
     volumes:
       - ./start-be.sh:/opt/apache-doris/start-be.sh
-    command: ["bash", "start-be.sh"]
+    command: ["start-be.sh"]
     depends_on:
       doris-fe:
         condition: service_healthy
@@ -52,11 +57,3 @@ services:
       timeout: 60s
       retries: 15
       start_period: 30s
-
-networks:
-  doris-net:
-    driver: bridge
-    name: doris-net
-    ipam:
-      config:
-        - subnet: 10.20.31.32/28

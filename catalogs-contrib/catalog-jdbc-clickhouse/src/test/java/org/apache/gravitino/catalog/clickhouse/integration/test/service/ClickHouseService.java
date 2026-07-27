@@ -101,6 +101,18 @@ public class ClickHouseService {
     }
   }
 
+  public String executeQueryForResult(String sql) {
+    try (Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(sql)) {
+      if (resultSet.next()) {
+        return resultSet.getString(1);
+      }
+      return null;
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public void close() {
     try {
       connection.close();
