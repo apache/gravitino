@@ -26,7 +26,13 @@ import org.apache.gravitino.secret.GravitinoSecretProvider;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.SecretWriteContext;
 
-/** In-memory secret provider for development and testing. */
+/**
+ * In-memory secret provider for development and unit tests.
+ *
+ * <p>Secrets are stored in process memory only and are lost on restart. Values are Base64-encoded
+ * for opaque storage, which is <strong>not</strong> encryption. Do not use this provider in
+ * production.
+ */
 public class InMemorySecretsProvider implements GravitinoSecretProvider {
 
   private final ConcurrentHashMap<String, String> secrets = new ConcurrentHashMap<>();
@@ -38,6 +44,12 @@ public class InMemorySecretsProvider implements GravitinoSecretProvider {
 
   @Override
   public String writeSecret(String plaintext, SecretWriteContext context) {
+    if (plaintext == null) {
+      throw new IllegalArgumentException("plaintext must not be null");
+    }
+    if (context == null) {
+      throw new IllegalArgumentException("context must not be null");
+    }
     String urn =
         SecretUrn.buildWriteThrough(
             context.providerName(),

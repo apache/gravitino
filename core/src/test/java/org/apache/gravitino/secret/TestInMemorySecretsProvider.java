@@ -38,4 +38,14 @@ public class TestInMemorySecretsProvider {
     provider.deleteSecret(urn);
     Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(urn));
   }
+
+  @Test
+  public void testWriteSecretRejectsNullArguments() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    SecretWriteContext context = new SecretWriteContext("memory", "catalog", 10L, "password");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.writeSecret(null, context));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.writeSecret("s3cr3t", null));
+  }
 }

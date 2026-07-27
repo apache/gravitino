@@ -22,14 +22,8 @@ package org.apache.gravitino.secret;
 /** Constants for Gravitino entity secret management. */
 public final class SecretConstants {
 
-  /** Reserved property key listing comma-separated secret property names. */
-  public static final String SECRET_KEYS_PROPERTY = "gravitino.secret.keys";
-
   /** Prefix for Gravitino secret URNs. */
   public static final String URN_PREFIX = "urn:gravitino-secret:";
-
-  /** Mask value used for secret placeholders in API responses. */
-  public static final String MASK = "******";
 
   private SecretConstants() {}
 }

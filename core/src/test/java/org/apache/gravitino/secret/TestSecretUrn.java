@@ -19,8 +19,6 @@
 
 package org.apache.gravitino.secret;
 
-import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
-
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -39,20 +37,13 @@ public class TestSecretUrn {
   }
 
   @Test
-  public void testIsWriteThroughForEntity() {
-    String urn = SecretUrn.buildWriteThrough("memory", "schema", 7L, "token");
-    Assertions.assertTrue(SecretUrn.isWriteThroughForEntity(urn, "schema", 7L));
-    Assertions.assertFalse(SecretUrn.isWriteThroughForEntity(urn, "catalog", 7L));
-    Assertions.assertFalse(SecretUrn.isWriteThroughForEntity(urn, "schema", 8L));
-    Assertions.assertFalse(
-        SecretUrn.isWriteThroughForEntity(URN_PREFIX + "memory:external:ref", "schema", 7L));
-  }
-
-  @Test
   public void testDottedPropertyKeyInUrn() {
     String urn = SecretUrn.buildWriteThrough("local", "catalog", 1L, "authentication.password");
     Assertions.assertEquals("urn:gravitino-secret:local:catalog:1:authentication.password", urn);
-    Assertions.assertTrue(SecretUrn.isWriteThroughForEntity(urn, "catalog", 1L));
+    SecretUrn.ParsedUrn parsed = SecretUrn.parse(urn);
+    Assertions.assertEquals("local", parsed.providerName());
+    Assertions.assertEquals(
+        java.util.List.of("catalog", "1", "authentication.password"), parsed.identifierSegments());
   }
 
   @Test

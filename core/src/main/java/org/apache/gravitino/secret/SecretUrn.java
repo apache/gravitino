@@ -147,27 +147,6 @@ public final class SecretUrn {
   }
 
   /**
-   * Returns whether the URN is a write-through secret for the given entity.
-   *
-   * @param urn the secret URN
-   * @param entityType the entity type
-   * @param entityId the entity identifier
-   * @return {@code true} if the URN is write-through for the entity
-   */
-  public static boolean isWriteThroughForEntity(String urn, String entityType, long entityId) {
-    try {
-      ParsedUrn parsed = parse(urn);
-      List<String> segments = parsed.identifierSegments();
-      if (segments.size() != 3) {
-        return false;
-      }
-      return segments.get(0).equals(entityType) && segments.get(1).equals(String.valueOf(entityId));
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
-  }
-
-  /**
    * Validates that a URN segment contains only allowed characters.
    *
    * @param segment the segment to validate
