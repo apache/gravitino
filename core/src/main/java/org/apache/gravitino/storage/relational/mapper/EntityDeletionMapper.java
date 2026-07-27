@@ -23,6 +23,7 @@ import org.apache.gravitino.storage.relational.po.EntityDeletionPO;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /** MyBatis mapper for durable metadata deletion generations. */
 public interface EntityDeletionMapper {
@@ -47,4 +48,40 @@ public interface EntityDeletionMapper {
   @Nullable
   @SelectProvider(type = EntityDeletionSQLProvider.class, method = "selectEntityDeletion")
   EntityDeletionPO selectEntityDeletion(@Param("deletionId") String deletionId);
+
+  /**
+   * Selects and locks one exact deletion generation.
+   *
+   * @param deletionId opaque deletion identifier
+   * @return persisted deletion, or {@code null} when absent
+   */
+  @Nullable
+  @SelectProvider(type = EntityDeletionSQLProvider.class, method = "selectEntityDeletionForUpdate")
+  EntityDeletionPO selectEntityDeletionForUpdate(@Param("deletionId") String deletionId);
+
+  /**
+   * Selects the action currently reserving one canonical entity name.
+   *
+   * @param activeNameKey canonical active-name key
+   * @return active deletion action, or {@code null} when the name is free
+   */
+  @Nullable
+  @SelectProvider(type = EntityDeletionSQLProvider.class, method = "selectActiveEntityDeletion")
+  EntityDeletionPO selectActiveEntityDeletion(@Param("activeNameKey") String activeNameKey);
+
+  /**
+   * Conditionally completes an exact retained restore.
+   *
+   * @param deletionId opaque deletion identifier
+   * @param expectedRevision revision supplied by the strong ETag
+   * @param serverNow authoritative transaction time
+   * @param acceptedRestoreEtag accepted strong ETag
+   * @return number of updated rows
+   */
+  @UpdateProvider(type = EntityDeletionSQLProvider.class, method = "restoreEntityDeletion")
+  int restoreEntityDeletion(
+      @Param("deletionId") String deletionId,
+      @Param("expectedRevision") long expectedRevision,
+      @Param("serverNow") long serverNow,
+      @Param("acceptedRestoreEtag") String acceptedRestoreEtag);
 }

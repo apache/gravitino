@@ -70,4 +70,54 @@ public class EntityDeletionService {
     return SessionUtils.doWithCommitAndFetchResult(
         EntityDeletionMapper.class, mapper -> mapper.selectEntityDeletion(deletionId));
   }
+
+  /**
+   * Loads and locks one exact deletion generation in the caller's transaction.
+   *
+   * @param deletionId opaque deletion identifier
+   * @return deletion generation, or {@code null} when absent
+   */
+  @Nullable
+  public EntityDeletionPO getForUpdate(String deletionId) {
+    Objects.requireNonNull(deletionId, "deletionId must not be null");
+    return SessionUtils.getWithoutCommit(
+        EntityDeletionMapper.class, mapper -> mapper.selectEntityDeletionForUpdate(deletionId));
+  }
+
+  /**
+   * Loads the action currently reserving one canonical name.
+   *
+   * @param activeNameKey canonical active-name key
+   * @return active deletion action, or {@code null} when the name is free
+   */
+  @Nullable
+  public EntityDeletionPO getByActiveName(String activeNameKey) {
+    Objects.requireNonNull(activeNameKey, "activeNameKey must not be null");
+    return SessionUtils.doWithCommitAndFetchResult(
+        EntityDeletionMapper.class, mapper -> mapper.selectActiveEntityDeletion(activeNameKey));
+  }
+
+  /**
+   * Completes a restore only while the exact action revision remains recoverable.
+   *
+   * <p>This method joins the caller's transaction, so restoring the table rows and releasing the
+   * name reservation commit atomically.
+   *
+   * @param deletionId opaque deletion identifier
+   * @param expectedRevision revision represented by the accepted ETag
+   * @param serverNow authoritative transaction time
+   * @param acceptedRestoreEtag accepted strong ETag
+   * @return {@code true} when the compare-and-set succeeded
+   */
+  public boolean restore(
+      String deletionId, long expectedRevision, long serverNow, String acceptedRestoreEtag) {
+    Objects.requireNonNull(deletionId, "deletionId must not be null");
+    Objects.requireNonNull(acceptedRestoreEtag, "acceptedRestoreEtag must not be null");
+    return SessionUtils.getWithoutCommit(
+            EntityDeletionMapper.class,
+            mapper ->
+                mapper.restoreEntityDeletion(
+                    deletionId, expectedRevision, serverNow, acceptedRestoreEtag))
+        == 1;
+  }
 }

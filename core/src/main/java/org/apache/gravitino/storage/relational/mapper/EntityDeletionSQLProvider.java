@@ -83,4 +83,54 @@ public class EntityDeletionSQLProvider {
         + TABLE_NAME
         + " WHERE deletion_id = #{deletionId}";
   }
+
+  /**
+   * Builds an exact deletion-generation locking lookup.
+   *
+   * @param deletionId opaque deletion identifier
+   * @return parameterized select SQL
+   */
+  public static String selectEntityDeletionForUpdate(@Param("deletionId") String deletionId) {
+    return selectEntityDeletion(deletionId) + " FOR UPDATE";
+  }
+
+  /**
+   * Builds the lookup for the action reserving one canonical name.
+   *
+   * @param activeNameKey canonical active-name key
+   * @return parameterized select SQL
+   */
+  public static String selectActiveEntityDeletion(@Param("activeNameKey") String activeNameKey) {
+    return "SELECT "
+        + SELECT_COLUMNS
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE active_name_key = #{activeNameKey}";
+  }
+
+  /**
+   * Builds the compare-and-set that completes a retained restore.
+   *
+   * @param deletionId opaque deletion identifier
+   * @param expectedRevision revision supplied by the strong ETag
+   * @param serverNow authoritative transaction time
+   * @param acceptedRestoreEtag accepted strong ETag
+   * @return parameterized update SQL
+   */
+  public static String restoreEntityDeletion(
+      @Param("deletionId") String deletionId,
+      @Param("expectedRevision") long expectedRevision,
+      @Param("serverNow") long serverNow,
+      @Param("acceptedRestoreEtag") String acceptedRestoreEtag) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET state = 'RESTORED', revision = revision + 1, active_name_key = NULL,"
+        + " cleanup_status = NULL, cleanup_last_error = NULL,"
+        + " accepted_restore_etag = #{acceptedRestoreEtag}, restored_at = #{serverNow},"
+        + " updated_at = #{serverNow}"
+        + " WHERE deletion_id = #{deletionId} AND state = 'DELETED'"
+        + " AND revision = #{expectedRevision} AND purge_job_id IS NULL"
+        + " AND retention_expires_at IS NOT NULL"
+        + " AND retention_expires_at > #{serverNow}";
+  }
 }
