@@ -63,6 +63,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
    */
   private static final int ENTITY_CHANGE_POLLER_MAX_ROWS = 2000;
 
+  /** Max records rendered in a batch summary log line. */
+  private static final int MAX_SUMMARIZED_RECORDS = 20;
+
   /** What the poller does when a listener keeps failing after {@code maxListenerRetries}. */
   public enum ListenerFailureAction {
     /** Stop this server process, because its local caches are known to be stale. */
@@ -125,6 +128,10 @@ public class EntityChangeLogPoller implements AutoCloseable {
   public void registerListener(EntityChangeLogListener listener) {
     Preconditions.checkArgument(listener != null, "listener cannot be null");
     listeners.add(listener);
+    LOG.info(
+        "Registered entity change log listener {}, {} listener(s) active",
+        listener.getClass().getName(),
+        listeners.size());
   }
 
   /**
@@ -134,7 +141,12 @@ public class EntityChangeLogPoller implements AutoCloseable {
    */
   public void unregisterListener(EntityChangeLogListener listener) {
     Preconditions.checkArgument(listener != null, "listener cannot be null");
-    listeners.remove(listener);
+    if (listeners.remove(listener)) {
+      LOG.info(
+          "Unregistered entity change log listener {}, {} listener(s) active",
+          listener.getClass().getName(),
+          listeners.size());
+    }
   }
 
   /**
@@ -152,9 +164,13 @@ public class EntityChangeLogPoller implements AutoCloseable {
             SessionUtils.getWithoutCommit(
                 EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
     LOG.info(
-        "Starting entity change log poller at high-water id {} with a {} second interval",
+        "Starting entity change log poller at high-water id {} with a {} second interval, "
+            + "{} listener(s) registered, maxListenerRetries={}, listenerFailureAction={}",
         entityPollHighWaterId,
-        pollIntervalSecs);
+        pollIntervalSecs,
+        listeners.size(),
+        maxListenerRetries,
+        listenerFailureAction);
 
     scheduler =
         Executors.newSingleThreadScheduledExecutor(
@@ -181,6 +197,19 @@ public class EntityChangeLogPoller implements AutoCloseable {
         Thread.currentThread().interrupt();
       }
     }
+
+    // The final cursor tells where this node stopped consuming, which is the starting point when
+    // comparing nodes after an incident.
+    LOG.info(
+        "Stopped entity change log poller at high-water id {}{}",
+        entityPollHighWaterId,
+        pendingDelivery == null
+            ? ""
+            : ", with an unapplied batch id range ["
+                + pendingDelivery.firstChangeId()
+                + ", "
+                + pendingDelivery.lastChangeId
+                + "]");
   }
 
   @VisibleForTesting
@@ -191,19 +220,21 @@ public class EntityChangeLogPoller implements AutoCloseable {
       if (handleInterruptIfAny(e, "Entity change poll")) {
         return;
       }
-      LOG.warn("Entity change poll failed", e);
+      LOG.warn("Entity change poll failed at high-water id {}", entityPollHighWaterId, e);
     }
   }
 
   private synchronized void doPollChanges() {
     BatchDelivery delivery = pendingDelivery;
     if (delivery != null) {
-      LOG.debug(
-          "Retrying entity change log batch with {} record(s), id range [{}, {}], for {} pending "
-              + "listener(s)",
+      LOG.info(
+          "Retrying entity change log batch with {} record(s), id range [{}, {}], attempt {} of "
+              + "{}, for {} pending listener(s)",
           delivery.changes.size(),
           delivery.firstChangeId(),
           delivery.lastChangeId,
+          delivery.attempts,
+          maxListenerRetries + 1,
           delivery.pendingListeners.size());
       deliver(delivery);
       return;
@@ -227,12 +258,41 @@ public class EntityChangeLogPoller implements AutoCloseable {
     BatchDelivery delivery =
         new BatchDelivery(immutableChanges, lastChangeId, List.copyOf(listeners), 1);
     LOG.debug(
-        "Fetched {} entity change log record(s) after cursor {}, id range [{}, {}]",
+        "Fetched {} entity change log record(s) after cursor {}, id range [{}, {}]: {}",
         immutableChanges.size(),
         entityPollHighWaterId,
         delivery.firstChangeId(),
-        delivery.lastChangeId);
+        delivery.lastChangeId,
+        summarize(immutableChanges));
     return delivery;
+  }
+
+  /**
+   * Renders a batch as {@code id:ENTITY_TYPE:OPERATE_TYPE:fullName} entries, so a DEBUG log answers
+   * "which invalidations did this node actually see" without querying the database. Long batches
+   * are truncated, because the whole batch shares one id range that is already logged.
+   */
+  private static String summarize(List<EntityChangeRecord> changes) {
+    StringBuilder builder = new StringBuilder();
+    int limit = Math.min(changes.size(), MAX_SUMMARIZED_RECORDS);
+    for (int i = 0; i < limit; i++) {
+      EntityChangeRecord change = changes.get(i);
+      if (i > 0) {
+        builder.append(", ");
+      }
+      builder
+          .append(change.getId())
+          .append(':')
+          .append(change.getEntityType())
+          .append(':')
+          .append(change.getOperateType())
+          .append(':')
+          .append(change.getFullName());
+    }
+    if (changes.size() > limit) {
+      builder.append(", ... ").append(changes.size() - limit).append(" more");
+    }
+    return builder.toString();
   }
 
   private List<EntityChangeRecord> fetchEntityChanges() {
@@ -291,12 +351,14 @@ public class EntityChangeLogPoller implements AutoCloseable {
     entityPollHighWaterId = delivery.lastChangeId;
     pendingDelivery = null;
     LOG.info(
-        "Consumed {} entity change log record(s), id range [{}, {}]; cursor advanced from {} to {}",
+        "Consumed {} entity change log record(s), id range [{}, {}]; cursor advanced from {} to {}; "
+            + "newest record is ~{} ms old",
         delivery.changes.size(),
         delivery.firstChangeId(),
         delivery.lastChangeId,
         previousHighWaterId,
-        entityPollHighWaterId);
+        entityPollHighWaterId,
+        delivery.approximateLagMs());
   }
 
   private void handleExhaustedRetries(
@@ -385,6 +447,16 @@ public class EntityChangeLogPoller implements AutoCloseable {
 
     private long firstChangeId() {
       return changes.get(0).getId();
+    }
+
+    /**
+     * How far this node is behind the newest record of the batch, in milliseconds. It compares the
+     * DB-generated {@code created_at} with the local JVM clock, so it is only an estimate and can
+     * even be negative when the two clocks disagree. It is still the quickest way to spot a node
+     * that fell behind: a steadily growing value means this node is not keeping up.
+     */
+    private long approximateLagMs() {
+      return System.currentTimeMillis() - changes.get(changes.size() - 1).getCreatedAt();
     }
   }
 }

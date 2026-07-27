@@ -120,6 +120,9 @@ public class EntityChangeLogCleaner implements AutoCloseable {
             "Pruned {} entity change log record(s) older than {} ms, measured with database time",
             totalPrunedRows,
             retentionMs);
+      } else {
+        // Without this line a cleaner that never runs looks exactly like one that finds nothing.
+        LOG.debug("No entity change log record older than {} ms to prune", retentionMs);
       }
     } catch (Exception e) {
       LOG.warn(
