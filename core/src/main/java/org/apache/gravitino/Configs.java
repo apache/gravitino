@@ -206,7 +206,7 @@ public class Configs {
           .doc(
               "The number of times the poller retries a change log batch for a failing listener"
                   + " before applying gravitino.entityChangeLog.listenerFailureAction")
-          .version(ConfigConstants.VERSION_1_3_0)
+          .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
           .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES);
@@ -217,7 +217,7 @@ public class Configs {
               "What the poller does when a listener exhausted its retries: EXIT stops this server"
                   + " because its local caches are known to be stale, SKIP drops the batch for that"
                   + " listener and keeps serving")
-          .version(ConfigConstants.VERSION_1_3_0)
+          .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .checkValue(
               value ->
