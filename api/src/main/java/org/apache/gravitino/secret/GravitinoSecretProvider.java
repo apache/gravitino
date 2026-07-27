@@ -20,8 +20,10 @@
 package org.apache.gravitino.secret;
 
 import java.util.Map;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Service provider interface for Gravitino secret backends. */
+@DeveloperApi
 public interface GravitinoSecretProvider {
 
   /**

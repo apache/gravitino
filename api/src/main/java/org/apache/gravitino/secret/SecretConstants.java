@@ -19,7 +19,10 @@
 
 package org.apache.gravitino.secret;
 
+import org.apache.gravitino.annotation.DeveloperApi;
+
 /** Constants for Gravitino entity secret management. */
+@DeveloperApi
 public final class SecretConstants {
 
   /** Prefix for Gravitino secret URNs. */

@@ -20,8 +20,10 @@
 package org.apache.gravitino.secret;
 
 import java.util.Objects;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Immutable context for writing a secret at entity create time. */
+@DeveloperApi
 public final class SecretWriteContext {
 
   private final String providerName;

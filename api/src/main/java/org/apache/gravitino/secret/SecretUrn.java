@@ -27,8 +27,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Helpers for building and parsing Gravitino secret URNs. */
+@DeveloperApi
 public final class SecretUrn {
 
   // Allow '.' so dotted property keys (e.g. authentication.password) can appear in URNs.
