@@ -262,7 +262,7 @@ public class TestRelationalEntityStore {
               backendEntered.countDown();
               // Hold the backend "DB" call open to simulate a slow round-trip.
               releaseBackend.await(10, TimeUnit.SECONDS);
-              return new ArrayList<RelationalEntity<?>>();
+              return new ArrayList<>();
             });
 
     ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -291,6 +291,8 @@ public class TestRelationalEntityStore {
     } finally {
       releaseBackend.countDown();
       executor.shutdownNow();
+      Assertions.assertTrue(
+          executor.awaitTermination(5, TimeUnit.SECONDS), "executor should terminate");
     }
   }
 }
