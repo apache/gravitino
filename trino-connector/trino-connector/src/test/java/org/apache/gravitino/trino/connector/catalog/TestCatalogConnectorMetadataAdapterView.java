@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.catalog;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.CatalogSchemaName;
 import io.trino.spi.connector.ConnectorViewDefinition;
 import io.trino.spi.connector.ConnectorViewDefinition.ViewColumn;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoView;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
@@ -83,8 +85,11 @@ public class TestCatalogConnectorMetadataAdapterView {
             true,
             List.of(new CatalogSchemaName("c", "s")));
 
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> adapter.createView(new SchemaTableName("s", "v1"), definition, Map.of()));
+    TrinoException exception =
+        assertThrows(
+            TrinoException.class,
+            () -> adapter.createView(new SchemaTableName("s", "v1"), definition, Map.of()));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
   }
 }

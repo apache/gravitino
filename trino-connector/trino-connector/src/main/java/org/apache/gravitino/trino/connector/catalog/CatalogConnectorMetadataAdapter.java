@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import com.google.common.base.Preconditions;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
@@ -36,6 +37,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
@@ -218,10 +220,11 @@ public class CatalogConnectorMetadataAdapter {
       SchemaTableName viewName,
       ConnectorViewDefinition definition,
       Map<String, Object> viewProperties) {
-    Preconditions.checkArgument(
-        definition.getPath().isEmpty(),
-        "View %s has a non-empty path (SET PATH), which Gravitino cannot persist",
-        viewName);
+    if (!definition.getPath().isEmpty()) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+          "View " + viewName + " has a non-empty path (SET PATH), which Gravitino cannot persist");
+    }
     TypeManager typeManager = JsonCodec.getTypeManager(getClass().getClassLoader());
     List<GravitinoColumn> columns = new ArrayList<>();
     List<ViewColumn> viewColumns = definition.getColumns();
