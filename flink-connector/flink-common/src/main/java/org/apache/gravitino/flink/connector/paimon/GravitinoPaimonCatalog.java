@@ -39,11 +39,7 @@ import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
-import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
-import org.apache.gravitino.credential.JdbcCredential;
-import org.apache.gravitino.credential.OSSSecretKeyCredential;
-import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
@@ -64,7 +60,6 @@ import org.apache.paimon.flink.FlinkCatalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.FlinkFileIOLoader;
 import org.apache.paimon.options.Options;
-import org.apache.paimon.utils.HadoopUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -144,13 +139,10 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       return;
     }
     Map<String, String> paimonOptions = new HashMap<>(mutableOptions);
-    Configuration hadoopConf =
-        HadoopUtils.getHadoopConfiguration(Options.fromMap(withoutHadoopOptions(paimonOptions)));
-    moveHadoopOptionsToConf(paimonOptions, hadoopConf);
-    movePaimonStorageOptionsToConf(paimonOptions, hadoopConf);
+    Configuration hadoopConf = PropertyUtils.extractHadoopConfiguration(paimonOptions);
     try {
-      applyCredentialsToCatalog(
-          CredentialPropertyUtils.getCredentials(catalog()), paimonOptions, hadoopConf);
+      CredentialPropertyUtils.applyPaimonCredentials(
+          CredentialPropertyUtils.getCredentials(catalog()), paimonOptions);
     } catch (NoSuchCatalogException e) {
       LOG.warn(
           "Catalog '{}' not found in Gravitino during open(); credential injection skipped."
@@ -158,6 +150,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
           getName(),
           e);
     }
+    movePaimonStorageOptionsToConf(paimonOptions, hadoopConf);
     this.paimonCatalog = createInnerCatalog(paimonOptions, hadoopConf);
     super.open();
   }
@@ -174,43 +167,10 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       Map<String, String> paimonOptions, Configuration hadoopConf) {
     CatalogContext catalogContext =
         CatalogContext.create(
-            Options.fromMap(paimonOptions), hadoopConf, new FlinkFileIOLoader(), null);
+            Options.fromMap(paimonOptions), hadoopConf, null, new FlinkFileIOLoader());
     return (AbstractCatalog)
         FlinkCatalogFactory.createCatalog(
             context.getName(), catalogContext, context.getClassLoader());
-  }
-
-  private static void moveHadoopOptionsToConf(
-      Map<String, String> paimonOptions, Configuration hadoopConf) {
-    paimonOptions
-        .entrySet()
-        .removeIf(
-            entry -> {
-              String hadoopKey = toHadoopConfKey(entry.getKey());
-              if (hadoopKey == null) {
-                return false;
-              }
-
-              hadoopConf.set(hadoopKey, entry.getValue());
-              return true;
-            });
-  }
-
-  private static Map<String, String> withoutHadoopOptions(Map<String, String> options) {
-    Map<String, String> result = new HashMap<>(options);
-    result.keySet().removeIf(key -> toHadoopConfKey(key) != null);
-    return result;
-  }
-
-  private static String toHadoopConfKey(String key) {
-    if (key.startsWith(PropertyUtils.HADOOP_PREFIX)) {
-      return key.substring(PropertyUtils.HADOOP_PREFIX.length());
-    } else if (key.startsWith(PropertyUtils.FS_PREFIX)
-        || key.startsWith(PropertyUtils.DFS_PREFIX)) {
-      return key;
-    }
-
-    return null;
   }
 
   private static void movePaimonStorageOptionsToConf(
@@ -225,6 +185,10 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
         paimonOptions, hadoopConf, PAIMON_S3_SECRET_KEY_ALIAS, HADOOP_S3_SECRET_KEY);
     moveOptionToHadoopConf(
         paimonOptions, hadoopConf, PaimonConstants.S3_SECRET_KEY, HADOOP_S3_SECRET_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.OSS_ACCESS_KEY, PaimonConstants.OSS_ACCESS_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.OSS_SECRET_KEY, PaimonConstants.OSS_SECRET_KEY);
   }
 
   private static void moveOptionToHadoopConf(
@@ -235,29 +199,6 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     String value = paimonOptions.remove(paimonKey);
     if (value != null) {
       hadoopConf.set(hadoopKey, value);
-    }
-  }
-
-  private static void applyCredentialsToCatalog(
-      Credential[] credentials, Map<String, String> paimonOptions, Configuration hadoopConf) {
-    for (Credential credential : credentials) {
-      if (credential instanceof JdbcCredential) {
-        JdbcCredential jdbc = (JdbcCredential) credential;
-        paimonOptions.put(PaimonConstants.PAIMON_JDBC_USER, jdbc.jdbcUser());
-        paimonOptions.put(PaimonConstants.PAIMON_JDBC_PASSWORD, jdbc.jdbcPassword());
-      } else if (credential instanceof S3SecretKeyCredential) {
-        S3SecretKeyCredential s3 = (S3SecretKeyCredential) credential;
-        hadoopConf.set(HADOOP_S3_ACCESS_KEY, s3.accessKeyId());
-        hadoopConf.set(HADOOP_S3_SECRET_KEY, s3.secretAccessKey());
-      } else if (credential instanceof OSSSecretKeyCredential) {
-        OSSSecretKeyCredential oss = (OSSSecretKeyCredential) credential;
-        hadoopConf.set(PaimonConstants.OSS_ACCESS_KEY, oss.accessKeyId());
-        hadoopConf.set(PaimonConstants.OSS_SECRET_KEY, oss.secretAccessKey());
-      } else {
-        LOG.warn(
-            "Received unrecognized credential type '{}' for Paimon catalog, skipping",
-            credential.getClass().getName());
-      }
     }
   }
 
