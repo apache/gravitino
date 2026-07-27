@@ -31,12 +31,12 @@ from gravitino.exceptions.base import (
     NoSuchCatalogException,
 )
 
-from tests.integration.integration_test_env import IntegrationTestEnv
+from tests.integration.integration_test_env import IntegrationTestEnv, MetalakeTestMixin
 
 logger = logging.getLogger(__name__)
 
 
-class TestCatalog(IntegrationTestEnv):
+class TestCatalog(MetalakeTestMixin, IntegrationTestEnv):
     metalake_name: str = "TestSchema_metalake" + str(randint(1, 10000))
 
     catalog_name: str = "testCatalog" + str(randint(1, 10000))
@@ -53,20 +53,6 @@ class TestCatalog(IntegrationTestEnv):
     )
     gravitino_client: GravitinoClient = None
 
-    def setUp(self):
-        self.init_test_env()
-
-    def tearDown(self):
-        self.clean_test_data()
-
-    def init_test_env(self):
-        self.gravitino_admin_client.create_metalake(
-            self.metalake_name, comment="", properties={}
-        )
-        self.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self.metalake_name
-        )
-
     def create_catalog(self, catalog_name) -> Catalog:
         return self.gravitino_client.create_catalog(
             name=catalog_name,
@@ -77,9 +63,7 @@ class TestCatalog(IntegrationTestEnv):
         )
 
     def clean_test_data(self):
-        self.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self.metalake_name
-        )
+        self.gravitino_client = self.create_gravitino_client(self.metalake_name)
         try:
             logger.info(
                 "TestCatalog: drop catalog %s[%s]",
@@ -89,18 +73,9 @@ class TestCatalog(IntegrationTestEnv):
         except GravitinoRuntimeException:
             logger.warning("TestCatalog: failed to drop catalog %s", self.catalog_name)
 
-        try:
-            logger.info(
-                "TestCatalog: drop metalake %s[%s]",
-                self.metalake_name,
-                self.gravitino_admin_client.drop_metalake(
-                    self.metalake_name, force=True
-                ),
-            )
-        except GravitinoRuntimeException:
-            logger.warning(
-                "TestCatalog: failed to drop metalake %s", self.metalake_name
-            )
+        self.drop_test_metalake(
+            self.gravitino_admin_client, self.metalake_name, "TestCatalog"
+        )
 
         self.catalog_name = self.catalog_name_bak
 

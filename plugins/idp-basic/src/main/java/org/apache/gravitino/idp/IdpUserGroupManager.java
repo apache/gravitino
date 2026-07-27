@@ -158,7 +158,7 @@ public class IdpUserGroupManager implements Closeable {
             "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
       }
       return user;
-    } catch (NotFoundException e) {
+    } catch (Exception e) {
       throw new UnauthorizedException(
           "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
     }

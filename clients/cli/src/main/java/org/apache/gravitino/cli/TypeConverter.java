@@ -76,6 +76,8 @@ public class TypeConverter {
         return Types.StringType.get();
       case "binary":
         return Types.BinaryType.get();
+      case "variant":
+        return Types.VariantType.get();
       default:
         throw new IllegalArgumentException("Unknown or unsupported type: " + typeName);
     }

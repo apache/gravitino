@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.doris.DorisCatalog.DORIS_TABLE_PROPER
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -136,7 +137,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder.append(" COMMENT \"").append(comment).append("\"");
+      sqlBuilder.append(" COMMENT \"").append(escapeSqlLiteral(comment, '"')).append("\"");
     }
 
     // Add Partition Info
@@ -796,7 +797,7 @@ public class DorisTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add("MODIFY COMMENT \"" + newComment + "\"");
+      alterSql.add("MODIFY COMMENT \"" + escapeSqlLiteral(newComment, '"') + "\"");
     }
 
     if (CollectionUtils.isEmpty(alterSql)) {
@@ -848,7 +849,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnComment.fieldName()[0];
 
-    return String.format("MODIFY COLUMN `%s` COMMENT '%s'", col, newComment);
+    return String.format(
+        "MODIFY COLUMN `%s` COMMENT '%s'", col, escapeSqlLiteral(newComment, '\''));
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
@@ -873,7 +875,10 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
+      columnDefinition
+          .append("COMMENT '")
+          .append(escapeSqlLiteral(addColumn.getComment(), '\''))
+          .append("' ");
     }
 
     // Append position if available
@@ -985,7 +990,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
-      sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");
+      sqlBuilder.append("COMMENT '").append(escapeSqlLiteral(column.comment(), '\'')).append("' ");
     }
     return sqlBuilder;
   }

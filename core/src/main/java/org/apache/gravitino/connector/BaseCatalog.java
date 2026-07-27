@@ -211,6 +211,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return ops;
   }
 
+  /**
+   * Whether to validate this catalog against its backend at create time rather than on first use.
+   *
+   * @return {@code true} to validate at create; {@code false} (default) to defer
+   */
+  public boolean shouldValidateOnCreate() {
+    return false;
+  }
+
   public void checkMetalakeAndCatalogInUse() {
     Map<String, String> catalogProperties = entity.getProperties();
     if (catalogProperties == null) {
