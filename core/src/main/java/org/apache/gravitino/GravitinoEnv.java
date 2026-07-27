@@ -56,6 +56,7 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.encryption.kms.KmsClientRegistry;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
@@ -153,6 +154,8 @@ public class GravitinoEnv {
   private MetalakeDispatcher metalakeDispatcher;
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
+
+  private KmsClientRegistry kmsClientRegistry;
 
   private TagDispatcher tagDispatcher;
 
@@ -419,6 +422,21 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the metadata-only KMS client registry associated with the Gravitino environment.
+   *
+   * <p>The environment owns this registry. Callers may inject it into dependent components but must
+   * not close it.
+   *
+   * @return The KMS client registry instance.
+   * @throws IllegalStateException if the environment has not been initialized
+   */
+  public KmsClientRegistry kmsClientRegistry() {
+    Preconditions.checkState(
+        kmsClientRegistry != null, "GravitinoEnv components are not initialized.");
+    return kmsClientRegistry;
+  }
+
+  /**
    * Get the IdGenerator associated with the Gravitino environment.
    *
    * @return The IdGenerator instance.
@@ -635,10 +653,16 @@ public class GravitinoEnv {
       }
     }
 
+    if (kmsClientRegistry != null) {
+      kmsClientRegistry.close();
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
   private void initBaseComponents() {
+    this.kmsClientRegistry = new KmsClientRegistry(config);
+
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
 

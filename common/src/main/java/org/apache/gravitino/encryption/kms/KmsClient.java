@@ -28,6 +28,9 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
  * <p>This is a server-side operation client, not a credential-vending API. Provider credentials
  * authenticate calls made by the client and must never be returned to callers. This client does not
  * perform cryptographic operations.
+ *
+ * <p>Implementations must support concurrent operation calls on one client instance. Operation
+ * failures must not close the client; later calls reuse the same instance.
  */
 @DeveloperApi
 public interface KmsClient extends AutoCloseable {
