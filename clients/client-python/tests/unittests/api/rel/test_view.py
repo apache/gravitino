@@ -22,6 +22,7 @@ from gravitino.api.rel.dialects import Dialects
 from gravitino.api.rel.representation import Representation
 from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.view import View
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class TestView(unittest.TestCase):
@@ -67,3 +68,9 @@ class TestView(unittest.TestCase):
         self.assertIsNone(View.default_catalog(view))
         self.assertIsNone(View.default_schema(view))
         self.assertEqual({}, View.properties(view))
+
+    def test_supports_tags_raises_exception(self):
+        view = Mock(spec=View)
+
+        with self.assertRaises(UnsupportedOperationException):
+            View.supports_tags(view)

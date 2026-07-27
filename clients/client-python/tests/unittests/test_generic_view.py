@@ -18,13 +18,23 @@
 import unittest
 
 from gravitino.api.rel.dialects import Dialects
+from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.client.generic_view import GenericView
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.view_dto import ViewDTO
+from gravitino.namespace import Namespace
+from gravitino.utils.http_client import HTTPClient
 
 
 class TestGenericView(unittest.TestCase):
+    _rest_client = HTTPClient("http://localhost:8080")
+    _view_namespace = Namespace.of(
+        "demo_metalake",
+        "demo_catalog",
+        "demo_schema",
+    )
+
     def _generic_view(
         self,
         name: str = "demo_view",
@@ -45,6 +55,8 @@ class TestGenericView(unittest.TestCase):
                 _properties={"key": "value"},
                 _audit=AuditDTO("creator"),
             ),
+            self._rest_client,
+            self._view_namespace,
         )
 
     def test_generic_view(self) -> None:
@@ -59,3 +71,15 @@ class TestGenericView(unittest.TestCase):
         self.assertEqual(1, len(generic_view.representations()))
         self.assertEqual("SELECT 1", generic_view.sql_for(Dialects.TRINO).sql())
         self.assertEqual("creator", generic_view.audit_info().creator())
+
+    def test_extends_supports_tags_class(self) -> None:
+        generic_view = self._generic_view()
+
+        self.assertTrue(issubclass(GenericView, SupportsTags))
+        expected_methods = ["list_tags", "list_tags_info", "get_tag", "associate_tags"]
+        self.assertTrue(
+            all(
+                callable(getattr(generic_view, method, None))
+                for method in expected_methods
+            )
+        )
