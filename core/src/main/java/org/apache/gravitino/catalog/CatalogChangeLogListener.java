@@ -51,6 +51,7 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
 
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
+    RuntimeException firstFailure = null;
     for (EntityChangeRecord change : changes) {
       try {
         if (!isCatalogChange(change)) {
@@ -71,12 +72,21 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
         LOG.debug("Invalidating catalog cache due to entity change log: {}", ident);
         catalogManager.getCatalogCache().invalidate(ident);
       } catch (RuntimeException e) {
+        if (firstFailure == null) {
+          firstFailure = e;
+        } else {
+          firstFailure.addSuppressed(e);
+        }
         LOG.warn(
             "Failed to process catalog change log record: fullName={}, entityType={}",
             change.getFullName(),
             change.getEntityType(),
             e);
       }
+    }
+
+    if (firstFailure != null) {
+      throw firstFailure;
     }
   }
 

@@ -28,8 +28,8 @@ import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
@@ -52,8 +52,8 @@ public class TestEntityChangeLogPoller {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
     EntityChangeRecord first = change(1L, "CATALOG", "ml1.cat1");
     EntityChangeRecord second = change(2L, "SCHEMA", "ml1.cat1.sch1");
-    when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of(first, second));
-    when(mapper.selectEntityChanges(2L, 500)).thenReturn(List.of());
+    when(mapper.selectEntityChanges(0L, 2000)).thenReturn(List.of(first, second));
+    when(mapper.selectEntityChanges(2L, 2000)).thenReturn(List.of());
 
     List<EntityChangeRecord> firstListenerRecords = new ArrayList<>();
     List<EntityChangeRecord> secondListenerRecords = new ArrayList<>();
@@ -80,13 +80,15 @@ public class TestEntityChangeLogPoller {
   }
 
   @Test
-  void testListenerFailureDoesNotBlockOtherListenersAndCursorStillAdvances() {
+  void testRetriesOnlyFailedListenersBeforeAdvancingCursor() {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
     EntityChangeRecord change = change(1L, "CATALOG", "ml1.cat1");
-    when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of(change));
-    when(mapper.selectEntityChanges(1L, 500)).thenReturn(List.of());
+    when(mapper.selectEntityChanges(0L, 2000)).thenReturn(List.of(change));
+    when(mapper.selectEntityChanges(1L, 2000)).thenReturn(List.of());
 
     List<EntityChangeRecord> received = new ArrayList<>();
+    AtomicInteger failingListenerCalls = new AtomicInteger();
+    AtomicBoolean firstCall = new AtomicBoolean(true);
 
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       sessionUtils
@@ -100,21 +102,108 @@ public class TestEntityChangeLogPoller {
       EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
       poller.registerListener(
           changes -> {
-            throw new RuntimeException("listener failed");
+            failingListenerCalls.incrementAndGet();
+            if (firstCall.getAndSet(false)) {
+              throw new RuntimeException("listener failed");
+            }
           });
       poller.registerListener(received::addAll);
 
       poller.pollChanges();
       poller.pollChanges();
+      poller.pollChanges();
     }
 
+    Assertions.assertEquals(2, failingListenerCalls.get());
     Assertions.assertEquals(List.of(change), received);
+    verify(mapper).selectEntityChanges(0L, 2000);
+    verify(mapper).selectEntityChanges(1L, 2000);
+  }
+
+  @Test
+  void testUnregisteredFailedListenerDoesNotBlockCursor() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    EntityChangeRecord change = change(1L, "CATALOG", "ml1.cat1");
+    when(mapper.selectEntityChanges(0L, 2000)).thenReturn(List.of(change));
+    when(mapper.selectEntityChanges(1L, 2000)).thenReturn(List.of());
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      sessionUtils
+          .when(() -> SessionUtils.getWithoutCommit(any(), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<Object, Object> func = invocation.getArgument(1);
+                return func.apply(mapper);
+              });
+
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      EntityChangeLogListener failedListener =
+          changes -> {
+            throw new RuntimeException("listener failed");
+          };
+      poller.registerListener(failedListener);
+
+      poller.pollChanges();
+      poller.unregisterListener(failedListener);
+      poller.pollChanges();
+      poller.pollChanges();
+    }
+
+    verify(mapper).selectEntityChanges(1L, 2000);
+  }
+
+  @Test
+  void testDoesNotPruneWhileListenerFailurePausesCursor() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    EntityChangeRecord change = change(1L, "CATALOG", "ml1.cat1");
+    when(mapper.selectEntityChanges(0L, 2000)).thenReturn(List.of(change));
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      poller.registerListener(
+          changes -> {
+            throw new RuntimeException("listener failed");
+          });
+
+      poller.pollChanges();
+      poller.pollChanges();
+    }
+
+    verify(mapper).selectEntityChanges(0L, 2000);
+    verify(mapper, never()).pruneOldEntityChanges(anyLong());
+  }
+
+  @Test
+  void testDoesNotPruneUntilBacklogLargerThanOneBatchIsConsumed() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    List<EntityChangeRecord> firstBatch = changes(1L, 2000L);
+    EntityChangeRecord remainingChange = change(2001L, "TABLE", "ml1.cat1.schema1.table2001");
+    when(mapper.selectEntityChanges(0L, 2000)).thenReturn(firstBatch);
+    when(mapper.selectEntityChanges(2000L, 2000)).thenReturn(List.of(remainingChange));
+
+    List<EntityChangeRecord> received = new ArrayList<>();
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      poller.registerListener(received::addAll);
+
+      poller.pollChanges();
+      verify(mapper, never()).pruneOldEntityChanges(anyLong());
+
+      poller.pollChanges();
+    }
+
+    Assertions.assertEquals(2001, received.size());
+    verify(mapper, never()).pruneOldEntityChanges(anyLong());
   }
 
   @Test
   void testPollChangesCatchesFetchFailures() {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
-    when(mapper.selectEntityChanges(0L, 500)).thenThrow(new RuntimeException("db failed"));
+    when(mapper.selectEntityChanges(0L, 2000)).thenThrow(new RuntimeException("db failed"));
 
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       sessionUtils
@@ -136,7 +225,7 @@ public class TestEntityChangeLogPoller {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
     EntityChangeRecord first = change(1L, "CATALOG", "ml1.cat1");
     EntityChangeRecord second = change(2L, "SCHEMA", "ml1.cat1.sch1");
-    when(mapper.selectEntityChanges(0L, 500)).thenReturn(new ArrayList<>(List.of(first, second)));
+    when(mapper.selectEntityChanges(0L, 2000)).thenReturn(new ArrayList<>(List.of(first, second)));
 
     List<EntityChangeRecord> received = new ArrayList<>();
 
@@ -148,10 +237,6 @@ public class TestEntityChangeLogPoller {
                 Function<Object, Object> func = invocation.getArgument(1);
                 return func.apply(mapper);
               });
-      sessionUtils
-          .when(() -> SessionUtils.doWithoutCommit(any(), any()))
-          .thenAnswer(invocation -> null);
-
       EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
       poller.registerListener(
           changes -> Assertions.assertThrows(UnsupportedOperationException.class, changes::clear));
@@ -163,62 +248,16 @@ public class TestEntityChangeLogPoller {
     Assertions.assertEquals(List.of(first, second), received);
   }
 
-  @Test
-  void testPrunesExpiredChangesAfterCleanupInterval() {
-    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
-    when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of());
-
-    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
-      mockSessionUtils(sessionUtils, mapper);
-
-      EntityChangeLogPoller poller =
-          new EntityChangeLogPoller(
-              1, TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1), () -> 100_000_000L);
-
-      poller.pollChanges();
-    }
-
-    verify(mapper).pruneOldEntityChanges(100_000_000L - TimeUnit.DAYS.toMillis(1));
-  }
-
-  @Test
-  void testSkipsPruneBeforeCleanupInterval() {
-    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
-    when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of());
-
-    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
-      mockSessionUtils(sessionUtils, mapper);
-
-      EntityChangeLogPoller poller =
-          new EntityChangeLogPoller(
-              1, TimeUnit.DAYS.toMillis(1), TimeUnit.HOURS.toMillis(1), () -> 100_000_000L);
-
-      poller.pollChanges();
-      poller.pollChanges();
-    }
-
-    verify(mapper).pruneOldEntityChanges(100_000_000L - TimeUnit.DAYS.toMillis(1));
-  }
-
-  @Test
-  void testDisablesPruneWhenRetentionIsZero() {
-    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
-    when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of());
-
-    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
-      mockSessionUtils(sessionUtils, mapper);
-
-      EntityChangeLogPoller poller =
-          new EntityChangeLogPoller(1, 0L, TimeUnit.HOURS.toMillis(1), () -> 100_000_000L);
-
-      poller.pollChanges();
-    }
-
-    verify(mapper, never()).pruneOldEntityChanges(anyLong());
-  }
-
   private static EntityChangeRecord change(long id, String type, String fullName) {
     return new EntityChangeRecord(id, "ml1", type, fullName, OperateType.ALTER, 0L);
+  }
+
+  private static List<EntityChangeRecord> changes(long firstId, long lastId) {
+    List<EntityChangeRecord> changes = new ArrayList<>();
+    for (long id = firstId; id <= lastId; id++) {
+      changes.add(change(id, "TABLE", "ml1.cat1.schema1.table" + id));
+    }
+    return changes;
   }
 
   private static void mockSessionUtils(
@@ -229,14 +268,6 @@ public class TestEntityChangeLogPoller {
             invocation -> {
               Function<Object, Object> func = invocation.getArgument(1);
               return func.apply(mapper);
-            });
-    sessionUtils
-        .when(() -> SessionUtils.doWithoutCommit(any(), any()))
-        .thenAnswer(
-            invocation -> {
-              Consumer<Object> consumer = invocation.getArgument(1);
-              consumer.accept(mapper);
-              return null;
             });
   }
 }

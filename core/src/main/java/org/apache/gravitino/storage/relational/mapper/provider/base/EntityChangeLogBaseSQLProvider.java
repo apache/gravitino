@@ -18,12 +18,16 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_PRUNE_BATCH_SIZE;
 import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.ibatis.annotations.Param;
 
 public class EntityChangeLogBaseSQLProvider {
+
+  private static final String CURRENT_TIME_MILLIS_SQL =
+      "((UNIX_TIMESTAMP() * 1000.0) + " + "EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)";
 
   /**
    * Cursor-advance contract for the entity change poller: {@code id} is monotonic and unique, so
@@ -67,16 +71,19 @@ public class EntityChangeLogBaseSQLProvider {
         + ENTITY_CHANGE_LOG_TABLE_NAME
         + " (metalake_name, entity_type, entity_full_name, operate_type, created_at)"
         + " VALUES (#{metalakeName}, #{entityType}, #{fullName}, #{operateType},"
-        + " (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)";
+        + CURRENT_TIME_MILLIS_SQL
+        + ")";
   }
 
-  public String pruneOldEntityChanges(@Param("before") long before) {
+  public String pruneOldEntityChanges(@Param("retentionMs") long retentionMs) {
     // Keep the retention window conservative. A running server can be delayed by long GC pauses,
-    // network isolation, scheduler stalls, or clock skew between nodes; pruning too aggressively
-    // can let that server miss an invalidation while its local cache is still warm.
+    // network isolation, or scheduler stalls; pruning too aggressively can let that server miss an
+    // invalidation while its local cache is still warm.
     return "DELETE FROM "
         + ENTITY_CHANGE_LOG_TABLE_NAME
-        + " WHERE created_at < #{before} LIMIT 1000";
+        + " WHERE created_at < "
+        + CURRENT_TIME_MILLIS_SQL
+        + " - #{retentionMs} LIMIT "
+        + ENTITY_CHANGE_LOG_PRUNE_BATCH_SIZE;
   }
 }

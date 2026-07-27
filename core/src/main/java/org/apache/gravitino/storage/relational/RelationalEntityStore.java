@@ -73,6 +73,7 @@ public class RelationalEntityStore
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityChangeLogPoller entityChangeLogPoller;
+  private EntityChangeLogCleaner entityChangeLogCleaner;
   private EntityCache cache;
 
   @VisibleForTesting
@@ -95,16 +96,16 @@ public class RelationalEntityStore
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
 
-    // The change-log poller is a side module of the entity store: it polls the entity_change_log
-    // table this store writes to, dispatches batches to registered listeners (e.g. for cross-node
-    // cache invalidation), and prunes expired rows. Like the garbage collector, it is owned and
-    // lifecycle-managed by the store itself.
+    // Polling and cleanup use separate single-threaded schedulers. Polling only dispatches changes
+    // to local listeners, while cleanup independently removes records beyond the retention period.
     this.entityChangeLogPoller =
-        new EntityChangeLogPoller(
-            config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
+        new EntityChangeLogPoller(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS));
+    this.entityChangeLogCleaner =
+        new EntityChangeLogCleaner(
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
     this.entityChangeLogPoller.start();
+    this.entityChangeLogCleaner.start();
   }
 
   private RelationalBackend createRelationalEntityBackend(Config config) {
@@ -234,6 +235,7 @@ public class RelationalEntityStore
   public void close() throws IOException {
     cache.clear();
     entityChangeLogPoller.close();
+    entityChangeLogCleaner.close();
     garbageCollector.close();
     backend.close();
   }
