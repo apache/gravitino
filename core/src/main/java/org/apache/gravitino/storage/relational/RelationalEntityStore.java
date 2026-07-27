@@ -321,6 +321,10 @@ public class RelationalEntityStore
     // not block concurrent cache mutations for the duration of the DB round-trip.
     List<RelationalEntity<?>> result = new ArrayList<>();
     List<NameIdentifier> uncachedIdentifiers = new ArrayList<>();
+    // Generation of each uncached key's cache slot, snapshotted at the miss (before the backend
+    // read). If the key is invalidated during the read, the generation changes and the populate
+    // below skips it, so a stale backend result cannot overwrite the concurrent invalidation.
+    Map<NameIdentifier, Long> uncachedGenerations = new HashMap<>();
 
     for (NameIdentifier nameIdentifier : nameIdentifiers) {
       Optional<List<RelationalEntity<?>>> cachedRelations =
@@ -328,6 +332,8 @@ public class RelationalEntityStore
       if (cachedRelations.isPresent()) {
         result.addAll(cachedRelations.get());
       } else {
+        uncachedGenerations.put(
+            nameIdentifier, cache.relationGeneration(nameIdentifier, identType, relType));
         uncachedIdentifiers.add(nameIdentifier);
       }
     }
@@ -337,7 +343,8 @@ public class RelationalEntityStore
           backend.batchListEntitiesByRelation(relType, uncachedIdentifiers, identType);
       result.addAll(backendRelations);
 
-      batchPopulateRelationCache(relType, identType, uncachedIdentifiers, backendRelations);
+      batchPopulateRelationCache(
+          relType, identType, uncachedIdentifiers, backendRelations, uncachedGenerations);
     }
 
     return result;
@@ -476,7 +483,8 @@ public class RelationalEntityStore
       SupportsRelationOperations.Type relType,
       Entity.EntityType identType,
       List<NameIdentifier> uncachedIdentifiers,
-      List<RelationalEntity<?>> backendRelations) {
+      List<RelationalEntity<?>> backendRelations,
+      Map<NameIdentifier, Long> uncachedGenerations) {
     Map<NameIdentifier, List<RelationalEntity<?>>> relationsBySource = new HashMap<>();
     for (RelationalEntity<?> relation : backendRelations) {
       relationsBySource.computeIfAbsent(relation.source(), k -> new ArrayList<>()).add(relation);
@@ -493,7 +501,8 @@ public class RelationalEntityStore
         }
       }
 
-      cache.put(sourceId, identType, relType, entityList);
+      cache.putIfNotInvalidatedSince(
+          sourceId, identType, relType, entityList, uncachedGenerations.get(sourceId));
     }
   }
 

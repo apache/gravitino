@@ -22,8 +22,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,11 +38,14 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.TagEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -294,5 +299,113 @@ public class TestRelationalEntityStore {
       Assertions.assertTrue(
           executor.awaitTermination(5, TimeUnit.SECONDS), "executor should terminate");
     }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testBatchListSkipsPopulateWhenInvalidatedDuringBackendCall()
+      throws IOException, IllegalAccessException, InterruptedException {
+    SupportsRelationOperations.Type relType =
+        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL;
+    Entity.EntityType identType = Entity.EntityType.TABLE;
+    NameIdentifier src = NameIdentifier.of("metalake", "catalog", "schema", "table1");
+
+    Config config = new Config(false) {};
+    CaffeineEntityCache realCache = new CaffeineEntityCache(config);
+    FieldUtils.writeField(store, "cache", realCache, true);
+
+    // The backend returns a relation for src (the value that would become stale once the key is
+    // invalidated mid-call).
+    TagEntity staleTag =
+        TagEntity.builder()
+            .withId(1L)
+            .withName("stale-tag")
+            .withNamespace(Namespace.of("metalake"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    RelationalEntity<TagEntity> staleRelation =
+        new RelationalEntity<>(relType, src, identType, staleTag);
+
+    CountDownLatch backendEntered = new CountDownLatch(1);
+    CountDownLatch releaseBackend = new CountDownLatch(1);
+    Mockito.when(backend.batchListEntitiesByRelation(eq(relType), any(List.class), eq(identType)))
+        .thenAnswer(
+            invocation -> {
+              backendEntered.countDown();
+              // Hold the backend "DB" call open so the invalidation can complete first.
+              releaseBackend.await(10, TimeUnit.SECONDS);
+              List<RelationalEntity<?>> backendResult = new ArrayList<>();
+              backendResult.add(staleRelation);
+              return backendResult;
+            });
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<List<RelationalEntity<?>>> listFuture =
+          executor.submit(
+              () -> store.batchListEntitiesByRelation(relType, List.of(src), identType));
+
+      // Wait until the list is blocked inside the backend call, then invalidate the key. The
+      // invalidation completes while the (soon-to-be-stale) backend result is still in flight.
+      Assertions.assertTrue(
+          backendEntered.await(5, TimeUnit.SECONDS), "backend call should have been entered");
+      realCache.invalidate(src, identType, relType);
+
+      // Release the backend and let the list finish; it still returns the read value to the caller.
+      releaseBackend.countDown();
+      List<RelationalEntity<?>> listResult =
+          Assertions.assertDoesNotThrow(() -> listFuture.get(5, TimeUnit.SECONDS));
+      Assertions.assertEquals(1, listResult.size(), "caller still receives the backend result");
+
+      // The stale result must NOT have been cached over the concurrent invalidation: the slot is
+      // left absent and rebuilt on the next read.
+      Optional<List<TagEntity>> cached = realCache.getIfPresent(relType, src, identType);
+      Assertions.assertFalse(
+          cached.isPresent(),
+          "populate must be skipped when the key was invalidated during the backend call");
+    } finally {
+      releaseBackend.countDown();
+      executor.shutdownNow();
+      Assertions.assertTrue(
+          executor.awaitTermination(5, TimeUnit.SECONDS), "executor should terminate");
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testBatchListPopulatesWhenNotInvalidatedDuringBackendCall()
+      throws IOException, IllegalAccessException {
+    SupportsRelationOperations.Type relType =
+        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL;
+    Entity.EntityType identType = Entity.EntityType.TABLE;
+    NameIdentifier src = NameIdentifier.of("metalake", "catalog", "schema", "table1");
+
+    Config config = new Config(false) {};
+    CaffeineEntityCache realCache = new CaffeineEntityCache(config);
+    FieldUtils.writeField(store, "cache", realCache, true);
+
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(1L)
+            .withName("tag")
+            .withNamespace(Namespace.of("metalake"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    RelationalEntity<TagEntity> relation = new RelationalEntity<>(relType, src, identType, tag);
+    List<RelationalEntity<?>> backendResult = new ArrayList<>();
+    backendResult.add(relation);
+    Mockito.when(backend.batchListEntitiesByRelation(eq(relType), any(List.class), eq(identType)))
+        .thenReturn(backendResult);
+
+    // Control: with no concurrent invalidation, the generation is unchanged and the result is
+    // cached, so the guard does not spuriously skip valid populates.
+    store.batchListEntitiesByRelation(relType, List.of(src), identType);
+
+    Optional<List<TagEntity>> cached = realCache.getIfPresent(relType, src, identType);
+    Assertions.assertTrue(cached.isPresent(), "result must be cached when not invalidated");
+    Assertions.assertEquals(1, cached.get().size());
+    Assertions.assertEquals("tag", cached.get().get(0).name());
   }
 }

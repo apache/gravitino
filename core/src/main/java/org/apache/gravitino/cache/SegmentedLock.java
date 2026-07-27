@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
@@ -44,6 +45,15 @@ public class SegmentedLock {
    * #getDistinctSortedLocks} with a guaranteed total order (no hash-collision ties).
    */
   private final Map<Lock, Integer> lockIndices;
+
+  /**
+   * Per-stripe monotonic generation counters. A caller can snapshot a key's counter via {@link
+   * #generation} and later detect whether {@link #incrementGeneration} ran on the same stripe in
+   * the meantime. Counters are per-stripe (not per-key) to reuse the existing striping and stay
+   * bounded; keys that share a stripe share a counter, so an unrelated increment only yields a
+   * false-positive (an increment is never missed), which callers must tolerate.
+   */
+  private final AtomicLong[] generations;
 
   /** CountDownLatch for global operations - null when no operation is in progress */
   private final AtomicReference<CountDownLatch> globalOperationLatch = new AtomicReference<>();
@@ -66,6 +76,10 @@ public class SegmentedLock {
         IntStream.range(0, this.stripedLocks.size())
             .boxed()
             .collect(Collectors.toMap(this.stripedLocks::getAt, i -> i));
+    this.generations = new AtomicLong[this.stripedLocks.size()];
+    for (int i = 0; i < this.generations.length; i++) {
+      this.generations[i] = new AtomicLong();
+    }
   }
 
   /**
@@ -234,6 +248,39 @@ public class SegmentedLock {
     } finally {
       releaseAllLocks(sortedLocks);
     }
+  }
+
+  /**
+   * Returns the current generation of the stripe that guards the given key. A caller can snapshot
+   * this value and later confirm, under {@link #withLock}, that no {@link #incrementGeneration}
+   * touched the stripe in the meantime (the generation is unchanged).
+   *
+   * @param key Key to determine the stripe
+   * @return the current generation counter for the key's stripe
+   */
+  public long generation(Object key) {
+    return generationCounter(key).get();
+  }
+
+  /**
+   * Increments the generation of the stripe that guards the given key, so callers that snapshotted
+   * the generation before this call can detect the change.
+   *
+   * @param key Key to determine the stripe
+   */
+  public void incrementGeneration(Object key) {
+    generationCounter(key).incrementAndGet();
+  }
+
+  /** Increments the generation of every stripe. Used by global clearing operations. */
+  public void incrementAllGenerations() {
+    for (AtomicLong generation : generations) {
+      generation.incrementAndGet();
+    }
+  }
+
+  private AtomicLong generationCounter(Object key) {
+    return generations[lockIndices.get(getSegmentLock(key))];
   }
 
   /** Checks if a global operation is currently in progress. */

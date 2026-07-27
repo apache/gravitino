@@ -211,6 +211,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
           // bypasses the removal listener; reverseIndex.remove(key) then cleans up only this
           // entry's own bookkeeping (entityToReverseIndexMap + reverseIndex references to it).
           cacheData.invalidate(key);
+          segmentedLock.incrementGeneration(key);
           reverseIndex.remove(key);
           cacheIndex.remove(key.toString());
           return true;
@@ -293,6 +294,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     segmentedLock.withGlobalLock(
         () -> {
           cacheData.invalidateAll();
+          segmentedLock.incrementAllGenerations();
         });
   }
 
@@ -309,6 +311,39 @@ public class CaffeineEntityCache extends BaseEntityCache {
     segmentedLock.withLock(
         entityCacheKey,
         () -> {
+          syncEntitiesToCache(
+              entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
+        });
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public long relationGeneration(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
+    checkArguments(ident, type, relType);
+    return segmentedLock.generation(EntityCacheRelationKey.of(ident, type, relType));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <E extends Entity & HasIdentifier> void putIfNotInvalidatedSince(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      List<E> entities,
+      long sinceGeneration) {
+    checkArguments(ident, type, relType);
+    Preconditions.checkArgument(entities != null, "Entities cannot be null");
+    EntityCacheRelationKey entityCacheKey = EntityCacheRelationKey.of(ident, type, relType);
+    segmentedLock.withLock(
+        entityCacheKey,
+        () -> {
+          // The stripe's generation changing means the relation was invalidated after the caller
+          // observed the cache miss. Skip the put so a possibly-stale backend result cannot
+          // overwrite the concurrent invalidation; the entry is rebuilt on the next read.
+          if (segmentedLock.generation(entityCacheKey) != sinceGeneration) {
+            return;
+          }
           syncEntitiesToCache(
               entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
         });
@@ -484,6 +519,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       visited.add(currentKeyToRemove);
 
       cacheData.invalidate(currentKeyToRemove);
+      segmentedLock.incrementGeneration(currentKeyToRemove);
       cacheIndex.remove(currentKeyToRemove.toString());
 
       // Remove related entity keys

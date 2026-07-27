@@ -102,4 +102,40 @@ public interface SupportsRelationEntityCache {
       Entity.EntityType type,
       SupportsRelationOperations.Type relType,
       List<E> entities);
+
+  /**
+   * Returns an opaque generation token for the cache slot that holds the given relation. Callers
+   * that populate the cache from a backend using a cache-aside pattern should snapshot this token
+   * before reading the backend (right after observing a cache miss) and pass it to {@link
+   * #putIfNotInvalidatedSince}, so a concurrent invalidation that happens during the backend read
+   * is detected and the possibly-stale result is not written.
+   *
+   * @param ident the name identifier
+   * @param type the entity type
+   * @param relType the relation type
+   * @return the current generation token for the relation's cache slot
+   */
+  long relationGeneration(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType);
+
+  /**
+   * Puts a list of related entities into the cache only if the relation has not been invalidated
+   * since the given generation token was snapshotted. If the relation was invalidated in the
+   * meantime, the put is skipped so a stale backend result cannot overwrite a concurrent
+   * invalidation; the entry is left absent and rebuilt on the next read.
+   *
+   * @param ident The name identifier of the entity to cache the related entities for
+   * @param type The type of the entity to cache the related entities for
+   * @param relType The relation type to cache the related entities for
+   * @param entities The list of related entities to cache
+   * @param sinceGeneration The generation token snapshotted via {@link #relationGeneration} before
+   *     the backend read
+   * @param <E> The class of the related entities
+   */
+  <E extends Entity & HasIdentifier> void putIfNotInvalidatedSince(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      List<E> entities,
+      long sinceGeneration);
 }
