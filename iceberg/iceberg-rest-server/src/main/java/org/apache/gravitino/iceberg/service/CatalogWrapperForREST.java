@@ -20,13 +20,16 @@
 package org.apache.gravitino.iceberg.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -50,6 +53,7 @@ import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.Scan;
@@ -85,8 +89,20 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private final ScanPlanCache scanPlanCache;
 
+  /** Maximum number of file scan tasks handed out inline by one scan planning response. */
+  private final int scanPlanTaskBatchSize;
+
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
+
+  /**
+   * Total order over file scan tasks, so that plan-task tokens, which address tasks by position,
+   * keep pointing at the same tasks when a plan is recomputed.
+   */
+  private static final Comparator<FileScanTask> FILE_SCAN_TASK_ORDER =
+      Comparator.comparing((FileScanTask task) -> task.file().location())
+          .thenComparingLong(FileScanTask::start)
+          .thenComparingLong(FileScanTask::length);
 
   /**
    * Client-facing catalog property keys retained when building the IRC {@code /v1/config} defaults
@@ -116,6 +132,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
     this.scanPlanCache = loadScanPlanCache(config);
+    this.scanPlanTaskBatchSize = config.get(IcebergConfig.SCAN_PLAN_TASK_BATCH_SIZE);
   }
 
   public LoadTableResponse createTable(
@@ -391,10 +408,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * client-side metadata loading and enabling parallel task execution.
    *
    * <p>Implementation uses synchronous scan planning (COMPLETED status) and returns structured
-   * {@code file-scan-tasks} per the Iceberg 1.11 REST spec. It does not emit legacy {@code
-   * plan-tasks} JSON strings, so clients built for Iceberg &lt; 1.11 are not supported. This is
-   * different from asynchronous mode (SUBMITTED status) where a plan ID is returned for later
-   * retrieval.
+   * {@code file-scan-tasks} per the Iceberg 1.11 REST spec. This is different from asynchronous
+   * mode (SUBMITTED status) where a plan ID is returned for later retrieval.
+   *
+   * <p>At most {@link IcebergConfig#SCAN_PLAN_TASK_BATCH_SIZE} file scan tasks are returned inline.
+   * When a scan plans more tasks than that, the remainder is handed out as {@code plan-tasks}
+   * tokens that the client exchanges for the rest of the tasks through {@link #fetchScanTasks}, so
+   * one response never has to carry a plan of unbounded size.
    *
    * <p>When {@code requestCredentialVending} is true and the table is eligible (non-local,
    * non-HDFS), storage credentials are injected directly into the response using the table already
@@ -429,45 +449,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     try {
       Table table = getCatalog().loadTable(tableIdentifier);
-      Optional<PlanTableScanResponse> cachedResponse =
-          scanPlanCache.get(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest));
-
-      PlanTableScanResponse response;
-      if (cachedResponse.isPresent()) {
-        LOG.info("Using cached scan plan for table: {}", tableIdentifier);
-        response = cachedResponse.get();
-      } else {
-        List<FileScanTask> fileScanTasks = new ArrayList<>();
-
-        try (CloseableIterable<FileScanTask> scanTasks =
-            createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
-          for (FileScanTask fileScanTask : scanTasks) {
-            fileScanTasks.add(fileScanTask);
-          }
-        } catch (IOException e) {
-          LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
-          throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
-        }
-
-        if (fileScanTasks.isEmpty()) {
-          LOG.info(
-              "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
-              tableIdentifier);
-        }
-
-        try {
-          response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
-        } catch (Exception e) {
-          LOG.error("Failed to build scan plan response for table: {}", tableIdentifier, e);
-          throw new RuntimeException(
-              String.format(
-                  "Failed to build scan plan response for table: %s. Error: %s",
-                  tableIdentifier, e.getMessage()),
-              e);
-        }
-
-        scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
-      }
+      // Pin the snapshot before planning so that plan-task tokens issued for this plan resolve
+      // against exactly the snapshot that was planned, even if the table changes meanwhile.
+      PlanTableScanRequest pinnedScanRequest = pinSnapshot(table, scanRequest);
+      PlanTableScanResponse fullPlan = planFullScan(tableIdentifier, table, pinnedScanRequest);
+      PlanTableScanResponse response =
+          splitIntoPlanTasks(tableIdentifier, pinnedScanRequest, fullPlan);
 
       if (requestCredentialVending && !isLocalOrHdfsLocation(table.location())) {
         response = injectScanCredentials(tableIdentifier, table, response, privilege);
@@ -488,43 +475,229 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   /**
-   * Fetch the scan tasks associated with a {@code plan-task} token previously handed out by {@link
-   * #planTableScan}.
+   * Fetch the scan tasks covered by a {@code plan-task} token previously handed out by {@link
+   * #planTableScan}, completing the second step of the Iceberg REST scan planning protocol.
    *
-   * <p>Scan planning here is synchronous: {@link #planTableScan} always returns {@code COMPLETED}
-   * with the full set of {@code file-scan-tasks} inline and never emits {@code plan-tasks} tokens.
-   * A client therefore has no token to present, and any token reaching this method did not
-   * originate from this server (or came from a server generation that no longer retains it). Per
-   * the Iceberg REST specification that case is an unknown plan task, so this method always throws
-   * {@link NoSuchPlanTaskException}, which the REST layer maps to 404.
-   *
-   * <p>The endpoint still exists and is advertised in {@code /v1/config} because clients such as
-   * pyiceberg refuse to use server-side scan planning at all unless {@code POST
-   * .../tables/{table}/tasks} is advertised as supported. Implementing it keeps the two-step
-   * protocol contract intact and gives batched planning a place to land if {@link #planTableScan}
-   * later starts emitting {@code plan-tasks}.
+   * <p>Tokens are self-describing (see {@link PlanTaskToken}): each one carries the scan request it
+   * was planned from, with the snapshot pinned at planning time, plus the range of file scan tasks
+   * it stands for. The plan is reproduced here from the {@linkplain ScanPlanCache scan plan cache}
+   * when it is still cached and re-planned against the pinned snapshot otherwise, then the token's
+   * range is returned. Because no state is kept between the two calls, a token remains redeemable
+   * after a server restart and on any Gravitino instance serving the same catalog.
    *
    * @param tableIdentifier the table the plan task belongs to.
    * @param request the request carrying the {@code plan-task} token.
-   * @return never returns normally.
+   * @return the file scan tasks the token covers.
    * @throws org.apache.iceberg.exceptions.NoSuchTableException if the table doesn't exist.
-   * @throws NoSuchPlanTaskException always, since no {@code plan-task} tokens are ever issued.
+   * @throws NoSuchPlanTaskException if the token was not issued for this table, or the plan it
+   *     refers to can no longer be reproduced (for example its snapshot has expired).
    */
+  @SuppressWarnings("deprecation")
   public FetchScanTasksResponse fetchScanTasks(
       TableIdentifier tableIdentifier, FetchScanTasksRequest request) {
+    Optional<PlanTaskToken> decodedToken = PlanTaskToken.decode(request.planTask());
+
     // Validate the table exists first, so a bad table reports 404 for the table rather than
     // masking it as an unknown plan task. Consistent with planTableScan behavior.
-    getCatalog().loadTable(tableIdentifier);
+    Table table = getCatalog().loadTable(tableIdentifier);
 
+    if (!decodedToken.isPresent() || !decodedToken.get().matchesTable(tableIdentifier)) {
+      LOG.info(
+          "Rejecting unknown plan task '{}' for table {}", request.planTask(), tableIdentifier);
+      throw new NoSuchPlanTaskException(
+          "Plan task %s was not issued for table %s", request.planTask(), tableIdentifier);
+    }
+
+    PlanTaskToken token = decodedToken.get();
+    PlanTableScanResponse fullPlan;
+    try {
+      fullPlan = planFullScan(tableIdentifier, table, token.scanRequest());
+    } catch (IllegalArgumentException e) {
+      // The pinned snapshot is gone (expired or rolled back), so the plan the token refers to can
+      // no longer be reproduced. That is a stale plan task, not a bad request.
+      LOG.info(
+          "Plan task '{}' for table {} can no longer be planned: {}",
+          request.planTask(),
+          tableIdentifier,
+          e.getMessage());
+      throw new NoSuchPlanTaskException(
+          "Plan task %s is no longer available for table %s: %s",
+          request.planTask(), tableIdentifier, e.getMessage());
+    }
+
+    List<FileScanTask> allTasks = fullPlan.fileScanTasks();
+    int taskCount = allTasks == null ? 0 : allTasks.size();
+    if (token.offset() >= taskCount) {
+      LOG.info(
+          "Plan task '{}' for table {} covers tasks from offset {}, but the plan has {} tasks",
+          request.planTask(),
+          tableIdentifier,
+          token.offset(),
+          taskCount);
+      throw new NoSuchPlanTaskException(
+          "Plan task %s is no longer available for table %s", request.planTask(), tableIdentifier);
+    }
+
+    List<FileScanTask> batch =
+        ImmutableList.copyOf(
+            allTasks.subList(token.offset(), Math.min(token.offset() + token.limit(), taskCount)));
     LOG.info(
-        "Rejecting unknown plan task '{}' for table {}: scan planning is synchronous and does not "
-            + "issue plan-task tokens.",
-        request.planTask(),
-        tableIdentifier);
-    throw new NoSuchPlanTaskException(
-        "Plan task %s not found for table %s. Scan planning completes synchronously and returns "
-            + "all file scan tasks in the plan response, so no plan-task tokens are issued.",
-        request.planTask(), tableIdentifier);
+        "Returning {} file scan tasks for plan task of table {} at offset {}",
+        batch.size(),
+        tableIdentifier,
+        token.offset());
+
+    FetchScanTasksResponse.Builder builder =
+        FetchScanTasksResponse.builder()
+            .withFileScanTasks(batch)
+            .withSpecsById(fullPlan.specsById());
+    List<DeleteFile> deleteFiles = referencedDeleteFiles(batch);
+    if (!deleteFiles.isEmpty()) {
+      builder.withDeleteFiles(deleteFiles);
+    }
+    return builder.build();
+  }
+
+  /**
+   * Plans the whole scan and returns every file scan task inline, serving the {@linkplain
+   * ScanPlanCache scan plan cache} when the same plan was computed before.
+   *
+   * <p>Tasks are ordered deterministically so that a plan-task token, which addresses tasks by
+   * position, resolves to the same tasks on a later re-plan of the same snapshot.
+   */
+  private PlanTableScanResponse planFullScan(
+      TableIdentifier tableIdentifier, Table table, PlanTableScanRequest scanRequest) {
+    ScanPlanCacheKey cacheKey = ScanPlanCacheKey.create(tableIdentifier, table, scanRequest);
+    Optional<PlanTableScanResponse> cachedResponse = scanPlanCache.get(cacheKey);
+    if (cachedResponse.isPresent()) {
+      LOG.info("Using cached scan plan for table: {}", tableIdentifier);
+      return cachedResponse.get();
+    }
+
+    List<FileScanTask> fileScanTasks = new ArrayList<>();
+    try (CloseableIterable<FileScanTask> scanTasks =
+        createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
+      for (FileScanTask fileScanTask : scanTasks) {
+        fileScanTasks.add(fileScanTask);
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
+      throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
+    }
+
+    if (fileScanTasks.isEmpty()) {
+      LOG.info(
+          "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
+          tableIdentifier);
+    }
+
+    // Iceberg plans manifests in parallel, so the order tasks come back in is not reproducible.
+    // Sort them so positions stay stable across re-plans of the same snapshot.
+    fileScanTasks.sort(FILE_SCAN_TASK_ORDER);
+
+    PlanTableScanResponse response;
+    try {
+      response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
+    } catch (Exception e) {
+      LOG.error("Failed to build scan plan response for table: {}", tableIdentifier, e);
+      throw new RuntimeException(
+          String.format(
+              "Failed to build scan plan response for table: %s. Error: %s",
+              tableIdentifier, e.getMessage()),
+          e);
+    }
+
+    scanPlanCache.put(cacheKey, response);
+    return response;
+  }
+
+  /**
+   * Keeps the first {@link IcebergConfig#SCAN_PLAN_TASK_BATCH_SIZE} file scan tasks of {@code
+   * fullPlan} inline and turns the remaining tasks into {@code plan-tasks} tokens, so a single
+   * response never carries an unbounded plan.
+   *
+   * <p>Returns {@code fullPlan} unchanged when batching is disabled or the plan already fits in one
+   * batch, which is the common case and keeps a plan a client can consume without a second call.
+   */
+  @SuppressWarnings("deprecation")
+  private PlanTableScanResponse splitIntoPlanTasks(
+      TableIdentifier tableIdentifier,
+      PlanTableScanRequest scanRequest,
+      PlanTableScanResponse fullPlan) {
+    List<FileScanTask> allTasks = fullPlan.fileScanTasks();
+    if (scanPlanTaskBatchSize <= 0
+        || allTasks == null
+        || allTasks.size() <= scanPlanTaskBatchSize) {
+      return fullPlan;
+    }
+
+    List<String> planTasks = new ArrayList<>();
+    for (int offset = scanPlanTaskBatchSize;
+        offset < allTasks.size();
+        offset += scanPlanTaskBatchSize) {
+      planTasks.add(
+          PlanTaskToken.encode(tableIdentifier, scanRequest, offset, scanPlanTaskBatchSize));
+    }
+
+    List<FileScanTask> firstBatch =
+        ImmutableList.copyOf(allTasks.subList(0, scanPlanTaskBatchSize));
+    LOG.info(
+        "Split scan plan of table {} into {} inline file scan tasks and {} plan tasks",
+        tableIdentifier,
+        firstBatch.size(),
+        planTasks.size());
+
+    PlanTableScanResponse.Builder builder =
+        PlanTableScanResponse.builder()
+            .withPlanStatus(PlanStatus.COMPLETED)
+            .withFileScanTasks(firstBatch)
+            .withPlanTasks(planTasks)
+            .withSpecsById(fullPlan.specsById());
+    List<DeleteFile> deleteFiles = referencedDeleteFiles(firstBatch);
+    if (!deleteFiles.isEmpty()) {
+      builder.withDeleteFiles(deleteFiles);
+    }
+    return builder.build();
+  }
+
+  /**
+   * Pins the snapshot a scan request plans against, so that plan-task tokens issued for the
+   * resulting plan keep resolving to the same snapshot after the table changes.
+   *
+   * <p>Requests that already name a snapshot, incremental requests (which pin a snapshot range) and
+   * scans of a table without a current snapshot are returned unchanged.
+   */
+  private static PlanTableScanRequest pinSnapshot(Table table, PlanTableScanRequest scanRequest) {
+    boolean isIncremental =
+        scanRequest.startSnapshotId() != null || scanRequest.endSnapshotId() != null;
+    if (scanRequest.snapshotId() != null || isIncremental || table.currentSnapshot() == null) {
+      return scanRequest;
+    }
+
+    return PlanTableScanRequest.builder()
+        .withSnapshotId(table.currentSnapshot().snapshotId())
+        .withSelect(scanRequest.select())
+        .withFilter(scanRequest.filter())
+        .withCaseSensitive(scanRequest.caseSensitive())
+        .withUseSnapshotSchema(scanRequest.useSnapshotSchema())
+        .withStatsFields(scanRequest.statsFields())
+        .withMinRowsRequested(scanRequest.minRowsRequested())
+        .build();
+  }
+
+  /**
+   * Collects the delete files referenced by {@code fileScanTasks}, deduplicated by location. The
+   * Iceberg response serializer expects every delete file a task references to be listed in the
+   * response, since tasks reference delete files by their index in that list.
+   */
+  private static List<DeleteFile> referencedDeleteFiles(List<FileScanTask> fileScanTasks) {
+    Map<String, DeleteFile> deleteFilesByLocation = new LinkedHashMap<>();
+    for (FileScanTask fileScanTask : fileScanTasks) {
+      for (DeleteFile deleteFile : fileScanTask.deletes()) {
+        deleteFilesByLocation.putIfAbsent(deleteFile.location(), deleteFile);
+      }
+    }
+    return ImmutableList.copyOf(deleteFilesByLocation.values());
   }
 
   /**
@@ -556,11 +729,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   /**
-   * Builds a synchronous COMPLETED scan plan response for Iceberg 1.11+ REST clients only.
+   * Builds a synchronous COMPLETED scan plan response holding the whole plan, for Iceberg 1.11+
+   * REST clients only.
    *
    * <p>Matches {@link CatalogHandlers#planTableScan}: {@code file-scan-tasks} plus {@code
-   * specs-by-id} from {@link Table#specs()}. Does not populate legacy {@code plan-tasks} JSON
-   * strings.
+   * specs-by-id} from {@link Table#specs()}, and the delete files those tasks reference. Batching
+   * into {@code plan-tasks} happens later, in {@link #splitIntoPlanTasks}, so the cached plan
+   * always holds every task.
    *
    * <p>{@code specs-by-id} uses the table's full spec map ({@link Table#specs()}), not only
    * partition specs referenced by the returned {@code fileScanTasks}. That matches Iceberg 1.11
@@ -570,11 +745,16 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
       Table table, List<FileScanTask> fileScanTasks) {
-    return PlanTableScanResponse.builder()
-        .withPlanStatus(PlanStatus.COMPLETED)
-        .withFileScanTasks(fileScanTasks)
-        .withSpecsById(table.specs())
-        .build();
+    PlanTableScanResponse.Builder builder =
+        PlanTableScanResponse.builder()
+            .withPlanStatus(PlanStatus.COMPLETED)
+            .withFileScanTasks(fileScanTasks)
+            .withSpecsById(table.specs());
+    List<DeleteFile> deleteFiles = referencedDeleteFiles(fileScanTasks);
+    if (!deleteFiles.isEmpty()) {
+      builder.withDeleteFiles(deleteFiles);
+    }
+    return builder.build();
   }
 
   /**

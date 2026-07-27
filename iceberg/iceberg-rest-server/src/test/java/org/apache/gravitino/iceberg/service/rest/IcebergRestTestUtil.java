@@ -95,6 +95,19 @@ public class IcebergRestTestUtil {
 
   public static ResourceConfig getIcebergResourceConfig(
       Class c, boolean bindIcebergTableOps, List<EventListenerPlugin> eventListenerPlugins) {
+    return getIcebergResourceConfig(
+        c, bindIcebergTableOps, eventListenerPlugins, Collections.emptyMap());
+  }
+
+  /**
+   * @param extraCatalogConf catalog properties (unprefixed, e.g. {@code scan-plan-task-batch-size})
+   *     applied to the test catalog, for tests that need a non-default catalog configuration.
+   */
+  public static ResourceConfig getIcebergResourceConfig(
+      Class c,
+      boolean bindIcebergTableOps,
+      List<EventListenerPlugin> eventListenerPlugins,
+      Map<String, String> extraCatalogConf) {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(c);
     resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
@@ -136,6 +149,13 @@ public class IcebergRestTestUtil {
           String.format(
               "%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS),
           "true");
+      // Apply the extra properties to the prefixed catalog and, unprefixed, to the default catalog
+      // that serves requests without a prefix in the path.
+      extraCatalogConf.forEach(
+          (key, value) -> {
+            catalogConf.put(String.format("%s.%s", catalogConfigPrefix, key), value);
+            catalogConf.put(key, value);
+          });
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
       // used to override register table interface
