@@ -256,6 +256,51 @@ class TestHiveCatalogOperations {
   }
 
   @Test
+  void testCreateViewPersistsTrinoDefaultCatalogAndSchema() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
+    when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+
+    ArgumentCaptor<HiveTable> hiveTableCaptor = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing().when(hiveClient).createTable(hiveTableCaptor.capture());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    // Simulates a Trino "USE gt_hive.db; CREATE VIEW v AS SELECT * FROM t" statement, where
+    // the unqualified "t" must be resolved against defaultCatalog/defaultSchema on reload.
+    op.createView(
+        NameIdentifier.of("db", "v_trino"),
+        null,
+        new Column[0],
+        new SQLRepresentation[] {
+          SQLRepresentation.builder().withDialect("trino").withSql("SELECT * FROM t").build()
+        },
+        "gt_hive",
+        "db",
+        Maps.newHashMap());
+
+    Map<String, String> storedProperties = hiveTableCaptor.getValue().properties();
+    Assertions.assertEquals("gt_hive", storedProperties.get("gravitino.view.default-catalog"));
+    Assertions.assertEquals("db", storedProperties.get("gravitino.view.default-schema"));
+
+    when(hiveClient.getTable(anyString(), anyString(), anyString()))
+        .thenReturn(hiveTableCaptor.getValue());
+    View loaded = op.loadView(NameIdentifier.of("db", "v_trino"));
+
+    Assertions.assertEquals("gt_hive", loaded.defaultCatalog());
+    Assertions.assertEquals("db", loaded.defaultSchema());
+  }
+
+  @Test
   void testCreateViewClearsStaleTrinoMarkerForNonTrinoDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);

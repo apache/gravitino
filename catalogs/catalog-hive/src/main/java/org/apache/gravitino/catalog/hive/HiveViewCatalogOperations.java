@@ -123,11 +123,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
     try {
       Map<String, String> params = Maps.newHashMap(safeProperties);
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
-      if (Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())) {
-        params.put(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY, "true");
-      } else {
-        params.remove(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY);
-      }
+      applyTrinoResolutionContext(
+          params, sqlRepresentation.dialect(), defaultCatalog, defaultSchema);
       String viewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
 
       HiveTable hiveTable =
@@ -226,11 +223,11 @@ class HiveViewCatalogOperations implements ViewCatalog {
           updatedColumns = copyColumns(replace.getColumns());
           updatedComment = replace.getComment();
           updatedViewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
-          if (Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())) {
-            updatedProperties.put(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY, "true");
-          } else {
-            updatedProperties.remove(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY);
-          }
+          applyTrinoResolutionContext(
+              updatedProperties,
+              sqlRepresentation.dialect(),
+              replace.getDefaultCatalog(),
+              replace.getDefaultSchema());
         } else {
           throw new IllegalArgumentException(
               "Unsupported view change type: " + change.getClass().getSimpleName());
@@ -397,6 +394,15 @@ class HiveViewCatalogOperations implements ViewCatalog {
             .withSql(StringUtils.defaultString(representationSql))
             .build();
 
+    // Only Trino dialect views persist a default catalog/schema (see
+    // applyTrinoResolutionContext()); other dialects never store these properties.
+    String restoredDefaultCatalog = null;
+    String restoredDefaultSchema = null;
+    if (Dialects.TRINO.equalsIgnoreCase(detectedDialect)) {
+      restoredDefaultCatalog = params.get(HiveView.DEFAULT_CATALOG_KEY);
+      restoredDefaultSchema = params.get(HiveView.DEFAULT_SCHEMA_KEY);
+    }
+
     return HiveView.builder()
         .withName(ident.name())
         .withComment(comment)
@@ -404,6 +410,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
         .withRepresentations(new SQLRepresentation[] {rep})
         .withProperties(params)
         .withAuditInfo(auditInfo)
+        .withDefaultCatalog(restoredDefaultCatalog)
+        .withDefaultSchema(restoredDefaultSchema)
         .build();
   }
 
@@ -444,20 +452,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
             ident);
         return selected;
       case Dialects.TRINO:
-        // HMS has no field to persist a Trino view's default catalog/schema, so any value
-        // supplied here is accepted but not stored; it is not required to be null. Unqualified
-        // identifiers in the view body will therefore fail to resolve on reload unless the view
-        // was defined with fully-qualified references.
-        if (defaultCatalog != null || defaultSchema != null) {
-          LOG.debug(
-              "View {} has a non-null defaultCatalog={}/defaultSchema={}, but the Hive catalog "
-                  + "cannot persist them for the '{}' dialect; unqualified identifiers in the "
-                  + "view body may fail to resolve on reload",
-              ident,
-              defaultCatalog,
-              defaultSchema,
-              selected.dialect());
-        }
+        // The default catalog/schema are persisted in reserved HMS properties by
+        // applyTrinoResolutionContext() and restored in toHiveView(), so no value is required to
+        // be null here.
         return selected;
       case Dialects.FLINK:
         Preconditions.checkArgument(
@@ -489,6 +486,31 @@ class HiveViewCatalogOperations implements ViewCatalog {
             String.format(
                 "Hive catalog currently supports only [%s] view dialects, but got '%s' for view %s",
                 SUPPORTED_VIEW_DIALECTS, selected.dialect(), ident));
+    }
+  }
+
+  /**
+   * Sets or clears the Trino dialect marker and its default catalog/schema in the given HMS
+   * property map, so a Trino view's resolution context survives a reload.
+   */
+  private static void applyTrinoResolutionContext(
+      Map<String, String> params, String dialect, String defaultCatalog, String defaultSchema) {
+    if (!Dialects.TRINO.equalsIgnoreCase(dialect)) {
+      params.remove(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY);
+      params.remove(HiveView.DEFAULT_CATALOG_KEY);
+      params.remove(HiveView.DEFAULT_SCHEMA_KEY);
+      return;
+    }
+    params.put(HiveView.GRAVITINO_TRINO_VIEW_MARKER_KEY, "true");
+    if (defaultCatalog != null) {
+      params.put(HiveView.DEFAULT_CATALOG_KEY, defaultCatalog);
+    } else {
+      params.remove(HiveView.DEFAULT_CATALOG_KEY);
+    }
+    if (defaultSchema != null) {
+      params.put(HiveView.DEFAULT_SCHEMA_KEY, defaultSchema);
+    } else {
+      params.remove(HiveView.DEFAULT_SCHEMA_KEY);
     }
   }
 

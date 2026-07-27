@@ -160,10 +160,15 @@ public class CatalogConnectorMetadataAdapter {
    * Gravitino views, so the resulting definition always has an empty owner; since Trino requires an
    * owner for run-as-definer views, {@code runAsInvoker} is always {@code true}.
    *
+   * <p>{@link ConnectorViewDefinition} requires a catalog to be present whenever a schema is
+   * present. Some catalogs (e.g. Iceberg) can store a default schema without a default catalog; in
+   * that case the current Trino catalog is used, since the schema is implicitly relative to it.
+   *
    * @param view the Gravitino view
+   * @param catalogName the name of the Trino catalog this view belongs to
    * @return the Trino ConnectorViewDefinition
    */
-  public ConnectorViewDefinition getViewDefinition(GravitinoView view) {
+  public ConnectorViewDefinition getViewDefinition(GravitinoView view, String catalogName) {
     Preconditions.checkArgument(
         view.getSql() != null,
         "View %s.%s has no Trino dialect SQL representation",
@@ -179,9 +184,14 @@ public class CatalogConnectorMetadataAdapter {
                         Optional.ofNullable(column.getComment())))
             .collect(Collectors.toList());
 
+    String defaultCatalog = view.getDefaultCatalog();
+    if (defaultCatalog == null && view.getDefaultSchema() != null) {
+      defaultCatalog = catalogName;
+    }
+
     return new ConnectorViewDefinition(
         view.getSql(),
-        Optional.ofNullable(view.getDefaultCatalog()),
+        Optional.ofNullable(defaultCatalog),
         Optional.ofNullable(view.getDefaultSchema()),
         columns,
         Optional.ofNullable(view.getComment()),
@@ -194,6 +204,11 @@ public class CatalogConnectorMetadataAdapter {
    * Transform Trino ConnectorViewDefinition to Gravitino view metadata. The {@code viewProperties}
    * are merged as-is into the resulting view's generic properties.
    *
+   * <p>Gravitino views have no field to persist the view's {@code path} (the catalogs/schemas used
+   * to resolve unqualified function names, set via {@code SET PATH}), so a definition with a
+   * non-empty path is rejected rather than silently discarding it; loading a view therefore always
+   * returns an empty path, which is safe because no view with a non-empty path is ever stored.
+   *
    * @param viewName the schema-qualified view name
    * @param definition the Trino ConnectorViewDefinition
    * @param viewProperties the Trino view properties
@@ -203,6 +218,10 @@ public class CatalogConnectorMetadataAdapter {
       SchemaTableName viewName,
       ConnectorViewDefinition definition,
       Map<String, Object> viewProperties) {
+    Preconditions.checkArgument(
+        definition.getPath().isEmpty(),
+        "View %s has a non-empty path (SET PATH), which Gravitino cannot persist",
+        viewName);
     TypeManager typeManager = JsonCodec.getTypeManager(getClass().getClassLoader());
     List<GravitinoColumn> columns = new ArrayList<>();
     List<ViewColumn> viewColumns = definition.getColumns();

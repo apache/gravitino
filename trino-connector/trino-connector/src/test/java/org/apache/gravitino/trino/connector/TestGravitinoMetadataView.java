@@ -89,10 +89,11 @@ public class TestGravitinoMetadataView {
         new GravitinoView("s", "v1", List.of(), null, Map.of(), "select 1", null, null);
     CatalogConnectorMetadata catalogMetadata = mock(CatalogConnectorMetadata.class);
     when(catalogMetadata.getViewIfPresent("s", "v1")).thenReturn(Optional.of(view));
+    when(catalogMetadata.getCatalogName()).thenReturn("c");
 
     ConnectorViewDefinition connectorViewDefinition = mock(ConnectorViewDefinition.class);
     CatalogConnectorMetadataAdapter metadataAdapter = mock(CatalogConnectorMetadataAdapter.class);
-    when(metadataAdapter.getViewDefinition(view)).thenReturn(connectorViewDefinition);
+    when(metadataAdapter.getViewDefinition(view, "c")).thenReturn(connectorViewDefinition);
 
     GravitinoMetadata metadata = createTestMetadata(catalogMetadata, metadataAdapter);
     ConnectorSession session = mock(ConnectorSession.class);

@@ -20,6 +20,16 @@ SHOW TABLES FROM gt_hive.gt_hive_view_db;
 DROP VIEW gt_hive.gt_hive_view_db.v02;
 SHOW TABLES FROM gt_hive.gt_hive_view_db;
 
+-- default catalog/schema round trip: create a view via USE with an unqualified source table
+-- reference, then switch the session default elsewhere before querying it, so the query can only
+-- succeed if the view's own stored default catalog/schema (not the ambient session) is used to
+-- resolve "t01".
+USE gt_hive.gt_hive_view_db;
+CREATE VIEW v03 AS SELECT id, name FROM t01 WHERE salary > 100;
+USE gt_hive.information_schema;
+SELECT * FROM gt_hive.gt_hive_view_db.v03 ORDER BY id;
+DROP VIEW gt_hive.gt_hive_view_db.v03;
+
 -- error cases: drop nonexistent view; create view colliding with existing table name (HMS natural rejection)
 DROP VIEW gt_hive.gt_hive_view_db.nonexistent_view;
 CREATE VIEW gt_hive.gt_hive_view_db.t01 AS SELECT 1;

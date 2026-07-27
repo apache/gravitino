@@ -33,6 +33,16 @@ DROP VIEW
 
 "t01"
 
+USE
+
+CREATE VIEW
+
+USE
+
+"2","bob"
+
+DROP VIEW
+
 <QUERY_FAILED> View 'gt_hive.gt_hive_view_db.nonexistent_view' does not exist
 
 <QUERY_FAILED> Table already exists: 'gt_hive.gt_hive_view_db.t01'

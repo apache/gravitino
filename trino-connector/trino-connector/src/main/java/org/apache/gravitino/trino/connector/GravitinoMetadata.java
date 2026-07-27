@@ -839,7 +839,9 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       ConnectorSession session, SchemaTableName viewName) {
     return catalogConnectorMetadata
         .getViewIfPresent(viewName.getSchemaName(), viewName.getTableName())
-        .map(metadataAdapter::getViewDefinition);
+        .map(
+            view ->
+                metadataAdapter.getViewDefinition(view, catalogConnectorMetadata.getCatalogName()));
   }
 
   @Override

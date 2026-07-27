@@ -76,6 +76,15 @@ public class CatalogConnectorMetadata {
   @Nullable private final ViewCatalog viewCatalog;
 
   /**
+   * Retrieves the name of this Trino catalog.
+   *
+   * @return the catalog name
+   */
+  public String getCatalogName() {
+    return catalogName;
+  }
+
+  /**
    * Constructs a new CatalogConnectorMetadata.
    *
    * @param metalake the Gravitino metalake

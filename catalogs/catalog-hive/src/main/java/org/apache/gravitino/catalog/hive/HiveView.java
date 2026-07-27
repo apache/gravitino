@@ -48,7 +48,8 @@ import org.apache.gravitino.rel.View;
  * <p>Native Presto/Trino views created outside Gravitino use the {@code presto_view} HMS property
  * and encode their body as a base64-wrapped comment rather than plain SQL text; since decoding that
  * native format requires Trino's own serialization logic, this catalog does not attempt to read it
- * and such views are treated as Hive dialect (i.e. not exposed as Trino-readable SQL).
+ * and rejects such views with {@link UnsupportedOperationException} rather than exposing the
+ * encoded body as if it were valid SQL in any dialect.
  */
 @Unstable
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -61,6 +62,17 @@ public class HiveView implements View {
   static final String SPARK_VERSION_KEY = "spark.sql.create.version";
   static final String FLINK_PROPERTY_PREFIX = "flink.";
   static final String GRAVITINO_TRINO_VIEW_MARKER_KEY = "gravitino.view.trino_dialect";
+
+  /**
+   * Reserved HMS properties used to persist a view's default catalog/schema, since HMS itself has
+   * no dedicated field for them. Restored in {@code toHiveView()} so unqualified identifiers in the
+   * view body can still be resolved after reload. Matches the property names used by the Paimon
+   * catalog ({@code PaimonView.DEFAULT_CATALOG_PROPERTY}/{@code DEFAULT_SCHEMA_PROPERTY}) for the
+   * same purpose.
+   */
+  static final String DEFAULT_CATALOG_KEY = "gravitino.view.default-catalog";
+
+  static final String DEFAULT_SCHEMA_KEY = "gravitino.view.default-schema";
 
   /**
    * The HMS property native Presto/Trino sets on views created directly through its own Hive
