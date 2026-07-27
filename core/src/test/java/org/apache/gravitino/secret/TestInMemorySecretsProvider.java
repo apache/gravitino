@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.secret;
 
+import java.util.Map;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ public class TestInMemorySecretsProvider {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
     Assertions.assertEquals("memory", provider.type());
 
+    provider.initialize("memory", Map.of());
     SecretWriteContext context = new SecretWriteContext("memory", "catalog", 10L, "password");
     String urn = provider.writeSecret("s3cr3t", context);
     Assertions.assertEquals("urn:gravitino-secret:memory:catalog:10:password", urn);
@@ -37,6 +39,7 @@ public class TestInMemorySecretsProvider {
 
     provider.deleteSecret(urn);
     Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(urn));
+    provider.close();
   }
 
   @Test
