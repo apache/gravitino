@@ -52,16 +52,4 @@ public interface GravitinoSecretProvider {
    * @param urn the secret URN
    */
   void deleteSecret(String urn);
-
-  /**
-   * Builds a URN for an externally referenced secret.
-   *
-   * @param propertyKey the property key
-   * @param locator the external secret locator
-   * @return the secret URN
-   */
-  default String buildExternalReferenceUrn(String propertyKey, SecretReferenceLocator locator) {
-    throw new UnsupportedOperationException(
-        String.format("Provider %s does not support external secret references", type()));
-  }
 }

@@ -23,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.gravitino.secret.GravitinoSecretProvider;
-import org.apache.gravitino.secret.SecretReferenceLocator;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.SecretWriteContext;
 
@@ -62,11 +61,5 @@ public class InMemorySecretsProvider implements GravitinoSecretProvider {
   @Override
   public void deleteSecret(String urn) {
     secrets.remove(urn);
-  }
-
-  @Override
-  public String buildExternalReferenceUrn(String propertyKey, SecretReferenceLocator locator) {
-    throw new UnsupportedOperationException(
-        String.format("Provider %s does not support external secret references", type()));
   }
 }

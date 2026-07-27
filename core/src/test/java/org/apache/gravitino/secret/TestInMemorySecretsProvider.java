@@ -38,15 +38,4 @@ public class TestInMemorySecretsProvider {
     provider.deleteSecret(urn);
     Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(urn));
   }
-
-  @Test
-  public void testExternalReferenceUnsupported() {
-    InMemorySecretsProvider provider = new InMemorySecretsProvider();
-    SecretReferenceLocator locator = new SecretReferenceLocator("memory", "mount", "path");
-    UnsupportedOperationException exception =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class,
-            () -> provider.buildExternalReferenceUrn("password", locator));
-    Assertions.assertTrue(exception.getMessage().contains("memory"));
-  }
 }
