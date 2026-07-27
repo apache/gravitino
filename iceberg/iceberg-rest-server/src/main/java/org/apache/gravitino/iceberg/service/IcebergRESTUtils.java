@@ -265,15 +265,20 @@ public class IcebergRESTUtils {
   static PlanTableScanResponse copyWithCredentials(
       PlanTableScanResponse response,
       List<org.apache.iceberg.rest.credentials.Credential> credentials) {
-    return PlanTableScanResponse.builder()
-        .withPlanStatus(response.planStatus())
-        .withPlanId(response.planId())
-        .withPlanTasks(response.planTasks())
-        .withFileScanTasks(response.fileScanTasks())
-        .withSpecsById(response.specsById())
-        .withErrorResponse(response.errorResponse())
-        .withCredentials(credentials)
-        .build();
+    PlanTableScanResponse.Builder builder =
+        PlanTableScanResponse.builder()
+            .withPlanStatus(response.planStatus())
+            .withPlanId(response.planId())
+            .withPlanTasks(response.planTasks())
+            .withFileScanTasks(response.fileScanTasks())
+            .withSpecsById(response.specsById())
+            .withErrorResponse(response.errorResponse())
+            .withCredentials(credentials);
+    // withDeleteFiles rejects null, and a response without delete files leaves the field unset.
+    if (response.deleteFiles() != null) {
+      builder.withDeleteFiles(response.deleteFiles());
+    }
+    return builder.build();
   }
 
   public static <T> Response ok(T t) {
