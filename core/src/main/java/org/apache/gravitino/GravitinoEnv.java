@@ -711,7 +711,8 @@ public class GravitinoEnv {
         new TableNormalizeDispatcher(internalTableOperationDispatcher, catalogManager);
     TableEventDispatcher tableEventDispatcher =
         new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
-    this.tableDispatcher = new TableHookDispatcher(tableEventDispatcher);
+    this.tableDispatcher =
+        new TableHookDispatcher(tableEventDispatcher, this::ownerDispatcher, catalogManager);
 
     // TODO: We can install hooks when we need, we only supports ownership post hook,
     //  partition doesn't have ownership, so we don't need it now.
