@@ -59,6 +59,7 @@ import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.FlinkFileIOLoader;
+import org.apache.paimon.fs.FileIOLoader;
 import org.apache.paimon.options.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -165,9 +166,11 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   @VisibleForTesting
   protected AbstractCatalog createInnerCatalog(
       Map<String, String> paimonOptions, Configuration hadoopConf) {
+    FileIOLoader preferIOLoader = null;
+    FileIOLoader fallbackIOLoader = new FlinkFileIOLoader();
     CatalogContext catalogContext =
         CatalogContext.create(
-            Options.fromMap(paimonOptions), hadoopConf, null, new FlinkFileIOLoader());
+            Options.fromMap(paimonOptions), hadoopConf, preferIOLoader, fallbackIOLoader);
     return (AbstractCatalog)
         FlinkCatalogFactory.createCatalog(
             context.getName(), catalogContext, context.getClassLoader());
