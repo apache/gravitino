@@ -564,7 +564,7 @@ class TestHiveCatalogOperations {
   }
 
   @Test
-  void testLoadViewTreatsNativeTrinoViewAsHiveDialect() throws Exception {
+  void testLoadViewRejectsNativeTrinoView() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
 
@@ -572,7 +572,9 @@ class TestHiveCatalogOperations {
     HiveClient hiveClient = mock(HiveClient.class);
     // Native Presto/Trino views (created outside Gravitino) carry the "presto_view" HMS property
     // and encode their body as a base64-wrapped comment, not plain SQL. Without the
-    // gravitino.view.trino_dialect marker, this must not be identified as (readable) Trino dialect.
+    // gravitino.view.trino_dialect marker, this must be rejected rather than returned as a Hive
+    // dialect representation, since other engines (Spark, Flink) would otherwise receive the
+    // encoded text as if it were valid SQL.
     when(hiveClient.getTable(anyString(), anyString(), anyString()))
         .thenReturn(
             HiveTable.builder()
@@ -597,10 +599,9 @@ class TestHiveCatalogOperations {
             });
     op.clientPool = clientPool;
 
-    View loaded = op.loadView(NameIdentifier.of("db", "v_native_trino"));
-
-    SQLRepresentation representation = (SQLRepresentation) loaded.representations()[0];
-    Assertions.assertEquals("hive", representation.dialect());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> op.loadView(NameIdentifier.of("db", "v_native_trino")));
   }
 
   @Test

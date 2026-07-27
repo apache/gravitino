@@ -53,7 +53,7 @@ The connector provides read access and write access to data and metadata stored 
 - [DROP VIEW](https://trino.io/docs/current/sql/drop-view.html)
 - [ALTER VIEW ... RENAME TO](https://trino.io/docs/current/sql/alter-view.html)
 
-View management is only supported for catalogs backed by Hive, Iceberg or Paimon; other catalogs
+View management is only supported for catalogs backed by Hive or Iceberg; other catalogs
 (e.g. Glue, JDBC, Memory) do not support view operations. A view stored by Gravitino may carry SQL
 representations for multiple engines (Hive, Spark, Flink, Trino); the Trino connector only reads and
 writes the Trino dialect representation. A view that has no Trino SQL representation is silently

@@ -62,6 +62,14 @@ public class HiveView implements View {
   static final String FLINK_PROPERTY_PREFIX = "flink.";
   static final String GRAVITINO_TRINO_VIEW_MARKER_KEY = "gravitino.view.trino_dialect";
 
+  /**
+   * The HMS property native Presto/Trino sets on views created directly through its own Hive
+   * connector (bypassing Gravitino). Such views encode their body as a base64-wrapped comment
+   * rather than plain SQL, so this key is used only to detect and reject them, never to identify a
+   * Gravitino-managed Trino dialect view (see {@link #GRAVITINO_TRINO_VIEW_MARKER_KEY}).
+   */
+  static final String NATIVE_PRESTO_VIEW_MARKER_KEY = "presto_view";
+
   private String name;
   private String comment;
   private Column[] columns;
@@ -118,11 +126,19 @@ public class HiveView implements View {
    *
    * @param parameters The HMS table parameters map.
    * @return The detected dialect string: "trino", "spark", "flink", or "hive".
+   * @throws UnsupportedOperationException if the view was created by a native Presto/Trino Hive
+   *     connector (bypassing Gravitino); its encoded body cannot be read as SQL by any engine.
    */
   static String detectDialect(Map<String, String> parameters) {
     if (parameters != null
         && "true".equalsIgnoreCase(parameters.get(GRAVITINO_TRINO_VIEW_MARKER_KEY))) {
       return Dialects.TRINO;
+    }
+    if (parameters != null
+        && "true".equalsIgnoreCase(parameters.get(NATIVE_PRESTO_VIEW_MARKER_KEY))) {
+      throw new UnsupportedOperationException(
+          "View was created by a native Presto/Trino Hive connector; its encoded body cannot be "
+              + "read by Gravitino");
     }
     if (parameters != null && parameters.containsKey(SPARK_VERSION_KEY)) {
       return Dialects.SPARK;
