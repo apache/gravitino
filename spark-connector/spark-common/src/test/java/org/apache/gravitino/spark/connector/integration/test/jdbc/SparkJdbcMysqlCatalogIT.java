@@ -26,12 +26,19 @@ import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
+import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo;
+import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo.SparkColumnInfo;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
+import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -160,5 +167,50 @@ public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(2, result.size());
     Assertions.assertTrue(result.contains("2"));
     Assertions.assertTrue(result.contains("3"));
+  }
+
+  @Test
+  void testExternalTypeEnumColumn() throws Exception {
+    // Verifies that MySQL ENUM columns (mapped to ExternalType by Gravitino) are loadable
+    // in Spark without UnsupportedOperationException, and are presented as StringType.
+    String db = getDefaultDatabase();
+    String tableName = "external_type_test_" + UUID.randomUUID().toString().replace("-", "");
+    String jdbcUrl = mysqlUrl + "/" + db;
+    try (Connection conn = DriverManager.getConnection(jdbcUrl, mysqlUsername, mysqlPassword);
+        Statement stmt = conn.createStatement()) {
+      stmt.execute("DROP TABLE IF EXISTS " + tableName);
+      stmt.execute(
+          "CREATE TABLE " + tableName + " (id INT, status ENUM('active', 'inactive', 'pending'))");
+      stmt.execute("INSERT INTO " + tableName + " VALUES (1, 'active'), (2, 'inactive')");
+    }
+
+    // Verify Gravitino metadata layer: ENUM column is represented as ExternalType.
+    // This guards against future changes where MysqlTypeConverter might map ENUM to
+    // a native Gravitino type, which would bypass the ExternalType -> StringType path.
+    Table gravitinoTable =
+        getGravitinoCatalog().asTableCatalog().loadTable(NameIdentifier.of(db, tableName));
+    Assertions.assertEquals(2, gravitinoTable.columns().length);
+    Assertions.assertTrue(
+        gravitinoTable.columns()[1].dataType() instanceof Types.ExternalType,
+        "MySQL ENUM should be represented as ExternalType at the Gravitino metadata layer");
+
+    // Verify Spark connector layer: ExternalType is mapped to StringType,
+    // and the table is loadable without UnsupportedOperationException.
+    // MySQL ENUM is not in Gravitino's native type set -> mapped to ExternalType ->
+    // SparkTypeConverter maps ExternalType to StringType.
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    List<SparkColumnInfo> columns = tableInfo.getColumns();
+    Assertions.assertEquals(2, columns.size());
+    Assertions.assertEquals(DataTypes.IntegerType, columns.get(0).getType());
+    Assertions.assertEquals(
+        DataTypes.StringType,
+        columns.get(1).getType(),
+        "ExternalType (ENUM) should be mapped to StringType");
+
+    // Verify SELECT works without UnsupportedOperationException.
+    List<String> result = getQueryData(String.format("SELECT * FROM %s ORDER BY id", tableName));
+    Assertions.assertEquals(2, result.size());
+    Assertions.assertTrue(result.get(0).contains("active"));
+    Assertions.assertTrue(result.get(1).contains("inactive"));
   }
 }

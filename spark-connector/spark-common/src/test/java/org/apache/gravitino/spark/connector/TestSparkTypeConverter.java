@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Set;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.rel.types.Types.BinaryType;
 import org.apache.gravitino.rel.types.Types.BooleanType;
 import org.apache.gravitino.rel.types.Types.ByteType;
@@ -96,6 +97,12 @@ public class TestSparkTypeConverter {
             Assertions.assertEquals(sparkType, sparkTypeConverter.toSparkType(gravitinoType)));
 
     Assertions.assertEquals(DataTypes.StringType, sparkTypeConverter.toSparkType(UUIDType.get()));
+    Assertions.assertEquals(
+        DataTypes.StringType, sparkTypeConverter.toSparkType(Types.ExternalType.of("IPv4")));
+    Assertions.assertEquals(
+        DataTypes.StringType, sparkTypeConverter.toSparkType(Types.ExternalType.of("LARGEINT")));
+    Assertions.assertEquals(
+        DataTypes.StringType, sparkTypeConverter.toSparkType(Types.ExternalType.of("unknown")));
 
     notSupportGravitinoTypes.forEach(
         gravitinoType ->
