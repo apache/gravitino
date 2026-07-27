@@ -449,7 +449,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
         // identifiers in the view body will therefore fail to resolve on reload unless the view
         // was defined with fully-qualified references.
         if (defaultCatalog != null || defaultSchema != null) {
-          LOG.warn(
+          LOG.debug(
               "View {} has a non-null defaultCatalog={}/defaultSchema={}, but the Hive catalog "
                   + "cannot persist them for the '{}' dialect; unqualified identifiers in the "
                   + "view body may fail to resolve on reload",
