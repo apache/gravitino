@@ -21,19 +21,18 @@ package org.apache.gravitino.secret;
 
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
-import com.google.common.base.Joiner;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 
 /** Helpers for building and parsing Gravitino secret URNs. */
 public final class SecretUrn {
 
   // Allow '.' so dotted property keys (e.g. authentication.password) can appear in URNs.
   private static final Pattern SEGMENT_PATTERN = Pattern.compile("[a-zA-Z0-9._-]+");
-  private static final Joiner COLON_JOINER = Joiner.on(':');
 
   /** Parsed representation of a Gravitino secret URN. */
   public static final class ParsedUrn {
@@ -120,12 +119,12 @@ public final class SecretUrn {
    * @return the parsed URN
    */
   public static ParsedUrn parse(String urn) {
-    if (urn == null || !urn.startsWith(URN_PREFIX)) {
+    if (!StringUtils.startsWith(urn, URN_PREFIX)) {
       throw new IllegalArgumentException("Invalid Gravitino secret URN: " + urn);
     }
 
     String remainder = urn.substring(URN_PREFIX.length());
-    if (remainder.isEmpty()) {
+    if (StringUtils.isEmpty(remainder)) {
       throw new IllegalArgumentException("Invalid Gravitino secret URN: " + urn);
     }
 
@@ -138,11 +137,10 @@ public final class SecretUrn {
       validateSegment(segment);
     }
 
+    String[] identifierParts = Arrays.copyOfRange(segments, 1, segments.length);
     String providerName = segments[0];
-    String identifier = COLON_JOINER.join(Arrays.copyOfRange(segments, 1, segments.length));
-    List<String> identifierSegments =
-        Collections.unmodifiableList(
-            Arrays.asList(Arrays.copyOfRange(segments, 1, segments.length)));
+    String identifier = StringUtils.join(identifierParts, ':');
+    List<String> identifierSegments = Collections.unmodifiableList(Arrays.asList(identifierParts));
     return new ParsedUrn(providerName, identifier, identifierSegments);
   }
 
@@ -152,7 +150,7 @@ public final class SecretUrn {
    * @param segment the segment to validate
    */
   public static void validateSegment(String segment) {
-    if (segment == null || segment.isEmpty() || !SEGMENT_PATTERN.matcher(segment).matches()) {
+    if (StringUtils.isEmpty(segment) || !SEGMENT_PATTERN.matcher(segment).matches()) {
       throw new IllegalArgumentException("Invalid URN segment: " + segment);
     }
   }
