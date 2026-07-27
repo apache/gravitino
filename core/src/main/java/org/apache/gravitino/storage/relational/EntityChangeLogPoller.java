@@ -42,17 +42,40 @@ import org.slf4j.LoggerFactory;
  * the listeners that have not succeeded yet.
  *
  * <p>A listener that throws after partially applying a batch receives the whole batch again, so
- * listeners must make each callback atomic or tolerate retrying changes they already applied.
+ * listeners must make each callback atomic or tolerate retrying changes they already applied. A
+ * listener that cannot satisfy that contract must swallow its own failures, as {@code
+ * CatalogChangeLogListener} does.
+ *
+ * <p>Retries are bounded by {@code maxListenerRetries}. While a batch is paused no new batch is
+ * fetched, so a permanently failing listener would otherwise freeze cache invalidation for the
+ * whole process. When the bound is reached, {@link ListenerFailureAction} decides what happens:
+ * {@code EXIT} stops this server (the local caches are known to be stale, so serving from them
+ * would trade correctness for availability), {@code SKIP} drops the failed listeners from the batch
+ * and advances the cursor.
  */
 public class EntityChangeLogPoller implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(EntityChangeLogPoller.class);
 
-  /** Max entity-change rows to fetch per batch. */
+  /**
+   * Max entity-change rows to fetch per batch. A paused batch is retained in memory until every
+   * listener applies it, so this also bounds the poller's retained heap.
+   */
   private static final int ENTITY_CHANGE_POLLER_MAX_ROWS = 2000;
+
+  /** What the poller does when a listener keeps failing after {@code maxListenerRetries}. */
+  public enum ListenerFailureAction {
+    /** Stop this server process, because its local caches are known to be stale. */
+    EXIT,
+    /** Drop the failing listener from the batch, advance the cursor and keep serving. */
+    SKIP
+  }
 
   private final List<EntityChangeLogListener> listeners = new CopyOnWriteArrayList<>();
   private final long pollIntervalSecs;
+  private final int maxListenerRetries;
+  private final ListenerFailureAction listenerFailureAction;
+  private final Runnable exitHandler;
 
   @Nullable private BatchDelivery pendingDelivery;
 
@@ -63,14 +86,39 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * Creates an {@link EntityChangeLogPoller}.
    *
    * @param pollIntervalSecs interval between successive polling cycles
+   * @param maxListenerRetries how many times a failing listener is retried for the same batch
+   *     before {@code listenerFailureAction} is applied
+   * @param listenerFailureAction what to do once a listener exhausted its retries
    */
-  public EntityChangeLogPoller(long pollIntervalSecs) {
+  public EntityChangeLogPoller(
+      long pollIntervalSecs, int maxListenerRetries, ListenerFailureAction listenerFailureAction) {
+    // System.exit() runs the JVM shutdown hooks, which is where GravitinoServer performs its
+    // graceful stop, so in-flight requests still get a chance to finish.
+    this(pollIntervalSecs, maxListenerRetries, listenerFailureAction, () -> System.exit(1));
+  }
+
+  @VisibleForTesting
+  EntityChangeLogPoller(
+      long pollIntervalSecs,
+      int maxListenerRetries,
+      ListenerFailureAction listenerFailureAction,
+      Runnable exitHandler) {
     Preconditions.checkArgument(pollIntervalSecs > 0, "pollIntervalSecs must be positive");
+    Preconditions.checkArgument(maxListenerRetries >= 0, "maxListenerRetries must be non-negative");
+    Preconditions.checkArgument(
+        listenerFailureAction != null, "listenerFailureAction cannot be null");
     this.pollIntervalSecs = pollIntervalSecs;
+    this.maxListenerRetries = maxListenerRetries;
+    this.listenerFailureAction = listenerFailureAction;
+    this.exitHandler = exitHandler;
   }
 
   /**
    * Registers a listener to receive future entity change batches.
+   *
+   * <p>A listener only receives batches fetched after it was registered. In particular, if a batch
+   * is currently paused by a failing listener, the newly registered listener does not receive that
+   * batch and the cursor moves past it once the batch completes.
    *
    * @param listener the listener to register
    */
@@ -177,7 +225,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
     List<EntityChangeRecord> immutableChanges = List.copyOf(changes);
     long lastChangeId = immutableChanges.get(immutableChanges.size() - 1).getId();
     BatchDelivery delivery =
-        new BatchDelivery(immutableChanges, lastChangeId, List.copyOf(listeners));
+        new BatchDelivery(immutableChanges, lastChangeId, List.copyOf(listeners), 1);
     LOG.debug(
         "Fetched {} entity change log record(s) after cursor {}, id range [{}, {}]",
         immutableChanges.size(),
@@ -217,27 +265,67 @@ public class EntityChangeLogPoller implements AutoCloseable {
   private void deliver(BatchDelivery delivery) {
     List<EntityChangeLogListener> failedListeners = notifyListeners(delivery);
     if (failedListeners.isEmpty()) {
-      long previousHighWaterId = entityPollHighWaterId;
-      entityPollHighWaterId = delivery.lastChangeId;
-      pendingDelivery = null;
-      LOG.info(
-          "Consumed {} entity change log record(s), id range [{}, {}]; cursor advanced from {} to "
-              + "{}",
-          delivery.changes.size(),
+      advanceCursor(delivery);
+      return;
+    }
+
+    if (delivery.attempts > maxListenerRetries) {
+      handleExhaustedRetries(delivery, failedListeners);
+      return;
+    }
+
+    pendingDelivery = delivery.retryOnly(failedListeners);
+    LOG.error(
+        "Entity change log cursor is paused at id {} because {} listener(s) failed to apply batch "
+            + "id range [{}, {}] (attempt {} of {})",
+        entityPollHighWaterId,
+        failedListeners.size(),
+        delivery.firstChangeId(),
+        delivery.lastChangeId,
+        delivery.attempts,
+        maxListenerRetries + 1);
+  }
+
+  private void advanceCursor(BatchDelivery delivery) {
+    long previousHighWaterId = entityPollHighWaterId;
+    entityPollHighWaterId = delivery.lastChangeId;
+    pendingDelivery = null;
+    LOG.info(
+        "Consumed {} entity change log record(s), id range [{}, {}]; cursor advanced from {} to {}",
+        delivery.changes.size(),
+        delivery.firstChangeId(),
+        delivery.lastChangeId,
+        previousHighWaterId,
+        entityPollHighWaterId);
+  }
+
+  private void handleExhaustedRetries(
+      BatchDelivery delivery, List<EntityChangeLogListener> failedListeners) {
+    List<String> failedListenerNames = new ArrayList<>();
+    for (EntityChangeLogListener listener : failedListeners) {
+      failedListenerNames.add(listener.getClass().getName());
+    }
+
+    if (listenerFailureAction == ListenerFailureAction.EXIT) {
+      LOG.error(
+          "Stopping this server: listener(s) {} failed to apply entity change log batch id range "
+              + "[{}, {}] after {} attempt(s), so local caches are stale and cannot be trusted",
+          failedListenerNames,
           delivery.firstChangeId(),
           delivery.lastChangeId,
-          previousHighWaterId,
-          entityPollHighWaterId);
-    } else {
-      pendingDelivery = delivery.retryOnly(failedListeners);
-      LOG.error(
-          "Entity change log cursor is paused at id {} because {} listener(s) failed to apply "
-              + "batch id range [{}, {}]",
-          entityPollHighWaterId,
-          failedListeners.size(),
-          delivery.firstChangeId(),
-          delivery.lastChangeId);
+          delivery.attempts);
+      exitHandler.run();
+      return;
     }
+
+    LOG.error(
+        "Dropping entity change log batch id range [{}, {}] for listener(s) {} after {} attempt(s);"
+            + " their local caches may be stale until the affected entries expire",
+        delivery.firstChangeId(),
+        delivery.lastChangeId,
+        failedListenerNames,
+        delivery.attempts);
+    advanceCursor(delivery);
   }
 
   private List<EntityChangeLogListener> notifyListeners(BatchDelivery delivery) {
@@ -277,17 +365,22 @@ public class EntityChangeLogPoller implements AutoCloseable {
     private final long lastChangeId;
     private final List<EntityChangeLogListener> pendingListeners;
 
+    /** How many times this batch has been dispatched, starting at 1 for the initial dispatch. */
+    private final int attempts;
+
     private BatchDelivery(
         List<EntityChangeRecord> changes,
         long lastChangeId,
-        List<EntityChangeLogListener> pendingListeners) {
+        List<EntityChangeLogListener> pendingListeners,
+        int attempts) {
       this.changes = changes;
       this.lastChangeId = lastChangeId;
       this.pendingListeners = pendingListeners;
+      this.attempts = attempts;
     }
 
     private BatchDelivery retryOnly(List<EntityChangeLogListener> failedListeners) {
-      return new BatchDelivery(changes, lastChangeId, List.copyOf(failedListeners));
+      return new BatchDelivery(changes, lastChangeId, List.copyOf(failedListeners), attempts + 1);
     }
 
     private long firstChangeId() {

@@ -26,8 +26,19 @@ import org.apache.ibatis.annotations.Param;
 
 public class EntityChangeLogBaseSQLProvider {
 
+  /**
+   * DB-side expression for "now" in milliseconds. It is the established codebase convention for
+   * DB-generated millisecond timestamps, shared with 27+ other base providers
+   * (TableMetaBaseSQLProvider, FilesetVersionBaseSQLProvider, etc.). It works on MySQL natively and
+   * on H2 in {@code MODE=MYSQL}; PostgreSQL overrides both statements in its own provider.
+   *
+   * <p>Insertion and expiration both use this expression, so retention is measured entirely with
+   * the database clock and is immune to clock skew between Gravitino nodes. Round-trip behaviour is
+   * verified by {@code TestEntityChangeLogMapper#testEntityChangeLogInsertAndSelect}, which asserts
+   * the persisted value is within 1 s of the JVM clock.
+   */
   private static final String CURRENT_TIME_MILLIS_SQL =
-      "((UNIX_TIMESTAMP() * 1000.0) + " + "EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)";
+      "((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)";
 
   /**
    * Cursor-advance contract for the entity change poller: {@code id} is monotonic and unique, so
@@ -53,15 +64,7 @@ public class EntityChangeLogBaseSQLProvider {
     return "SELECT COALESCE(MAX(id), 0) FROM " + ENTITY_CHANGE_LOG_TABLE_NAME;
   }
 
-  /**
-   * The {@code (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000}
-   * expression is the established codebase convention for DB-generated millisecond timestamps,
-   * shared with 27+ other base providers (TableMetaBaseSQLProvider, FilesetVersionBaseSQLProvider,
-   * etc.). It works on MySQL natively and on H2 in {@code MODE=MYSQL}; PostgreSQL overrides this
-   * method in its own provider. Round-trip behaviour is verified by {@code
-   * TestEntityChangeLogMapper#testEntityChangeLogInsertAndSelect}, which asserts the persisted
-   * value is within 1 s of the JVM clock.
-   */
+  /** Inserts a change record, stamping {@code created_at} with {@link #CURRENT_TIME_MILLIS_SQL}. */
   public String insertEntityChange(
       @Param("metalakeName") String metalakeName,
       @Param("entityType") String entityType,
@@ -79,6 +82,10 @@ public class EntityChangeLogBaseSQLProvider {
     // Keep the retention window conservative. A running server can be delayed by long GC pauses,
     // network isolation, or scheduler stalls; pruning too aggressively can let that server miss an
     // invalidation while its local cache is still warm.
+    //
+    // No ORDER BY here, unlike the PostgreSQL provider: H2's DELETE grammar accepts LIMIT but not
+    // ORDER BY. Every matched row is expired anyway, so the deletion order does not matter; the
+    // cleaner randomizes its start time to keep HA nodes from deleting the same rows at once.
     return "DELETE FROM "
         + ENTITY_CHANGE_LOG_TABLE_NAME
         + " WHERE created_at < "

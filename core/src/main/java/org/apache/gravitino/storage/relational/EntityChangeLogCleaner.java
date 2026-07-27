@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -37,6 +38,9 @@ import org.slf4j.LoggerFactory;
 public class EntityChangeLogCleaner implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(EntityChangeLogCleaner.class);
+
+  /** Upper bound for the delay before the first cleanup run. */
+  private static final long MAX_INITIAL_DELAY_MS = TimeUnit.MINUTES.toMillis(10);
 
   private final long retentionMs;
   private final long cleanupIntervalMs;
@@ -71,12 +75,27 @@ public class EntityChangeLogCleaner implements AutoCloseable {
               thread.setDaemon(true);
               return thread;
             });
+    long initialDelayMs = initialDelayMs();
     scheduler.scheduleWithFixedDelay(
-        this::cleanExpiredChanges, cleanupIntervalMs, cleanupIntervalMs, TimeUnit.MILLISECONDS);
+        this::cleanExpiredChanges, initialDelayMs, cleanupIntervalMs, TimeUnit.MILLISECONDS);
     LOG.info(
-        "Starting entity change log cleaner with retention {} days and cleanup interval {} hours",
-        TimeUnit.MILLISECONDS.toDays(retentionMs),
-        TimeUnit.MILLISECONDS.toHours(cleanupIntervalMs));
+        "Starting entity change log cleaner with retention {} ms, cleanup interval {} ms and "
+            + "initial delay {} ms",
+        retentionMs,
+        cleanupIntervalMs,
+        initialDelayMs);
+  }
+
+  /**
+   * Returns a randomized short delay before the first run. It is deliberately much smaller than the
+   * cleanup interval, otherwise a server restarted more often than that interval would never clean
+   * up. The randomization spreads the first run of the HA nodes, which all delete from the same
+   * rows.
+   */
+  @VisibleForTesting
+  long initialDelayMs() {
+    long bound = Math.min(cleanupIntervalMs, MAX_INITIAL_DELAY_MS);
+    return ThreadLocalRandom.current().nextLong(bound) + 1;
   }
 
   @VisibleForTesting
@@ -98,9 +117,9 @@ public class EntityChangeLogCleaner implements AutoCloseable {
 
       if (totalPrunedRows > 0) {
         LOG.info(
-            "Pruned {} entity change log record(s) older than {} days using database time",
+            "Pruned {} entity change log record(s) older than {} ms, measured with database time",
             totalPrunedRows,
-            TimeUnit.MILLISECONDS.toDays(retentionMs));
+            retentionMs);
       }
     } catch (Exception e) {
       LOG.warn(

@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,26 +37,53 @@ public class TestCatalogChangeLogListener {
 
   @Test
   @SuppressWarnings("unchecked")
-  void testProcessesRemainingChangesBeforePropagatingFailure() {
+  void testProcessesRemainingChangesAndSwallowsFailure() {
     CatalogManager catalogManager = mock(CatalogManager.class);
     Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
     NameIdentifier failedIdentifier = NameIdentifier.of("metalake", "failed");
     NameIdentifier successfulIdentifier = NameIdentifier.of("metalake", "successful");
-    RuntimeException failure = new RuntimeException("invalidation failed");
 
     when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(failedIdentifier)).thenThrow(failure);
+    when(catalogManager.consumeLocalMutation(failedIdentifier))
+        .thenThrow(new RuntimeException("invalidation failed"));
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
-    RuntimeException thrown =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () ->
-                listener.onEntityChange(
-                    List.of(change(1L, "metalake.failed"), change(2L, "metalake.successful"))));
 
-    Assertions.assertSame(failure, thrown);
+    // The failure must not reach the poller. A retried batch would re-invalidate catalogs this
+    // process mutated itself, because consumeLocalMutation() is single-shot, and closing an
+    // in-use CatalogWrapper also closes its IsolatedClassLoader.
+    Assertions.assertDoesNotThrow(
+        () ->
+            listener.onEntityChange(
+                List.of(change(1L, "metalake.failed"), change(2L, "metalake.successful"))));
+
     verify(catalogCache).invalidate(successfulIdentifier);
+    verify(catalogCache, never()).invalidate(failedIdentifier);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testSkipsLocalMutationAndNonCatalogRecords() {
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
+    NameIdentifier localIdentifier = NameIdentifier.of("metalake", "local");
+
+    when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
+    when(catalogManager.consumeLocalMutation(localIdentifier)).thenReturn(true);
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            listener.onEntityChange(
+                List.of(
+                    change(1L, "metalake.local"),
+                    change(2L, "metalake"),
+                    change(3L, "metalake.cat.schema"),
+                    new EntityChangeRecord(
+                        4L, "metalake", "SCHEMA", "metalake.cat.sch", OperateType.ALTER, 0L))));
+
+    verify(catalogCache, never()).invalidate(any());
   }
 
   private static EntityChangeRecord change(long id, String fullName) {

@@ -33,6 +33,13 @@ import org.slf4j.LoggerFactory;
  *
  * <p>This listener is called <em>synchronously</em> in the poller thread. Implementations must not
  * block or perform expensive I/O; only fast, in-memory cache invalidations are permitted.
+ *
+ * <p>This listener never propagates a failure to the poller, so the poller never retries a batch
+ * for it. That is deliberate: local-mutation de-duplication ({@link
+ * CatalogManager#consumeLocalMutation}) is single-shot, so re-delivering an already-applied batch
+ * would invalidate a catalog this process mutated itself and close its still-in-use {@code
+ * IsolatedClassLoader}. Dropping an invalidation is the cheaper failure: the catalog cache expires
+ * on access, so staleness is bounded by {@code gravitino.catalog.cache.evictionIntervalMs}.
  */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
 
@@ -51,7 +58,6 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
 
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
-    RuntimeException firstFailure = null;
     for (EntityChangeRecord change : changes) {
       try {
         if (!isCatalogChange(change)) {
@@ -72,21 +78,15 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
         LOG.debug("Invalidating catalog cache due to entity change log: {}", ident);
         catalogManager.getCatalogCache().invalidate(ident);
       } catch (RuntimeException e) {
-        if (firstFailure == null) {
-          firstFailure = e;
-        } else {
-          firstFailure.addSuppressed(e);
-        }
+        // Deliberately not rethrown: see the class javadoc. A dropped invalidation only costs
+        // bounded staleness here, while a retry of an already-applied batch can tear down a
+        // catalog that is still in use.
         LOG.warn(
             "Failed to process catalog change log record: fullName={}, entityType={}",
             change.getFullName(),
             change.getEntityType(),
             e);
       }
-    }
-
-    if (firstFailure != null) {
-      throw firstFailure;
     }
   }
 

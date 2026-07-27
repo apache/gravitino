@@ -27,6 +27,10 @@ import org.apache.ibatis.annotations.Param;
 
 public class EntityChangeLogPostgreSQLProvider extends EntityChangeLogBaseSQLProvider {
 
+  /**
+   * PostgreSQL flavour of the DB-side "now in milliseconds" expression. Insertion and expiration
+   * share it, so retention is measured entirely with the database clock.
+   */
   private static final String CURRENT_TIME_MILLIS_SQL =
       "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
 

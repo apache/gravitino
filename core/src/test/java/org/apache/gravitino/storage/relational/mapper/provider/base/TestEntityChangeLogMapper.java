@@ -174,10 +174,27 @@ public class TestEntityChangeLogMapper {
     String postgreSql =
         new EntityChangeLogPostgreSQLProvider().pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30));
 
-    Assertions.assertTrue(baseSql.contains("CURRENT_TIMESTAMP"));
-    Assertions.assertTrue(baseSql.contains("#{retentionMs}"));
-    Assertions.assertTrue(postgreSql.contains("CURRENT_TIMESTAMP"));
-    Assertions.assertTrue(postgreSql.contains("#{retentionMs}"));
+    // The cutoff must be derived from the DB clock, never from a JVM timestamp bound into the SQL.
+    Assertions.assertTrue(baseSql.contains("CURRENT_TIMESTAMP"), baseSql);
+    Assertions.assertTrue(baseSql.contains("#{retentionMs}"), baseSql);
+    Assertions.assertFalse(baseSql.contains("#{before}"), baseSql);
+    Assertions.assertTrue(postgreSql.contains("CURRENT_TIMESTAMP"), postgreSql);
+    Assertions.assertTrue(postgreSql.contains("#{retentionMs}"), postgreSql);
+    Assertions.assertFalse(postgreSql.contains("#{before}"), postgreSql);
+  }
+
+  @Test
+  void testEntityChangeLogPruneKeepsRowsInsideRetention() {
+    entityChangeLogMapper.insertEntityChange(
+        "metalake1", "TABLE", "metalake1.cat.schema.recent", OperateType.ALTER);
+
+    int prunedRows =
+        SessionUtils.doWithCommitAndFetchResult(
+            EntityChangeLogMapper.class,
+            mapper -> mapper.pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30)));
+
+    Assertions.assertEquals(0, prunedRows);
+    Assertions.assertEquals(1, entityChangeLogMapper.selectEntityChanges(0L, 100).size());
   }
 
   private void forceCreatedAt(String fullName, long createdAt) throws SQLException {

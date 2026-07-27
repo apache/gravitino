@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -58,7 +59,55 @@ public class TestEntityChangeLogCleaner {
       cleaner.cleanExpiredChanges();
     }
 
-    verify(mapper, never()).pruneOldEntityChanges(0);
+    verify(mapper, never()).pruneOldEntityChanges(anyLong());
+  }
+
+  @Test
+  void testFirstRunDoesNotWaitForAWholeCleanupInterval() {
+    // A server restarted more often than the cleanup interval must still prune, so the first run
+    // is scheduled after a short randomized delay instead of a full interval.
+    EntityChangeLogCleaner dailyCleaner =
+        new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1));
+    for (int i = 0; i < 100; i++) {
+      long delayMs = dailyCleaner.initialDelayMs();
+      Assertions.assertTrue(delayMs > 0, "initial delay must be positive, got " + delayMs);
+      Assertions.assertTrue(
+          delayMs <= TimeUnit.MINUTES.toMillis(10), "initial delay too long: " + delayMs);
+    }
+
+    // Never longer than the configured interval either.
+    EntityChangeLogCleaner frequentCleaner = new EntityChangeLogCleaner(RETENTION_MS, 50L);
+    for (int i = 0; i < 100; i++) {
+      Assertions.assertTrue(frequentCleaner.initialDelayMs() <= 50L);
+    }
+  }
+
+  @Test
+  void testStartAndCloseAreSafeToPair() {
+    EntityChangeLogCleaner cleaner =
+        new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1));
+
+    Assertions.assertDoesNotThrow(cleaner::start);
+    Assertions.assertDoesNotThrow(cleaner::close);
+    // close() on a cleaner that was never started must not fail either.
+    Assertions.assertDoesNotThrow(
+        () -> new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1)).close());
+  }
+
+  @Test
+  void testStartIsNoOpWhenRetentionIsZero() throws Exception {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+
+      try (EntityChangeLogCleaner cleaner = new EntityChangeLogCleaner(0, 1L)) {
+        cleaner.start();
+        Thread.sleep(200);
+      }
+    }
+
+    verify(mapper, never()).pruneOldEntityChanges(anyLong());
   }
 
   @Test
