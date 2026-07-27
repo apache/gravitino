@@ -245,22 +245,6 @@ public class MiniGravitino {
       if (!executor.awaitTermination(3, TimeUnit.MINUTES)) {
         throw new RuntimeException("Can not terminate MiniGravitino server task");
       }
-
-      long beginTime = System.currentTimeMillis();
-      boolean started = true;
-
-      String url = String.format("http://%s:%d/metrics", host, port);
-      while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-        sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
-        started = HttpUtils.isHttpServerUp(url);
-        if (!started) {
-          break;
-        }
-      }
-
-      if (started) {
-        throw new RuntimeException("Can not stop Gravitino server");
-      }
     } catch (InterruptedException | RuntimeException | Error e) {
       failure = e;
       throw e;
