@@ -1413,6 +1413,10 @@ public class POConverters {
           .withName(tagPO.getTagName())
           .withNamespace(namespace)
           .withComment(tagPO.getComment())
+          .withAllowedValues(
+              tagPO.getAllowedValues() == null
+                  ? null
+                  : JsonUtils.anyFieldMapper().readValue(tagPO.getAllowedValues(), String[].class))
           .withProperties(JsonUtils.anyFieldMapper().readValue(tagPO.getProperties(), Map.class))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(tagPO.getAuditInfo(), AuditInfo.class))
@@ -1433,6 +1437,10 @@ public class POConverters {
           .withTagName(tagEntity.name())
           .withComment(tagEntity.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(tagEntity.properties()))
+          .withAllowedValues(
+              tagEntity.allowedValues().isPresent()
+                  ? JsonUtils.anyFieldMapper().writeValueAsString(tagEntity.allowedValues().get())
+                  : null)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(tagEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -1455,6 +1463,10 @@ public class POConverters {
           .withMetalakeId(oldTagPO.getMetalakeId())
           .withComment(newEntity.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.properties()))
+          .withAllowedValues(
+              newEntity.allowedValues().isPresent()
+                  ? JsonUtils.anyFieldMapper().writeValueAsString(newEntity.allowedValues().get())
+                  : null)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -1467,6 +1479,16 @@ public class POConverters {
 
   public static TagMetadataObjectRelPO initializeTagMetadataObjectRelPOWithVersion(
       Long tagId, Long metadataObjectId, String metadataObjectType) {
+    return initializeTagMetadataObjectRelPOWithVersion(
+        tagId, metadataObjectId, metadataObjectType, null, 0);
+  }
+
+  public static TagMetadataObjectRelPO initializeTagMetadataObjectRelPOWithVersion(
+      Long tagId,
+      Long metadataObjectId,
+      String metadataObjectType,
+      String tagValue,
+      Integer valueOrder) {
     try {
       AuditInfo auditInfo =
           AuditInfo.builder()
@@ -1478,6 +1500,8 @@ public class POConverters {
           .withTagId(tagId)
           .withMetadataObjectId(metadataObjectId)
           .withMetadataObjectType(metadataObjectType)
+          .withTagValue(tagValue)
+          .withValueOrder(valueOrder)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)

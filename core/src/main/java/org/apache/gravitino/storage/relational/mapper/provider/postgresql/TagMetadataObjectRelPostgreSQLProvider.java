@@ -34,9 +34,32 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TagMetadataObjectRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRelBaseSQLProvider {
+  @Override
+  public String batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+      Long metadataObjectId, String metadataObjectType, List<TagMetadataObjectRelPO> tagRelPOs) {
+    return "<script>"
+        + "UPDATE "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+        + " AND ("
+        + "<foreach item='item' collection='tagRels' separator=' OR '>"
+        + "(tag_id = #{item.tagId}"
+        + "<choose>"
+        + "<when test='item.tagValue == null'> AND tag_value IS NULL</when>"
+        + "<otherwise> AND tag_value = #{item.tagValue}</otherwise>"
+        + "</choose>"
+        + ")"
+        + "</foreach>"
+        + ")"
+        + "</script>";
+  }
+
   @Override
   public String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       String metalakeName, String tagName) {
@@ -238,7 +261,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   @Override
   public String listTagMetadataObjectRelsByMetalakeAndTagName(String metalakeName, String tagName) {
     return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
-        + " te.metadata_object_type as metadataObjectType, te.audit_info as auditInfo,"
+        + " te.metadata_object_type as metadataObjectType, te.tag_value as tagValue,"
+        + " te.value_order as valueOrder, te.audit_info as auditInfo,"
         + " te.current_version as currentVersion, te.last_version as lastVersion,"
         + " te.deleted_at as deletedAt"
         + " FROM "

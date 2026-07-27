@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -579,7 +580,11 @@ public class TestTagEvent {
     Tag[] tags = new Tag[] {tag, tag};
 
     when(dispatcher.createTag(
-            any(String.class), any(String.class), any(String.class), any(Map.class)))
+            any(String.class),
+            any(String.class),
+            any(String.class),
+            any(Map.class),
+            nullable(String[].class)))
         .thenReturn(tag);
     when(dispatcher.listTags(metalake)).thenReturn(tagNames);
     when(dispatcher.listTagsInfo(metalake)).thenReturn(tags);

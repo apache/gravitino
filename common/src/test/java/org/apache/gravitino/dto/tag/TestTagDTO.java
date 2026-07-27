@@ -62,6 +62,24 @@ public class TestTagDTO {
 
     Assertions.assertEquals(properties, deserTagDTO1.properties());
 
+    // Test tag with allowed values and assignment values
+    TagDTO tagWithValues =
+        TagDTO.builder()
+            .withName("tag_test")
+            .withComment("tag comment")
+            .withAudit(audit)
+            .withAllowedValues(new String[] {"finance", "risk"})
+            .withAssignmentValues(new String[] {"finance"})
+            .build();
+
+    serJson = JsonUtils.objectMapper().writeValueAsString(tagWithValues);
+    TagDTO deserTagWithValues = JsonUtils.objectMapper().readValue(serJson, TagDTO.class);
+    Assertions.assertEquals(tagWithValues, deserTagWithValues);
+    Assertions.assertArrayEquals(
+        new String[] {"finance", "risk"}, deserTagWithValues.allowedValues().get());
+    Assertions.assertArrayEquals(
+        new String[] {"finance"}, deserTagWithValues.assignmentValues().get());
+
     // Test tag with inherited
     TagDTO tagDTO2 =
         TagDTO.builder()

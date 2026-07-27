@@ -28,6 +28,7 @@ import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagValuePair;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -57,7 +58,17 @@ public class TagHookDispatcher implements TagDispatcher {
   @Override
   public Tag createTag(
       String metalake, String name, String comment, Map<String, String> properties) {
-    Tag tag = dispatcher.createTag(metalake, name, comment, properties);
+    return createTag(metalake, name, comment, properties, null);
+  }
+
+  @Override
+  public Tag createTag(
+      String metalake,
+      String name,
+      String comment,
+      Map<String, String> properties,
+      String[] allowedValues) {
+    Tag tag = dispatcher.createTag(metalake, name, comment, properties, allowedValues);
 
     // Set the creator as the owner of the tag.
     OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
@@ -90,6 +101,11 @@ public class TagHookDispatcher implements TagDispatcher {
   }
 
   @Override
+  public MetadataObject[] listMetadataObjectsForTag(String metalake, String name, String value) {
+    return dispatcher.listMetadataObjectsForTag(metalake, name, value);
+  }
+
+  @Override
   public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject) {
     return dispatcher.listTagsForMetadataObject(metalake, metadataObject);
   }
@@ -102,6 +118,16 @@ public class TagHookDispatcher implements TagDispatcher {
   @Override
   public String[] associateTagsForMetadataObject(
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove) {
+    return dispatcher.associateTagsForMetadataObject(
+        metalake, metadataObject, tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] associateTagsForMetadataObject(
+      String metalake,
+      MetadataObject metadataObject,
+      TagValuePair[] tagsToAdd,
+      TagValuePair[] tagsToRemove) {
     return dispatcher.associateTagsForMetadataObject(
         metalake, metadataObject, tagsToAdd, tagsToRemove);
   }

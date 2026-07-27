@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
@@ -45,5 +46,35 @@ public class TestTagCreateRequest {
         JsonUtils.objectMapper().readValue(serJson, TagCreateRequest.class);
     Assertions.assertEquals(request1, deserRequest1);
     Assertions.assertEquals(properties, deserRequest1.getProperties());
+  }
+
+  @Test
+  public void testTagCreateRequestSerDeWithAllowedValues() throws JsonProcessingException {
+    String[] allowedValues = new String[] {"finance", "risk"};
+    TagCreateRequest request = new TagCreateRequest("tag_test", "tag comment", null, allowedValues);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(request);
+    TagCreateRequest deserRequest =
+        JsonUtils.objectMapper().readValue(serJson, TagCreateRequest.class);
+
+    Assertions.assertEquals(request, deserRequest);
+    Assertions.assertArrayEquals(allowedValues, deserRequest.getAllowedValues());
+  }
+
+  @Test
+  public void testTagCreateRequestValidateAllowedValues() {
+    new TagCreateRequest("tag_test", "tag comment", null, new String[] {"finance"}).validate();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new TagCreateRequest("tag_test", null, null, new String[] {""}).validate());
+    char[] tooLongValueChars = new char[257];
+    Arrays.fill(tooLongValueChars, 'a');
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            new TagCreateRequest(
+                    "tag_test", null, null, new String[] {new String(tooLongValueChars)})
+                .validate());
   }
 }

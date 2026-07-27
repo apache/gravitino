@@ -86,6 +86,7 @@ import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.tag.TagValuePair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -815,6 +816,24 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
     }
+  }
+
+  @Override
+  public List<GenericEntity> listMetadataObjectsForTag(NameIdentifier tagIdent, String value)
+      throws IOException {
+    return TagMetaService.getInstance().listAssociatedMetadataObjectsForTag(tagIdent, value);
+  }
+
+  @Override
+  public List<TagEntity> updateTagRelations(
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      TagValuePair[] tagsToAdd,
+      TagValuePair[] tagsToRemove)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    return TagMetaService.getInstance()
+        .associateTagValuesWithMetadataObject(
+            srcEntityIdent, srcEntityType, tagsToAdd, tagsToRemove);
   }
 
   @Override

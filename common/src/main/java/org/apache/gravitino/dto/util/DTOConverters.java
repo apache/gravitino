@@ -607,6 +607,8 @@ public class DTOConverters {
             .withName(tag.name())
             .withComment(tag.comment())
             .withProperties(tag.properties())
+            .withAllowedValues(tag.allowedValues().orElse(null))
+            .withAssignmentValues(tag.assignmentValues().orElse(null))
             .withAudit(toDTO(tag.auditInfo()))
             .withInherited(inherited);
 

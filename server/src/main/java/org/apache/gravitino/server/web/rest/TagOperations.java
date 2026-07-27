@@ -157,7 +157,11 @@ public class TagOperations {
             request.validate();
             Tag tag =
                 tagDispatcher.createTag(
-                    metalake, request.getName(), request.getComment(), request.getProperties());
+                    metalake,
+                    request.getName(),
+                    request.getComment(),
+                    request.getProperties(),
+                    request.getAllowedValues());
 
             LOG.info("Created tag: {} under metalake: {}", tag.name(), metalake);
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
@@ -268,14 +272,20 @@ public class TagOperations {
   public Response listMetadataObjectsForTag(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName) {
-    LOG.info("Received list objects for tag: {} under metalake: {}", tagName, metalake);
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
+      @QueryParam("value") String value) {
+    LOG.info(
+        "Received list objects for tag: {} and value: {} under metalake: {}",
+        tagName,
+        value,
+        metalake);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject[] objects = tagDispatcher.listMetadataObjectsForTag(metalake, tagName);
+            MetadataObject[] objects =
+                tagDispatcher.listMetadataObjectsForTag(metalake, tagName, value);
             objects = objects == null ? new MetadataObject[0] : objects;
 
             LOG.info(
