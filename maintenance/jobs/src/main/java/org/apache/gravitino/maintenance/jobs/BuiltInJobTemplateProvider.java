@@ -30,6 +30,7 @@ import org.apache.gravitino.maintenance.jobs.iceberg.IcebergUpdateStatsAndMetric
 import org.apache.gravitino.maintenance.jobs.spark.SparkPiJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.gravitino.maintenance.jobs.iceberg.IcebergRewriteManifestsJob;
 
 /** Provides built-in job templates bundled with the Gravitino jobs module. */
 public class BuiltInJobTemplateProvider implements JobTemplateProvider {
@@ -45,7 +46,8 @@ public class BuiltInJobTemplateProvider implements JobTemplateProvider {
       ImmutableList.of(
           new SparkPiJob(),
           new IcebergRewriteDataFilesJob(),
-          new IcebergUpdateStatsAndMetricsJob());
+          new IcebergUpdateStatsAndMetricsJob()),
+          new IcebergRewriteManifestsJob());
 
   @Override
   public List<? extends JobTemplate> jobTemplates() {
