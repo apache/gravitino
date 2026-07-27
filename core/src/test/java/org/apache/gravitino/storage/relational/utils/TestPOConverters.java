@@ -623,6 +623,7 @@ public class TestPOConverters {
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
+    assertNull(initPO.getDeletionId());
 
     TableEntity entity =
         POConverters.fromTableAndColumnPOs(
@@ -715,6 +716,7 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("test", updatePO.getTableName());
+    assertNull(updatePO.getDeletionId());
   }
 
   @Test

@@ -76,11 +76,13 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     PRIMARY KEY (table_id),
     CONSTRAINT uk_sid_tn_del UNIQUE (schema_id, table_name, deleted_at),
     -- Aliases are used here, and indexes with the same name in H2 can only be created once.
     KEY idx_tmid (metalake_id),
-    KEY idx_tcid (catalog_id)
+    KEY idx_tcid (catalog_id),
+    KEY idx_tm_deletion (`deletion_id`)
 ) ENGINE=InnoDB;
 
 
@@ -101,12 +103,14 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `column_default_value` CLOB DEFAULT NULL COMMENT 'column default value',
     `column_op_type` TINYINT(1) NOT NULL COMMENT 'column operation type, 1 is create, 2 is update, 3 is delete',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'column deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'column deletion generation identifier',
     `audit_info` CLOB NOT NULL COMMENT 'column audit info',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_tid_ver_cid_del` (`table_id`, `table_version`, `column_id`, `deleted_at`),
     KEY `idx_tcmid` (`metalake_id`),
     KEY `idx_tccid` (`catalog_id`),
-    KEY `idx_tcsid` (`schema_id`)
+    KEY `idx_tcsid` (`schema_id`),
+    KEY `idx_tcvi_table_deletion` (`table_id`, `deletion_id`)
 ) ENGINE=InnoDB;
 
 
@@ -208,9 +212,11 @@ CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'securable objectcurrent version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'securable object last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'securable object deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     PRIMARY KEY (`id`),
     KEY `idx_obj_rid` (`role_id`),
-    KEY `idx_obj_eid` (`metadata_object_id`)
+    KEY `idx_obj_eid` (`metadata_object_id`),
+    KEY `idx_securable_object_deletion` (`metadata_object_id`, `type`, `deletion_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `user_role_rel` (
@@ -312,10 +318,12 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag relation deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_ti_mi_del` (`tag_id`, `metadata_object_id`, `deleted_at`),
     KEY `idx_tid` (`tag_id`),
-    KEY `idx_mid` (`metadata_object_id`)
+    KEY `idx_mid` (`metadata_object_id`),
+    KEY `idx_tag_relation_deletion` (`deletion_id`, `metadata_object_type`, `metadata_object_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `owner_meta` (
@@ -329,12 +337,14 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_oid` (`owner_id`),
     KEY `idx_meid` (`metadata_object_id`),
-    KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`)
+    KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`),
+    KEY `idx_owner_object_deletion` (`metadata_object_id`, `metadata_object_type`, `deletion_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `model_meta` (
@@ -421,10 +431,12 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy relation deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_pi_mi_mo_del` (`policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_pid` (`policy_id`),
-    KEY `idx_prmid` (`metadata_object_id`)
+    KEY `idx_prmid` (`metadata_object_id`),
+    KEY `idx_policy_relation_deletion` (`metadata_object_id`, `metadata_object_type`, `deletion_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `statistic_meta` (
@@ -439,10 +451,12 @@ CREATE TABLE IF NOT EXISTS `statistic_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'statistic current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'statistic last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'statistic deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_si_mi_mo_del` (`statistic_name`, `metadata_object_id`, `deleted_at`),
     KEY `idx_stid` (`statistic_id`),
-    KEY `idx_moid` (`metadata_object_id`)
+    KEY `idx_moid` (`metadata_object_id`),
+    KEY `idx_statistic_object_deletion` (`metadata_object_id`, `metadata_object_type`, `deletion_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `job_template_meta` (
@@ -487,7 +501,9 @@ CREATE TABLE IF NOT EXISTS `table_version_info` (
     `comment`   CLOB DEFAULT NULL COMMENT 'table comment',
     `version` BIGINT(20) UNSIGNED COMMENT 'table current version',
     `deleted_at`      BIGINT(20) UNSIGNED DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
-    UNIQUE KEY `uk_table_id_version_deleted_at` (`table_id`, `version`, `deleted_at`)
+    `deletion_id`     VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
+    UNIQUE KEY `uk_table_id_version_deleted_at` (`table_id`, `version`, `deleted_at`),
+    KEY `idx_tvi_table_deletion` (`table_id`, `deletion_id`)
 ) ENGINE=InnoDB COMMENT 'table detail information including format, location, properties, partition, distribution, sort order, index and so on';
 
 CREATE TABLE IF NOT EXISTS `function_meta` (
@@ -606,6 +622,64 @@ CREATE INDEX IF NOT EXISTS `idx_table_metrics_composite`
   ON `table_metrics`(`table_identifier`, `table_partition`, `metric_ts`);
 CREATE INDEX IF NOT EXISTS `idx_job_metrics_identifier_metric_ts`
   ON `job_metrics`(`job_identifier`, `metric_ts`);
+
+CREATE TABLE IF NOT EXISTS `entity_deletion` (
+  `deletion_id`              VARCHAR(64)   NOT NULL COMMENT 'opaque identifier for one deletion generation',
+  `entity_type`              VARCHAR(32)   NOT NULL COMMENT 'entity type, TABLE in the Iceberg REST implementation',
+  `entity_id`                BIGINT        NOT NULL COMMENT 'immutable source entity id',
+  `entity_version`           BIGINT        NOT NULL COMMENT 'source entity version captured at deletion',
+  `metalake_id`              BIGINT        NOT NULL COMMENT 'immutable owning metalake id',
+  `catalog_id`               BIGINT        NOT NULL COMMENT 'immutable owning catalog id',
+  `parent_id`                BIGINT        NOT NULL COMMENT 'immutable immediate parent id, schema id for a table',
+  `namespace_snapshot`       VARCHAR(512)  NOT NULL COMMENT 'namespace snapshot used for routing and audit',
+  `entity_name_snapshot`     VARCHAR(128)  NOT NULL COMMENT 'entity name captured at deletion',
+  `active_name_key`          VARCHAR(64)   DEFAULT NULL COMMENT 'unique name reservation while deletion is active',
+  `state`                    VARCHAR(16)   NOT NULL COMMENT 'DELETED|RESTORED|PURGING|PURGED',
+  `revision`                 BIGINT        NOT NULL DEFAULT 0 COMMENT 'optimistic lifecycle revision',
+  `deleted_at`               BIGINT        NOT NULL COMMENT 'deletion timestamp in milliseconds',
+  `retention_expires_at`     BIGINT        DEFAULT NULL COMMENT 'fixed recovery deadline, NULL means immediate nonrecoverable cleanup',
+  `deleted_by`               VARCHAR(128)  NOT NULL COMMENT 'actor that requested deletion',
+  `purge_requested`          TINYINT(1)    NOT NULL COMMENT 'original Iceberg REST purgeRequested value for audit',
+  `purge_job_type`           VARCHAR(64)   NOT NULL COMMENT 'durable purge executor type',
+  `purge_job_id`             VARCHAR(64)   DEFAULT NULL COMMENT 'batch purge job that claimed this generation',
+  `cleanup_status`           VARCHAR(16)   DEFAULT NULL COMMENT 'PENDING|RUNNING|FAILED|SUCCEEDED',
+  `cleanup_attempt_count`    INT           NOT NULL DEFAULT 0 COMMENT 'number of cleanup attempts',
+  `cleanup_last_error`       VARCHAR(2048) DEFAULT NULL COMMENT 'sanitized most recent cleanup error',
+  `accepted_restore_etag`    VARCHAR(192)  DEFAULT NULL COMMENT 'deletion action ETag accepted by successful UNDROP',
+  `request_id`               VARCHAR(128)  DEFAULT NULL COMMENT 'originating request id',
+  `correlation_id`           VARCHAR(128)  DEFAULT NULL COMMENT 'lifecycle correlation id',
+  `restored_at`              BIGINT        DEFAULT NULL COMMENT 'successful restore timestamp in milliseconds',
+  `purged_at`                BIGINT        DEFAULT NULL COMMENT 'successful purge timestamp in milliseconds',
+  `updated_at`               BIGINT        NOT NULL COMMENT 'last lifecycle update timestamp in milliseconds',
+  PRIMARY KEY (`deletion_id`),
+  UNIQUE KEY `uk_entity_deletion_active_name` (`active_name_key`),
+  KEY `idx_entity_deletion_entity_history` (`entity_type`, `entity_id`, `deleted_at`, `deletion_id`),
+  KEY `idx_entity_deletion_gc` (`state`, `retention_expires_at`, `deletion_id`),
+  KEY `idx_entity_deletion_purge_job` (`purge_job_id`, `cleanup_status`, `deletion_id`)
+) COMMENT='durable deletion lifecycle actions and terminal receipts';
+
+CREATE TABLE IF NOT EXISTS `entity_deletion_audit` (
+  `audit_id`                 VARCHAR(64)   NOT NULL COMMENT 'audit event identifier',
+  `deletion_id`              VARCHAR(64)   NOT NULL COMMENT 'deletion generation identifier',
+  `entity_type`              VARCHAR(32)   NOT NULL COMMENT 'entity type',
+  `entity_id`                BIGINT        NOT NULL COMMENT 'immutable source entity id',
+  `event_type`               VARCHAR(64)   NOT NULL COMMENT 'lifecycle event type',
+  `action_revision`          BIGINT        DEFAULT NULL COMMENT 'action revision associated with the event',
+  `prior_state`              VARCHAR(16)   DEFAULT NULL COMMENT 'prior lifecycle state',
+  `new_state`                VARCHAR(16)   DEFAULT NULL COMMENT 'new lifecycle state',
+  `prior_cleanup_status`     VARCHAR(16)   DEFAULT NULL COMMENT 'prior cleanup status',
+  `new_cleanup_status`       VARCHAR(16)   DEFAULT NULL COMMENT 'new cleanup status',
+  `purge_job_id`             VARCHAR(64)   DEFAULT NULL COMMENT 'associated purge job id',
+  `lease_epoch`              BIGINT        DEFAULT NULL COMMENT 'purge worker fencing epoch',
+  `actor`                    VARCHAR(128)  NOT NULL COMMENT 'request actor or worker identity',
+  `request_id`               VARCHAR(128)  DEFAULT NULL COMMENT 'request id',
+  `correlation_id`           VARCHAR(128)  NOT NULL COMMENT 'lifecycle correlation id',
+  `reason_code`              VARCHAR(64)   DEFAULT NULL COMMENT 'bounded machine-readable reason',
+  `reason`                   VARCHAR(2048) DEFAULT NULL COMMENT 'sanitized reason without credentials or secrets',
+  `created_at`               BIGINT        NOT NULL COMMENT 'event timestamp in milliseconds',
+  PRIMARY KEY (`audit_id`),
+  KEY `idx_entity_deletion_audit_action` (`deletion_id`, `created_at`, `audit_id`)
+) COMMENT='append-only deletion lifecycle audit events';
 
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
