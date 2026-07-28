@@ -180,6 +180,13 @@ public class DorisTableOperations extends JdbcTableOperations {
       resultMap = new HashMap<>(properties);
     }
 
+    Preconditions.checkArgument(
+        !resultMap.containsKey(REPLICATION_FACTOR)
+            || !resultMap.containsKey(REPLICATION_ALLOCATION),
+        "Properties '%s' and '%s' cannot be set at the same time",
+        REPLICATION_FACTOR,
+        REPLICATION_ALLOCATION);
+
     // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
     // set the property 'replication_num' to 1 explicitly.
     if (!resultMap.containsKey(REPLICATION_FACTOR)
