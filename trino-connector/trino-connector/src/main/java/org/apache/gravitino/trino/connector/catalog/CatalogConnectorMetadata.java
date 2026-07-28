@@ -53,6 +53,7 @@ import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
@@ -70,6 +71,7 @@ public class CatalogConnectorMetadata {
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema does not exist";
 
   private final String catalogName;
+  private final boolean singleMetalakeMode;
   private final SupportsSchemas schemaCatalog;
   private final TableCatalog tableCatalog;
   @Nullable private final FunctionCatalog functionCatalog;
@@ -85,12 +87,24 @@ public class CatalogConnectorMetadata {
   }
 
   /**
+   * Indicates whether the Gravitino Trino connector is running in single-metalake mode.
+   *
+   * @return true if the connector is running in single-metalake mode
+   */
+  public boolean isSingleMetalakeMode() {
+    return singleMetalakeMode;
+  }
+
+  /**
    * Constructs a new CatalogConnectorMetadata.
    *
    * @param metalake the Gravitino metalake
    * @param catalogIdentifier the name of the catalog
+   * @param config the Gravitino Trino connector configuration
    */
-  public CatalogConnectorMetadata(GravitinoMetalake metalake, NameIdentifier catalogIdentifier) {
+  public CatalogConnectorMetadata(
+      GravitinoMetalake metalake, NameIdentifier catalogIdentifier, GravitinoConfig config) {
+    this.singleMetalakeMode = config.singleMetalakeMode();
     try {
       this.catalogName = catalogIdentifier.name();
       Catalog catalog = metalake.loadCatalog(catalogName);

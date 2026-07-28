@@ -164,13 +164,18 @@ public class CatalogConnectorMetadataAdapter {
    *
    * <p>{@link ConnectorViewDefinition} requires a catalog to be present whenever a schema is
    * present. Some catalogs (e.g. Iceberg) can store a default schema without a default catalog; in
-   * that case the current Trino catalog is used, since the schema is implicitly relative to it.
+   * single-metalake mode the current Trino catalog is used as a fallback, since the schema is
+   * implicitly relative to it. In multi-metalake mode the bare Gravitino catalog name is not the
+   * name Trino actually resolves catalogs by, so this fallback cannot be applied and the view is
+   * rejected instead of being exposed with a wrong or unresolvable catalog.
    *
    * @param view the Gravitino view
    * @param catalogName the name of the Trino catalog this view belongs to
+   * @param singleMetalakeMode whether the connector is running in single-metalake mode
    * @return the Trino ConnectorViewDefinition
    */
-  public ConnectorViewDefinition getViewDefinition(GravitinoView view, String catalogName) {
+  public ConnectorViewDefinition getViewDefinition(
+      GravitinoView view, String catalogName, boolean singleMetalakeMode) {
     Preconditions.checkArgument(
         view.getSql() != null,
         "View %s.%s has no Trino dialect SQL representation",
@@ -186,11 +191,16 @@ public class CatalogConnectorMetadataAdapter {
                         Optional.ofNullable(column.getComment())))
             .collect(Collectors.toList());
 
-    // Known limitation: in multi-metalake mode, catalogName is the bare Gravitino catalog name,
-    // not the metalake-prefixed name Trino actually resolves catalogs by, so this fallback only
-    // produces a resolvable catalog in (the default) single-metalake mode.
     String defaultCatalog = view.getDefaultCatalog();
     if (defaultCatalog == null && view.getDefaultSchema() != null) {
+      if (!singleMetalakeMode) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
+            String.format(
+                "View %s.%s has a default schema without a default catalog, which is not "
+                    + "supported in multi-metalake mode",
+                view.getSchemaName(), view.getName()));
+      }
       defaultCatalog = catalogName;
     }
 

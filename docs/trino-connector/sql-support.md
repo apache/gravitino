@@ -61,6 +61,11 @@ invisible to Trino (it does not appear in `SHOW TABLES`/`information_schema` and
 rather than causing an error. View owner is not supported; views are always shown with `SECURITY
 INVOKER` (Gravitino does not track an owner, so `SECURITY DEFINER` cannot be represented).
 
+Some catalogs (e.g. Iceberg) can store a view with a default schema but no default catalog. In
+single-metalake mode this is resolved against the current Trino catalog. In multi-metalake mode it
+cannot be resolved reliably, so loading such a view fails with an error instead of silently
+resolving to a possibly incorrect catalog.
+
 ### Transactions
 
 - [START TRANSACTION](https://trino.io/docs/current/sql/start-transaction.html)

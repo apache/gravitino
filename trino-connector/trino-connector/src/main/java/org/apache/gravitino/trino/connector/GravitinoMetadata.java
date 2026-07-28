@@ -841,7 +841,10 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
         .getViewIfPresent(viewName.getSchemaName(), viewName.getTableName())
         .map(
             view ->
-                metadataAdapter.getViewDefinition(view, catalogConnectorMetadata.getCatalogName()));
+                metadataAdapter.getViewDefinition(
+                    view,
+                    catalogConnectorMetadata.getCatalogName(),
+                    catalogConnectorMetadata.isSingleMetalakeMode()));
   }
 
   @Override

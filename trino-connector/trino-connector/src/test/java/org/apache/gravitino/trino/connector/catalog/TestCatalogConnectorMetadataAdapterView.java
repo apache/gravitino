@@ -51,7 +51,8 @@ public class TestCatalogConnectorMetadataAdapterView {
         new GravitinoView(
             "s", "v1", List.of(column), null, Map.of(), "select 1", null, "default_schema");
 
-    ConnectorViewDefinition definition = adapter.getViewDefinition(view, "current_catalog");
+    ConnectorViewDefinition definition =
+        adapter.getViewDefinition(view, "current_catalog", /* singleMetalakeMode= */ true);
 
     // Iceberg views may store a default schema without a default catalog; since Trino requires a
     // catalog whenever a schema is present, the current Trino catalog is used.
@@ -60,12 +61,30 @@ public class TestCatalogConnectorMetadataAdapterView {
   }
 
   @Test
+  public void testGetViewDefinitionRejectsSchemaWithoutCatalogInMultiMetalakeMode() {
+    GravitinoColumn column = new GravitinoColumn(Column.of("id", Types.StringType.get()), 0);
+    GravitinoView view =
+        new GravitinoView(
+            "s", "v1", List.of(column), null, Map.of(), "select 1", null, "default_schema");
+
+    TrinoException exception =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                adapter.getViewDefinition(
+                    view, "current_catalog", /* singleMetalakeMode= */ false));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
+  }
+
+  @Test
   public void testGetViewDefinitionKeepsNullSchemaWhenCatalogAbsent() {
     GravitinoColumn column = new GravitinoColumn(Column.of("id", Types.StringType.get()), 0);
     GravitinoView view =
         new GravitinoView("s", "v1", List.of(column), null, Map.of(), "select 1", null, null);
 
-    ConnectorViewDefinition definition = adapter.getViewDefinition(view, "current_catalog");
+    ConnectorViewDefinition definition =
+        adapter.getViewDefinition(view, "current_catalog", /* singleMetalakeMode= */ false);
 
     assertEquals(Optional.empty(), definition.getCatalog());
     assertEquals(Optional.empty(), definition.getSchema());

@@ -81,10 +81,11 @@ public class GravitinoConnector implements Connector {
   public GravitinoConnector(CatalogConnectorContext catalogConnectorContext) {
     this.catalogIdentifier = catalogConnectorContext.getCatalog().geNameIdentifier();
     this.catalogConnectorContext = catalogConnectorContext;
-    this.connectorMetadata =
-        new CatalogConnectorMetadata(catalogConnectorContext.getMetalake(), this.catalogIdentifier);
-
     GravitinoConfig config = catalogConnectorContext.getConfig();
+    this.connectorMetadata =
+        new CatalogConnectorMetadata(
+            catalogConnectorContext.getMetalake(), this.catalogIdentifier, config);
+
     this.forwardUser = config.isForwardUser();
     this.perUserSessionCache = forwardUser ? buildSessionCache(config) : null;
   }
@@ -237,7 +238,9 @@ public class GravitinoConnector implements Connector {
                 GravitinoMetalake userMetalake =
                     userClient.loadMetalake(catalogConnectorContext.getMetalake().name());
                 return new UserSession(
-                    userClient, new CatalogConnectorMetadata(userMetalake, catalogIdentifier));
+                    userClient,
+                    new CatalogConnectorMetadata(
+                        userMetalake, catalogIdentifier, catalogConnectorContext.getConfig()));
               })
           .metadata;
     } catch (ExecutionException e) {

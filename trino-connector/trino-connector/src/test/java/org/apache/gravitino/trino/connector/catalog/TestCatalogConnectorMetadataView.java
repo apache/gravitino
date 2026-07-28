@@ -51,6 +51,7 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoView;
 import org.junit.jupiter.api.Test;
@@ -462,7 +463,8 @@ public class TestCatalogConnectorMetadataView {
     when(catalog.asSchemas()).thenReturn(mock(SupportsSchemas.class));
     when(catalog.asTableCatalog()).thenReturn(mock(TableCatalog.class));
     when(catalog.asViewCatalog()).thenReturn(viewCatalog);
-    return new CatalogConnectorMetadata(metalake, NameIdentifier.of("metalake", "test_catalog"));
+    return new CatalogConnectorMetadata(
+        metalake, NameIdentifier.of("metalake", "test_catalog"), mock(GravitinoConfig.class));
   }
 
   private CatalogConnectorMetadata createMetadataWithoutViewCatalog() {
@@ -473,6 +475,7 @@ public class TestCatalogConnectorMetadataView {
     when(catalog.asSchemas()).thenReturn(mock(SupportsSchemas.class));
     when(catalog.asTableCatalog()).thenReturn(mock(TableCatalog.class));
     when(catalog.asViewCatalog()).thenThrow(new UnsupportedOperationException("Not supported"));
-    return new CatalogConnectorMetadata(metalake, NameIdentifier.of("metalake", "test_catalog"));
+    return new CatalogConnectorMetadata(
+        metalake, NameIdentifier.of("metalake", "test_catalog"), mock(GravitinoConfig.class));
   }
 }
