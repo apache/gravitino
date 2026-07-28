@@ -205,28 +205,31 @@ public class TestScanPlanTaskBatching {
   }
 
   @Test
-  void testResponsesCarryTheDeleteFilesTheirTasksReference() {
+  void testBatchingKeepsDeleteFilesWithTheTasksThatReferenceThem() {
+    // A batch is a slice of the plan, and tasks reference delete files by index into the response
+    // that carries them, so slicing must not leave a task pointing at a delete file that is not in
+    // its own response.
     CatalogWrapperForREST wrapper = newWrapper("merge-on-read", 1);
     TableIdentifier tableId = createTableWithDataFiles(wrapper, "tbl", 2);
-    appendPositionDeleteFile(wrapper, tableId, dataFileLocation("tbl", 0));
+    appendPositionDeleteFile(wrapper, tableId, dataFileLocation("tbl", 1));
 
     PlanTableScanResponse plan = planTableScan(wrapper, tableId);
+    Assertions.assertTrue(
+        plan.deleteFiles().isEmpty(),
+        "The first batch covers the data file without deletes, so it lists no delete files");
+    Assertions.assertDoesNotThrow(() -> PlanTableScanResponseParser.toJson(plan));
+
+    FetchScanTasksResponse batchWithDeletes =
+        wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest(plan.planTasks().get(0)));
 
     Assertions.assertEquals(
         1,
-        plan.deleteFiles().size(),
-        "Tasks reference delete files by index, so the response must list them");
-    // Serialization fails outright when a referenced delete file is missing from the response.
-    String planJson = PlanTableScanResponseParser.toJson(plan);
+        batchWithDeletes.deleteFiles().size(),
+        "The batch holding the deleted-from data file must carry its delete file");
+    String batchJson = FetchScanTasksResponseParser.toJson(batchWithDeletes);
     Assertions.assertTrue(
-        planJson.contains("\"delete-file-references\":[0]"),
-        "The task must point at the delete file listed in the response, but was: " + planJson);
-
-    for (String planTask : plan.planTasks()) {
-      FetchScanTasksResponse response =
-          wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest(planTask));
-      Assertions.assertDoesNotThrow(() -> FetchScanTasksResponseParser.toJson(response));
-    }
+        batchJson.contains("\"delete-file-references\":[0]"),
+        "The task must point at the delete file listed in its own response, but was: " + batchJson);
   }
 
   @Test
