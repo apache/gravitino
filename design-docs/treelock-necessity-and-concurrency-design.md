@@ -129,16 +129,33 @@ This matters for the comparison below:
 - For **external-backed** catalogs, the external system is a single shared authority that all Gravitino nodes talk to. It decides the final state according to its own concurrency semantics. For example, a database normally rejects a duplicate `CREATE TABLE`; Hive Metastore accepts full-table replacement alters without exposing a Gravitino-compatible version/CAS contract, so concurrent alters are not guaranteed to merge and may be last-writer-wins. Gravitino does not promise stronger merge semantics than the external catalog. Because TreeLock is per-node — and ordinary table alter currently takes a TreeLock read lock, so same-table alters can overlap even in one JVM — **cross-node behavior here already depends on the external system today, not on TreeLock.**
 - For **Gravitino-managed** catalogs (fileset, model, and so on) there is **no external judge**. A fileset's "external" side is just a directory on HDFS or S3, which has no uniqueness check and no parent/child rule. For these, correctness can only come from the Gravitino store.
 
+#### A concrete lost write on HMS and Glue, and what can be done
+
+HMS `alter_table(db, table, newTable)` carries only the new object, never the base the caller read, so the server has nothing to compare against. The connector is a plain read-modify-write (`HiveCatalogOperations:692-746`, still carrying `// TODO(@Minghuang): require a table lock to avoid race condition`):
+
+| Step | Server A                                   | Server B                                |
+|------|--------------------------------------------|-----------------------------------------|
+| 1    | loads t1: columns `[a]`, comment `c0`      |                                         |
+| 2    |                                            | loads t1: the same base                 |
+| 3    | writes back columns `[a, b]`, comment `c0` |                                         |
+| 4    |                                            | writes back columns `[a]`, comment `c1` |
+
+Both calls succeed, the table ends with comment `c1`, and **column `b` is gone** although B never touched columns. Same-field conflicts resolving to last-writer-wins would be expected, as in a SQL `UPDATE`; the defect is the collateral loss of a field the winner never edited. Gravitino does not notice either, because the connector returns the locally built object instead of re-reading (`HiveCatalogOperations:750`), so the store row mirrors a state HMS never held — and that row does not self-heal on read.
+
+**Glue has the same defect**, for the same reason: `getTable` → build a full `TableInput` in memory → `UpdateTable` → return the locally built object (`GlueCatalogOperations:500-583`; its Iceberg tables take a separate branch and are unaffected). The other external-backed backends do not have this shape: JDBC translates the changes into an incremental `ALTER TABLE` statement and then re-reads, Iceberg commits an incremental change list under its native OCC, Paimon applies incremental `SchemaChange`s and re-reads. So this is a defect of the two HMS-shaped connectors, not of external-backed catalogs in general.
+
+A lock does not fix this: a fencing token has nothing to validate against on HMS, and it would only serialize callers going through Gravitino while Spark, Trino and the Hive CLI write to the same HMS directly. The affordable fix is detection rather than mutual exclusion: **re-read after `alter_table`, verify the requested changes are present, and on a mismatch re-apply the change list to the fresh base with bounded retries**, then mirror the re-read result. One extra RPC, no new component, converges for disjoint changes, and detects out-of-band writers too; only the two connectors above need it, so a capability flag keeps the rest on the fast path. Hive 4's `AlterTableRequest.expectedParameterKey/Value` is a real single-parameter CAS, but Gravitino builds against Hive `2.3.9`/`3.1.3`, so it stays a future option.
+
 ### What would break without TreeLock 
 
 Putting the above together, here is what happens with no in-process lock and no new database rule. The simple cases first:
 
-| Two operations at the same time                                                                                                                 | Result                                                                                                                                                               | Predictable?                                 |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Two `createTable` with the same name (external-backed)                                                                                          | The external catalog allows only one; the other gets `TableAlreadyExistsException`                                                                                   | Yes                                          |
-| Two `alterTable` on the same table (external-backed)                                                                                            | The external system determines the final state under its own semantics; Gravitino does not guarantee field-level merge. The store mirror must converge to that state | Yes, within the external system's contract   |
-| Any write on an entity whose only source of truth is the Gravitino store (metalake, catalog, fileset, model, tag, policy, user, group, role, …) | Real lost-update / orphan races                                                                                                                                      | Yes, but only closable at the database layer |
-| Crash between the external op and `store.put`                                                                                                   | Leftover object in the external system                                                                                                                               | No lock helps (crash, not concurrency)       |
+| Two operations at the same time                                                                                                                 | Result                                                                                                                                                                                                                                                                                                                                                | Predictable?                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|
+| Two `createTable` with the same name (external-backed)                                                                                          | The external catalog allows only one; the other gets `TableAlreadyExistsException`                                                                                                                                                                                                                                                                    | Yes                                           |
+| Two `alterTable` on the same table (external-backed)                                                                                            | The external system decides who wins, by its own rules. The two changes are **not** merged field by field: on HMS and Glue the winner's copy replaces the whole table, so a field the loser changed can silently disappear (see the subsection above). Gravitino's job is only to make its store row match whatever the external system ended up with | Yes, within the external system's contract    |
+| Any write on an entity whose only source of truth is the Gravitino store (metalake, catalog, fileset, model, tag, policy, user, group, role, …) | Real lost-update races (two writers overwrite each other — closed by the version CAS of Change 4) and orphan races (a child is inserted under a parent being dropped — closed by the shared parent-row transaction of Change 4)                                                                                                                       | Yes, but only closable at the database layer  |
+| Crash between the external op and `store.put`                                                                                                   | Leftover object in the external system                                                                                                                                                                                                                                                                                                                | No lock helps (crash, not concurrency)        |
 
 ### Do conflicting external operations always report a clear winner?
 
@@ -149,7 +166,9 @@ This is a fair thing to check, because the analysis above leans on "the external
 - **drop is silent.** `dropTable` returns `true` if it dropped the table and `false` if the table "does not exist" (API contract: `TableCatalog.dropTable`; Hive catches not-found and returns `false`, `HiveCatalogOperations:983-993`). So a `false` can mean "someone else already dropped or renamed it" just as easily as "there was nothing to drop" — Gravitino cannot tell the two apart from the return value. `dropSchema` is the same, except it throws `NonEmptySchemaException` when the schema still has children and cascade is off.
 - **drop-database vs create-table is order- and cascade-dependent.** If the create lands first and the drop cascades, both operations report success and the net external state is "gone." If the drop lands first, the create fails. If the drop is non-cascade and a child exists, the drop fails. In every ordering the external state is internally consistent, but there is no single "exactly one succeeds" rule.
 
-Why this matters here: it does **not** make the external side inconsistent, and it does **not** cause a wrong store write (drop deletes the store row unconditionally, regardless of the boolean). But Gravitino cannot trust a drop's return value to know the true external state — one more reason the store copy needs an occasional reconcile rather than trusting each call's result. This is a reporting limit of the connector API, not something a lock would fix.
+Why this matters here: it does **not** make the external side inconsistent, and in the common case it does **not** cause a wrong store write (drop deletes the store row unconditionally, regardless of the boolean). But Gravitino cannot trust a drop's return value to know the true external state — one more reason the store copy needs an occasional reconcile rather than trusting each call's result. This is a reporting limit of the connector API, not something a lock would fix.
+
+The winner can still be decided in the store: make drop's store step a conditional delete on `(id, current_version)` — the Change 4 CAS — instead of today's unconditional delete by name (`TableOperationDispatcher:385-386`). "One row deleted" then means this call de-registered the entity, which is what should drive the id-based cleanup and the change-log entry. It is exact for store-only entities, and it also stops a by-name delete from removing the row of a same-named entity that was re-created in the meantime.
 
 ### The harder case: mixed alter / rename / drop
 
@@ -301,113 +320,46 @@ This is the implementation design for Direction 1. Changes 1–5 are blocking co
 
 ### Change 1 — OCC as the base rule, with the retry in the right place
 
-Add a typed exception and report the "0 rows updated" signal that already exists in each update path:
+**Problem.** Concurrent writers can overwrite each other because no update path checks that the row it read is still the row it is writing.
 
-```java
-/** Thrown when an entity UPDATE matches 0 rows because current_version changed at the same time. */
-public class OptimisticLockException extends GravitinoRuntimeException { ... }
-```
+**Approach.** Make every entity UPDATE conditional on the version it read (`WHERE id = ? AND current_version = ? AND deleted_at = 0`), and turn the "0 rows updated" signal that already exists into a typed `OptimisticLockException` that the server maps to HTTP 409.
 
-Put the exception in a shared module both `core` and `server` can use (for example `api/.../exceptions`). In each `*MetaService` write, throw it when the UPDATE changes 0 rows because the row still exists but its version changed. The UPDATE has this shape:
-
-```sql
-UPDATE catalog_meta
-SET    ..., current_version = #{new.currentVersion}
-WHERE  catalog_id = #{old.catalogId}
-  AND  current_version = #{old.currentVersion}
-  AND  deleted_at = 0;
-```
-
-**Where to put conflict handling.** It MUST NOT wrap the external-catalog call. The external operation may already have committed and is not generally safe to repeat. Conflict handling belongs around the **store-only read-change-write step**, but the action taken after a conflict depends on which store is authoritative.
+**The part that needs care is where the retry goes.** It must not wrap the external-catalog call — that call may already have committed and is not generally safe to repeat — and what to do after a conflict depends on which side is authoritative:
 
 ```
-WRONG (simple):  doWithTreeLock { external.alter(); store.update(); }   ← retry repeats external.alter()
+WRONG:            retry { external.alter(); store.update(); }   ← repeats the external call
 MANAGED:          retry { reReadStore(); applyUserDelta(); conditionalUpdate(); }
 EXTERNAL MIRROR:  external.alter(); onStoreConflict { reReadExternalAndSyncOrReconcile(); }
 ```
 
-For a Gravitino-managed entity, re-read the latest store row and re-apply the original user **delta**, not a precomputed whole-row result. Use a limited number of attempts with growing wait time (config: `gravitino.entity.store.occ.maxRetries`, default 3; wait 10 ms → 20 ms → 40 ms). After the attempts run out, surface `OptimisticLockException` as HTTP 409.
-
-For an external-backed entity, the object returned by `catalog.alterTable(...)` is only a snapshot of the external result at that point. Consider this ordering:
-
-1. external alter A completes;
-2. external alter B completes, so the external source of truth is now B;
-3. B updates the Gravitino store first;
-4. A's store CAS fails.
-
-Re-reading the store and replaying the captured A object would overwrite B in the mirror even though the external source of truth is B. On this path, either re-read the external catalog and synchronize its current state, or skip the stale mirror write and enqueue/record reconciliation. Do not blindly retry the captured external result.
-
-The current `OperationDispatcher.operateOnEntity` catches broad `Exception` and returns `null` (`core/src/main/java/org/apache/gravitino/catalog/OperationDispatcher.java:204-216`). The implementation must ensure that the typed OCC conflict is not swallowed on paths where the API promises HTTP 409. Document and test each dispatcher path's policy: retry, reconcile, or surface conflict.
-
-- Retry/conflict handling applies only to WRITE paths; READ is unchanged except that an import write must follow the create and parent rules below.
-- The external operation must execute exactly once, even if the store update conflicts.
-- A store-mirror conflict must never make the mirror older than the external authority.
-
-Some update methods also write version rows, relation rows, or changelog rows. If the main UPDATE changes 0 rows, those side writes must roll back: run the main conditional UPDATE first, and if it changes 0 rows, throw inside the transaction so the whole transaction rolls back.
-
-**Acceptance criteria:**
-
-- a managed delta retries against a freshly read version and either commits once or returns 409;
-- an external alter runs exactly once, and a reversed store-write ordering converges the mirror to the final external value;
-- a failed main CAS leaves no version, property, relation, audit, or changelog side row;
-- `OptimisticLockException` reaches the server exception mapper on every path documented as returning 409.
+For a managed entity, retry means re-reading the current row and re-applying the user's **delta**, never replaying a precomputed whole row. For an external-backed mirror, replaying is actively wrong: if alter A and alter B both committed externally and B updated the mirror first, replaying A's captured result would make the mirror disagree with the external authority. On that path the rule is re-read the external state, or record a reconcile — never retry the captured result. A conflict must also roll back the version/property/relation/changelog side rows written in the same transaction, and must not be swallowed by the broad catch in `OperationDispatcher.operateOnEntity` (`OperationDispatcher.java:204-216`).
 
 ### Change 2 — Make the version always go up
 
-OCC only works if the version goes up after a successful write. What the code does today is mixed. Verified by reading `POConverters`:
+**Problem.** OCC needs the version to increase after every successful write, and today it does not. Reading `POConverters`: `table` increments, `metalake`/`catalog`/`schema`/`topic` **freeze** the version and compare the whole old row field by field instead, and `fileset`/`policy` increment only when a versioned field changed.
 
-- `table` is the only entity that raises the version: `currentVersion = lastVersion + 1` (`updateTablePOWithVersionAndSchemaId`).
-- `metalake`, `catalog`, `schema`, and `topic` all **freeze** the version (`nextVersion = lastVersion` in `updateMetalakePOWithVersion` / `updateCatalogPOWithVersion` / `updateSchemaPOWithVersion` / `updateTopicPOWithVersion`) and instead compare the whole old row field by field. That is weaker (it can miss a change that is later changed back) and fragile (it depends on `properties`/`audit_info` JSON serializing to the exact same bytes).
-- `fileset` and `policy` raise the version only when a versioned field actually changed (`updateFilesetPOWithVersion` / the policy converter increment `lastVersion++` conditionally).
+The full-row compare is both weaker (it misses a value that is changed and changed back) and fragile (it depends on `properties`/`audit_info` JSON serializing to identical bytes). And no entity does clean version-only OCC today: even `table` still carries a full-row `WHERE`, so the frozen-version entities rely entirely on that fragile compare. This is a pre-existing gap that shrinking TreeLock would expose, which is why this change is wider than it first looks.
 
-A sharper point: **no entity does a clean "`WHERE current_version = N`" OCC today.** Even `table`, whose version does increase, still carries a full-row match in its `WHERE` clause (`table_name`, `metalake_id`, `catalog_id`, `schema_id`, `audit_info`, `current_version`, `last_version` — `TableMetaBaseSQLProvider.updateTableMeta`), and `metalake` compares `metalake_comment`, `properties`, `audit_info`, `schema_version`, and both versions (`MetalakeMetaBaseSQLProvider.updateMetalakeMeta`). So OCC-on-version-alone is not the current behaviour anywhere; the frozen-version entities in effect rely entirely on the fragile full-row compare. This is a pre-existing correctness gap that shrinking TreeLock would expose, which is why Change 2 is wider than it first appears.
-
-The remaining update paths (`user`, `group`, `role`, `tag`, `view`, `function`, `model`) have **not** been checked line by line yet; some use version tables or a different version layout. Each must be audited before we rely on OCC for it.
-
-Fix: for every entity that uses OCC, make a successful write raise the version, and reduce the UPDATE condition to `id = ? AND current_version = ? AND deleted_at = 0`. Add a test for the change-then-change-back case.
+**Approach.** For every entity covered by OCC, raise the version on success and reduce the UPDATE predicate to `id + current_version + deleted_at`. The paths not yet read line by line (`user`, `group`, `role`, `tag`, `view`, `function`, `model`) must be audited before OCC is relied on for them, since some use version tables or a different layout.
 
 ### Change 3 — Split strict user create from import/reconcile upsert
 
-The database unique key cannot elect one create winner if the code turns the conflict into an update. This is the current managed-schema flow:
+**Problem.** A unique key cannot elect a create winner if the code converts the conflict into an update. Managed create today is `exists()` then `put(..., overwrite = true)` over `ON DUPLICATE KEY UPDATE`, so two servers can both see "not found", generate different ids, and both report success — with the second overwriting the row the first created (`ManagedSchemaOperations.java:92-119`, `SchemaMetaBaseSQLProvider.java:237`; managed fileset has the same shape).
 
-1. `ManagedSchemaOperations.createSchema` checks `store.exists(...)`;
-2. two servers can both observe "not found" and generate different entity ids;
-3. both call `store.put(schemaEntity, true)`;
-4. `SchemaMetaBaseSQLProvider` uses `ON DUPLICATE KEY UPDATE`, so both requests can report success and the second request can overwrite fields on the row created by the first id.
+**Approach.** Replace the single ambiguous `overwrite` boolean with explicit write intents, so the storage layer knows which semantics the caller wants:
 
-The relevant starting points are:
+| Intent                          | Required behavior                                                          |
+| ------------------------------- | -------------------------------------------------------------------------- |
+| User create of the requested leaf | strict non-overwriting insert; duplicate maps to `AlreadyExistsException` |
+| Auto-creating a missing ancestor | insert-if-absent, but must return/re-read the canonical winning id        |
+| Import or read repair            | upsert, only after the external identity and stale-row rules are applied  |
+| Reconcile                        | explicit overwrite, observable, never reachable from a normal create API   |
 
-- `core/src/main/java/org/apache/gravitino/catalog/ManagedSchemaOperations.java:92-119`
-- `core/src/main/java/org/apache/gravitino/storage/relational/service/SchemaMetaService.java:195-203`
-- `core/src/main/java/org/apache/gravitino/storage/relational/mapper/provider/base/SchemaMetaBaseSQLProvider.java:237`
-
-Managed fileset creation has the same `exists` then `put(..., true)` shape:
-
-- `catalogs/catalog-fileset/src/main/java/org/apache/gravitino/catalog/fileset/FilesetCatalogOperations.java:416,566`
-- `core/src/main/java/org/apache/gravitino/storage/relational/service/FilesetMetaService.java:157-189`
-- `core/src/main/java/org/apache/gravitino/storage/relational/mapper/provider/base/FilesetMetaBaseSQLProvider.java:246`
-
-Implement explicit write intents instead of one ambiguous `overwrite` boolean:
-
-| Intent                                    | Required behavior                                                                           |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------- |
-| User create of the requested leaf         | strict non-overwriting insert; duplicate live name/id maps to `AlreadyExistsException`      |
-| Automatically creating a missing ancestor | idempotent insert-if-absent is allowed, but it must return/re-read the canonical winning id |
-| Import or read repair                     | idempotent upsert is allowed only after external identity and stale-row rules are applied   |
-| Reconcile                                 | explicit overwrite/upsert, observable in metrics/logs, never used by a normal create API    |
-
-Do not rely on the preliminary `exists` check for correctness. It may remain as an optimization, but the insert result/unique constraint decides the winner. Ensure property/version/audit rows use the canonical winning entity id and run in the same transaction as the entity insert.
-
-**Acceptance criteria:**
-
-- in a two-server managed-schema and managed-fileset create race, exactly one leaf create succeeds and the other receives `AlreadyExistsException`;
-- there is one live entity row and no property/version/audit row for the losing generated id;
-- two concurrent ancestor auto-creates converge on one canonical ancestor id;
-- import/reconcile remains idempotent and cannot silently change normal create semantics.
+The preliminary `exists` check may stay as an optimization, but the insert result decides the winner, and side rows must use the canonical winning id in the same transaction.
 
 ### Change 4 — Protect parent/child and endpoint invariants in one database protocol
 
-A plain live-parent conditional insert is not enough. Gravitino opens relational sessions at `READ_COMMITTED` (`SqlSessions.java:59-67`), and the metadata schema uses soft-delete without parent/child foreign keys. In `SchemaMetaService.deleteSchema`, the non-cascade child checks occur before the later delete transaction (`SchemaMetaService.java:367-419`). This ordering permits:
+**Problem.** Nothing stops a child from being inserted under a parent that is being dropped. Sessions run at `READ_COMMITTED` (`SqlSessions.java:59-67`), the schema uses soft-delete without parent/child foreign keys, and the non-cascade child check happens before the delete transaction (`SchemaMetaService.java:367-419`):
 
 ```text
 Tdrop:   check "no child" --------------------------- soft-delete parent
@@ -415,101 +367,35 @@ Tcreate:                  observe live parent; insert child
 result:  deleted parent + live child
 ```
 
-Even an atomic `INSERT ... SELECT ... WHERE parent.deleted_at = 0` only proves that the parent was live at the insert statement's snapshot. It does not make the later parent deletion re-check the new child.
+A conditional `INSERT ... SELECT ... WHERE parent.deleted_at = 0` does not fix this: it proves the parent was live at the insert's snapshot, but does not make the later parent delete re-check the new child.
 
-Create a shared transaction protocol in which every operation that can add/remove a dependent row locks the same live parent or endpoint row:
+**Approach.** Every operation that adds or removes a dependent row must lock the same live parent (or relation endpoint) row inside its own transaction:
 
 ```text
-create child transaction:
-  SELECT parent_id FROM parent_meta
-    WHERE parent_id = ? AND deleted_at = 0
-    FOR UPDATE;
-  if no row: throw NoSuchParent;
-  strict-insert child and its side rows;
-  commit;
-
-drop parent transaction:
-  SELECT parent_id FROM parent_meta
-    WHERE parent_id = ? AND deleted_at = 0
-    FOR UPDATE;
-  if non-cascade: check every child table after taking the parent lock;
-  if cascade: soft-delete every child/relation required by the contract;
-  soft-delete parent;
-  commit;
+create child:  SELECT ... FROM parent_meta WHERE parent_id = ? AND deleted_at = 0 FOR UPDATE;
+               if no row -> NoSuchParent; strict-insert child; commit;
+drop parent:   same SELECT ... FOR UPDATE; check or cascade children; soft-delete parent; commit;
 ```
 
-`FOR UPDATE` is illustrative; each database dialect may use the narrowest lock mode that creates the same conflict. Transactional database row locks are released automatically on commit, rollback, or connection loss; they do not need a distributed-lock lease. Configure/handle lock timeouts and deadlocks, and use one global lock order (`metalake → catalog → schema → entity/endpoint`) when an operation touches more than one row.
+The lock mode is illustrative — each dialect may use the narrowest mode with the same conflict. These are ordinary transactional row locks, released on commit, rollback or connection loss, so they need no lease; they do need one global lock order (`metalake → catalog → schema → entity`) and defined deadlock/timeout behavior. The protocol applies to parent/child creation and drop, rename targets, and relation endpoints (owner, tag, policy, statistic, role).
 
-Apply this protocol to:
-
-| Invariant           | Operations that must participate                                                                    |
-| ------------------- | --------------------------------------------------------------------------------------------------- |
-| metalake → children | create/import catalog, tag, policy, user, group, role, job template, and metalake drop              |
-| catalog → schema    | create/import/rename schema and catalog drop                                                        |
-| schema → entities   | create/import/rename table, fileset, topic, model, view, function and schema drop                   |
-| rename target       | rename must lock/check the target parent; source and target parents follow the global id/order rule |
-| relation endpoint   | associate owner/tag/policy/statistic/role relation and delete of either referenced endpoint         |
-
-For external-backed entities, do not hold the parent/endpoint row lock while calling Hive, Iceberg, JDBC, or another external catalog. The external call remains first. The subsequent short store transaction revalidates the parent/endpoint; if it no longer exists, the mirror write is skipped/reconciled according to Change 1. The implementation must explicitly document the externally committed but locally rejected outcome because no database protocol can roll back the external operation.
-
-`RelationalEntityStore.executeInTransaction` currently throws `UnsupportedOperationException` (`RelationalEntityStore.java:263-264`). Keep each invariant inside one `*MetaService` transaction, or first add a supported transaction boundary; do not simulate atomicity with several independent `SessionUtils` calls.
-
-**Acceptance criteria:**
-
-- `create child` versus cascade and non-cascade `drop parent` never leaves a live orphan;
-- non-cascade drop either sees the concurrent child and fails, or commits before create so create fails;
-- rename versus target-parent drop never moves an entity under a deleted parent;
-- association versus endpoint deletion never leaves a live dangling relation;
-- the same tests pass on every supported relational backend, with bounded deadlock/lock-timeout behavior.
+Two constraints on the implementation: never hold such a lock across an external-catalog call — the external call stays first, and the short store transaction afterwards revalidates the parent, skipping or reconciling the mirror write per Change 1, which means the "externally committed but locally rejected" outcome must be documented since no database protocol can undo the external side. And `RelationalEntityStore.executeInTransaction` currently throws `UnsupportedOperationException` (`RelationalEntityStore.java:263-264`), so each invariant must live inside one `*MetaService` transaction, or a real transaction boundary must be added first — not simulated with several `SessionUtils` calls.
 
 ### Change 5 — Audit every TreeLock call site by invariant
 
-The initial audit found roughly 154 `doWithTreeLock` calls across entity dispatchers, access control, owner, tag, policy, statistics, and jobs. Auditing only entity-row OCC is not enough. Before changing lock semantics, create an inventory with one row per call site:
+**Problem.** Roughly 154 `doWithTreeLock` calls exist across entity dispatchers, access control, owner, tag, policy, statistics and jobs. Replacing only entity-row OCC would silently drop whatever the other call sites were protecting.
 
-| Required inventory field               | Question to answer                                                                                 |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Operation and current lock target/mode | What does the call lock today: entity, parent namespace, owner, or another key?                    |
-| Rows read and written                  | Is it a same-row update, uniqueness rule, parent/child rule, relation, or state transition?        |
-| Source of truth                        | External catalog or Gravitino store?                                                               |
-| Existing database invariant            | Version CAS, unique key, foreign key, row lock, or none?                                           |
-| Replacement                            | OCC, strict insert, parent/endpoint protocol, idempotent reconcile, or explicitly no guard needed? |
-| Two-node test                          | Which barrier-controlled interleaving proves the replacement?                                      |
+**Approach.** Before changing lock semantics, build a checked-in inventory with one row per call site: what it locks today, which rows it reads and writes, which store is authoritative, which database invariant already exists, what replaces the lock (OCC, strict insert, parent/endpoint protocol, reconcile, or nothing), and which two-node test proves it. A call site marked "no replacement needed" needs a written reason.
 
-Known cases that must not be left implicit:
-
-- `TagManager.associateTagsForMetadataObject` locks the object and tag namespace, while `TagMetaService` resolves endpoint ids before inserting relations (`TagManager.java:311-358`, `TagMetaService.java:294-355`). A flat local lock with unchanged call sites no longer conflicts with parent deletion; Change 4's endpoint protocol must replace that protection.
-- `OwnerManager` and `OwnerMetaService` must enforce exactly one live owner per metadata object (`OwnerManager.java:68-110`, `OwnerMetaService.java:148-174`). The current owner unique key includes `owner_id`, so two different owners can both be live unless the service serializes/constraints the metadata-object key.
-- Job/status and statistics operations need an explicit state-transition or endpoint-liveness rule instead of being assumed safe because they use TreeLock today.
-
-The output of this change is both code fixes and a checked-in invariant matrix. Any call site marked "no replacement needed" requires a written reason and a two-node test when the operation writes Gravitino-owned data.
-
-**Acceptance criteria:**
-
-- every production `doWithTreeLock` call is present in the matrix;
-- owner/tag/policy/role/statistic/job invariants have database-enforced replacements and deterministic race tests;
-- no correctness argument depends on the proposed flat local lock;
-- reviewers can map every removed ancestor-lock conflict to a database invariant or a documented external-authority behavior.
+Three cases must not be left implicit: tag association resolves endpoint ids outside the lock's protection (`TagManager.java:311-358`), so Change 4's endpoint protocol has to take over; the owner unique key includes `owner_id`, so two live owners are possible for one object unless the service constrains the metadata-object key (`OwnerMetaService.java:148-174`); and job/statistics operations need an explicit state-transition or endpoint-liveness rule rather than being assumed safe because they use TreeLock today.
 
 ### Change 6 — Shrink TreeLock to a small in-process helper
 
-**Condition: Changes 1–5 are merged, their invariant matrix is complete, and all validation gates pass first.**
+**Condition: Changes 1–5 are merged, the invariant matrix is complete, and all validation gates pass first.**
 
-Replace the `LockManager` / `TreeLockNode` tree (with its reference counting, background node-cleanup thread, and in-JVM deadlock checker) with a small local helper keyed by the full `NameIdentifier`:
+Once correctness lives in the database, the `LockManager` / `TreeLockNode` tree — reference counting, background node cleanup, in-JVM deadlock checker — is no longer part of the argument. Replace it with a small map from `NameIdentifier` to `ReadWriteLock`, keeping the `doWithTreeLock` signature so call sites are untouched, and drop the chain of ancestor read locks only after Change 4 replaces those invariants.
 
-```java
-// Small local helper, no tree, no cleanup thread, no deadlock checker.
-// The real code must also clean unused entries safely.
-private final ConcurrentMap<NameIdentifier, ReadWriteLock> locks = new ConcurrentHashMap<>();
-ReadWriteLock lockFor(NameIdentifier ident) {
-  return locks.computeIfAbsent(ident, ignored -> new ReentrantReadWriteLock());
-}
-```
-
-- Keeps only a performance benefit: reducing repeated external calls and database retries under bursts of DDL. It is not part of the correctness proof.
-- Drops the chain of parent read locks only after Change 4 replaces every parent/endpoint invariant in the database.
-- `doWithTreeLock(ident, type, exec)` keeps the same signature; only the code behind it changes, so call sites are untouched.
-- Do **not** use a simple fixed-size striped lock unless the nested-lock case is solved: the current code calls `doWithTreeLock` inside `doWithTreeLock`, and with stripes a parent id and child id can map to the same lock, so a read lock followed by a write lock can deadlock.
-- Do not claim that the helper runs every same-entity operation one at a time while call sites still request read locks: two readers, including ordinary table alters today, can overlap. Either describe it only as a contention-reduction helper or change and test the intended modes.
+What remains is a performance helper: it reduces repeated external calls and database retries under bursts of DDL, and nothing more. Two traps to avoid: a fixed-size striped lock is unsafe here unless the nested-lock case is solved, because `doWithTreeLock` is called inside `doWithTreeLock` and a parent and child can hash to the same stripe (read lock then write lock deadlocks); and the helper must not be described as serializing same-entity operations while call sites still take read locks — ordinary table alters overlap today.
 
 ### What removing TreeLock requires (summary)
 
