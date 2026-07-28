@@ -425,10 +425,27 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       NameIdentifier nameIdentifier,
       AuthorizationRequestContext requestContext) {
     String metalake = nameIdentifier.namespace().level(0);
-    String currentUserName = PrincipalUtils.getCurrentUserName();
     if (Entity.EntityType.USER == type) {
+      String currentUserName = PrincipalUtils.getCurrentUserName();
       return Objects.equals(nameIdentifier.name(), currentUserName);
+    } else if (Entity.EntityType.GROUP == type) {
+      Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+      if (!(currentPrincipal instanceof UserPrincipal)) {
+        return false;
+      }
+
+      List<UserGroup> groups = ((UserPrincipal) currentPrincipal).getGroups();
+      if (groups.isEmpty()) {
+        return false;
+      }
+
+      boolean principalHasGroup =
+          groups.stream()
+              .map(UserGroup::getGroupName)
+              .anyMatch(groupName -> Objects.equals(groupName, nameIdentifier.name()));
+      return principalHasGroup;
     } else if (Entity.EntityType.ROLE == type) {
+      String currentUserName = PrincipalUtils.getCurrentUserName();
       try {
         Optional<Long> roleId =
             MetadataIdConverter.getID(

@@ -38,6 +38,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -62,12 +63,14 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestGroupOperations extends BaseOperationsTest {
@@ -381,6 +384,43 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testListGroupNamesFiltersByAuthorizationExpression() throws Exception {
+    Mockito.reset(manager, entityStore);
+    Mockito.doReturn(new String[] {"group", "filtered"}).when(manager).listGroupNames(any());
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
+    try (MockedStatic<MetadataAuthzHelper> metadataAuthzHelper =
+        Mockito.mockStatic(MetadataAuthzHelper.class)) {
+      metadataAuthzHelper
+          .when(
+              () ->
+                  MetadataAuthzHelper.filterByExpression(
+                      Mockito.eq("metalake1"),
+                      Mockito.eq("METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF"),
+                      Mockito.eq(EntityType.GROUP),
+                      Mockito.any(String[].class),
+                      Mockito.any()))
+          .thenReturn(new String[] {"group"});
+
+      GroupOperations groupOperations = new GroupOperations();
+      HttpServletRequest request = mock(HttpServletRequest.class);
+      FieldUtils.writeField(groupOperations, "httpRequest", request, true);
+
+      Response resp = groupOperations.listGroups("metalake1", false);
+
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+      NameListResponse listResponse = (NameListResponse) resp.getEntity();
+      Assertions.assertArrayEquals(new String[] {"group"}, listResponse.getNames());
+    }
+  }
+
+  @Test
   public void testListGroups() throws IOException {
     Group group = buildGroup("group");
     when(manager.listGroups(any())).thenReturn(new Group[] {group});
@@ -443,6 +483,46 @@ public class TestGroupOperations extends BaseOperationsTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testListGroupsFiltersByAuthorizationExpression() throws Exception {
+    Mockito.reset(manager, entityStore);
+    Group group = buildGroup("group");
+    Group filteredGroup = buildGroup("filtered");
+    Mockito.doReturn(new Group[] {group, filteredGroup}).when(manager).listGroups(any());
+
+    // Mock metalake with in-use property
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
+    try (MockedStatic<MetadataAuthzHelper> metadataAuthzHelper =
+        Mockito.mockStatic(MetadataAuthzHelper.class)) {
+      metadataAuthzHelper
+          .when(
+              () ->
+                  MetadataAuthzHelper.filterByExpression(
+                      Mockito.eq("metalake1"),
+                      Mockito.eq("METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF"),
+                      Mockito.eq(EntityType.GROUP),
+                      Mockito.any(Group[].class),
+                      Mockito.any()))
+          .thenReturn(new Group[] {group});
+
+      GroupOperations groupOperations = new GroupOperations();
+      HttpServletRequest request = mock(HttpServletRequest.class);
+      FieldUtils.writeField(groupOperations, "httpRequest", request, true);
+
+      Response resp = groupOperations.listGroups("metalake1", true);
+
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+      GroupListResponse listResponse = (GroupListResponse) resp.getEntity();
+      Assertions.assertEquals(1, listResponse.getGroups().length);
+      Assertions.assertEquals(group.name(), listResponse.getGroups()[0].name());
+    }
   }
 
   @Test
