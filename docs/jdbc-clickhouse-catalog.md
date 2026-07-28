@@ -195,11 +195,30 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | `String`/`VarChar`  | `String`                               |
 | `FixedChar(n)`      | `FixedString(n)`                       |
 | `Date`              | `Date`                                 |
-| `Timestamp[(p)]`    | `DateTime` (precision defaults to `0`) |
+| `Timestamp[(p)]`    | `DateTime` for p=0; `DateTime64(p)` for p in [1, 9] |
+| `Timestamp_tz[(p)]` | `DateTime('UTC')` for p=0; `DateTime64(p, 'UTC')` for p in [1, 9] |
 | `BOOLEAN`           | `Bool`                                 |
 | `UUID`              | `UUID`                                 |
 
 Other ClickHouse types are exposed as [External Type](./manage-relational-metadata-using-gravitino.md#external-type).
+
+ClickHouse stores explicit time zones in column metadata. The catalog uses `UTC` for Gravitino
+`Timestamp_tz` so the type can be recovered exactly on load. Native ClickHouse timestamp columns
+with a different explicit time zone remain `ExternalType`, preserving the detailed zone metadata.
+Timestamp precision from 10 through 12 is rejected before executing DDL because ClickHouse
+`DateTime64` supports at most nanoseconds.
+
+Gravitino `Variant` is rejected before executing DDL. ClickHouse `Variant(T1, T2, ...)` requires a
+closed list of alternative types and cannot preserve Gravitino's open-ended Variant contract.
+
+Gravitino `Null` is rejected before executing DDL because ClickHouse has no column type for a
+null-only placeholder whose concrete type is not yet known.
+
+Gravitino `Geometry` is rejected before executing DDL. The Geo types in the supported ClickHouse
+24.8 line are shape-specific and do not preserve Gravitino's CRS metadata.
+
+Gravitino `Geography` is rejected before executing DDL because ClickHouse Geo types do not preserve
+its CRS and edge-algorithm metadata.
 
 ### Table Properties
 
