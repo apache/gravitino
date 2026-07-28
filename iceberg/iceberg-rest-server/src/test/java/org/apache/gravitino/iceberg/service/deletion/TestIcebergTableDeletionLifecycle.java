@@ -36,11 +36,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
@@ -75,6 +82,7 @@ public class TestIcebergTableDeletionLifecycle extends TestJDBCBackend {
   private IcebergRequestContext requestContext;
   private TableIdentifier icebergIdentifier;
   private NameIdentifier gravitinoIdentifier;
+  private TableEntity table;
 
   @BeforeEach
   public void setUpLifecycle() throws IOException {
@@ -82,8 +90,7 @@ public class TestIcebergTableDeletionLifecycle extends TestJDBCBackend {
     createParentEntities(METALAKE, CATALOG, SCHEMA, AUDIT_INFO);
     Namespace namespace = NamespaceUtil.ofTable(METALAKE, CATALOG, SCHEMA);
     gravitinoIdentifier = NameIdentifier.of(namespace, TABLE);
-    TableEntity table =
-        createTableEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, TABLE, AUDIT_INFO);
+    table = createTableEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, TABLE, AUDIT_INFO);
     backend.insert(table, false);
 
     requestContext = mock(IcebergRequestContext.class);
@@ -141,6 +148,55 @@ public class TestIcebergTableDeletionLifecycle extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testConcurrentDeleteCreatesOneDeletionGeneration() throws Exception {
+    IcebergTableDeletionLifecycle lifecycle = lifecycle(true, 86_400_000L);
+    long beforeChange = maxChangeId();
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> first =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                await(start);
+                lifecycle.delete(requestContext, icebergIdentifier, false);
+              });
+      Future<?> second =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                await(start);
+                lifecycle.delete(requestContext, icebergIdentifier, false);
+              });
+
+      assertTrue(ready.await(10, TimeUnit.SECONDS));
+      start.countDown();
+      first.get(10, TimeUnit.SECONDS);
+      second.get(10, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+
+    assertNotNull(onlyRetained());
+    assertEquals(1L, selectLong("SELECT COUNT(*) FROM entity_deletion"));
+    assertChange(beforeChange, OperateType.DROP);
+  }
+
+  @TestTemplate
+  public void testDeleteInvalidatesAWarmedLocalTableCache() {
+    CaffeineEntityCache cache = new CaffeineEntityCache(new Config(false) {});
+    cache.put(table);
+    assertTrue(cache.getIfPresent(gravitinoIdentifier, Entity.EntityType.TABLE).isPresent());
+    IcebergTableDeletionLifecycle lifecycle =
+        lifecycle(true, 86_400_000L, true, new IcebergTableCacheInvalidator(cache::invalidate));
+
+    lifecycle.delete(requestContext, icebergIdentifier, false);
+
+    assertTrue(cache.getIfPresent(gravitinoIdentifier, Entity.EntityType.TABLE).isEmpty());
+  }
+
+  @TestTemplate
   public void testDeleteMissingTableIsNotFound() {
     IcebergTableDeletionLifecycle lifecycle = lifecycle(true, 86_400_000L);
     TableIdentifier missing =
@@ -178,10 +234,28 @@ public class TestIcebergTableDeletionLifecycle extends TestJDBCBackend {
 
   private IcebergTableDeletionLifecycle lifecycle(
       boolean enabled, long retentionMs, boolean available) {
+    return lifecycle(enabled, retentionMs, available, new IcebergTableCacheInvalidator());
+  }
+
+  private IcebergTableDeletionLifecycle lifecycle(
+      boolean enabled,
+      long retentionMs,
+      boolean available,
+      IcebergTableCacheInvalidator cacheInvalidator) {
     Map<String, String> properties = new HashMap<>();
     properties.put("soft-delete.enabled", String.valueOf(enabled));
     properties.put("soft-delete.retention-ms", String.valueOf(retentionMs));
-    return new IcebergTableDeletionLifecycle(new IcebergConfig(properties), available);
+    return new IcebergTableDeletionLifecycle(
+        new IcebergConfig(properties), available, cacheInvalidator);
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      latch.await();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Interrupted while coordinating concurrent deletes", e);
+    }
   }
 
   private IcebergRetainedTableDeletion onlyRetained() throws SQLException {

@@ -52,6 +52,7 @@ public class IcebergTableDeletionLifecycle {
   private final boolean available;
   private final boolean softDeleteEnabled;
   private final long retentionMs;
+  private final IcebergTableCacheInvalidator cacheInvalidator;
 
   /**
    * Creates an available lifecycle coordinator.
@@ -69,10 +70,17 @@ public class IcebergTableDeletionLifecycle {
    * @param available whether the shared relational metadata store is available
    */
   public IcebergTableDeletionLifecycle(IcebergConfig config, boolean available) {
+    this(config, available, new IcebergTableCacheInvalidator());
+  }
+
+  IcebergTableDeletionLifecycle(
+      IcebergConfig config, boolean available, IcebergTableCacheInvalidator cacheInvalidator) {
     Objects.requireNonNull(config, "config must not be null");
     this.available = available;
     this.softDeleteEnabled = config.get(IcebergConfig.SOFT_DELETE_ENABLED);
     this.retentionMs = config.get(IcebergConfig.SOFT_DELETE_RETENTION_MS);
+    this.cacheInvalidator =
+        Objects.requireNonNull(cacheInvalidator, "cacheInvalidator must not be null");
   }
 
   /**
@@ -125,6 +133,7 @@ public class IcebergTableDeletionLifecycle {
         throw e;
       }
     }
+    cacheInvalidator.invalidate(gravitinoIdentifier);
   }
 
   /** Returns whether an exact schema ID and table name is occupied by a retained root. */
