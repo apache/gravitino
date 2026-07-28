@@ -18,8 +18,15 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import java.security.Principal;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.storage.relational.mapper.TableDeletionMapper;
 import org.apache.gravitino.storage.relational.po.EntityDeletionPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
@@ -42,12 +49,31 @@ public class TableDeletionService {
   private TableDeletionService() {}
 
   /**
-   * Creates a deletion action and points the exact live table root to it atomically.
+   * Loads the exact live table root used to identify the DELETE target.
+   *
+   * @param identifier live table identifier
+   * @return current live table root
+   */
+  public TablePO getLiveTable(NameIdentifier identifier) {
+    Objects.requireNonNull(identifier, "identifier must not be null");
+    long tableId = EntityIdService.getEntityId(identifier, Entity.EntityType.TABLE);
+    TablePO table =
+        SessionUtils.doWithCommitAndFetchResult(
+            TableDeletionMapper.class, mapper -> mapper.selectLiveTable(tableId));
+    if (table == null) {
+      throw generationChanged("unknown", "live table root is absent");
+    }
+    return table;
+  }
+
+  /**
+   * Locks the identified live table root, creates a deletion action, and points the root to it
+   * atomically.
    *
    * <p>Related table metadata remains attached to the immutable table ID. It is not independently
    * tombstoned and therefore needs no separate restore path.
    *
-   * @param table expected live table root
+   * @param table expected live table identity
    * @param deletedAt authoritative deletion time
    * @param deletion active deletion action
    */
@@ -64,24 +90,31 @@ public class TableDeletionService {
     }
 
     SessionUtils.doMultipleWithCommit(
-        () -> EntityDeletionService.getInstance().insertWithoutCommit(deletion),
-        () ->
-            SessionUtils.doWithoutCommit(
-                TableDeletionMapper.class,
-                mapper -> {
-                  int updated =
-                      mapper.tombstoneTable(
-                          table.getTableId(),
-                          table.getSchemaId(),
-                          table.getTableName(),
-                          table.getCurrentVersion(),
-                          deletedAt,
-                          deletion.getDeletionId());
-                  if (updated != 1) {
-                    throw generationChanged(
-                        deletion.getDeletionId(), "table root changed before delete");
-                  }
-                }));
+        () -> {
+          SessionUtils.doWithoutCommit(
+              TableDeletionMapper.class,
+              mapper -> {
+                TablePO locked = mapper.selectLiveTableForUpdate(table.getTableId());
+                if (locked == null
+                    || !Objects.equals(locked.getSchemaId(), table.getSchemaId())
+                    || !Objects.equals(locked.getTableName(), table.getTableName())) {
+                  throw generationChanged(
+                      deletion.getDeletionId(), "locked table root does not match the target");
+                }
+                EntityDeletionService.getInstance().insertWithoutCommit(deletion);
+                if (mapper.tombstoneTable(
+                        locked.getTableId(),
+                        locked.getSchemaId(),
+                        locked.getTableName(),
+                        locked.getCurrentVersion(),
+                        deletedAt,
+                        deletion.getDeletionId())
+                    != 1) {
+                  throw generationChanged(
+                      deletion.getDeletionId(), "table root changed before delete");
+                }
+              });
+        });
   }
 
   /**
@@ -95,6 +128,59 @@ public class TableDeletionService {
     Objects.requireNonNull(deletionId, "deletionId must not be null");
     return SessionUtils.doWithCommitAndFetchResult(
         TableDeletionMapper.class, mapper -> mapper.selectRetainedTable(deletionId));
+  }
+
+  /** Returns all retained table roots under one exact schema identity. */
+  public List<TablePO> listRetainedTables(long schemaId) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        TableDeletionMapper.class, mapper -> mapper.selectRetainedTables(schemaId));
+  }
+
+  /**
+   * Returns the retained table root for one exact schema identity and table name.
+   *
+   * @return retained table root, or {@code null} when the name is unreserved
+   */
+  @Nullable
+  public TablePO getRetainedTable(long schemaId, String tableName) {
+    Objects.requireNonNull(tableName, "tableName must not be null");
+    List<TablePO> tables =
+        SessionUtils.doWithCommitAndFetchResult(
+            TableDeletionMapper.class,
+            mapper -> mapper.selectRetainedTablesByName(schemaId, tableName));
+    if (tables.size() > 1) {
+      throw new IllegalStateException(
+          "Multiple active deletions reserve table name " + tableName + " in schema " + schemaId);
+    }
+    return tables.isEmpty() ? null : tables.get(0);
+  }
+
+  /** Returns all table names reserved by retained roots under one schema identity. */
+  public Set<String> getReservedTableNames(long schemaId) {
+    Set<String> names = new HashSet<>();
+    listRetainedTables(schemaId).forEach(table -> names.add(table.getTableName()));
+    return names;
+  }
+
+  /** Returns whether the current principal owns an unchanged retained table identity. */
+  public boolean isRetainedOwner(long tableId, Principal principal) {
+    Objects.requireNonNull(principal, "principal must not be null");
+    return SessionUtils.doWithCommitAndFetchResult(
+        TableDeletionMapper.class,
+        mapper -> {
+          String userOwner = mapper.selectRetainedUserOwnerName(tableId);
+          if (Objects.equals(userOwner, principal.getName())) {
+            return true;
+          }
+          if (!(principal instanceof UserPrincipal)) {
+            return false;
+          }
+          String groupOwner = mapper.selectRetainedGroupOwnerName(tableId);
+          return groupOwner != null
+              && ((UserPrincipal) principal)
+                  .getGroups().stream()
+                      .anyMatch(group -> Objects.equals(groupOwner, group.getGroupName()));
+        });
   }
 
   /**

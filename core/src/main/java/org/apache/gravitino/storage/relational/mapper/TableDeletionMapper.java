@@ -18,14 +18,31 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
-/** Optimistic, generation-scoped mutations of a retained table root. */
+/** Row-locked, generation-scoped mutations of a retained table root. */
 public interface TableDeletionMapper {
+
+  /**
+   * Returns and locks one exact live table root.
+   *
+   * @param tableId immutable table identifier
+   * @return live table root, or {@code null} when absent
+   */
+  @Nullable
+  @Select({
+    "SELECT table_id AS tableId, table_name AS tableName, metalake_id AS metalakeId,",
+    "catalog_id AS catalogId, schema_id AS schemaId, audit_info AS auditInfo,",
+    "current_version AS currentVersion, last_version AS lastVersion,",
+    "deleted_at AS deletedAt, deletion_id AS deletionId FROM table_meta",
+    "WHERE table_id = #{tableId} AND deleted_at = 0 AND deletion_id IS NULL FOR UPDATE"
+  })
+  TablePO selectLiveTableForUpdate(@Param("tableId") long tableId);
 
   /**
    * Returns the table root that points to an exact deletion action.
@@ -42,6 +59,30 @@ public interface TableDeletionMapper {
     "WHERE deletion_id = #{deletionId} AND deleted_at > 0"
   })
   TablePO selectRetainedTable(@Param("deletionId") String deletionId);
+
+  /** Returns retained table roots under one exact schema identity. */
+  @Select({
+    "SELECT table_id AS tableId, table_name AS tableName, metalake_id AS metalakeId,",
+    "catalog_id AS catalogId, schema_id AS schemaId, audit_info AS auditInfo,",
+    "current_version AS currentVersion, last_version AS lastVersion,",
+    "deleted_at AS deletedAt, deletion_id AS deletionId FROM table_meta",
+    "WHERE schema_id = #{schemaId} AND deleted_at > 0 AND deletion_id IS NOT NULL",
+    "ORDER BY table_name, deletion_id"
+  })
+  List<TablePO> selectRetainedTables(@Param("schemaId") long schemaId);
+
+  /** Returns retained table roots for one exact schema identity and table name. */
+  @Select({
+    "SELECT table_id AS tableId, table_name AS tableName, metalake_id AS metalakeId,",
+    "catalog_id AS catalogId, schema_id AS schemaId, audit_info AS auditInfo,",
+    "current_version AS currentVersion, last_version AS lastVersion,",
+    "deleted_at AS deletedAt, deletion_id AS deletionId FROM table_meta",
+    "WHERE schema_id = #{schemaId} AND table_name = #{tableName}",
+    "AND deleted_at > 0 AND deletion_id IS NOT NULL",
+    "ORDER BY deletion_id"
+  })
+  List<TablePO> selectRetainedTablesByName(
+      @Param("schemaId") long schemaId, @Param("tableName") String tableName);
 
   /**
    * Returns and locks the table root that points to an exact deletion action.
@@ -75,13 +116,33 @@ public interface TableDeletionMapper {
   })
   TablePO selectLiveTable(@Param("tableId") long tableId);
 
+  /** Returns the unchanged user owner of one retained table identity. */
+  @Nullable
+  @Select({
+    "SELECT u.user_name FROM owner_meta o",
+    "JOIN user_meta u ON u.user_id = o.owner_id AND u.deleted_at = 0",
+    "WHERE o.metadata_object_id = #{tableId} AND o.metadata_object_type = 'TABLE'",
+    "AND o.owner_type = 'USER' AND o.deleted_at = 0"
+  })
+  String selectRetainedUserOwnerName(@Param("tableId") long tableId);
+
+  /** Returns the unchanged group owner of one retained table identity. */
+  @Nullable
+  @Select({
+    "SELECT g.group_name FROM owner_meta o",
+    "JOIN group_meta g ON g.group_id = o.owner_id AND g.deleted_at = 0",
+    "WHERE o.metadata_object_id = #{tableId} AND o.metadata_object_type = 'TABLE'",
+    "AND o.owner_type = 'GROUP' AND o.deleted_at = 0"
+  })
+  String selectRetainedGroupOwnerName(@Param("tableId") long tableId);
+
   /**
    * Tombstones the exact live table root.
    *
    * @param tableId immutable table identifier
    * @param schemaId immutable parent schema identifier
    * @param tableName table name at deletion time
-   * @param tableVersion expected current metadata version
+   * @param tableVersion metadata version read from the locked live row
    * @param deletedAt authoritative deletion time
    * @param deletionId opaque deletion identifier
    * @return number of updated rows

@@ -120,13 +120,47 @@ public class TestTableDeletionService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteRollsBackActionWhenRootCasFails() throws IOException {
-    EntityDeletionPO deletion = newDeletion("D-rollback");
+  public void testDeleteUsesTheLockedCurrentVersion() throws IOException {
+    EntityDeletionPO deletion = newDeletion("D-current");
     TablePO staleTable = copyWithVersion(liveTable, liveTable.getCurrentVersion() + 1);
+
+    TableDeletionService.getInstance().delete(staleTable, DELETED_AT, deletion);
+
+    assertNotNull(EntityDeletionService.getInstance().get("D-current"));
+    TablePO retained = TableDeletionService.getInstance().getRetainedTable("D-current");
+    assertNotNull(retained);
+    assertEquals(liveTable.getCurrentVersion(), retained.getCurrentVersion());
+    assertFalse(backend.exists(tableIdentifier, Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
+  public void testDeleteDoesNotLeaveAnActionWhenLockedRootIsNotLive() throws IOException {
+    TableDeletionService.getInstance().delete(liveTable, DELETED_AT, newDeletion("D1"));
 
     assertThrows(
         IllegalStateException.class,
-        () -> TableDeletionService.getInstance().delete(staleTable, DELETED_AT, deletion));
+        () ->
+            TableDeletionService.getInstance()
+                .delete(liveTable, DELETED_AT + 1, newDeletion("D-rollback")));
+
+    assertNull(EntityDeletionService.getInstance().get("D-rollback"));
+    assertNull(TableDeletionService.getInstance().getRetainedTable("D-rollback"));
+    assertNotNull(EntityDeletionService.getInstance().get("D1"));
+    assertFalse(backend.exists(tableIdentifier, Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
+  public void testDeleteJoinsOuterTransactionRollback() throws IOException {
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    TableDeletionService.getInstance()
+                        .delete(liveTable, DELETED_AT, newDeletion("D-rollback")),
+                () -> {
+                  throw new IllegalStateException("force outer transaction rollback");
+                }));
 
     assertNull(EntityDeletionService.getInstance().get("D-rollback"));
     assertNull(TableDeletionService.getInstance().getRetainedTable("D-rollback"));
