@@ -57,6 +57,7 @@ import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.TestCatalogOperations;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -500,6 +501,39 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testRenameTableSurfacesStoreUpdateFailure() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_rename_store_failure");
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_before_rename");
+    NameIdentifier renamedTableIdent = NameIdentifier.of(tableNs, "table_after_rename");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock update conflict"))
+        .when(entityStore)
+        .update(any(), any(), any(), any());
+
+    GravitinoRuntimeException exception =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    tableIdent, TableChange.rename(renamedTableIdent.name())));
+    Assertions.assertTrue(exception.getMessage().contains(tableIdent.toString()));
+    Assertions.assertTrue(exception.getMessage().contains(renamedTableIdent.toString()));
+  }
+
+  @Test
   public void testCreateAndDropTable() throws IOException {
     NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema71", "table31");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -605,9 +639,11 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
     Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
 
-    // dropTable returns false because the table is already gone from the catalog, but the
-    // orphaned schema entities must still be cleaned up.
+    // dropTable returns false because the table is already gone from the catalog. Preserve the
+    // table entity because the same result can be caused by a concurrent rename, while still
+    // cleaning up orphaned schema entities.
     Assertions.assertFalse(tableOperationDispatcher.dropTable(tableIdent));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
     Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
     Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
   }
