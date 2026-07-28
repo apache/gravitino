@@ -530,6 +530,22 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertFalse(result.containsKey(REPLICATION_FACTOR));
   }
 
+  @Test
+  public void testAppendNecessaryPropertiesRejectsConflictingReplicationProperties() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    Map<String, String> properties = new HashMap<>();
+    properties.put(REPLICATION_FACTOR, "1");
+    properties.put(REPLICATION_ALLOCATION, "tag.location.default: 1");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.appendNecessaryProperties(properties));
+
+    Assertions.assertEquals(
+        "Properties 'replication_num' and 'replication_allocation' cannot be set at the same time",
+        exception.getMessage());
+  }
+
   private static DataSource mockBackendDataSource(int aliveBackendCount) throws Exception {
     DataSource dataSource = Mockito.mock(DataSource.class);
     Connection connection = Mockito.mock(Connection.class);
