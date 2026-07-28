@@ -83,6 +83,6 @@ public class InMemorySecretsProvider implements GravitinoSecretProvider {
 
   @Override
   public void close() {
-    // No resources to release beyond the in-process map retained for the provider lifetime.
+    secrets.clear();
   }
 }

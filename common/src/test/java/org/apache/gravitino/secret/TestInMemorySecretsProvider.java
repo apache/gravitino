@@ -51,4 +51,16 @@ public class TestInMemorySecretsProvider {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> provider.writeSecret("s3cr3t", null));
   }
+
+  @Test
+  public void testCloseClearsStoredSecrets() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretWriteContext context = new SecretWriteContext("memory", "catalog", 10L, "password");
+    String urn = provider.writeSecret("s3cr3t", context);
+    Assertions.assertEquals("s3cr3t", provider.readSecret(urn));
+
+    provider.close();
+    Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(urn));
+  }
 }
