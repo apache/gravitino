@@ -27,9 +27,6 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -152,29 +149,10 @@ public class IcebergMetadataAuthorizationMethodInterceptor
    */
   @Override
   protected boolean shouldSkipAuthorization(Map<EntityType, NameIdentifier> nameIdentifierMap) {
-    if (!IcebergRESTServerContext.getInstance().skipAuthorizationForRestBackend()) {
-      return false;
-    }
-
     NameIdentifier catalogId = nameIdentifierMap.get(EntityType.CATALOG);
     if (catalogId == null) {
       return false;
     }
-
-    IcebergCatalogWrapperManager wrapperManager =
-        IcebergRESTServerContext.getInstance().catalogWrapperManager();
-    if (wrapperManager == null) {
-      return false;
-    }
-
-    IcebergCatalogWrapper catalogWrapper;
-    try {
-      catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
-    } catch (NoSuchCatalogException e) {
-      return false;
-    }
-    // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
-    // authorization. IRC2 handles authorization.
-    return catalogWrapper.isRESTCatalog();
+    return IcebergRESTServerContext.getInstance().shouldSkipAuthorization(catalogId.name());
   }
 }
