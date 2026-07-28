@@ -49,6 +49,7 @@ import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.cache.SupportsEntityCacheInvalidation;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -69,6 +70,7 @@ public class RelationalEntityStore
     implements EntityStore,
         SupportsRelationOperations,
         SupportsExternalIdOperations,
+        SupportsEntityCacheInvalidation,
         SupportsEntityChangeLog {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
@@ -77,6 +79,7 @@ public class RelationalEntityStore
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityChangeLogPoller entityChangeLogPoller;
+  private TableEntityCacheChangeListener tableEntityCacheChangeListener;
   private EntityCache cache;
 
   @VisibleForTesting
@@ -108,6 +111,7 @@ public class RelationalEntityStore
             config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
+    registerTableEntityCacheChangeListener();
     this.entityChangeLogPoller.start();
   }
 
@@ -275,8 +279,19 @@ public class RelationalEntityStore
   }
 
   @Override
+  public boolean invalidateEntityCache(NameIdentifier identifier, Entity.EntityType entityType) {
+    return cache.invalidate(identifier, entityType);
+  }
+
+  void registerTableEntityCacheChangeListener() {
+    this.tableEntityCacheChangeListener = new TableEntityCacheChangeListener(this);
+    this.entityChangeLogPoller.registerListener(tableEntityCacheChangeListener);
+  }
+
+  @Override
   public void close() throws IOException {
     cache.clear();
+    entityChangeLogPoller.unregisterListener(tableEntityCacheChangeListener);
     entityChangeLogPoller.close();
     garbageCollector.close();
     backend.close();

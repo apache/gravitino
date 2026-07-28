@@ -36,6 +36,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
@@ -97,6 +98,38 @@ public class TestRelationalEntityStore {
     InOrder inOrder = Mockito.inOrder(backend, cache);
     inOrder.verify(backend).delete(ident, Entity.EntityType.CATALOG, true);
     inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+  }
+
+  @Test
+  void testExplicitCacheInvalidationCapability() throws IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    Assertions.assertFalse(store.invalidateEntityCache(ident, Entity.EntityType.TABLE));
+
+    Mockito.verify(cache).invalidate(ident, Entity.EntityType.TABLE);
+  }
+
+  @Test
+  void testRegistersAndClosesTableCacheChangeListener() throws Exception {
+    EntityChangeLogPoller poller = Mockito.mock(EntityChangeLogPoller.class);
+    RelationalGarbageCollector garbageCollector = Mockito.mock(RelationalGarbageCollector.class);
+    FieldUtils.writeField(store, "entityChangeLogPoller", poller, true);
+    FieldUtils.writeField(store, "garbageCollector", garbageCollector, true);
+
+    store.registerTableEntityCacheChangeListener();
+
+    ArgumentCaptor<EntityChangeLogListener> listener =
+        ArgumentCaptor.forClass(EntityChangeLogListener.class);
+    Mockito.verify(poller).registerListener(listener.capture());
+    Assertions.assertInstanceOf(TableEntityCacheChangeListener.class, listener.getValue());
+
+    store.close();
+
+    Mockito.verify(poller).unregisterListener(listener.getValue());
+    Mockito.verify(poller).close();
+    Mockito.verify(garbageCollector).close();
+    Mockito.verify(backend).close();
   }
 
   @Test
