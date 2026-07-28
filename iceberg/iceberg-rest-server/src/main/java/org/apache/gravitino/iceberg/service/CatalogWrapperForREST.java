@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -53,7 +52,6 @@ import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseTable;
-import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.Scan;
@@ -563,15 +561,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         tableIdentifier,
         token.offset());
 
-    FetchScanTasksResponse.Builder builder =
-        FetchScanTasksResponse.builder()
-            .withFileScanTasks(batch)
-            .withSpecsById(fullPlan.specsById());
-    List<DeleteFile> deleteFiles = referencedDeleteFiles(batch);
-    if (!deleteFiles.isEmpty()) {
-      builder.withDeleteFiles(deleteFiles);
-    }
-    return builder.build();
+    // withFileScanTasks derives the response's delete files from the tasks, so a merge-on-read
+    // batch carries the delete files its tasks reference by index.
+    return FetchScanTasksResponse.builder()
+        .withFileScanTasks(batch)
+        .withSpecsById(fullPlan.specsById())
+        .build();
   }
 
   /**
@@ -667,32 +662,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         firstBatch.size(),
         planTasks.size());
 
-    PlanTableScanResponse.Builder builder =
-        PlanTableScanResponse.builder()
-            .withPlanStatus(PlanStatus.COMPLETED)
-            .withFileScanTasks(firstBatch)
-            .withPlanTasks(planTasks)
-            .withSpecsById(fullPlan.specsById());
-    List<DeleteFile> deleteFiles = referencedDeleteFiles(firstBatch);
-    if (!deleteFiles.isEmpty()) {
-      builder.withDeleteFiles(deleteFiles);
-    }
-    return builder.build();
-  }
-
-  /**
-   * Collects the delete files referenced by {@code fileScanTasks}, deduplicated by location. The
-   * Iceberg response serializer expects every delete file a task references to be listed in the
-   * response, since tasks reference delete files by their index in that list.
-   */
-  private static List<DeleteFile> referencedDeleteFiles(List<FileScanTask> fileScanTasks) {
-    Map<String, DeleteFile> deleteFilesByLocation = new LinkedHashMap<>();
-    for (FileScanTask fileScanTask : fileScanTasks) {
-      for (DeleteFile deleteFile : fileScanTask.deletes()) {
-        deleteFilesByLocation.putIfAbsent(deleteFile.location(), deleteFile);
-      }
-    }
-    return ImmutableList.copyOf(deleteFilesByLocation.values());
+    // withFileScanTasks derives the response's delete files from the tasks, so the inline batch
+    // carries the delete files its own tasks reference by index.
+    return PlanTableScanResponse.builder()
+        .withPlanStatus(PlanStatus.COMPLETED)
+        .withFileScanTasks(firstBatch)
+        .withPlanTasks(planTasks)
+        .withSpecsById(fullPlan.specsById())
+        .build();
   }
 
   /**
@@ -728,9 +705,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * REST clients only.
    *
    * <p>Matches {@link CatalogHandlers#planTableScan}: {@code file-scan-tasks} plus {@code
-   * specs-by-id} from {@link Table#specs()}, and the delete files those tasks reference. Batching
-   * into {@code plan-tasks} happens later, in {@link #splitIntoPlanTasks}, so the cached plan
-   * always holds every task.
+   * specs-by-id} from {@link Table#specs()}. Batching into {@code plan-tasks} happens later, in
+   * {@link #splitIntoPlanTasks}, so the cached plan always holds every task.
    *
    * <p>{@code specs-by-id} uses the table's full spec map ({@link Table#specs()}), not only
    * partition specs referenced by the returned {@code fileScanTasks}. That matches Iceberg 1.11
@@ -740,16 +716,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
       Table table, List<FileScanTask> fileScanTasks) {
-    PlanTableScanResponse.Builder builder =
-        PlanTableScanResponse.builder()
-            .withPlanStatus(PlanStatus.COMPLETED)
-            .withFileScanTasks(fileScanTasks)
-            .withSpecsById(table.specs());
-    List<DeleteFile> deleteFiles = referencedDeleteFiles(fileScanTasks);
-    if (!deleteFiles.isEmpty()) {
-      builder.withDeleteFiles(deleteFiles);
-    }
-    return builder.build();
+    return PlanTableScanResponse.builder()
+        .withPlanStatus(PlanStatus.COMPLETED)
+        .withFileScanTasks(fileScanTasks)
+        .withSpecsById(table.specs())
+        .build();
   }
 
   /**
