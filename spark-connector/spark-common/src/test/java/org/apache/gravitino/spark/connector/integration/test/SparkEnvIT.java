@@ -229,7 +229,15 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   protected void initCatalogEnv() throws Exception {}
 
-  private void initIcebergRestServiceEnv() {
+  /**
+   * Configures the auxiliary Iceberg REST service that Gravitino starts alongside the main server.
+   * Subclasses may override this method to use a different backend or provider (e.g.,
+   * dynamic-config-provider).
+   *
+   * <p>The default implementation registers a static Hive backend so that tests that point the
+   * Gravitino catalog directly at the REST endpoint work out of the box.
+   */
+  protected void initIcebergRestServiceEnv() {
     super.ignoreIcebergAuxRestService = false;
     Map<String, String> icebergRestServiceConfigs = new HashMap<>();
     icebergRestServiceConfigs.put(
@@ -251,6 +259,17 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
         warehouse);
     registerCustomConfigs(icebergRestServiceConfigs);
+  }
+
+  /**
+   * Returns additional Spark configuration entries that are applied on top of the defaults set by
+   * {@link #initSparkEnv}. Subclasses can override this to inject extra configs or to override
+   * defaults (e.g., flip {@code enableIcebergSupport} to {@code false} while enabling REST access).
+   *
+   * @return extra key-value pairs to merge into {@link SparkConf}; may be empty
+   */
+  protected Map<String, String> getExtraSparkConfigs() {
+    return java.util.Collections.emptyMap();
   }
 
   private void initHdfsFileSystem() {
@@ -280,6 +299,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .set("hive.exec.dynamic.partition.mode", "nonstrict")
             .set("spark.sql.warehouse.dir", warehouse)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
+    getExtraSparkConfigs().forEach(sparkConf::set);
     sparkSession =
         SparkSession.builder()
             .master("local[1]")

@@ -30,6 +30,23 @@ public class GravitinoSparkConfig {
       GRAVITINO_PREFIX + "enableIcebergSupport";
   public static final String GRAVITINO_ENABLE_PAIMON_SUPPORT =
       GRAVITINO_PREFIX + "enablePaimonSupport";
+
+  /**
+   * When true, registers {@code lakehouse-iceberg} Gravitino catalogs as native Iceberg REST
+   * catalogs ({@code org.apache.iceberg.spark.SparkCatalog} with {@code type=rest}) instead of the
+   * Gravitino wrapper catalog. Mutually exclusive with {@link #GRAVITINO_ENABLE_ICEBERG_SUPPORT}
+   * for a given catalog.
+   */
+  public static final String GRAVITINO_ICEBERG_ENABLE_REST_ACCESS =
+      GRAVITINO_PREFIX + "iceberg.enableRestAccess";
+
+  /**
+   * Explicit URI for the Gravitino Iceberg REST service, e.g. {@code http://host:9001/iceberg/}.
+   * When omitted, the URI is inferred from {@link #GRAVITINO_URI} by substituting the default
+   * Iceberg REST port (9001) and path ({@code /iceberg/}).
+   */
+  public static final String GRAVITINO_ICEBERG_REST_URI = GRAVITINO_PREFIX + "iceberg.restUri";
+
   public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = GRAVITINO_PREFIX + "client.";
 
   public static final String GRAVITINO_AUTH_TYPE =
