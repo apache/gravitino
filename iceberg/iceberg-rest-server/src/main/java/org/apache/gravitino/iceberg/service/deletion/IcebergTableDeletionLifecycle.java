@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.iceberg.service.deletion;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -32,9 +34,9 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.EntityDeletionPO;
+import org.apache.gravitino.storage.relational.po.TableDeletionEntryPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
-import org.apache.gravitino.storage.relational.service.EntityDeletionService;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.service.TableDeletionService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -46,8 +48,11 @@ import org.apache.iceberg.exceptions.NoSuchTableException;
 /** Transactional Iceberg REST table deletion lifecycle. */
 public class IcebergTableDeletionLifecycle {
 
-  /** Persisted lifecycle state for a retained table. */
+  /** Persisted lifecycle state for a retained or immediately purgeable action. */
   public static final String DELETED = "DELETED";
+
+  /** Irreversible cleanup-owned lifecycle state. */
+  public static final String PURGING = "PURGING";
 
   private final boolean available;
   private final boolean softDeleteEnabled;
@@ -155,11 +160,72 @@ public class IcebergTableDeletionLifecycle {
     }
   }
 
+  /** Returns retained roots joined to their active actions in deterministic table-name order. */
+  public List<IcebergRetainedTableDeletion> listDeleted(String catalogName, Namespace namespace) {
+    if (!available) {
+      return new ArrayList<>();
+    }
+    String metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    try {
+      long schemaId = schemaId(metalake, catalogName, namespace);
+      List<TableDeletionEntryPO> entries =
+          TableDeletionService.getInstance().listRetainedTableDeletions(schemaId);
+      List<IcebergRetainedTableDeletion> retained = new ArrayList<>(entries.size());
+      for (TableDeletionEntryPO entry : entries) {
+        retained.add(join(entry));
+      }
+      return retained;
+    } catch (NoSuchEntityException e) {
+      throw IcebergDeletionException.notFound();
+    }
+  }
+
+  /** Loads the retained root and action for one exact routed table name. */
+  public IcebergRetainedTableDeletion getDeleted(String catalogName, TableIdentifier identifier) {
+    IcebergRetainedTableDeletion retained = findActive(catalogName, identifier);
+    if (retained == null) {
+      throw IcebergDeletionException.notFound();
+    }
+    return retained;
+  }
+
   /** Returns the retained root and action occupying one routed table name, if complete. */
   @Nullable
   public IcebergRetainedTableDeletion findActive(String catalogName, TableIdentifier identifier) {
-    TablePO table = findRetainedTable(catalogName, identifier);
-    return table == null ? null : join(table);
+    if (!available) {
+      return null;
+    }
+    String metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    try {
+      long schemaId = schemaId(metalake, catalogName, identifier.namespace());
+      TableDeletionEntryPO entry =
+          TableDeletionService.getInstance().getRetainedTableDeletion(schemaId, identifier.name());
+      return entry == null ? null : join(entry);
+    } catch (NoSuchEntityException e) {
+      return null;
+    }
+  }
+
+  /** Converts retained relational state to its safe public action representation. */
+  public IcebergDeletionAction toAction(IcebergRetainedTableDeletion retained, long serverNow) {
+    EntityDeletionPO deletion = retained.getDeletion();
+    TablePO table = retained.getTable();
+    return IcebergDeletionAction.builder()
+        .deletionId(deletion.getDeletionId())
+        .entityId(String.valueOf(table.getTableId()))
+        .state(deletion.getState())
+        .deletedAt(table.getDeletedAt())
+        .retentionExpiresAt(deletion.getRetentionExpiresAt())
+        .purgeJobId(deletion.getPurgeJobId())
+        .recoverable(isRecoverable(deletion, serverNow))
+        .build();
+  }
+
+  static boolean isRecoverable(EntityDeletionPO deletion, long serverNow) {
+    return DELETED.equals(deletion.getState())
+        && (deletion.getRetentionExpiresAt() == null
+            || deletion.getRetentionExpiresAt() > serverNow)
+        && deletion.getPurgeJobId() == null;
   }
 
   @Nullable
@@ -176,12 +242,11 @@ public class IcebergTableDeletionLifecycle {
     }
   }
 
-  @Nullable
-  private static IcebergRetainedTableDeletion join(TablePO table) {
-    EntityDeletionPO deletion = EntityDeletionService.getInstance().get(table.getDeletionId());
-    return deletion == null
-        ? null
-        : IcebergRetainedTableDeletion.builder().table(table).deletion(deletion).build();
+  private static IcebergRetainedTableDeletion join(TableDeletionEntryPO entry) {
+    return IcebergRetainedTableDeletion.builder()
+        .table(entry.getTable())
+        .deletion(entry.getDeletion())
+        .build();
   }
 
   private static void appendChange(
