@@ -20,7 +20,7 @@
 package org.apache.gravitino.secret.memory;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.gravitino.secret.GravitinoSecretProvider;
@@ -30,13 +30,15 @@ import org.apache.gravitino.secret.SecretWriteContext;
 /**
  * In-memory secret provider for development and unit tests.
  *
- * <p>Secrets are stored in process memory only and are lost on restart. Values are Base64-encoded
- * for opaque storage, which is <strong>not</strong> encryption. Do not use this provider in
- * production.
+ * <p>Secrets are stored in process memory only and are lost on restart. Material is kept as a
+ * mutable {@code byte[]} so {@link #deleteSecret(String)} and {@link #close()} can explicitly zero
+ * the contents before dropping references. This is still <strong>not</strong> encryption and does
+ * not wipe caller-owned {@link String} arguments or return values from {@link #writeSecret}/{@link
+ * #readSecret}. Do not use this provider in production.
  */
 public class InMemorySecretsProvider implements GravitinoSecretProvider {
 
-  private final ConcurrentHashMap<String, String> secrets = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, byte[]> secrets = new ConcurrentHashMap<>();
 
   @Override
   public void initialize(String name, Map<String, String> config) {
@@ -62,27 +64,45 @@ public class InMemorySecretsProvider implements GravitinoSecretProvider {
             context.entityType(),
             context.entityId(),
             context.propertyKey());
-    secrets.put(
-        urn, Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8)));
+    // Own a mutable UTF-8 copy so delete/close can wipe the stored material.
+    secrets.put(urn, plaintext.getBytes(StandardCharsets.UTF_8));
     return urn;
   }
 
   @Override
   public String readSecret(String urn) {
-    String encoded = secrets.get(urn);
-    if (encoded == null) {
+    byte[] material = secrets.get(urn);
+    if (material == null) {
       throw new IllegalArgumentException("Secret not found for URN: " + urn);
     }
-    return new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
+    return new String(material, StandardCharsets.UTF_8);
   }
 
   @Override
   public void deleteSecret(String urn) {
-    secrets.remove(urn);
+    wipeAndRemove(urn);
   }
 
   @Override
   public void close() {
+    secrets.forEach((ignored, material) -> Arrays.fill(material, (byte) 0));
     secrets.clear();
+  }
+
+  /**
+   * Returns the stored secret bytes for {@code urn}, or {@code null} if absent. Visible for tests.
+   *
+   * @param urn the secret URN
+   * @return the stored byte array reference, or null
+   */
+  byte[] storedBytes(String urn) {
+    return secrets.get(urn);
+  }
+
+  private void wipeAndRemove(String urn) {
+    byte[] material = secrets.remove(urn);
+    if (material != null) {
+      Arrays.fill(material, (byte) 0);
+    }
   }
 }
