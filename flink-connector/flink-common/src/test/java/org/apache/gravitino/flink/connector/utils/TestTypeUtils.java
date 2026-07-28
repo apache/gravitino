@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.flink.connector.utils;
 
+import org.apache.flink.FlinkVersion;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.catalog.UnresolvedIdentifier;
 import org.apache.flink.table.types.logical.ArrayType;
@@ -51,6 +52,11 @@ import org.junit.jupiter.api.Test;
 
 public class TestTypeUtils {
 
+  private static final String FLINK_1_18 = "1.18";
+  private static final String FLINK_1_19 = "1.19";
+  private static final String FLINK_1_20 = "1.20";
+  private static final String FLINK_2_1 = "2.1";
+
   @Test
   public void testToGravitinoType() {
     Assertions.assertEquals(
@@ -71,8 +77,8 @@ public class TestTypeUtils {
     Assertions.assertEquals(Types.ShortType.get(), TypeUtils.toGravitinoType(new SmallIntType()));
     Assertions.assertEquals(
         Types.TimestampType.withoutTimeZone(6), TypeUtils.toGravitinoType(new TimestampType()));
-    Assertions.assertEquals(
-        Types.TimestampType.withTimeZone(6), TypeUtils.toGravitinoType(new ZonedTimestampType()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> TypeUtils.toGravitinoType(new ZonedTimestampType()));
     Assertions.assertEquals(
         Types.TimestampType.withTimeZone(6),
         TypeUtils.toGravitinoType(new LocalZonedTimestampType()));
@@ -205,7 +211,8 @@ public class TestTypeUtils {
     Assertions.assertEquals(
         Types.TimestampType.withoutTimeZone(6), TypeUtils.toGravitinoType(new TimestampType(6)));
     Assertions.assertEquals(
-        Types.TimestampType.withoutTimeZone(9), TypeUtils.toGravitinoType(new TimestampType(9)));
+        Types.TimestampType.withoutTimeZone(9),
+        TypeUtils.fromFlinkType(new TimestampType(9), FLINK_1_20));
 
     // TIMESTAMP with timezone (LocalZoned)
     Assertions.assertEquals(
@@ -219,7 +226,7 @@ public class TestTypeUtils {
         TypeUtils.toGravitinoType(new LocalZonedTimestampType(6)));
     Assertions.assertEquals(
         Types.TimestampType.withTimeZone(9),
-        TypeUtils.toGravitinoType(new LocalZonedTimestampType(9)));
+        TypeUtils.fromFlinkType(new LocalZonedTimestampType(9), FLINK_1_20));
 
     // Test converting back
     Assertions.assertEquals(
@@ -229,7 +236,8 @@ public class TestTypeUtils {
     Assertions.assertEquals(
         DataTypes.TIMESTAMP(6), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(6)));
     Assertions.assertEquals(
-        DataTypes.TIMESTAMP(9), TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(9)));
+        DataTypes.TIMESTAMP(9),
+        TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(9), FLINK_1_20));
 
     Assertions.assertEquals(
         DataTypes.TIMESTAMP_LTZ(0), TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(0)));
@@ -238,7 +246,57 @@ public class TestTypeUtils {
     Assertions.assertEquals(
         DataTypes.TIMESTAMP_LTZ(6), TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(6)));
     Assertions.assertEquals(
-        DataTypes.TIMESTAMP_LTZ(9), TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(9)));
+        DataTypes.TIMESTAMP_LTZ(9),
+        TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(9), FLINK_1_20));
+  }
+
+  @Test
+  public void testNanosecondTimestampRoundTrip() {
+    Types.TimestampType timestamp = Types.TimestampType.withoutTimeZone(9);
+    Types.TimestampType timestampTz = Types.TimestampType.withTimeZone(9);
+
+    Assertions.assertEquals(
+        timestamp,
+        TypeUtils.fromFlinkType(
+            TypeUtils.toFlinkType(timestamp, FLINK_1_20).getLogicalType(), FLINK_1_20));
+    Assertions.assertEquals(
+        timestampTz,
+        TypeUtils.fromFlinkType(
+            TypeUtils.toFlinkType(timestampTz, FLINK_1_20).getLogicalType(), FLINK_1_20));
+  }
+
+  @Test
+  public void testRejectNanosecondTimestampsBeforeFlink120() {
+    for (String flinkVersionId : new String[] {FLINK_1_18, FLINK_1_19}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> TypeUtils.fromFlinkType(new TimestampType(9), flinkVersionId));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              TypeUtils.fromFlinkType(
+                  new ArrayType(new LocalZonedTimestampType(9)), flinkVersionId));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(9), flinkVersionId));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              TypeUtils.toFlinkType(
+                  Types.ListType.nullable(Types.TimestampType.withTimeZone(9)), flinkVersionId));
+    }
+  }
+
+  @Test
+  public void testRejectOffsetBearingFlinkTimestamp() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> TypeUtils.toGravitinoType(new ZonedTimestampType(9)));
+    Assertions.assertEquals(
+        "Flink TIMESTAMP WITH TIME ZONE stores an offset per value and cannot be "
+            + "losslessly represented by Gravitino timestamp_tz; use TIMESTAMP_LTZ",
+        exception.getMessage());
   }
 
   @Test
@@ -247,12 +305,110 @@ public class TestTypeUtils {
         UnsupportedOperationException.class, () -> TypeUtils.toFlinkType(Types.TimeType.of(10)));
 
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
+        IllegalArgumentException.class,
         () -> TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(10)));
 
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
+        IllegalArgumentException.class,
         () -> TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(10)));
+  }
+
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> TypeUtils.toFlinkType(Types.VariantType.get(), FLINK_1_20));
+    Assertions.assertEquals(
+        "Flink 1.20 has no VARIANT logical type for Gravitino variant; VARIANT requires Flink 2.1 "
+            + "or later",
+        exception.getMessage());
+
+    if (isCurrentFlinkAtLeast(2, 1)) {
+      Assertions.assertEquals(
+          "VARIANT",
+          TypeUtils.toFlinkType(Types.VariantType.get(), FLINK_2_1)
+              .getLogicalType()
+              .getTypeRoot()
+              .name());
+    } else {
+      IllegalArgumentException runtimeException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> TypeUtils.toFlinkType(Types.VariantType.get(), FLINK_2_1));
+      Assertions.assertEquals(
+          "The configured Flink version 2.1 supports VARIANT, but the active Flink runtime does not "
+              + "expose DataTypes.VARIANT()",
+          runtimeException.getMessage());
+    }
+
+    if (!isCurrentFlinkAtLeast(2, 1)) {
+      IllegalArgumentException futureRuntimeException =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> TypeUtils.toFlinkType(Types.VariantType.get(), "2.2"));
+      Assertions.assertTrue(
+          futureRuntimeException.getMessage().startsWith("The configured Flink version 2.2"));
+    }
+  }
+
+  @Test
+  public void testUnknownTypeRoundTrip() {
+    Types.NullType unknown = Types.NullType.get();
+
+    for (String flinkVersionId : new String[] {FLINK_1_18, FLINK_1_19, FLINK_1_20}) {
+      Assertions.assertEquals(DataTypes.NULL(), TypeUtils.toFlinkType(unknown, flinkVersionId));
+      Assertions.assertEquals(
+          unknown,
+          TypeUtils.fromFlinkType(
+              TypeUtils.toFlinkType(unknown, flinkVersionId).getLogicalType(), flinkVersionId));
+    }
+  }
+
+  @Test
+  public void testRejectGeometryTypes() {
+    String expectedMessage = "Flink 2.1 has no geometry logical type that preserves CRS metadata";
+
+    Assertions.assertEquals(
+        expectedMessage,
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> TypeUtils.toFlinkType(Types.GeometryType.crs84(), FLINK_2_1))
+            .getMessage());
+    Assertions.assertEquals(
+        expectedMessage,
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> TypeUtils.toFlinkType(Types.GeometryType.of("EPSG:3857"), FLINK_2_1))
+            .getMessage());
+  }
+
+  @Test
+  public void testRejectGeographyTypes() {
+    String expectedMessage =
+        "Flink 2.1 has no geography logical type that preserves CRS and edge algorithm "
+            + "metadata";
+
+    Assertions.assertEquals(
+        expectedMessage,
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> TypeUtils.toFlinkType(Types.GeographyType.crs84(), FLINK_2_1))
+            .getMessage());
+    Assertions.assertEquals(
+        expectedMessage,
+        Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    TypeUtils.toFlinkType(Types.GeographyType.of("EPSG:4326", "karney"), FLINK_2_1))
+            .getMessage());
+  }
+
+  @Test
+  public void testRejectInvalidFlinkVersionId() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> TypeUtils.toFlinkType(Types.TimestampType.withoutTimeZone(9), "current"));
   }
 
   @Test
@@ -284,5 +440,12 @@ public class TestTypeUtils {
     Assertions.assertEquals(
         DataTypes.MULTISET(DataTypes.BIGINT()),
         TypeUtils.toFlinkType(Types.ExternalType.of("MULTISET<BIGINT>")));
+  }
+
+  private static boolean isCurrentFlinkAtLeast(int requiredMajor, int requiredMinor) {
+    String[] versionParts = FlinkVersion.current().toString().split("\\.");
+    int major = Integer.parseInt(versionParts[0]);
+    int minor = Integer.parseInt(versionParts[1]);
+    return major > requiredMajor || (major == requiredMajor && minor >= requiredMinor);
   }
 }

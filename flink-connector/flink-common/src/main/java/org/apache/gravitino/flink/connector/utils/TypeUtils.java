@@ -22,6 +22,7 @@ package org.apache.gravitino.flink.connector.utils;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.flink.FlinkVersion;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.ArrayType;
@@ -41,14 +42,43 @@ public class TypeUtils {
 
   // Flink supports time/timestamp precision from 0 to 9 (nanosecond precision).
   // @see
-  // https://nightlies.apache.org/flink/flink-docs-release-2.1/docs/dev/table/types/#date-and-time
+  // https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/types/#date-and-time
   protected static final int FLINK_SECONDS_PRECISION = 0;
   protected static final int FLINK_MICROS_PRECISION = 6;
   protected static final int FLINK_NANOS_PRECISION = 9;
 
   private TypeUtils() {}
 
+  /**
+   * Converts a Flink logical type to a Gravitino type using the active Flink runtime.
+   *
+   * @param logicalType the Flink logical type
+   * @return the corresponding Gravitino type
+   */
   public static Type toGravitinoType(LogicalType logicalType) {
+    return fromFlinkType(logicalType, FlinkVersion.current().toString());
+  }
+
+  /**
+   * Converts a Flink logical type to a Gravitino type using the active Flink version's
+   * compatibility rules.
+   *
+   * @param logicalType the Flink logical type
+   * @param flinkVersionId the active Flink version ID, such as {@code 1.20}
+   * @return the corresponding Gravitino type
+   */
+  public static Type fromFlinkType(LogicalType logicalType, String flinkVersionId) {
+    if ("VARIANT".equals(logicalType.getTypeRoot().name())) {
+      if (isFlinkVersionBefore(flinkVersionId, 2, 1)) {
+        throw new IllegalArgumentException(
+            "Flink "
+                + flinkVersionId
+                + " has no VARIANT logical type for Gravitino variant; VARIANT requires Flink 2.1 "
+                + "or later");
+      }
+      return Types.VariantType.get();
+    }
+
     switch (logicalType.getTypeRoot()) {
       case VARCHAR:
         return Types.StringType.get();
@@ -86,6 +116,7 @@ public class TypeUtils {
         org.apache.flink.table.types.logical.TimestampType timestampType =
             (org.apache.flink.table.types.logical.TimestampType) logicalType;
         int timestampPrecision = timestampType.getPrecision();
+        validateTimestampPrecisionForVersion(timestampPrecision, flinkVersionId);
         return Types.TimestampType.withoutTimeZone(timestampPrecision);
       case INTERVAL_YEAR_MONTH:
         return Types.IntervalYearType.get();
@@ -97,23 +128,25 @@ public class TypeUtils {
         org.apache.flink.table.types.logical.LocalZonedTimestampType localZonedTimestampType =
             (org.apache.flink.table.types.logical.LocalZonedTimestampType) logicalType;
         int localZonedPrecision = localZonedTimestampType.getPrecision();
+        validateTimestampPrecisionForVersion(localZonedPrecision, flinkVersionId);
         return Types.TimestampType.withTimeZone(localZonedPrecision);
       case TIMESTAMP_WITH_TIME_ZONE:
-        org.apache.flink.table.types.logical.ZonedTimestampType zonedTimestampType =
-            (org.apache.flink.table.types.logical.ZonedTimestampType) logicalType;
-        int zonedPrecision = zonedTimestampType.getPrecision();
-        return Types.TimestampType.withTimeZone(zonedPrecision);
+        throw new IllegalArgumentException(
+            "Flink TIMESTAMP WITH TIME ZONE stores an offset per value and cannot be "
+                + "losslessly represented by Gravitino timestamp_tz; use TIMESTAMP_LTZ");
       case ARRAY:
         ArrayType arrayType = (ArrayType) logicalType;
         LogicalType elementLogicalType = arrayType.getElementType();
-        Type elementType = toGravitinoType(elementLogicalType);
+        Type elementType = fromFlinkType(elementLogicalType, flinkVersionId);
         return Types.ListType.of(elementType, elementLogicalType.isNullable());
       case MAP:
         MapType mapType = (MapType) logicalType;
         LogicalType keyType = mapType.getKeyType();
         LogicalType valueType = mapType.getValueType();
         return Types.MapType.of(
-            toGravitinoType(keyType), toGravitinoType(valueType), valueType.isNullable());
+            fromFlinkType(keyType, flinkVersionId),
+            fromFlinkType(valueType, flinkVersionId),
+            valueType.isNullable());
       case ROW:
         RowType rowType = (RowType) logicalType;
         Types.StructType.Field[] fields =
@@ -121,7 +154,7 @@ public class TypeUtils {
                 .map(
                     field -> {
                       LogicalType fieldLogicalType = field.getType();
-                      Type fieldType = toGravitinoType(fieldLogicalType);
+                      Type fieldType = fromFlinkType(fieldLogicalType, flinkVersionId);
                       return Types.StructType.Field.of(
                           field.getName(),
                           fieldType,
@@ -148,7 +181,25 @@ public class TypeUtils {
     }
   }
 
+  /**
+   * Converts a Gravitino type to a Flink data type using the active Flink runtime.
+   *
+   * @param gravitinoType the Gravitino type
+   * @return the corresponding Flink data type
+   */
   public static DataType toFlinkType(Type gravitinoType) {
+    return toFlinkType(gravitinoType, FlinkVersion.current().toString());
+  }
+
+  /**
+   * Converts a Gravitino type to a Flink data type using the active Flink version's compatibility
+   * rules.
+   *
+   * @param gravitinoType the Gravitino type
+   * @param flinkVersionId the active Flink version ID, such as {@code 1.20}
+   * @return the corresponding Flink data type
+   */
+  public static DataType toFlinkType(Type gravitinoType, String flinkVersionId) {
     switch (gravitinoType.name()) {
       case DOUBLE:
         return DataTypes.DOUBLE();
@@ -188,12 +239,11 @@ public class TypeUtils {
         if (timestampType.hasPrecisionSet()) {
           precision = timestampType.precision();
           if (precision < FLINK_SECONDS_PRECISION || precision > FLINK_NANOS_PRECISION) {
-            throw new UnsupportedOperationException(
-                "Unsupported timestamp precision for Flink: "
-                    + precision
-                    + ". Flink supports precision from 0 to 9.");
+            throw new IllegalArgumentException(
+                "Flink supports timestamp precision from 0 to 9, but got " + precision);
           }
         }
+        validateTimestampPrecisionForVersion(precision, flinkVersionId);
         if (timestampType.hasTimeZone()) {
           return DataTypes.TIMESTAMP_LTZ(precision);
         } else {
@@ -202,12 +252,13 @@ public class TypeUtils {
       case LIST:
         Types.ListType listType = (Types.ListType) gravitinoType;
         return DataTypes.ARRAY(
-            nullable(toFlinkType(listType.elementType()), listType.elementNullable()));
+            nullable(
+                toFlinkType(listType.elementType(), flinkVersionId), listType.elementNullable()));
       case MAP:
         Types.MapType mapType = (Types.MapType) gravitinoType;
         return DataTypes.MAP(
-            toFlinkType(mapType.keyType()),
-            nullable(toFlinkType(mapType.valueType()), mapType.valueNullable()));
+            toFlinkType(mapType.keyType(), flinkVersionId),
+            nullable(toFlinkType(mapType.valueType(), flinkVersionId), mapType.valueNullable()));
       case STRUCT:
         Types.StructType structType = (Types.StructType) gravitinoType;
         List<DataTypes.Field> fields =
@@ -216,10 +267,13 @@ public class TypeUtils {
                     f -> {
                       if (f.comment() == null) {
                         return DataTypes.FIELD(
-                            f.name(), nullable(toFlinkType(f.type()), f.nullable()));
+                            f.name(),
+                            nullable(toFlinkType(f.type(), flinkVersionId), f.nullable()));
                       } else {
                         return DataTypes.FIELD(
-                            f.name(), nullable(toFlinkType(f.type()), f.nullable()), f.comment());
+                            f.name(),
+                            nullable(toFlinkType(f.type(), flinkVersionId), f.nullable()),
+                            f.comment());
                       }
                     })
                 .collect(Collectors.toList());
@@ -243,6 +297,18 @@ public class TypeUtils {
         return DataTypes.INTERVAL(DataTypes.YEAR());
       case INTERVAL_DAY:
         return DataTypes.INTERVAL(DataTypes.DAY());
+      case VARIANT:
+        return toFlinkVariantType(flinkVersionId);
+      case GEOMETRY:
+        throw new IllegalArgumentException(
+            "Flink "
+                + flinkVersionId
+                + " has no geometry logical type that preserves CRS metadata");
+      case GEOGRAPHY:
+        throw new IllegalArgumentException(
+            "Flink "
+                + flinkVersionId
+                + " has no geography logical type that preserves CRS and edge algorithm metadata");
       case EXTERNAL:
         Types.ExternalType externalType = (Types.ExternalType) gravitinoType;
         String catalogString = externalType.catalogString();
@@ -253,6 +319,54 @@ public class TypeUtils {
         return TypeConversions.fromLogicalToDataType(parsedType);
       default:
         throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
+    }
+  }
+
+  private static void validateTimestampPrecisionForVersion(int precision, String flinkVersionId) {
+    if (precision > FLINK_MICROS_PRECISION && isFlinkVersionBefore(flinkVersionId, 1, 20)) {
+      throw new IllegalArgumentException(
+          "Flink "
+              + flinkVersionId
+              + " cannot safely round-trip timestamp precision "
+              + precision
+              + " through Iceberg; nanosecond timestamps require Flink 1.20 or later");
+    }
+  }
+
+  private static DataType toFlinkVariantType(String flinkVersionId) {
+    if (isFlinkVersionBefore(flinkVersionId, 2, 1)) {
+      throw new IllegalArgumentException(
+          "Flink "
+              + flinkVersionId
+              + " has no VARIANT logical type for Gravitino variant; VARIANT requires Flink 2.1 "
+              + "or later");
+    }
+
+    try {
+      return (DataType) DataTypes.class.getMethod("VARIANT").invoke(null);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalArgumentException(
+          "The configured Flink version "
+              + flinkVersionId
+              + " supports VARIANT, but the active Flink runtime does not expose "
+              + "DataTypes.VARIANT()",
+          e);
+    }
+  }
+
+  private static boolean isFlinkVersionBefore(
+      String flinkVersionId, int requiredMajor, int requiredMinor) {
+    String[] versionParts = flinkVersionId.split("\\.");
+    if (versionParts.length < 2) {
+      throw new IllegalArgumentException("Invalid Flink version ID: " + flinkVersionId);
+    }
+
+    try {
+      int major = Integer.parseInt(versionParts[0]);
+      int minor = Integer.parseInt(versionParts[1]);
+      return major < requiredMajor || (major == requiredMajor && minor < requiredMinor);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Invalid Flink version ID: " + flinkVersionId, e);
     }
   }
 
