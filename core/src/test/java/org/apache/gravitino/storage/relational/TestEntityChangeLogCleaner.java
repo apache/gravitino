@@ -38,14 +38,38 @@ import org.mockito.MockedStatic;
 public class TestEntityChangeLogCleaner {
 
   private static final long RETENTION_MS = TimeUnit.DAYS.toMillis(30);
+  private static final long POLL_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
 
   @Test
   void testRejectsInvalidConfiguration() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> new EntityChangeLogCleaner(-1, TimeUnit.DAYS.toMillis(1)));
+        () -> new EntityChangeLogCleaner(-1, TimeUnit.DAYS.toMillis(1), POLL_INTERVAL_MS));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new EntityChangeLogCleaner(RETENTION_MS, 0));
+        IllegalArgumentException.class,
+        () -> new EntityChangeLogCleaner(RETENTION_MS, 0, POLL_INTERVAL_MS));
+  }
+
+  @Test
+  void testRejectsRetentionShorterThanTheConsumptionWindow() {
+    // A retention this short lets the cleaner delete records before every node polled them, which
+    // would lose invalidations silently, so it must fail at startup instead.
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                new EntityChangeLogCleaner(
+                    POLL_INTERVAL_MS * 9, TimeUnit.DAYS.toMillis(1), POLL_INTERVAL_MS));
+    Assertions.assertTrue(
+        e.getMessage().contains("at least"), "unexpected message: " + e.getMessage());
+
+    // Exactly at the bound is accepted, and so is a disabled cleanup with any poll interval.
+    Assertions.assertDoesNotThrow(
+        () ->
+            new EntityChangeLogCleaner(
+                POLL_INTERVAL_MS * 10, TimeUnit.DAYS.toMillis(1), POLL_INTERVAL_MS));
+    Assertions.assertDoesNotThrow(
+        () -> new EntityChangeLogCleaner(0, TimeUnit.DAYS.toMillis(1), TimeUnit.DAYS.toMillis(7)));
   }
 
   @Test
@@ -54,7 +78,8 @@ public class TestEntityChangeLogCleaner {
 
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       mockSessionUtils(sessionUtils, mapper);
-      EntityChangeLogCleaner cleaner = new EntityChangeLogCleaner(0, TimeUnit.DAYS.toMillis(1));
+      EntityChangeLogCleaner cleaner =
+          new EntityChangeLogCleaner(0, TimeUnit.DAYS.toMillis(1), POLL_INTERVAL_MS);
 
       cleaner.cleanExpiredChanges();
     }
@@ -67,7 +92,7 @@ public class TestEntityChangeLogCleaner {
     // A server restarted more often than the cleanup interval must still prune, so the first run
     // is scheduled after a short randomized delay instead of a full interval.
     EntityChangeLogCleaner dailyCleaner =
-        new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1));
+        new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1), POLL_INTERVAL_MS);
     for (int i = 0; i < 100; i++) {
       long delayMs = dailyCleaner.initialDelayMs();
       Assertions.assertTrue(delayMs > 0, "initial delay must be positive, got " + delayMs);
@@ -76,7 +101,8 @@ public class TestEntityChangeLogCleaner {
     }
 
     // Never longer than the configured interval either.
-    EntityChangeLogCleaner frequentCleaner = new EntityChangeLogCleaner(RETENTION_MS, 50L);
+    EntityChangeLogCleaner frequentCleaner =
+        new EntityChangeLogCleaner(RETENTION_MS, 50L, POLL_INTERVAL_MS);
     for (int i = 0; i < 100; i++) {
       Assertions.assertTrue(frequentCleaner.initialDelayMs() <= 50L);
     }
@@ -85,13 +111,15 @@ public class TestEntityChangeLogCleaner {
   @Test
   void testStartAndCloseAreSafeToPair() {
     EntityChangeLogCleaner cleaner =
-        new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1));
+        new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1), POLL_INTERVAL_MS);
 
     Assertions.assertDoesNotThrow(cleaner::start);
     Assertions.assertDoesNotThrow(cleaner::close);
     // close() on a cleaner that was never started must not fail either.
     Assertions.assertDoesNotThrow(
-        () -> new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1)).close());
+        () ->
+            new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1), POLL_INTERVAL_MS)
+                .close());
   }
 
   @Test
@@ -101,7 +129,7 @@ public class TestEntityChangeLogCleaner {
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       mockSessionUtils(sessionUtils, mapper);
 
-      try (EntityChangeLogCleaner cleaner = new EntityChangeLogCleaner(0, 1L)) {
+      try (EntityChangeLogCleaner cleaner = new EntityChangeLogCleaner(0, 1L, POLL_INTERVAL_MS)) {
         cleaner.start();
         Thread.sleep(200);
       }
@@ -121,7 +149,7 @@ public class TestEntityChangeLogCleaner {
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       mockSessionUtils(sessionUtils, mapper);
       EntityChangeLogCleaner cleaner =
-          new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1));
+          new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1), POLL_INTERVAL_MS);
 
       cleaner.cleanExpiredChanges();
     }
@@ -138,7 +166,7 @@ public class TestEntityChangeLogCleaner {
     try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       mockSessionUtils(sessionUtils, mapper);
       EntityChangeLogCleaner cleaner =
-          new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1));
+          new EntityChangeLogCleaner(RETENTION_MS, TimeUnit.DAYS.toMillis(1), POLL_INTERVAL_MS);
 
       Assertions.assertDoesNotThrow(cleaner::cleanExpiredChanges);
     }

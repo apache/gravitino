@@ -115,7 +115,8 @@ public class RelationalEntityStore
     this.entityChangeLogCleaner =
         new EntityChangeLogCleaner(
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
-            TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
+            TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)),
+            TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)));
     this.entityChangeLogPoller.start();
     this.entityChangeLogCleaner.start();
   }

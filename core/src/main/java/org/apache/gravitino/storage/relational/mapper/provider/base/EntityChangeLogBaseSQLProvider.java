@@ -21,24 +21,22 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_PRUNE_BATCH_SIZE;
 import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.ibatis.annotations.Param;
 
 public class EntityChangeLogBaseSQLProvider {
 
   /**
-   * DB-side expression for "now" in milliseconds. It is the established codebase convention for
-   * DB-generated millisecond timestamps, shared with 27+ other base providers
-   * (TableMetaBaseSQLProvider, FilesetVersionBaseSQLProvider, etc.). It works on MySQL natively and
-   * on H2 in {@code MODE=MYSQL}; PostgreSQL overrides both statements in its own provider.
+   * DB-side expression for "now" in milliseconds; PostgreSQL overrides both statements that use it
+   * in its own provider.
    *
    * <p>Insertion and expiration both use this expression, so retention is measured entirely with
    * the database clock and is immune to clock skew between Gravitino nodes. Round-trip behaviour is
    * verified by {@code TestEntityChangeLogMapper#testEntityChangeLogInsertAndSelect}, which asserts
    * the persisted value is within 1 s of the JVM clock.
    */
-  private static final String CURRENT_TIME_MILLIS_SQL =
-      "((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)";
+  private static final String CURRENT_TIME_MILLIS_SQL = DatabaseTimeSQL.MYSQL;
 
   /**
    * Cursor-advance contract for the entity change poller: {@code id} is monotonic and unique, so

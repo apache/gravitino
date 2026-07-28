@@ -34,6 +34,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Cleanup is intentionally independent from polling. The database calculates expiration using
  * its own clock, which is also the clock used when change records are inserted.
+ *
+ * <p>Retention is validated against the poll interval. A retention shorter than a few poll cycles
+ * lets this cleaner delete records before every node had a chance to consume them, which loses
+ * invalidations silently, so such a configuration is rejected at startup instead.
  */
 public class EntityChangeLogCleaner implements AutoCloseable {
 
@@ -41,6 +45,13 @@ public class EntityChangeLogCleaner implements AutoCloseable {
 
   /** Upper bound for the delay before the first cleanup run. */
   private static final long MAX_INITIAL_DELAY_MS = TimeUnit.MINUTES.toMillis(10);
+
+  /**
+   * How many poll cycles a change record must survive at minimum. A record has to outlive more than
+   * one cycle, because a node can miss cycles while it is restarting, stalled in a long GC pause,
+   * or paused retrying a failed listener.
+   */
+  private static final long MIN_RETENTION_POLL_CYCLES = 10;
 
   private final long retentionMs;
   private final long cleanupIntervalMs;
@@ -52,10 +63,23 @@ public class EntityChangeLogCleaner implements AutoCloseable {
    *
    * @param retentionMs retention time in milliseconds, or 0 to disable cleanup
    * @param cleanupIntervalMs interval between cleanup runs in milliseconds
+   * @param pollIntervalMs interval between poller cycles in milliseconds, used to reject a
+   *     retention that would drop records before the pollers can consume them
    */
-  public EntityChangeLogCleaner(long retentionMs, long cleanupIntervalMs) {
+  public EntityChangeLogCleaner(long retentionMs, long cleanupIntervalMs, long pollIntervalMs) {
     Preconditions.checkArgument(retentionMs >= 0, "retentionMs must be non-negative");
     Preconditions.checkArgument(cleanupIntervalMs > 0, "cleanupIntervalMs must be positive");
+    Preconditions.checkArgument(pollIntervalMs > 0, "pollIntervalMs must be positive");
+    // Divide rather than multiply: pollIntervalMs comes from configuration and a multiplication
+    // could overflow.
+    Preconditions.checkArgument(
+        retentionMs == 0 || retentionMs / MIN_RETENTION_POLL_CYCLES >= pollIntervalMs,
+        "retentionMs (%s) must be 0 to disable cleanup, or at least %s times the poll interval "
+            + "(%s ms); a shorter retention can prune change records before every node consumed "
+            + "them and silently lose cache invalidations",
+        retentionMs,
+        MIN_RETENTION_POLL_CYCLES,
+        pollIntervalMs);
     this.retentionMs = retentionMs;
     this.cleanupIntervalMs = cleanupIntervalMs;
   }

@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_PRUNE_BATCH_SIZE;
 import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.EntityChangeLogBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.ibatis.annotations.Param;
@@ -31,8 +32,7 @@ public class EntityChangeLogPostgreSQLProvider extends EntityChangeLogBaseSQLPro
    * PostgreSQL flavour of the DB-side "now in milliseconds" expression. Insertion and expiration
    * share it, so retention is measured entirely with the database clock.
    */
-  private static final String CURRENT_TIME_MILLIS_SQL =
-      "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+  private static final String CURRENT_TIME_MILLIS_SQL = DatabaseTimeSQL.POSTGRESQL;
 
   @Override
   public String insertEntityChange(
