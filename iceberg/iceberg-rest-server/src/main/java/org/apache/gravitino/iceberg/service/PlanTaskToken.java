@@ -51,9 +51,6 @@ class PlanTaskToken {
 
   private static final Logger LOG = LoggerFactory.getLogger(PlanTaskToken.class);
 
-  private static final int CURRENT_VERSION = 1;
-
-  private static final String VERSION = "version";
   private static final String TABLE = "table";
   private static final String OFFSET = "offset";
   private static final String LIMIT = "limit";
@@ -84,7 +81,6 @@ class PlanTaskToken {
   static String encode(
       TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest, int offset, int limit) {
     ObjectNode node = JsonUtil.mapper().createObjectNode();
-    node.put(VERSION, CURRENT_VERSION);
     node.put(TABLE, tableIdentifier.toString());
     node.put(OFFSET, offset);
     node.put(LIMIT, limit);
@@ -113,7 +109,7 @@ class PlanTaskToken {
     try {
       byte[] decoded = Base64.getUrlDecoder().decode(planTask);
       JsonNode node = JsonUtil.mapper().readTree(new String(decoded, StandardCharsets.UTF_8));
-      if (!node.isObject() || JsonUtil.getInt(VERSION, node) != CURRENT_VERSION) {
+      if (!node.isObject()) {
         return Optional.empty();
       }
 

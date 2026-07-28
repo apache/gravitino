@@ -710,7 +710,7 @@ A plan is handed to the client in batches of at most `scan-plan-task-batch-size`
 | `gravitino.iceberg-rest.scan-plan-cache-impl`              | The implementation of the scan plan cache.                                                                                                                                           | (none)        | No       | 1.2.0         |
 | `gravitino.iceberg-rest.scan-plan-cache-capacity`          | The capacity of the scan plan cache.                                                                                                                                                 | 200           | No       | 1.2.0         |
 | `gravitino.iceberg-rest.scan-plan-cache-expire-minutes`    | The expiration time (in minutes) of the scan plan cache.                                                                                                                             | 60            | No       | 1.2.0         |
-| `gravitino.iceberg-rest.scan-plan-task-batch-size`         | Maximum number of file scan tasks returned inline by one scan planning response. Tasks beyond this limit are offered as `plan-task` tokens. Set to 0 to always return every task inline. | 1000          | No       | 1.3.0         |
+| `gravitino.iceberg-rest.scan-plan-task-batch-size`         | Maximum number of file scan tasks returned inline by one scan planning response. Tasks beyond this limit are offered as `plan-task` tokens. Set to 0 to always return every task inline. | 100           | No       | 1.3.0         |
 
 The scan plan cache uses snapshot ID as part of the cache key, ensuring automatic invalidation when table data changes. This can provide significant speedup for repeated queries like dashboard refreshes or BI tool queries.
 
