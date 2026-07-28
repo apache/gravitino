@@ -42,6 +42,7 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.po.EntityDeletionPO;
+import org.apache.gravitino.storage.relational.po.TableDeletionEntryPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -131,6 +132,28 @@ public class TestTableDeletionService extends TestJDBCBackend {
     assertNotNull(retained);
     assertEquals(liveTable.getCurrentVersion(), retained.getCurrentVersion());
     assertFalse(backend.exists(tableIdentifier, Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
+  public void testRetainedTableReadsJoinTheRootAndAction() throws IOException {
+    TableDeletionService.getInstance().delete(liveTable, DELETED_AT, newDeletion("D-joined"));
+    long schemaId = liveTable.getSchemaId();
+
+    TableDeletionEntryPO entry =
+        TableDeletionService.getInstance().getRetainedTableDeletion(schemaId, TABLE);
+    assertNotNull(entry);
+    assertEquals(table.id(), entry.getTable().getTableId());
+    assertEquals(TABLE, entry.getTable().getTableName());
+    assertEquals("D-joined", entry.getTable().getDeletionId());
+    assertEquals("D-joined", entry.getDeletion().getDeletionId());
+    assertEquals("DELETED", entry.getDeletion().getState());
+    assertEquals(RETENTION_EXPIRES_AT, entry.getDeletion().getRetentionExpiresAt());
+    assertEquals(
+        List.of("D-joined"),
+        TableDeletionService.getInstance().listRetainedTableDeletions(schemaId).stream()
+            .map(value -> value.getDeletion().getDeletionId())
+            .toList());
+    assertNull(TableDeletionService.getInstance().getRetainedTableDeletion(schemaId, "missing"));
   }
 
   @TestTemplate

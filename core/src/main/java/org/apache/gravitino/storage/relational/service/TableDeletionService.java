@@ -29,6 +29,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.storage.relational.mapper.TableDeletionMapper;
 import org.apache.gravitino.storage.relational.po.EntityDeletionPO;
+import org.apache.gravitino.storage.relational.po.TableDeletionEntryPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -134,6 +135,33 @@ public class TableDeletionService {
   public List<TablePO> listRetainedTables(long schemaId) {
     return SessionUtils.doWithCommitAndFetchResult(
         TableDeletionMapper.class, mapper -> mapper.selectRetainedTables(schemaId));
+  }
+
+  /** Returns retained table roots joined to their actions under one exact schema identity. */
+  public List<TableDeletionEntryPO> listRetainedTableDeletions(long schemaId) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        TableDeletionMapper.class, mapper -> mapper.selectRetainedTableDeletions(schemaId));
+  }
+
+  /**
+   * Returns one retained table root joined to its action for an exact schema identity and name.
+   *
+   * @param schemaId immutable parent schema identifier
+   * @param tableName table name reserved by the retained root
+   * @return retained table/action join, or {@code null} when the name is unreserved
+   */
+  @Nullable
+  public TableDeletionEntryPO getRetainedTableDeletion(long schemaId, String tableName) {
+    Objects.requireNonNull(tableName, "tableName must not be null");
+    List<TableDeletionEntryPO> entries =
+        SessionUtils.doWithCommitAndFetchResult(
+            TableDeletionMapper.class,
+            mapper -> mapper.selectRetainedTableDeletionsByName(schemaId, tableName));
+    if (entries.size() > 1) {
+      throw new IllegalStateException(
+          "Multiple active deletions reserve table name " + tableName + " in schema " + schemaId);
+    }
+    return entries.isEmpty() ? null : entries.get(0);
   }
 
   /**
