@@ -172,18 +172,20 @@ The winner can still be decided in the store: make drop's store step a condition
 
 ### The harder case: mixed alter / rename / drop
 
-The worry is the mix of `alter`, `rename`, and `drop` on the same table from two servers at once. The good news: **with a healthy store, the pure concurrent race stays safe — it ends either consistent or missing a row (which self-heals). It does not by itself leave a stale row.**
+The worry is the mix of `alter`, `rename`, and `drop` on the same table from two servers at once. The good news: **with a healthy store, the pure concurrent race ends either consistent or missing a row, and it does not by itself leave a stale row.** The missing-row case is the one that needs a fix, and it is smaller than it looks — see below and [#12232](https://github.com/apache/gravitino/issues/12232).
 
 Take **rename `t1 → t2` on server A** and **drop `t1` on server B**, both on an external-backed catalog. Each operation does the external step first, then the store step. Two details of the store step matter: rename's store step (`updateTable`) reads t1's row and moves it to t2 in place; drop's store step (`store.delete(t1)`) runs **unconditionally** for external-backed tables (`TableOperationDispatcher:385-386`), even when the external drop found nothing.
 
 The external catalog serializes DDL, so which side wins on the external side depends on **whose external step ran first**. That, plus the fact that drop's store delete is unconditional, gives exactly these outcomes:
 
-![Mixed rename and drop: two external orderings, one of which can leave the store missing a row that self-heals](images/treelock-rename-drop-outcomes.png)
+![Mixed rename and drop: two external orderings, one of which can leave the store missing a row](images/treelock-rename-drop-outcomes.png)
 
 - **Drop's external step ran first** — t1 is already gone, so rename's external step throws `NoSuchTableException` and never reaches its store step. Drop deletes t1's store row. External and store both end empty → **consistent** (nothing to import).
 - **Rename's external step ran first** — t2 now exists externally, and drop's external step finds no t1 (returns false) — but its store step still deletes t1's store row **unconditionally**. Now the two store steps race:
   - rename's store update (t1 → t2) lands before drop's delete → the store has t2 → **consistent**;
-  - drop's delete removes t1's row before rename's store update → rename's update matches 0 rows and writes nothing → **store missing the row**: t2 exists externally but has no store row. This **fixes itself** on the next `loadTable(t2)` via import.
+  - drop's delete removes t1's row before rename's store update → rename's update matches 0 rows and writes nothing → **store missing the row**: t2 exists externally but has no store row.
+
+The last outcome only partly fixes itself. The next `loadTable(t2)` re-imports the entity row and its columns, but drop's store step cascades: `TableMetaService.deleteTable` also soft-deletes everything attached to that table id — **owner, tag, policy, role grants, statistics** — and `importTable` restores none of them, not even when the id is reused. So the relations are silently and irreversibly gone, while the caller is told the rename succeeded. The fix is simple: **do not touch the store when the external drop returned `false`**, since `false` here means "still there under another name", and leave stale-row cleanup to reconcile. Tracked as [#12232](https://github.com/apache/gravitino/issues/12232).
 
 The missing-row case matters only across nodes, or after removing TreeLock. Today TreeLock takes a write lock on the schema for both drop and rename, so on a single server they cannot interleave; under HA they already can, because the lock is per-node.
 
