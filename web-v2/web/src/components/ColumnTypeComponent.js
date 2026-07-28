@@ -130,11 +130,11 @@ export default function ColumnTypeComponent({ ...props }) {
         }
       }
       if (ColumnWithPrecisionType.includes(value)) {
-        const resolvedPrecision = paramPrecision || currentTypeParam
-        if (currentTypeParam && !paramPrecision) {
+        const resolvedPrecision = paramPrecision === '' ? currentTypeParam : paramPrecision
+        if (currentTypeParam && paramPrecision === '') {
           setParamPrecision(currentTypeParam)
         }
-        if (resolvedPrecision) {
+        if (resolvedPrecision !== '') {
           form.setFieldValue(
             [...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'],
             capitalizeFirstLetter(value) + `(${resolvedPrecision})`
