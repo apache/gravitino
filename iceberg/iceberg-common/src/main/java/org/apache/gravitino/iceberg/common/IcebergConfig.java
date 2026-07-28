@@ -351,7 +351,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .version(ConfigConstants.VERSION_1_3_0)
           .intConf()
           .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
-          .createWithDefault(1000);
+          .createWithDefault(100);
 
   public static final ConfigEntry<Integer> ASYNC_CLEANUP_WORKER_THREADS =
       new ConfigBuilder("async-cleanup.worker-threads")

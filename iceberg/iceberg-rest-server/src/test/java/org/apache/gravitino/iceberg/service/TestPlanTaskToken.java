@@ -87,14 +87,16 @@ public class TestPlanTaskToken {
   @ParameterizedTest
   @ValueSource(
       strings = {
-        // Unsupported token version, e.g. a token minted by a future server.
-        "{\"version\":2,\"table\":\"db.tbl\",\"offset\":0,\"limit\":10,\"scan\":{}}",
         // Ranges that cannot address any task.
-        "{\"version\":1,\"table\":\"db.tbl\",\"offset\":-1,\"limit\":10,\"scan\":{}}",
-        "{\"version\":1,\"table\":\"db.tbl\",\"offset\":0,\"limit\":0,\"scan\":{}}",
+        "{\"table\":\"db.tbl\",\"offset\":-1,\"limit\":10,\"scan\":{}}",
+        "{\"table\":\"db.tbl\",\"offset\":0,\"limit\":0,\"scan\":{}}",
         // Missing fields.
-        "{\"version\":1,\"table\":\"db.tbl\",\"offset\":0,\"limit\":10}",
-        "{\"version\":1,\"offset\":0,\"limit\":10,\"scan\":{}}"
+        "{\"table\":\"db.tbl\",\"offset\":0,\"limit\":10}",
+        "{\"offset\":0,\"limit\":10,\"scan\":{}}",
+        "{\"table\":\"db.tbl\",\"limit\":10,\"scan\":{}}",
+        // Fields of the wrong type.
+        "{\"table\":\"db.tbl\",\"offset\":\"first\",\"limit\":10,\"scan\":{}}",
+        "[\"db.tbl\",0,10]"
       })
   void testMalformedTokenPayloadsAreNotDecoded(String payload) {
     String planTask =

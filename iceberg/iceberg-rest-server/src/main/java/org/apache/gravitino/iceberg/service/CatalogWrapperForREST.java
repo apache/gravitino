@@ -96,15 +96,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
 
   /**
-   * Total order over file scan tasks, so that plan-task tokens, which address tasks by position,
-   * keep pointing at the same tasks when a plan is recomputed.
-   */
-  private static final Comparator<FileScanTask> FILE_SCAN_TASK_ORDER =
-      Comparator.comparing((FileScanTask task) -> task.file().location())
-          .thenComparingLong(FileScanTask::start)
-          .thenComparingLong(FileScanTask::length);
-
-  /**
    * Client-facing catalog property keys retained when building the IRC {@code /v1/config} defaults
    * and when extracting FileIO-derived config in {@link FederatedCatalogWrapper}.
    */
@@ -449,9 +440,29 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     try {
       Table table = getCatalog().loadTable(tableIdentifier);
-      // Pin the snapshot before planning so that plan-task tokens issued for this plan resolve
-      // against exactly the snapshot that was planned, even if the table changes meanwhile.
-      PlanTableScanRequest pinnedScanRequest = pinSnapshot(table, scanRequest);
+
+      // Pin the snapshot before planning so that plan-task tokens issued for this plan keep
+      // resolving to the snapshot that was planned, even if the table changes meanwhile. Requests
+      // that already name a snapshot, incremental requests (which pin a snapshot range) and tables
+      // without a current snapshot are planned exactly as they came in.
+      boolean snapshotAlreadyPinned =
+          scanRequest.snapshotId() != null
+              || scanRequest.startSnapshotId() != null
+              || scanRequest.endSnapshotId() != null
+              || table.currentSnapshot() == null;
+      PlanTableScanRequest pinnedScanRequest =
+          snapshotAlreadyPinned
+              ? scanRequest
+              : PlanTableScanRequest.builder()
+                  .withSnapshotId(table.currentSnapshot().snapshotId())
+                  .withSelect(scanRequest.select())
+                  .withFilter(scanRequest.filter())
+                  .withCaseSensitive(scanRequest.caseSensitive())
+                  .withUseSnapshotSchema(scanRequest.useSnapshotSchema())
+                  .withStatsFields(scanRequest.statsFields())
+                  .withMinRowsRequested(scanRequest.minRowsRequested())
+                  .build();
+
       PlanTableScanResponse fullPlan = planFullScan(tableIdentifier, table, pinnedScanRequest);
       PlanTableScanResponse response =
           splitIntoPlanTasks(tableIdentifier, pinnedScanRequest, fullPlan);
@@ -592,8 +603,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
 
     // Iceberg plans manifests in parallel, so the order tasks come back in is not reproducible.
-    // Sort them so positions stay stable across re-plans of the same snapshot.
-    fileScanTasks.sort(FILE_SCAN_TASK_ORDER);
+    // Order them totally: a plan-task token addresses tasks by position, so those positions must
+    // resolve to the same tasks across re-plans of the same snapshot.
+    fileScanTasks.sort(
+        Comparator.comparing((FileScanTask task) -> task.file().location())
+            .thenComparingLong(FileScanTask::start)
+            .thenComparingLong(FileScanTask::length));
 
     PlanTableScanResponse response;
     try {
@@ -658,31 +673,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       builder.withDeleteFiles(deleteFiles);
     }
     return builder.build();
-  }
-
-  /**
-   * Pins the snapshot a scan request plans against, so that plan-task tokens issued for the
-   * resulting plan keep resolving to the same snapshot after the table changes.
-   *
-   * <p>Requests that already name a snapshot, incremental requests (which pin a snapshot range) and
-   * scans of a table without a current snapshot are returned unchanged.
-   */
-  private static PlanTableScanRequest pinSnapshot(Table table, PlanTableScanRequest scanRequest) {
-    boolean isIncremental =
-        scanRequest.startSnapshotId() != null || scanRequest.endSnapshotId() != null;
-    if (scanRequest.snapshotId() != null || isIncremental || table.currentSnapshot() == null) {
-      return scanRequest;
-    }
-
-    return PlanTableScanRequest.builder()
-        .withSnapshotId(table.currentSnapshot().snapshotId())
-        .withSelect(scanRequest.select())
-        .withFilter(scanRequest.filter())
-        .withCaseSensitive(scanRequest.caseSensitive())
-        .withUseSnapshotSchema(scanRequest.useSnapshotSchema())
-        .withStatsFields(scanRequest.statsFields())
-        .withMinRowsRequested(scanRequest.minRowsRequested())
-        .build();
   }
 
   /**
