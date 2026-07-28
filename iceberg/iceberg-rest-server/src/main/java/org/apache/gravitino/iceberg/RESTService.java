@@ -36,6 +36,7 @@ import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
+import org.apache.gravitino.iceberg.service.deletion.IcebergTableDeletionLifecycle;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceHookDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
@@ -83,6 +84,7 @@ public class RESTService implements GravitinoAuxiliaryService {
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
   private Optional<IcebergCleanupManager> cleanupManager;
+  private IcebergTableDeletionLifecycle deletionLifecycle;
   private IcebergConfigProvider configProvider;
   private boolean auxMode;
 
@@ -125,6 +127,14 @@ public class RESTService implements GravitinoAuxiliaryService {
             auxMode,
             skipAuthorizationForRestBackend,
             icebergCatalogWrapperManager);
+    this.deletionLifecycle = new IcebergTableDeletionLifecycle(icebergConfig, auxMode);
+    Optional<IcebergTableDeletionLifecycle> deletionLifecycleForOperations =
+        deletionLifecycle.manages(false) ? Optional.of(deletionLifecycle) : Optional.empty();
+    if (!auxMode && icebergConfig.get(IcebergConfig.SOFT_DELETE_ENABLED)) {
+      LOG.warn(
+          "Iceberg REST soft delete is currently supported only in auxiliary mode; "
+              + "the standalone service will keep legacy DELETE behavior.");
+    }
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     if (auxMode) {
       // Async cleanup reuses the entity store's shared relational backend (connection pool +
@@ -146,11 +156,13 @@ public class RESTService implements GravitinoAuxiliaryService {
     // The raw namespace operation executor is shared with the table and view hook dispatchers so
     // their orphan-schema cleanup can probe namespace existence without firing namespace events.
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
-        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
+        new IcebergNamespaceOperationExecutor(
+            icebergCatalogWrapperManager, cleanupManager, deletionLifecycleForOperations);
 
     // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
-        new IcebergTableOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
+        new IcebergTableOperationExecutor(
+            icebergCatalogWrapperManager, cleanupManager, deletionLifecycleForOperations);
     IcebergTableOperationDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {
@@ -192,6 +204,7 @@ public class RESTService implements GravitinoAuxiliaryService {
             }
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
+            bind(deletionLifecycle).to(IcebergTableDeletionLifecycle.class).ranked(1);
             cleanupManager.ifPresent(
                 manager -> bind(manager).to(IcebergCleanupManager.class).ranked(1));
             bind(icebergTableDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
