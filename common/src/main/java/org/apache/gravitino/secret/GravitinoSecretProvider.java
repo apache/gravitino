@@ -29,14 +29,14 @@ public interface GravitinoSecretProvider {
   /**
    * Initializes this provider after construction.
    *
-   * <p>The default implementation is a no-op so providers that need no configuration (for example
-   * in-memory) can keep a no-arg constructor only.
+   * <p>Implementations must override this method and explicitly decide whether configuration is
+   * required. An empty body is acceptable for providers that need no setup.
    *
    * @param name the configured provider instance name
    * @param config provider-specific configuration (without the {@code gravitino.secret.provider.
    *     <name>.} prefix)
    */
-  default void initialize(String name, Map<String, String> config) {}
+  void initialize(String name, Map<String, String> config);
 
   /**
    * Returns the provider type identifier.
@@ -72,7 +72,8 @@ public interface GravitinoSecretProvider {
   /**
    * Releases resources owned by this provider.
    *
-   * <p>The default implementation is a no-op.
+   * <p>Implementations must override this method and explicitly release any held resources. An
+   * empty body is acceptable when there is nothing to clean up.
    */
-  default void close() {}
+  void close();
 }

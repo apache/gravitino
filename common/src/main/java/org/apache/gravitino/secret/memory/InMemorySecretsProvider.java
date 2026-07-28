@@ -21,6 +21,7 @@ package org.apache.gravitino.secret.memory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.gravitino.secret.GravitinoSecretProvider;
 import org.apache.gravitino.secret.SecretUrn;
@@ -36,6 +37,11 @@ import org.apache.gravitino.secret.SecretWriteContext;
 public class InMemorySecretsProvider implements GravitinoSecretProvider {
 
   private final ConcurrentHashMap<String, String> secrets = new ConcurrentHashMap<>();
+
+  @Override
+  public void initialize(String name, Map<String, String> config) {
+    // No configuration required for the in-memory provider.
+  }
 
   @Override
   public String type() {
@@ -73,5 +79,10 @@ public class InMemorySecretsProvider implements GravitinoSecretProvider {
   @Override
   public void deleteSecret(String urn) {
     secrets.remove(urn);
+  }
+
+  @Override
+  public void close() {
+    // No resources to release beyond the in-process map retained for the provider lifetime.
   }
 }
