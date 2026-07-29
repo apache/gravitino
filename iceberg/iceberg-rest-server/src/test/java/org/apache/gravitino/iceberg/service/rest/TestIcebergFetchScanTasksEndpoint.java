@@ -123,7 +123,7 @@ public class TestIcebergFetchScanTasksEndpoint extends IcebergNamespaceTestBase 
   void testTasksEndpointRejectsAnUnknownPlanTask() {
     createNamespaceAndTable();
 
-    Response response = doFetchScanTasks("unknown-token");
+    Response response = doFetchScanTasks("not-a-plan-task");
 
     Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
   }

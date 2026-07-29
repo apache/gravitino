@@ -566,13 +566,13 @@ public class IcebergTableOperations {
 
   /**
    * Fetch scan tasks endpoint. Completes the second step of the Iceberg REST two-step scan planning
-   * protocol: a client exchanges a {@code plan-task} token handed out by {@code POST
-   * .../tables/{table}/plan} for the scan tasks that token covers.
+   * protocol: a client exchanges a {@code plan-task} handed out by {@code POST
+   * .../tables/{table}/plan} for the scan tasks it covers.
    *
    * @param prefix The catalog prefix
    * @param namespace The namespace
    * @param table The table name
-   * @param request The request containing the {@code plan-task} token
+   * @param request The request containing the {@code plan-task}
    * @return Response containing the scan tasks for the given plan task
    */
   @POST

@@ -253,11 +253,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     dummyEventListener.clearEvent();
 
-    // A token this server never issued is an unknown plan task, reported as 404 per the Iceberg
-    // REST spec. Redeeming a real token is covered by TestIcebergFetchScanTasksEndpoint.
+    // A plan task this server never issued is unknown, reported as 404 per the Iceberg REST spec.
+    // Redeeming a real plan task is covered by TestIcebergFetchScanTasksEndpoint.
     Response response =
         doFetchScanTasks(
-            namespace, "fetch_tasks_table", new FetchScanTasksRequest("unknown-token"));
+            namespace, "fetch_tasks_table", new FetchScanTasksRequest("not-a-plan-task"));
     Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 
     // Assert on the error payload, not just the status: an unregistered route would also yield
@@ -265,7 +265,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     ErrorResponse error = response.readEntity(ErrorResponse.class);
     Assertions.assertEquals("NoSuchPlanTaskException", error.type());
     Assertions.assertTrue(
-        error.message().contains("unknown-token"),
+        error.message().contains("not-a-plan-task"),
         "Error message should name the rejected plan task, but was: " + error.message());
 
     Assertions.assertTrue(
@@ -282,7 +282,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     // A missing table is reported as a missing table, not masked as an unknown plan task.
     Response response =
-        doFetchScanTasks(namespace, "missing_table", new FetchScanTasksRequest("any-token"));
+        doFetchScanTasks(namespace, "missing_table", new FetchScanTasksRequest("any-plan-task"));
     Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
 
     ErrorResponse error = response.readEntity(ErrorResponse.class);

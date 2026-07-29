@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestPlanTaskToken {
+public class TestPlanTaskCodec {
 
   private static final TableIdentifier TABLE = TableIdentifier.of(Namespace.of("db"), "tbl");
 
@@ -47,41 +47,41 @@ public class TestPlanTaskToken {
             .withStatsFields(ImmutableList.of("id"))
             .build();
 
-    PlanTaskToken token =
-        PlanTaskToken.decode(PlanTaskToken.encode(TABLE, scanRequest, 1000, 500))
-            .orElseThrow(() -> new AssertionError("Token should decode"));
+    PlanTaskCodec.PlanTask planTask =
+        PlanTaskCodec.decode(PlanTaskCodec.encode(TABLE, scanRequest, 1000, 500))
+            .orElseThrow(() -> new AssertionError("Plan task should decode"));
 
-    Assertions.assertTrue(token.matchesTable(TABLE));
-    Assertions.assertEquals(1000, token.offset());
-    Assertions.assertEquals(500, token.limit());
-    Assertions.assertEquals(42L, token.scanRequest().snapshotId());
-    Assertions.assertEquals(ImmutableList.of("id", "data"), token.scanRequest().select());
+    Assertions.assertTrue(planTask.matchesTable(TABLE));
+    Assertions.assertEquals(1000, planTask.offset());
+    Assertions.assertEquals(500, planTask.limit());
+    Assertions.assertEquals(42L, planTask.scanRequest().snapshotId());
+    Assertions.assertEquals(ImmutableList.of("id", "data"), planTask.scanRequest().select());
     Assertions.assertEquals(
-        scanRequest.filter().toString(), token.scanRequest().filter().toString());
-    Assertions.assertFalse(token.scanRequest().caseSensitive());
-    Assertions.assertEquals(ImmutableList.of("id"), token.scanRequest().statsFields());
+        scanRequest.filter().toString(), planTask.scanRequest().filter().toString());
+    Assertions.assertFalse(planTask.scanRequest().caseSensitive());
+    Assertions.assertEquals(ImmutableList.of("id"), planTask.scanRequest().statsFields());
   }
 
   @Test
-  void testTokenIsRejectedForAnotherTable() {
-    PlanTaskToken token =
-        PlanTaskToken.decode(
-                PlanTaskToken.encode(TABLE, PlanTableScanRequest.builder().build(), 0, 10))
-            .orElseThrow(() -> new AssertionError("Token should decode"));
+  void testPlanTaskIsRejectedForAnotherTable() {
+    PlanTaskCodec.PlanTask planTask =
+        PlanTaskCodec.decode(
+                PlanTaskCodec.encode(TABLE, PlanTableScanRequest.builder().build(), 0, 10))
+            .orElseThrow(() -> new AssertionError("Plan task should decode"));
 
-    Assertions.assertFalse(token.matchesTable(TableIdentifier.of(Namespace.of("db"), "other")));
-    Assertions.assertFalse(token.matchesTable(TableIdentifier.of(Namespace.of("other"), "tbl")));
+    Assertions.assertFalse(planTask.matchesTable(TableIdentifier.of(Namespace.of("db"), "other")));
+    Assertions.assertFalse(planTask.matchesTable(TableIdentifier.of(Namespace.of("other"), "tbl")));
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"", "unknown-token", "not base64 at all!", "e30", "bm90IGpzb24"})
-  void testTokensThisServerDidNotIssueAreNotDecoded(String planTask) {
-    Assertions.assertEquals(Optional.empty(), PlanTaskToken.decode(planTask));
+  void testPlanTasksThisServerDidNotIssueAreNotDecoded(String planTask) {
+    Assertions.assertEquals(Optional.empty(), PlanTaskCodec.decode(planTask));
   }
 
   @Test
-  void testNullTokenIsNotDecoded() {
-    Assertions.assertEquals(Optional.empty(), PlanTaskToken.decode(null));
+  void testNullPlanTaskIsNotDecoded() {
+    Assertions.assertEquals(Optional.empty(), PlanTaskCodec.decode(null));
   }
 
   @ParameterizedTest
@@ -98,19 +98,19 @@ public class TestPlanTaskToken {
         "{\"table\":\"db.tbl\",\"offset\":\"first\",\"limit\":10,\"scan\":{}}",
         "[\"db.tbl\",0,10]"
       })
-  void testMalformedTokenPayloadsAreNotDecoded(String payload) {
+  void testMalformedPayloadsAreNotDecoded(String payload) {
     String planTask =
         Base64.getUrlEncoder()
             .withoutPadding()
             .encodeToString(payload.getBytes(StandardCharsets.UTF_8));
 
-    Assertions.assertEquals(Optional.empty(), PlanTaskToken.decode(planTask));
+    Assertions.assertEquals(Optional.empty(), PlanTaskCodec.decode(planTask));
   }
 
   @Test
-  void testTokenIsUrlSafe() {
+  void testPlanTaskIsUrlSafe() {
     String planTask =
-        PlanTaskToken.encode(
+        PlanTaskCodec.encode(
             TableIdentifier.of(Namespace.of("db"), "tbl"),
             PlanTableScanRequest.builder().withFilter(Expressions.equal("data", "a/b+c=d")).build(),
             0,
@@ -118,6 +118,6 @@ public class TestPlanTaskToken {
 
     Assertions.assertTrue(
         planTask.matches("[A-Za-z0-9_-]+"),
-        "Plan task tokens travel in JSON bodies and logs, but was: " + planTask);
+        "Plan tasks travel in JSON bodies and logs, but was: " + planTask);
   }
 }

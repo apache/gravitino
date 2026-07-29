@@ -567,7 +567,7 @@ public class TestCatalogWrapperForREST {
     String expectedPath = "/v1/upstream/namespaces/db/tables/tbl/tasks";
 
     // Plan tasks are minted by the remote catalog in a federated setup, so this wrapper only has to
-    // hand the token back and return whatever the remote catalog answers.
+    // hand the plan task back and return whatever the remote catalog answers.
     FetchScanTasksResponse upstreamResponse =
         FetchScanTasksResponse.builder()
             .withPlanTasks(Collections.singletonList("upstream-next-token"))

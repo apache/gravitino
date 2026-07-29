@@ -407,8 +407,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    *
    * <p>At most {@link IcebergConfig#SCAN_PLAN_TASK_BATCH_SIZE} file scan tasks are returned inline.
    * When a scan plans more tasks than that, the remainder is handed out as {@code plan-tasks}
-   * tokens that the client exchanges for the rest of the tasks through {@link #fetchScanTasks}, so
-   * one response never has to carry a plan of unbounded size.
+   * {@code plan-tasks} that the client exchanges for the rest of the tasks through {@link
+   * #fetchScanTasks}, so one response never has to carry a plan of unbounded size.
    *
    * <p>When {@code requestCredentialVending} is true and the table is eligible (non-local,
    * non-HDFS), storage credentials are injected directly into the response using the table already
@@ -444,7 +444,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     try {
       Table table = getCatalog().loadTable(tableIdentifier);
 
-      // Pin the snapshot before planning so that plan-task tokens issued for this plan keep
+      // Pin the snapshot before planning so that plan tasks issued for this plan keep
       // resolving to the snapshot that was planned, even if the table changes meanwhile. Requests
       // that already name a snapshot, incremental requests (which pin a snapshot range) and tables
       // without a current snapshot are planned exactly as they came in.
@@ -489,46 +489,46 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   /**
-   * Fetch the scan tasks covered by a {@code plan-task} token previously handed out by {@link
+   * Fetch the scan tasks covered by a {@code plan-task} previously handed out by {@link
    * #planTableScan}, completing the second step of the Iceberg REST scan planning protocol.
    *
-   * <p>Tokens are self-describing (see {@link PlanTaskToken}): each one carries the scan request it
-   * was planned from, with the snapshot pinned at planning time, plus the range of file scan tasks
-   * it stands for. The plan is reproduced here from the {@linkplain ScanPlanCache scan plan cache}
-   * when it is still cached and re-planned against the pinned snapshot otherwise, then the token's
-   * range is returned. Because no state is kept between the two calls, a token remains redeemable
-   * after a server restart and on any Gravitino instance serving the same catalog.
+   * <p>A plan task describes its own unit of work (see {@link PlanTaskCodec}): the scan request the
+   * plan was produced from, with the snapshot pinned at planning time, plus the range of file scan
+   * tasks it stands for. The plan is reproduced here from the {@linkplain ScanPlanCache scan plan
+   * cache} when it is still cached and re-planned against the pinned snapshot otherwise, then that
+   * range is returned. Because no state is kept between the two calls, a plan task remains
+   * redeemable after a server restart and on any Gravitino instance serving the same catalog.
    *
    * @param tableIdentifier the table the plan task belongs to.
-   * @param request the request carrying the {@code plan-task} token.
-   * @return the file scan tasks the token covers.
+   * @param request the request carrying the {@code plan-task}.
+   * @return the file scan tasks the plan task covers.
    * @throws org.apache.iceberg.exceptions.NoSuchTableException if the table doesn't exist.
-   * @throws NoSuchPlanTaskException if the token was not issued for this table, or the plan it
+   * @throws NoSuchPlanTaskException if the plan task was not issued for this table, or the plan it
    *     refers to can no longer be reproduced (for example its snapshot has expired).
    */
   @SuppressWarnings("deprecation")
   public FetchScanTasksResponse fetchScanTasks(
       TableIdentifier tableIdentifier, FetchScanTasksRequest request) {
-    Optional<PlanTaskToken> decodedToken = PlanTaskToken.decode(request.planTask());
+    Optional<PlanTaskCodec.PlanTask> decoded = PlanTaskCodec.decode(request.planTask());
 
     // Validate the table exists first, so a bad table reports 404 for the table rather than
     // masking it as an unknown plan task. Consistent with planTableScan behavior.
     Table table = getCatalog().loadTable(tableIdentifier);
 
-    if (!decodedToken.isPresent() || !decodedToken.get().matchesTable(tableIdentifier)) {
+    if (!decoded.isPresent() || !decoded.get().matchesTable(tableIdentifier)) {
       LOG.info(
           "Rejecting unknown plan task '{}' for table {}", request.planTask(), tableIdentifier);
       throw new NoSuchPlanTaskException(
           "Plan task %s was not issued for table %s", request.planTask(), tableIdentifier);
     }
 
-    PlanTaskToken token = decodedToken.get();
+    PlanTaskCodec.PlanTask planTask = decoded.get();
     PlanTableScanResponse fullPlan;
     try {
-      fullPlan = planFullScan(tableIdentifier, table, token.scanRequest());
+      fullPlan = planFullScan(tableIdentifier, table, planTask.scanRequest());
     } catch (IllegalArgumentException e) {
-      // The pinned snapshot is gone (expired or rolled back), so the plan the token refers to can
-      // no longer be reproduced. That is a stale plan task, not a bad request.
+      // The pinned snapshot is gone (expired or rolled back), so the plan the plan task refers to
+      // can no longer be reproduced. That is a stale plan task, not a bad request.
       LOG.info(
           "Plan task '{}' for table {} can no longer be planned: {}",
           request.planTask(),
@@ -541,12 +541,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     List<FileScanTask> allTasks = fullPlan.fileScanTasks();
     int taskCount = allTasks == null ? 0 : allTasks.size();
-    if (token.offset() >= taskCount) {
+    if (planTask.offset() >= taskCount) {
       LOG.info(
           "Plan task '{}' for table {} covers tasks from offset {}, but the plan has {} tasks",
           request.planTask(),
           tableIdentifier,
-          token.offset(),
+          planTask.offset(),
           taskCount);
       throw new NoSuchPlanTaskException(
           "Plan task %s is no longer available for table %s", request.planTask(), tableIdentifier);
@@ -554,12 +554,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     List<FileScanTask> batch =
         ImmutableList.copyOf(
-            allTasks.subList(token.offset(), Math.min(token.offset() + token.limit(), taskCount)));
+            allTasks.subList(
+                planTask.offset(), Math.min(planTask.offset() + planTask.limit(), taskCount)));
     LOG.info(
         "Returning {} file scan tasks for plan task of table {} at offset {}",
         batch.size(),
         tableIdentifier,
-        token.offset());
+        planTask.offset());
 
     // withFileScanTasks derives the response's delete files from the tasks, so a merge-on-read
     // batch carries the delete files its tasks reference by index.
@@ -573,8 +574,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * Plans the whole scan and returns every file scan task inline, serving the {@linkplain
    * ScanPlanCache scan plan cache} when the same plan was computed before.
    *
-   * <p>Tasks are ordered deterministically so that a plan-task token, which addresses tasks by
-   * position, resolves to the same tasks on a later re-plan of the same snapshot.
+   * <p>Tasks are ordered deterministically so that a plan task, which addresses tasks by position,
+   * resolves to the same tasks on a later re-plan of the same snapshot.
    */
   private PlanTableScanResponse planFullScan(
       TableIdentifier tableIdentifier, Table table, PlanTableScanRequest scanRequest) {
@@ -603,7 +604,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
 
     // Iceberg plans manifests in parallel, so the order tasks come back in is not reproducible.
-    // Order them totally: a plan-task token addresses tasks by position, so those positions must
+    // Order them totally: a plan task addresses tasks by position, so those positions must
     // resolve to the same tasks across re-plans of the same snapshot.
     fileScanTasks.sort(
         Comparator.comparing((FileScanTask task) -> task.file().location())
@@ -628,8 +629,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   /**
    * Keeps the first {@link IcebergConfig#SCAN_PLAN_TASK_BATCH_SIZE} file scan tasks of {@code
-   * fullPlan} inline and turns the remaining tasks into {@code plan-tasks} tokens, so a single
-   * response never carries an unbounded plan.
+   * fullPlan} inline and turns the remaining tasks into {@code plan-tasks}, so a single response
+   * never carries an unbounded plan.
    *
    * <p>Returns {@code fullPlan} unchanged when batching is disabled or the plan already fits in one
    * batch, which is the common case and keeps a plan a client can consume without a second call.
@@ -651,7 +652,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         offset < allTasks.size();
         offset += scanPlanTaskBatchSize) {
       planTasks.add(
-          PlanTaskToken.encode(tableIdentifier, scanRequest, offset, scanPlanTaskBatchSize));
+          PlanTaskCodec.encode(tableIdentifier, scanRequest, offset, scanPlanTaskBatchSize));
     }
 
     List<FileScanTask> firstBatch =
