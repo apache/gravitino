@@ -66,6 +66,12 @@ single-metalake mode this is resolved against the current Trino catalog. In mult
 cannot be resolved reliably, so loading such a view fails with an error instead of silently
 resolving to a possibly incorrect catalog.
 
+For Hive-backed catalogs, Trino dialect views are stored using Trino's own native "Presto View"
+Hive Metastore format, so views are interoperable with a native Trino (or Presto) Hive connector
+pointed at the same Hive Metastore: a view created directly through a native Trino Hive connector
+is visible and queryable through Gravitino, and a view created through Gravitino is visible and
+queryable through a native Trino Hive connector.
+
 ### Transactions
 
 - [START TRANSACTION](https://trino.io/docs/current/sql/start-transaction.html)

@@ -9,5 +9,6 @@ call gravitino.system.create_catalog(
 
 CREATE CATALOG native_hive USING hive
 WITH (
-    "hive.metastore.uri" = '${hive_uri}'
+    "hive.metastore.uri" = '${hive_uri}',
+    "fs.hadoop.enabled" = 'true'
 );

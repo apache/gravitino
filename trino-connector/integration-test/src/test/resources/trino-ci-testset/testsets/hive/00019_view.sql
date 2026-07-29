@@ -34,9 +34,10 @@ DROP VIEW gt_hive.gt_hive_view_db.v03;
 DROP VIEW gt_hive.gt_hive_view_db.nonexistent_view;
 CREATE VIEW gt_hive.gt_hive_view_db.t01 AS SELECT 1;
 
--- native Trino view interop: a view created directly through Trino's own Hive connector
--- (bypassing Gravitino) encodes its body in Trino's internal format, not plain SQL, so it must
--- not be exposed as a readable Trino view through Gravitino.
+-- native Trino view interop: a view created directly through Trino's own native Hive connector
+-- (bypassing Gravitino) is encoded using Trino's own native "Presto View" format; Gravitino's
+-- Trino connector recognizes this format directly, so the view is visible and queryable through
+-- gt_hive too, without going through Gravitino at all to create it.
 CREATE VIEW native_hive.gt_hive_view_db.native_v01 AS SELECT id, name FROM native_hive.gt_hive_view_db.t01;
 SHOW TABLES FROM gt_hive.gt_hive_view_db;
 SELECT * FROM gt_hive.gt_hive_view_db.native_v01 ORDER BY id;

@@ -49,9 +49,11 @@ DROP VIEW
 
 CREATE VIEW
 
+"native_v01"
 "t01"
 
-<QUERY_FAILED> Table 'gt_hive.gt_hive_view_db.native_v01' does not exist
+"1","alice"
+"2","bob"
 
 DROP VIEW
 
