@@ -339,12 +339,7 @@ public class RelationalEntityStore
       Entity.EntityType srcType,
       NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException {
-    List<E> backendEntities = backend.listEntitiesByRelation(relType, srcIdentifier, srcType, true);
-    return backendEntities.stream()
-        .filter(e -> e.nameIdentifier().equals(destEntityIdent))
-        .findFirst()
-        .orElseThrow(
-            () -> new NoSuchEntityException("No such entity with ident: %s", destEntityIdent));
+    return backend.getEntityByRelation(relType, srcIdentifier, srcType, destEntityIdent);
   }
 
   @Override
