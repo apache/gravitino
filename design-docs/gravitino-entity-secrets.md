@@ -55,10 +55,20 @@ scope for this design (the SPI remains open for them).
 
 ## 2. Goals
 
-1. **Secrets SPI**: define a pluggable `GravitinoSecretProvider` for write /
+1. **Secrets provider interface**: define a pluggable `GravitinoSecretProvider` for write /
    read / delete of secret material behind durable **references**.
 
-2. **REST + persistence split**: HTTP **`properties`** stays **`map<string, string>`**; optional
+2. **Learn from existing `KmsClient` patterns, without reusing it**: follow the same
+   server-side style already used by `KmsClient` / `KmsClientFactory` / named conf instances
+   (factory + registry + credentials stay off the reference object). Do **not** extend or call
+   `KmsClient` for entity secrets: that API **inspects encryption keys**
+   (`getKeyProperties(KmsReference)`) under `gravitino.kms.*` and does **not** read/write opaque
+   secret strings (for example `jdbc-password`). KMS backends (Transit / cloud KMS) are a
+   different product surface from secret stores (KV / Secrets Manager). Entity secrets need
+   `writeSecret` / `readSecret` / `deleteSecret`, URN persistence, and
+   `gravitino.secret.provider.*`.
+
+3. **REST + persistence split**: HTTP **`properties`** stays **`map<string, string>`**; optional
    **`secretReferences`** (key → locator object; server **builds** the URN) and/or
    **`secretBindings`** (key → provider name for write-through) mark secrets on **create**; **alter**
    adds `@type`s **`setSecretBinding`** / **`setSecretReference`** (§5.9.4) for **catalog, schema, and
@@ -68,21 +78,21 @@ scope for this design (the SPI remains open for them).
    Whether to `deleteSecret` on entity drop is decided from the **URN shape** (write-through embeds
    `entityType`/`entityId`/`propertyKey` — §5.5.2 C), not a second reserved list.
 
-3. **Backend registry**: register named secrets-provider instances in **server configuration
+4. **Backend registry**: register named secrets-provider instances in **server configuration
    files**. Catalogs reference instances by **`provider_name` in the secret URN**. Clients
    **discover** registered names via read-only `GET /api/secrets/providers` (§5.9.6) —
    registration is still conf-only (no CRUD REST).
 
-4. **Backward compatible reads**: existing all-string entity properties continue to
+5. **Backward compatible reads**: existing all-string entity properties continue to
    work as plaintext with no migration required.
 
-5. **Omit secrets on GET/list and audit**: GET/list **omit** any key listed in
+6. **Omit secrets on GET/list and audit**: GET/list **omit** any key listed in
    persisted **`gravitino.secret.keys`** (same strip behavior as today's `PropertiesMetadata.hidden`).
 
-6. **In-memory provider**: ship a process-local `InMemorySecretsProvider` for UT / IT / local
+7. **In-memory provider**: ship a process-local `InMemorySecretsProvider` for UT / IT / local
    quick-start (not for production).
 
-7. **Server-side resolution only**: resolve references on the Gravitino server when loading
+8. **Server-side resolution only**: resolve references on the Gravitino server when loading
    catalogs / schemas / filesets or connecting; call `readSecret` **on each use**.
 
 ## 3. Non-Goals
