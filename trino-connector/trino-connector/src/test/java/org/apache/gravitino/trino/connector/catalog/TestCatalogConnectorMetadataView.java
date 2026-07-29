@@ -251,11 +251,14 @@ public class TestCatalogConnectorMetadataView {
   @Test
   public void testCreateViewReplaceAppliesPropertyChanges() {
     // ViewChange.replaceView() does not affect properties, so CREATE OR REPLACE VIEW must apply
-    // any property diff itself.
+    // any property diff itself. Only additions/updates are applied - not removals - since the
+    // view's current properties can include catalog-internal/reserved entries (e.g. Hive's
+    // transient_lastDdlTime) that must never be targeted for removal.
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.viewExists(any())).thenReturn(true);
     View existingView = createView(Dialects.TRINO, "select 1");
-    when(existingView.properties()).thenReturn(Map.of("keep", "same", "remove_me", "x"));
+    when(existingView.properties())
+        .thenReturn(Map.of("keep", "same", "transient_lastDdlTime", "12345"));
     when(viewCatalog.loadView(any())).thenReturn(existingView);
 
     CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
@@ -282,20 +285,13 @@ public class TestCatalogConnectorMetadataView {
                     c instanceof ViewChange.SetProperty
                         && "add_me".equals(((ViewChange.SetProperty) c).getProperty())
                         && "y".equals(((ViewChange.SetProperty) c).getValue())));
-    assertTrue(
-        changes.stream()
-            .anyMatch(
-                c ->
-                    c instanceof ViewChange.RemoveProperty
-                        && "remove_me".equals(((ViewChange.RemoveProperty) c).getProperty())));
+    assertTrue(changes.stream().noneMatch(c -> c instanceof ViewChange.RemoveProperty));
     assertTrue(
         changes.stream()
             .noneMatch(
                 c ->
-                    (c instanceof ViewChange.SetProperty
-                            && "keep".equals(((ViewChange.SetProperty) c).getProperty()))
-                        || (c instanceof ViewChange.RemoveProperty
-                            && "keep".equals(((ViewChange.RemoveProperty) c).getProperty()))));
+                    c instanceof ViewChange.SetProperty
+                        && "keep".equals(((ViewChange.SetProperty) c).getProperty())));
   }
 
   @Test

@@ -767,14 +767,19 @@ public class CatalogConnectorMetadata {
   }
 
   /**
-   * Computes the {@link ViewChange} operations needed to make a view's stored properties match
-   * {@code desired}, so that {@code CREATE OR REPLACE VIEW ... WITH (...)} applies the new
-   * properties instead of silently leaving the old ones in place ({@link ViewChange#replaceView}
-   * does not affect properties).
+   * Computes the {@link ViewChange} operations needed to apply {@code desired} on top of a view's
+   * current properties, so that {@code CREATE OR REPLACE VIEW ... WITH (...)} applies the new
+   * properties instead of silently leaving them unset ({@link ViewChange#replaceView} does not
+   * affect properties).
+   *
+   * <p>Only additions/updates are applied, never removals: {@code current} is the view's full
+   * underlying property map, which can include catalog-internal/reserved entries (e.g. Hive's
+   * {@code transient_lastDdlTime}) that this connector does not own and must not attempt to remove,
+   * so a key absent from {@code desired} is left untouched rather than being deleted.
    *
    * @param current the view's current properties
    * @param desired the view's desired properties after the replace
-   * @return the property changes needed to go from {@code current} to {@code desired}
+   * @return the property changes needed to apply {@code desired} onto {@code current}
    */
   private static List<ViewChange> computePropertyChanges(
       Map<String, String> current, Map<String, String> desired) {
@@ -782,11 +787,6 @@ public class CatalogConnectorMetadata {
     for (Map.Entry<String, String> entry : desired.entrySet()) {
       if (!Objects.equals(current.get(entry.getKey()), entry.getValue())) {
         changes.add(ViewChange.setProperty(entry.getKey(), entry.getValue()));
-      }
-    }
-    for (String key : current.keySet()) {
-      if (!desired.containsKey(key)) {
-        changes.add(ViewChange.removeProperty(key));
       }
     }
     return changes;
