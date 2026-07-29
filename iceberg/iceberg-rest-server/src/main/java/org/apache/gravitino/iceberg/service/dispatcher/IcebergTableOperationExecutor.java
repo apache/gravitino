@@ -148,6 +148,10 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       deletionLifecycle.get().delete(context, tableIdentifier, purgeRequested);
       return;
     }
+    // Disabling soft delete stops creating and collecting retained deletions, but existing
+    // generations must remain hidden and reserved until the feature is re-enabled or their
+    // already-linked cleanup job finishes.
+    rejectReservedName(context, tableIdentifier, false);
     IcebergCatalogWrapper wrapper =
         icebergCatalogWrapperManager.getCatalogWrapper(context.catalogName());
     if (!purgeRequested) {

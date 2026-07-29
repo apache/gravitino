@@ -77,8 +77,10 @@ public class IcebergCleanupManager implements AutoCloseable {
   private final long pollIntervalMs;
   private final long heartbeatTimeoutMs;
   private final long retentionMs;
+  private final long shutdownTimeoutMs;
   private final ThreadPoolExecutor deleteExecutor;
   @Nullable private final IcebergRetainedDeletionRegistrationCleaner registrationCleaner;
+  @Nullable private final IcebergRetainedDeletionPurgeCoordinator retainedDeletionCoordinator;
   // Heartbeat token per job this manager currently owns, keyed by id. The scheduler renews it and a
   // worker reads it for the terminal CAS; refreshHeartbeats drops the entry once a peer reclaims.
   private final Map<Long, Long> ownedHeartbeats = new ConcurrentHashMap<>();
@@ -88,6 +90,7 @@ public class IcebergCleanupManager implements AutoCloseable {
 
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final AtomicBoolean closed = new AtomicBoolean(false);
+  private boolean closeComplete;
   private ExecutorService workers;
   private ScheduledExecutorService scheduler;
 
@@ -98,7 +101,7 @@ public class IcebergCleanupManager implements AutoCloseable {
    * @param config Iceberg REST server config
    */
   public IcebergCleanupManager(IcebergCleanupJobStore store, IcebergConfig config) {
-    this(store, config, null);
+    this(store, config, null, null);
   }
 
   /**
@@ -117,8 +120,44 @@ public class IcebergCleanupManager implements AutoCloseable {
       IcebergCleanupJobStore store,
       IcebergConfig config,
       @Nullable IcebergRetainedDeletionRegistrationCleaner registrationCleaner) {
+    this(store, config, registrationCleaner, null);
+  }
+
+  /**
+   * Creates an async cleanup manager with retained-deletion collection and registration handling.
+   *
+   * @param store the cleanup job store backed by the entity store's relational backend
+   * @param config Iceberg REST server config
+   * @param registrationCleaner retained-table registration cleaner, or {@code null} when retained
+   *     deletion jobs are not enabled
+   * @param retainedDeletionCoordinator retained-deletion collector, or {@code null} when soft
+   *     delete is not enabled
+   */
+  public IcebergCleanupManager(
+      IcebergCleanupJobStore store,
+      IcebergConfig config,
+      @Nullable IcebergRetainedDeletionRegistrationCleaner registrationCleaner,
+      @Nullable IcebergRetainedDeletionPurgeCoordinator retainedDeletionCoordinator) {
+    this(store, config, registrationCleaner, retainedDeletionCoordinator, 5_000L);
+  }
+
+  IcebergCleanupManager(
+      IcebergCleanupJobStore store,
+      IcebergConfig config,
+      @Nullable IcebergRetainedDeletionRegistrationCleaner registrationCleaner,
+      @Nullable IcebergRetainedDeletionPurgeCoordinator retainedDeletionCoordinator,
+      long shutdownTimeoutMs) {
+    if (retainedDeletionCoordinator != null && registrationCleaner == null) {
+      throw new IllegalArgumentException(
+          "A retained-deletion coordinator requires a registration cleaner");
+    }
+    if (shutdownTimeoutMs <= 0) {
+      throw new IllegalArgumentException("shutdownTimeoutMs must be positive");
+    }
     this.store = store;
     this.registrationCleaner = registrationCleaner;
+    this.retainedDeletionCoordinator = retainedDeletionCoordinator;
+    this.shutdownTimeoutMs = shutdownTimeoutMs;
     this.workerThreads = config.get(IcebergConfig.ASYNC_CLEANUP_WORKER_THREADS);
     int deleteThreads = config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_THREADS);
     this.deleteBatchSize = config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_BATCH_SIZE);
@@ -189,34 +228,48 @@ public class IcebergCleanupManager implements AutoCloseable {
       workers.submit(this::workerLoop);
     }
 
-    // One scheduler thread runs both periodic tasks: heartbeat renewal and row pruning.
-    this.scheduler = Executors.newScheduledThreadPool(1, daemon("iceberg-cleanup-heartbeat-prune"));
+    // Context discovery can call a remote Iceberg catalog. Give it a second scheduler thread so a
+    // slow collection tick cannot starve ownership heartbeats for jobs already deleting files.
+    this.scheduler = Executors.newScheduledThreadPool(2, daemon("iceberg-cleanup-scheduler"));
     long heartbeatIntervalMs = heartbeatTimeoutMs / 3L;
     scheduler.scheduleAtFixedRate(
         this::refreshHeartbeats, heartbeatIntervalMs, heartbeatIntervalMs, TimeUnit.MILLISECONDS);
     scheduler.scheduleAtFixedRate(this::prune, 1L, 1L, TimeUnit.HOURS);
+    if (retainedDeletionCoordinator != null) {
+      scheduler.scheduleAtFixedRate(
+          this::enqueueRetainedDeletions, 0L, pollIntervalMs, TimeUnit.MILLISECONDS);
+    }
   }
 
   @Override
-  public void close() {
-    if (!closed.compareAndSet(false, true)) {
+  public synchronized void close() {
+    if (closeComplete) {
       return;
     }
 
+    closed.set(true);
     running.set(false);
+    boolean terminated = true;
     if (scheduler != null) {
       scheduler.shutdownNow();
+      terminated &= awaitTermination(scheduler, shutdownTimeoutMs);
     }
     if (workers != null) {
       workers.shutdownNow();
-      awaitTermination(workers);
+      terminated &= awaitTermination(workers, shutdownTimeoutMs);
     }
     deleteExecutor.shutdownNow();
     // Wait for in-flight delete batches to observe the interrupt and stop, matching the workers
     // above, so close() does not return while file deletions are still running on a dying pool.
-    awaitTermination(deleteExecutor);
+    terminated &= awaitTermination(deleteExecutor, shutdownTimeoutMs);
     // The job store is backed by the entity store's shared relational backend, which owns the
     // connection pool lifecycle, so there is nothing to close here.
+    if (!terminated) {
+      // RESTService must not close catalog wrappers while a collector or registration cleaner may
+      // still be using them. Surface the failed shutdown so dependency teardown stops safely.
+      throw new IllegalStateException("Iceberg cleanup executors did not terminate");
+    }
+    closeComplete = true;
   }
 
   void cleanupFiles(FileIO io, String metadataLocation) {
@@ -456,6 +509,23 @@ public class IcebergCleanupManager implements AutoCloseable {
     }
   }
 
+  private void enqueueRetainedDeletions() {
+    IcebergRetainedDeletionPurgeCoordinator coordinator = retainedDeletionCoordinator;
+    if (coordinator == null) {
+      return;
+    }
+    try {
+      int enqueued = coordinator.enqueueEligibleDeletions(System.currentTimeMillis());
+      if (enqueued > 0) {
+        LOG.info("Enqueued {} retained Iceberg table deletion(s) for cleanup", enqueued);
+      }
+    } catch (Throwable t) {
+      // A ScheduledExecutorService suppresses every later invocation after one uncaught failure.
+      // Keep the state-driven collector alive: the next tick sees the same unclaimed deletions.
+      LOG.warn("Retained Iceberg deletion collection failed; the next tick will retry", t);
+    }
+  }
+
   // Collects unique manifests before deleting their data so advisory total progress is known up
   // front. Data-file paths are still streamed one manifest at a time and never accumulated.
   private void deleteDataFiles(FileIO io, TableMetadata metadata, Set<String> manifests) {
@@ -521,11 +591,12 @@ public class IcebergCleanupManager implements AutoCloseable {
     }
   }
 
-  private static void awaitTermination(ExecutorService pool) {
+  private static boolean awaitTermination(ExecutorService pool, long timeoutMs) {
     try {
-      pool.awaitTermination(5, TimeUnit.SECONDS);
+      return pool.awaitTermination(timeoutMs, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+      return false;
     }
   }
 

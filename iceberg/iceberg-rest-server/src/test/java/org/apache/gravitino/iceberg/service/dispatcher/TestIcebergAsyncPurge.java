@@ -177,6 +177,28 @@ class TestIcebergAsyncPurge {
     verify(lifecycle, never()).delete(any(), any(), anyBoolean());
   }
 
+  @Test
+  void testDisabledLifecycleStillRejectsDeleteOfReservedGeneration() {
+    CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
+    IcebergTableDeletionLifecycle lifecycle = mock(IcebergTableDeletionLifecycle.class);
+    IcebergRequestContext request = context(true);
+    when(lifecycle.manages(true)).thenReturn(false);
+    when(lifecycle.isNameReserved("cat", TABLE)).thenReturn(true);
+
+    Assertions.assertThrows(
+        NoSuchTableException.class,
+        () ->
+            tableExecutor(wrapper, Optional.of(cleanup), Optional.of(lifecycle))
+                .dropTable(request, TABLE, true));
+
+    verify(lifecycle, never()).delete(any(), any(), anyBoolean());
+    verify(wrapper, never()).dropTable(any());
+    verify(wrapper, never()).purgeTable(any());
+    verify(wrapper, never()).loadTableMetadata(any());
+    verify(cleanup, never()).addJob(any());
+  }
+
   // --- create / register tombstone ---
 
   @Test

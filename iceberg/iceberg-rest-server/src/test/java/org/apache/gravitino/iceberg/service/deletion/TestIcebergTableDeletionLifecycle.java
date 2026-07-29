@@ -236,6 +236,55 @@ public class TestIcebergTableDeletionLifecycle extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDisabledSoftDeleteStillReservesExistingDeletion() {
+    lifecycle(true, 86_400_000L).delete(requestContext, icebergIdentifier, false);
+    IcebergTableDeletionLifecycle disabled = lifecycle(false, 86_400_000L);
+
+    assertFalse(disabled.manages(false));
+    assertTrue(disabled.isNameReserved(CATALOG, icebergIdentifier));
+    assertEquals(
+        Set.of(TABLE), disabled.reservedTableNames(CATALOG, icebergIdentifier.namespace()));
+    assertNotNull(disabled.getDeleted(CATALOG, icebergIdentifier));
+  }
+
+  @TestTemplate
+  public void testRetentionZeroHasNoRecoveryWindow() throws SQLException {
+    IcebergTableDeletionLifecycle lifecycle = lifecycle(true, 0L);
+    lifecycle.delete(requestContext, icebergIdentifier, false);
+
+    IcebergRetainedTableDeletion retained = onlyRetained();
+    assertEquals(
+        retained.getTable().getDeletedAt(), retained.getDeletion().getRetentionExpiresAt());
+    assertFalse(lifecycle.toAction(retained, retained.getTable().getDeletedAt()).isRecoverable());
+  }
+
+  @TestTemplate
+  public void testNullRetentionHasNoAutomaticExpiry() throws SQLException {
+    IcebergTableDeletionLifecycle lifecycle = lifecycle(true, 86_400_000L);
+    lifecycle.delete(requestContext, icebergIdentifier, false);
+
+    IcebergRetainedTableDeletion retained = onlyRetained();
+    retained.getDeletion().setRetentionExpiresAt(null);
+    assertNull(retained.getDeletion().getRetentionExpiresAt());
+    assertNull(lifecycle.toAction(retained, Long.MAX_VALUE).getRetentionExpiresAt());
+    assertTrue(lifecycle.toAction(retained, Long.MAX_VALUE).isRecoverable());
+  }
+
+  @TestTemplate
+  public void testDeletedListMapsMissingNamespaceToSafeNotFound() {
+    IcebergTableDeletionLifecycle lifecycle = lifecycle(true, 86_400_000L);
+
+    IcebergDeletionException exception =
+        assertThrows(
+            IcebergDeletionException.class,
+            () ->
+                lifecycle.listDeleted(
+                    CATALOG, org.apache.iceberg.catalog.Namespace.of("missing-parent")));
+    assertEquals(IcebergDeletionException.Outcome.NOT_FOUND, exception.outcome());
+    assertEquals("Deleted table is not available", exception.getMessage());
+  }
+
+  @TestTemplate
   public void testUndropReactivatesTheOriginalRootAndConsumesTheAction()
       throws IOException, SQLException {
     IcebergTableDeletionLifecycle lifecycle = lifecycle(true, 86_400_000L);

@@ -20,9 +20,12 @@
 package org.apache.gravitino.iceberg.service.cleanup;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
@@ -308,6 +311,80 @@ public class TestIcebergCleanupManager extends TestJDBCBackend {
     } finally {
       svc.close();
       FailOnceBulkFileIO.reset();
+    }
+  }
+
+  @TestTemplate
+  void testRetainedCollectorRetriesAfterTickFailure() {
+    IcebergRetainedDeletionPurgeCoordinator coordinator =
+        mock(IcebergRetainedDeletionPurgeCoordinator.class);
+    IcebergRetainedDeletionRegistrationCleaner cleaner =
+        mock(IcebergRetainedDeletionRegistrationCleaner.class);
+    when(coordinator.enqueueEligibleDeletions(anyLong()))
+        .thenThrow(new RuntimeException("transient collector failure"))
+        .thenReturn(0);
+    IcebergCleanupManager svc =
+        new IcebergCleanupManager(store, fastPollConfig(), cleaner, coordinator);
+
+    svc.start();
+    try {
+      Awaitility.await()
+          .atMost(5, TimeUnit.SECONDS)
+          .untilAsserted(() -> verify(coordinator, atLeast(2)).enqueueEligibleDeletions(anyLong()));
+    } finally {
+      svc.close();
+    }
+  }
+
+  @TestTemplate
+  void testRetainedCollectorRequiresRegistrationCleaner() {
+    IcebergRetainedDeletionPurgeCoordinator coordinator =
+        mock(IcebergRetainedDeletionPurgeCoordinator.class);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new IcebergCleanupManager(store, fastPollConfig(), null, coordinator));
+  }
+
+  @TestTemplate
+  void testCloseRemainsRetryableUntilCollectorTerminates() throws InterruptedException {
+    CountDownLatch collectorStarted = new CountDownLatch(1);
+    CountDownLatch releaseCollector = new CountDownLatch(1);
+    IcebergRetainedDeletionPurgeCoordinator coordinator =
+        mock(IcebergRetainedDeletionPurgeCoordinator.class);
+    IcebergRetainedDeletionRegistrationCleaner cleaner =
+        mock(IcebergRetainedDeletionRegistrationCleaner.class);
+    when(coordinator.enqueueEligibleDeletions(anyLong()))
+        .thenAnswer(
+            ignored -> {
+              collectorStarted.countDown();
+              while (true) {
+                try {
+                  if (releaseCollector.await(1, TimeUnit.SECONDS)) {
+                    return 0;
+                  }
+                } catch (InterruptedException interruptIgnored) {
+                  // Deliberately emulate a provider call that does not honor interruption.
+                }
+              }
+            });
+    IcebergCleanupManager svc =
+        new IcebergCleanupManager(store, fastPollConfig(), cleaner, coordinator, 20L);
+
+    try {
+      svc.start();
+      Assertions.assertTrue(collectorStarted.await(5, TimeUnit.SECONDS));
+      Assertions.assertThrows(IllegalStateException.class, svc::close);
+
+      releaseCollector.countDown();
+      Assertions.assertDoesNotThrow(svc::close);
+    } finally {
+      releaseCollector.countDown();
+      try {
+        svc.close();
+      } catch (IllegalStateException stillStopping) {
+        // A failing assertion must not strand the deliberately blocked daemon in this test.
+      }
     }
   }
 
