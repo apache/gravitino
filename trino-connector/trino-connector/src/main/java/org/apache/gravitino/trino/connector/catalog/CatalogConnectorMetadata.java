@@ -22,9 +22,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
@@ -78,24 +80,6 @@ public class CatalogConnectorMetadata {
   @Nullable private final ViewCatalog viewCatalog;
 
   /**
-   * Retrieves the name of this Trino catalog.
-   *
-   * @return the catalog name
-   */
-  public String getCatalogName() {
-    return catalogName;
-  }
-
-  /**
-   * Indicates whether the Gravitino Trino connector is running in single-metalake mode.
-   *
-   * @return true if the connector is running in single-metalake mode
-   */
-  public boolean isSingleMetalakeMode() {
-    return singleMetalakeMode;
-  }
-
-  /**
    * Constructs a new CatalogConnectorMetadata.
    *
    * @param metalake the Gravitino metalake
@@ -134,6 +118,24 @@ public class CatalogConnectorMetadata {
           "Catalog does not support schema or table operations." + e.getMessage(),
           e);
     }
+  }
+
+  /**
+   * Retrieves the name of this Trino catalog.
+   *
+   * @return the catalog name
+   */
+  public String getCatalogName() {
+    return catalogName;
+  }
+
+  /**
+   * Indicates whether the Gravitino Trino connector is running in single-metalake mode.
+   *
+   * @return true if the connector is running in single-metalake mode
+   */
+  public boolean isSingleMetalakeMode() {
+    return singleMetalakeMode;
   }
 
   /**
@@ -634,14 +636,16 @@ public class CatalogConnectorMetadata {
                   + view.getName()
                   + " because it has SQL representations in other dialects");
         }
-        viewCatalog.alterView(
-            identifier,
+        List<ViewChange> changes = new ArrayList<>();
+        changes.add(
             ViewChange.replaceView(
                 view.getRawColumns(),
                 representations,
                 view.getDefaultCatalog(),
                 view.getDefaultSchema(),
                 view.getComment()));
+        changes.addAll(computePropertyChanges(existingView.properties(), view.getProperties()));
+        viewCatalog.alterView(identifier, changes.toArray(new ViewChange[0]));
       } else {
         viewCatalog.createView(
             identifier,
@@ -735,6 +739,9 @@ public class CatalogConnectorMetadata {
     } catch (NoSuchViewException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_VIEW_NOT_EXISTS, "View does not exist", e);
+    } catch (ViewAlreadyExistsException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS, "View already exists", e);
     } catch (UnsupportedOperationException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
@@ -757,5 +764,31 @@ public class CatalogConnectorMetadata {
                 representation instanceof SQLRepresentation
                     && !Dialects.TRINO.equalsIgnoreCase(
                         ((SQLRepresentation) representation).dialect()));
+  }
+
+  /**
+   * Computes the {@link ViewChange} operations needed to make a view's stored properties match
+   * {@code desired}, so that {@code CREATE OR REPLACE VIEW ... WITH (...)} applies the new
+   * properties instead of silently leaving the old ones in place ({@link ViewChange#replaceView}
+   * does not affect properties).
+   *
+   * @param current the view's current properties
+   * @param desired the view's desired properties after the replace
+   * @return the property changes needed to go from {@code current} to {@code desired}
+   */
+  private static List<ViewChange> computePropertyChanges(
+      Map<String, String> current, Map<String, String> desired) {
+    List<ViewChange> changes = new ArrayList<>();
+    for (Map.Entry<String, String> entry : desired.entrySet()) {
+      if (!Objects.equals(current.get(entry.getKey()), entry.getValue())) {
+        changes.add(ViewChange.setProperty(entry.getKey(), entry.getValue()));
+      }
+    }
+    for (String key : current.keySet()) {
+      if (!desired.containsKey(key)) {
+        changes.add(ViewChange.removeProperty(key));
+      }
+    }
+    return changes;
   }
 }

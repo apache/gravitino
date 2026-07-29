@@ -33,6 +33,7 @@ import static org.mockito.Mockito.when;
 
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.SchemaTableName;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
@@ -55,6 +57,7 @@ import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoView;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 public class TestCatalogConnectorMetadataView {
 
@@ -246,6 +249,56 @@ public class TestCatalogConnectorMetadataView {
   }
 
   @Test
+  public void testCreateViewReplaceAppliesPropertyChanges() {
+    // ViewChange.replaceView() does not affect properties, so CREATE OR REPLACE VIEW must apply
+    // any property diff itself.
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    when(viewCatalog.viewExists(any())).thenReturn(true);
+    View existingView = createView(Dialects.TRINO, "select 1");
+    when(existingView.properties()).thenReturn(Map.of("keep", "same", "remove_me", "x"));
+    when(viewCatalog.loadView(any())).thenReturn(existingView);
+
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+    GravitinoView view =
+        new GravitinoView(
+            "db",
+            "v1",
+            List.of(),
+            null,
+            Map.of("keep", "same", "add_me", "y"),
+            "select 1",
+            null,
+            null);
+    metadata.createView(view, true);
+
+    ArgumentCaptor<ViewChange[]> captor = ArgumentCaptor.forClass(ViewChange[].class);
+    verify(viewCatalog, times(1)).alterView(eq(NameIdentifier.of("db", "v1")), captor.capture());
+    List<ViewChange> changes = Arrays.asList(captor.getValue());
+
+    assertTrue(
+        changes.stream()
+            .anyMatch(
+                c ->
+                    c instanceof ViewChange.SetProperty
+                        && "add_me".equals(((ViewChange.SetProperty) c).getProperty())
+                        && "y".equals(((ViewChange.SetProperty) c).getValue())));
+    assertTrue(
+        changes.stream()
+            .anyMatch(
+                c ->
+                    c instanceof ViewChange.RemoveProperty
+                        && "remove_me".equals(((ViewChange.RemoveProperty) c).getProperty())));
+    assertTrue(
+        changes.stream()
+            .noneMatch(
+                c ->
+                    (c instanceof ViewChange.SetProperty
+                            && "keep".equals(((ViewChange.SetProperty) c).getProperty()))
+                        || (c instanceof ViewChange.RemoveProperty
+                            && "keep".equals(((ViewChange.RemoveProperty) c).getProperty()))));
+  }
+
+  @Test
   public void testCreateViewReplaceRejectsWhenOtherDialectRepresentationsPresent() {
     ViewCatalog viewCatalog = mock(ViewCatalog.class);
     when(viewCatalog.viewExists(any())).thenReturn(true);
@@ -410,6 +463,23 @@ public class TestCatalogConnectorMetadataView {
         assertThrows(TrinoException.class, () -> metadata.renameView(oldName, newName));
     assertEquals(
         GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), exception.getErrorCode());
+  }
+
+  @Test
+  public void testRenameViewThrowsWhenTargetAlreadyExists() {
+    ViewCatalog viewCatalog = mock(ViewCatalog.class);
+    View view = createView(Dialects.TRINO, "select 1");
+    when(viewCatalog.loadView(any())).thenReturn(view);
+    when(viewCatalog.alterView(any(), any(ViewChange.RenameView.class)))
+        .thenThrow(new ViewAlreadyExistsException("View exists"));
+    CatalogConnectorMetadata metadata = createMetadataWithViewCatalog(viewCatalog);
+
+    SchemaTableName oldName = new SchemaTableName("db", "v1");
+    SchemaTableName newName = new SchemaTableName("db", "v2");
+    TrinoException exception =
+        assertThrows(TrinoException.class, () -> metadata.renameView(oldName, newName));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_VIEW_ALREADY_EXISTS.toErrorCode(), exception.getErrorCode());
   }
 
   @Test
