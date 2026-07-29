@@ -26,14 +26,12 @@ import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -60,8 +58,8 @@ import org.slf4j.LoggerFactory;
  * <p>Relation query results are NOT cached by this implementation; relation and list operations
  * always fall back to the {@code EntityStore}. Entity types whose materialized form embeds
  * relation-derived data ({@code USER}, {@code GROUP}, {@code ROLE}) are excluded from caching
- * entirely, because without relation tracking their entries could not be invalidated when the
- * referenced entities change.
+ * entirely by {@link BaseEntityCache#put}, because without relation tracking their entries could
+ * not be invalidated when the referenced entities change.
  */
 public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_CLEANUP_CORE_THREADS = 1;
@@ -85,31 +83,20 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
 
-  /**
-   * Entity types that must not be cached by this implementation.
-   *
-   * <p>{@code USER}, {@code GROUP} and {@code ROLE} are materialized with relation-derived data
-   * joined in at load time: a role carries its securable objects, and a user/group carries its role
-   * names. A mutation on the entity itself invalidates its own key through the write path, but this
-   * embedded data also goes stale through a mutation on a different entity. For example, deleting
-   * or renaming a securable object changes a role's materialized form, and deleting or renaming a
-   * role changes a user's/group's role names. Such a mutation touches neither this entity's own key
-   * nor any hierarchy ancestor of it, so neither the write-path invalidation nor the prefix cascade
-   * in {@link #invalidateHierarchy} would evict it; only the (now removed) reverse index could.
-   * Caching them would therefore serve stale authorization data.
-   */
-  private static final Set<Entity.EntityType> NON_CACHEABLE_TYPES =
-      Sets.immutableEnumSet(
-          Entity.EntityType.USER, Entity.EntityType.GROUP, Entity.EntityType.ROLE);
-
   /** Segmented locking for better concurrency */
   private final SegmentedLock segmentedLock;
 
   /** Cache data structure. */
   private final Cache<EntityCacheKey, Entity> cacheData;
 
-  /** Prefix index over cache keys, used for cascading removal of descendant entries. */
-  private RadixTree<EntityCacheKey> cacheIndex;
+  /**
+   * Prefix index over cache keys, used for cascading removal of descendant entries.
+   *
+   * <p>The tree itself is thread-safe, but {@link #clear()} swaps in a brand-new tree, so the field
+   * is {@code volatile} to publish that swap to readers that do not hold a segment lock (see {@link
+   * #size()}).
+   */
+  private volatile RadixTree<EntityCacheKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
 
@@ -191,7 +178,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null;
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Read from the prefix index without holding a segment lock, so the result is a point-in-time
+   * estimate: entries concurrently added or cascaded away may or may not be counted. It may also
+   * briefly exceed the number of live entries, because entries evicted by Caffeine are removed from
+   * the index asynchronously by the removal listener.
+   */
   @Override
   public long size() {
     return cacheIndex.size();
@@ -209,17 +203,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E extends Entity & HasIdentifier> void put(E entity) {
-    Preconditions.checkArgument(entity != null, "Entity cannot be null");
-
-    // Called before taking this entity's lock: it may take another key's lock (e.g. the model key
-    // when inserting a model version), and nesting the two segment locks could deadlock.
-    invalidateOnKeyChange(entity);
-
-    if (NON_CACHEABLE_TYPES.contains(entity.type())) {
-      return;
-    }
-
+  protected <E extends Entity & HasIdentifier> void doPut(E entity) {
     NameIdentifier identifier = getIdentFromEntity(entity);
     EntityCacheKey entityCacheKey = EntityCacheKey.of(identifier, entity.type());
 
@@ -264,16 +248,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
     Preconditions.checkArgument(action != null, "Action cannot be null");
 
     return segmentedLock.withLockAndThrow(key, action);
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <T, E extends Exception> T withMultipleKeyCacheLock(
-      List<EntityCacheKey> keys, EntityCache.ThrowingSupplier<T, E> action) throws E {
-    Preconditions.checkArgument(keys != null, "Keys cannot be null");
-    Preconditions.checkArgument(action != null, "Action cannot be null");
-
-    return segmentedLock.withMultipleKeyLockAndThrow(keys, action);
   }
 
   /**

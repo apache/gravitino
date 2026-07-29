@@ -357,11 +357,12 @@ public class RelationalEntityStore
       boolean override)
       throws IOException {
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
-    // Defensive: relation results are not cached, and no currently cached entity type embeds
-    // relation-derived data (the only types that do — USER/GROUP/ROLE — are excluded from the
-    // cache), so these invalidations are a no-op today. They are kept so that if a cached type ever
-    // starts materializing this relation, its stale single-entity entry is dropped on a relation
-    // write.
+    // Relation query results themselves are not cached, but both endpoints may be cached entities
+    // (OWNER_REL, TAG_/POLICY_METADATA_OBJECT_REL and METADATA_OBJECT_ROLE_REL are keyed by
+    // catalog/schema/table/... on the source side), so drop their entries conservatively: a
+    // relation write can change data materialized into the endpoint entity. Note this is not free —
+    // EntityCache#invalidate cascades over the identifier hierarchy, so invalidating a catalog also
+    // drops every cached schema and table beneath it.
     cache.invalidate(srcIdentifier, srcType);
     cache.invalidate(dstIdentifier, dstType);
   }
@@ -380,8 +381,8 @@ public class RelationalEntityStore
     }
     backend.batchInsertRelations(
         relType, srcIdentifiers, srcType, dstIdentifier, dstType, override);
-    // Defensive no-op invalidation for the same reason as insertRelation: no currently cached
-    // entity type embeds relation-derived data (the ones that do are excluded from the cache).
+    // Invalidate both endpoints for the same reason as insertRelation, including the hierarchy
+    // cascade noted there.
     for (NameIdentifier ident : srcIdentifiers) {
       cache.invalidate(ident, srcType);
     }

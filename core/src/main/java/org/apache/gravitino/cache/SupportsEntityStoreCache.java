@@ -62,6 +62,19 @@ public interface SupportsEntityStoreCache {
   /**
    * Puts an entity into the cache.
    *
+   * <p><b>Implementations MUST NOT cache {@code USER}, {@code GROUP} and {@code ROLE} entities.</b>
+   * This is a correctness constraint, not an optimization: these types are materialized with
+   * relation-derived data joined in at load time (a role carries its securable objects, a
+   * user/group carries its role names), and that embedded data goes stale through mutations on
+   * other entities that touch neither this entity's own key nor any of its hierarchy ancestors.
+   * Since no invalidation path covers them, caching them serves stale authorization data.
+   * Implementations extending {@link BaseEntityCache} get this check for free, see {@link
+   * BaseEntityCache#isCacheable(Entity.EntityType)}.
+   *
+   * <p>Implementations must also invoke {@link #invalidateOnKeyChange(Entity)} for every entity,
+   * including non-cacheable ones, since a non-cacheable entity may still invalidate a cacheable
+   * one.
+   *
    * @param entity The entity to cache
    * @param <E> The class of the entity
    */
