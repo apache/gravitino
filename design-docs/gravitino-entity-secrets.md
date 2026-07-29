@@ -335,7 +335,7 @@ server (v1). See §8 for the full configuration reference.
 | In scope                                               | Out of scope                                      |
 | ------------------------------------------------------ | ------------------------------------------------- |
 | SPI + `gravitino.secret.keys` + resolve / omit-on-read | Additional provider implementations beyond memory |
-| Load providers from server conf                        | Table / column encryption KMS                     |
+| Load providers from server conf                        |                                                   |
 | **In-memory** secrets provider (UT/IT / local)         |                                                   |
 
 Missing / unloadable `className` ⇒ startup or resolve fails with a clear error.
