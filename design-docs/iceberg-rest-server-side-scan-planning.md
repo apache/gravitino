@@ -19,14 +19,10 @@
 
 # Design: Server-Side Scan Planning Results (`plan-tasks`) for the Gravitino Iceberg REST Server
 
-| Field   | Value                                                                                     |
-| ------- | ----------------------------------------------------------------------------------------- |
-| Status  | In review                                                                                 |
-| Authors | @laserninja                                                                               |
-| Created | 2026-07-28                                                                                |
-| Issue   | [#11284](https://github.com/apache/gravitino/issues/11284)                                |
-| PR      | [#12194](https://github.com/apache/gravitino/pull/12194)                                  |
-| Module  | `iceberg/iceberg-rest-server`, `iceberg/iceberg-common`, `catalogs/catalog-common`, `core` |
+Implemented by [#12194](https://github.com/apache/gravitino/pull/12194) for
+[#11284](https://github.com/apache/gravitino/issues/11284), in
+`iceberg/iceberg-rest-server`, `iceberg/iceberg-common`,
+`catalogs/catalog-common` and `core`.
 
 ---
 
@@ -34,7 +30,7 @@
 
 Server-side scan planning in the Iceberg REST specification is a **two-step**
 protocol. A client submits a scan, and the server may answer with results
-inline, with opaque `plan-tasks` tokens, or with both:
+inline, with opaque `plan-tasks`, or with both:
 
 ```
 1. POST /v1/{prefix}/namespaces/{ns}/tables/{t}/plan    → status, file-scan-tasks, plan-tasks
@@ -71,7 +67,7 @@ step 2 of the protocol exists for.
 
 A first iteration of PR #12194 added the route and the dispatcher plumbing
 but left the handler throwing `NoSuchPlanTaskException` unconditionally,
-since no token was ever issued. Review feedback
+since no plan task was ever issued. Review feedback
 ([#12194](https://github.com/apache/gravitino/pull/12194#discussion_r3655295585))
 was that an endpoint which always fails is not support for the interface.
 This document covers the design that makes both steps real.
@@ -94,26 +90,26 @@ This document covers the design that makes both steps real.
 
 1. **Complete the two-step protocol**: `POST .../tasks` is implemented,
    advertised in `/v1/config`, and returns the file scan tasks a `plan-task`
-   token covers. Verifiable: an end-to-end HTTP test redeems a token issued
-   by `POST .../plan` and gets `200` with the expected tasks.
+   covers. Verifiable: an end-to-end HTTP test redeems a `plan-task` issued by
+   `POST .../plan` and gets `200` with the expected tasks.
 2. **Bounded plan responses**: no scan planning response carries more than a
    configured number of `file-scan-tasks`; the remainder is offered as
    `plan-tasks`. Verifiable: a scan with N tasks and batch size B returns B
-   tasks inline and `ceil(N/B) - 1` tokens.
+   tasks inline and `ceil(N/B) - 1` plan tasks.
 3. **Correct task coverage**: the tasks reachable through a plan response
    plus all of its `plan-tasks` are exactly the tasks of the planned
    snapshot, each appearing once. Verifiable by a unit test over a table
    whose plan spans several batches.
-4. **Tokens survive restart and replica failover**: a token issued by one
+4. **Plan tasks survive restart and replica failover**: a plan task issued by one
    Gravitino instance is redeemable after that instance restarts and on any
-   other instance serving the same catalog. Verifiable: token resolution
+   other instance serving the same catalog. Verifiable: plan task resolution
    depends on no in-process state.
-5. **Snapshot stability**: a token resolves against the snapshot that was
+5. **Snapshot stability**: a plan task resolves against the snapshot that was
    planned, even if the table is committed to in between. Verifiable: append
-   to the table after planning, then redeem the tokens and see the original
+   to the table after planning, then redeem the plan tasks and see the original
    snapshot's tasks.
 6. **Spec-conformant errors**: an unknown, foreign or no-longer-resolvable
-   token returns `404` with `NoSuchPlanTaskException`; a missing table
+   plan task returns `404` with `NoSuchPlanTaskException`; a missing table
    returns `404` with `NoSuchTableException`.
 7. **No regression for small scans**: a plan that fits in one batch is
    byte-identical to today's response and needs no second call.
@@ -132,11 +128,12 @@ This document covers the design that makes both steps real.
 2. **Honoring `min-rows-requested`**: the spec's row-count hint for sizing
    plan tasks is not implemented. Batches are sized in tasks, not rows;
    supporting the hint requires row-count accounting we can add later
-   without changing the token format.
-3. **A distributed scan plan cache**: `ScanPlanCache` stays a pluggable
-   interface with an in-memory implementation. Making a shared cache the
-   default is a separate operational decision (see §8).
-4. **Signed or encrypted tokens**: tokens carry no secret and grant no
+   without changing the plan task format.
+3. **Scan plan cache defaults and implementations**: `ScanPlanCache` stays a
+   pluggable interface with an in-memory implementation, disabled by default.
+   Whether Gravitino should enable a cache by default, and whether it should
+   ship a shared one, is tracked separately (§8.1).
+4. **Signed or encrypted plan tasks**: a plan task carries no secret and grants no
    access (§5.5.4), so cryptographic protection would add key management for
    no privilege boundary.
 5. **Legacy Iceberg clients (< 1.11)**: responses use structured
@@ -150,27 +147,27 @@ This document covers the design that makes both steps real.
 
 ## 4. Solution Investigations
 
-The endpoint itself is not the interesting part; how a `plan-task` token is
+The endpoint itself is not the interesting part; how a `plan-task` is
 represented and resolved is. Four options were considered.
 
 | Approach                                                    | Pros                                                                                        | Cons                                                                                                                                 | Decision                                                                    |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
 | **A.** Keep returning everything inline; `.../tasks` always `404` | No new concepts; smallest diff                                                              | The endpoint is decoration, not support (review feedback); plan responses stay unbounded                                              | **Rejected** — does not meet Goals 1–2                                      |
-| **B.** In-memory plan-task store, random token ids          | Fastest redemption (no re-planning); trivial token                                          | Token dies with the process and is meaningless on another replica, so a scan fails mid-way after a restart or behind a load balancer  | **Rejected** — violates Goal 4                                              |
-| **C.** Self-describing token: scan request + pinned snapshot + task range | No cross-request state, so restart-safe and replica-safe; reuses the existing plan cache for speed | Redeeming a token re-plans the snapshot on a cache miss; token is larger than an opaque id                                            | **Chosen**                                                                  |
+| **B.** In-memory plan-task store, random ids                | Fastest redemption (no re-planning); trivial to produce                                     | The state dies with the process and means nothing on another replica, so a scan fails mid-way after a restart or behind a load balancer | **Rejected** — violates Goal 4                                              |
+| **C.** Self-describing plan task: scan request + pinned snapshot + task range | No cross-request state, so restart-safe and replica-safe; reuses the existing plan cache for speed | Redeeming one re-plans the snapshot on a cache miss; the string is longer than a random id                                          | **Chosen**                                                                  |
 | **D.** Asynchronous plan (`SUBMITTED` + `planId`) with server-side plan state | Matches the part of the spec built for very large plans                                     | Needs a plan lifecycle (states, expiry, cancellation, storage) — that is #11635's scope, and it does not remove the need for `.../tasks` | **Deferred** — orthogonal; this design stays synchronous                     |
 
 **Why not B, in more detail.** Gravitino's Iceberg REST server is routinely
 run as more than one replica behind a load balancer, and the Iceberg Java
 client fetches plan tasks *concurrently* (`ScanTaskIterable` uses a worker
 pool), so consecutive requests of one scan land on different replicas by
-design. With node-local token state, a client's scan fails with `404` for
+design. With node-local plan task state, a client's scan fails with `404` for
 reasons that have nothing to do with its own behavior, and the failure is
 timing-dependent — the worst kind to debug. Sticky sessions or a shared
 store would fix it, but that is either an operator burden or option D's
 plan-state problem in disguise.
 
-**Cost of C, stated plainly.** A token redemption needs the full ordered
+**Cost of C, stated plainly.** A plan task redemption needs the full ordered
 task list for its snapshot. With the scan plan cache enabled that is one
 cache lookup; with the cache disabled (today's default) it re-plans the
 pinned snapshot. For a plan of N tasks and batch size B the client makes
@@ -185,14 +182,14 @@ pinned snapshot. For a plan of N tasks and batch size B the client makes
 
 Re-planning is not free but it is also not new work: it reads the same
 manifests the first plan read, for a snapshot that is pinned and therefore
-immutable. The mitigation is documented (enable `scan-plan-cache-impl`), and
-§8 asks whether Gravitino should go further and couple batching to the cache
-being enabled.
+immutable. The mitigation is documented (enable `scan-plan-cache-impl`);
+coupling batching to the cache being enabled was considered and rejected in
+review (§8.1).
 
-**Alternative considered for ordering.** A token could carry the identity of
+**Alternative considered for ordering.** A plan task could carry the identity of
 the files it covers instead of an index range, which would remove the
-dependency on a stable order. Rejected: it makes tokens grow with batch size
-(kilobytes per token) and duplicates in the token what the plan already
+dependency on a stable order. Rejected: it makes plan tasks grow with batch size
+(kilobytes per plan task) and duplicates in the plan task what the plan already
 knows, when a total order over `(file location, start, length)` gives
 stability for free (§5.6).
 
@@ -213,7 +210,7 @@ stability for free (§5.6).
         │  3. plan full scan  ── cache hit ─▶ cached plan│
         │     miss ─▶ plan, sort tasks, put in cache    │
         │  4. split: first B tasks inline,              │
-        │            one plan-task token per later batch│
+        │            one plan task per later batch│
         │  5. inject vended credentials (if requested)  │
         └───────────────────────────────────────────────┘
                           │
@@ -225,9 +222,9 @@ stability for free (§5.6).
                           ▼
         ┌───────────────────────────────────────────────┐
         │ CatalogWrapperForREST.fetchScanTasks          │
-        │  1. decode token (not ours ⇒ 404)             │
+        │  1. decode plan task (not ours ⇒ 404)             │
         │  2. loadTable (missing ⇒ 404)                 │
-        │  3. plan full scan for the token's scan       │
+        │  3. plan full scan for the plan task's scan       │
         │     request ── cache hit ─▶ cached plan       │
         │     miss ─▶ re-plan pinned snapshot, sort     │
         │  4. slice [offset, offset+limit)              │
@@ -236,7 +233,7 @@ stability for free (§5.6).
               file-scan-tasks for that batch
 ```
 
-Nothing is stored between the two calls. The token *is* the state.
+Nothing is stored between the two calls. The plan task *is* the state.
 
 ### 5.2 New REST API: `POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/tasks`
 
@@ -244,7 +241,7 @@ Nothing is stored between the two calls. The token *is* the state.
 
 | Field       | Type   | Required | Description                                            |
 | ----------- | ------ | -------- | ------------------------------------------------------ |
-| `plan-task` | string | yes      | An opaque token from a prior plan response (§5.5)      |
+| `plan-task` | string | yes      | An opaque string from a prior plan response (§5.5)     |
 
 ```json
 { "plan-task": "eyJ0YWJsZSI6ImRiLnRibCIsIm9mZnNldCI6MTAwLCJsaW1pdCI6MTAwLCJzY2FuIjp7…" }
@@ -254,7 +251,7 @@ Nothing is stored between the two calls. The token *is* the state.
 
 | Field             | Type   | Present                     | Description                                                    |
 | ----------------- | ------ | --------------------------- | -------------------------------------------------------------- |
-| `file-scan-tasks` | array  | always                      | The tasks this token covers: data file, residual, delete refs   |
+| `file-scan-tasks` | array  | always                      | The tasks this plan task covers: data file, residual, delete refs   |
 | `delete-files`    | array  | when the batch's tasks have deletes | Delete files the batch's tasks reference by index (§5.11)   |
 | `specs-by-id`     | object | always                      | Partition specs, required to deserialize the tasks              |
 | `plan-tasks`      | array  | never in this implementation | Reserved by the spec for a server that sub-divides further      |
@@ -273,19 +270,19 @@ Nothing is stored between the two calls. The token *is* the state.
 with the same expression as `POST .../plan` (owner, or `USE_CATALOG` +
 `USE_SCHEMA` + `SELECT_TABLE`/`MODIFY_TABLE`). Then the table is loaded, so
 a request against a missing table reports the missing table rather than
-masking it as a bad token. Then the token is decoded and resolved.
+masking it as a bad plan task. Then the plan task is decoded and resolved.
 
-| Condition                                                      | Status | Error type                 |
-| -------------------------------------------------------------- | ------ | -------------------------- |
-| Token resolves to a batch of the plan                          | `200`  | —                          |
-| Missing or empty request body                                  | `400`  | `IllegalArgumentException` |
-| Table does not exist                                           | `404`  | `NoSuchTableException`     |
-| Token not issued by this server, or issued for another table   | `404`  | `NoSuchPlanTaskException`  |
-| Token's snapshot no longer exists (expired, rolled back)       | `404`  | `NoSuchPlanTaskException`  |
-| Token's range starts past the end of the plan                  | `404`  | `NoSuchPlanTaskException`  |
-| Caller lacks table privileges                                  | `403`  | `ForbiddenException`       |
+| Condition                                                        | Status | Error type                 |
+| ---------------------------------------------------------------- | ------ | -------------------------- |
+| Plan task resolves to a batch of the plan                        | `200`  | —                          |
+| Missing or empty request body                                    | `400`  | `IllegalArgumentException` |
+| Table does not exist                                             | `404`  | `NoSuchTableException`     |
+| Plan task not issued by this server, or issued for another table | `404`  | `NoSuchPlanTaskException`  |
+| Plan task's snapshot no longer exists (expired, rolled back)     | `404`  | `NoSuchPlanTaskException`  |
+| Plan task's range starts past the end of the plan                | `404`  | `NoSuchPlanTaskException`  |
+| Caller lacks table privileges                                    | `403`  | `ForbiddenException`       |
 
-Tokens are **not** single-use: redeeming one twice returns the same tasks,
+Plan tasks are **not** single-use: redeeming one twice returns the same tasks,
 which keeps client retries safe.
 
 ### 5.3 Changed REST API: `POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan`
@@ -295,7 +292,7 @@ which keeps client retries safe.
 
 **New behavior.** `COMPLETED` with at most `scan-plan-task-batch-size`
 `file-scan-tasks` inline; every later batch is offered as a `plan-task`
-token. Below the threshold the response is unchanged.
+plan task. Below the threshold the response is unchanged.
 
 ```json
 {
@@ -326,17 +323,21 @@ spec.
 endpoint list next to the existing plan endpoint, which is what unblocks
 clients that gate on the endpoint set.
 
-### 5.5 The `plan-task` token
+### 5.5 The `plan-task` string
+
+To a client a plan task is an opaque string, exactly as the Iceberg REST
+specification defines it (§8.3); to the server it describes the unit of work it
+stands for. `PlanTaskCodec` is the only place that reads or writes it.
 
 #### 5.5.1 Payload
 
-The token is `base64url(JSON)`, unpadded. Four fields, nothing else:
+The plan task is `base64url(JSON)`, unpadded. Four fields, nothing else:
 
-| Field    | Type   | Description                                                                  |
-| -------- | ------ | ---------------------------------------------------------------------------- |
-| `table`  | string | `TableIdentifier.toString()` of the planned table                             |
-| `offset` | int    | Index of the first task the token covers, in the plan's total order (§5.6)     |
-| `limit`  | int    | Maximum number of tasks the token covers                                      |
+| Field    | Type   | Description                                                                                        |
+| -------- | ------ | -------------------------------------------------------------------------------------------------- |
+| `table`  | string | `TableIdentifier.toString()` of the planned table                                                   |
+| `offset` | int    | Index of the first task it covers, in the plan's total order (§5.6)                                 |
+| `limit`  | int    | Maximum number of tasks it covers                                                                  |
 | `scan`   | object | The planned request, serialized by Iceberg's `PlanTableScanRequestParser`, with the snapshot pinned |
 
 ```json
@@ -360,24 +361,24 @@ without touching this design.
 
 #### 5.5.2 Encoding and decoding
 
-`PlanTaskToken.encode(table, scanRequest, offset, limit)` produces the
-string; `PlanTaskToken.decode(planTask)` returns `Optional<PlanTaskToken>`
-and is empty for anything this server would not have issued: not base64,
-not a JSON object, a missing or wrongly typed field, `offset < 0`, or
-`limit <= 0`. `fetchScanTasks` additionally requires
-`token.matchesTable(tableIdentifier)`. Every rejection path becomes one
-`404 NoSuchPlanTaskException`, so a malformed token and an expired one are
+`PlanTaskCodec.encode(table, scanRequest, offset, limit)` produces the string;
+`PlanTaskCodec.decode(planTask)` returns
+`Optional<PlanTaskCodec.PlanTask>` — the unit of work the string stands for —
+and is empty for anything this server would not have issued: not base64, not a
+JSON object, a missing or wrongly typed field, `offset < 0`, or `limit <= 0`. `fetchScanTasks` additionally requires
+`planTask.matchesTable(tableIdentifier)`. Every rejection path becomes one
+`404 NoSuchPlanTaskException`, so a malformed plan task and an expired one are
 indistinguishable to a client, as the spec intends.
 
 `decode` returning `Optional` rather than throwing keeps "this is not our
-token" as an ordinary outcome, and leaves the mapping to a REST error in the
+plan task" as an ordinary outcome, and leaves the mapping to a REST error in the
 one place that knows the request context.
 
 #### 5.5.3 Forward compatibility
 
 An earlier revision carried a `version` field; review feedback
 ([#12194](https://github.com/apache/gravitino/pull/12194#discussion_r3664512613))
-asked for it to be dropped, and it was. It is redundant: a token from a
+asked for it to be dropped, and it was. It is redundant: a plan task from a
 future format that this server cannot decode into these four fields is
 already reported as an unknown plan task, which is the same behavior the
 version check produced. A future format change should therefore keep these
@@ -385,20 +386,20 @@ field names meaning what they mean here, and may add fields freely.
 
 #### 5.5.4 Security properties
 
-The token is opaque to clients but is **not a capability**:
+The plan task is opaque to clients but is **not a capability**:
 
 - Authorization is evaluated from the **table in the request path**, never
-  from the token, so a token cannot widen access.
-- A token minted for another table is rejected, so it cannot be used to read
+  from the plan task, so a plan task cannot widen access.
+- A plan task encoded for another table is rejected, so it cannot be used to read
   a table the caller happens to be authorized for by swapping paths.
-- A forged token can at most express a scan the caller could already submit
+- A forged plan task can at most express a scan the caller could already submit
   directly through `POST .../plan` (filters and projections are not
   privileges).
-- The token contains no credential and no user identity; it names a table, a
+- The plan task contains no credential and no user identity; it names a table, a
   snapshot id, and a scan.
 
-The token does reveal the snapshot id and the client's own filter to anyone
-who sees the token, which is the same information that client already sent
+The plan task does reveal the snapshot id and the client's own filter to anyone
+who sees the plan task, which is the same information that client already sent
 and received in the plan response.
 
 ### 5.6 Determinism: pinned snapshots and a total order over tasks
@@ -408,8 +409,8 @@ Two properties make it so.
 
 **Snapshot pinning.** If a request does not name a snapshot (and is not an
 incremental scan, which pins a range), `planTableScan` resolves the table's
-current snapshot and plans *that*, embedding it in the tokens. Without this,
-a commit between plan and fetch would move the token to a different
+current snapshot and plans *that*, embedding it in the plan tasks. Without this,
+a commit between plan and fetch would move the plan task to a different
 snapshot: tasks would be dropped or duplicated, and a client could produce a
 result set that never existed at any point in time. Requests that already
 pin a snapshot, incremental requests, and tables with no current snapshot
@@ -470,9 +471,11 @@ private PlanTableScanResponse splitIntoPlanTasks(
     PlanTableScanResponse fullPlan);
 private static List<DeleteFile> referencedDeleteFiles(List<FileScanTask> fileScanTasks);
 
-// .../service/PlanTaskToken.java (new, package-private)
+// .../service/PlanTaskCodec.java (new, package-private)
 static String encode(TableIdentifier table, PlanTableScanRequest scan, int offset, int limit);
-static Optional<PlanTaskToken> decode(String planTask);
+static Optional<PlanTask> decode(String planTask);
+
+// PlanTaskCodec.PlanTask, the unit of work a decoded plan-task stands for
 boolean matchesTable(TableIdentifier tableIdentifier);
 PlanTableScanRequest scanRequest();
 int offset();
@@ -496,9 +499,9 @@ delegates to `planFullScan`, and batches through `splitIntoPlanTasks`.
 
 When the backend is another REST catalog, `planTableScan` already delegates
 upstream, so the `plan-tasks` a client receives are the **remote** catalog's
-tokens and are opaque to Gravitino. `FederatedCatalogWrapper.fetchScanTasks`
-therefore forwards the token unchanged to the remote `.../tasks` and returns
-what the remote answers; local token decoding is never involved. Response
+plan tasks and are opaque to Gravitino. `FederatedCatalogWrapper.fetchScanTasks`
+therefore forwards the plan task unchanged to the remote `.../tasks` and returns
+what the remote answers; local plan task decoding is never involved. Response
 deserialization needs the table's partition specs, which are supplied
 through a `ParserContext` built from the loaded table, mirroring the existing
 federated plan path.
@@ -526,9 +529,11 @@ carries the delete file and serializes with `"delete-file-references":[0]`.
 | `gravitino.iceberg-rest.scan-plan-task-batch-size`   | `100`   | 1.3.0 | Maximum `file-scan-tasks` returned inline by one scan planning response; later batches become `plan-tasks`. `0` disables batching. |
 
 The default matches the Iceberg side, as agreed in review
-([#12194](https://github.com/apache/gravitino/pull/12194#discussion_r3662630664)).
-Setting `0` restores the pre-change response shape exactly, which is the
-escape hatch for an operator with a non-conformant client.
+([#12194](https://github.com/apache/gravitino/pull/12194#discussion_r3662630664)),
+and keeps a response comfortably inside the ~1 MB body limit common to
+gateways and load balancers: 100 file scan tasks serialize to roughly 0.3 MB
+(§8.2). Setting `0` restores the pre-change response shape exactly, which is
+the escape hatch for an operator with a non-conformant client.
 
 ### 5.13 User process
 
@@ -539,15 +544,15 @@ escape hatch for an operator with a non-conformant client.
    projection and optionally `snapshot-id`.
 3. The server answers `COMPLETED` with up to `scan-plan-task-batch-size`
    tasks inline plus one `plan-task` per remaining batch. If the plan fits in
-   one batch there are no tokens and the client is done.
-4. The client starts work on the inline tasks and, for each token, calls
+   one batch there are no plan tasks and the client is done.
+4. The client starts work on the inline tasks and, for each plan task, calls
    `POST /v1/{prefix}/namespaces/db/tables/tbl/tasks` with
-   `{"plan-task": "<token>"}` — the Iceberg Java client does this
+   `{"plan-task": "<plan task>"}` — the Iceberg Java client does this
    concurrently from a worker pool.
 5. Each response carries that batch's `file-scan-tasks` (plus `delete-files`
    for a merge-on-read table). The union across the plan response and all
-   tokens is the complete task set for the planned snapshot.
-6. If the client presents a token after the planned snapshot has expired, it
+   plan tasks is the complete task set for the planned snapshot.
+6. If the client presents a plan task after the planned snapshot has expired, it
    gets `404 NoSuchPlanTaskException` and re-plans from step 2.
 
 ### 5.14 Implementation process
@@ -567,9 +572,9 @@ IcebergTableOperationExecutor
       ▼
 CatalogWrapperForREST.fetchScanTasks
       │
-      ├── PlanTaskToken.decode ──── empty / other table ──▶ 404 NoSuchPlanTaskException
+      ├── PlanTaskCodec.decode ──── empty / other table ──▶ 404 NoSuchPlanTaskException
       ├── catalog.loadTable ─────── missing ──────────────▶ 404 NoSuchTableException
-      ├── planFullScan(token.scanRequest())
+      ├── planFullScan(planTask.scanRequest())
       │        ├── scan plan cache hit ─▶ cached full ordered plan
       │        └── miss ─▶ plan pinned snapshot, sort, cache
       │        └── snapshot gone (IllegalArgumentException) ─▶ 404 NoSuchPlanTaskException
@@ -601,29 +606,54 @@ catalog instead.
 
 | Level                    | Coverage                                                                                                                                              |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Token unit tests         | Round-trip of snapshot, filter, projection, stats fields and range; rejection of foreign, malformed, wrongly typed and non-object payloads; URL safety |
-| Wrapper unit tests       | Batching arithmetic; every task reachable exactly once; resolution against a pinned snapshot after a later append; cache-served path; batching disabled; merge-on-read batches carrying their own delete files; unknown/foreign/stale tokens; missing table |
-| REST end-to-end          | With batch size 1: `/plan` advertises the expected tokens and each `POST .../tasks` returns `200` with its task; unknown token returns `404` with the right error type; empty body returns `400` |
-| Federation               | The federated path posts to the remote `.../tasks` with the token forwarded untouched                                                                  |
+| Plan task unit tests         | Round-trip of snapshot, filter, projection, stats fields and range; rejection of foreign, malformed, wrongly typed and non-object payloads; URL safety |
+| Wrapper unit tests       | Batching arithmetic; every task reachable exactly once; resolution against a pinned snapshot after a later append; cache-served path; batching disabled; merge-on-read batches carrying their own delete files; unknown/foreign/stale plan tasks; missing table |
+| REST end-to-end          | With batch size 1: `/plan` advertises the expected plan tasks and each `POST .../tasks` returns `200` with its task; unknown plan task returns `404` with the right error type; empty body returns `400` |
+| Federation               | The federated path posts to the remote `.../tasks` with the plan task forwarded untouched                                                                  |
 | Events and config        | Pre/failure event dispatch for the new operation; `/v1/config` advertises the endpoint                                                                 |
 
 ---
 
-## 8. Open questions for review
+## 8. Decisions taken in review
 
-1. **Should batching depend on the scan plan cache?** With the cache
-   disabled (today's default), an N-batch plan costs N full plans (§4). An
-   alternative is to keep everything inline unless a cache is configured, so
-   the protocol's second step is only used when redemption is cheap. That
-   trades Goal 2 away in the default configuration; the current design
-   prefers bounded responses and documents the cache recommendation.
-2. **Is 100 the right default?** It matches the Iceberg side and was agreed
-   in review, but it means a 100,000-file scan becomes 1,000 requests. A
-   larger default, or sizing batches by serialized bytes rather than task
-   count, may serve big tables better.
-3. **Should tokens carry an expiry?** Today a token stays valid as long as
-   its snapshot exists. A short expiry would bound how stale a client's view
-   can be, at the cost of an extra failure mode.
+Three questions were open when this design was first written and were settled
+in review on [#12241](https://github.com/apache/gravitino/pull/12241).
+
+### 8.1 Batching does not depend on the scan plan cache
+
+With the cache disabled — today's default — an N-batch plan costs N full plans
+(§4), which argued for keeping everything inline unless a cache is configured.
+
+**Decision:** leave caching out of this design. Batching always applies, and
+whether Gravitino should enable a scan plan cache by default is a separate
+question, raised as its own issue so it can be discussed on its own terms
+(with a stated preference for enabling it). This keeps Goal 2 intact in every
+configuration, at the cost of re-planning on a cache miss, which the user
+documentation calls out.
+
+### 8.2 The default batch size stays 100
+
+100 matches the Iceberg side, and the number also lines up with deployment
+reality: many gateways and load balancers cap a response body at about 1 MB,
+and 100 file scan tasks serialize to roughly 0.3 MB. It does mean a
+100,000-file scan takes 1,000 requests.
+
+**Decision:** keep 100. If real workloads show the default causing problems,
+that is a separate issue — possibly sizing batches by serialized bytes rather
+than by task count.
+
+### 8.3 A plan task does not expire
+
+Neither the Iceberg specification nor its implementation gives a plan task any
+lifetime. The OpenAPI definition calls it "an opaque string provided by the
+REST server that represents a unit of work for generating file scan tasks for
+scan planning" — an ordinary request parameter, like a table or catalog name,
+not a credential.
+
+**Decision:** no expiry. A plan task stays redeemable as long as the snapshot
+it pins exists, and the class that produces and reads it is named
+`PlanTaskCodec` rather than a token type, to keep the code aligned with that
+framing.
 
 ---
 
@@ -636,20 +666,21 @@ Delivered in [#12194](https://github.com/apache/gravitino/pull/12194):
 - [x] Map `NoSuchPlanTaskException` to `404` in `IcebergExceptionMapper`
 - [x] Advertise `Endpoint.V1_FETCH_TABLE_SCAN_PLAN_TASKS` in `IcebergConfigOperations`
 - [x] Add `IcebergFetchScanTasks{Pre,,Failure}Event` and `OperationType.FETCH_SCAN_TASKS`, and wire them in `IcebergTableEventDispatcher` and `IcebergTableHookDispatcher`
-- [x] Add `PlanTaskToken` (encode, decode, table match)
+- [x] Add `PlanTaskCodec` (encode, decode, table match)
 - [x] Add `scan-plan-task-batch-size` to `IcebergConstants` and `IcebergConfig`
 - [x] Split plan responses into inline tasks plus `plan-tasks` in `CatalogWrapperForREST.planTableScan`
 - [x] Pin the planned snapshot and order planned tasks totally
-- [x] Resolve a token to its batch in `CatalogWrapperForREST.fetchScanTasks`
+- [x] Resolve a plan task to its batch in `CatalogWrapperForREST.fetchScanTasks`
 - [x] Forward `POST {table}/tasks` upstream in `FederatedCatalogWrapper`
-- [x] Unit tests: `TestPlanTaskToken`, `TestScanPlanTaskBatching`
+- [x] Unit tests: `TestPlanTaskCodec`, `TestScanPlanTaskBatching`
 - [x] REST tests: `TestIcebergFetchScanTasksEndpoint`, `TestIcebergTableOperations`, `TestIcebergConfig`
 - [x] Federation test in `TestCatalogWrapperForREST`
-- [x] Document the endpoint, token semantics and the new property in `docs/iceberg-rest-service.md`
+- [x] Document the endpoint, plan task semantics and the new property in `docs/iceberg-rest-service.md`
 
 Follow-ups, each its own issue:
 
+- [ ] Decide whether the scan plan cache should be enabled by default (§8.1)
 - [ ] Integration test with pyiceberg `scan-planning-mode=server` against a multi-batch table
 - [ ] Honor `min-rows-requested` when sizing batches (Non-Goal 2)
-- [ ] Ship a shared `ScanPlanCache` implementation so token redemption avoids re-planning across replicas (Non-Goal 3)
-- [ ] Revisit the default batch size once real workloads are measured (§8.2)
+- [ ] Ship a shared `ScanPlanCache` implementation so plan task redemption avoids re-planning across replicas (Non-Goal 3)
+- [ ] Revisit the default batch size if real workloads show 100 causing problems (§8.2)
