@@ -194,12 +194,12 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   /**
    * Delegates the second step of scan planning to the remote REST catalog.
    *
-   * <p>{@code plan-task} tokens in a federated setup are minted by the remote catalog during {@link
+   * <p>{@code plan-tasks} in a federated setup are issued by the remote catalog during {@link
    * #planTableScan}, so they are opaque here and are handed back untouched for the remote catalog
    * to resolve. Scan tasks carry no credentials, so nothing needs rewriting on the way back.
    *
    * @param tableIdentifier the table the plan task belongs to.
-   * @param request the request carrying the remote catalog's {@code plan-task} token.
+   * @param request the request carrying the remote catalog's {@code plan-task}.
    * @return the scan tasks the remote catalog returns for that plan task.
    */
   @Override
@@ -276,11 +276,11 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
 
   /**
    * Sends a {@code POST {table}/tasks} request to the remote REST catalog, redeeming a {@code
-   * plan-task} token the remote catalog issued.
+   * plan-task} the remote catalog issued.
    *
    * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
    * @param identifier the table the plan task belongs to.
-   * @param request the request carrying the remote catalog's {@code plan-task} token.
+   * @param request the request carrying the remote catalog's {@code plan-task}.
    * @param specsById partition specs for the table, needed for response deserialization.
    * @return the scan tasks the remote catalog returns for that plan task.
    */

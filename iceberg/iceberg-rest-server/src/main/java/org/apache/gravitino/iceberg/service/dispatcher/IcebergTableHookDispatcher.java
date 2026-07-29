@@ -200,12 +200,12 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   }
 
   /**
-   * Fetch the scan tasks for a {@code plan-task} token returned by a prior scan plan. Read-only, so
-   * no hooks are needed and the call is passed straight through.
+   * Fetch the scan tasks for a {@code plan-task} returned by a prior scan plan. Read-only, so no
+   * hooks are needed and the call is passed straight through.
    *
    * @param context Iceberg REST request context information.
    * @param tableIdentifier The Iceberg table identifier.
-   * @param request The request carrying the {@code plan-task} token.
+   * @param request The request carrying the {@code plan-task}.
    * @return A FetchScanTasksResponse containing the scan tasks for that plan task.
    */
   @Override

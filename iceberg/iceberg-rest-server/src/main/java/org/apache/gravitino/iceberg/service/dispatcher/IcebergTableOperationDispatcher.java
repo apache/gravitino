@@ -138,12 +138,12 @@ public interface IcebergTableOperationDispatcher {
       PlanTableScanRequest scanRequest);
 
   /**
-   * Fetch the scan tasks for a {@code plan-task} token returned by a prior {@link #planTableScan}
-   * call, completing the second step of the Iceberg REST two-step scan planning protocol.
+   * Fetch the scan tasks for a {@code plan-task} returned by a prior {@link #planTableScan} call,
+   * completing the second step of the Iceberg REST two-step scan planning protocol.
    *
    * @param context Iceberg REST request context information.
    * @param tableIdentifier The Iceberg table identifier.
-   * @param request The request carrying the {@code plan-task} token.
+   * @param request The request carrying the {@code plan-task}.
    * @return A {@link FetchScanTasksResponse} containing the scan tasks for that plan task.
    */
   FetchScanTasksResponse fetchScanTasks(

@@ -345,7 +345,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
       new ConfigBuilder(IcebergConstants.SCAN_PLAN_TASK_BATCH_SIZE)
           .doc(
               "Maximum number of file scan tasks returned inline by one scan planning response. "
-                  + "Tasks beyond this limit are handed out as plan-task tokens that clients "
+                  + "Tasks beyond this limit are handed out as plan-tasks that clients "
                   + "exchange for the remaining tasks. Set to 0 to disable batching and always "
                   + "return every task inline.")
           .version(ConfigConstants.VERSION_1_3_0)

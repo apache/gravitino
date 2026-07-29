@@ -58,7 +58,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Covers the two-step scan planning protocol: {@code planTableScan} handing out {@code plan-tasks}
- * once a plan outgrows one batch, and {@code fetchScanTasks} redeeming those tokens.
+ * once a plan outgrows one batch, and {@code fetchScanTasks} redeeming those plan tasks.
  */
 @SuppressWarnings("deprecation")
 public class TestScanPlanTaskBatching {
@@ -188,20 +188,20 @@ public class TestScanPlanTaskBatching {
 
     Assertions.assertThrows(
         NoSuchPlanTaskException.class,
-        () -> wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest("unknown-token")),
-        "A token this server never minted is an unknown plan task");
+        () -> wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest("not-a-plan-task")),
+        "A string this server never issued is an unknown plan task");
 
-    String tokenForOtherTable = PlanTaskToken.encode(otherTableId, SCAN_ALL, 1, 1);
+    String planTaskForOtherTable = PlanTaskCodec.encode(otherTableId, SCAN_ALL, 1, 1);
     Assertions.assertThrows(
         NoSuchPlanTaskException.class,
-        () -> wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest(tokenForOtherTable)),
-        "A token minted for another table must not resolve against this one");
+        () -> wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest(planTaskForOtherTable)),
+        "A plan task encoded for another table must not resolve against this one");
 
-    String tokenPastEndOfPlan = PlanTaskToken.encode(tableId, SCAN_ALL, 99, 1);
+    String planTaskPastEndOfPlan = PlanTaskCodec.encode(tableId, SCAN_ALL, 99, 1);
     Assertions.assertThrows(
         NoSuchPlanTaskException.class,
-        () -> wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest(tokenPastEndOfPlan)),
-        "A token pointing past the end of the plan is stale");
+        () -> wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest(planTaskPastEndOfPlan)),
+        "A plan task pointing past the end of the plan is stale");
   }
 
   @Test
@@ -240,7 +240,7 @@ public class TestScanPlanTaskBatching {
 
     Assertions.assertThrows(
         org.apache.iceberg.exceptions.NoSuchTableException.class,
-        () -> wrapper.fetchScanTasks(missingTableId, new FetchScanTasksRequest("any-token")));
+        () -> wrapper.fetchScanTasks(missingTableId, new FetchScanTasksRequest("any-plan-task")));
   }
 
   private PlanTableScanResponse planTableScan(

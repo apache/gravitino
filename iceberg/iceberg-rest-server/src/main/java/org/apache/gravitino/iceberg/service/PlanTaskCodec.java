@@ -34,49 +34,40 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A {@code plan-task} token handed out by {@code POST .../tables/{table}/plan} and redeemed at
- * {@code POST .../tables/{table}/tasks}.
+ * Encodes and decodes the {@code plan-task} strings handed out by {@code POST
+ * .../tables/{table}/plan} and redeemed at {@code POST .../tables/{table}/tasks}.
  *
- * <p>The token is self-describing: it carries the table, the scan request it was planned from (with
- * the snapshot pinned at planning time) and the slice of the planned file scan tasks it stands for.
- * Nothing about the token is stored server side, so it stays valid across server restarts and can
- * be redeemed by any Gravitino instance that serves the same catalog.
+ * <p>The Iceberg REST specification describes a plan task as an opaque string representing a unit
+ * of work for generating file scan tasks, and says nothing about its contents. Here that unit of
+ * work is described by the string itself: the table, the scan request the plan was produced from
+ * (with the snapshot pinned at planning time) and the range of the planned file scan tasks it
+ * stands for, as base64url-encoded JSON. Nothing is stored server side, so a plan task stays
+ * redeemable across server restarts and on any Gravitino instance that serves the same catalog.
  *
- * <p>The token is opaque to clients but is not a capability: it grants no access on its own. {@code
- * POST .../tasks} authorizes the table in the request path and rejects a token minted for a
- * different table, so a forged token can at most express a scan the caller could already submit
- * through {@code POST .../plan}.
+ * <p>A plan task grants no access on its own: {@code POST .../tasks} authorizes the table in the
+ * request path and rejects a plan task encoded for a different table, so a forged one can at most
+ * express a scan the caller could already submit through {@code POST .../plan}.
  */
-class PlanTaskToken {
+final class PlanTaskCodec {
 
-  private static final Logger LOG = LoggerFactory.getLogger(PlanTaskToken.class);
+  private static final Logger LOG = LoggerFactory.getLogger(PlanTaskCodec.class);
 
   private static final String TABLE = "table";
   private static final String OFFSET = "offset";
   private static final String LIMIT = "limit";
   private static final String SCAN = "scan";
 
-  private final String table;
-  private final PlanTableScanRequest scanRequest;
-  private final int offset;
-  private final int limit;
-
-  private PlanTaskToken(String table, PlanTableScanRequest scanRequest, int offset, int limit) {
-    this.table = table;
-    this.scanRequest = scanRequest;
-    this.offset = offset;
-    this.limit = limit;
-  }
+  private PlanTaskCodec() {}
 
   /**
-   * Encodes a token covering {@code limit} file scan tasks starting at {@code offset} of the plan
-   * produced by {@code scanRequest}.
+   * Encodes a plan task covering {@code limit} file scan tasks starting at {@code offset} of the
+   * plan produced by {@code scanRequest}.
    *
    * @param tableIdentifier the table the plan belongs to.
    * @param scanRequest the scan request the plan was produced from, with the snapshot pinned.
-   * @param offset index of the first file scan task the token covers.
-   * @param limit maximum number of file scan tasks the token covers.
-   * @return the encoded token.
+   * @param offset index of the first file scan task the plan task covers.
+   * @param limit maximum number of file scan tasks the plan task covers.
+   * @return the encoded plan task.
    */
   static String encode(
       TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest, int offset, int limit) {
@@ -96,12 +87,12 @@ class PlanTaskToken {
   }
 
   /**
-   * Decodes a token previously produced by {@link #encode}.
+   * Decodes a plan task previously produced by {@link #encode}.
    *
-   * @param planTask the token presented by the client.
-   * @return the decoded token, or empty if the token was not issued by this server.
+   * @param planTask the plan task presented by the client.
+   * @return the unit of work it stands for, or empty if it was not issued by this server.
    */
-  static Optional<PlanTaskToken> decode(String planTask) {
+  static Optional<PlanTask> decode(String planTask) {
     if (planTask == null || planTask.isEmpty()) {
       return Optional.empty();
     }
@@ -120,43 +111,59 @@ class PlanTaskToken {
       }
 
       return Optional.of(
-          new PlanTaskToken(
+          new PlanTask(
               JsonUtil.getString(TABLE, node),
               PlanTableScanRequestParser.fromJson(JsonUtil.get(SCAN, node)),
               offset,
               limit));
     } catch (Exception e) {
-      // Any malformed token is simply a token this server did not issue.
+      // Anything that does not decode is simply a plan task this server did not issue.
       LOG.debug("Ignoring plan task that could not be decoded: {}", planTask, e);
       return Optional.empty();
     }
   }
 
-  /**
-   * Returns whether this token was minted for {@code tableIdentifier}.
-   *
-   * @param tableIdentifier the table from the request path.
-   * @return true if the token belongs to that table.
-   */
-  boolean matchesTable(TableIdentifier tableIdentifier) {
-    return table.equals(tableIdentifier.toString());
-  }
+  /** The unit of work a decoded {@code plan-task} stands for. */
+  static class PlanTask {
 
-  PlanTableScanRequest scanRequest() {
-    return scanRequest;
-  }
+    private final String table;
+    private final PlanTableScanRequest scanRequest;
+    private final int offset;
+    private final int limit;
 
-  int offset() {
-    return offset;
-  }
+    private PlanTask(String table, PlanTableScanRequest scanRequest, int offset, int limit) {
+      this.table = table;
+      this.scanRequest = scanRequest;
+      this.offset = offset;
+      this.limit = limit;
+    }
 
-  int limit() {
-    return limit;
-  }
+    /**
+     * Returns whether this plan task was encoded for {@code tableIdentifier}.
+     *
+     * @param tableIdentifier the table from the request path.
+     * @return true if the plan task belongs to that table.
+     */
+    boolean matchesTable(TableIdentifier tableIdentifier) {
+      return table.equals(tableIdentifier.toString());
+    }
 
-  @Override
-  public String toString() {
-    return String.format(
-        "PlanTaskToken{table=%s, offset=%s, limit=%s, scan=%s}", table, offset, limit, scanRequest);
+    PlanTableScanRequest scanRequest() {
+      return scanRequest;
+    }
+
+    int offset() {
+      return offset;
+    }
+
+    int limit() {
+      return limit;
+    }
+
+    @Override
+    public String toString() {
+      return String.format(
+          "PlanTask{table=%s, offset=%s, limit=%s, scan=%s}", table, offset, limit, scanRequest);
+    }
   }
 }

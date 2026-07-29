@@ -311,11 +311,11 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   }
 
   /**
-   * Fetch the scan tasks for a {@code plan-task} token returned by a prior scan plan.
+   * Fetch the scan tasks for a {@code plan-task} returned by a prior scan plan.
    *
    * @param context Iceberg REST request context information.
    * @param tableIdentifier The Iceberg table identifier.
-   * @param request The request carrying the {@code plan-task} token.
+   * @param request The request carrying the {@code plan-task}.
    * @return A FetchScanTasksResponse containing the scan tasks for that plan task
    */
   @Override
