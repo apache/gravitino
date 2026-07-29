@@ -173,7 +173,7 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `USE_SCHEMA`         | Metalake, Catalog, Schema           | Use any schema in scope, and reach the objects inside it           |
 | `CREATE_TABLE`       | Metalake, Catalog, Schema           | Create tables in any schema in scope                               |
 | `SELECT_TABLE`       | Metalake, Catalog, Schema, Table    | Read any table in scope                                            |
-| `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table    | Write to, and alter the schema of, any table in scope              |
+| `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table    | Read and write to the table, and alter the schema of, any table in scope              |
 | `CREATE_VIEW`        | Metalake, Catalog, Schema           | Create views in any schema in scope                                |
 | `SELECT_VIEW`        | Metalake, Catalog, Schema, View     | Read any view in scope                                             |
 | `CREATE_TOPIC`       | Metalake, Catalog, Schema           | Create topics in any schema in scope                               |
