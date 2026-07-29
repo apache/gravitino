@@ -71,8 +71,12 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
         + " properties = #{tagMeta.properties},"
         + " audit_info = #{tagMeta.auditInfo},"
         // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
-        + " current_version = current_version + 1,"
-        + " last_version = last_version + 1,"
+        + " current_version = "
+        + TAG_TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TAG_TABLE_NAME
+        + ".last_version + 1,"
         + " deleted_at = #{tagMeta.deletedAt}";
   }
 

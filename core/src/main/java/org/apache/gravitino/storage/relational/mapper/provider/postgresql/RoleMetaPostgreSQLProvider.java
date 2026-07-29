@@ -63,8 +63,12 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
         + " properties = #{roleMeta.properties},"
         + " audit_info = #{roleMeta.auditInfo},"
         // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
-        + " current_version = current_version + 1,"
-        + " last_version = last_version + 1,"
+        + " current_version = "
+        + ROLE_TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + ROLE_TABLE_NAME
+        + ".last_version + 1,"
         + " deleted_at = #{roleMeta.deletedAt}";
   }
 

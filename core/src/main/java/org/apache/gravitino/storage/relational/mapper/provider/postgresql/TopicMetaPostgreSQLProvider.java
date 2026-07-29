@@ -115,8 +115,12 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
         + " properties = #{topicMeta.properties},"
         + " audit_info = #{topicMeta.auditInfo},"
         // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
-        + " current_version = current_version + 1,"
-        + " last_version = last_version + 1,"
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".last_version + 1,"
         + " deleted_at = #{topicMeta.deletedAt}";
   }
 

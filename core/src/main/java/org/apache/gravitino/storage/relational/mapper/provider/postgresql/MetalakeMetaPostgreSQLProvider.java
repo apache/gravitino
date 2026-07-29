@@ -57,8 +57,12 @@ public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider 
         + " audit_info = #{metalakeMeta.auditInfo},"
         + " schema_version = #{metalakeMeta.schemaVersion},"
         // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
-        + " current_version = current_version + 1,"
-        + " last_version = last_version + 1,"
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".last_version + 1,"
         + " deleted_at = #{metalakeMeta.deletedAt}";
   }
 
