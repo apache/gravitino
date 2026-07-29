@@ -69,8 +69,14 @@ const MetalakeList = () => {
   const [search, setSearch] = useState('')
   const [ownerRefreshKey, setOwnerRefreshKey] = useState(0)
   const auth = useAppSelector(state => state.auth)
+<<<<<<< HEAD
   const { serviceAdmins, authUser, anthEnable } = auth
   const admins = Array.isArray(serviceAdmins) ? serviceAdmins : (serviceAdmins || '').split(',')
+=======
+  const { serviceAdmins, authUser, anthEnable, authType, authToken } = auth
+  const isAuthReady = authType && (authType !== 'oauth' || !!authToken)
+  const admins = normalizeServiceAdmins(serviceAdmins)
+>>>>>>> 29d40aa64 ([#12200] fix(web-v2): Gate metalake fetch until OAuth token is ready (#12203))
   const isServiceAdmin = admins.includes(authUser?.name)
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
@@ -78,8 +84,15 @@ const MetalakeList = () => {
 
   useEffect(() => {
     dispatch(resetMetalakeStore())
-    dispatch(fetchMetalakes())
   }, [dispatch])
+
+  useEffect(() => {
+    if (!isAuthReady) {
+      return
+    }
+
+    dispatch(fetchMetalakes())
+  }, [dispatch, isAuthReady])
 
   useEffect(() => {
     const filteredData = store.metalakes
