@@ -215,8 +215,9 @@ public class SchemaMetaBaseSQLProvider {
         + " schema_comment = #{schemaMeta.schemaComment},"
         + " properties = #{schemaMeta.properties},"
         + " audit_info = #{schemaMeta.auditInfo},"
-        + " current_version = #{schemaMeta.currentVersion},"
-        + " last_version = #{schemaMeta.lastVersion},"
+        // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
+        + " current_version = current_version + 1,"
+        + " last_version = last_version + 1,"
         + " deleted_at = #{schemaMeta.deletedAt}";
   }
 
@@ -253,8 +254,9 @@ public class SchemaMetaBaseSQLProvider {
         + " schema_comment = VALUES(schema_comment),"
         + " properties = VALUES(properties),"
         + " audit_info = VALUES(audit_info),"
-        + " current_version = VALUES(current_version),"
-        + " last_version = VALUES(last_version),"
+        // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
+        + " current_version = current_version + 1,"
+        + " last_version = last_version + 1,"
         + " deleted_at = VALUES(deleted_at)"
         + "</script>";
   }

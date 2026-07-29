@@ -378,18 +378,22 @@ public class ModelMetaService {
             .toString();
     boolean isRenamed = !Objects.equals(oldModelEntity.name(), newEntity.name());
 
-    AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      ModelMetaMapper.class,
-                      mapper ->
-                          mapper.updateModelMeta(
-                              POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO))),
           () -> {
-            if (isRenamed && updateResult.get() > 0) {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    ModelMetaMapper.class,
+                    mapper ->
+                        mapper.updateModelMeta(
+                            POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO));
+            if (updated == 0) {
+              throw new OptimisticLockException(
+                  "Failed to update entity %s because it was modified concurrently", identifier);
+            }
+          },
+          () -> {
+            if (isRenamed) {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -400,18 +404,16 @@ public class ModelMetaService {
                           OperateType.ALTER));
             }
           });
+    } catch (OptimisticLockException ole) {
+      // The CAS was lost; doMultipleWithCommit already rolled the whole transaction back.
+      throw ole;
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL, newEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newEntity;
-    } else {
-      throw new OptimisticLockException(
-          "Failed to update entity %s because it was modified concurrently", identifier);
-    }
+    return newEntity;
   }
 
   @Monitored(

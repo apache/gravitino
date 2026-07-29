@@ -143,7 +143,6 @@ public class ViewMetaService {
         newEntity.id(),
         oldViewEntity.id());
 
-    AtomicInteger updateResult = new AtomicInteger(0);
     try {
       ViewPO newViewPO = updateViewPO(oldViewPO, newEntity);
       String metalakeName = ident.namespace().level(0);
@@ -160,16 +159,16 @@ public class ViewMetaService {
                   ViewVersionInfoMapper.class,
                   mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())),
           () -> {
-            updateResult.set(
+            int updated =
                 SessionUtils.getWithoutCommit(
-                    ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO)));
-            if (updateResult.get() == 0) {
+                    ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO));
+            if (updated == 0) {
               throw new OptimisticLockException(
                   "Failed to update entity %s because it was modified concurrently", ident);
             }
           },
           () -> {
-            if (isRenamed && updateResult.get() > 0) {
+            if (isRenamed) {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -181,11 +180,10 @@ public class ViewMetaService {
             }
           });
       return newEntity;
+    } catch (OptimisticLockException ole) {
+      // The CAS was lost; doMultipleWithCommit already rolled the whole transaction back.
+      throw ole;
     } catch (RuntimeException re) {
-      if (updateResult.get() == 0) {
-        throw new OptimisticLockException(
-            re, "Failed to update entity %s because it was modified concurrently", ident);
-      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.VIEW, newEntity.nameIdentifier().toString());
       throw re;

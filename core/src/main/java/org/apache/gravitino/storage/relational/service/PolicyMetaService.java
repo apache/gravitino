@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -144,7 +145,9 @@ public class PolicyMetaService {
         updatedPolicyEntity.id(),
         oldPolicyEntity.id());
 
-    int[] updateResult = new int[] {-1};
+    // Only the non-versioned branch reports its row count back here; the versioned branch aborts
+    // the transaction from inside the first operation instead.
+    AtomicInteger updateResult = new AtomicInteger(-1);
     try {
       boolean checkNeedUpdateVersion =
           POConverters.checkPolicyVersionNeedUpdate(
@@ -153,38 +156,39 @@ public class PolicyMetaService {
           POConverters.updatePolicyPOWithVersion(
               oldPolicyPO, updatedPolicyEntity, checkNeedUpdateVersion);
       if (checkNeedUpdateVersion) {
+        // The meta update runs first so a stale writer rolls back before writing a version row.
         SessionUtils.doMultipleWithCommit(
             () -> {
-              updateResult[0] =
+              int updated =
                   SessionUtils.getWithoutCommit(
                       PolicyMetaMapper.class,
                       mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
-              if (updateResult[0] == 0) {
+              if (updated == 0) {
                 throw new OptimisticLockException(
                     "Failed to update entity %s because it was modified concurrently", ident);
               }
+              updateResult.set(updated);
             },
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyVersionMapper.class,
                     mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO())));
       } else {
-        updateResult[0] =
+        updateResult.set(
             SessionUtils.doWithCommitAndFetchResult(
                 PolicyMetaMapper.class,
-                mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
+                mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO)));
       }
+    } catch (OptimisticLockException ole) {
+      // The CAS was lost; doMultipleWithCommit already rolled the whole transaction back.
+      throw ole;
     } catch (RuntimeException re) {
-      if (updateResult[0] == 0) {
-        throw new OptimisticLockException(
-            re, "Failed to update entity %s because it was modified concurrently", ident);
-      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult[0] > 0) {
+    if (updateResult.get() > 0) {
       return updatedPolicyEntity;
     } else {
       throw new OptimisticLockException(

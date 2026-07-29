@@ -66,8 +66,9 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " metalake_id = #{groupMeta.metalakeId},"
         + " external_id = #{groupMeta.externalId},"
         + " audit_info = #{groupMeta.auditInfo},"
-        + " current_version = #{groupMeta.currentVersion},"
-        + " last_version = #{groupMeta.lastVersion},"
+        // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
+        + " current_version = current_version + 1,"
+        + " last_version = last_version + 1,"
         + " deleted_at = #{groupMeta.deletedAt}";
   }
 

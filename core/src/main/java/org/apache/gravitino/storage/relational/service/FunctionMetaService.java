@@ -260,17 +260,16 @@ public class FunctionMetaService {
         newEntity.id(),
         oldFunctionEntity.id());
 
-    AtomicInteger updateResult = new AtomicInteger(-1);
     try {
       FunctionPO newFunctionPO = updateFunctionPO(oldFunctionPO, newEntity);
       // Update the function meta first so a stale writer rolls back before writing a version row.
       SessionUtils.doMultipleWithCommit(
           () -> {
-            updateResult.set(
+            int updated =
                 SessionUtils.getWithoutCommit(
                     FunctionMetaMapper.class,
-                    mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO)));
-            if (updateResult.get() == 0) {
+                    mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO));
+            if (updated == 0) {
               throw new OptimisticLockException(
                   "Failed to update entity %s because it was modified concurrently", identifier);
             }
@@ -281,11 +280,10 @@ public class FunctionMetaService {
                   mapper -> mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())));
 
       return newEntity;
+    } catch (OptimisticLockException ole) {
+      // The CAS was lost; doMultipleWithCommit already rolled the whole transaction back.
+      throw ole;
     } catch (RuntimeException re) {
-      if (updateResult.get() == 0) {
-        throw new OptimisticLockException(
-            re, "Failed to update entity %s because it was modified concurrently", identifier);
-      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FUNCTION, newEntity.nameIdentifier().toString());
       throw re;

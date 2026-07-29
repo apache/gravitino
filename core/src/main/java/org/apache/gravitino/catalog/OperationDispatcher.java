@@ -211,6 +211,13 @@ public abstract class OperationDispatcher {
       // Case 2: The table is created by Gravitino, but has no corresponding entity in Gravitino.
       LOG.error(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
     } catch (OptimisticLockException e) {
+      // A lost CAS is a real conflict, not a best-effort store failure, so it must not be
+      // swallowed like Case 3 below: the caller needs it to surface as HTTP 409.
+      //
+      // NOTE: for an alter this is only the Gravitino-side entity write. The underlying catalog
+      // (Hive, Iceberg, ...) has already applied the change and is NOT rolled back, so the caller
+      // sees a conflict for a change that partly happened. Callers that can re-apply their update
+      // idempotently should retry (see LanceTableOperations#updateTableWithCasRetry).
       throw e;
     } catch (Exception e) {
       // Case 3: The table is created by Gravitino, but failed to operate the corresponding entity

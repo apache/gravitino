@@ -97,6 +97,50 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testInsertWithOverwriteAdvancesVersionCas() throws IOException {
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName),
+            "overwrite_cas_topic",
+            AUDIT_INFO);
+    backend.insert(topic, false);
+
+    TopicPO staleSnapshot;
+    try (SqlSession session =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      staleSnapshot =
+          session
+              .getMapper(TopicMetaMapper.class)
+              .selectTopicMetaBySchemaIdAndName(schemaId, "overwrite_cas_topic");
+    }
+    Assertions.assertEquals(1L, staleSnapshot.getCurrentVersion());
+
+    // An overwrite-create replaces the row's content. It must advance the version instead of
+    // rewriting it from the new PO, otherwise it would reset the CAS token back to 1.
+    TopicEntity overwritten =
+        createTopicEntity(
+            topic.id(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName),
+            "overwrite_cas_topic",
+            AUDIT_INFO);
+    backend.insert(overwritten, true);
+
+    // A fresh session is required: MyBatis serves a repeated query from the session-local cache.
+    try (SqlSession session =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      TopicMetaMapper mapper = session.getMapper(TopicMetaMapper.class);
+      TopicPO reloaded = mapper.selectTopicMetaBySchemaIdAndName(schemaId, "overwrite_cas_topic");
+      Assertions.assertEquals(2L, reloaded.getCurrentVersion());
+      Assertions.assertEquals(2L, reloaded.getLastVersion());
+
+      // A writer still holding the pre-overwrite snapshot must lose the CAS.
+      TopicPO staleNewPO = POConverters.updateTopicPOWithVersion(staleSnapshot, overwritten);
+      Assertions.assertEquals(0, mapper.updateTopicMeta(staleNewPO, staleSnapshot));
+    }
+  }
+
+  @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {
     TopicEntity topic =
         createTopicEntity(

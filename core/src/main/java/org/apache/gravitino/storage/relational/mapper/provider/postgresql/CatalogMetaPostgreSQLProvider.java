@@ -79,8 +79,9 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
         + " catalog_comment = #{catalogMeta.catalogComment},"
         + " properties = #{catalogMeta.properties},"
         + " audit_info = #{catalogMeta.auditInfo},"
-        + " current_version = #{catalogMeta.currentVersion},"
-        + " last_version = #{catalogMeta.lastVersion},"
+        // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
+        + " current_version = current_version + 1,"
+        + " last_version = last_version + 1,"
         + " deleted_at = #{catalogMeta.deletedAt}";
   }
 

@@ -179,8 +179,9 @@ public class GroupMetaBaseSQLProvider {
         + " metalake_id = #{groupMeta.metalakeId},"
         + " audit_info = #{groupMeta.auditInfo},"
         + " external_id = #{groupMeta.externalId},"
-        + " current_version = #{groupMeta.currentVersion},"
-        + " last_version = #{groupMeta.lastVersion},"
+        // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
+        + " current_version = current_version + 1,"
+        + " last_version = last_version + 1,"
         + " deleted_at = #{groupMeta.deletedAt}";
   }
 

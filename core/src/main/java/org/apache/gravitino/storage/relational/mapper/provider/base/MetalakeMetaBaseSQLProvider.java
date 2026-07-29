@@ -125,8 +125,9 @@ public class MetalakeMetaBaseSQLProvider {
         + " properties = #{metalakeMeta.properties},"
         + " audit_info = #{metalakeMeta.auditInfo},"
         + " schema_version = #{metalakeMeta.schemaVersion},"
-        + " current_version = #{metalakeMeta.currentVersion},"
-        + " last_version = #{metalakeMeta.lastVersion},"
+        // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
+        + " current_version = current_version + 1,"
+        + " last_version = last_version + 1,"
         + " deleted_at = #{metalakeMeta.deletedAt}";
   }
 

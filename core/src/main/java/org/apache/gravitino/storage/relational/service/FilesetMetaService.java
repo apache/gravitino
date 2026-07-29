@@ -231,7 +231,6 @@ public class FilesetMetaService {
         // insert is protected by a unique constraint on `fileset_id + version + deleted_at`. If
         // the meta update affects 0 rows (concurrent modification), the transaction is rolled
         // back — including the version insert — and the update is treated as a conflict.
-        int[] metaUpdateCountRef = new int[1];
         try {
           SessionUtils.doMultipleWithCommit(
               () ->
@@ -239,18 +238,18 @@ public class FilesetMetaService {
                       FilesetVersionMapper.class,
                       mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
               () -> {
-                metaUpdateCountRef[0] =
+                int updated =
                     SessionUtils.getWithoutCommit(
                         FilesetMetaMapper.class,
                         mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
-                if (metaUpdateCountRef[0] == 0) {
+                if (updated == 0) {
                   throw new OptimisticLockException(
                       "Failed to update entity %s because it was modified concurrently",
                       identifier);
                 }
               },
               () -> {
-                if (isRenamed && metaUpdateCountRef[0] > 0) {
+                if (isRenamed) {
                   SessionUtils.doWithoutCommit(
                       EntityChangeLogMapper.class,
                       mapper ->
@@ -262,17 +261,13 @@ public class FilesetMetaService {
                 }
               });
           updateResult = 1;
+        } catch (OptimisticLockException ole) {
+          // The CAS was lost; the transaction was rolled back, including the version insert above.
+          throw ole;
         } catch (RuntimeException re) {
-          if (metaUpdateCountRef[0] == 0) {
-            // The meta update matched no rows; the transaction was rolled back,
-            // including the version insert above.
-            throw new OptimisticLockException(
-                re, "Failed to update entity %s because it was modified concurrently", identifier);
-          } else {
-            ExceptionUtils.checkSQLException(
-                re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
-            throw re;
-          }
+          ExceptionUtils.checkSQLException(
+              re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
+          throw re;
         }
       } else {
         int[] metaUpdateCountRef = new int[1];
@@ -296,6 +291,8 @@ public class FilesetMetaService {
             });
         updateResult = metaUpdateCountRef[0];
       }
+    } catch (OptimisticLockException ole) {
+      throw ole;
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());

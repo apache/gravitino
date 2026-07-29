@@ -204,7 +204,6 @@ public class RoleMetaService {
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     AuthorizationUtils.checkRole(identifier);
 
-    int[] updateResult = new int[] {-1};
     try {
       String metalake = NameIdentifierUtil.getMetalake(identifier);
       Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
@@ -239,13 +238,13 @@ public class RoleMetaService {
 
       SessionUtils.doMultipleWithCommit(
           () -> {
-            updateResult[0] =
+            int updated =
                 SessionUtils.getWithoutCommit(
                     RoleMetaMapper.class,
                     mapper ->
                         mapper.updateRoleMeta(
                             POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO));
-            if (updateResult[0] == 0) {
+            if (updated == 0) {
               throw new OptimisticLockException(
                   "Failed to update entity %s because it was modified concurrently", identifier);
             }
@@ -273,11 +272,10 @@ public class RoleMetaService {
                   RoleMetaMapper.class, mapper -> mapper.touchRoleUpdatedAt(rolePO.getRoleId())));
 
       return newRoleEntity;
+    } catch (OptimisticLockException ole) {
+      // The CAS was lost; doMultipleWithCommit already rolled the whole transaction back.
+      throw ole;
     } catch (RuntimeException re) {
-      if (updateResult[0] == 0) {
-        throw new OptimisticLockException(
-            re, "Failed to update entity %s because it was modified concurrently", identifier);
-      }
       ExceptionUtils.checkSQLException(re, Entity.EntityType.ROLE, identifier.toString());
       throw re;
     }

@@ -62,45 +62,52 @@ public class TestModelMetaService extends TestJDBCBackend {
 
   @TestTemplate
   public void testUpdateModelWithCacheDisabled() throws IOException, IllegalAccessException {
+    // GravitinoEnv is a JVM-wide singleton, so the original config has to be restored before
+    // leaving this test; otherwise every later test in the same JVM sees the mock.
+    Object originalConfig = FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(false);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
-    createAndInsertMakeLake(METALAKE_NAME);
-    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
-    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    try {
+      createAndInsertMakeLake(METALAKE_NAME);
+      createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+      createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
 
-    ModelEntity model =
-        createModelEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            MODEL_NS,
-            "cache_disabled_model",
-            "comment",
-            0,
-            ImmutableMap.of(),
-            AUDIT_INFO);
-    ModelMetaService.getInstance().insertModel(model, false);
+      ModelEntity model =
+          createModelEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              MODEL_NS,
+              "cache_disabled_model",
+              "comment",
+              0,
+              ImmutableMap.of(),
+              AUDIT_INFO);
+      ModelMetaService.getInstance().insertModel(model, false);
 
-    ModelMetaService.getInstance()
-        .updateModel(
-            model.nameIdentifier(),
-            entity -> {
-              ModelEntity oldModel = (ModelEntity) entity;
-              return ModelEntity.builder()
-                  .withId(oldModel.id())
-                  .withName(oldModel.name())
-                  .withNamespace(oldModel.namespace())
-                  .withComment("updated comment")
-                  .withLatestVersion(oldModel.latestVersion())
-                  .withProperties(oldModel.properties())
-                  .withAuditInfo(oldModel.auditInfo())
-                  .build();
-            });
+      ModelMetaService.getInstance()
+          .updateModel(
+              model.nameIdentifier(),
+              entity -> {
+                ModelEntity oldModel = (ModelEntity) entity;
+                return ModelEntity.builder()
+                    .withId(oldModel.id())
+                    .withName(oldModel.name())
+                    .withNamespace(oldModel.namespace())
+                    .withComment("updated comment")
+                    .withLatestVersion(oldModel.latestVersion())
+                    .withProperties(oldModel.properties())
+                    .withAuditInfo(oldModel.auditInfo())
+                    .build();
+              });
 
-    ModelPO updatedModel =
-        ModelMetaService.getInstance().getModelPOByIdentifier(model.nameIdentifier());
-    Assertions.assertEquals(2L, updatedModel.getCurrentVersion());
-    Assertions.assertEquals(2L, updatedModel.getLastVersion());
+      ModelPO updatedModel =
+          ModelMetaService.getInstance().getModelPOByIdentifier(model.nameIdentifier());
+      Assertions.assertEquals(2L, updatedModel.getCurrentVersion());
+      Assertions.assertEquals(2L, updatedModel.getLastVersion());
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "config", originalConfig, true);
+    }
   }
 
   @TestTemplate

@@ -40,6 +40,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -409,7 +410,10 @@ public class ModelVersionMetaService {
     if (updateResult.get() > 0) {
       return newModelVersionEntity;
     } else {
-      throw new IOException("Failed to update the entity: " + ident);
+      // model_version_info has no OCC version columns yet, so the guard is still the full-row
+      // compare; a zero-row match means the same thing, i.e. someone else changed the row.
+      throw new OptimisticLockException(
+          "Failed to update entity %s because it was modified concurrently", ident);
     }
   }
 

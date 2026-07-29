@@ -52,8 +52,9 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " schema_comment = #{schemaMeta.schemaComment},"
         + " properties = #{schemaMeta.properties},"
         + " audit_info = #{schemaMeta.auditInfo},"
-        + " current_version = #{schemaMeta.currentVersion},"
-        + " last_version = #{schemaMeta.lastVersion},"
+        // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
+        + " current_version = current_version + 1,"
+        + " last_version = last_version + 1,"
         + " deleted_at = #{schemaMeta.deletedAt}";
   }
 
@@ -77,8 +78,9 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " schema_comment = EXCLUDED.schema_comment,"
         + " properties = EXCLUDED.properties,"
         + " audit_info = EXCLUDED.audit_info,"
-        + " current_version = EXCLUDED.current_version,"
-        + " last_version = EXCLUDED.last_version,"
+        // OCC: bump (not reset) the version so overwrite-create can't revive a stale CAS token.
+        + " current_version = current_version + 1,"
+        + " last_version = last_version + 1,"
         + " deleted_at = EXCLUDED.deleted_at"
         + "</script>";
   }

@@ -194,14 +194,15 @@ public class TableMetaService {
     boolean isFullNameChanged =
         isSchemaChanged || !Objects.equals(oldTableEntity.name(), newTableEntity.name());
 
-    final AtomicInteger updateResult = new AtomicInteger(-1);
     try {
+      // The meta update runs first and aborts the transaction on a lost CAS, so every operation
+      // below only ever runs for the writer that won.
       SessionUtils.doMultipleWithCommit(
           () -> {
-            updateResult.set(
+            int updated =
                 SessionUtils.getWithoutCommit(
-                    TableMetaMapper.class, mapper -> ops.updatePO(mapper, newTablePO, oldTablePO)));
-            if (updateResult.get() == 0) {
+                    TableMetaMapper.class, mapper -> ops.updatePO(mapper, newTablePO, oldTablePO));
+            if (updated == 0) {
               throw new OptimisticLockException(
                   "Failed to update entity %s because it was modified concurrently", identifier);
             }
@@ -214,14 +215,11 @@ public class TableMetaService {
                         oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
                     mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
                   }),
-          () -> {
-            if (updateResult.get() > 0) {
+          () ->
               TableColumnMetaService.getInstance()
-                  .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
-            }
-          },
+                  .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO),
           () -> {
-            if (isFullNameChanged && updateResult.get() > 0) {
+            if (isFullNameChanged) {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -233,11 +231,10 @@ public class TableMetaService {
             }
           });
 
+    } catch (OptimisticLockException ole) {
+      // The CAS was lost; doMultipleWithCommit already rolled the whole transaction back.
+      throw ole;
     } catch (RuntimeException re) {
-      if (updateResult.get() == 0) {
-        throw new OptimisticLockException(
-            re, "Failed to update entity %s because it was modified concurrently", identifier);
-      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TABLE, newTableEntity.nameIdentifier().toString());
       throw re;

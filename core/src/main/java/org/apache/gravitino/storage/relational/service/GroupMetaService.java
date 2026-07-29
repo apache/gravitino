@@ -268,18 +268,17 @@ public class GroupMetaService {
     if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
       return newEntity;
     }
-    int[] updateResult = new int[] {-1};
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
-            updateResult[0] =
+            int updated =
                 SessionUtils.getWithoutCommit(
                     GroupMetaMapper.class,
                     mapper ->
                         mapper.updateGroupMeta(
                             POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
                             oldGroupPO));
-            if (updateResult[0] == 0) {
+            if (updated == 0) {
               throw new OptimisticLockException(
                   "Failed to update entity %s because it was modified concurrently", identifier);
             }
@@ -309,11 +308,10 @@ public class GroupMetaService {
               SessionUtils.doWithoutCommit(
                   GroupMetaMapper.class,
                   mapper -> mapper.touchGroupUpdatedAt(oldGroupPO.getGroupId())));
+    } catch (OptimisticLockException ole) {
+      // The CAS was lost; doMultipleWithCommit already rolled the whole transaction back.
+      throw ole;
     } catch (RuntimeException re) {
-      if (updateResult[0] == 0) {
-        throw new OptimisticLockException(
-            re, "Failed to update entity %s because it was modified concurrently", identifier);
-      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
       throw re;
