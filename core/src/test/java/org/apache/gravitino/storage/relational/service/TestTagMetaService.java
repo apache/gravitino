@@ -30,13 +30,20 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.RelationUpdate;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.AssignedTagEntity;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -51,6 +58,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
@@ -450,45 +458,45 @@ public class TestTagMetaService extends TestJDBCBackend {
           NameIdentifierUtil.ofTag(METALAKE_NAME, "tag3")
         };
 
-    List<TagEntity> tagEntities =
+    List<AssignedTagEntity> tagEntities =
         tagMetaService.associateTagsWithMetadataObject(
             catalog.nameIdentifier(), catalog.type(), tagsToAdd, new NameIdentifier[0]);
     Assertions.assertEquals(3, tagEntities.size());
-    Assertions.assertTrue(tagEntities.contains(tagEntity1));
-    Assertions.assertTrue(tagEntities.contains(tagEntity2));
-    Assertions.assertTrue(tagEntities.contains(tagEntity3));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities, tagEntity1));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities, tagEntity2));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities, tagEntity3));
 
     // Test disassociate tags with metadata object
     NameIdentifier[] tagsToRemove =
         new NameIdentifier[] {NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1")};
 
-    List<TagEntity> tagEntities1 =
+    List<AssignedTagEntity> tagEntities1 =
         tagMetaService.associateTagsWithMetadataObject(
             catalog.nameIdentifier(), catalog.type(), new NameIdentifier[0], tagsToRemove);
 
     Assertions.assertEquals(2, tagEntities1.size());
-    Assertions.assertFalse(tagEntities1.contains(tagEntity1));
-    Assertions.assertTrue(tagEntities1.contains(tagEntity2));
-    Assertions.assertTrue(tagEntities1.contains(tagEntity3));
+    Assertions.assertFalse(containsValuelessTagAssignment(tagEntities1, tagEntity1));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities1, tagEntity2));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities1, tagEntity3));
 
     // Test no tags to associate and disassociate
-    List<TagEntity> tagEntities2 =
+    List<AssignedTagEntity> tagEntities2 =
         tagMetaService.associateTagsWithMetadataObject(
             catalog.nameIdentifier(), catalog.type(), new NameIdentifier[0], new NameIdentifier[0]);
     Assertions.assertEquals(2, tagEntities2.size());
-    Assertions.assertFalse(tagEntities2.contains(tagEntity1));
-    Assertions.assertTrue(tagEntities2.contains(tagEntity2));
-    Assertions.assertTrue(tagEntities2.contains(tagEntity3));
+    Assertions.assertFalse(containsValuelessTagAssignment(tagEntities2, tagEntity1));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities2, tagEntity2));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities2, tagEntity3));
 
     // Test associate and disassociate same tags with metadata object
-    List<TagEntity> tagEntities3 =
+    List<AssignedTagEntity> tagEntities3 =
         tagMetaService.associateTagsWithMetadataObject(
             catalog.nameIdentifier(), catalog.type(), tagsToRemove, tagsToRemove);
 
     Assertions.assertEquals(2, tagEntities3.size());
-    Assertions.assertFalse(tagEntities3.contains(tagEntity1));
-    Assertions.assertTrue(tagEntities3.contains(tagEntity2));
-    Assertions.assertTrue(tagEntities3.contains(tagEntity3));
+    Assertions.assertFalse(containsValuelessTagAssignment(tagEntities3, tagEntity1));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities3, tagEntity2));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities3, tagEntity3));
 
     // Test associate and disassociate in-existent tags with metadata object
     NameIdentifier[] tagsToAdd1 =
@@ -503,13 +511,13 @@ public class TestTagMetaService extends TestJDBCBackend {
           NameIdentifierUtil.ofTag(METALAKE_NAME, "tag7")
         };
 
-    List<TagEntity> tagEntities4 =
+    List<AssignedTagEntity> tagEntities4 =
         tagMetaService.associateTagsWithMetadataObject(
             catalog.nameIdentifier(), catalog.type(), tagsToAdd1, tagsToRemove1);
 
     Assertions.assertEquals(2, tagEntities4.size());
-    Assertions.assertTrue(tagEntities4.contains(tagEntity2));
-    Assertions.assertTrue(tagEntities4.contains(tagEntity3));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities4, tagEntity2));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities4, tagEntity3));
 
     // Test associate already associated tags with metadata object
     Assertions.assertThrows(
@@ -519,13 +527,13 @@ public class TestTagMetaService extends TestJDBCBackend {
                 catalog.nameIdentifier(), catalog.type(), tagsToAdd, new NameIdentifier[0]));
 
     // Test disassociate already disassociated tags with metadata object
-    List<TagEntity> tagEntities5 =
+    List<AssignedTagEntity> tagEntities5 =
         tagMetaService.associateTagsWithMetadataObject(
             catalog.nameIdentifier(), catalog.type(), new NameIdentifier[0], tagsToRemove);
 
     Assertions.assertEquals(2, tagEntities5.size());
-    Assertions.assertTrue(tagEntities5.contains(tagEntity2));
-    Assertions.assertTrue(tagEntities5.contains(tagEntity3));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities5, tagEntity2));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities5, tagEntity3));
 
     // Test associate and disassociate with invalid metadata object
     Assertions.assertThrows(
@@ -538,22 +546,140 @@ public class TestTagMetaService extends TestJDBCBackend {
                 tagsToRemove));
 
     // Test associate and disassociate to a schema
-    List<TagEntity> tagEntities6 =
+    List<AssignedTagEntity> tagEntities6 =
         tagMetaService.associateTagsWithMetadataObject(
             schema.nameIdentifier(), schema.type(), tagsToAdd, tagsToRemove);
 
     Assertions.assertEquals(2, tagEntities6.size());
-    Assertions.assertTrue(tagEntities6.contains(tagEntity2));
-    Assertions.assertTrue(tagEntities6.contains(tagEntity3));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities6, tagEntity2));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities6, tagEntity3));
 
     // Test associate and disassociate to a table
-    List<TagEntity> tagEntities7 =
+    List<AssignedTagEntity> tagEntities7 =
         tagMetaService.associateTagsWithMetadataObject(
             table.nameIdentifier(), table.type(), tagsToAdd, tagsToRemove);
 
     Assertions.assertEquals(2, tagEntities7.size());
-    Assertions.assertTrue(tagEntities7.contains(tagEntity2));
-    Assertions.assertTrue(tagEntities7.contains(tagEntity3));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities7, tagEntity2));
+    Assertions.assertTrue(containsValuelessTagAssignment(tagEntities7, tagEntity3));
+  }
+
+  @TestTemplate
+  public void testAssociateTagValuesWithMetadataObject() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_value");
+
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tagEntity =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("stage")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("stage comment")
+            .withProperties(props)
+            .withAllowedValues(new String[] {"dev", "prod"})
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(tagEntity, false);
+
+    TagEntity storedTag =
+        tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(METALAKE_NAME, "stage"));
+    Assertions.assertArrayEquals(
+        new String[] {"dev", "prod"}, storedTag.valueConstraint().allowedValues());
+    Assertions.assertFalse(storedTag.assignment().isPresent());
+
+    List<AssignedTagEntity> tagEntities =
+        backend.updateEntityRelations(
+            RelationUpdate.of(
+                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                catalog.nameIdentifier(),
+                catalog.type(),
+                new RelationEdgeTarget[] {
+                  RelationEdgeTarget.of(
+                      NameIdentifierUtil.ofTag(METALAKE_NAME, "stage"),
+                      Entity.EntityType.TAG,
+                      "dev"),
+                  RelationEdgeTarget.of(
+                      NameIdentifierUtil.ofTag(METALAKE_NAME, "stage"),
+                      Entity.EntityType.TAG,
+                      "prod")
+                },
+                new RelationEdgeTarget[0]));
+
+    Assertions.assertEquals(1, tagEntities.size());
+    Assertions.assertEquals("stage", tagEntities.get(0).name());
+    assertAssignmentValues(tagEntities.get(0), "dev", "prod");
+    Assertions.assertEquals(2, countActiveTagRel(tagEntity.id()));
+
+    AssignedTagEntity tagForMetadataObject =
+        tagMetaService.getTagForMetadataObject(
+            catalog.nameIdentifier(),
+            catalog.type(),
+            NameIdentifierUtil.ofTag(METALAKE_NAME, "stage"));
+    assertAssignmentValues(tagForMetadataObject, "dev", "prod");
+
+    List<GenericEntity> devMetadataObjects =
+        backend.listEntitiesByRelation(
+            RelationQuery.of(
+                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                NameIdentifierUtil.ofTag(METALAKE_NAME, "stage"),
+                Entity.EntityType.TAG,
+                true,
+                "dev"));
+    Assertions.assertEquals(1, devMetadataObjects.size());
+    Assertions.assertTrue(
+        containsGenericEntity(devMetadataObjects, "catalog_value", Entity.EntityType.CATALOG));
+
+    List<GenericEntity> missingMetadataObjects =
+        backend.listEntitiesByRelation(
+            RelationQuery.of(
+                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                NameIdentifierUtil.ofTag(METALAKE_NAME, "stage"),
+                Entity.EntityType.TAG,
+                true,
+                "missing"));
+    Assertions.assertEquals(0, missingMetadataObjects.size());
+
+    List<AssignedTagEntity> tagEntitiesAfterRemove =
+        tagMetaService.associateTagValuesWithMetadataObject(
+            catalog.nameIdentifier(),
+            catalog.type(),
+            new TagValue[0],
+            new TagValue[] {TagValue.of("stage", "dev")});
+    Assertions.assertEquals(1, tagEntitiesAfterRemove.size());
+    assertAssignmentValues(tagEntitiesAfterRemove.get(0), "prod");
+    Assertions.assertEquals(1, countActiveTagRel(tagEntity.id()));
+
+    List<AssignedTagEntity> tagEntitiesAfterDuplicateAdd =
+        tagMetaService.associateTagValuesWithMetadataObject(
+            catalog.nameIdentifier(),
+            catalog.type(),
+            new TagValue[] {TagValue.of("stage", "prod")},
+            new TagValue[0]);
+    Assertions.assertEquals(1, tagEntitiesAfterDuplicateAdd.size());
+    assertAssignmentValues(tagEntitiesAfterDuplicateAdd.get(0), "prod");
+    Assertions.assertEquals(1, countActiveTagRel(tagEntity.id()));
+
+    List<AssignedTagEntity> tagEntitiesAfterSameValueAddRemove =
+        tagMetaService.associateTagValuesWithMetadataObject(
+            catalog.nameIdentifier(),
+            catalog.type(),
+            new TagValue[] {TagValue.of("stage", "prod")},
+            new TagValue[] {TagValue.of("stage", "prod")});
+    Assertions.assertEquals(1, tagEntitiesAfterSameValueAddRemove.size());
+    assertAssignmentValues(tagEntitiesAfterSameValueAddRemove.get(0), "prod");
+    Assertions.assertEquals(1, countActiveTagRel(tagEntity.id()));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tagMetaService.associateTagValuesWithMetadataObject(
+                    catalog.nameIdentifier(),
+                    catalog.type(),
+                    new TagValue[] {TagValue.of("stage", "qa")},
+                    new TagValue[0]));
+    Assertions.assertTrue(exception.getMessage().contains("is not in allowed values"));
   }
 
   @TestTemplate
@@ -563,7 +689,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     TagMetaService tagMetaService = TagMetaService.getInstance();
 
     // Test list tags for catalog
-    List<TagEntity> tagEntities =
+    List<AssignedTagEntity> tagEntities =
         tagMetaService.listTagsForMetadataObject(
             NameIdentifier.of(METALAKE_NAME, "catalog1"), Entity.EntityType.CATALOG);
     Assertions.assertEquals(2, tagEntities.size());
@@ -573,7 +699,7 @@ public class TestTagMetaService extends TestJDBCBackend {
         tagEntities.stream().anyMatch(tagEntity -> tagEntity.name().equals("tag3")));
 
     // Test list tags for schema
-    List<TagEntity> tagEntities1 =
+    List<AssignedTagEntity> tagEntities1 =
         tagMetaService.listTagsForMetadataObject(
             NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1"), Entity.EntityType.SCHEMA);
 
@@ -584,7 +710,7 @@ public class TestTagMetaService extends TestJDBCBackend {
         tagEntities1.stream().anyMatch(tagEntity -> tagEntity.name().equals("tag3")));
 
     // Test list tags for table
-    List<TagEntity> tagEntities2 =
+    List<AssignedTagEntity> tagEntities2 =
         tagMetaService.listTagsForMetadataObject(
             NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
             Entity.EntityType.TABLE);
@@ -611,7 +737,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     TagMetaService tagMetaService = TagMetaService.getInstance();
 
     // Test get tag for catalog
-    TagEntity tagEntity =
+    AssignedTagEntity tagEntity =
         tagMetaService.getTagForMetadataObject(
             NameIdentifier.of(METALAKE_NAME, "catalog1"),
             Entity.EntityType.CATALOG,
@@ -619,7 +745,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertEquals("tag2", tagEntity.name());
 
     // Test get tag for schema
-    TagEntity tagEntity1 =
+    AssignedTagEntity tagEntity1 =
         tagMetaService.getTagForMetadataObject(
             NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1"),
             Entity.EntityType.SCHEMA,
@@ -627,7 +753,7 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertEquals("tag3", tagEntity1.name());
 
     // Test get tag for table
-    TagEntity tagEntity2 =
+    AssignedTagEntity tagEntity2 =
         tagMetaService.getTagForMetadataObject(
             NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
             Entity.EntityType.TABLE,
@@ -1122,6 +1248,24 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> tagMetaService.getTagIdByTagName(metalakeId, "missing_tag"));
+  }
+
+  private boolean containsValuelessTagAssignment(
+      List<AssignedTagEntity> tagEntities, TagEntity expectedTagEntity) {
+    return tagEntities.stream()
+        .anyMatch(
+            tagEntity ->
+                tagEntity.id().equals(expectedTagEntity.id())
+                    && tagEntity.name().equals(expectedTagEntity.name())
+                    && tagEntity.assignment().isPresent()
+                    && !tagEntity.assignment().get().hasValues());
+  }
+
+  private void assertAssignmentValues(AssignedTagEntity tagEntity, String... expectedValues) {
+    assertTrue(tagEntity.assignment().isPresent());
+    assertEquals(
+        new LinkedHashSet<>(Arrays.asList(expectedValues)),
+        new LinkedHashSet<>(Arrays.asList(tagEntity.assignment().get().values())));
   }
 
   private boolean containsGenericEntity(

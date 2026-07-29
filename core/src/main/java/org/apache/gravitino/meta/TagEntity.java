@@ -20,6 +20,7 @@
 package org.apache.gravitino.meta;
 
 import com.google.common.collect.Maps;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +32,7 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagValueConstraint;
 
 public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
@@ -46,6 +48,9 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the tag entity.");
 
+  public static final Field ALLOWED_VALUES =
+      Field.optional("allowed_values", String[].class, "The allowed assignment values.");
+
   public static final Field AUDIT_INFO =
       Field.required("audit_info", Audit.class, "The audit details of the tag entity.");
 
@@ -54,6 +59,7 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   private Namespace namespace;
   private String comment;
   private Map<String, String> properties;
+  private String[] allowedValues;
   private Audit auditInfo;
 
   private TagEntity() {}
@@ -65,6 +71,7 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(COMMENT, comment);
     fields.put(PROPERTIES, properties);
+    fields.put(ALLOWED_VALUES, allowedValues);
     fields.put(AUDIT_INFO, auditInfo);
 
     return Collections.unmodifiableMap(fields);
@@ -101,6 +108,17 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   }
 
   @Override
+  public TagValueConstraint valueConstraint() {
+    if (allowedValues == null) {
+      return TagValueConstraint.anyValue();
+    }
+    if (allowedValues.length == 0) {
+      return TagValueConstraint.noValue();
+    }
+    return TagValueConstraint.ofAllowedValues(allowedValues);
+  }
+
+  @Override
   public Optional<Boolean> inherited() {
     return Optional.empty();
   }
@@ -125,12 +143,15 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(comment, that.comment)
         && Objects.equals(properties, that.properties)
+        && Arrays.equals(allowedValues, that.allowedValues)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, namespace, comment, properties, auditInfo);
+    int result = Objects.hash(id, name, namespace, comment, properties, auditInfo);
+    result = 31 * result + Arrays.hashCode(allowedValues);
+    return result;
   }
 
   public static Builder builder() {
@@ -167,6 +188,11 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
     public Builder withProperties(Map<String, String> properties) {
       tagEntity.properties = properties;
+      return this;
+    }
+
+    public Builder withAllowedValues(String[] allowedValues) {
+      tagEntity.allowedValues = allowedValues == null ? null : allowedValues.clone();
       return this;
     }
 
