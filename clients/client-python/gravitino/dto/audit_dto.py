@@ -23,15 +23,18 @@ from dataclasses_json import DataClassJsonMixin, config
 
 from gravitino.api.audit import Audit
 
+
 def _decode_datetime(date_str: Optional[str]) -> Optional[datetime]:
     if not date_str:
         return None
     return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
 
+
 def _encode_datetime(date_obj: Optional[datetime]) -> Optional[str]:
     if not date_obj:
         return None
     return date_obj.isoformat().replace("+00:00", "Z")
+
 
 @dataclass
 class AuditDTO(Audit, DataClassJsonMixin):
@@ -41,7 +44,10 @@ class AuditDTO(Audit, DataClassJsonMixin):
     """The creator of the audit."""
 
     _create_time: Optional[datetime] = field(
-        default=None, metadata=config(field_name="createTime", decoder=_decode_datetime, encoder=_encode_datetime)
+        default=None,
+        metadata=config(
+            field_name="createTime", decoder=_decode_datetime, encoder=_encode_datetime
+        ),
     )
     """The create time of the audit."""
 
@@ -51,7 +57,12 @@ class AuditDTO(Audit, DataClassJsonMixin):
     """The last modifier of the audit."""
 
     _last_modified_time: Optional[datetime] = field(
-        default=None, metadata=config(field_name="lastModifiedTime", decoder=_decode_datetime, encoder=_encode_datetime)
+        default=None,
+        metadata=config(
+            field_name="lastModifiedTime",
+            decoder=_decode_datetime,
+            encoder=_encode_datetime,
+        ),
     )
     """The last modified time of the audit."""
 

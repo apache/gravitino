@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json as _json
 import unittest
+from datetime import datetime
 
 from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
     PartitionDTOSerdes,
@@ -126,10 +127,11 @@ class TestResponses(unittest.TestCase):
         self.assertEqual(0, model_resp.model().latest_version())
         self.assertEqual("test comment", model_resp.model().comment())
         self.assertEqual({"key1": "value1"}, model_resp.model().properties())
-        from datetime import datetime
+
         self.assertEqual("anonymous", model_resp.model().audit_info().creator())
         self.assertEqual(
-            datetime.fromisoformat("2024-04-05T10:10:35.218+00:00"), model_resp.model().audit_info().create_time()
+            datetime.fromisoformat("2024-04-05T10:10:35.218+00:00"),
+            model_resp.model().audit_info().create_time(),
         )
 
         json_data_missing = {
@@ -205,10 +207,11 @@ class TestResponses(unittest.TestCase):
         self.assertEqual(["alias1", "alias2"], resp.model_version().aliases())
         self.assertEqual("test comment", resp.model_version().comment())
         self.assertEqual({"key1": "value1"}, resp.model_version().properties())
-        from datetime import datetime
+
         self.assertEqual("anonymous", resp.model_version().audit_info().creator())
         self.assertEqual(
-            datetime.fromisoformat("2024-04-05T10:10:35.218+00:00"), resp.model_version().audit_info().create_time()
+            datetime.fromisoformat("2024-04-05T10:10:35.218+00:00"),
+            resp.model_version().audit_info().create_time(),
         )
 
         json_data = {
