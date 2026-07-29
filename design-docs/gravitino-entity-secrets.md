@@ -46,10 +46,10 @@ material**:
   catalogs reference secrets via `secret(scope, key)` instead of embedding passwords as bare
   strings in connection options.
 
-Gravitino should follow the same split: **Apache Gravitino (OSS) defines the SPI, URN model,
-REST contract, and an in-memory provider**; **production backends** (HashiCorp Vault, OpenBao,
-AWS Secrets Manager, GCP Secret Manager, Azure Key Vault, …) plug into this SPI and are specified
-in the Enterprise backends design.
+Gravitino should define a pluggable **secrets-provider SPI**, persist durable **URN references**
+instead of plaintext for marked keys, expose a clear **REST create/alter contract**, and ship an
+**in-memory provider** for tests and local use. Additional provider implementations are out of
+scope for this design (the SPI remains open for them).
 
 ---
 
@@ -92,16 +92,16 @@ in the Enterprise backends design.
    keys stay plaintext. REST **`secretReferences` / `secretBindings`** declare which keys are
    secrets on create.
 
-2. **Plaintext backend credentials in configuration**: long-lived credential **values** must not
-   appear in `gravitino.properties`. Operators inject them via **environment variables** (or cloud
-   IAM) before startup; configuration stores only **env var names** / non-secret settings.
+2. **Plaintext provider credentials in configuration**: if a future provider needs credentials,
+   long-lived credential **values** must not appear in `gravitino.properties`. The in-memory
+   provider needs none. Configuration stores only non-secret settings (and env var **names** when
+   a provider requires them).
 
-3. **Production secret backends in Apache Gravitino**: HashiCorp Vault, OpenBao, AWS Secrets
-   Manager, GCP Secret Manager, and Azure Key Vault clients are **out of scope** for this OSS
-   design. They plug into the same SPI and are specified in the Enterprise backends design.
+3. **Additional provider implementations**: this design ships only **`InMemorySecretsProvider`**.
+   Other backends are out of scope here; the SPI stays pluggable via `className`.
 
-4. **Table / column encryption KMS**: encrypting table data with cloud KMS / Vault Transit is a
-   separate feature (different SPI and config namespace).
+4. **Table / column encryption**: encrypting table data with a KMS is a separate feature
+   (different SPI and config namespace).
 
 ## 4. Industry Approaches (Polaris and Databricks)
 
@@ -126,12 +126,12 @@ displays redact as `[REDACTED]`.
 
 ### 4.3 Cross-product summary
 
-| Topic                                   | Apache Polaris                                                               | Databricks                                                                         |
-| --------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Where secret material lives             | `UserSecretsManager` backend                                                 | Databricks Secrets service                                                         |
-| What is persisted on catalog/connection | Typed `SecretReference` object                                               | `secret(scope,key)`                                                                |
-| Secret binding model                    | **Fixed allowlist** (`clientSecret`, `bearerToken`, …); always write-through | **Same property** may be plaintext **or** `secret(scope,key)`                      |
-| Official backend kinds                  | SPI — any impl (in-memory, Vault, …)                                         | **Databricks-backed** + **Azure Key Vault** (no first-class HashiCorp Vault scope) |
+| Topic                                   | Apache Polaris                                                               | Databricks                                                                  |
+| --------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Where secret material lives             | `UserSecretsManager` backend                                                 | Databricks Secrets service                                                  |
+| What is persisted on catalog/connection | Typed `SecretReference` object                                               | `secret(scope,key)`                                                         |
+| Secret binding model                    | **Fixed allowlist** (`clientSecret`, `bearerToken`, …); always write-through | **Same property** may be plaintext **or** `secret(scope,key)`               |
+| Official backend kinds                  | SPI — any implementation                                                     | **Databricks-backed** + Azure Key Vault (peer product; not Gravitino scope) |
 
 ### 4.4 Why Gravitino follows Polaris (not Databricks) for the reference shape
 
@@ -141,11 +141,11 @@ Both peers share one idea we keep: **secret material lives outside catalog metad
 
 | Dimension                      | Databricks                                                    | Polaris                                          | Gravitino choice                                                                                                                                                                                           |
 | ------------------------------ | ------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Where secrets are stored       | First-party **Secrets** service (scopes)                      | Pluggable **`UserSecretsManager`** (BYO / impl)  | **BYO backends** via SPI — not a new Gravitino “scopes” product                                                                                                                                            |
+| Where secrets are stored       | First-party **Secrets** service (scopes)                      | Pluggable **`UserSecretsManager`** (BYO / impl)  | Pluggable SPI + in-memory provider — not a new Gravitino “scopes” product                                                                                                                                  |
 | How catalogs reference secrets | Platform DSL `secret(scope, key)` in SQL / connection options | Typed **`SecretReference`** object on the entity | REST: create **`secretReferences` / `secretBindings`**; alter **`setSecretBinding` / `setSecretReference`**; persistence: **URN string** + reserved **`gravitino.secret.keys`**; no SQL/`secret()` runtime |
 | Secret binding model           | **Same property** may be plaintext **or** `secret(scope,key)` | **Fixed allowlist** only; always write-through   | **`secretReferences` / `secretBindings`** on create; alter via **`setSecretBinding` / `setSecretReference`**; persist listed keys in **`gravitino.secret.keys`**; omit those keys on GET                   |
 | Multi-backend / multi-instance | Scoped under the Databricks Secrets service                   | SPI type + URN `type-specific-identifier`        | Named entries in server conf; URN embeds **`provider_name`** only (`className` selects implementation at factory time)                                                                                     |
-| Official backend kinds         | Databricks-backed + **Azure Key Vault** only                  | SPI — implementer’s choice                       | **In-memory** in OSS; production backends via SPI (Enterprise)                                                                                                                                           |
+| Official backend kinds         | Databricks-backed + Azure Key Vault (peer)                    | SPI — implementer’s choice                       | **In-memory** provider shipped; SPI remains pluggable                                                                                                                                                      |
 
 ---
 
@@ -156,7 +156,7 @@ Both peers share one idea we keep: **secret material lives outside catalog metad
 | Layer                               | Shape                 | Role                                                                                                                   |
 | ----------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | **REST** `properties`               | `map<string, string>` | Unchanged from today — create HTTP values are strings                                                                  |
-| **REST** `secretReferences`         | `map<string, object>` | Optional on **create** — **property key → KMS locator** (external ref; server builds URN — §5.9.2)                     |
+| **REST** `secretReferences`         | `map<string, object>` | Optional on **create** — **property key → locator** (external ref; server builds URN — §5.9.2)                         |
 | **REST** alter secret `@type`s      | in `updates`          | **`setSecretBinding`** / **`setSecretReference`** (§5.9.4) — same `{ "updates": [...] }` body; `setProperty` unchanged |
 | **REST** `secretBindings`           | `map<string, string>` | Optional on **create** — **property key → provider name** (write-through; plaintext in `properties`)                   |
 | **Persistence** entity `properties` | JSON **string map**   | `catalog_meta` / `schema_meta` / `fileset_version_info` — secret keys store URN strings; see reserved keys below       |
@@ -178,7 +178,7 @@ After create/alter:
 gravitino.secret.keys  = all keys from secretReferences ∪ secretBindings (and prior secrets kept)
 ```
 
-Drop-time KMS delete uses URN shape (§5.5.2 C) — no separate ownership list.
+Drop-time `deleteSecret` uses URN shape (§5.5.2 C) — no separate ownership list.
 
 **Server-side resolve path** (entity load / connect — uses **`gravitino.secret.keys`**, not JSON type):
 
@@ -193,11 +193,11 @@ Drop-time KMS delete uses URN shape (§5.5.2 C) — no separate ownership list.
 urn:gravitino-secret:<provider_name>:<type-specific-identifier>
 ```
 
-| Part                         | Unified? | Rule                                                                                                                                                                                                   |
-| ---------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `urn:gravitino-secret`       | Yes      | Fixed scheme + namespace                                                                                                                                                                               |
-| `<provider_name>`            | Yes      | Config key `gravitino.secret.provider.<name>.*`; **authoritative** for registry lookup (backend endpoint / auth live here — **not** in the URN)                                              |
-| `<type-specific-identifier>` | No       | Address of the secret **inside** the backend selected by `provider_name`. Colon-separated `[a-zA-Z0-9_-]+` segments. Layout is defined by the provider implementation (`className`). |
+| Part                         | Unified? | Rule                                                                                                                                                                                  |
+| ---------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `urn:gravitino-secret`       | Yes      | Fixed scheme + namespace                                                                                                                                                              |
+| `<provider_name>`            | Yes      | Config key `gravitino.secret.provider.<name>.*`; **authoritative** for registry lookup (provider settings live here — **not** in the URN)                                             |
+| `<type-specific-identifier>` | No       | Address of the secret **inside** the provider selected by `provider_name`. Colon-separated `[a-zA-Z0-9_-]+` segments. Layout is defined by the provider implementation (`className`). |
 
 Secret URNs follow [RFC 8141](https://www.rfc-editor.org/rfc/rfc8141.html) `urn:<NID>:<NSS>` — a
 persistent, location-independent name (not a fetch URL). Gravitino uses informal NID
@@ -243,11 +243,9 @@ urn:gravitino-secret:memory:fileset:30019:s3-secret-access-key
 The property key from `SecretWriteContext` is the last segment (not an opaque ordinal).
 Re-writing the same property key overwrites that URN / map entry (no ordinal allocation).
 
-Provider-specific **external** identifiers (Vault KV mount/path, AWS secret name, …) are defined
-by each production backend. Apache Gravitino only requires that write-through URNs embed
-`<entityType>:<entityId>:<propertyKey>` so drop can decide whether to call `deleteSecret`
-(§5.5.2 C). See the Enterprise secrets-backends design for Vault / OpenBao / AWS / GCP / Azure
-URN layouts and locator `attributes`.
+Write-through URNs (including in-memory) embed `<entityType>:<entityId>:<propertyKey>` so drop
+can decide whether to call `deleteSecret` (§5.5.2 C). External-ref identifier layouts are defined
+by each provider implementation; this design only specifies the in-memory write-through form.
 
 Legacy persistence (no `secretReferences` / `secretBindings` on create):
 
@@ -277,21 +275,15 @@ Register named instances in
 **server configuration** (`gravitino.conf` / `gravitino.properties` and included files), not in a
 database table.
 
-**Authentication model:** production backends may require credentials. Operators place them in
-**environment variables** (or rely on cloud IAM) **before** starting Gravitino. Configuration
-stores only **env var names** and non-secret settings (`className`, region, …) — never plaintext
-credential values. The in-memory provider needs no credentials.
+**Authentication model:** the in-memory provider needs no credentials. Configuration stores
+`className` and any non-secret settings — never plaintext credential values.
 
 ```properties
 gravitino.secret.providers=memory
 
-# In-memory (OSS default for tests / local)
+# In-memory (default for tests / local)
 gravitino.secret.provider.memory.className=org.apache.gravitino.secrets.memory.InMemorySecretsProvider
 ```
-
-Additional named instances (Vault, OpenBao, AWS Secrets Manager, …) use the same
-`gravitino.secret.provider.<name>.*` pattern; their `className` and settings are defined by the
-Enterprise backends design.
 
 Same shape as `gravitino.eventListener.names` + `gravitino.eventListener.{name}.class`: the
 list holds **instance names**; `className` selects the implementation; remaining keys are
@@ -301,15 +293,14 @@ instance settings.
 | -------------------------------------------- | ----------------------------------------------------------------------------- |
 | `gravitino.secret.providers`                 | Comma-separated **instance names** (cluster scope)                            |
 | `gravitino.secret.provider.<name>.className` | Fully qualified `GravitinoSecretProvider` implementation class (**required**) |
-| `gravitino.secret.provider.<name>.*`         | Implementation-specific settings (see each backend's design)                  |
+| `gravitino.secret.provider.<name>.*`         | Implementation-specific settings (none for in-memory beyond `className`)      |
 
 **Startup sequence (v1):**
 
-1. Operator exports or injects env vars (if the backend needs them) with non-expired credentials.
-2. Operator starts Gravitino.
-3. Provider factory loads each instance's **`className`**, passes the remaining
-   `gravitino.secret.provider.<name>.*` keys, resolves env var **names** from the process
-   environment, and constructs live `GravitinoSecretProvider` instances.
+1. Operator starts Gravitino.
+2. Provider factory loads each instance's **`className`**, passes the remaining
+   `gravitino.secret.provider.<name>.*` keys, and constructs live `GravitinoSecretProvider`
+   instances.
 
 Example entry summary:
 
@@ -342,14 +333,13 @@ server (v1). See §8 for the full configuration reference.
   GET/list: keys in gravitino.secret.keys are omitted (stripped)
 ```
 
-### 5.4 OSS vs production backends
+### 5.4 Scope of this design
 
-| Layer                                                | Apache Gravitino (this design)                          | Production backends (Enterprise design)               |
-| ---------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------- |
-| SPI + `gravitino.secret.keys` + resolve/omit-on-read | Yes                                                     | Same SPI contract                                       |
-| Load providers from server conf                      | Yes                                                     | Same                                                    |
-| **In-memory** secrets provider                       | **Yes** (UT/IT / local; process-local, lost on restart) | Optional for tests                                      |
-| Vault / OpenBao / AWS / GCP / Azure **clients**      | No                                                      | **Yes** — Enterprise entity-secrets backends design     |
+| In scope                                               | Out of scope                                      |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| SPI + `gravitino.secret.keys` + resolve / omit-on-read | Additional provider implementations beyond memory |
+| Load providers from server conf                        | Table / column encryption KMS                     |
+| **In-memory** secrets provider (UT/IT / local)         |                                                   |
 
 Missing / unloadable `className` ⇒ startup or resolve fails with a clear error.
 
@@ -429,21 +419,7 @@ display names.
 
 Create request shapes: §5.9.2 / §5.9.5. Below is the SPI / URN outcome only.
 
-**A. External reference (no `writeSecret`)**
-
-Ops stores the secret in an external backend. Client create uses `secretReferences` with a
-provider-specific locator (`provider` + `attributes`). Core **builds** the URN and persists:
-
-```text
-jdbc-password = urn:gravitino-secret:<provider_name>:<type-specific-identifier>
-gravitino.secret.keys = jdbc-password
-```
-
-Load path: key in `gravitino.secret.keys` → `readSecret(urn)` → backend read.
-Locator `attributes` keys are **provider-defined**. Read-only backends still support external
-refs; they reject write-through.
-
-**B. Write-through (in-memory example)**
+**A. Write-through (in-memory)**
 
 Client create uses `secretBindings` (`jdbc-password` → `memory`) plus plaintext in
 `properties`. Core calls `writeSecret(plaintext, SecretWriteContext("catalog", entityId,
@@ -454,30 +430,36 @@ jdbc-password = urn:gravitino-secret:memory:catalog:10042:jdbc-password
 gravitino.secret.keys = jdbc-password
 ```
 
-Trailing `catalog:<id>:jdbc-password` marks write-through for drop (§5.5.2 C). Backends that are
-external-ref-only: `writeSecret` throws → API rejects write-through for that provider.
+Trailing `catalog:<id>:jdbc-password` marks write-through for drop (§5.5.2 C).
+
+**B. External reference (`secretReferences`)**
+
+The REST contract accepts a locator (`provider` + `attributes`). Core **builds** the URN and
+persists it without calling `writeSecret`. Required `attributes` keys are defined by the selected
+provider. **`InMemorySecretsProvider` rejects external-ref binds** in this design (it is
+write-through only); other providers may accept them via the same SPI.
 
 **C. Drop entity (catalog / schema / fileset) — URN shape decides delete**
 
 No new drop query param (no `purgeSecrets`). On drop of a catalog, schema, or fileset, for each
 key in **`gravitino.secret.keys`**, parse the stored URN:
 
-| URN type-specific identifier (after `provider_name`) | Behavior on drop |
-| ---------------------------------------------------- | ---------------- |
-| **Write-through shaped for this entity** — trailing segments are `<entityType>:<entityId>:<propertyKey>` where `entityType` ∈ {`catalog`,`schema`,`fileset`}, `entityId` equals this entity's id, and `propertyKey` equals the property key (in-memory: identifier is exactly those three; other backends may prefix path segments before the same trailing triple) | Best-effort `deleteSecret(urn)`, then drop metadata |
-| **Anything else** (operator-managed external address) | Drop metadata only — **do not** delete the remote secret |
+| URN type-specific identifier (after `provider_name`)                                                                                                                                                                                                           | Behavior on drop                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Write-through shaped for this entity** — for in-memory, the identifier is exactly `<entityType>:<entityId>:<propertyKey>` where `entityType` ∈ {`catalog`,`schema`,`fileset`}, `entityId` equals this entity's id, and `propertyKey` equals the property key | Best-effort `deleteSecret(urn)`, then drop metadata |
+| **Anything else**                                                                                                                                                                                                                                              | Drop metadata only — **do not** call `deleteSecret` |
 
 ### 5.6 In-memory secrets provider (OSS default)
 
 OSS ships a default `GravitinoSecretProvider` for **tests / local / quick-start**.
 
-| Aspect           | Rule                                                                             |
-| ---------------- | -------------------------------------------------------------------------------- |
-| Config           | `className=…InMemorySecretsProvider`                                             |
-| Intended use     | UT / IT / local only — **not** production                                        |
-| Durability       | Process-local `ConcurrentHashMap`; **lost on restart**                           |
-| Multi-node       | Each JVM has its own map — do not share write-through secrets across servers     |
-| Auth / conf keys | None beyond `className` (no `uri`, `tokenEnv`, …); SPI `type()` returns `memory` |
+| Aspect           | Rule                                                                         |
+| ---------------- | ---------------------------------------------------------------------------- |
+| Config           | `className=…InMemorySecretsProvider`                                         |
+| Intended use     | UT / IT / local only — **not** production                                    |
+| Durability       | Process-local `ConcurrentHashMap`; **lost on restart**                       |
+| Multi-node       | Each JVM has its own map — do not share write-through secrets across servers |
+| Auth / conf keys | None beyond `className`; SPI `type()` returns `memory`                       |
 
 **Config example:**
 
@@ -501,9 +483,8 @@ map[URN] = Base64(plaintext)
 
 **Type-specific identifier:** `<entityType>:<entityId>:<propertyKey>` — see §5.1.1 (catalog / schema / fileset).
 
-**External `secretReferences`:** may point at URNs whose `provider_name` is an `in-memory`
-instance only if that process previously wrote them (or tests pre-seeded the map). Pointing an
-in-memory URN at another JVM is undefined.
+**External `secretReferences`:** **`InMemorySecretsProvider` rejects them** (write-through only).
+Use `secretBindings` / `setSecretBinding` with this provider.
 
 ### 5.7 Backward compatibility
 
@@ -513,9 +494,7 @@ in-memory URN at another JVM is undefined.
 
 ### 5.8 Credential refresh
 
-Production backends may need periodic credential refresh (tokens, short-lived cloud creds). The
-in-memory provider has none. Refresh policy is backend-specific and documented with each
-Enterprise backend implementation.
+The in-memory provider has no login credentials and needs no refresh.
 
 ### 5.9 Entity REST API (catalog / schema / fileset)
 
@@ -553,14 +532,8 @@ Persisted example (write-through owned key):
 }
 ```
 
-External-ref example (operator-managed address — drop must **not** `deleteSecret`):
-
-```json
-{
-  "jdbc-password": "urn:gravitino-secret:<provider>:<type-specific-identifier>",
-  "gravitino.secret.keys": "jdbc-password"
-}
-```
+Write-through ownership is visible in the URN shape (`…:catalog:<id>:<propertyKey>`). Drop calls
+`deleteSecret` only for that shape (§5.5.2 C).
 
 **Affected endpoints** (entity paths unchanged; secrets behavior shared — §5.9.2–5.9.5, drop §5.5.2 C;
 plus cluster list §5.9.6):
@@ -598,12 +571,12 @@ rules as catalog list.
 | `provider`   | Yes      | Registered `provider_name`                                                                                   |
 | `attributes` | No       | Provider-specific locator keys (`map<string, string>`). Empty / omitted ⇒ empty map. Never a raw URN string. |
 
-**`attributes`** are provider-specific. The REST schema stays the same for every backend; each
-`GravitinoSecretProvider` documents required keys (e.g. Vault `mount`/`path`, AWS `secretId`, …).
+**`attributes`** are provider-specific. The REST schema stays the same for every provider; each
+`GravitinoSecretProvider` documents required keys. **`InMemorySecretsProvider` does not use
+`attributes`** (write-through only).
 
-The Gravitino **property key** (map key on create, or `property` on alter) is **not** duplicated
-inside `attributes` for backends that use it as the last URN segment — the server binds that key
-when building the URN.
+The Gravitino **property key** (map key on create, or `property` on alter) is bound by the server
+when building write-through URNs.
 
 Server builds:
 
@@ -611,19 +584,19 @@ Server builds:
 urn:gravitino-secret:<provider>:<type-specific-identifier>
 ```
 
-| Situation                                                                        | Server behavior                                                                                                                                                                                      |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Key **not** in either secret map                                                 | Persist `properties` value as plain **string** (legacy / non-secret).                                                                                                                                |
-| Key in **`secretReferences`**                                                    | Validate locator; **build URN**; persist **URN string**; key **must not** be in `properties`; **do not** `readSecret` on write; add to `gravitino.secret.keys` only.             |
-| Key in **`secretBindings`**                                                      | `properties[key]` required; plaintext (not `******`) → `writeSecret` via named provider; persist **returned URN string**; add to `gravitino.secret.keys`. |
-| Key in **both** `secretReferences` and `secretBindings`                          | **Reject**.                                                                                                                                                                                          |
-| Key in `secretReferences` **and** also present in `properties`                   | **Reject**.                                                                                                                                                                                          |
-| Key in `secretBindings`, value in `properties` is `******`                       | **Reject** (no existing value to preserve).                                                                                                                                                          |
-| Key in `secretBindings` but missing from `properties`                            | **Reject**.                                                                                                                                                                                          |
-| `secretBindings` / locator `provider` not in `gravitino.secret.providers`        | **Reject**.                                                                                                                                                                                          |
-| Locator `attributes` value is a raw `urn:gravitino-secret:...` string            | **Reject** — use locator attributes, not a client-built URN.                                                                                                                                         |
-| Client sends reserved `gravitino.secret.keys`                                    | **Reject** — server-managed only.                                                                                                                                                                    |
-| Client sends a raw `urn:gravitino-secret:...` string as `secretReferences` value | **Reject** in v1 — use the locator object (server builds the URN).                                                                                                                                   |
+| Situation                                                                        | Server behavior                                                                                                                                                      |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Key **not** in either secret map                                                 | Persist `properties` value as plain **string** (legacy / non-secret).                                                                                                |
+| Key in **`secretReferences`**                                                    | Validate locator; **build URN**; persist **URN string**; key **must not** be in `properties`; **do not** `readSecret` on write; add to `gravitino.secret.keys` only. |
+| Key in **`secretBindings`**                                                      | `properties[key]` required; plaintext (not `******`) → `writeSecret` via named provider; persist **returned URN string**; add to `gravitino.secret.keys`.            |
+| Key in **both** `secretReferences` and `secretBindings`                          | **Reject**.                                                                                                                                                          |
+| Key in `secretReferences` **and** also present in `properties`                   | **Reject**.                                                                                                                                                          |
+| Key in `secretBindings`, value in `properties` is `******`                       | **Reject** (no existing value to preserve).                                                                                                                          |
+| Key in `secretBindings` but missing from `properties`                            | **Reject**.                                                                                                                                                          |
+| `secretBindings` / locator `provider` not in `gravitino.secret.providers`        | **Reject**.                                                                                                                                                          |
+| Locator `attributes` value is a raw `urn:gravitino-secret:...` string            | **Reject** — use locator attributes, not a client-built URN.                                                                                                         |
+| Client sends reserved `gravitino.secret.keys`                                    | **Reject** — server-managed only.                                                                                                                                    |
+| Client sends a raw `urn:gravitino-secret:...` string as `secretReferences` value | **Reject** in v1 — use the locator object (server builds the URN).                                                                                                   |
 
 When create succeeds with any secret keys, persist the reserved keys as in §5.1. If there are no
 secret keys, **omit** `gravitino.secret.keys`.
@@ -649,32 +622,10 @@ secret keys, **omit** `gravitino.secret.keys`.
 
 Only `jdbc-password` is write-through; `jdbc-url` and `jdbc-user` stay plain strings.
 
-**External reference example** (`secretReferences`; secret key **not** in `properties`):
+**External reference:** `secretReferences` / `setSecretReference` are part of the REST contract
+for providers that support locators. **`InMemorySecretsProvider` rejects them**; use
+`secretBindings` / `setSecretBinding` instead (examples below and in §5.9.5).
 
-```json
-{
-  "name": "mysql_prod",
-  "type": "relational",
-  "provider": "jdbc-mysql",
-  "secretReferences": {
-    "jdbc-password": {
-      "provider": "asm_prod",
-      "attributes": {
-        "secretId": "prod/mysql/app",
-        "jsonKey": "password"
-      }
-    }
-  },
-  "properties": {
-    "jdbc-url": "jdbc:mysql://db.example.com/sales",
-    "jdbc-driver": "com.mysql.cj.jdbc.Driver",
-    "jdbc-user": "app"
-  }
-}
-```
-
-Server builds a provider-specific URN. The `attributes` map is opaque to core beyond validation
-by the selected provider. Concrete URN layouts live in the Enterprise backends design.
 
 #### 5.9.3 GET and list (response)
 
@@ -706,27 +657,27 @@ sibling maps). Existing **`setProperty`** stays a **string** `value` (plaintext 
 | `@type`    | Yes      | Discriminator |
 | `property` | Yes      | Property key  |
 
-| `@type`              | Fields (flat; not nested under `value`)                                                     | Behavior                                                                                                                                      |
-| -------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `setProperty`        | `value` (**string** plaintext)                                                              | Today’s plaintext set. If key already in `gravitino.secret.keys`, in-place `writeSecret` via provider in the **current** URN; persist new URN |
-| `setSecretBinding`   | `provider` (instance name) + `value` (plaintext string)                                     | Write-through bind/re-bind (`writeSecret`); persist returned URN; update `gravitino.secret.keys`               |
-| `setSecretReference` | `provider` (instance name) + `attributes` (`map<string,string>`; same locator as §5.9.2)    | External ref; server builds URN from locator; update `gravitino.secret.keys`. Required `attributes` keys are provider-defined.         |
+| `@type`              | Fields (flat; not nested under `value`)                                                  | Behavior                                                                                                                                      |
+| -------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setProperty`        | `value` (**string** plaintext)                                                           | Today’s plaintext set. If key already in `gravitino.secret.keys`, in-place `writeSecret` via provider in the **current** URN; persist new URN |
+| `setSecretBinding`   | `provider` (instance name) + `value` (plaintext string)                                  | Write-through bind/re-bind (`writeSecret`); persist returned URN; update `gravitino.secret.keys`                                              |
+| `setSecretReference` | `provider` (instance name) + `attributes` (`map<string,string>`; same locator as §5.9.2) | External ref; server builds URN from locator; update `gravitino.secret.keys`. Required `attributes` keys are provider-defined.                |
 
-| Rule                                                                                     | Behavior                                                                                          |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `setSecretBinding` missing `provider` / string `value`, or `value` is `******`           | **Reject**                                                                                        |
-| `setSecretReference` missing `provider`                                                  | **Reject**                                                                                        |
-| `setSecretReference` `attributes` value is a raw `urn:gravitino-secret:...` string       | **Reject** — use locator attributes, not a client-built URN                                       |
-| `setSecretReference` missing attributes required by the selected provider                 | **Reject**                                                                                        |
-| `provider` unknown                                                                       | **Reject**                                                                                        |
-| `setProperty` `value` is `******`                                                        | **Reject**                                                                                        |
-| `setProperty` `value` is `urn:gravitino-secret:...`                                      | **Reject** in v1 — use `setSecretReference` or `setSecretBinding`                                 |
-| `removeProperty` on a secret key                                                         | Remove from properties and `gravitino.secret.keys`; **do not** `deleteSecret` on alter (§5.5.2 C) |
-| Any secret `@type` / `setProperty` on `gravitino.secret.keys`                            | **Reject** — server-managed only                                                                  |
-| Other `@type`s (`rename` / `updateComment` / …)                                          | Unchanged                                                                                         |
+| Rule                                                                               | Behavior                                                                                          |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `setSecretBinding` missing `provider` / string `value`, or `value` is `******`     | **Reject**                                                                                        |
+| `setSecretReference` missing `provider`                                            | **Reject**                                                                                        |
+| `setSecretReference` `attributes` value is a raw `urn:gravitino-secret:...` string | **Reject** — use locator attributes, not a client-built URN                                       |
+| `setSecretReference` missing attributes required by the selected provider          | **Reject**                                                                                        |
+| `provider` unknown                                                                 | **Reject**                                                                                        |
+| `setProperty` `value` is `******`                                                  | **Reject**                                                                                        |
+| `setProperty` `value` is `urn:gravitino-secret:...`                                | **Reject** in v1 — use `setSecretReference` or `setSecretBinding`                                 |
+| `removeProperty` on a secret key                                                   | Remove from properties and `gravitino.secret.keys`; **do not** `deleteSecret` on alter (§5.5.2 C) |
+| Any secret `@type` / `setProperty` on `gravitino.secret.keys`                      | **Reject** — server-managed only                                                                  |
+| Other `@type`s (`rename` / `updateComment` / …)                                    | Unchanged                                                                                         |
 
 OpenAPI: add `SetSecretBindingRequest` / `SetSecretReferenceRequest` (and schema/fileset
-equivalents) to the catalog-update oneOf. Examples: TC-4–TC-5 below.
+equivalents) to the catalog-update oneOf. Example: TC-3 below.
 
 After a successful alter, refresh `gravitino.secret.keys` (omit when empty).
 
@@ -734,55 +685,14 @@ After a successful alter, refresh `gravitino.secret.keys` (omit when empty).
 
 All examples use metalake `prod`. HTTP **200** on success; response bodies omitted (keys in `gravitino.secret.keys` omitted on GET/list — §5.9.3). Each case shows **request** + persisted **DB `properties`**.
 
-- **TC-1–TC-3** — `POST …/catalogs` (create)
-- **TC-4–TC-5** — `PUT …/catalogs/{catalog}` (alter; `setSecretReference` / `setSecretBinding` in `updates`)
+- **TC-1–TC-2** — `POST …/catalogs` (create)
+- **TC-3** — `PUT …/catalogs/{catalog}` (alter; `setSecretBinding` in `updates`)
 
 Reject cases follow §5.9.2 / §5.9.4 and existing catalog semantics — no separate fixtures.
 
 ---
 
-**TC-1 — Create: external reference via locator (200)**
-
-Request:
-
-```json
-{
-  "name": "mysql_prod",
-  "type": "relational",
-  "provider": "jdbc-mysql",
-  "comment": "Production MySQL catalog",
-  "secretReferences": {
-    "jdbc-password": {
-      "provider": "asm_prod",
-      "attributes": {
-        "secretId": "prod/mysql/app",
-        "jsonKey": "password"
-      }
-    }
-  },
-  "properties": {
-    "jdbc-url": "jdbc:mysql://db.example.com:3306/sales",
-    "jdbc-driver": "com.mysql.cj.jdbc.Driver",
-    "jdbc-user": "app"
-  }
-}
-```
-
-DB `properties` (persisted):
-
-```json
-{
-  "jdbc-url": "jdbc:mysql://db.example.com:3306/sales",
-  "jdbc-driver": "com.mysql.cj.jdbc.Driver",
-  "jdbc-user": "app",
-  "jdbc-password": "urn:gravitino-secret:memory:catalog:10042:jdbc-password",
-  "gravitino.secret.keys": "jdbc-password"
-}
-```
-
----
-
-**TC-2 — Create: write-through (200)**
+**TC-1 — Create: write-through via `secretBindings` (200)**
 
 Request:
 
@@ -812,13 +722,13 @@ DB `properties` (illustrative returned URN):
   "jdbc-driver": "com.mysql.cj.jdbc.Driver",
   "jdbc-user": "app",
   "jdbc-password": "urn:gravitino-secret:memory:catalog:10042:jdbc-password",
-  "gravitino.secret.keys": "jdbc-password",
+  "gravitino.secret.keys": "jdbc-password"
 }
 ```
 
 ---
 
-**TC-3 — Create: legacy plaintext, no `secretReferences` / `secretBindings` (200)**
+**TC-2 — Create: legacy plaintext, no `secretReferences` / `secretBindings` (200)**
 
 Request:
 
@@ -850,46 +760,7 @@ DB `properties` (plaintext; reserved key **absent**):
 
 ---
 
-**TC-4 — Alter: external reference via `setSecretReference` (200)**
-
-Prior DB (no secret yet, or prior plaintext omitted here). Rebind `jdbc-password`:
-
-```json
-{
-  "updates": [
-    {
-      "@type": "setProperty",
-      "property": "jdbc-url",
-      "value": "jdbc:mysql://db.example.com:3306/sales"
-    },
-    {
-      "@type": "setSecretReference",
-      "property": "jdbc-password",
-      "provider": "asm_prod",
-      "attributes": {
-        "secretId": "prod/mysql/app",
-        "jsonKey": "password"
-      }
-    }
-  ]
-}
-```
-
-DB `properties` (persisted):
-
-```json
-{
-  "jdbc-url": "jdbc:mysql://db.example.com:3306/sales",
-  "jdbc-driver": "com.mysql.cj.jdbc.Driver",
-  "jdbc-user": "app",
-  "jdbc-password": "urn:gravitino-secret:asm_prod:name:prod:mysql:app:jsonKey:password",
-  "gravitino.secret.keys": "jdbc-password"
-}
-```
-
----
-
-**TC-5 — Alter: write-through via `setSecretBinding` (200)**
+**TC-3 — Alter: write-through via `setSecretBinding` (200)**
 
 Request (flat `provider` + plaintext `value`):
 
@@ -937,10 +808,10 @@ Authenticated like other metadata APIs. Empty registry ⇒ empty `providers` arr
 | -------------- | -------- | ---------------------------------------------------------------------------------------- |
 | `name`         | Yes      | Instance name from `gravitino.secret.providers` (same string used in bindings / locator) |
 | `type`         | Yes      | From the live SPI instance’s `type()` (e.g. `memory`) — not a conf key                   |
-| `uri`          | No       | Backend address from conf when present (omit for in-memory)                              |
+| `uri`          | No       | Optional provider endpoint from conf when present (omit for in-memory)                   |
 
-**Must not return:** `tokenEnv`, auth tokens, or any other secret-bearing conf.
-Do **not** list secrets inside any backend.
+**Must not return:** credentials or any secret-bearing conf.
+Do **not** list secret material from the provider.
 
 Example response (`200`):
 
@@ -982,7 +853,7 @@ String-only `catalog_meta.properties`; no secrets-provider registry.
 | **Server configuration**      | Cluster-level named backends (`gravitino.secret.provider.<name>.*`)                  |
 | **`catalog_meta.properties`** | All-string JSON map; secret values = URN strings                                     |
 | **`gravitino.secret.keys`**   | Reserved key inside that map — comma-separated secret property keys (absent if none) |
-| External secret backends      | Secret material                                                                      |
+| In-memory provider map        | Secret material (process-local; not in the DB)                                       |
 
 No new database table is introduced for secrets-provider registration.
 
@@ -1003,9 +874,8 @@ urn:gravitino-secret:<provider_name>:<type-specific-identifier>
 ```
 
 - **Syntax** is shared (scheme + `provider_name` + colon-separated identifier segments).
-- **`<type-specific-identifier>`** is the secret's **in-backend address** for that SPI `type`.
-  Write-through identifiers use `<entityType>:<entityId>:<propertyKey>` (§5.1.1). External-ref
-  layouts are provider-defined (Enterprise backends design).
+- **`<type-specific-identifier>`** is the secret's address for that SPI `type`. For in-memory
+  write-through: `<entityType>:<entityId>:<propertyKey>` (§5.1.1).
 - On write/resolve: route by `<provider_name>` only; `className` selects the implementation at factory time.
 - Renaming a provider in configuration requires operator migration of catalog URNs (or keeping the
   old name in conf).
@@ -1031,7 +901,7 @@ Aligned with `gravitino.eventListener.names` / `gravitino.eventListener.{name}.c
 | `gravitino.secret.provider.<name>.className` | FQCN of `GravitinoSecretProvider` (**required**)   |
 | `gravitino.secret.provider.<name>.*`         | Implementation-specific settings                   |
 
-**Built-in implementation class (OSS):**
+**Built-in implementation class:**
 
 | Role                    | `className`                                                   |
 | ----------------------- | ------------------------------------------------------------- |
@@ -1044,8 +914,7 @@ gravitino.secret.providers=memory
 gravitino.secret.provider.memory.className=org.apache.gravitino.secrets.memory.InMemorySecretsProvider
 ```
 
-Production backend `className` values and settings (Vault, OpenBao, AWS, GCP, Azure) are defined in
-the Enterprise entity-secrets backends design. Config change requires edit + **restart**.
+Config change requires edit + **restart**.
 
 ---
 
@@ -1057,33 +926,30 @@ the Enterprise entity-secrets backends design. Config change requires edit + **r
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | 0     | SPI + URN string model + reserved `gravitino.secret.keys` (drop delete via URN shape)                                              |
 | 1     | In-memory `GravitinoSecretProvider` (§5.6; Base64 map value; UT/IT / local)                                                        |
-| 2     | Load named providers from server configuration + env-based login creds                                                             |
+| 2     | Load named providers from server configuration                                                                                     |
 | 3     | Resolve by list membership + omit-on-read GET/list (strip keys in `gravitino.secret.keys`)                                         |
 | 4     | Write-through persisting URN strings + `gravitino.secret.keys`                                                                     |
 | 5     | Entity REST (catalog/schema/fileset): secret maps + omit-on-read; drop URN-shape cleanup; list providers; OpenAPI / clients (§5.9) |
 | 6     | Docs + unit / integration tests for SPI, in-memory provider, and REST contracts                                                    |
-
-Production backends (Vault, OpenBao, AWS Secrets Manager, GCP Secret Manager, Azure Key Vault) and
-Enterprise UI / Helm are tracked in the Enterprise backends design.
 
 ### 9.2 Checklist
 
 | Area          | Checklist                                                                                                                                            |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Registry      | **File config** to register, **cluster scope**, no `metalake_id`, no DB table; **list** via `GET /api/secrets/providers`                             |
-| Multi-backend | Multiple named conf entries; refs use `provider_name` in URN                                                                                         |
+| Providers     | Named conf entries; refs use `provider_name` in URN; v1 ships **in-memory** only                                                                     |
 | Resolution    | Key in `gravitino.secret.keys` → URN string → `readSecret`; else plaintext                                                                           |
 | URN           | `urn:gravitino-secret:<name>:<identifier>`; write-through id = `entityType:entityId:propertyKey`; route by `provider_name`                           |
-| Configuration | `gravitino.secret.providers` + `provider.<name>.className` + settings; env var names; edit + restart                                                 |
+| Configuration | `gravitino.secret.providers` + `provider.<name>.className` (+ settings); edit + restart                                                              |
 | GET / list    | Keys in `gravitino.secret.keys` **omitted**; also omit `gravitino.secret.keys` itself from response                                                  |
 | REST API      | Create: `secretReferences` / `secretBindings`; alter: `setSecretBinding` / `setSecretReference` (§5.9.4); list providers (§5.9.6); server builds URN |
 | Drop          | No `purgeSecrets` param; `deleteSecret` only when URN is write-through-shaped for this entity (§5.5.2 C)                                             |
 | Persistence   | All-string map on catalog/schema/fileset; `gravitino.secret.keys` (comma-separated; omit when empty)                                                 |
-| Frontend      | Provider picker from list API; create maps; alter `setSecretBinding` / `setSecretReference`; detail/list omits secret keys                           |
-| Rotation      | Backend credential refresh is backend-specific (§5.8)                                                                                                |
+| Clients       | List providers API; create maps; alter `setSecretBinding` / `setSecretReference`; detail/list omits secret keys                                      |
+| Rotation      | In-memory: none (§5.8)                                                                                                                               |
 | Compat        | all-string properties still work with empty / unset provider list                                                                                    |
-| Security      | no plaintext tokens in conf; omit secret keys on read; TLS; never persist `******` as secret material                                                |
-| Scope         | This design: SPI + **in-memory provider** + conf loader + decode + REST; production backends: Enterprise design                                      |
+| Security      | omit secret keys on read; never persist `******` as secret material                                                                                  |
+| Scope         | SPI + **in-memory provider** + conf loader + decode + REST                                                                                           |
 
 ---
 
@@ -1093,4 +959,3 @@ Enterprise UI / Helm are tracked in the Enterprise backends design.
 2. [Polaris – `SecretReference`](https://github.com/apache/polaris/blob/main/polaris-core/src/main/java/org/apache/polaris/core/secrets/SecretReference.java)
 3. [Databricks – Secret management](https://docs.databricks.com/aws/en/security/secrets/)
 4. [Databricks – CREATE CONNECTION](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-create-connection)
-5. Enterprise design: entity secrets backends (Vault, OpenBao, AWS, GCP, Azure)
