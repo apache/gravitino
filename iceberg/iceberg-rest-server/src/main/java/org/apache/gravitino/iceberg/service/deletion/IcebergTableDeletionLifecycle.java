@@ -52,6 +52,9 @@ public class IcebergTableDeletionLifecycle {
   /** Persisted lifecycle state for a retained table. */
   public static final String DELETED = "DELETED";
 
+  /** Irreversible cleanup-owned lifecycle state. */
+  public static final String PURGING = "PURGING";
+
   private final boolean available;
   private final boolean softDeleteEnabled;
   private final long retentionMs;
@@ -179,6 +182,107 @@ public class IcebergTableDeletionLifecycle {
     return table == null ? null : join(table);
   }
 
+  /**
+   * Loads the retained root and action for one exact routed table name.
+   *
+   * @param catalogName routed catalog name
+   * @param identifier routed table identifier
+   * @return retained table root and deletion action
+   */
+  public IcebergRetainedTableDeletion getDeleted(String catalogName, TableIdentifier identifier) {
+    IcebergRetainedTableDeletion retained = findActive(catalogName, identifier);
+    if (retained == null) {
+      throw IcebergDeletionException.notFound();
+    }
+    return retained;
+  }
+
+  /**
+   * Loads one internal deletion ID and verifies that its retained root matches the routed table.
+   *
+   * @param catalogName routed catalog name
+   * @param identifier routed table identifier
+   * @param deletionId internal deletion identifier
+   * @return retained table root and deletion action
+   */
+  public IcebergRetainedTableDeletion getUndropAction(
+      String catalogName, TableIdentifier identifier, String deletionId) {
+    if (!available || deletionId == null || deletionId.trim().isEmpty()) {
+      throw IcebergDeletionException.notFound();
+    }
+    EntityDeletionPO deletion = EntityDeletionService.getInstance().get(deletionId);
+    TablePO table = TableDeletionService.getInstance().getRetainedTable(deletionId);
+    if (deletion == null || table == null || !routeMatches(table, catalogName, identifier)) {
+      throw IcebergDeletionException.notFound();
+    }
+    return IcebergRetainedTableDeletion.builder().table(table).deletion(deletion).build();
+  }
+
+  /**
+   * Reactivates the exact internal deletion generation currently routed by a table name.
+   *
+   * @param context request context
+   * @param identifier exact routed table identifier
+   * @param deletionId internal deletion identifier resolved before authorization
+   */
+  public void undrop(IcebergRequestContext context, TableIdentifier identifier, String deletionId) {
+    undropInternal(context, identifier, deletionId, null);
+  }
+
+  /**
+   * Reactivates the exact deletion generation authorized for an immutable source table ID.
+   *
+   * @param context request context
+   * @param identifier exact routed table identifier
+   * @param deletionId exact deletion generation authorized for this request
+   * @param expectedTableId immutable source table ID authorized for this request
+   */
+  public void undrop(
+      IcebergRequestContext context,
+      TableIdentifier identifier,
+      String deletionId,
+      long expectedTableId) {
+    undropInternal(context, identifier, deletionId, expectedTableId);
+  }
+
+  private void undropInternal(
+      IcebergRequestContext context,
+      TableIdentifier identifier,
+      String deletionId,
+      @Nullable Long expectedTableId) {
+    if (!available) {
+      throw IcebergDeletionException.notFound();
+    }
+
+    IcebergRetainedTableDeletion retained =
+        getUndropAction(context.catalogName(), identifier, deletionId);
+    if (expectedTableId != null
+        && retained.getTable().getTableId().longValue() != expectedTableId.longValue()) {
+      throw IcebergDeletionException.notFound();
+    }
+    validateRecoverable(retained.getDeletion(), System.currentTimeMillis());
+
+    String metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    NameIdentifier gravitinoIdentifier =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake, context.catalogName(), identifier, HierarchicalSchemaUtil.schemaSeparator());
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> TableDeletionService.getInstance().restore(deletionId),
+          () -> appendChange(metalake, gravitinoIdentifier, OperateType.ALTER));
+    } catch (IllegalStateException e) {
+      EntityDeletionPO current = EntityDeletionService.getInstance().get(deletionId);
+      if (current != null && !isRecoverable(current, System.currentTimeMillis())) {
+        throw failure(
+            IcebergDeletionException.Outcome.GONE,
+            "Deletion action has crossed the UNDROP boundary");
+      }
+      throw failure(
+          IcebergDeletionException.Outcome.CONFLICT, "Table generation cannot be restored");
+    }
+    cacheInvalidator.invalidate(gravitinoIdentifier);
+  }
+
   @Nullable
   private TablePO findRetainedTable(String catalogName, TableIdentifier identifier) {
     if (!available) {
@@ -201,6 +305,38 @@ public class IcebergTableDeletionLifecycle {
         : IcebergRetainedTableDeletion.builder().table(table).deletion(deletion).build();
   }
 
+  private boolean routeMatches(TablePO table, String catalogName, TableIdentifier identifier) {
+    String metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    try {
+      return Objects.equals(
+              table.getSchemaId(), schemaId(metalake, catalogName, identifier.namespace()))
+          && Objects.equals(table.getTableName(), identifier.name());
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+  }
+
+  private static boolean isRecoverable(EntityDeletionPO deletion, long serverNow) {
+    return DELETED.equals(deletion.getState())
+        && deletion.getRetentionExpiresAt() != null
+        && deletion.getRetentionExpiresAt() > serverNow
+        && deletion.getPurgeJobId() == null;
+  }
+
+  private static void validateRecoverable(EntityDeletionPO deletion, long serverNow) {
+    if (PURGING.equals(deletion.getState())
+        || deletion.getPurgeJobId() != null
+        || deletion.getRetentionExpiresAt() == null
+        || deletion.getRetentionExpiresAt() <= serverNow) {
+      throw failure(
+          IcebergDeletionException.Outcome.GONE, "Deletion action has crossed the UNDROP boundary");
+    }
+    if (!DELETED.equals(deletion.getState())) {
+      throw failure(
+          IcebergDeletionException.Outcome.CONFLICT, "Deletion action is not recoverable");
+    }
+  }
+
   private static void appendChange(
       String metalake, NameIdentifier identifier, OperateType operateType) {
     SessionUtils.doWithoutCommit(
@@ -216,5 +352,10 @@ public class IcebergTableDeletionLifecycle {
             namespace, HierarchicalSchemaUtil.schemaSeparator());
     return EntityIdService.getEntityId(
         NameIdentifier.of(metalake, catalogName, schemaName), Entity.EntityType.SCHEMA);
+  }
+
+  private static IcebergDeletionException failure(
+      IcebergDeletionException.Outcome outcome, String message) {
+    return new IcebergDeletionException(outcome, message);
   }
 }
