@@ -26,14 +26,17 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.EntityChangeLogPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -134,11 +137,19 @@ public class TestEntityChangeLogMapper {
             .findFirst()
             .orElseThrow(() -> new AssertionError("recent row missing"));
 
-    entityChangeLogMapper.pruneOldEntityChanges(1001L);
+    int prunedRows =
+        SessionUtils.doWithCommitAndFetchResult(
+            EntityChangeLogMapper.class,
+            mapper -> mapper.pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30)));
+    Assertions.assertEquals(1, prunedRows);
 
-    List<EntityChangeRecord> after = entityChangeLogMapper.selectEntityChanges(0L, 100);
-    Assertions.assertEquals(1, after.size());
-    Assertions.assertEquals(recent, after.get(0).getCreatedAt());
+    try (SqlSession verificationSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      List<EntityChangeRecord> after =
+          verificationSession.getMapper(EntityChangeLogMapper.class).selectEntityChanges(0L, 100);
+      Assertions.assertEquals(1, after.size());
+      Assertions.assertEquals(recent, after.get(0).getCreatedAt());
+    }
   }
 
   @Test
@@ -154,6 +165,36 @@ public class TestEntityChangeLogMapper {
     Assertions.assertEquals(3, rows.size());
     Assertions.assertTrue(rows.get(0).getId() < rows.get(1).getId());
     Assertions.assertTrue(rows.get(1).getId() < rows.get(2).getId());
+  }
+
+  @Test
+  void testEntityChangeLogPruneUsesDatabaseTime() {
+    String baseSql =
+        new EntityChangeLogBaseSQLProvider().pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30));
+    String postgreSql =
+        new EntityChangeLogPostgreSQLProvider().pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30));
+
+    // The cutoff must be derived from the DB clock, never from a JVM timestamp bound into the SQL.
+    Assertions.assertTrue(baseSql.contains("CURRENT_TIMESTAMP"), baseSql);
+    Assertions.assertTrue(baseSql.contains("#{retentionMs}"), baseSql);
+    Assertions.assertFalse(baseSql.contains("#{before}"), baseSql);
+    Assertions.assertTrue(postgreSql.contains("CURRENT_TIMESTAMP"), postgreSql);
+    Assertions.assertTrue(postgreSql.contains("#{retentionMs}"), postgreSql);
+    Assertions.assertFalse(postgreSql.contains("#{before}"), postgreSql);
+  }
+
+  @Test
+  void testEntityChangeLogPruneKeepsRowsInsideRetention() {
+    entityChangeLogMapper.insertEntityChange(
+        "metalake1", "TABLE", "metalake1.cat.schema.recent", OperateType.ALTER);
+
+    int prunedRows =
+        SessionUtils.doWithCommitAndFetchResult(
+            EntityChangeLogMapper.class,
+            mapper -> mapper.pruneOldEntityChanges(TimeUnit.DAYS.toMillis(30)));
+
+    Assertions.assertEquals(0, prunedRows);
+    Assertions.assertEquals(1, entityChangeLogMapper.selectEntityChanges(0L, 100).size());
   }
 
   private void forceCreatedAt(String fullName, long createdAt) throws SQLException {
