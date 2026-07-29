@@ -620,6 +620,8 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
 
 CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `id`                BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique cleanup job id',
+  `table_id`          BIGINT(20)    UNSIGNED NULL COMMENT 'immutable retained table id, NULL for legacy immediate-purge jobs',
+  `deletion_id`       VARCHAR(64)   NULL COMMENT 'opaque retained deletion generation, NULL for legacy immediate-purge jobs',
   `catalog_id`        BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique id of the owning catalog, stable across catalog rename',
   `namespace`         VARCHAR(512)  NOT NULL COMMENT 'namespace of the table to be cleaned up',
   `table_name`        VARCHAR(256)  NOT NULL COMMENT 'name of the table to be cleaned up',
@@ -635,6 +637,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
   `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_icj_deletion` (`deletion_id`),
   KEY `idx_state_updated` (`state`, `updated_at`),
   KEY `idx_object` (`catalog_id`, `namespace`(255), `table_name`(128), `state`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table cleanup jobs';

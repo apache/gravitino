@@ -56,6 +56,13 @@ COMMENT ON COLUMN entity_deletion.retention_expires_at IS 'fixed recovery deadli
 COMMENT ON COLUMN entity_deletion.purge_job_id IS 'batch purge job that claimed this generation';
 
 ALTER TABLE iceberg_cleanup_job
+    ADD COLUMN IF NOT EXISTS table_id BIGINT,
+    ADD COLUMN IF NOT EXISTS deletion_id VARCHAR(64);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_icj_deletion ON iceberg_cleanup_job (deletion_id);
+COMMENT ON COLUMN iceberg_cleanup_job.table_id IS 'immutable retained table id, NULL for legacy immediate-purge jobs';
+COMMENT ON COLUMN iceberg_cleanup_job.deletion_id IS 'opaque retained deletion generation, NULL for legacy immediate-purge jobs';
+
+ALTER TABLE iceberg_cleanup_job
     ADD COLUMN IF NOT EXISTS manifests_total BIGINT,
     ADD COLUMN IF NOT EXISTS manifests_done BIGINT;
 COMMENT ON COLUMN iceberg_cleanup_job.manifests_total IS 'advisory number of manifests discovered, NULL before progress is reported';

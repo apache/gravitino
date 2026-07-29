@@ -20,8 +20,11 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.gravitino.storage.relational.po.TableDeletionEntryPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -60,6 +63,38 @@ public interface TableDeletionMapper {
   })
   TablePO selectRetainedTable(@Param("deletionId") String deletionId);
 
+  /** Returns a bounded, unlocked projection of expired retained table deletions. */
+  @Results(
+      value = {
+        @Result(property = "table.tableId", column = "table_id"),
+        @Result(property = "table.tableName", column = "table_name"),
+        @Result(property = "table.metalakeId", column = "metalake_id"),
+        @Result(property = "table.catalogId", column = "catalog_id"),
+        @Result(property = "table.schemaId", column = "schema_id"),
+        @Result(property = "table.auditInfo", column = "audit_info"),
+        @Result(property = "table.currentVersion", column = "current_version"),
+        @Result(property = "table.lastVersion", column = "last_version"),
+        @Result(property = "table.deletedAt", column = "deleted_at"),
+        @Result(property = "table.deletionId", column = "table_deletion_id"),
+        @Result(property = "deletion.deletionId", column = "action_deletion_id"),
+        @Result(property = "deletion.state", column = "action_state"),
+        @Result(property = "deletion.retentionExpiresAt", column = "action_retention_expires_at"),
+        @Result(property = "deletion.purgeJobId", column = "action_purge_job_id")
+      })
+  @Select({
+    "SELECT t.table_id, t.table_name, t.metalake_id, t.catalog_id, t.schema_id,",
+    "t.audit_info, t.current_version, t.last_version, t.deleted_at,",
+    "t.deletion_id AS table_deletion_id, d.deletion_id AS action_deletion_id,",
+    "d.state AS action_state, d.retention_expires_at AS action_retention_expires_at,",
+    "d.purge_job_id AS action_purge_job_id FROM entity_deletion d",
+    "JOIN table_meta t ON t.deletion_id = d.deletion_id",
+    "WHERE d.state = 'DELETED' AND d.purge_job_id IS NULL",
+    "AND d.retention_expires_at IS NOT NULL AND d.retention_expires_at <= #{now}",
+    "AND t.deleted_at > 0 AND t.deletion_id IS NOT NULL",
+    "ORDER BY d.retention_expires_at, d.deletion_id LIMIT #{limit}"
+  })
+  List<TableDeletionEntryPO> selectEligibleRetainedTableDeletions(
+      @Param("now") long now, @Param("limit") int limit);
   /** Returns retained table roots under one exact schema identity. */
   @Select({
     "SELECT table_id AS tableId, table_name AS tableName, metalake_id AS metalakeId,",

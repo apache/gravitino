@@ -46,5 +46,10 @@ CREATE TABLE IF NOT EXISTS `entity_deletion` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'active deletion lifecycle actions';
 
 ALTER TABLE `iceberg_cleanup_job`
+    ADD COLUMN `table_id` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'immutable retained table id, NULL for legacy immediate-purge jobs' AFTER `id`,
+    ADD COLUMN `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'opaque retained deletion generation, NULL for legacy immediate-purge jobs' AFTER `table_id`;
+CREATE UNIQUE INDEX `uk_icj_deletion` ON `iceberg_cleanup_job` (`deletion_id`);
+
+ALTER TABLE `iceberg_cleanup_job`
     ADD COLUMN `manifests_total` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'advisory number of manifests discovered, NULL before progress is reported' AFTER `heartbeat_at`,
     ADD COLUMN `manifests_done` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'advisory number of manifests processed, NULL before progress is reported' AFTER `manifests_total`;

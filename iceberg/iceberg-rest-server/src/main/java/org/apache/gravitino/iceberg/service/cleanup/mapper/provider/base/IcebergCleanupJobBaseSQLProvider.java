@@ -40,10 +40,10 @@ public class IcebergCleanupJobBaseSQLProvider {
   public String insertCleanupJob(@Param("po") IcebergCleanupJobPO po) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (id, catalog_id, namespace, table_name, metadata_location,"
+        + " (id, table_id, deletion_id, catalog_id, namespace, table_name, metadata_location,"
         + " file_io_impl, file_io_props, state, attempts, last_error, heartbeat_at,"
         + " manifests_total, manifests_done, created_by, updated_at) VALUES"
-        + " (#{po.id}, #{po.catalogId}, #{po.namespace},"
+        + " (#{po.id}, #{po.tableId}, #{po.deletionId}, #{po.catalogId}, #{po.namespace},"
         + " #{po.tableName}, #{po.metadataLocation}, #{po.fileIOImpl}, #{po.fileIOProps},"
         + " #{po.state}, #{po.attempts}, #{po.lastError}, #{po.heartbeatAt},"
         + " #{po.manifestsTotal}, #{po.manifestsDone}, #{po.createdBy}, #{po.updatedAt})";
@@ -62,7 +62,8 @@ public class IcebergCleanupJobBaseSQLProvider {
     // trap, which also keeps the predicate index-friendly. Full rows are returned so a winning
     // claimer can build the job directly: the columns the job needs are immutable after enqueue,
     // so the pre-claim snapshot stays accurate without a re-read.
-    return "SELECT id, catalog_id AS catalogId, namespace,"
+    return "SELECT id, table_id AS tableId, deletion_id AS deletionId,"
+        + " catalog_id AS catalogId, namespace,"
         + " table_name AS tableName, metadata_location AS metadataLocation,"
         + " file_io_impl AS fileIOImpl, file_io_props AS fileIOProps, state, attempts,"
         + " last_error AS lastError, heartbeat_at AS heartbeatAt,"

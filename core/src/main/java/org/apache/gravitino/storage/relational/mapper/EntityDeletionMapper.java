@@ -24,6 +24,7 @@ import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /** MyBatis mapper for active metadata deletion generations. */
 public interface EntityDeletionMapper {
@@ -58,6 +59,20 @@ public interface EntityDeletionMapper {
   @Nullable
   @SelectProvider(type = EntityDeletionSQLProvider.class, method = "selectEntityDeletionForUpdate")
   EntityDeletionPO selectEntityDeletionForUpdate(@Param("deletionId") String deletionId);
+
+  /**
+   * Claims an expired deletion generation for one exact purge job.
+   *
+   * @param deletionId opaque deletion identifier
+   * @param purgeJobId durable cleanup-job identifier encoded as a decimal string
+   * @param now authoritative server time used for the inclusive retention boundary
+   * @return number of claimed rows
+   */
+  @UpdateProvider(type = EntityDeletionSQLProvider.class, method = "claimEntityDeletionForPurge")
+  int claimEntityDeletionForPurge(
+      @Param("deletionId") String deletionId,
+      @Param("purgeJobId") String purgeJobId,
+      @Param("now") long now);
 
   /**
    * Deletes an exact action after the caller has locked and validated it.

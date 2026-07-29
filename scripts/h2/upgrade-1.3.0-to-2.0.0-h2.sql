@@ -45,6 +45,13 @@ CREATE TABLE IF NOT EXISTS `entity_deletion` (
 ) COMMENT='active deletion lifecycle actions';
 
 ALTER TABLE `iceberg_cleanup_job`
+    ADD COLUMN `table_id` BIGINT DEFAULT NULL COMMENT 'immutable retained table id, NULL for legacy immediate-purge jobs' AFTER `id`;
+ALTER TABLE `iceberg_cleanup_job`
+    ADD COLUMN `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'opaque retained deletion generation, NULL for legacy immediate-purge jobs' AFTER `table_id`;
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_icj_deletion`
+    ON `iceberg_cleanup_job` (`deletion_id`);
+
+ALTER TABLE `iceberg_cleanup_job`
     ADD COLUMN `manifests_total` BIGINT DEFAULT NULL COMMENT 'advisory number of manifests discovered, NULL before progress is reported' AFTER `heartbeat_at`;
 ALTER TABLE `iceberg_cleanup_job`
     ADD COLUMN `manifests_done` BIGINT DEFAULT NULL COMMENT 'advisory number of manifests processed, NULL before progress is reported' AFTER `manifests_total`;

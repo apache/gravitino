@@ -633,6 +633,8 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
 
 CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `id`                BIGINT        NOT NULL COMMENT 'globally unique cleanup job id',
+  `table_id`          BIGINT        NULL COMMENT 'immutable retained table id, NULL for legacy immediate-purge jobs',
+  `deletion_id`       VARCHAR(64)   NULL COMMENT 'opaque retained deletion generation, NULL for legacy immediate-purge jobs',
   `catalog_id`        BIGINT        NOT NULL COMMENT 'globally unique id of the owning catalog, stable across catalog rename',
   `namespace`         VARCHAR(512)  NOT NULL COMMENT 'namespace of the table to be cleaned up',
   `table_name`        VARCHAR(256)  NOT NULL COMMENT 'name of the table to be cleaned up',
@@ -649,5 +651,6 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `updated_at`        BIGINT        NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`)
 ) COMMENT='async Iceberg table cleanup jobs';
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_icj_deletion` ON `iceberg_cleanup_job` (`deletion_id`);
 CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_id`, `namespace`, `table_name`, `state`);

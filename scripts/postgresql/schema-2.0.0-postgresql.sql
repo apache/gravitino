@@ -1085,6 +1085,8 @@ COMMENT ON COLUMN entity_change_log.created_at IS 'timestamp of the change in mi
 
 CREATE TABLE IF NOT EXISTS iceberg_cleanup_job (
   id                BIGINT        NOT NULL PRIMARY KEY,
+  table_id          BIGINT,
+  deletion_id       VARCHAR(64),
   catalog_id        BIGINT        NOT NULL,
   namespace         VARCHAR(512)  NOT NULL,
   table_name        VARCHAR(256)  NOT NULL,
@@ -1100,10 +1102,13 @@ CREATE TABLE IF NOT EXISTS iceberg_cleanup_job (
   created_by        VARCHAR(128)  NOT NULL,
   updated_at        BIGINT        NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uk_icj_deletion ON iceberg_cleanup_job (deletion_id);
 CREATE INDEX IF NOT EXISTS idx_state_updated ON iceberg_cleanup_job (state, updated_at);
 CREATE INDEX IF NOT EXISTS idx_object ON iceberg_cleanup_job (catalog_id, namespace, table_name, state);
 COMMENT ON TABLE iceberg_cleanup_job IS 'async Iceberg table cleanup jobs';
 COMMENT ON COLUMN iceberg_cleanup_job.id IS 'globally unique cleanup job id';
+COMMENT ON COLUMN iceberg_cleanup_job.table_id IS 'immutable retained table id, NULL for legacy immediate-purge jobs';
+COMMENT ON COLUMN iceberg_cleanup_job.deletion_id IS 'opaque retained deletion generation, NULL for legacy immediate-purge jobs';
 COMMENT ON COLUMN iceberg_cleanup_job.catalog_id IS 'globally unique id of the owning catalog, stable across catalog rename';
 COMMENT ON COLUMN iceberg_cleanup_job.namespace IS 'namespace of the table to be cleaned up';
 COMMENT ON COLUMN iceberg_cleanup_job.table_name IS 'name of the table to be cleaned up';

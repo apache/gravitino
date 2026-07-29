@@ -78,17 +78,38 @@ public class IcebergCleanupJobStore {
   }
 
   /**
-   * Persists a new PENDING job.
+   * Persists a legacy immediate-cleanup job as PENDING.
    *
-   * @param job job to persist
+   * <p>A job linked to a retained deletion must be inserted through {@link
+   * IcebergDeletionPurgeStore#claimAndEnqueue} so job creation and {@code DELETED -> PURGING}
+   * ownership commit in one transaction.
+   *
+   * @param job unlinked legacy job to persist
    * @return generated id
    */
   public long addJob(IcebergCleanupJob job) {
-    long id = idGenerator.nextId();
+    if (job.tableId() != null || job.deletionId() != null) {
+      throw new IllegalArgumentException(
+          "Retained-deletion jobs must be enqueued through the atomic purge handoff");
+    }
+    long id = allocateJobId();
     long now = System.currentTimeMillis();
-    IcebergCleanupJobPO po = IcebergCleanupJobPO.fromCleanupJob(job, id, now);
-    SessionUtils.doWithCommit(IcebergCleanupJobMapper.class, mapper -> mapper.insertCleanupJob(po));
+    SessionUtils.doWithCommit(
+        IcebergCleanupJobMapper.class,
+        mapper -> mapper.insertCleanupJob(IcebergCleanupJobPO.fromCleanupJob(job, id, now)));
     return id;
+  }
+
+  /** Allocates an application-generated cleanup-job identifier. */
+  long allocateJobId() {
+    return idGenerator.nextId();
+  }
+
+  /** Inserts a preallocated PENDING job into the caller's transaction. */
+  void insertJobWithoutCommit(IcebergCleanupJob job, long id, long now) {
+    IcebergCleanupJobPO po = IcebergCleanupJobPO.fromCleanupJob(job, id, now);
+    SessionUtils.doWithoutCommit(
+        IcebergCleanupJobMapper.class, mapper -> mapper.insertCleanupJob(po));
   }
 
   /**

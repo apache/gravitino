@@ -69,6 +69,26 @@ public class EntityDeletionSQLProvider {
   }
 
   /**
+   * Builds the guarded transition that hands an expired deletion to one purge job.
+   *
+   * @param deletionId opaque deletion identifier
+   * @param purgeJobId durable cleanup-job identifier encoded as a decimal string
+   * @param now authoritative server time used for the inclusive retention boundary
+   * @return parameterized update SQL
+   */
+  public static String claimEntityDeletionForPurge(
+      @Param("deletionId") String deletionId,
+      @Param("purgeJobId") String purgeJobId,
+      @Param("now") long now) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET state = 'PURGING', purge_job_id = #{purgeJobId}"
+        + " WHERE deletion_id = #{deletionId} AND state = 'DELETED'"
+        + " AND purge_job_id IS NULL AND retention_expires_at IS NOT NULL"
+        + " AND retention_expires_at <= #{now}";
+  }
+
+  /**
    * Builds an exact deletion-action removal after it has been locked and validated.
    *
    * @param deletionId opaque deletion identifier

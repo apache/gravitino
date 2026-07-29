@@ -81,6 +81,20 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
         "alice");
   }
 
+  private static IcebergCleanupJob linkedJob(long tableId, String deletionId) {
+    return IcebergCleanupJob.forRetainedDeletion(
+        0L,
+        tableId,
+        deletionId,
+        CATALOG_ID,
+        "db",
+        "t",
+        "s3://b/db/t/metadata/0.json",
+        "org.apache.iceberg.aws.s3.S3FileIO",
+        ImmutableMap.of("k", "v"),
+        "alice");
+  }
+
   @TestTemplate
   void testAddTakeSucceedLifecycle() {
     Assertions.assertFalse(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
@@ -95,6 +109,8 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     Optional<IcebergCleanupJob> taken = store.takePendingJob(now, 300_000L, 10);
     Assertions.assertTrue(taken.isPresent());
     Assertions.assertEquals(id, taken.get().id());
+    Assertions.assertNull(taken.get().tableId());
+    Assertions.assertNull(taken.get().deletionId());
     Assertions.assertEquals(ImmutableMap.of("k", "v"), taken.get().fileIOProperties());
     Assertions.assertEquals(IcebergCleanupJob.State.RUNNING, store.stateOf(id));
     Assertions.assertTrue(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
@@ -107,6 +123,17 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     Assertions.assertFalse(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
     Assertions.assertEquals(
         1, store.deleteFinishedJobsByLegacyTimeline(System.currentTimeMillis() + 1));
+  }
+
+  @TestTemplate
+  void testPublicAddJobRejectsLinkedDeletion() {
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> store.addJob(linkedJob(101L, "D1")));
+
+    Assertions.assertTrue(failure.getMessage().contains("atomic purge handoff"));
+    Assertions.assertFalse(
+        store.takePendingJob(System.currentTimeMillis(), 300_000L, 10).isPresent());
   }
 
   @TestTemplate
