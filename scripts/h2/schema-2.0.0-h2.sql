@@ -643,6 +643,8 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `attempts`          INT           NOT NULL DEFAULT 0 COMMENT 'number of processing attempts made so far',
   `last_error`        VARCHAR(2048) NULL COMMENT 'truncated reason for the most recent failure, NULL until a job fails',
   `heartbeat_at`      BIGINT        NOT NULL DEFAULT 0 COMMENT 'last heartbeat from the worker, 0 when not running',
+  `manifests_total`   BIGINT        NULL COMMENT 'advisory number of manifests discovered, NULL before progress is reported',
+  `manifests_done`    BIGINT        NULL COMMENT 'advisory number of manifests processed, NULL before progress is reported',
   `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
   `updated_at`        BIGINT        NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`)

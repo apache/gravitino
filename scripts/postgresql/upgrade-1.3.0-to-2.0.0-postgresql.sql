@@ -54,3 +54,9 @@ COMMENT ON COLUMN entity_deletion.deletion_id IS 'opaque identifier for one acti
 COMMENT ON COLUMN entity_deletion.state IS 'DELETED | PURGING';
 COMMENT ON COLUMN entity_deletion.retention_expires_at IS 'fixed recovery deadline in milliseconds';
 COMMENT ON COLUMN entity_deletion.purge_job_id IS 'batch purge job that claimed this generation';
+
+ALTER TABLE iceberg_cleanup_job
+    ADD COLUMN IF NOT EXISTS manifests_total BIGINT,
+    ADD COLUMN IF NOT EXISTS manifests_done BIGINT;
+COMMENT ON COLUMN iceberg_cleanup_job.manifests_total IS 'advisory number of manifests discovered, NULL before progress is reported';
+COMMENT ON COLUMN iceberg_cleanup_job.manifests_done IS 'advisory number of manifests processed, NULL before progress is reported';

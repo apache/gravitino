@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.cleanup.mapper;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.service.cleanup.mapper.provider.base.IcebergCleanupJobBaseSQLProvider;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
@@ -90,8 +91,16 @@ public class IcebergCleanupJobSQLProviderFactory {
   }
 
   public static String heartbeat(
-      @Param("id") long id, @Param("lastHeartbeat") long lastHeartbeat, @Param("now") long now) {
-    return getProvider().heartbeat(id, lastHeartbeat, now);
+      @Param("id") long id,
+      @Param("lastHeartbeat") long lastHeartbeat,
+      @Param("now") long now,
+      @Param("manifestsTotal") @Nullable Long manifestsTotal,
+      @Param("manifestsDone") @Nullable Long manifestsDone) {
+    return getProvider().heartbeat(id, lastHeartbeat, now, manifestsTotal, manifestsDone);
+  }
+
+  public static String selectStatus(@Param("id") long id) {
+    return getProvider().selectStatus(id);
   }
 
   public static String selectUnfinishedJobId(

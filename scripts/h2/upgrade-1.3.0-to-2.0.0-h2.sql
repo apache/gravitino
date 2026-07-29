@@ -43,3 +43,8 @@ CREATE TABLE IF NOT EXISTS `entity_deletion` (
   KEY `idx_entity_deletion_gc` (`state`, `retention_expires_at`, `deletion_id`),
   KEY `idx_entity_deletion_purge_job` (`purge_job_id`, `deletion_id`)
 ) COMMENT='active deletion lifecycle actions';
+
+ALTER TABLE `iceberg_cleanup_job`
+    ADD COLUMN `manifests_total` BIGINT DEFAULT NULL COMMENT 'advisory number of manifests discovered, NULL before progress is reported' AFTER `heartbeat_at`;
+ALTER TABLE `iceberg_cleanup_job`
+    ADD COLUMN `manifests_done` BIGINT DEFAULT NULL COMMENT 'advisory number of manifests processed, NULL before progress is reported' AFTER `manifests_total`;

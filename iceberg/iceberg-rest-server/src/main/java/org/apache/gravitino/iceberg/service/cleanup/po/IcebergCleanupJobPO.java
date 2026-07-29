@@ -56,6 +56,8 @@ public class IcebergCleanupJobPO {
   private Integer attempts;
   private String lastError;
   private Long heartbeatAt;
+  private Long manifestsTotal;
+  private Long manifestsDone;
   private String createdBy;
   private Long updatedAt;
 
@@ -80,6 +82,8 @@ public class IcebergCleanupJobPO {
         .withAttempts(0)
         .withLastError(null)
         .withHeartbeatAt(0L)
+        .withManifestsTotal(null)
+        .withManifestsDone(null)
         .withCreatedBy(job.createdBy())
         .withUpdatedAt(now)
         .build();

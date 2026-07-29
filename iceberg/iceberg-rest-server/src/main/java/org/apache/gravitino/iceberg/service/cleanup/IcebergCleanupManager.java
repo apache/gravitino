@@ -38,6 +38,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongPredicate;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.BaseTable;
@@ -65,6 +66,8 @@ public class IcebergCleanupManager implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCleanupManager.class);
 
+  private static final ThreadLocal<ManifestProgress> CURRENT_MANIFEST_PROGRESS =
+      new ThreadLocal<>();
   private final IcebergCleanupJobStore store;
   private final int workerThreads;
   private final int deleteBatchSize;
@@ -77,6 +80,9 @@ public class IcebergCleanupManager implements AutoCloseable {
   // Heartbeat token per job this manager currently owns, keyed by id. The scheduler renews it and a
   // worker reads it for the terminal CAS; refreshHeartbeats drops the entry once a peer reclaims.
   private final Map<Long, Long> ownedHeartbeats = new ConcurrentHashMap<>();
+  // Operator-facing progress is advisory. Workers rebuild it from zero on every run; no cleanup
+  // decision reads it, and it is persisted only alongside an ownership-fenced heartbeat.
+  private final Map<Long, ManifestProgress> manifestProgressByJob = new ConcurrentHashMap<>();
 
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -316,6 +322,7 @@ public class IcebergCleanupManager implements AutoCloseable {
         }
 
         ownedHeartbeats.put(job.get().id(), now);
+        manifestProgressByJob.put(job.get().id(), new ManifestProgress());
         runJob(job.get());
       } catch (Throwable t) {
         // The loop is submitted once, so if it exits the worker is gone for good. Catch everything
@@ -333,13 +340,19 @@ public class IcebergCleanupManager implements AutoCloseable {
     long id = job.id();
     // try-with-resources so the per-job FileIO (which may hold an S3 client / connection pool) is
     // closed on every path: success, transient failure, and the early return inside cleanupFiles.
+    ManifestProgress progress = manifestProgressByJob.get(id);
+    CURRENT_MANIFEST_PROGRESS.set(progress);
     try (FileIO io = CatalogUtil.loadFileIO(job.fileIOImpl(), job.fileIOProperties(), null)) {
       cleanupFiles(io, job.metadataLocation());
+      flushManifestProgress(id);
       finishJob(id, heartbeat -> store.markSucceeded(id, heartbeat));
     } catch (RuntimeException e) {
       LOG.warn("Cleanup job {} failed transiently; will retry", id, e);
+      flushManifestProgress(id);
       finishJob(id, heartbeat -> store.recordFailure(id, e.getMessage(), maxAttempts, heartbeat));
     } finally {
+      CURRENT_MANIFEST_PROGRESS.remove();
+      manifestProgressByJob.remove(id);
       ownedHeartbeats.remove(id);
     }
   }
@@ -358,20 +371,36 @@ public class IcebergCleanupManager implements AutoCloseable {
   void refreshHeartbeats() {
     long now = System.currentTimeMillis();
     for (Map.Entry<Long, Long> entry : new ArrayList<>(ownedHeartbeats.entrySet())) {
-      long id = entry.getKey();
-      try {
-        long previousHeartbeat = entry.getValue();
-        ownedHeartbeats.put(id, now);
-        if (!store.heartbeat(id, previousHeartbeat, now)) {
-          LOG.warn("Lost ownership of cleanup job {}", id);
-          ownedHeartbeats.remove(id, now);
-        }
-      } catch (Throwable t) {
-        ownedHeartbeats.replace(id, now, entry.getValue());
-        // scheduleAtFixedRate stops a task forever if it throws, so never let one escape: a bad job
-        // must not stop heartbeat renewal for the whole process.
-        LOG.warn("Heartbeat update failed for job {}", id, t);
+      refreshHeartbeat(entry.getKey(), entry.getValue(), now);
+    }
+  }
+
+  private void flushManifestProgress(long id) {
+    Long heartbeat = ownedHeartbeats.get(id);
+    if (heartbeat != null) {
+      refreshHeartbeat(id, heartbeat, Math.max(System.currentTimeMillis(), heartbeat + 1L));
+    }
+  }
+
+  private void refreshHeartbeat(long id, long previousHeartbeat, long now) {
+    try {
+      ownedHeartbeats.put(id, now);
+      ManifestProgress progress = manifestProgressByJob.get(id);
+      boolean refreshed =
+          progress == null
+              ? store.heartbeat(id, previousHeartbeat, now)
+              : store.heartbeat(
+                  id, previousHeartbeat, now, progress.manifestsTotal(), progress.manifestsDone());
+      if (!refreshed) {
+        LOG.warn("Lost ownership of cleanup job {}", id);
+        ownedHeartbeats.remove(id, now);
       }
+    } catch (Throwable t) {
+      ownedHeartbeats.replace(id, now, previousHeartbeat);
+      // scheduleAtFixedRate stops a task forever if it throws, so never let one escape: a bad job
+      // must not stop heartbeat renewal for the whole process. Progress is best-effort too, so a
+      // failed progress write never fails the cleanup itself.
+      LOG.warn("Heartbeat update failed for job {}", id, t);
     }
   }
 
@@ -384,9 +413,10 @@ public class IcebergCleanupManager implements AutoCloseable {
     }
   }
 
-  // Streams each manifest's data files to deleteAll (one manifest's paths in memory at a time) and
-  // collects the manifest paths into `manifests` for the caller to delete next.
+  // Collects unique manifests before deleting their data so advisory total progress is known up
+  // front. Data-file paths are still streamed one manifest at a time and never accumulated.
   private void deleteDataFiles(FileIO io, TableMetadata metadata, Set<String> manifests) {
+    List<ManifestFile> uniqueManifests = new ArrayList<>();
     for (Snapshot snapshot : metadata.snapshots()) {
       List<ManifestFile> snapshotManifests;
       try {
@@ -398,20 +428,53 @@ public class IcebergCleanupManager implements AutoCloseable {
         continue;
       }
       for (ManifestFile manifest : snapshotManifests) {
-        if (!manifests.add(manifest.path())) {
-          continue; // shared by several snapshots; its data files were already deleted
-        }
-        try (CloseableIterable<String> paths =
-            ManifestFiles.readPaths(manifest, io, metadata.specsById())) {
-          // deleteAll pulls this lazy iterable in batches, so only one batch is held at a time.
-          deleteAll(io, paths);
-        } catch (NotFoundException manifestGone) {
-          // Manifests are deleted after their data files, so a missing one has no data files left.
-          LOG.debug("Manifest {} already gone; skipping", manifest.path());
-        } catch (Exception e) {
-          throw new RuntimeException("Failed to read manifest " + manifest.path(), e);
+        if (manifests.add(manifest.path())) {
+          uniqueManifests.add(manifest);
         }
       }
+    }
+
+    ManifestProgress progress = CURRENT_MANIFEST_PROGRESS.get();
+    if (progress != null) {
+      progress.reset(uniqueManifests.size());
+    }
+    for (ManifestFile manifest : uniqueManifests) {
+      try (CloseableIterable<String> paths =
+          ManifestFiles.readPaths(manifest, io, metadata.specsById())) {
+        // deleteAll pulls this lazy iterable in batches, so only one batch is held at a time.
+        deleteAll(io, paths);
+      } catch (NotFoundException manifestGone) {
+        // Manifests are deleted after their data files, so a missing one has no data files left.
+        LOG.debug("Manifest {} already gone; skipping", manifest.path());
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to read manifest " + manifest.path(), e);
+      }
+      if (progress != null) {
+        progress.completeManifest();
+      }
+    }
+  }
+
+  private static class ManifestProgress {
+
+    private final AtomicLong manifestsTotal = new AtomicLong();
+    private final AtomicLong manifestsDone = new AtomicLong();
+
+    private void reset(int total) {
+      manifestsTotal.set(total);
+      manifestsDone.set(0);
+    }
+
+    private void completeManifest() {
+      manifestsDone.incrementAndGet();
+    }
+
+    private long manifestsTotal() {
+      return manifestsTotal.get();
+    }
+
+    private long manifestsDone() {
+      return manifestsDone.get();
     }
   }
 

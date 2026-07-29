@@ -1095,6 +1095,8 @@ CREATE TABLE IF NOT EXISTS iceberg_cleanup_job (
   attempts          INT           NOT NULL DEFAULT 0,
   last_error        VARCHAR(2048),
   heartbeat_at      BIGINT        NOT NULL DEFAULT 0,
+  manifests_total   BIGINT,
+  manifests_done    BIGINT,
   created_by        VARCHAR(128)  NOT NULL,
   updated_at        BIGINT        NOT NULL
 );
@@ -1112,5 +1114,7 @@ COMMENT ON COLUMN iceberg_cleanup_job.state IS 'PENDING | RUNNING | SUCCEEDED | 
 COMMENT ON COLUMN iceberg_cleanup_job.attempts IS 'number of processing attempts made so far';
 COMMENT ON COLUMN iceberg_cleanup_job.last_error IS 'truncated reason for the most recent failure, NULL until a job fails';
 COMMENT ON COLUMN iceberg_cleanup_job.heartbeat_at IS 'last heartbeat from the worker, 0 when not running';
+COMMENT ON COLUMN iceberg_cleanup_job.manifests_total IS 'advisory number of manifests discovered, NULL before progress is reported';
+COMMENT ON COLUMN iceberg_cleanup_job.manifests_done IS 'advisory number of manifests processed, NULL before progress is reported';
 COMMENT ON COLUMN iceberg_cleanup_job.created_by IS 'principal that requested the drop (audit)';
 COMMENT ON COLUMN iceberg_cleanup_job.updated_at IS 'last state change, drives poll ordering and old finished-job cleanup';
