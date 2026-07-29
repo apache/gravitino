@@ -45,6 +45,10 @@ public interface IcebergCleanupJobMapper {
   List<IcebergCleanupJobPO> selectCandidateJobs(
       @Param("heartbeatExpiry") long heartbeatExpiry, @Param("window") int window);
 
+  /** Returns the observed number of PENDING and RUNNING cleanup jobs. */
+  @SelectProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "countInflightJobs")
+  int countInflightJobs();
+
   @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "markRunning")
   int markRunning(
       @Param("id") long id, @Param("now") long now, @Param("heartbeatExpiry") long heartbeatExpiry);

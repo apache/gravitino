@@ -101,8 +101,10 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
   @TestTemplate
   void testAddTakeSucceedLifecycle() {
     Assertions.assertFalse(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
+    Assertions.assertEquals(0, store.countInflightJobs());
 
     long id = store.addJob(sampleJob());
+    Assertions.assertEquals(1, store.countInflightJobs());
     Assertions.assertTrue(id > 0);
     Assertions.assertTrue(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
     // The same namespace/table under a different catalog must not match.
@@ -120,6 +122,7 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     Assertions.assertFalse(store.takePendingJob(now, 300_000L, 10).isPresent());
 
     Assertions.assertTrue(store.markSucceeded(id, now));
+    Assertions.assertEquals(0, store.countInflightJobs());
     Assertions.assertEquals(IcebergCleanupJob.State.SUCCEEDED, store.stateOf(id));
     // A second transition no longer owns the (now terminal) row, so it reports no update.
     Assertions.assertFalse(store.markSucceeded(id, now));

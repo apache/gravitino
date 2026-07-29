@@ -93,6 +93,8 @@ public class TestIcebergConfig {
   public void testAsyncCleanupDefaults() {
     IcebergConfig config = new IcebergConfig(ImmutableMap.of());
     Assertions.assertEquals(2, config.get(IcebergConfig.ASYNC_CLEANUP_WORKER_THREADS));
+    Assertions.assertEquals(100, config.get(IcebergConfig.ASYNC_CLEANUP_MAX_INFLIGHT_JOBS));
+    Assertions.assertEquals(20, config.get(IcebergConfig.ASYNC_CLEANUP_ENQUEUE_BATCH_SIZE));
     Assertions.assertEquals(4, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_THREADS));
     Assertions.assertEquals(1000, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_BATCH_SIZE));
     Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_POLL_INTERVAL_SECS));

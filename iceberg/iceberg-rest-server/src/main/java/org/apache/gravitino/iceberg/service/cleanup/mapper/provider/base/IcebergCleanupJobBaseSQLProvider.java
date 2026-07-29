@@ -76,6 +76,13 @@ public class IcebergCleanupJobBaseSQLProvider {
   }
 
   /**
+   * @return the PENDING plus RUNNING job count used for advisory collector capacity
+   */
+  public String countInflightJobs() {
+    return "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE state IN ('PENDING', 'RUNNING')";
+  }
+
+  /**
    * @param id job id
    * @param now claim timestamp, written as state change and initial heartbeat
    * @param heartbeatExpiry heartbeats older than this make a RUNNING row reclaimable

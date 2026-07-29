@@ -143,6 +143,19 @@ public class IcebergCleanupJobStore {
   }
 
   /**
+   * Returns the observed number of cleanup jobs still eligible for worker execution.
+   *
+   * <p>This count is advisory across multiple servers. Exact duplicate prevention remains the
+   * deletion-action claim transaction and unique deletion-generation job link.
+   *
+   * @return PENDING plus RUNNING cleanup jobs
+   */
+  public int countInflightJobs() {
+    return SessionUtils.getWithoutCommit(
+        IcebergCleanupJobMapper.class, IcebergCleanupJobMapper::countInflightJobs);
+  }
+
+  /**
    * Marks a RUNNING job SUCCEEDED, only if the caller still owns it.
    *
    * @param id job id

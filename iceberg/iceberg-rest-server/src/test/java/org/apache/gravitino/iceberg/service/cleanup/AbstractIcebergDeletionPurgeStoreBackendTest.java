@@ -130,6 +130,16 @@ abstract class AbstractIcebergDeletionPurgeStoreBackendTest extends TestJDBCBack
   }
 
   @TestTemplate
+  void testEligibleCandidateCursorIsExclusive() {
+    long deadline = DELETED_AT + 10_000;
+    delete("D1", deadline);
+
+    assertEquals(1, purgeStore.findEligibleDeletionsAfter(deadline, deadline, "D0", 10).size());
+    assertTrue(purgeStore.findEligibleDeletionsAfter(deadline, deadline, "D1", 10).isEmpty());
+    assertTrue(purgeStore.findEligibleDeletionsAfter(deadline, deadline + 1, "D0", 10).isEmpty());
+  }
+
+  @TestTemplate
   void testInsertFailureRollsBackPurgeOwnership() {
     long deadline = DELETED_AT + 10_000;
     delete("D1", deadline);

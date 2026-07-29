@@ -65,6 +65,13 @@ public class IcebergCleanupJobSQLProviderFactory {
     return getProvider().selectCandidateJobs(heartbeatExpiry, window);
   }
 
+  /**
+   * @return portable SQL that counts PENDING and RUNNING cleanup jobs
+   */
+  public static String countInflightJobs() {
+    return getProvider().countInflightJobs();
+  }
+
   public static String markRunning(
       @Param("id") long id,
       @Param("now") long now,

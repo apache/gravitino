@@ -349,6 +349,24 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
 
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_MAX_INFLIGHT_JOBS =
+      new ConfigBuilder("async-cleanup.max-inflight-jobs")
+          .doc(
+              "Advisory maximum number of PENDING and RUNNING cleanup jobs observed before "
+                  + "retained-deletion collection pauses.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(100);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_ENQUEUE_BATCH_SIZE =
+      new ConfigBuilder("async-cleanup.enqueue-batch-size")
+          .doc("Maximum retained deletion actions considered by one collection tick.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(20);
+
   public static final ConfigEntry<Integer> ASYNC_CLEANUP_DELETE_THREADS =
       new ConfigBuilder("async-cleanup.delete-threads")
           .doc("Server-wide file-delete pool size, shared across all cleanup jobs.")

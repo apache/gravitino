@@ -25,6 +25,7 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -66,6 +67,7 @@ public interface TableDeletionMapper {
 
   /** Returns a bounded, unlocked projection of expired retained table deletions. */
   @Results(
+      id = "retainedTableDeletion",
       value = {
         @Result(property = "table.tableId", column = "table_id"),
         @Result(property = "table.tableName", column = "table_name"),
@@ -96,6 +98,29 @@ public interface TableDeletionMapper {
   })
   List<TableDeletionEntryPO> selectEligibleRetainedTableDeletions(
       @Param("now") long now, @Param("limit") int limit);
+
+  /** Returns the next bounded candidate window strictly after an eligible-action cursor. */
+  @ResultMap("retainedTableDeletion")
+  @Select({
+    "SELECT t.table_id, t.table_name, t.metalake_id, t.catalog_id, t.schema_id,",
+    "t.audit_info, t.current_version, t.last_version, t.deleted_at,",
+    "t.deletion_id AS table_deletion_id, d.deletion_id AS action_deletion_id,",
+    "d.state AS action_state, d.retention_expires_at AS action_retention_expires_at,",
+    "d.purge_job_id AS action_purge_job_id FROM entity_deletion d",
+    "JOIN table_meta t ON t.deletion_id = d.deletion_id",
+    "WHERE d.state = 'DELETED' AND d.purge_job_id IS NULL",
+    "AND d.retention_expires_at IS NOT NULL AND d.retention_expires_at <= #{now}",
+    "AND (d.retention_expires_at > #{afterRetentionExpiresAt}",
+    "OR (d.retention_expires_at = #{afterRetentionExpiresAt}",
+    "AND d.deletion_id > #{afterDeletionId}))",
+    "AND t.deleted_at > 0 AND t.deletion_id IS NOT NULL",
+    "ORDER BY d.retention_expires_at, d.deletion_id LIMIT #{limit}"
+  })
+  List<TableDeletionEntryPO> selectEligibleRetainedTableDeletionsAfter(
+      @Param("now") long now,
+      @Param("afterRetentionExpiresAt") long afterRetentionExpiresAt,
+      @Param("afterDeletionId") String afterDeletionId,
+      @Param("limit") int limit);
   /** Returns retained table roots under one exact schema identity. */
   @Select({
     "SELECT table_id AS tableId, table_name AS tableName, metalake_id AS metalakeId,",

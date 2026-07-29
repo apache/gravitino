@@ -72,6 +72,28 @@ public class IcebergDeletionPurgeStore {
   }
 
   /**
+   * Returns the next bounded eligible candidate window after an ordered action cursor.
+   *
+   * @param serverNow authoritative server time; expiry is inclusive
+   * @param afterRetentionExpiresAt previous candidate's retention deadline
+   * @param afterDeletionId previous candidate's opaque deletion id
+   * @param limit maximum candidates to return
+   * @return eligible retained deletions after the cursor
+   */
+  public List<TableDeletionEntryPO> findEligibleDeletionsAfter(
+      long serverNow, long afterRetentionExpiresAt, String afterDeletionId, int limit) {
+    if (limit <= 0) {
+      throw new IllegalArgumentException("limit must be positive");
+    }
+    Objects.requireNonNull(afterDeletionId, "afterDeletionId must not be null");
+    return SessionUtils.getWithoutCommit(
+        TableDeletionMapper.class,
+        mapper ->
+            mapper.selectEligibleRetainedTableDeletionsAfter(
+                serverNow, afterRetentionExpiresAt, afterDeletionId, limit));
+  }
+
+  /**
    * Atomically claims one candidate and enqueues its fully constructed cleanup job.
    *
    * <p>The job must carry the same immutable table and deletion identifiers as the candidate. A
