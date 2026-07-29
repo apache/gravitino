@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.iceberg.service.deletion;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -41,6 +43,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 
 /** Transactional Iceberg REST table deletion lifecycle. */
@@ -152,6 +155,20 @@ public class IcebergTableDeletionLifecycle {
           .getReservedTableNames(schemaId(metalake, catalogName, namespace));
     } catch (NoSuchEntityException e) {
       return Collections.emptySet();
+    }
+  }
+
+  /** Returns retained table roots in one namespace. */
+  public List<TablePO> listDeleted(String catalogName, Namespace namespace) {
+    if (!available) {
+      return new ArrayList<>();
+    }
+    String metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    try {
+      return TableDeletionService.getInstance()
+          .listRetainedTables(schemaId(metalake, catalogName, namespace));
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchNamespaceException("Namespace does not exist: %s", namespace);
     }
   }
 

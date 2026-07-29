@@ -67,6 +67,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -125,6 +126,9 @@ public class TestIcebergTableDeletionLifecycle extends TestJDBCBackend {
     assertTrue(lifecycle.isNameReserved(CATALOG, icebergIdentifier));
     assertEquals(
         Set.of(TABLE), lifecycle.reservedTableNames(CATALOG, icebergIdentifier.namespace()));
+    assertEquals(1, lifecycle.listDeleted(CATALOG, icebergIdentifier.namespace()).size());
+    assertEquals(
+        TABLE, lifecycle.listDeleted(CATALOG, icebergIdentifier.namespace()).get(0).getTableName());
     assertEquals(
         deletion.getDeletionId(),
         lifecycle.findActive(CATALOG, icebergIdentifier).getDeletion().getDeletionId());
@@ -132,6 +136,11 @@ public class TestIcebergTableDeletionLifecycle extends TestJDBCBackend {
         lifecycle
             .reservedTableNames(CATALOG, org.apache.iceberg.catalog.Namespace.of("missing-parent"))
             .isEmpty());
+    assertThrows(
+        NoSuchNamespaceException.class,
+        () ->
+            lifecycle.listDeleted(
+                CATALOG, org.apache.iceberg.catalog.Namespace.of("missing-parent")));
     assertChange(beforeChange, OperateType.DROP);
   }
 
@@ -226,6 +235,7 @@ public class TestIcebergTableDeletionLifecycle extends TestJDBCBackend {
     assertFalse(lifecycle.manages(true));
     assertFalse(lifecycle.isNameReserved(CATALOG, icebergIdentifier));
     assertTrue(lifecycle.reservedTableNames(CATALOG, icebergIdentifier.namespace()).isEmpty());
+    assertTrue(lifecycle.listDeleted(CATALOG, icebergIdentifier.namespace()).isEmpty());
   }
 
   private IcebergTableDeletionLifecycle lifecycle(boolean enabled, long retentionMs) {

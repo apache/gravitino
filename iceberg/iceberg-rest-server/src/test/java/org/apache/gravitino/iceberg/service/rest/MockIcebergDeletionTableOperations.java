@@ -20,22 +20,31 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import org.apache.gravitino.iceberg.service.deletion.IcebergTableDeletionLifecycle;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.iceberg.catalog.Namespace;
 
 /** Table resource used to exercise the deletion-aware HTTP DELETE contract. */
 public class MockIcebergDeletionTableOperations extends IcebergTableOperations {
 
-  /** Creates the test resource with a mocked dispatcher. */
+  /** Creates the test resource with mocked deletion dependencies. */
   @Inject
   public MockIcebergDeletionTableOperations(
       IcebergMetricsManager icebergMetricsManager,
-      IcebergTableOperationDispatcher tableOperationDispatcher) {
-    super(icebergMetricsManager, tableOperationDispatcher);
+      IcebergTableOperationDispatcher tableOperationDispatcher,
+      IcebergTableDeletionLifecycle deletionLifecycle) {
+    super(icebergMetricsManager, tableOperationDispatcher, deletionLifecycle);
   }
 
   @Override
   HttpServletRequest httpServletRequest() {
     return IcebergRestTestUtil.createMockHttpRequest();
+  }
+
+  @Override
+  boolean canManageDeletedTable(String catalogName, Namespace namespace, TablePO table) {
+    return !"hidden".equals(table.getTableName());
   }
 }

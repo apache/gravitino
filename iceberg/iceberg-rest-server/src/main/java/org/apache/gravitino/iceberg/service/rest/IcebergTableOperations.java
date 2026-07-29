@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -45,6 +46,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.EntityTag;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -57,6 +59,7 @@ import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.deletion.IcebergTableDeletionLifecycle;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
@@ -69,6 +72,7 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.IcebergTableDeletionAuthzHandler;
+import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
@@ -102,16 +106,32 @@ public class IcebergTableOperations {
 
   private ObjectMapper icebergObjectMapper;
   private IcebergTableOperationDispatcher tableOperationDispatcher;
+  @Nullable private IcebergTableDeletionLifecycle deletionLifecycle;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergTableOperations(
       IcebergMetricsManager icebergMetricsManager,
-      IcebergTableOperationDispatcher tableOperationDispatcher) {
+      IcebergTableOperationDispatcher tableOperationDispatcher,
+      @Nullable IcebergTableDeletionLifecycle deletionLifecycle) {
     this.icebergMetricsManager = icebergMetricsManager;
     this.tableOperationDispatcher = tableOperationDispatcher;
+    this.deletionLifecycle = deletionLifecycle;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
+  }
+
+  /**
+   * Creates ordinary table operations without the relational deletion lifecycle.
+   *
+   * @param icebergMetricsManager Iceberg metrics manager
+   * @param tableOperationDispatcher table operation dispatcher
+   */
+  @VisibleForTesting
+  protected IcebergTableOperations(
+      IcebergMetricsManager icebergMetricsManager,
+      IcebergTableOperationDispatcher tableOperationDispatcher) {
+    this(icebergMetricsManager, tableOperationDispatcher, null);
   }
 
   @GET
@@ -126,7 +146,8 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
       @QueryParam("pageToken") String pageToken,
-      @QueryParam("pageSize") Integer pageSize) {
+      @QueryParam("pageSize") Integer pageSize,
+      @DefaultValue("false") @QueryParam("deleted") boolean deleted) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -137,6 +158,25 @@ public class IcebergTableOperations {
           () -> {
             IcebergRequestContext context =
                 new IcebergRequestContext(httpServletRequest(), catalogName);
+            if (deleted) {
+              List<TablePO> retained =
+                  deletionLifecycle == null
+                      ? new ArrayList<>()
+                      : deletionLifecycle.listDeleted(catalogName, icebergNS);
+              List<TableIdentifier> identifiers =
+                  retained.stream()
+                      .filter(table -> canManageDeletedTable(catalogName, icebergNS, table))
+                      .map(table -> TableIdentifier.of(icebergNS, table.getTableName()))
+                      .collect(Collectors.toList());
+              ListTablesResponse response =
+                  IcebergPaginationHelper.paginateTables(
+                      ListTablesResponse.builder().addAll(identifiers).build(),
+                      Optional.ofNullable(pageToken),
+                      Optional.ofNullable(pageSize));
+              return Response.ok(response)
+                  .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                  .build();
+            }
             ListTablesResponse listTablesResponse =
                 tableOperationDispatcher.listTable(context, icebergNS);
 
@@ -654,6 +694,18 @@ public class IcebergTableOperations {
               + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
               + "Gravitino Iceberg REST server supports: vended-credentials");
     }
+  }
+
+  @VisibleForTesting
+  boolean canManageDeletedTable(String catalogName, Namespace namespace, TablePO table) {
+    String metalake = IcebergRESTServerContext.getInstance().metalakeName();
+    NameIdentifier identifier =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            metalake,
+            catalogName,
+            TableIdentifier.of(namespace, table.getTableName()),
+            HierarchicalSchemaUtil.schemaSeparator());
+    return IcebergTableDeletionAuthzHandler.canListRetained(identifier, table.getTableId());
   }
 
   private NameIdentifier[] toNameIdentifiers(
