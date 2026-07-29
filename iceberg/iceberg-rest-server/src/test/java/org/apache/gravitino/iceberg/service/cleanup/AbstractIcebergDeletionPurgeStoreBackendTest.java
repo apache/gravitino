@@ -193,6 +193,60 @@ abstract class AbstractIcebergDeletionPurgeStoreBackendTest extends TestJDBCBack
   }
 
   @TestTemplate
+  void testOwnedCompletionAtomicallyConsumesRetainedGeneration() {
+    long deadline = DELETED_AT + 10_000;
+    delete("D1", deadline);
+    TableDeletionEntryPO candidate = onlyCandidate(deadline);
+    long jobId =
+        purgeStore
+            .claimAndEnqueue(candidate, cleanupJob(candidate, "alice"), deadline)
+            .orElseThrow();
+    long heartbeat = deadline + 1;
+    IcebergCleanupJob claimed =
+        cleanupJobStore.takePendingJob(heartbeat, 300_000L, 10).orElseThrow();
+
+    assertTrue(cleanupJobStore.finalizeRetainedDeletion(claimed, heartbeat));
+    assertEquals(IcebergCleanupJob.State.SUCCEEDED, cleanupJobStore.stateOf(jobId));
+    assertNull(EntityDeletionService.getInstance().get("D1"));
+    assertNull(TableDeletionService.getInstance().getRetainedTable("D1"));
+  }
+
+  @TestTemplate
+  void testFinalizationMismatchRollsBackJobAndMetadata() {
+    long deadline = DELETED_AT + 10_000;
+    delete("D1", deadline);
+    TableDeletionEntryPO candidate = onlyCandidate(deadline);
+    long jobId =
+        purgeStore
+            .claimAndEnqueue(candidate, cleanupJob(candidate, "alice"), deadline)
+            .orElseThrow();
+    long heartbeat = deadline + 1;
+    IcebergCleanupJob claimed =
+        cleanupJobStore.takePendingJob(heartbeat, 300_000L, 10).orElseThrow();
+    IcebergCleanupJob wrongTable =
+        IcebergCleanupJob.forRetainedDeletion(
+            claimed.id(),
+            claimed.tableId() + 1,
+            claimed.deletionId(),
+            claimed.catalogId(),
+            claimed.namespace(),
+            claimed.tableName(),
+            claimed.metadataLocation(),
+            claimed.fileIOImpl(),
+            claimed.fileIOProperties(),
+            claimed.createdBy());
+
+    assertThrows(
+        IllegalStateException.class,
+        () -> cleanupJobStore.finalizeRetainedDeletion(wrongTable, heartbeat));
+    assertEquals(IcebergCleanupJob.State.RUNNING, cleanupJobStore.stateOf(jobId));
+    assertNotNull(EntityDeletionService.getInstance().get("D1"));
+    assertNotNull(TableDeletionService.getInstance().getRetainedTable("D1"));
+
+    assertTrue(cleanupJobStore.finalizeRetainedDeletion(claimed, heartbeat));
+  }
+
+  @TestTemplate
   void testStaleCandidateCannotClaimLaterGeneration() {
     delete("D1", Long.MAX_VALUE);
     TableDeletionEntryPO staleCandidate = onlyCandidate(Long.MAX_VALUE);

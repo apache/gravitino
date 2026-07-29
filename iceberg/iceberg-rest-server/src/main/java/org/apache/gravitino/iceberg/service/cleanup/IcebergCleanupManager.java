@@ -369,7 +369,7 @@ public class IcebergCleanupManager implements AutoCloseable {
       try (FileIO io = CatalogUtil.loadFileIO(job.fileIOImpl(), job.fileIOProperties(), null)) {
         cleanupFiles(io, job.metadataLocation());
         flushManifestProgress(id);
-        finishJob(id, heartbeat -> store.markSucceeded(id, heartbeat));
+        finishJob(id, heartbeat -> completeSuccessfully(job, heartbeat));
       }
     } catch (RuntimeException e) {
       LOG.warn("Cleanup job {} failed transiently; will retry", id, e);
@@ -393,6 +393,12 @@ public class IcebergCleanupManager implements AutoCloseable {
       throw new IllegalStateException("Retained-deletion cleanup is not configured on this server");
     }
     registrationCleaner.removeRegistration(job);
+  }
+
+  private boolean completeSuccessfully(IcebergCleanupJob job, long heartbeat) {
+    return job.deletionId() == null
+        ? store.markSucceeded(job.id(), heartbeat)
+        : store.finalizeRetainedDeletion(job, heartbeat);
   }
   // markSucceeded/recordFailure CAS on the heartbeat token, so a worker whose lease a peer
   // reclaimed cannot overwrite the job the peer now owns. A null token means a refresh already

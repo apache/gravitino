@@ -27,6 +27,7 @@ import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapp
 import org.apache.gravitino.iceberg.service.cleanup.mapper.provider.IcebergCleanupMapperPackageProvider;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.TableDeletionService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.session.Configuration;
@@ -157,6 +158,37 @@ public class IcebergCleanupJobStore {
                 mapper.markFinished(
                     id, IcebergCleanupJob.State.SUCCEEDED.name(), null, now, heartbeat))
         > 0;
+  }
+
+  /**
+   * Atomically succeeds a linked cleanup job and consumes its exact retained relational generation.
+   *
+   * <p>The heartbeat compare-and-swap is the worker fence. Only the worker that still owns the
+   * RUNNING job may proceed to the action/table row locks and exact metadata deletes. A failure in
+   * either half rolls back both the job transition and every relational delete; the already
+   * completed external cleanup is safe to replay.
+   *
+   * @param job linked retained-deletion cleanup job
+   * @param heartbeat caller's current heartbeat ownership token
+   * @return {@code true} iff this worker still owned and finalized the job
+   */
+  public boolean finalizeRetainedDeletion(IcebergCleanupJob job, long heartbeat) {
+    if (job.tableId() == null || job.deletionId() == null) {
+      throw new IllegalArgumentException("Cleanup job is not linked to a retained deletion");
+    }
+    long now = System.currentTimeMillis();
+    return SessionUtils.doWithCommitAndFetchResult(
+        IcebergCleanupJobMapper.class,
+        mapper -> {
+          if (mapper.markFinished(
+                  job.id(), IcebergCleanupJob.State.SUCCEEDED.name(), null, now, heartbeat)
+              != 1) {
+            return false;
+          }
+          TableDeletionService.getInstance()
+              .finalizePurge(job.tableId(), job.deletionId(), Long.toString(job.id()));
+          return true;
+        });
   }
 
   /**

@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.storage.relational.mapper.EntityDeletionMapper;
 import org.apache.gravitino.storage.relational.mapper.TableDeletionMapper;
 import org.apache.gravitino.storage.relational.po.EntityDeletionPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
@@ -220,6 +221,66 @@ public class TableDeletionService {
             throw generationChanged(deletionId, "restored table root is not visible");
           }
           return restored;
+        });
+  }
+
+  /**
+   * Hard-deletes the exact retained table generation owned by one purge job.
+   *
+   * <p>The action is locked before the retained table, matching purge claim and UNDROP lock order.
+   * This method joins an existing relational transaction, allowing the cleanup-job ownership CAS
+   * and relational metadata finalization to commit or roll back together.
+   *
+   * @param tableId immutable table identifier captured by the purge job
+   * @param deletionId opaque deletion identifier captured by the purge job
+   * @param purgeJobId durable cleanup-job identifier encoded as a decimal string
+   * @throws IllegalStateException if the action, job ownership, or retained table generation does
+   *     not match
+   */
+  public void finalizePurge(long tableId, String deletionId, String purgeJobId) {
+    Objects.requireNonNull(deletionId, "deletionId must not be null");
+    Objects.requireNonNull(purgeJobId, "purgeJobId must not be null");
+
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          EntityDeletionPO deletion = EntityDeletionService.getInstance().getForUpdate(deletionId);
+          if (deletion == null
+              || !"PURGING".equals(deletion.getState())
+              || !Objects.equals(purgeJobId, deletion.getPurgeJobId())) {
+            throw generationChanged(deletionId, "purge job does not own the deletion action");
+          }
+
+          SessionUtils.doWithoutCommit(
+              TableDeletionMapper.class,
+              mapper -> {
+                TablePO table = mapper.selectRetainedTableForUpdate(deletionId);
+                if (table == null
+                    || table.getTableId() != tableId
+                    || !Objects.equals(deletionId, table.getDeletionId())) {
+                  throw generationChanged(
+                      deletionId, "retained table root does not match the purge target");
+                }
+
+                mapper.deleteOwnedOwnerRelations(tableId);
+                mapper.deleteOwnedTagRelations(tableId);
+                mapper.deleteOwnedPolicyRelations(tableId);
+                mapper.deleteOwnedStatistics(tableId);
+                mapper.deleteOwnedSecurableRelations(tableId);
+                mapper.deleteOwnedPartitionStatistics(tableId);
+                mapper.deleteOwnedTableVersions(tableId);
+                mapper.deleteOwnedColumnVersions(tableId);
+
+                if (mapper.deleteRetainedTable(tableId, deletionId) != 1) {
+                  throw generationChanged(deletionId, "retained table root changed before purge");
+                }
+                SessionUtils.doWithoutCommit(
+                    EntityDeletionMapper.class,
+                    actionMapper -> {
+                      if (actionMapper.deletePurgingEntityDeletion(deletionId, purgeJobId) != 1) {
+                        throw generationChanged(deletionId, "deletion action changed before purge");
+                      }
+                    });
+              });
         });
   }
 

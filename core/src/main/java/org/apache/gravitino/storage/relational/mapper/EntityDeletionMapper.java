@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.EntityDeletionPO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -82,4 +83,18 @@ public interface EntityDeletionMapper {
    */
   @DeleteProvider(type = EntityDeletionSQLProvider.class, method = "deleteEntityDeletion")
   int deleteEntityDeletion(@Param("deletionId") String deletionId);
+
+  /**
+   * Deletes only the purge-owned action for an exact deletion generation and cleanup job.
+   *
+   * @param deletionId opaque deletion identifier
+   * @param purgeJobId durable cleanup-job identifier encoded as a decimal string
+   * @return number of deleted rows
+   */
+  @Delete({
+    "DELETE FROM entity_deletion WHERE deletion_id = #{deletionId}",
+    "AND state = 'PURGING' AND purge_job_id = #{purgeJobId}"
+  })
+  int deletePurgingEntityDeletion(
+      @Param("deletionId") String deletionId, @Param("purgeJobId") String purgeJobId);
 }

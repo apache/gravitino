@@ -205,7 +205,11 @@ public class IcebergCleanupJobBaseSQLProvider {
   public String deleteFinishedJobsByLegacyTimeline(@Param("legacyTimeline") long legacyTimeline) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE state IN ('SUCCEEDED', 'FAILED') AND updated_at < #{legacyTimeline}";
+        + " WHERE state IN ('SUCCEEDED', 'FAILED') AND updated_at < #{legacyTimeline}"
+        + " AND (deletion_id IS NULL OR NOT EXISTS (SELECT 1 FROM entity_deletion d"
+        + " WHERE d.deletion_id = "
+        + TABLE_NAME
+        + ".deletion_id))";
   }
 
   /**

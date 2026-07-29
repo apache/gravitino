@@ -324,8 +324,12 @@ public class TestIcebergCleanupManager extends TestJDBCBackend {
             })
         .when(cleaner)
         .removeRegistration(any(IcebergCleanupJob.class));
+    Map<String, String> config = new HashMap<>();
+    config.put("async-cleanup.worker-threads", "1");
+    config.put("async-cleanup.poll-interval-secs", "1");
+    config.put("async-cleanup.max-attempts", "1");
     IcebergCleanupManager svc =
-        new IcebergCleanupManager(store, fastPollConfig(), cleaner) {
+        new IcebergCleanupManager(store, new IcebergConfig(config), cleaner) {
           @Override
           void cleanupFiles(FileIO io, String metadataLocation) {
             Assertions.assertTrue(registrationRemoved.get());
@@ -337,7 +341,7 @@ public class TestIcebergCleanupManager extends TestJDBCBackend {
     try {
       Awaitility.await()
           .atMost(5, TimeUnit.SECONDS)
-          .until(() -> store.stateOf(id) == IcebergCleanupJob.State.SUCCEEDED);
+          .until(() -> store.stateOf(id) == IcebergCleanupJob.State.FAILED);
       Assertions.assertEquals(1, cleanupCalls.get());
       verify(cleaner).removeRegistration(any(IcebergCleanupJob.class));
     } finally {

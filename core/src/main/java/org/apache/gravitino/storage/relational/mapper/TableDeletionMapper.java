@@ -22,6 +22,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.TableDeletionEntryPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.Results;
@@ -208,4 +209,74 @@ public interface TableDeletionMapper {
     "WHERE table_id = #{tableId} AND deletion_id = #{deletionId} AND deleted_at > 0"
   })
   int restoreTable(@Param("tableId") long tableId, @Param("deletionId") String deletionId);
+
+  /** Hard-deletes owner relations attached to an exact table identity or any of its columns. */
+  @Delete({
+    "DELETE FROM owner_meta WHERE",
+    "(metadata_object_type = 'TABLE' AND metadata_object_id = #{tableId}) OR",
+    "(metadata_object_type = 'COLUMN' AND metadata_object_id IN",
+    "(SELECT DISTINCT column_id FROM table_column_version_info WHERE table_id = #{tableId}))"
+  })
+  int deleteOwnedOwnerRelations(@Param("tableId") long tableId);
+
+  /** Hard-deletes tag relations attached to an exact table identity or any of its columns. */
+  @Delete({
+    "DELETE FROM tag_relation_meta WHERE",
+    "(metadata_object_type = 'TABLE' AND metadata_object_id = #{tableId}) OR",
+    "(metadata_object_type = 'COLUMN' AND metadata_object_id IN",
+    "(SELECT DISTINCT column_id FROM table_column_version_info WHERE table_id = #{tableId}))"
+  })
+  int deleteOwnedTagRelations(@Param("tableId") long tableId);
+
+  /** Hard-deletes policy relations attached to an exact table identity or any of its columns. */
+  @Delete({
+    "DELETE FROM policy_relation_meta WHERE",
+    "(metadata_object_type = 'TABLE' AND metadata_object_id = #{tableId}) OR",
+    "(metadata_object_type = 'COLUMN' AND metadata_object_id IN",
+    "(SELECT DISTINCT column_id FROM table_column_version_info WHERE table_id = #{tableId}))"
+  })
+  int deleteOwnedPolicyRelations(@Param("tableId") long tableId);
+
+  /** Hard-deletes statistics attached to an exact table identity or any of its columns. */
+  @Delete({
+    "DELETE FROM statistic_meta WHERE",
+    "(metadata_object_type = 'TABLE' AND metadata_object_id = #{tableId}) OR",
+    "(metadata_object_type = 'COLUMN' AND metadata_object_id IN",
+    "(SELECT DISTINCT column_id FROM table_column_version_info WHERE table_id = #{tableId}))"
+  })
+  int deleteOwnedStatistics(@Param("tableId") long tableId);
+
+  /** Hard-deletes role grants attached to an exact table identity or any of its columns. */
+  @Delete({
+    "DELETE FROM role_meta_securable_object WHERE",
+    "(type = 'TABLE' AND metadata_object_id = #{tableId}) OR",
+    "(type = 'COLUMN' AND metadata_object_id IN",
+    "(SELECT DISTINCT column_id FROM table_column_version_info WHERE table_id = #{tableId}))"
+  })
+  int deleteOwnedSecurableRelations(@Param("tableId") long tableId);
+
+  /** Hard-deletes partition statistics owned by an exact table identity. */
+  @Delete("DELETE FROM partition_statistic_meta WHERE table_id = #{tableId}")
+  int deleteOwnedPartitionStatistics(@Param("tableId") long tableId);
+
+  /** Hard-deletes all table versions owned by an exact table identity. */
+  @Delete("DELETE FROM table_version_info WHERE table_id = #{tableId}")
+  int deleteOwnedTableVersions(@Param("tableId") long tableId);
+
+  /** Hard-deletes all column versions owned by an exact table identity. */
+  @Delete("DELETE FROM table_column_version_info WHERE table_id = #{tableId}")
+  int deleteOwnedColumnVersions(@Param("tableId") long tableId);
+
+  /**
+   * Hard-deletes only the retained table root for the expected deletion generation.
+   *
+   * @param tableId immutable table identifier
+   * @param deletionId opaque deletion identifier
+   * @return number of deleted rows
+   */
+  @Delete({
+    "DELETE FROM table_meta WHERE table_id = #{tableId}",
+    "AND deletion_id = #{deletionId} AND deleted_at > 0"
+  })
+  int deleteRetainedTable(@Param("tableId") long tableId, @Param("deletionId") String deletionId);
 }
