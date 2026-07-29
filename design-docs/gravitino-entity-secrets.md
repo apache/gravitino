@@ -100,9 +100,6 @@ scope for this design (the SPI remains open for them).
 3. **Additional provider implementations**: this design ships only **`InMemorySecretsProvider`**.
    Other backends are out of scope here; the SPI stays pluggable via `className`.
 
-4. **Table / column encryption**: encrypting table data with a KMS is a separate feature
-   (different SPI and config namespace).
-
 ## 4. Industry Approaches (Polaris and Databricks)
 
 This section compares **Apache Polaris** and **Databricks Secrets**.
