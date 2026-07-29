@@ -66,7 +66,7 @@ scope for this design (the SPI remains open for them).
    column. Secret property values are stored as **URN strings**; reserved key
    **`gravitino.secret.keys`** (all secret keys) is comma-separated and server-managed.
    Whether to `deleteSecret` on entity drop is decided from the **URN shape** (write-through embeds
-   `entityType`/`entityId`/`propertyKey` — §5.5.2 C), not a second reserved list.
+   `entityType`/`entityId`/`propertyKey` — §5.5.1 C), not a second reserved list.
 
 3. **Backend registry**: register named secrets-provider instances in **server configuration
    files**. Catalogs reference instances by **`provider_name` in the secret URN**. Clients
@@ -178,7 +178,7 @@ After create/alter:
 gravitino.secret.keys  = all keys from secretReferences ∪ secretBindings (and prior secrets kept)
 ```
 
-Drop-time `deleteSecret` uses URN shape (§5.5.2 C) — no separate ownership list.
+Drop-time `deleteSecret` uses URN shape (§5.5.1 C) — no separate ownership list.
 
 **Server-side resolve path** (entity load / connect — uses **`gravitino.secret.keys`**, not JSON type):
 
@@ -244,7 +244,7 @@ The property key from `SecretWriteContext` is the last segment (not an opaque or
 Re-writing the same property key overwrites that URN / map entry (no ordinal allocation).
 
 Write-through URNs (including in-memory) embed `<entityType>:<entityId>:<propertyKey>` so drop
-can decide whether to call `deleteSecret` (§5.5.2 C). External-ref identifier layouts are defined
+can decide whether to call `deleteSecret` (§5.5.1 C). External-ref identifier layouts are defined
 by each provider implementation; this design only specifies the in-memory write-through form.
 
 Legacy persistence (no `secretReferences` / `secretBindings` on create):
@@ -343,18 +343,15 @@ server (v1). See §8 for the full configuration reference.
 
 Missing / unloadable `className` ⇒ startup or resolve fails with a clear error.
 
-### 5.5 SPI design
+### 5.5 `GravitinoSecretProvider`
 
-#### 5.5.1 Chosen shape: one SPI instance per configured provider
-
-**Core** loads named entries from server configuration, and for each name builds **one**
-`GravitinoSecretProvider` by reflecting the entry’s **`className`** and passing the remaining
-instance properties. Catalog resolve does:
+Core loads each named conf entry into **one** live `GravitinoSecretProvider` (via `className`).
+Resolve path:
 
 ```text
 key in gravitino.secret.keys  →  URN string value
                                     →  parse provider_name from URN
-                                    →  lookup live instance by name (implementation from `className`)
+                                    →  lookup live instance by name
                                     →  instance.readSecret(urn)
 ```
 
@@ -383,7 +380,7 @@ public interface GravitinoSecretProvider {
 
   /**
    * Best-effort delete. Used on entity drop (and create rollback) for
-   * <b>Gravitino-managed</b> secrets only — see §5.5.2 C.
+   * <b>Gravitino-managed</b> secrets only — see §5.5.1 C.
    */
   void deleteSecret(String urn);
 }
@@ -415,7 +412,7 @@ Core persists:
 URN / write-through paths must use **stable entity ids** + **entity type** + **property key**, not
 display names.
 
-#### 5.5.2 Concrete examples
+#### 5.5.1 Concrete examples
 
 Create request shapes: §5.9.2 / §5.9.5. Below is the SPI / URN outcome only.
 
@@ -430,7 +427,7 @@ jdbc-password = urn:gravitino-secret:memory:catalog:10042:jdbc-password
 gravitino.secret.keys = jdbc-password
 ```
 
-Trailing `catalog:<id>:jdbc-password` marks write-through for drop (§5.5.2 C).
+Trailing `catalog:<id>:jdbc-password` marks write-through for drop (§5.5.1 C).
 
 **B. External reference (`secretReferences`)**
 
@@ -479,7 +476,7 @@ map[URN] = Base64(plaintext)
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `writeSecret`  | Base64-encode plaintext. Allocate URN `urn:gravitino-secret:<provider_name>:<entityType>:<entityId>:<propertyKey>` from `SecretWriteContext`. Store Base64 under that URN (overwrite if same key). Return the URN. |
 | `readSecret`   | Look up map by URN; Base64-decode; return plaintext. Missing URN → treat as gone (impl-defined: null / error). Provider name in URN must match this instance.                                                      |
-| `deleteSecret` | `map.remove(urn)` — best-effort; used by create rollback and drop for **managed** secrets (§5.5.2 C).                                                                                                              |
+| `deleteSecret` | `map.remove(urn)` — best-effort; used by create rollback and drop for **managed** secrets (§5.5.1 C).                                                                                                              |
 
 **Type-specific identifier:** `<entityType>:<entityId>:<propertyKey>` — see §5.1.1 (catalog / schema / fileset).
 
@@ -533,9 +530,9 @@ Persisted example (write-through owned key):
 ```
 
 Write-through ownership is visible in the URN shape (`…:catalog:<id>:<propertyKey>`). Drop calls
-`deleteSecret` only for that shape (§5.5.2 C).
+`deleteSecret` only for that shape (§5.5.1 C).
 
-**Affected endpoints** (entity paths unchanged; secrets behavior shared — §5.9.2–5.9.5, drop §5.5.2 C;
+**Affected endpoints** (entity paths unchanged; secrets behavior shared — §5.9.2–5.9.5, drop §5.5.1 C;
 plus cluster list §5.9.6):
 
 | Method   | Path                                                                           | Entity / scope |
@@ -672,7 +669,7 @@ sibling maps). Existing **`setProperty`** stays a **string** `value` (plaintext 
 | `provider` unknown                                                                 | **Reject**                                                                                        |
 | `setProperty` `value` is `******`                                                  | **Reject**                                                                                        |
 | `setProperty` `value` is `urn:gravitino-secret:...`                                | **Reject** in v1 — use `setSecretReference` or `setSecretBinding`                                 |
-| `removeProperty` on a secret key                                                   | Remove from properties and `gravitino.secret.keys`; **do not** `deleteSecret` on alter (§5.5.2 C) |
+| `removeProperty` on a secret key                                                   | Remove from properties and `gravitino.secret.keys`; **do not** `deleteSecret` on alter (§5.5.1 C) |
 | Any secret `@type` / `setProperty` on `gravitino.secret.keys`                      | **Reject** — server-managed only                                                                  |
 | Other `@type`s (`rename` / `updateComment` / …)                                    | Unchanged                                                                                         |
 
@@ -943,7 +940,7 @@ Config change requires edit + **restart**.
 | Configuration | `gravitino.secret.providers` + `provider.<name>.className` (+ settings); edit + restart                                                              |
 | GET / list    | Keys in `gravitino.secret.keys` **omitted**; also omit `gravitino.secret.keys` itself from response                                                  |
 | REST API      | Create: `secretReferences` / `secretBindings`; alter: `setSecretBinding` / `setSecretReference` (§5.9.4); list providers (§5.9.6); server builds URN |
-| Drop          | No `purgeSecrets` param; `deleteSecret` only when URN is write-through-shaped for this entity (§5.5.2 C)                                             |
+| Drop          | No `purgeSecrets` param; `deleteSecret` only when URN is write-through-shaped for this entity (§5.5.1 C)                                             |
 | Persistence   | All-string map on catalog/schema/fileset; `gravitino.secret.keys` (comma-separated; omit when empty)                                                 |
 | Clients       | List providers API; create maps; alter `setSecretBinding` / `setSecretReference`; detail/list omits secret keys                                      |
 | Rotation      | In-memory: none (§5.8)                                                                                                                               |
