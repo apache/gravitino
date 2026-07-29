@@ -19,6 +19,11 @@
 
 package org.apache.gravitino.iceberg.service.cleanup;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,13 +34,16 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
@@ -117,6 +125,29 @@ public class TestIcebergCleanupManager extends TestJDBCBackend {
         NoopFileIO.class.getName(),
         ImmutableMap.of(),
         "alice");
+  }
+
+  private static IcebergCleanupJob retainedJob() {
+    return IcebergCleanupJob.forRetainedDeletion(
+        0L,
+        200L,
+        "D1",
+        CATALOG_ID,
+        "db",
+        "t",
+        "s3://b/db/t/metadata/0.json",
+        NoopFileIO.class.getName(),
+        ImmutableMap.of(),
+        "iceberg-rest-retention-gc");
+  }
+
+  private long insertRetainedJob() {
+    long id = store.allocateJobId();
+    long now = System.currentTimeMillis();
+    SessionUtils.doWithCommit(
+        IcebergCleanupJobMapper.class,
+        ignored -> store.insertJobWithoutCommit(retainedJob(), id, now));
+    return id;
   }
 
   // Builds db.t with one appended data file (so it has a manifest list, a manifest, and a data
@@ -277,6 +308,66 @@ public class TestIcebergCleanupManager extends TestJDBCBackend {
     } finally {
       svc.close();
       FailOnceBulkFileIO.reset();
+    }
+  }
+
+  @TestTemplate
+  void testRetainedWorkerRemovesRegistrationBeforeFiles() {
+    AtomicBoolean registrationRemoved = new AtomicBoolean();
+    AtomicInteger cleanupCalls = new AtomicInteger();
+    IcebergRetainedDeletionRegistrationCleaner cleaner =
+        mock(IcebergRetainedDeletionRegistrationCleaner.class);
+    doAnswer(
+            invocation -> {
+              registrationRemoved.set(true);
+              return null;
+            })
+        .when(cleaner)
+        .removeRegistration(any(IcebergCleanupJob.class));
+    IcebergCleanupManager svc =
+        new IcebergCleanupManager(store, fastPollConfig(), cleaner) {
+          @Override
+          void cleanupFiles(FileIO io, String metadataLocation) {
+            Assertions.assertTrue(registrationRemoved.get());
+            cleanupCalls.incrementAndGet();
+          }
+        };
+    long id = insertRetainedJob();
+    svc.start();
+    try {
+      Awaitility.await()
+          .atMost(5, TimeUnit.SECONDS)
+          .until(() -> store.stateOf(id) == IcebergCleanupJob.State.SUCCEEDED);
+      Assertions.assertEquals(1, cleanupCalls.get());
+      verify(cleaner).removeRegistration(any(IcebergCleanupJob.class));
+    } finally {
+      svc.close();
+    }
+  }
+
+  @TestTemplate
+  void testRetainedWorkerFailsClosedWithoutRegistrationCleaner() {
+    Map<String, String> config = new HashMap<>();
+    config.put("async-cleanup.worker-threads", "1");
+    config.put("async-cleanup.poll-interval-secs", "1");
+    config.put("async-cleanup.max-attempts", "1");
+    AtomicInteger cleanupCalls = new AtomicInteger();
+    IcebergCleanupManager svc =
+        new IcebergCleanupManager(store, new IcebergConfig(config)) {
+          @Override
+          void cleanupFiles(FileIO io, String metadataLocation) {
+            cleanupCalls.incrementAndGet();
+          }
+        };
+    long id = insertRetainedJob();
+    svc.start();
+    try {
+      Awaitility.await()
+          .atMost(5, TimeUnit.SECONDS)
+          .until(() -> store.stateOf(id) == IcebergCleanupJob.State.FAILED);
+      Assertions.assertEquals(0, cleanupCalls.get());
+    } finally {
+      svc.close();
     }
   }
 

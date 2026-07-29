@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongPredicate;
+import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogUtil;
@@ -77,6 +78,7 @@ public class IcebergCleanupManager implements AutoCloseable {
   private final long heartbeatTimeoutMs;
   private final long retentionMs;
   private final ThreadPoolExecutor deleteExecutor;
+  @Nullable private final IcebergRetainedDeletionRegistrationCleaner registrationCleaner;
   // Heartbeat token per job this manager currently owns, keyed by id. The scheduler renews it and a
   // worker reads it for the terminal CAS; refreshHeartbeats drops the entry once a peer reclaims.
   private final Map<Long, Long> ownedHeartbeats = new ConcurrentHashMap<>();
@@ -96,7 +98,27 @@ public class IcebergCleanupManager implements AutoCloseable {
    * @param config Iceberg REST server config
    */
   public IcebergCleanupManager(IcebergCleanupJobStore store, IcebergConfig config) {
+    this(store, config, null);
+  }
+
+  /**
+   * Creates an async cleanup manager with retained-deletion registration handling.
+   *
+   * <p>The cleaner is required only for cleanup jobs linked to a retained deletion. Keeping it
+   * optional preserves the existing immediate-purge path while making a missing retained-deletion
+   * integration fail closed before any file is removed.
+   *
+   * @param store the cleanup job store backed by the entity store's relational backend
+   * @param config Iceberg REST server config
+   * @param registrationCleaner retained-table registration cleaner, or {@code null} when retained
+   *     deletion jobs are not enabled
+   */
+  public IcebergCleanupManager(
+      IcebergCleanupJobStore store,
+      IcebergConfig config,
+      @Nullable IcebergRetainedDeletionRegistrationCleaner registrationCleaner) {
     this.store = store;
+    this.registrationCleaner = registrationCleaner;
     this.workerThreads = config.get(IcebergConfig.ASYNC_CLEANUP_WORKER_THREADS);
     int deleteThreads = config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_THREADS);
     this.deleteBatchSize = config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_BATCH_SIZE);
@@ -342,10 +364,13 @@ public class IcebergCleanupManager implements AutoCloseable {
     // closed on every path: success, transient failure, and the early return inside cleanupFiles.
     ManifestProgress progress = manifestProgressByJob.get(id);
     CURRENT_MANIFEST_PROGRESS.set(progress);
-    try (FileIO io = CatalogUtil.loadFileIO(job.fileIOImpl(), job.fileIOProperties(), null)) {
-      cleanupFiles(io, job.metadataLocation());
-      flushManifestProgress(id);
-      finishJob(id, heartbeat -> store.markSucceeded(id, heartbeat));
+    try {
+      removeRetainedRegistration(job);
+      try (FileIO io = CatalogUtil.loadFileIO(job.fileIOImpl(), job.fileIOProperties(), null)) {
+        cleanupFiles(io, job.metadataLocation());
+        flushManifestProgress(id);
+        finishJob(id, heartbeat -> store.markSucceeded(id, heartbeat));
+      }
     } catch (RuntimeException e) {
       LOG.warn("Cleanup job {} failed transiently; will retry", id, e);
       flushManifestProgress(id);
@@ -357,6 +382,18 @@ public class IcebergCleanupManager implements AutoCloseable {
     }
   }
 
+  private void removeRetainedRegistration(IcebergCleanupJob job) {
+    if ((job.tableId() == null) != (job.deletionId() == null)) {
+      throw new IllegalStateException("Cleanup job has an incomplete retained-deletion identity");
+    }
+    if (job.deletionId() == null) {
+      return;
+    }
+    if (registrationCleaner == null) {
+      throw new IllegalStateException("Retained-deletion cleanup is not configured on this server");
+    }
+    registrationCleaner.removeRegistration(job);
+  }
   // markSucceeded/recordFailure CAS on the heartbeat token, so a worker whose lease a peer
   // reclaimed cannot overwrite the job the peer now owns. A null token means a refresh already
   // saw the takeover, so we skip. A failed CAS just leaves the row RUNNING to be reclaimed and
