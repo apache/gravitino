@@ -58,15 +58,10 @@ scope for this design (the SPI remains open for them).
 1. **Secrets provider interface**: define a pluggable `GravitinoSecretProvider` for write /
    read / delete of secret material behind durable **references**.
 
-2. **Learn from existing `KmsClient` patterns, without reusing it**: follow the same
-   server-side style already used by `KmsClient` / `KmsClientFactory` / named conf instances
-   (factory + registry + credentials stay off the reference object). Do **not** extend or call
-   `KmsClient` for entity secrets: that API **inspects encryption keys**
-   (`getKeyProperties(KmsReference)`) under `gravitino.kms.*` and does **not** read/write opaque
-   secret strings (for example `jdbc-password`). KMS backends (Transit / cloud KMS) are a
-   different product surface from secret stores (KV / Secrets Manager). Entity secrets need
-   `writeSecret` / `readSecret` / `deleteSecret`, URN persistence, and
-   `gravitino.secret.provider.*`.
+2. **Follow existing `KmsClient` patterns when implementing `GravitinoSecretProvider`**: only a
+   minority of products can be connected the same way for both table-encryption KMS and entity
+   secrets. What can be reused is the Factory / registry style and, where applicable, the same
+   connection setup — not the `KmsClient` interface itself.
 
 3. **REST + persistence split**: HTTP **`properties`** stays **`map<string, string>`**; optional
    **`secretReferences`** (key → locator object; server **builds** the URN) and/or
