@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.glue.GlueIcebergTableHelper.fromIcebe
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -234,5 +235,16 @@ class TestGlueIcebergTableHelper {
     assertEquals(Types.TimestampType.withTimeZone(6), cols[0].dataType());
     assertEquals(Types.TimeType.of(6), cols[1].dataType());
     assertEquals(Types.DecimalType.of(10, 2), cols[2].dataType());
+  }
+
+  @Test
+  void testValidateAwsStaticCredential() {
+    // validate blank aws credential
+    assertFalse(GlueIcebergTableHelper.validateAwsStaticCredential("", ""));
+
+    // should throw error when only have access key or secret key
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GlueIcebergTableHelper.validateAwsStaticCredential("test-access-key", ""));
   }
 }

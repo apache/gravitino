@@ -164,7 +164,8 @@ final class GlueIcebergTableHelper {
 
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
-    if (accessKey != null && secretKey != null) {
+    boolean validated = validateAwsStaticCredential(accessKey, secretKey);
+    if (validated) {
       icebergProps.put(
           CLIENT_CREDENTIALS_PROVIDER, GravitinoGlueCredentialsProvider.class.getName());
       icebergProps.put(CLIENT_CREDENTIALS_PROVIDER_ACCESS_KEY_ID, accessKey);
@@ -176,7 +177,7 @@ final class GlueIcebergTableHelper {
       icebergProps.put(GLUE_ENDPOINT, endpoint);
     }
 
-    if (accessKey != null && secretKey != null) {
+    if (validated) {
       icebergProps.put(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID, accessKey);
       icebergProps.put(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY, secretKey);
     }
@@ -187,6 +188,20 @@ final class GlueIcebergTableHelper {
     glueCatalog.initialize("gravitino-glue-iceberg", icebergProps);
     LOG.info("Initialized Iceberg GlueCatalog for region {}", region);
     return glueCatalog;
+  }
+
+  @VisibleForTesting
+  static boolean validateAwsStaticCredential(String accessKey, String secretKey) {
+    boolean hasAccessKey = StringUtils.isNotBlank(accessKey);
+    boolean hasSecretKey = StringUtils.isNotBlank(secretKey);
+    Preconditions.checkArgument(
+        hasAccessKey == hasSecretKey,
+        "Both '%s' and '%s' must be set together. "
+            + "Either provide both keys for static authentication, "
+            + "or omit both to use the default credential chain.",
+        GlueConstants.AWS_ACCESS_KEY_ID,
+        GlueConstants.AWS_SECRET_ACCESS_KEY);
+    return hasAccessKey;
   }
 
   /**
