@@ -48,8 +48,7 @@ material**:
 
 Gravitino should define a pluggable **secrets-provider SPI**, persist durable **URN references**
 instead of plaintext for marked keys, expose a clear **REST create/alter contract**, and ship an
-**in-memory provider** for tests and local use. Additional provider implementations are out of
-scope for this design (the SPI remains open for them).
+**in-memory provider** for tests and local use.
 
 ---
 
@@ -73,21 +72,16 @@ scope for this design (the SPI remains open for them).
    Whether to `deleteSecret` on entity drop is decided from the **URN shape** (write-through embeds
    `entityType`/`entityId`/`propertyKey` — §5.5.2 C), not a second reserved list.
 
-4. **Backend registry**: register named secrets-provider instances in **server configuration
-   files**. Catalogs reference instances by **`provider_name` in the secret URN**. Clients
-   **discover** registered names via read-only `GET /api/secrets/providers` (§5.9.6) —
-   registration is still conf-only (no CRUD REST).
-
-5. **Backward compatible reads**: existing all-string entity properties continue to
+4. **Backward compatible reads**: existing all-string entity properties continue to
    work as plaintext with no migration required.
 
-6. **Omit secrets on GET/list and audit**: GET/list **omit** any key listed in
+5. **Omit secrets on GET/list and audit**: GET/list **omit** any key listed in
    persisted **`gravitino.secret.keys`** (same strip behavior as today's `PropertiesMetadata.hidden`).
 
-7. **In-memory provider**: ship a process-local `InMemorySecretsProvider` for UT / IT / local
+6. **In-memory provider**: ship a process-local `InMemorySecretsProvider` for UT / IT / local
    quick-start (not for production).
 
-8. **Server-side resolution only**: resolve references on the Gravitino server when loading
+7. **Server-side resolution only**: resolve references on the Gravitino server when loading
    catalogs / schemas / filesets or connecting; call `readSecret` **on each use**.
 
 ## 3. Non-Goals
@@ -103,7 +97,7 @@ scope for this design (the SPI remains open for them).
    a provider requires them).
 
 3. **Additional provider implementations**: this design ships only **`InMemorySecretsProvider`**.
-   Other backends are out of scope here; the SPI stays pluggable via `className`.
+   Other backends are out of scope here.
 
 ## 4. Industry Approaches (Polaris and Databricks)
 
