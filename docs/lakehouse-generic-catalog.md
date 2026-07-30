@@ -12,7 +12,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-Some table formats define a catalog of their own, and Apache Gravitino federates to it. 
+Some table formats define a catalog of their own, and Apache Gravitino federates to it. Lance and Delta define no catalog. A table in either format is a set of files, so the metadata needs a home. The Generic Lakehouse Catalog provides one, holding the metadata directly rather than federating. That is what makes it generic: a single catalog serves any format that arrives without one of its own.
 
 Lance and Delta define no catalog. A table in either format is a set of files, so the metadata needs a home. The Generic Lakehouse Catalog provides one, holding the metadata directly rather than federating. That is what makes it generic: a single catalog serves any format that arrives without one of its own.
 
