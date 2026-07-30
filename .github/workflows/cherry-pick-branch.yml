@@ -138,9 +138,15 @@ jobs:
           BODY="${BODY//\$\{TARGET_BRANCH\}/${TARGET_BRANCH}}"
 
           # Ensure labels exist (forks may not have them yet).
-          gh label create cherry-pick             --description "Automatically opened cherry-pick PR"             --color 1D76DB             --force >/dev/null 2>&1 || true
+          gh label create cherry-pick \
+            --description "Automatically opened cherry-pick PR" \
+            --color 1D76DB \
+            --force >/dev/null 2>&1 || true
           if [ "${SUCCESS}" != "true" ]; then
-            gh label create cherry-pick-conflict               --description "Cherry-pick has conflicts; needs human resolution before merge"               --color B60205               --force >/dev/null 2>&1 || true
+            gh label create cherry-pick-conflict \
+              --description "Cherry-pick has conflicts; needs human resolution before merge" \
+              --color B60205 \
+              --force >/dev/null 2>&1 || true
           fi
 
           LABEL_ARGS=()
