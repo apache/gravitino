@@ -141,14 +141,14 @@ credentials, otherwise a Gravitino server configured with an authenticator other
 rejects them and every Lance operation fails. Configure the auth type to match the Gravitino
 server:
 
-| Configuration Property                            | Description                                                                       | Default Value      | Required          | Since Version |
-|---------------------------------------------------|-----------------------------------------------------------------------------------|--------------------|-------------------|---------------|
-| `gravitino.lance-rest.gravitino-auth-type`        | Auth type used to reach the Gravitino server. Supported values: `simple`, `oauth2` | `simple`           | No                | 1.3.0         |
-| `gravitino.lance-rest.gravitino-simple.user-name` | User name presented when the auth type is `simple`                                | `lance-rest-server` | No                | 1.3.0         |
-| `gravitino.lance-rest.gravitino-oauth2.server-uri`| OAuth2 server URI                                                                 | (none)             | Yes, for `oauth2` | 1.3.0         |
-| `gravitino.lance-rest.gravitino-oauth2.credential`| Credential used to request the OAuth2 token                                       | (none)             | Yes, for `oauth2` | 1.3.0         |
-| `gravitino.lance-rest.gravitino-oauth2.token-path`| Path on the OAuth2 server used to request the token                               | (none)             | Yes, for `oauth2` | 1.3.0         |
-| `gravitino.lance-rest.gravitino-oauth2.scope`     | Scope of the requested OAuth2 token                                               | (none)             | Yes, for `oauth2` | 1.3.0         |
+| Configuration Property                             | Description                                                                        | Default Value       | Required          | Since Version |
+|----------------------------------------------------|------------------------------------------------------------------------------------|---------------------|-------------------|---------------|
+| `gravitino.lance-rest.gravitino-auth-type`         | Auth type used to reach the Gravitino server. Supported values: `simple`, `oauth2` | `simple`            | No                | 2.0.0         |
+| `gravitino.lance-rest.gravitino-simple.user-name`  | User name presented when the auth type is `simple`                                 | `lance-rest-server` | No                | 2.0.0         |
+| `gravitino.lance-rest.gravitino-oauth2.server-uri` | OAuth2 server URI                                                                  | (none)              | Yes, for `oauth2` | 2.0.0         |
+| `gravitino.lance-rest.gravitino-oauth2.credential` | Credential used to request the OAuth2 token                                        | (none)              | Yes, for `oauth2` | 2.0.0         |
+| `gravitino.lance-rest.gravitino-oauth2.token-path` | Path on the OAuth2 server used to request the token                                | (none)              | Yes, for `oauth2` | 2.0.0         |
+| `gravitino.lance-rest.gravitino-oauth2.scope`      | Scope of the requested OAuth2 token                                                | (none)              | Yes, for `oauth2` | 2.0.0         |
 
 This setting controls how the service authenticates to the Gravitino server. It does not change how
 callers authenticate to the Lance REST service itself.
