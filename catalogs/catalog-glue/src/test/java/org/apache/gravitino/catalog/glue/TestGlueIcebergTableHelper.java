@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.glue;
 
 import static org.apache.gravitino.catalog.glue.GlueIcebergTableHelper.fromIcebergType;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
@@ -36,6 +38,7 @@ import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.Types.BooleanType;
@@ -238,13 +241,73 @@ class TestGlueIcebergTableHelper {
   }
 
   @Test
-  void testValidateAwsStaticCredential() {
-    // validate blank aws credential
-    assertFalse(GlueIcebergTableHelper.validateAwsStaticCredential("", ""));
+  void testCreateGlueCatalogWithoutStaticCredentials() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
 
-    // should throw error when only have access key or secret key
+    assertDoesNotThrow(
+        () -> {
+          try (GlueCatalog ignored =
+              (GlueCatalog) GlueIcebergTableHelper.createGlueCatalog(config)) {
+            // No-op.
+          }
+        });
+  }
+
+  @Test
+  void testCreateGlueCatalogWithBlankStaticCredentials() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_ACCESS_KEY_ID, "");
+    config.put(GlueConstants.AWS_SECRET_ACCESS_KEY, " ");
+
+    assertDoesNotThrow(
+        () -> {
+          try (GlueCatalog ignored =
+              (GlueCatalog) GlueIcebergTableHelper.createGlueCatalog(config)) {
+            // No-op.
+          }
+        });
+  }
+
+  @Test
+  void testCreateGlueCatalogWithStaticCredentials() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_ACCESS_KEY_ID, "test-access-key");
+    config.put(GlueConstants.AWS_SECRET_ACCESS_KEY, "test-secret-key");
+
+    assertDoesNotThrow(
+        () -> {
+          try (GlueCatalog ignored =
+              (GlueCatalog) GlueIcebergTableHelper.createGlueCatalog(config)) {
+            // No-op.
+          }
+        });
+  }
+
+  @Test
+  void testCreateGlueCatalogWithOnlyAccessKey() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_ACCESS_KEY_ID, "test-access-key");
+
     assertThrows(
-        IllegalArgumentException.class,
-        () -> GlueIcebergTableHelper.validateAwsStaticCredential("test-access-key", ""));
+        IllegalArgumentException.class, () -> GlueIcebergTableHelper.createGlueCatalog(config));
+  }
+
+  @Test
+  void testCreateGlueCatalogWithOnlySecretKey() {
+    Map<String, String> config = new HashMap<>();
+    config.put(GlueConstants.AWS_REGION, "us-east-1");
+    config.put(GlueConstants.WAREHOUSE, "s3://test-bucket/warehouse");
+    config.put(GlueConstants.AWS_SECRET_ACCESS_KEY, "test-secret-key");
+
+    assertThrows(
+        IllegalArgumentException.class, () -> GlueIcebergTableHelper.createGlueCatalog(config));
   }
 }
