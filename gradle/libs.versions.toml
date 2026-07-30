@@ -55,6 +55,7 @@ httpcore5 = "5.3.4"
 micrometer-core = "1.12.2"
 mockserver = "5.15.0"
 commons-configuration2 = "2.10.1"
+commons-codec = "1.17.1"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
@@ -254,6 +255,7 @@ micrometer-core = { group = "io.micrometer", name = "micrometer-core", version.r
 
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+commons-codec = { group = "commons-codec", name = "commons-codec", version.ref = "commons-codec" }
 commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
 commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }

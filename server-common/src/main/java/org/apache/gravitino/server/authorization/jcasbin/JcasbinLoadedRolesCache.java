@@ -28,19 +28,9 @@ import org.apache.gravitino.cache.GravitinoCache;
  * A {@link GravitinoCache} of {@code roleId -> }{@link CachedRolePolicies}, the per-role privilege
  * index consulted on the authorization hot path.
  *
- * <p><b>Policy ownership:</b> before privilege policies moved into {@link CachedRolePolicies}, this
- * cache stored only {@code role_meta.updated_at}, while the corresponding {@code p(roleId, ...)}
- * policies lived separately in JCasbin enforcers. Eviction therefore needed a synchronous removal
- * listener to delete those orphaned {@code p} rows without deleting the independently managed
- * {@code g(user/group, roleId)} bindings.
- *
- * <p>Now each cache value owns both the version sentinel and the role's complete privilege index,
- * and the JCasbin enforcer owns only the {@code g} bindings; it contains no {@code p} policies.
- * Eviction discards the policy index together with its cache entry, leaving no second policy copy
- * to clean up. On the next request, {@link JcasbinAuthorizer} observes the cache miss, reloads the
- * role from the database, and rebuilds the index. A removal listener must not delete the role from
- * the enforcer because doing so would also remove valid {@code g} bindings whose lifecycle is
- * managed by the user/group role caches.
+ * <p>Each cache value owns both the version sentinel and the role's complete privilege index.
+ * Eviction therefore discards the entire role-policy snapshot atomically. On the next request,
+ * {@link JcasbinAuthorizer} observes the cache miss, reloads the role, and rebuilds the index.
  *
  * <p>Unlike {@link org.apache.gravitino.cache.CaffeineGravitinoCache} this cache is <b>access</b>
  * based ({@code expireAfterAccess}): the index of a role that keeps being authorized against stays

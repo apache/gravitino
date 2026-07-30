@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.server.authorization.jcasbin;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -27,8 +29,7 @@ import java.util.Map;
  *
  * <p>The {@code index} maps each {@link PolicyKey} the role grants or denies to its {@link Effect},
  * with {@link Effect#DENY} already taking precedence over {@link Effect#ALLOW} within the role. A
- * privilege probe becomes a single {@link Map#get(Object)} instead of a linear scan over every
- * jcasbin policy line.
+ * privilege probe becomes a single {@link Map#get(Object)}.
  */
 final class CachedRolePolicies {
 
@@ -37,7 +38,7 @@ final class CachedRolePolicies {
 
   CachedRolePolicies(long updatedAt, Map<PolicyKey, Effect> index) {
     this.updatedAt = updatedAt;
-    this.index = index;
+    this.index = Collections.unmodifiableMap(new HashMap<>(index));
   }
 
   long getUpdatedAt() {

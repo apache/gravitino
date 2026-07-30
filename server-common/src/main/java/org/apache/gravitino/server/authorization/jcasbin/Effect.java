@@ -20,8 +20,7 @@ package org.apache.gravitino.server.authorization.jcasbin;
 
 /**
  * The effect of a single privilege rule in the per-role policy index. {@link #DENY} beats {@link
- * #ALLOW} both within a single role and across the roles a user holds, mirroring the jcasbin {@code
- * policy_effect} {@code some(where (p.eft == allow)) && !some(where (p.eft == deny))}.
+ * #ALLOW} both within a single role and across the roles a user holds.
  */
 enum Effect {
   /** The rule grants the privilege. */

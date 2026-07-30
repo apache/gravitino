@@ -21,14 +21,11 @@ package org.apache.gravitino.server.authorization.jcasbin;
 import java.util.Objects;
 
 /**
- * Composite key of the per-role policy index: {@code (metadataType, metadataId, privilege)}. It
- * mirrors the non-subject fields of a jcasbin {@code p} policy row so that an index lookup answers
- * the same question the old {@code enforcer.enforce} matcher did for one role, but in {@code O(1)}
- * instead of a linear scan over every policy line.
+ * Composite key of the per-role policy index: {@code (metadataType, metadataId, privilege)}. An
+ * index lookup resolves one role's rule in {@code O(1)}.
  *
- * <p>The three fields are compared with exact equality, matching the jcasbin matcher's string
- * comparison; {@code metadataType} and {@code privilege} are stored as they are passed on the
- * authorization hot path (already upper-cased enum names).
+ * <p>The three fields are compared with exact equality. {@code metadataType} and {@code privilege}
+ * are stored as they are passed on the authorization hot path (already upper-cased enum names).
  */
 final class PolicyKey {
 

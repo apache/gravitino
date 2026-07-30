@@ -97,7 +97,6 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.casbin.jcasbin.main.Enforcer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -172,10 +171,7 @@ public class TestJcasbinAuthorizer {
 
   private static final AtomicLong userVersionCounter = new AtomicLong(1L);
 
-  /**
-   * Recreated per test in {@link #createAuthorizer()} so each case starts with empty enforcer state
-   * and a fresh cache; the previous static instance leaked g-rows and cache entries across cases.
-   */
+  /** Recreated per test so each case starts with fresh authorization caches. */
   private JcasbinAuthorizer jcasbinAuthorizer;
 
   private static ObjectMapper objectMapper = new ObjectMapper();
@@ -340,8 +336,8 @@ public class TestJcasbinAuthorizer {
 
   @BeforeEach
   public void createAuthorizer() throws Exception {
-    // Build a fresh authorizer per test so enforcer g-rows and version-validated cache state can
-    // never bleed across cases regardless of the JUnit execution order.
+    // Build a fresh authorizer per test so version-validated cache state can never bleed across
+    // cases regardless of the JUnit execution order.
     jcasbinAuthorizer = new JcasbinAuthorizer();
     jcasbinAuthorizer.initialize();
     restoreDefaultPrincipal();
@@ -412,9 +408,8 @@ public class TestJcasbinAuthorizer {
 
     assertTrue(doAuthorize(currentPrincipal));
 
-    // Test role cache.
-    // When the user's role changes to one with no privileges, the prune step removes
-    // the stale role's g-rows from the enforcer, so authorization fails immediately.
+    // Test role cache. When the user's role changes to one with no privileges, the next request
+    // receives a new effective-role snapshot, so authorization fails immediately.
     Long newRoleId = -1L;
     RoleEntity tempNewRole = getRoleEntity(newRoleId, "tempNewRole", ImmutableList.of());
     when(entityStore.get(
@@ -429,7 +424,7 @@ public class TestJcasbinAuthorizer {
         .thenReturn(ImmutableList.of(new RoleUpdatedAt(newRoleId, "tempNewRole", roleVersion2)));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
-    // tempNewRole has no privileges; prune step removes stale allowRole g-row, so authz fails.
+    // tempNewRole has no privileges, so the new request is denied.
     assertFalse(doAuthorize(currentPrincipal));
 
     // After clearing the role policy cache, the next authorize forces a reload.
@@ -564,8 +559,7 @@ public class TestJcasbinAuthorizer {
     // the defence-in-depth tier: if versionCheckAndLoadRoles is ever invoked with
     // a roleId whose version probe row is missing (e.g. cache window race, future
     // code path bypassing the fat-JOIN), the fix must still evict that role's
-    // loadedRoles index entry so that any residual user → deleted-role g-row grants
-    // nothing on subsequent probes (an absent index resolves to no privilege).
+    // loadedRoles index entry so the request-local role ID cannot resolve any privilege.
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
 
@@ -1207,9 +1201,8 @@ public class TestJcasbinAuthorizer {
     // User is removed from the group at the IdP level -- next token has no groups.
     UserPrincipal noGroupPrincipal = setCurrentPrincipalWithGroup(null);
 
-    // The prune step detects that the group-inherited role is no longer valid
-    // (group not in token → role not in desiredRoleIds) and removes the stale g-rows.
-    // Access is denied immediately without waiting for cache TTL expiry.
+    // The next request derives its effective roles from the new token, so the group role is absent
+    // and access is denied immediately without waiting for cache TTL expiry.
     assertFalse(doAuthorize(noGroupPrincipal));
 
     restoreDefaultPrincipal();
@@ -1582,7 +1575,7 @@ public class TestJcasbinAuthorizer {
    * one request context also verifies that the allow and deny paths observe the same loaded role
    * snapshot.
    */
-  private void assertAuthorizationDecision(
+  private AuthorizationRequestContext assertAuthorizationDecision(
       Principal principal,
       MetadataObject metadataObject,
       Privilege.Name privilege,
@@ -1597,6 +1590,7 @@ public class TestJcasbinAuthorizer {
         expectedDeny,
         jcasbinAuthorizer.deny(principal, METALAKE, metadataObject, privilege, requestContext),
         "unexpected deny decision");
+    return requestContext;
   }
 
   /** Asserts the cached effect for a role and catalog privilege. */
@@ -1782,21 +1776,18 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testRoleCacheInvalidationPreservesUserRoleBindings() throws Exception {
-    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+  public void testRoleCacheInvalidationDoesNotMutateRequestRoleSnapshot() throws Exception {
     GravitinoCache<Long, CachedRolePolicies> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
-
     Long testRoleId = 300L;
-    String roleIdStr = String.valueOf(testRoleId);
-    String userIdStr = String.valueOf(USER_ID);
-    allowEnforcer.addRoleForUser(userIdStr, roleIdStr);
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+    requestContext.setEffectiveRoleIds(Collections.singleton(testRoleId));
     loadedRoles.put(
         testRoleId, new CachedRolePolicies(System.currentTimeMillis(), new HashMap<>()));
 
     loadedRoles.invalidate(testRoleId);
 
     assertFalse(loadedRoles.getIfPresent(testRoleId).isPresent());
-    assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
+    assertEquals(Collections.singleton(testRoleId), requestContext.getEffectiveRoleIds());
   }
 
   @Test
@@ -1811,11 +1802,9 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testPrivilegeProbesUseIndexNotEnforcerPolicies() throws Exception {
+  public void testPrivilegeProbesUseIndexAndRequestRoleSnapshot() throws Exception {
     // Guards the O(roles_per_user) optimization: privilege probes resolve against the per-role
-    // index, and the enforcer holds only the role-membership (g) graph, never privilege (p)
-    // policies. If a future change reintroduces enforce/addPolicy on the hot path, the empty-policy
-    // assertion below fails.
+    // index using the role IDs captured in the request context.
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
 
@@ -1825,12 +1814,13 @@ public class TestJcasbinAuthorizer {
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
         .thenReturn(ImmutableList.of(buildRolePO(ALLOW_ROLE_ID, "allowRole")));
 
-    assertAuthorizationDecision(
-        currentPrincipal,
-        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
-        USE_CATALOG,
-        true,
-        false);
+    AuthorizationRequestContext requestContext =
+        assertAuthorizationDecision(
+            currentPrincipal,
+            MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+            USE_CATALOG,
+            true,
+            false);
 
     // The per-role index carries the granted privilege ...
     CachedRolePolicies cached =
@@ -1840,21 +1830,14 @@ public class TestJcasbinAuthorizer {
         Effect.ALLOW,
         cached.getIndex().get(new PolicyKey("CATALOG", CATALOG_ID, USE_CATALOG.name())),
         "index must resolve the granted allow");
-
-    // ... while the enforcer holds only membership (g) rows, never privilege (p) policies.
-    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
-    assertTrue(
-        allowEnforcer.getPolicy().isEmpty(),
-        "enforcer must not store privilege (p) policies; probes use the index");
-    assertTrue(
-        allowEnforcer
-            .getRolesForUser(String.valueOf(USER_ID))
-            .contains(String.valueOf(ALLOW_ROLE_ID)),
-        "enforcer must still hold the user -> role grouping row");
+    assertEquals(
+        Collections.singleton(ALLOW_ROLE_ID),
+        requestContext.getEffectiveRoleIds(),
+        "request must retain the effective role snapshot used by the probe");
   }
 
   @Test
-  public void testDenyPolicyUsesDenyIndexWithoutEnforcerPolicies() throws Exception {
+  public void testDenyPolicyUsesDenyIndexAndRequestRoleSnapshot() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
@@ -1872,17 +1855,10 @@ public class TestJcasbinAuthorizer {
                     "DENY")));
     mockDirectUserRoles(denyRole);
 
-    assertAuthorizationDecision(currentPrincipal, catalog, USE_CATALOG, false, true);
+    AuthorizationRequestContext requestContext =
+        assertAuthorizationDecision(currentPrincipal, catalog, USE_CATALOG, false, true);
     assertCachedRoleEffect(DENY_ROLE_ID, MetadataObject.Type.CATALOG, USE_CATALOG, Effect.DENY);
-
-    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
-    assertTrue(
-        allowEnforcer.getPolicy().isEmpty(), "enforcer must not store DENY privilege policies");
-    assertTrue(
-        allowEnforcer
-            .getRolesForUser(String.valueOf(USER_ID))
-            .contains(String.valueOf(DENY_ROLE_ID)),
-        "enforcer must retain the user -> deny-role grouping row");
+    assertEquals(Collections.singleton(DENY_ROLE_ID), requestContext.getEffectiveRoleIds());
   }
 
   @Test
@@ -1943,9 +1919,6 @@ public class TestJcasbinAuthorizer {
         allowThenDenyRoleId, MetadataObject.Type.CATALOG, USE_CATALOG, Effect.DENY);
     assertCachedRoleEffect(
         denyThenAllowRoleId, MetadataObject.Type.CATALOG, USE_CATALOG, Effect.DENY);
-    assertTrue(
-        getAllowEnforcer(jcasbinAuthorizer).getPolicy().isEmpty(),
-        "mixed effects must remain in the role indexes");
   }
 
   @Test
@@ -2089,16 +2062,19 @@ public class TestJcasbinAuthorizer {
                     USE_CATALOG,
                     "DENY")));
     mockDirectUserRoles(denyRole);
-    assertAuthorizationDecision(currentPrincipal, catalog, USE_CATALOG, false, true);
+    AuthorizationRequestContext deniedRequest =
+        assertAuthorizationDecision(currentPrincipal, catalog, USE_CATALOG, false, true);
+    assertEquals(Collections.singleton(DENY_ROLE_ID), deniedRequest.getEffectiveRoleIds());
 
     mockNoDirectUserRoles();
 
-    assertAuthorizationDecision(currentPrincipal, catalog, USE_CATALOG, false, false);
-    assertFalse(
-        getAllowEnforcer(jcasbinAuthorizer)
-            .getRolesForUser(String.valueOf(USER_ID))
-            .contains(String.valueOf(DENY_ROLE_ID)),
-        "removed role assignment must be pruned from the grouping graph");
+    AuthorizationRequestContext nextRequest =
+        assertAuthorizationDecision(currentPrincipal, catalog, USE_CATALOG, false, false);
+    assertTrue(nextRequest.getEffectiveRoleIds().isEmpty());
+    assertEquals(
+        Collections.singleton(DENY_ROLE_ID),
+        deniedRequest.getEffectiveRoleIds(),
+        "an earlier request must retain its immutable role snapshot");
   }
 
   @Test
@@ -2147,6 +2123,20 @@ public class TestJcasbinAuthorizer {
     assertNotEquals(key, new PolicyKey("CATALOG", CATALOG_ID, USE_SCHEMA.name()));
     assertEquals(
         "PolicyKey{type=CATALOG, id=" + CATALOG_ID + ", priv=USE_CATALOG}", key.toString());
+  }
+
+  @Test
+  public void testCachedRolePoliciesDefensivelyCopiesIndex() {
+    Map<PolicyKey, Effect> index = new HashMap<>();
+    PolicyKey key = new PolicyKey("CATALOG", CATALOG_ID, USE_CATALOG.name());
+    CachedRolePolicies cachedRolePolicies = new CachedRolePolicies(1L, index);
+
+    index.put(key, Effect.ALLOW);
+
+    assertTrue(cachedRolePolicies.getIndex().isEmpty());
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> cachedRolePolicies.getIndex().put(key, Effect.ALLOW));
   }
 
   /** Tests {@link JcasbinAuthorizer#hasMetadataPrivilegePermission} hierarchy walk */
@@ -2627,11 +2617,5 @@ public class TestJcasbinAuthorizer {
     Field field = JcasbinAuthorizer.class.getDeclaredField("metadataIdCache");
     field.setAccessible(true);
     return (GravitinoCache<String, Long>) field.get(authorizer);
-  }
-
-  private static Enforcer getAllowEnforcer(JcasbinAuthorizer authorizer) throws Exception {
-    Field field = JcasbinAuthorizer.class.getDeclaredField("allowEnforcer");
-    field.setAccessible(true);
-    return (Enforcer) field.get(authorizer);
   }
 }
