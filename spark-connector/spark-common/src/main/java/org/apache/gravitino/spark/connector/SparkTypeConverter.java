@@ -192,6 +192,11 @@ public class SparkTypeConverter {
       return DataTypes.createStructType(fields);
     } else if (gravitinoType instanceof Types.NullType) {
       return DataTypes.NullType;
+    } else if (gravitinoType instanceof Types.ExternalType) {
+      // ExternalType represents types with no Gravitino-native mapping (e.g. ClickHouse
+      // IPv4/IPv6, Doris LARGEINT/BITMAP, Glue unknown types). Map to StringType so that
+      // tables containing these columns remain loadable in Spark. Users can CAST as needed.
+      return DataTypes.StringType;
     }
     throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
   }
