@@ -37,6 +37,7 @@ import {
 } from '@/lib/store/metalakes'
 import { to } from '@/lib/utils'
 import { formatToDateTime } from '@/lib/utils/date'
+import { normalizeServiceAdmins } from '@/lib/utils/serviceAdmins'
 import Icons from '@/components/Icons'
 import GetOwner from '@/components/GetOwner'
 import PropertiesContent from '@/components/PropertiesContent'
@@ -69,14 +70,9 @@ const MetalakeList = () => {
   const [search, setSearch] = useState('')
   const [ownerRefreshKey, setOwnerRefreshKey] = useState(0)
   const auth = useAppSelector(state => state.auth)
-<<<<<<< HEAD
-  const { serviceAdmins, authUser, anthEnable } = auth
-  const admins = Array.isArray(serviceAdmins) ? serviceAdmins : (serviceAdmins || '').split(',')
-=======
   const { serviceAdmins, authUser, anthEnable, authType, authToken } = auth
   const isAuthReady = authType && (authType !== 'oauth' || !!authToken)
   const admins = normalizeServiceAdmins(serviceAdmins)
->>>>>>> 29d40aa64 ([#12200] fix(web-v2): Gate metalake fetch until OAuth token is ready (#12203))
   const isServiceAdmin = admins.includes(authUser?.name)
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
