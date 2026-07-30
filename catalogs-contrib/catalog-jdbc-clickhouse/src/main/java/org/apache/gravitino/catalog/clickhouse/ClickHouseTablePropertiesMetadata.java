@@ -99,6 +99,15 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
           "",
           false);
 
+  public static final PropertyEntry<String> ENGINE_PARAMETERS_PROPERTY_ENTRY =
+      stringOptionalPropertyEntry(
+          TableConstants.ENGINE_PARAMETERS,
+          "Engine parameters extracted from engine_full (e.g. \"ts\" for ReplacingMergeTree(ts)). "
+              + "Only used for non-Distributed MergeTree-family engines.",
+          false,
+          "",
+          false);
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       createPropertiesMetadata();
 
@@ -125,6 +134,7 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
         CLUSTER_REMOTE_DATABASE_PROPERTY_ENTRY.getName(), CLUSTER_REMOTE_DATABASE_PROPERTY_ENTRY);
     map.put(CLUSTER_REMOTE_TABLE_PROPERTY_ENTRY.getName(), CLUSTER_REMOTE_TABLE_PROPERTY_ENTRY);
     map.put(CLUSTER_SHARDING_KEY_PROPERTY_ENTRY.getName(), CLUSTER_SHARDING_KEY_PROPERTY_ENTRY);
+    map.put(ENGINE_PARAMETERS_PROPERTY_ENTRY.getName(), ENGINE_PARAMETERS_PROPERTY_ENTRY);
 
     return Collections.unmodifiableMap(map);
   }

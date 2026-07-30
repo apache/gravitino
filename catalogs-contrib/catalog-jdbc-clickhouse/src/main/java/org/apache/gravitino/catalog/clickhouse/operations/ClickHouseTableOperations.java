@@ -458,7 +458,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return engine;
     }
 
-    sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
+    String engineParams = StringUtils.trim(properties.get(TableConstants.ENGINE_PARAMETERS));
+    if (StringUtils.isNotBlank(engineParams)) {
+      sqlBuilder.append("\n ENGINE = %s(%s)".formatted(engine.getValue(), engineParams));
+    } else {
+      sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
+    }
     return engine;
   }
 
@@ -703,6 +708,20 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                       put(ClusterConstants.CLUSTER_NAME, clusterName);
                     } else {
                       put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
+                    }
+
+                    // Extract engine parameters from engine_full for non-Distributed engines.
+                    // engine_full contains the full engine DDL (e.g.
+                    // "ReplacingMergeTree(ts) ORDER BY id SETTINGS ..."), while the engine
+                    // column only contains the engine name without parameters.
+                    // For Distributed engines, parameters are already stored as separate
+                    // distributed-table properties below.
+                    if (!StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
+                      String engineFull = resultSet.getString("engine_full");
+                      String engineParams = extractEngineParams(engine, engineFull);
+                      if (StringUtils.isNotBlank(engineParams)) {
+                        put(TableConstants.ENGINE_PARAMETERS, engineParams);
+                      }
                     }
 
                     if (StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
@@ -1640,6 +1659,43 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         StringUtils.isNotBlank(indexName), "Data skipping index name must not be blank");
     return "INDEX %s %s TYPE %s GRANULARITY %d"
         .formatted(quoteIdentifier(indexName), fieldStr, typeName, granularity);
+  }
+
+  /**
+   * Extracts engine parameters from the {@code engine_full} column of {@code system.tables}.
+   *
+   * <p>Uses bracket-depth counting to correctly handle nested parentheses (e.g. {@code
+   * SummingMergeTree((a, b))} returns {@code "(a, b)"}). For {@code ReplacingMergeTree(ts)},
+   * returns {@code "ts"}. For engines without parameters (e.g. {@code MergeTree}), returns {@code
+   * null}.
+   */
+  @VisibleForTesting
+  static String extractEngineParams(String engineName, String engineFull) {
+    if (StringUtils.isBlank(engineFull) || StringUtils.isBlank(engineName)) {
+      return null;
+    }
+    if (!StringUtils.startsWithIgnoreCase(engineFull, engineName)) {
+      return null;
+    }
+    int paramsStart = engineName.length();
+    if (paramsStart >= engineFull.length() || engineFull.charAt(paramsStart) != '(') {
+      return null;
+    }
+    // Bracket-depth counting handles nested parentheses (e.g. SummingMergeTree((a, b))).
+    int depth = 0;
+    for (int i = paramsStart + 1; i < engineFull.length(); i++) {
+      char ch = engineFull.charAt(i);
+      if (ch == '(') {
+        depth++;
+      } else if (ch == ')') {
+        if (depth == 0) {
+          return engineFull.substring(paramsStart + 1, i).trim();
+        }
+        depth--;
+      }
+    }
+    // Unmatched parenthesis.
+    return null;
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
