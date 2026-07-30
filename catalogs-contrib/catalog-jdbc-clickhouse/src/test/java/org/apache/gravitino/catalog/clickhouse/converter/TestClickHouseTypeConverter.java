@@ -72,7 +72,7 @@ public class TestClickHouseTypeConverter {
     checkJdbcTypeToGravitinoType(Types.FloatType.get(), FLOAT32, null, null);
     checkJdbcTypeToGravitinoType(Types.DoubleType.get(), FLOAT64, null, null);
     checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE, null, null);
-    checkJdbcTypeToGravitinoType(Types.ExternalType.of(DATE32), DATE32, null, null);
+    checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE32, null, null);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(0), DATETIME, null, null);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, 10, 2);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), STRING, 20, null);
@@ -100,8 +100,7 @@ public class TestClickHouseTypeConverter {
         Types.DecimalType.of(12, 2), CLICKHOUSE_TYPE_CONVERTER.toGravitino(nullableDecimal));
 
     JdbcTypeConverter.JdbcTypeBean date32 = createTypeBean(DATE32, null, null);
-    Assertions.assertEquals(
-        Types.ExternalType.of(DATE32), CLICKHOUSE_TYPE_CONVERTER.toGravitino(date32));
+    Assertions.assertEquals(Types.DateType.get(), CLICKHOUSE_TYPE_CONVERTER.toGravitino(date32));
 
     // Enum8/Enum16: ClickHouse normalizes Enum to Enum8, so "Enum8('active'=1)" must match
     JdbcTypeConverter.JdbcTypeBean enum8 =
@@ -114,7 +113,6 @@ public class TestClickHouseTypeConverter {
     Assertions.assertEquals(
         Types.ExternalType.of("Enum16('x'=1,'y'=2)"),
         CLICKHOUSE_TYPE_CONVERTER.toGravitino(enum16));
-
     JdbcTypeConverter.JdbcTypeBean ipv4 = createTypeBean("IPv4", null, null);
     Assertions.assertEquals(
         Types.ExternalType.of("IPv4"), CLICKHOUSE_TYPE_CONVERTER.toGravitino(ipv4));
