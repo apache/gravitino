@@ -99,7 +99,8 @@ jobs:
         run: |
           # Use original commit message with branch prefix
           TITLE="[Cherry-pick to ${TARGET_BRANCH}] ${COMMIT_MESSAGE}"
-          
+          LABELS=(cherry-pick)
+
           # Prepare body with cherry-pick info
           if [ "${SUCCESS}" = "true" ]; then
             BODY=$(cat <<'EOF'
@@ -110,25 +111,41 @@ jobs:
           EOF
           )
           else
+            # Make conflicts visible in the PR list (title + label), not only in the body.
+            TITLE="[DO NOT MERGE] ${TITLE}"
+            LABELS+=(cherry-pick-conflict)
+            gh label create cherry-pick-conflict \
+              --description "Cherry-pick has conflicts; needs human resolution before merge" \
+              --color B60205 \
+              --force >/dev/null 2>&1 || true
+
             BODY=$(cat <<'EOF'
           **Cherry-pick Information:**
           - Original commit: ${COMMIT_SHA}
           - Target branch: `${TARGET_BRANCH}`
           - Status: ⚠️ **Has conflicts - manual resolution required**
-          
+
+          **Do not merge** until conflict markers are resolved and the
+          `cherry-pick-conflict` label is removed.
+
           Please review and resolve the conflicts before merging.
           EOF
           )
           fi
-          
+
           # Replace placeholders with actual values
           BODY="${BODY//\$\{COMMIT_SHA\}/${COMMIT_SHA}}"
           BODY="${BODY//\$\{TARGET_BRANCH\}/${TARGET_BRANCH}}"
-          
+
+          LABEL_ARGS=()
+          for label in "${LABELS[@]}"; do
+            LABEL_ARGS+=(--label "$label")
+          done
+
           gh pr create \
             --title "$TITLE" \
             --body "$BODY" \
             --base ${{ inputs.target-branch }} \
             --head ${{ steps.cherry-pick.outputs.branch-name }} \
-            --label cherry-pick \
+            "${LABEL_ARGS[@]}" \
             --reviewer jerryshao || echo "Failed to create PR, may already exist"
