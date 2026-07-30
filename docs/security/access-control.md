@@ -77,106 +77,7 @@ Access to an object is controlled by privileges, granted through roles, and by o
 behaves like a privilege that arrives with the object rather than one you grant, and it carries the
 administrative rights, altering, dropping, and transferring, that no privilege name covers.
 
-<<<<<<< HEAD
-### Role
-
-A role is a named collection of privileges on securable objects. Roles simplify access management by allowing you to:
-
-- **Group privileges**: Bundle related permissions together
-- **Assign to multiple users**: Grant the same set of permissions to multiple users or groups
-- **Quick onboarding**: New users can start working immediately by receiving pre-configured roles
-
-**Ownership of Roles:**
-- The creator of a role is automatically the owner
-- Owners have full control over the role, including the ability to drop it
-- Only the owner can modify the role's permissions
-
-### Privilege
-
-Privilege is a specific operation method for securable object, if you need to control fine-grained privileges on a securable object in the system,
-then you need to design many different Privileges, however, too many Privileges will cause too complicated settings in the authorization.
-
-If you only need to carry out coarse-grained privilege control on the securable object in the system, then you only need to design a small number of Privileges,
-but it will result in too weak control ability when the authentication. Therefore, the design of Privilege is an important trade-off in the access control system.
-We know that Privilege is generally divided into two types, one is the management category of Privilege, such as the `CREATE`, `DELETE` resource privilege,
-and the other is the operation category of Privilege, such as the `READ` and `WRITE` resource privilege.
-
-In most organizations, the number of data managers is much smaller than the number of data users.
-Because it is the data users who need fine-grained privilege control,
-we must provide more Privileges related to usage and more tightly gatekeeper the administrative Privileges.
-To enforce this, we’ll introduce the concept of Ownership as a complete replacement for the administrative category of Privilege.
-
-### Ownership
-
-Every securable object in Gravitino has an owner - the user with administrative control over that object.
-
-**Key Characteristics:**
-
-- **Automatic assignment**: The creator of an object automatically becomes its owner
-- **Administrative privileges**: Owners have implicit management privileges (e.g., drop, alter)
-- **Exclusive control**: Only the owner can fully manage the object
-- **Group ownership**: Ownership can be assigned to a group, granting all members of that group owner privileges
-
-**Supported Objects:**
-
-The following metadata objects support ownership:
-
-| Metadata Object Type |
-|----------------------|
-| Metalake             |
-| Catalog              |
-| Schema               |
-| Table                |
-| View                 |
-| Topic                |
-| Fileset              |
-| Role                 |
-| Model                |
-| Function             |
-| Tag                  |
-| JobTemplate          |
-| Job                  |
-
-### User
-
-A user represents an individual identity in Gravitino. Users can be:
-- Granted one or more roles
-- Given different operating privileges based on their assigned roles
-- Made owners of securable objects
-
-### Group
-
-A group is a collection of users that simplifies permission management by allowing you to:
-- Grant permissions to multiple users at once
-- Manage access control for teams or departments
-- Assign roles that all group members will inherit
-
-All users in a group inherit the roles and privileges granted to that group.
-
-### Metadata Objects
-
-Metadata objects are entities managed by Gravitino, such as catalogs, schemas, tables, filesets, topics, models, functions, roles, and metalakes.
-
-**Naming Convention:**
-- Each metadata object has a **type** and a **name**
-- Names use dot notation to represent hierarchy
-
-**Examples:**
-- `METALAKE`: "metalake1"
-- `CATALOG`: "catalog1" (under a metalake)
-- `SCHEMA`: "catalog1.schema1" (under a catalog)
-- `TABLE`: "catalog1.schema1.table1" (under a schema)
-
-### Securable Objects
-
-A securable object is any metadata object to which access can be granted. The default policy is **deny-by-default**: unless explicitly granted, access is denied.
-
-**Hierarchy:**
-
-Securable objects exist in a hierarchical container structure:
-=======
 Everything sits under a metalake, but only the data objects nest below a catalog:
->>>>>>> e6f3a47f4 ([MINOR] docs: update the access control page (#12247))
 
 ```
 Metalake (top level)
@@ -492,46 +393,6 @@ Three identities act in turn, from an empty server to a user reading one schema.
 administrator bootstraps the metalake and hands it off, `manager` runs it, and `staff` builds and
 shares the data. Each presents its own bearer token.
 
-<<<<<<< HEAD
-## Operations
-
-The following sections demonstrate how to perform common access control operations using both the REST API (Shell) and Java client.
-
-## User Operations
-
-### Add a User
-
-Add a user to your metalake before using authorization features.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "user1"
-}' http://localhost:8090/api/metalakes/test/users
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-GravitinoClient client = ...
-User user =
-    client.addUser("user1");
-```
-
-</TabItem>
-</Tabs>
-
-### List Users
-
-List all users in a metalake. Use `details=true` to get full user objects instead of just names.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-=======
 Every call sends the same two headers, so the examples use a helper:
 
 ```shell
@@ -546,7 +407,6 @@ gravitino() {
 **1. The service administrator creates the metalake and hands it over.** Creating it adds the creator
 as a user and makes them owner, which is what authorizes the next two calls. After the transfer,
 `manager` owns the metalake and the service administrator has no further part to play.
->>>>>>> e6f3a47f4 ([MINOR] docs: update the access control page (#12247))
 
 ```shell
 gravitino -X POST "http://localhost:8090/api/metalakes" \
@@ -562,31 +422,9 @@ gravitino -X PUT "$GRAVITINO/owners/metalake/{metalake}" \
   -d '{"name": "manager", "type": "USER"}'
 ```
 
-<<<<<<< HEAD
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-GravitinoClient client = ...
-String[] usernames = client.listUserNames();
-
-User[] users = client.listUsers();
-```
-
-</TabItem>
-</Tabs>
-
-### Get a User
-
-Get a user by its name.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-=======
 **2. `manager` delegates catalog creation to `staff`.** Owning the metalake lets `manager` add users
 and create roles without any grant. The role carries `CREATE_CATALOG` on the metalake, so it covers
 every catalog `staff` creates, now and later.
->>>>>>> e6f3a47f4 ([MINOR] docs: update the access control page (#12247))
 
 ```shell
 gravitino -X POST "$GRAVITINO/users" \
@@ -631,34 +469,6 @@ gravitino -X POST "$GRAVITINO/catalogs/{catalog}/schemas" \
   -d '{"name": "{schema}"}'
 ```
 
-<<<<<<< HEAD
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-GravitinoClient client = ...
-boolean removed =
-    client.removeUser("user1");
-```
-
-</TabItem>
-</Tabs>
-
-## Group Operation
-
-### Add a Group
-
-Add the group to your metalake before you use the authorization.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "group1"
-}' http://localhost:8090/api/metalakes/test/groups
-=======
 **4. `staff` gives `analyst` read access.** Reading one schema takes three privileges: `USE_CATALOG`
 and `USE_SCHEMA` to reach it, and `SELECT_TABLE` to read what is in it. Object names are not
 validated, so a typo produces a role that grants nothing. `analyst` must already be a user in the
@@ -690,7 +500,6 @@ gravitino -X POST "$GRAVITINO/roles" \
 gravitino -X PUT "$GRAVITINO/permissions/users/analyst/grant" \
   -H "Authorization: Bearer $STAFF_TOKEN" \
   -d '{"roleNames": ["schema_reader"]}'
->>>>>>> e6f3a47f4 ([MINOR] docs: update the access control page (#12247))
 ```
 
 `analyst` can now read every table in `{catalog}.{schema}`, including tables created there later, and
@@ -738,131 +547,7 @@ Three take arguments that are hard to derive from the signature alone.
 A role's objects are built as a nested path rather than a dotted string:
 
 ```java
-<<<<<<< HEAD
-GravitinoClient client = ...
-Group group =
-    client.addGroup("group1");
-```
-
-</TabItem>
-</Tabs>
-
-### List Groups
-
-List the groups in a metalake.
-Returns the list of groups if details is true, otherwise returns the list of group name.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/
-
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/?details=true
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-GravitinoClient client = ...
-String[] usernames = client.listGroupNames();
-
-User[] users = client.listGroups();
-```
-
-</TabItem>
-</Tabs>
-
-### Get a Group
-
-Get a group by its name.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/group1
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-GravitinoClient client = ...
-Group group =
-    client.getGroup("group1");
-```
-
-</TabItem>
-</Tabs>
-
-### Remove a Group
-
-Remove a group by its name.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/group1
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-GravitinoClient client = ...
-boolean removed =
-    client.removeGroup("group1");
-```
-
-</TabItem>
-</Tabs>
-
-## Role Operation
-
-### Create a Role
-
-Create a role by given properties.
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
-
-```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-   "name": "role1",
-   "properties": {"k1": "v1"},
-   "securableObjects": [
-          {
-             "fullName": "catalog1.schema1.table1",
-             "type": "TABLE",
-             "privileges": [
-                    {
-                         "name": "SELECT_TABLE",
-                         "condition": "ALLOW"
-                    }
-             ]    
-          }
-   ]
-}' http://localhost:8090/api/metalakes/test/roles
-```
-
-</TabItem>
-<TabItem value="java" label="Java">
-
-```java
-GravitinoClient client = ...
-
-SecurableObject securableObject =
-=======
 SecurableObject table =
->>>>>>> e6f3a47f4 ([MINOR] docs: update the access control page (#12247))
     SecurableObjects.ofTable(
         SecurableObjects.ofSchema(
             SecurableObjects.ofCatalog("catalog1", Collections.emptyList()),
