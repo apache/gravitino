@@ -1,16 +1,10 @@
 ---
-title: "Connect Trino to Iceberg REST"
+title: "Connect Trino to the Iceberg REST Catalog"
 sidebar_label: "Trino"
 ---
 
 ## Introduction
 
-<<<<<<< HEAD
-Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
-Iceberg-compatible engine can connect to directly — without installing a Gravitino-specific
-connector plugin. This page describes how to configure Trino to use Gravitino's Iceberg REST
-(IRC) endpoint.
-=======
 Apache Gravitino exposes an Iceberg REST Catalog (IRC) endpoint that any Iceberg-compatible engine
 can connect to directly, without installing a Gravitino-specific connector plugin. The sections
 below describe how to configure Trino to use it.
@@ -19,34 +13,9 @@ Most of the configuration is on the Trino side and is covered here. The storage 
 lives on the Gravitino catalog and is covered in [Credential
 vending](../security/credential-vending.md), which this page links to at each point where it
 applies.
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 
-:::note
-This integration uses the standard Apache Iceberg REST catalog specification. Gravitino enforces
-its full access-control model on all IRC requests.
-:::
+## Quick Start
 
-<<<<<<< HEAD
-## Prerequisites
-
-- Apache Gravitino running with the Iceberg REST service enabled. See
-  [Iceberg REST catalog service](../iceberg-rest-service.md) for setup instructions.
-- The Gravitino IRC endpoint is accessible from the Trino coordinator and all workers. The default
-  port is `9001`.
-- Trino 469 or later recommended.
-
-## Configuration
-
-Create a catalog properties file in your Trino `etc/catalog/` directory. The filename determines
-the catalog name in Trino — `gravitino_irc.properties` creates a catalog named `gravitino_irc`.
-
-:::note
-The `warehouse` property is managed by the Gravitino IRC server and does not need to be set in
-the Trino catalog configuration.
-:::
-
-### No Authentication
-=======
 Create a catalog properties file in your Trino `etc/catalog/` directory. The filename determines the
 catalog name in Trino, so `gravitino_irc.properties` creates a catalog named `gravitino_irc`. Some
 distributions place the directory at `etc/trino/catalog/`. Either way, these are per-catalog
@@ -55,21 +24,14 @@ properties and do not belong in `config.properties`.
 The file below is complete, using vended credentials with OAuth2 authentication. Place it in
 `etc/catalog/` and restart Trino. Each commented group has a matching section below, covering what
 the properties do and what the alternatives are.
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 
 ```properties
 # Connection properties
 connector.name=iceberg
 iceberg.catalog.type=rest
-iceberg.rest-catalog.uri=http://<gravitino-host>:9001/iceberg
+iceberg.rest-catalog.uri=http://{gravitino_host}:9001/iceberg
+iceberg.rest-catalog.prefix={catalog}
 
-<<<<<<< HEAD
-# Native S3 filesystem (Trino 430+)
-fs.native-s3.enabled=true
-s3.region=us-east-1
-s3.aws-access-key=<access-key>
-s3.aws-secret-key=<secret-key>
-=======
 # Storage access
 iceberg.rest-catalog.vended-credentials-enabled=true
 fs.s3.enabled=true
@@ -80,19 +42,12 @@ iceberg.rest-catalog.security=OAUTH2
 iceberg.rest-catalog.oauth2.credential={client_id}:{client_secret}
 iceberg.rest-catalog.oauth2.server-uri={token_endpoint_uri}
 iceberg.rest-catalog.oauth2.scope={scope}
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 
 # Table defaults
 iceberg.file-format=PARQUET
 iceberg.compression-codec=ZSTD
 ```
 
-<<<<<<< HEAD
-### Basic Authentication
-
-Requires Trino **481+**. Trino has no native Basic mode for Iceberg REST; pass `Authorization`
-via HTTP headers.
-=======
 On Trino 480 and earlier, `fs.s3.enabled` is named `fs.native-s3.enabled`. See [Storage
 Access](#storage-access).
 
@@ -345,39 +300,17 @@ Trino 481 added `iceberg.rest-catalog.http-headers`
 and Basic authentication is one use of it rather than a feature in its own right.
 
 Encode the credentials:
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 
-```shell
-echo -n '<username>:<password>' | base64
+```bash
+echo -n '{username}:{password}' | base64
 ```
 
 Then set the header:
 
 ```properties
-connector.name=iceberg
-iceberg.catalog.type=rest
-iceberg.rest-catalog.uri=http://<gravitino-host>:9001/iceberg
-
-# Basic authentication
-iceberg.rest-catalog.http-headers=Authorization: Basic <base64-credentials>
-
-# Native S3 filesystem (Trino 430+)
-fs.native-s3.enabled=true
-s3.region=us-east-1
-s3.aws-access-key=<access-key>
-s3.aws-secret-key=<secret-key>
-
-# Table defaults
-iceberg.file-format=PARQUET
-iceberg.compression-codec=ZSTD
+iceberg.rest-catalog.http-headers=Authorization: Basic {base64_credentials}
 ```
 
-<<<<<<< HEAD
-Replace `<base64-credentials>` with the output of `echo -n '<username>:<password>' | base64`.
-
-### OAuth2 Authentication
-
-=======
 On releases before 481 there is no way to send the header, so the choice there is OAuth2 or no
 authentication.
 
@@ -424,34 +357,11 @@ Trino sends one fixed token, obtained out of band from your identity provider, o
 the IRC. Nothing renews it, so when the token expires every request fails with 401 until someone
 edits the catalog file and restarts Trino.
 
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 ```properties
-connector.name=iceberg
-iceberg.catalog.type=rest
-iceberg.rest-catalog.uri=http://<gravitino-host>:9001/iceberg
-
-# OAuth2 authentication
 iceberg.rest-catalog.security=OAUTH2
-iceberg.rest-catalog.oauth2.token=<your-token>
-
-# Native S3 filesystem (Trino 430+)
-fs.native-s3.enabled=true
-s3.region=us-east-1
-s3.aws-access-key=<access-key>
-s3.aws-secret-key=<secret-key>
-
-# Table defaults
-iceberg.file-format=PARQUET
-iceberg.compression-codec=ZSTD
+iceberg.rest-catalog.oauth2.token={token}
 ```
 
-<<<<<<< HEAD
-See [How to authenticate](../security/how-to-authenticate.md) for Gravitino authentication
-configuration options.
-
-:::tip Local development
-For local development with MinIO, replace the S3 section with:
-=======
 Reach for it when Trino cannot reach the OAuth2 server, or for a short-lived test. Note that the
 token sits in plaintext in the catalog file and is directly replayable against the IRC by anyone who
 can read that file, which a client secret is not.
@@ -460,24 +370,14 @@ can read that file, which a client secret is not.
 
 On Trino 479 and later, add the following to both options to avoid token-exchange behavior that can
 cause repeated token requests:
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 
 ```properties
-fs.native-s3.enabled=true
-s3.endpoint=http://<minio-host>:9000
-s3.path-style-access=true
-s3.aws-access-key=<minio-access-key>
-s3.aws-secret-key=<minio-secret-key>
-s3.region=us-east-1
+iceberg.rest-catalog.session=NONE
+iceberg.rest-catalog.oauth2.token-exchange-enabled=false
 ```
 
-See [gravitino-irc-quickstart](https://github.com/markhoerth/gravitino-irc-quickstart) for a
-complete local development environment using MinIO.
-:::
+`iceberg.rest-catalog.session=NONE` is already the default and can be omitted.
 
-<<<<<<< HEAD
-## Start Trino
-=======
 ## Table Defaults
 
 Optional, and independent of everything else on this page. These set the defaults Trino uses when it
@@ -487,37 +387,31 @@ creates tables through the IRC:
 iceberg.file-format=PARQUET
 iceberg.compression-codec=ZSTD
 ```
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 
-Trino is a server process — the catalog is picked up automatically when Trino starts. After
-placing `gravitino_irc.properties` in `etc/catalog/`, restart Trino:
+## Starting Trino
+
+Trino is a server process, and the catalog is picked up when Trino starts. After placing
+`gravitino_irc.properties` in `etc/catalog/`, restart Trino:
 
 ```bash
 $TRINO_HOME/bin/launcher restart
 ```
 
+Trino needs roughly 20 seconds to accept queries after a restart, which is long enough to produce
+misleading connection errors in scripted runs.
+
 Once Trino is running, connect using the Trino CLI:
 
 ```bash
-trino --server http://<trino-host>:8080 --catalog gravitino_irc
+trino --server http://{trino_host}:8080 --catalog gravitino_irc
 ```
 
-Or connect without specifying a default catalog and qualify queries fully:
+Or connect without a default catalog and qualify queries fully:
 
 ```bash
-trino --server http://<trino-host>:8080
+trino --server http://{trino_host}:8080
 ```
 
-<<<<<<< HEAD
-## Examples
-
-Once connected, use the Trino CLI or any Trino-compatible client.
-
-### List Schemas
-
-```sql
-SHOW SCHEMAS FROM gravitino_irc;
-=======
 ## Verification
 
 ### Confirm the Server Vends Credentials
@@ -546,43 +440,11 @@ Expected output:
     }
   }
 ]
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 ```
 
-### List Tables
-
-```sql
-SHOW TABLES FROM gravitino_irc.<namespace>;
-```
-
-### Query a Table
-
-```sql
-SELECT * FROM gravitino_irc.<namespace>.<table> LIMIT 10;
-```
-
-### Create a Schema
-
-When creating a schema in Trino, a storage location must be specified:
-
-```sql
-CREATE SCHEMA gravitino_irc.<namespace>
-WITH (location = 's3://<bucket>/<namespace>/');
-```
-
-### Create a Table
-
-```sql
-CREATE TABLE gravitino_irc.<namespace>.new_table (
-  id INTEGER,
-  name VARCHAR,
-  created_at TIMESTAMP
-)
-WITH (
-  format         = 'PARQUET',
-  format_version = 2
-);
-```
+Three markers distinguish genuine vending from static credentials passed through: the access key
+begins with `ASIA` rather than `AKIA`, a session token is present, and the prefix is scoped to the
+table path rather than the whole bucket.
 
 ### Confirm the Engine Path
 
@@ -598,17 +460,8 @@ where an EC2 instance profile could otherwise satisfy the S3 reads.
 
 ## Known Issues
 
-### `SHOW SCHEMAS` Fails on Gravitino IRC (OAuth2, Nested Namespaces)
+### Vended Credentials Are Not Refreshed During Long-Running Queries
 
-<<<<<<< HEAD
-**Cause:** When Trino connects to Gravitino IRC with `iceberg.rest-catalog.security=OAUTH2`,
-`iceberg.rest-catalog.nested-namespace-enabled=true`, and `iceberg.rest-catalog.session=NONE`
-(the default), `SHOW SCHEMAS` recursively calls Iceberg REST `listNamespaces`. On Trino releases
-before 482, each recursive call creates a separate OAuth session, which can trigger excessive token
-requests and cause errors such as `Connection pool shut down` or `StackOverflowError`.
-
-**Solution:** Upgrade to Trino 482+.
-=======
 Applies to Trino releases before 481.
 
 **Cause:** Gravitino advertises a refresh endpoint in the `loadTable` response as
@@ -651,46 +504,24 @@ default), `SHOW SCHEMAS` recursively calls Iceberg REST `listNamespaces`. On Tri
 requests and cause errors such as `Connection pool shut down` or `StackOverflowError`.
 
 **Solution:** Upgrade to Trino 482 or later.
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 
 ### `TIMESTAMP WITH TIME ZONE` Values Are Not Adjusted to the Client Session Time Zone
 
-**Cause:** For `TIMESTAMP WITH TIME ZONE` values, Trino does not adjust query results according to
-the client session time zone. Unlike Spark and Flink, Trino displays these values based on the
-stored timestamp-with-time-zone value.
+**Cause:** Trino does not adjust `TIMESTAMP WITH TIME ZONE` results according to the client session
+time zone. Unlike Spark and Flink, it displays these values based on the stored
+timestamp-with-time-zone value.
 
-**Solution:** To convert a `TIMESTAMP WITH TIME ZONE` value to the current client session time
-zone, use `at_timezone` together with `current_timezone()`:
+**Solution:** Convert with `at_timezone` and `current_timezone()`:
 
 ```sql
 SELECT
   id,
   at_timezone(timestamp_with_timezone_column, current_timezone())
-FROM <catalog>.<namespace>.<table>;
+FROM {catalog}.{namespace}.{table};
 ```
 
-## Gravitino Connector vs. Iceberg REST
+### Trino Identifiers Are Not Case Sensitive
 
-<<<<<<< HEAD
-| Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
-|:-------------------------|:----------------------------|:------------------------------|
-| Engine plugin required   | Yes                         | No                            |
-| Gravitino access control | Yes                         | Yes                           |
-| Supported engines        | Trino, Spark, Flink, Daft   | Any Iceberg-compatible engine |
-| Credential vending       | Varies                      | Yes (S3, GCS, OSS, ADLS)      |
-
-### Trino Identifiers Are Not Treated as Case Sensitive
-
-Trino identifiers are not treated as case sensitive. As a result, metadata names that differ
-only by letter case cannot be distinguished. See [Trino identifier
-documentation](https://trino.io/docs/current/language/reserved.html#language-identifiers). This
-limitation comes from Trino itself and is not specific to Gravitino.
-
-For the best compatibility with Trino:
-
-- Use lowercase metadata names.
-- Avoid creating objects whose names differ only by letter case.
-=======
 **Cause:** Trino identifiers are not treated as case sensitive, so metadata names that differ only
 by letter case cannot be distinguished. See [Trino identifier
 documentation](https://trino.io/docs/current/language/reserved.html#language-identifiers). The
@@ -735,10 +566,10 @@ Catalogs created through the Gravitino REST catalog API are registered in a meta
 can be granted on them and Gravitino access control applies to queries that reach them over the IRC.
 Catalogs defined instead in the Iceberg REST service configuration file are not registered in a
 metalake, so there is nothing to grant privileges on.
->>>>>>> 4d60cc71c ([MINOR] docs: update the Trino Iceberg REST engine page (#12242))
 
 ## Related
 
+- [Credential vending](../security/credential-vending.md)
 - [Iceberg REST catalog service](../iceberg-rest-service.md)
 - [Connect Spark to Iceberg REST](./spark.md)
 - [Connect Flink to Iceberg REST](./flink.md)
