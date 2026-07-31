@@ -515,7 +515,7 @@ do not diverge.
 | REST `secretReferences`    | —                             | **New optional** on **create** (property key → **locator object**; server builds URN)            |
 | REST `secretBindings`      | —                             | **New optional** on **create** (property key → provider name)                                    |
 | REST alter `updates`       | existing `@type`s             | **Add** `setSecretBinding` / `setSecretReference` (§5.9.4); `setProperty` stays plaintext string |
-| REST list providers        | —                             | **New** `GET /api/secrets/providers` — safe metadata only (§5.9.6)                               |
+| REST list providers        | —                             | **New** `GET /configs/secrets/providers` — static config discovery (§5.9.6)                      |
 | Persistence                | string map per entity         | Same; secret values = **URN strings** (recognized by URN shape; drop delete via URN shape)       |
 | Tables                     | —                             | `catalog_meta.properties`, `schema_meta.properties`, `fileset_version_info.properties`           |
 | REST response `properties` | hidden keys stripped          | Keys whose values match the URN recognition rule **omitted**                                     |
@@ -533,24 +533,24 @@ Write-through ownership is visible in the URN shape (`…:catalog:<id>:<property
 alter `removeProperty` call `deleteSecret` only for that shape (§5.5.2 C).
 
 **Affected endpoints** (entity paths unchanged; secrets behavior shared — §5.9.2–5.9.5, drop §5.5.2 C;
-plus cluster list §5.9.6):
+plus static config list §5.9.6):
 
-| Method   | Path                                                                           | Entity / scope |
-| -------- | ------------------------------------------------------------------------------ | -------------- |
-| `GET`    | `/api/secrets/providers`                                                       | Cluster        |
-| `POST`   | `/metalakes/{metalake}/catalogs`                                               | Catalog        |
-| `GET`    | `/metalakes/{metalake}/catalogs/{catalog}`                                     | Catalog        |
-| `GET`    | `/metalakes/{metalake}/catalogs?details=true`                                  | Catalog        |
-| `PUT`    | `/metalakes/{metalake}/catalogs/{catalog}`                                     | Catalog        |
-| `DELETE` | `/metalakes/{metalake}/catalogs/{catalog}`                                     | Catalog        |
-| `POST`   | `/metalakes/{metalake}/catalogs/{catalog}/schemas`                             | Schema         |
-| `GET`    | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}`                    | Schema         |
-| `PUT`    | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}`                    | Schema         |
-| `DELETE` | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}`                    | Schema         |
-| `POST`   | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets`           | Fileset        |
-| `GET`    | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}` | Fileset        |
-| `PUT`    | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}` | Fileset        |
-| `DELETE` | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}` | Fileset        |
+| Method   | Path                                                                           | Entity / scope                        |
+| -------- | ------------------------------------------------------------------------------ | ------------------------------------- |
+| `GET`    | `/configs/secrets/providers`                                                   | Cluster                               |
+| `POST`   | `/metalakes/{metalake}/catalogs`                                               | Catalog                               |
+| `GET`    | `/metalakes/{metalake}/catalogs/{catalog}`                                     | Catalog (only omit secret property)   |
+| `GET`    | `/metalakes/{metalake}/catalogs?details=true`                                  | Catalog (only omit secret property)   |
+| `PUT`    | `/metalakes/{metalake}/catalogs/{catalog}`                                     | Catalog                               |
+| `DELETE` | `/metalakes/{metalake}/catalogs/{catalog}`                                     | Catalog                               |
+| `POST`   | `/metalakes/{metalake}/catalogs/{catalog}/schemas`                             | Schema                                |
+| `GET`    | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}`                    | Schema (only omit secret property)    |
+| `PUT`    | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}`                    | Schema                                |
+| `DELETE` | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}`                    | Schema                                |
+| `POST`   | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets`           | Fileset                               |
+| `GET`    | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}` | Fileset (only omit secret property)   |
+| `PUT`    | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}` | Fileset                               |
+| `DELETE` | `/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}` | Fileset                               |
 
 List-with-details endpoints that return properties for schema/fileset follow the same omit-on-read
 rules as catalog list.
@@ -782,19 +782,25 @@ locator / binding-object `provider`). Unknown names are **Reject**. Web UI and A
 therefore need discovery — without hardcoding names from ops docs.
 
 **Registration** stays file-based (§8): no REST create/update/delete of providers.
-**Discovery** is a read-only cluster-scoped endpoint (not under a metalake path):
+**Discovery** is a read-only **static configuration** endpoint under `/configs` (same family as
+`GET /configs`; not under a metalake `/api` path). Future subsystems may follow the same pattern
+(e.g. `/configs/kms/providers`).
 
 ```http
-GET /api/secrets/providers
+GET /configs/secrets/providers
 ```
 
-Authenticated like other metadata APIs. Empty registry ⇒ empty `providers` array (not an error).
+Same auth model as `GET /configs`. Empty registry ⇒ empty `providers` array (not an error).
+
+**Authorization:** the response is safe provider metadata only (`name` / `type` / optional `uri`) —
+no secret material — so there is **no additional privilege check** beyond that auth model.
+Binding secrets still requires the usual catalog / schema / fileset create or alter privileges.
 
 | Response field | Required | Meaning                                                                                  |
 | -------------- | -------- | ---------------------------------------------------------------------------------------- |
 | `name`         | Yes      | Instance name from `gravitino.secret.providers` (same string used in bindings / locator) |
-| `type`         | Yes      | From the live SPI instance’s `type()` (e.g. `memory`) — not a conf key                   |
-| `uri`          | No       | Optional provider endpoint from conf when present (omit for in-memory)                   |
+| `type`         | Yes      | Provider kind from static registration (conf / loaded provider metadata), e.g. `memory`  |
+| `uri`          | No       | Optional non-secret provider endpoint from conf when present (omit for in-memory)        |
 
 **Must not return:** credentials or any secret-bearing conf.
 Do **not** list secret material from the provider.
@@ -803,7 +809,6 @@ Example response (`200`):
 
 ```json
 {
-  "code": 0,
   "providers": [
     { "name": "memory", "type": "memory" }
   ]
@@ -872,8 +877,8 @@ urn:gravitino-secret:<provider_name>:<type-specific-identifier>
 
 Named secrets-provider backends are **registered** in **server configuration files**, not via REST
 create/update/delete or database tables. Clients may **list** registered instances via
-`GET /api/secrets/providers` (§5.9.6) — that endpoint returns safe metadata only, never credentials
-or endpoint URLs.
+`GET /configs/secrets/providers` (§5.9.6) — that endpoint returns safe static metadata only, never
+credentials or secret-bearing conf (optional non-secret `uri` from conf when present).
 
 ### 8.1 Provider list and per-provider keys
 
@@ -921,7 +926,7 @@ Config change requires edit + **restart**.
 
 | Area          | Checklist                                                                                                                                            |
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Registry      | **File config** to register, **cluster scope**, no `metalake_id`, no DB table; **list** via `GET /api/secrets/providers`                             |
+| Registry      | **File config** to register, **cluster scope**, no `metalake_id`, no DB table; **list** via `GET /configs/secrets/providers`                         |
 | Providers     | Named conf entries; refs use `provider_name` in URN; v1 ships **in-memory** only                                                                     |
 | Resolution    | Value starts with `urn:gravitino-secret` and ends with property key → `readSecret`; else plaintext                                                   |
 | URN           | `urn:gravitino-secret:<name>:<identifier>`; write-through id = `entityType:entityId:propertyKey`; route by `provider_name`                           |
