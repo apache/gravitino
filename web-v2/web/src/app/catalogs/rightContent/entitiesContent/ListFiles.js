@@ -19,7 +19,7 @@
 
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 
 import { ArrowLeftOutlined, CopyOutlined, FileOutlined, FolderOutlined } from '@ant-design/icons'
 import { App, Button, Select, Space, Spin, Table, Typography } from 'antd'
@@ -41,40 +41,9 @@ const ListFiles = ({ metalake, catalog, schema, fileset, storageLocations, defau
   const store = useAppSelector(state => state.metalakes)
   const dispatch = useAppDispatch()
 
-  // Track the current fileset identity to detect switches.
-  // Reset navigation state immediately during render (before useEffects run)
-  // so that no stale state can trigger API calls with wrong parameters.
-  const filesetIdentity = `${catalog}.${schema}.${fileset}`
-  const prevFilesetIdentityRef = useRef(filesetIdentity)
-
-  // Track which filesetIdentity the storageLocations prop belongs to.
-  // We record the identity when storageLocations reference changes,
-  // so we can detect when storageLocations is stale (from a previous fileset).
-  const prevStorageLocationsRef = useRef(storageLocations)
-  const storageLocationsIdentityRef = useRef(filesetIdentity)
-  if (prevStorageLocationsRef.current !== storageLocations) {
-    prevStorageLocationsRef.current = storageLocations
-
-    // storageLocations reference changed — record which fileset it belongs to
-    if (storageLocations && Object.keys(storageLocations).length > 0) {
-      storageLocationsIdentityRef.current = filesetIdentity
-    }
-  }
-
-  const filesetSwitched = prevFilesetIdentityRef.current !== filesetIdentity
-  if (filesetSwitched) {
-    prevFilesetIdentityRef.current = filesetIdentity
-    setSubPath('')
-    setPathSegments([])
-    setCurrentLocation(undefined)
-  }
-
-  // Whether storageLocations matches the current fileset (not stale)
-  const storageLocationsIsStale = storageLocationsIdentityRef.current !== filesetIdentity
-
   // Sync currentLocation with storageLocations/defaultLocationName.
-  // When currentLocation is undefined (after fileset switch) or no longer
-  // exists in storageLocations, derive the correct value from props.
+  // When currentLocation is undefined or no longer exists in
+  // storageLocations, derive the correct value from props.
   useEffect(() => {
     if (!storageLocations || Object.keys(storageLocations).length === 0) {
       setCurrentLocation(undefined)
@@ -104,15 +73,7 @@ const ListFiles = ({ metalake, catalog, schema, fileset, storageLocations, defau
   }, [sub_path])
 
   useEffect(() => {
-    if (
-      metalake &&
-      catalog &&
-      schema &&
-      fileset &&
-      currentLocation &&
-      storageLocations?.[currentLocation] &&
-      !storageLocationsIsStale
-    ) {
+    if (metalake && catalog && schema && fileset && currentLocation && storageLocations?.[currentLocation]) {
       dispatch(
         getFilesetFiles({
           metalake,
@@ -124,7 +85,7 @@ const ListFiles = ({ metalake, catalog, schema, fileset, storageLocations, defau
         })
       )
     }
-  }, [dispatch, metalake, catalog, schema, fileset, sub_path, currentLocation, storageLocationsIsStale])
+  }, [dispatch, metalake, catalog, schema, fileset, sub_path, currentLocation])
 
   const handleLocationChange = value => {
     setCurrentLocation(value)
@@ -205,8 +166,12 @@ const ListFiles = ({ metalake, catalog, schema, fileset, storageLocations, defau
     return { columns, minWidth: 100 }
   }, [columns])
 
-  if (!storageLocations || Object.keys(storageLocations).length === 0 || storageLocationsIsStale) {
+  if (!storageLocations) {
     return <Spin />
+  }
+
+  if (Object.keys(storageLocations).length === 0) {
+    return <Text type='secondary'>No storage locations configured</Text>
   }
 
   if (!currentLocation || !storageLocations[currentLocation]) {

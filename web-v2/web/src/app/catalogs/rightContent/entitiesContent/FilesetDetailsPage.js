@@ -268,6 +268,7 @@ export default function FilesetDetailsPage({ ...props }) {
       {activeTab === 'files' && !store.activatedDetailsLoading && (
         <div data-refer='tab-files-panel'>
           <ListFiles
+            key={`${catalog}.${schema}.${fileset}`}
             metalake={currentMetalake}
             catalog={catalog}
             schema={schema}
