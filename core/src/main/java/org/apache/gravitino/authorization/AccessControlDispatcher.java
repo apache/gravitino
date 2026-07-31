@@ -20,8 +20,11 @@ package org.apache.gravitino.authorization;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -67,6 +70,18 @@ public interface AccessControlDispatcher {
       throws UserAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Adds users in bulk.
+   *
+   * @param metalake The Metalake of the Users.
+   * @param users The Users to add.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Users encounters storage issues.
+   */
+  List<BulkItemResult<User>> addUsers(String metalake, List<UserAdd> users)
+      throws NoSuchMetalakeException;
+
+  /**
    * Removes a User.
    *
    * @param metalake The Metalake of the User.
@@ -77,6 +92,20 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If removing the User encounters storage issues.
    */
   boolean removeUser(String metalake, String user) throws NoSuchMetalakeException;
+
+  /**
+   * Removes Users in bulk.
+   *
+   * @param metalake The Metalake of the Users.
+   * @param users The names of the Users.
+   * @param metalakeOwner The Metalake owner.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Users encounters storage issues.
+   */
+  List<BulkItemResult<String>> removeUsers(
+      String metalake, List<String> users, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException;
 
   /**
    * Removes a User by external identifier.
