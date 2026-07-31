@@ -69,7 +69,8 @@ const MetalakeList = () => {
   const [search, setSearch] = useState('')
   const [ownerRefreshKey, setOwnerRefreshKey] = useState(0)
   const auth = useAppSelector(state => state.auth)
-  const { serviceAdmins, authUser, anthEnable } = auth
+  const { serviceAdmins, authUser, anthEnable, authType, authToken } = auth
+  const isAuthReady = authType && (authType !== 'oauth' || !!authToken)
   const admins = Array.isArray(serviceAdmins) ? serviceAdmins : (serviceAdmins || '').split(',')
   const isServiceAdmin = admins.includes(authUser?.name)
   const dispatch = useAppDispatch()
@@ -78,8 +79,15 @@ const MetalakeList = () => {
 
   useEffect(() => {
     dispatch(resetMetalakeStore())
-    dispatch(fetchMetalakes())
   }, [dispatch])
+
+  useEffect(() => {
+    if (!isAuthReady) {
+      return
+    }
+
+    dispatch(fetchMetalakes())
+  }, [dispatch, isAuthReady])
 
   useEffect(() => {
     const filteredData = store.metalakes
