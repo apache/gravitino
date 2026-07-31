@@ -1,0 +1,82 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+name: Conflict Marker Check
+
+# Standalone workflow so path filters on build.yml cannot skip this check.
+# Catches cherry-pick / sync PRs that commit unresolved git conflict markers.
+on:
+  pull_request:
+    branches: ["main", "branch-*"]
+  push:
+    branches: ["main", "branch-*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conflict-marker-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conflict-marker-check:
+    name: conflict-marker-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fail if unresolved git conflict markers are introduced
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.sha }}"
+            # First push / force-push edge case: before may be all zeros.
+            if [ -z "${BASE_SHA}" ] || [[ "${BASE_SHA}" =~ ^0+$ ]]; then
+              BASE_SHA="$(git rev-parse "${HEAD_SHA}^")"
+            fi
+          fi
+
+          echo "Checking range ${BASE_SHA}...${HEAD_SHA}"
+
+          # git's built-in check for conflict markers introduced in the diff.
+          git diff --check "${BASE_SHA}...${HEAD_SHA}"
+
+          # Explicit line-start scan on changed files (======= must be a whole line).
+          failed=0
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            if grep -nE '^(<<<<<<< |>>>>>>> |=======$)' "$f"; then
+              echo "::error file=${f}::Unresolved conflict markers remain in ${f}"
+              failed=1
+            fi
+          done < <(git diff --name-only --diff-filter=ACMR "${BASE_SHA}...${HEAD_SHA}")
+
+          if [ "${failed}" -ne 0 ]; then
+            echo "Unresolved git conflict markers found. Resolve them before merging."
+            exit 1
+          fi
+
+          echo "No unresolved conflict markers found."
