@@ -121,7 +121,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
     Map<String, String> safeProperties = properties == null ? ImmutableMap.of() : properties;
     SQLRepresentation sqlRepresentation =
         validateSQLRepresentation(
-            representations, defaultCatalog, defaultSchema, safeProperties, ident);
+            representations, defaultCatalog, defaultSchema, safeProperties, columns, ident);
 
     try {
       Map<String, String> params = Maps.newHashMap(safeProperties);
@@ -242,6 +242,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
                   replace.getDefaultCatalog(),
                   replace.getDefaultSchema(),
                   updatedProperties,
+                  replace.getColumns(),
                   ident);
           updatedColumns = hmsColumns(replace.getColumns(), sqlRepresentation.dialect());
           updatedViewOriginalText =
@@ -252,10 +253,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
                   replace.getDefaultCatalog(),
                   replace.getDefaultSchema(),
                   ident);
+          isTrinoView = Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect());
           updatedComment =
-              Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())
-                  ? TrinoNativeViewCodec.PRESTO_VIEW_COMMENT
-                  : replace.getComment();
+              isTrinoView ? TrinoNativeViewCodec.PRESTO_VIEW_COMMENT : replace.getComment();
           applyTrinoViewMarker(updatedProperties, sqlRepresentation.dialect());
         } else {
           throw new IllegalArgumentException(
@@ -485,6 +485,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
       String defaultCatalog,
       String defaultSchema,
       Map<String, String> properties,
+      Column[] columns,
       NameIdentifier ident) {
     int representationCount = representations == null ? 0 : representations.length;
     Representation firstRepresentation =
@@ -513,6 +514,12 @@ class HiveViewCatalogOperations implements ViewCatalog {
         // The default catalog/schema are encoded into the Trino native view payload by
         // toHmsViewOriginalText() and restored in toHiveView(), so no value is required to be null
         // here.
+        Preconditions.checkArgument(
+            columns != null && columns.length > 0,
+            "Dialect '%s' requires at least one column for view %s; without it the encoded "
+                + "payload cannot be decoded on the next load",
+            selected.dialect(),
+            ident);
         return selected;
       case Dialects.FLINK:
         Preconditions.checkArgument(

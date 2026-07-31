@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -125,7 +127,7 @@ final class TrinoNativeViewCodec {
     byte[] bytes;
     try {
       bytes = MAPPER.writeValueAsBytes(root);
-    } catch (Exception e) {
+    } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to encode Trino native view definition", e);
     }
     return VIEW_PREFIX + Base64.getEncoder().encodeToString(bytes) + VIEW_SUFFIX;
@@ -152,7 +154,7 @@ final class TrinoNativeViewCodec {
     JsonNode root;
     try {
       root = MAPPER.readTree(bytes);
-    } catch (Exception e) {
+    } catch (IOException e) {
       throw new IllegalArgumentException("Failed to decode Trino native view definition", e);
     }
 
