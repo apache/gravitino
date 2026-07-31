@@ -148,4 +148,22 @@ public class NoOpsCache extends BaseEntityCache {
       List<E> entities) {
     // do nothing
   }
+
+  /** {@inheritDoc} */
+  @Override
+  public long relationGeneration(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
+    return 0L;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <E extends Entity & HasIdentifier> void putIfNotInvalidatedSince(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      List<E> entities,
+      long sinceGeneration) {
+    // do nothing
+  }
 }

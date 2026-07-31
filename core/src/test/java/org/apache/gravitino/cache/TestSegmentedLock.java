@@ -380,4 +380,33 @@ public class TestSegmentedLock {
               });
         });
   }
+
+  @Test
+  void testGenerationStartsAtZero() {
+    SegmentedLock lock = new SegmentedLock(4);
+    assertEquals(0L, lock.generation("key1"));
+    assertEquals(0L, lock.generation(null));
+  }
+
+  @Test
+  void testIncrementGenerationBumpsOnlyTheKeyStripe() {
+    SegmentedLock lock = new SegmentedLock(16);
+    long before = lock.generation("key1");
+    lock.incrementGeneration("key1");
+    assertEquals(before + 1, lock.generation("key1"));
+
+    // The same key stays consistent, and its stripe reflects the increment.
+    lock.incrementGeneration("key1");
+    assertEquals(before + 2, lock.generation("key1"));
+  }
+
+  @Test
+  void testIncrementAllGenerationsBumpsEveryStripe() {
+    SegmentedLock lock = new SegmentedLock(8);
+    long g1 = lock.generation("key1");
+    long g2 = lock.generation("another-key");
+    lock.incrementAllGenerations();
+    assertEquals(g1 + 1, lock.generation("key1"));
+    assertEquals(g2 + 1, lock.generation("another-key"));
+  }
 }
