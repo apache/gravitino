@@ -69,8 +69,9 @@ instead of plaintext for marked keys, expose a clear **REST create/alter contrac
    fileset** (see §5.9). **Persistence** stays an all-string JSON map on each entity's properties
    column. Secret property values are stored as **URN strings**. A property is treated as a secret
    when its value matches the **URN recognition rule** (§5.1): starts with `urn:gravitino-secret`
-   and ends with that property's key. Whether to `deleteSecret` on entity drop is decided from the
-   **URN shape** (write-through embeds `entityType`/`entityId`/`propertyKey` — §5.5.2 C).
+   and ends with that property's key. Whether to `deleteSecret` on entity drop or alter
+   `removeProperty` is decided from the **URN shape** (write-through embeds
+   `entityType`/`entityId`/`propertyKey` — §5.5.2 C).
 
 4. **Backward compatible reads**: existing all-string entity properties continue to
    work as plaintext with no migration required.
@@ -174,7 +175,7 @@ satisfy this rule by construction. Plaintext values never match.
 | Value matches the recognition rule | Value is a URN string → parse `provider_name` → `readSecret(urn)` |
 | Value does **not** match           | Use value as plaintext; **do not** call secrets provider          |
 
-Drop-time `deleteSecret` uses URN shape (§5.5.2 C).
+Drop / `removeProperty` `deleteSecret` uses URN shape (§5.5.2 C).
 
 #### 5.1.1 URN shape
 
@@ -371,8 +372,8 @@ public interface GravitinoSecretProvider {
   String readSecret(String urn);
 
   /**
-   * Best-effort delete. Used on entity drop (and create rollback) for
-   * <b>Gravitino-managed</b> secrets only — see §5.5.2 C.
+   * Best-effort delete. Used on entity drop, alter removeProperty, and create
+   * rollback for <b>Gravitino-managed</b> (write-through) secrets only — see §5.5.2 C.
    */
   void deleteSecret(String urn);
 }
@@ -428,15 +429,23 @@ provider. The built URN **must end with the property key**. **`InMemorySecretsPr
 external-ref binds** in this design (it is write-through only); other providers may accept them
 via the same interface.
 
-**C. Drop entity (catalog / schema / fileset) — URN shape decides delete**
+**C. Drop entity / `removeProperty` — URN shape decides delete**
 
-No new drop query param (no `purgeSecrets`). On drop of a catalog, schema, or fileset, for each
-property whose value matches the URN recognition rule (§5.1), parse the stored URN:
+No new drop query param (no `purgeSecrets`). The same ownership check applies when:
 
-| URN type-specific identifier (after `provider_name`)                                                                                                                                                                                                           | Behavior on drop                                    |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| **Write-through shaped for this entity** — for in-memory, the identifier is exactly `<entityType>:<entityId>:<propertyKey>` where `entityType` ∈ {`catalog`,`schema`,`fileset`}, `entityId` equals this entity's id, and `propertyKey` equals the property key | Best-effort `deleteSecret(urn)`, then drop metadata |
-| **Anything else**                                                                                                                                                                                                                                              | Drop metadata only — **do not** call `deleteSecret` |
+- dropping a catalog, schema, or fileset, or
+- alter `removeProperty` removes a secret key
+
+For each candidate property whose value matches the URN recognition rule (§5.1), parse the stored
+URN:
+
+| URN type-specific identifier (after `provider_name`)                                                                                                                                                                                                           | Behavior                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Write-through shaped for this entity** — for in-memory, the identifier is exactly `<entityType>:<entityId>:<propertyKey>` where `entityType` ∈ {`catalog`,`schema`,`fileset`}, `entityId` equals this entity's id, and `propertyKey` equals the property key | Best-effort `deleteSecret(urn)`, then drop / remove the property metadata |
+| **Anything else** (including external-ref URNs)                                                                                                                                                                                                                | Drop / remove property metadata only — **do not** call `deleteSecret`     |
+
+Rationale: write-through secrets are **Gravitino-managed**; once the property (or entity) is gone,
+leaving material in the provider would orphan it. External refs are owned outside Gravitino.
 
 ### 5.6 In-memory secrets provider (OSS default)
 
@@ -468,7 +477,7 @@ map[URN] = Base64(plaintext)
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `writeSecret`  | Base64-encode plaintext. Allocate URN `urn:gravitino-secret:<provider_name>:<entityType>:<entityId>:<propertyKey>` from `SecretWriteContext`. Store Base64 under that URN (overwrite if same key). Return the URN. |
 | `readSecret`   | Look up map by URN; Base64-decode; return plaintext. Missing URN → treat as gone (impl-defined: null / error). Provider name in URN must match this instance.                                                      |
-| `deleteSecret` | `map.remove(urn)` — best-effort; used by create rollback and drop for **managed** secrets (§5.5.2 C).                                                                                                              |
+| `deleteSecret` | `map.remove(urn)` — best-effort; used by create rollback, entity drop, and alter `removeProperty` for **managed** (write-through) secrets (§5.5.2 C).                                                              |
 
 **Type-specific identifier:** `<entityType>:<entityId>:<propertyKey>` — see §5.1.1 (catalog / schema / fileset).
 
@@ -520,8 +529,8 @@ Persisted example (write-through owned key):
 }
 ```
 
-Write-through ownership is visible in the URN shape (`…:catalog:<id>:<propertyKey>`). Drop calls
-`deleteSecret` only for that shape (§5.5.2 C).
+Write-through ownership is visible in the URN shape (`…:catalog:<id>:<propertyKey>`). Drop and
+alter `removeProperty` call `deleteSecret` only for that shape (§5.5.2 C).
 
 **Affected endpoints** (entity paths unchanged; secrets behavior shared — §5.9.2–5.9.5, drop §5.5.2 C;
 plus cluster list §5.9.6):
@@ -644,17 +653,17 @@ sibling maps). Existing **`setProperty`** stays a **string** `value` (plaintext 
 | `setSecretBinding`   | `provider` (instance name) + `value` (plaintext string)                                  | Write-through bind/re-bind (`writeSecret`); persist returned URN                                                                                          |
 | `setSecretReference` | `provider` (instance name) + `attributes` (`map<string,string>`; same locator as §5.9.2) | External ref; server builds URN from locator (must end with the property key). Required `attributes` keys are provider-defined.                           |
 
-| Rule                                                                               | Behavior                                                              |
-| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `setSecretBinding` missing `provider` / string `value`, or `value` is `******`     | **Reject**                                                            |
-| `setSecretReference` missing `provider`                                            | **Reject**                                                            |
-| `setSecretReference` `attributes` value is a raw `urn:gravitino-secret:...` string | **Reject** — use locator attributes, not a client-built URN           |
-| `setSecretReference` missing attributes required by the selected provider          | **Reject**                                                            |
-| `provider` unknown                                                                 | **Reject**                                                            |
-| `setProperty` `value` is `******`                                                  | **Reject**                                                            |
-| `setProperty` `value` is `urn:gravitino-secret:...`                                | **Reject** in v1 — use `setSecretReference` or `setSecretBinding`     |
-| `removeProperty` on a secret key                                                   | Remove from properties; **do not** `deleteSecret` on alter (§5.5.2 C) |
-| Other `@type`s (`rename` / `updateComment` / …)                                    | Unchanged                                                             |
+| Rule                                                                               | Behavior                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `setSecretBinding` missing `provider` / string `value`, or `value` is `******`     | **Reject**                                                                                                                                                                                                                                         |
+| `setSecretReference` missing `provider`                                            | **Reject**                                                                                                                                                                                                                                         |
+| `setSecretReference` `attributes` value is a raw `urn:gravitino-secret:...` string | **Reject** — use locator attributes, not a client-built URN                                                                                                                                                                                        |
+| `setSecretReference` missing attributes required by the selected provider          | **Reject**                                                                                                                                                                                                                                         |
+| `provider` unknown                                                                 | **Reject**                                                                                                                                                                                                                                         |
+| `setProperty` `value` is `******`                                                  | **Reject**                                                                                                                                                                                                                                         |
+| `setProperty` `value` is `urn:gravitino-secret:...`                                | **Reject** in v1 — use `setSecretReference` or `setSecretBinding`                                                                                                                                                                                  |
+| `removeProperty` on a secret key                                                   | Remove from properties; if the **current** value is write-through-shaped for this entity (§5.5.2 C), best-effort `deleteSecret(urn)` (same rule as entity drop). External-ref / other URN shapes: remove property only — **do not** `deleteSecret` |
+| Other `@type`s (`rename` / `updateComment` / …)                                    | Unchanged                                                                                                                                                                                                                                          |
 
 OpenAPI: add `SetSecretBindingRequest` / `SetSecretReferenceRequest` (and schema/fileset
 equivalents) to the catalog-update oneOf. Example: TC-3 below.
@@ -835,13 +844,13 @@ No new database table is introduced for secrets-provider registration.
 
 ### 7.2 Secret recognition (URN shape)
 
-| Aspect   | Rule                                                                                |
-| -------- | ----------------------------------------------------------------------------------- |
-| Gate     | Value **starts with** `urn:gravitino-secret` **and** **ends with** the property key |
-| Persist  | Server writes URN strings under the secret property keys (create/alter)             |
-| Resolve  | Matching values → `readSecret`; others stay plaintext                               |
-| GET/list | Matching keys are **omitted**                                                       |
-| Drop     | Matching write-through-shaped URNs may `deleteSecret` (§5.5.2 C)                    |
+| Aspect                  | Rule                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| Gate                    | Value **starts with** `urn:gravitino-secret` **and** **ends with** the property key |
+| Persist                 | Server writes URN strings under the secret property keys (create/alter)             |
+| Resolve                 | Matching values → `readSecret`; others stay plaintext                               |
+| GET/list                | Matching keys are **omitted**                                                       |
+| Drop / `removeProperty` | Matching write-through-shaped URNs may `deleteSecret` (§5.5.2 C)                    |
 
 ### 7.3 URN
 
@@ -919,7 +928,7 @@ Config change requires edit + **restart**.
 | Configuration | `gravitino.secret.providers` + `provider.<name>.className` (+ settings); edit + restart                                                              |
 | GET / list    | Keys whose values match the URN recognition rule **omitted**                                                                                         |
 | REST API      | Create: `secretReferences` / `secretBindings`; alter: `setSecretBinding` / `setSecretReference` (§5.9.4); list providers (§5.9.6); server builds URN |
-| Drop          | No `purgeSecrets` param; `deleteSecret` only when URN is write-through-shaped for this entity (§5.5.2 C)                                             |
+| Drop / alter  | No `purgeSecrets` param; `deleteSecret` on drop or `removeProperty` only when URN is write-through-shaped for this entity (§5.5.2 C)                 |
 | Persistence   | All-string map on catalog/schema/fileset; secret values are URN strings                                                                              |
 | Clients       | List providers API; create maps; alter `setSecretBinding` / `setSecretReference`; detail/list omits secret keys                                      |
 | Rotation      | In-memory: none (§5.8)                                                                                                                               |
