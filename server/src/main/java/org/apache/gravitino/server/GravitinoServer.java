@@ -182,7 +182,9 @@ public class GravitinoServer extends ResourceConfig {
     server.addServlet(servlet, API_ANY_PATH);
     Servlet configServlet = new ConfigServlet(serverConfig);
     server.addServlet(configServlet, "/configs");
-    server.addServlet(new SecretProvidersConfigServlet(serverConfig), "/configs/secrets/providers");
+    server.addServlet(
+        new SecretProvidersConfigServlet(gravitinoEnv.secretProviderRegistry()),
+        "/configs/secrets/providers");
 
     // Root-level aliases for enterprise GTMs that require probes at well-known root paths.
     // Forwards /health, /health/live, /health/ready, and /health.html to the canonical

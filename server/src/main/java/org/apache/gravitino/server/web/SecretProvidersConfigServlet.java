@@ -27,7 +27,6 @@ import java.util.Map;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.gravitino.Config;
 import org.apache.gravitino.secret.SecretProviderInfo;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.slf4j.Logger;
@@ -37,7 +36,8 @@ import org.slf4j.LoggerFactory;
  * Serves {@code GET /configs/secrets/providers} with safe secrets-provider discovery metadata.
  *
  * <p>Uses the same auth model as {@link ConfigServlet} (no additional privilege check). Returns
- * only {@code name}, {@code type}, and optional non-secret {@code uri}.
+ * only {@code name}, {@code type}, and optional non-secret {@code uri}. The process-owned {@link
+ * SecretProviderRegistry} from {@code GravitinoEnv} is the source of truth.
  */
 public class SecretProvidersConfigServlet extends HttpServlet {
 
@@ -46,17 +46,12 @@ public class SecretProvidersConfigServlet extends HttpServlet {
   private final List<SecretProviderInfo> providers;
 
   /**
-   * Creates a servlet that lists providers configured in {@code config}.
+   * Creates a servlet backed by the process-owned secrets-provider registry.
    *
-   * <p>Providers are loaded only to resolve safe metadata ({@code type()} / optional {@code uri}),
-   * then closed. The discovery response is a static snapshot of configuration.
-   *
-   * @param config Gravitino server configuration
+   * @param registry the environment-owned registry; must not be closed by this servlet
    */
-  public SecretProvidersConfigServlet(Config config) {
-    try (SecretProviderRegistry registry = new SecretProviderRegistry(config)) {
-      this.providers = ImmutableList.copyOf(registry.listProviders());
-    }
+  public SecretProvidersConfigServlet(SecretProviderRegistry registry) {
+    this.providers = ImmutableList.copyOf(registry.listProviders());
   }
 
   @Override

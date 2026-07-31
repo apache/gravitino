@@ -32,9 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
-import org.apache.gravitino.server.ServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -43,70 +43,78 @@ public class TestSecretProvidersConfigServlet {
 
   @Test
   public void testEmptyProviders() throws Exception {
-    ServerConfig serverConfig = new ServerConfig(false);
-    Assertions.assertTrue(fetchProviderList(serverConfig).isEmpty());
+    try (SecretProviderRegistry registry = new SecretProviderRegistry(new Config(false) {})) {
+      Assertions.assertTrue(fetchProviderList(registry).isEmpty());
+    }
   }
 
   @Test
   public void testListsConfiguredProvider() throws Exception {
-    ServerConfig serverConfig = new ServerConfig(false);
-    Properties properties = new Properties();
-    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
-    properties.setProperty(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
-            + "memory."
-            + SecretProviderRegistry.CLASS_NAME,
-        InMemorySecretsProvider.class.getName());
-    serverConfig.loadFromProperties(properties);
-
-    List<Map<String, Object>> providers = fetchProviderList(serverConfig);
-    Assertions.assertEquals(1, providers.size());
-    Assertions.assertEquals("memory", providers.get(0).get("name"));
-    Assertions.assertEquals("memory", providers.get(0).get("type"));
-    Assertions.assertFalse(providers.get(0).containsKey("uri"));
+    try (SecretProviderRegistry registry = registryWithMemoryProvider(null)) {
+      List<Map<String, Object>> providers = fetchProviderList(registry);
+      Assertions.assertEquals(1, providers.size());
+      Assertions.assertEquals("memory", providers.get(0).get("name"));
+      Assertions.assertEquals("memory", providers.get(0).get("type"));
+      Assertions.assertFalse(providers.get(0).containsKey("uri"));
+    }
   }
 
   @Test
   public void testListsOptionalUri() throws Exception {
-    ServerConfig serverConfig = new ServerConfig(false);
-    Properties properties = new Properties();
-    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "vault");
-    properties.setProperty(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
-            + "vault."
-            + SecretProviderRegistry.CLASS_NAME,
-        InMemorySecretsProvider.class.getName());
-    properties.setProperty(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
-            + "vault."
-            + SecretProviderRegistry.URI,
-        "https://vault.example.com");
-    serverConfig.loadFromProperties(properties);
-
-    List<Map<String, Object>> providers = fetchProviderList(serverConfig);
-    Assertions.assertEquals(1, providers.size());
-    Assertions.assertEquals("vault", providers.get(0).get("name"));
-    Assertions.assertEquals("memory", providers.get(0).get("type"));
-    Assertions.assertEquals("https://vault.example.com", providers.get(0).get("uri"));
+    try (SecretProviderRegistry registry =
+        registryWithNamedProvider("vault", "https://vault.example.com")) {
+      List<Map<String, Object>> providers = fetchProviderList(registry);
+      Assertions.assertEquals(1, providers.size());
+      Assertions.assertEquals("vault", providers.get(0).get("name"));
+      Assertions.assertEquals("memory", providers.get(0).get("type"));
+      Assertions.assertEquals("https://vault.example.com", providers.get(0).get("uri"));
+    }
   }
 
   @Test
   public void testHandlesIOException() throws Exception {
-    SecretProvidersConfigServlet servlet =
-        new SecretProvidersConfigServlet(new ServerConfig(false));
-    servlet.init();
-    HttpServletResponse res = mock(HttpServletResponse.class);
-    PrintWriter writer = mock(PrintWriter.class);
-    when(res.getWriter()).thenReturn(writer);
-    doThrow(new IOException("Test IO error")).when(writer).write(any(String.class));
+    try (SecretProviderRegistry registry = new SecretProviderRegistry(new Config(false) {})) {
+      SecretProvidersConfigServlet servlet = new SecretProvidersConfigServlet(registry);
+      servlet.init();
+      HttpServletResponse res = mock(HttpServletResponse.class);
+      PrintWriter writer = mock(PrintWriter.class);
+      when(res.getWriter()).thenReturn(writer);
+      doThrow(new IOException("Test IO error")).when(writer).write(any(String.class));
 
-    assertDoesNotThrow(() -> servlet.doGet(null, res));
-    verify(res).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-    servlet.destroy();
+      assertDoesNotThrow(() -> servlet.doGet(null, res));
+      verify(res).setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      servlet.destroy();
+    }
   }
 
-  private Map<String, Object> fetchProviders(ServerConfig serverConfig) throws Exception {
-    SecretProvidersConfigServlet servlet = new SecretProvidersConfigServlet(serverConfig);
+  private static SecretProviderRegistry registryWithMemoryProvider(String uri) {
+    return registryWithNamedProvider("memory", uri);
+  }
+
+  private static SecretProviderRegistry registryWithNamedProvider(String name, String uri) {
+    Config config = new Config(false) {};
+    Properties properties = new Properties();
+    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, name);
+    properties.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + name
+            + "."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    if (uri != null) {
+      properties.setProperty(
+          SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+              + name
+              + "."
+              + SecretProviderRegistry.URI,
+          uri);
+    }
+    config.loadFromProperties(properties);
+    return new SecretProviderRegistry(config);
+  }
+
+  private Map<String, Object> fetchProviders(SecretProviderRegistry registry) throws Exception {
+    SecretProvidersConfigServlet servlet = new SecretProvidersConfigServlet(registry);
     servlet.init();
     HttpServletResponse res = mock(HttpServletResponse.class);
     PrintWriter writer = mock(PrintWriter.class);
@@ -119,8 +127,9 @@ public class TestSecretProvidersConfigServlet {
         .readValue(captor.getValue(), new TypeReference<Map<String, Object>>() {});
   }
 
-  private List<Map<String, Object>> fetchProviderList(ServerConfig serverConfig) throws Exception {
-    Map<String, Object> body = fetchProviders(serverConfig);
+  private List<Map<String, Object>> fetchProviderList(SecretProviderRegistry registry)
+      throws Exception {
+    Map<String, Object> body = fetchProviders(registry);
     return ObjectMapperProvider.objectMapper()
         .convertValue(body.get("providers"), new TypeReference<List<Map<String, Object>>>() {});
   }

@@ -38,7 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Loads and owns named {@link GravitinoSecretProvider} instances from server configuration.
+ * Loads and owns named {@link GravitinoSecretProvider} instances from server configuration for the
+ * process lifetime (owned by {@code GravitinoEnv}, analogous to the KMS client registry).
  *
  * <p>Configuration shape:
  *
