@@ -58,6 +58,25 @@ lanceSparkBundleVersions.forEach { version ->
   }
 }
 
+// The standalone distribution packages this module's runtimeClasspath into libs/. The Hive
+// metastore client (via :lance:lance-common -> lance-namespace-hive2 -> hive-common) transitively
+// drags in legacy servlet containers/APIs that collide with Gravitino's Jetty 9.4.x + Servlet 3.1:
+//   - org.eclipse.jetty.aggregate:jetty-all:7.6.0 / org.mortbay.jetty / org.eclipse.jetty.orbit
+//     -> IncompatibleClassChangeError: Connector can not implement Container
+//   - javax.servlet:servlet-api:2.4 / javax.servlet:jsp-api:2.0
+//     -> NoSuchMethodError: HttpServletRequest.getDispatcherType() (a Servlet 3.0+ method)
+// Because libs/ is loaded alphabetically at runtime, these old jars shadow the modern ones and
+// crash the server (at startup, or on the first request). The Hive metastore client needs no
+// servlet container, so drop them from this module's classpath too (the excludes in lance-common
+// do not propagate to a consuming module's runtimeClasspath).
+configurations.all {
+  exclude(group = "org.eclipse.jetty.aggregate")
+  exclude(group = "org.eclipse.jetty.orbit")
+  exclude(group = "org.mortbay.jetty")
+  exclude(group = "javax.servlet", module = "servlet-api")
+  exclude(group = "javax.servlet", module = "jsp-api")
+}
+
 dependencies {
   implementation(project(":api"))
   implementation(project(":common")) {

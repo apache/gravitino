@@ -39,6 +39,14 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
   public static final String GRAVITINO_NAMESPACE_BACKEND = "gravitino";
   public static final String GRAVITINO_URI = "http://localhost:8090";
 
+  // Backed by lance-namespace-hive2; named "hive2" because Lance also ships a separate
+  // lance-namespace-hive3 implementation.
+  public static final String HIVE2_NAMESPACE_BACKEND = "hive2";
+  // The hive-* config keys are shared Hive Metastore settings, not tied to the hive2 backend
+  // name, so a future hive3 backend can reuse them as-is.
+  public static final String HIVE_CONFIG_KEY_PREFIX = "hive";
+  public static final int DEFAULT_HIVE_CLIENT_POOL_SIZE = 3;
+
   public static final ConfigEntry<String> NAMESPACE_BACKEND =
       new ConfigBuilder(CONFIG_NAMESPACE_BACKEND)
           .doc("The backend implementation for namespace operations")
@@ -60,6 +68,27 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault(GRAVITINO_URI);
 
+  public static final ConfigEntry<String> HIVE_METASTORE_URIS =
+      new ConfigBuilder(HIVE_CONFIG_KEY_PREFIX + "-metastore-uris")
+          .doc("The Hive Metastore thrift URIs, e.g., thrift://host:9083")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> HIVE_WAREHOUSE =
+      new ConfigBuilder(HIVE_CONFIG_KEY_PREFIX + "-warehouse")
+          .doc("The warehouse/root storage location for the Hive Lance namespace backend")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<Integer> HIVE_CLIENT_POOL_SIZE =
+      new ConfigBuilder(HIVE_CONFIG_KEY_PREFIX + "-client-pool-size")
+          .doc("The size of the Hive Metastore client pool")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .createWithDefault(DEFAULT_HIVE_CLIENT_POOL_SIZE);
+
   public LanceConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, key -> true);
@@ -79,6 +108,18 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
 
   public String getGravitinoMetalake() {
     return get(METALAKE_NAME);
+  }
+
+  public String getHiveMetastoreUris() {
+    return get(HIVE_METASTORE_URIS);
+  }
+
+  public String getHiveWarehouse() {
+    return get(HIVE_WAREHOUSE);
+  }
+
+  public int getHiveClientPoolSize() {
+    return get(HIVE_CLIENT_POOL_SIZE);
   }
 
   @Override

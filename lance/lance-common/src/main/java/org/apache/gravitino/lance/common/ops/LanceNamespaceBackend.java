@@ -20,9 +20,13 @@ package org.apache.gravitino.lance.common.ops;
 
 import java.util.Arrays;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceNamespaceWrapper;
+import org.apache.gravitino.lance.common.ops.hive.HiveLanceNamespaceWrapper;
 
 public enum LanceNamespaceBackend {
-  GRAVITINO("gravitino", GravitinoLanceNamespaceWrapper.class);
+  GRAVITINO("gravitino", GravitinoLanceNamespaceWrapper.class),
+  // Backed by lance-namespace-hive2; named "hive2" because Lance also ships a separate
+  // lance-namespace-hive3 implementation.
+  HIVE2("hive2", HiveLanceNamespaceWrapper.class);
 
   private final String type;
   private final Class<? extends NamespaceWrapper> wrapperClass;
