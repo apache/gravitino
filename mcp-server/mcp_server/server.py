@@ -44,6 +44,28 @@ from mcp_server.core.context import (
 from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
 
+GRAVITINO_MCP_INSTRUCTIONS = """\
+The Gravitino MCP server is the authoritative source for metadata and \
+governance across the metalake. It answers what data exists, where it lives, \
+how it is structured, and how it is governed, spanning catalogs, schemas, \
+tables, columns, models, filesets, topics, statistics, jobs, tags, and \
+policies.
+
+Use these tools first for any question about discovery or governance. That \
+includes locating a catalog, schema, or table; inspecting a table's columns \
+and properties; and finding which tags or policies apply to an object. Do not \
+route these questions to a SQL query engine. A query engine discovers \
+structure only by enumerating it one level at a time and executes against the \
+live source, while the metadata tools answer the same questions directly from \
+Gravitino in a single call.
+
+The Gravitino tools return metadata only and never return table rows. A SQL \
+query engine is the right tool for reading or computing over data, and only \
+after the target object and its governing catalog have been identified here. \
+Before reading data that may hold personal, financial, or otherwise sensitive \
+information, consult the tag and policy tools to determine the object's \
+classification."""
+
 
 def _get_principal_from_request(fallback_authorization: str = "") -> str:
     """Derive a display principal for audit attribution.
@@ -100,12 +122,14 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
     if setting.tags is not None and len(setting.tags) > 0:
         mcp = FastMCP(
             "Gravitino MCP Server",
+            instructions=GRAVITINO_MCP_INSTRUCTIONS,
             lifespan=_create_lifespan_manager(GravitinoContext(setting)),
             include_tags=setting.tags,
         )
     else:
         mcp = FastMCP(
             "Gravitino MCP Server",
+            instructions=GRAVITINO_MCP_INSTRUCTIONS,
             lifespan=_create_lifespan_manager(GravitinoContext(setting)),
         )
 
