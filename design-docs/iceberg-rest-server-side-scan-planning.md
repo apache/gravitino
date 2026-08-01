@@ -184,7 +184,8 @@ Re-planning is not free but it is also not new work: it reads the same
 manifests the first plan read, for a snapshot that is pinned and therefore
 immutable. The mitigation is documented (enable `scan-plan-cache-impl`);
 coupling batching to the cache being enabled was considered and rejected in
-review (§8.1).
+review (§8.1). What this costs in a replicated deployment, and what would remove
+the cost rather than shrink it, is §5.15 and §8.5.
 
 **Alternative considered for ordering.** A plan task could carry the identity of
 the files it covers instead of an index range, which would remove the
@@ -416,11 +417,43 @@ result set that never existed at any point in time. Requests that already
 pin a snapshot, incremental requests, and tables with no current snapshot
 are planned exactly as they arrive.
 
-**Total order.** Iceberg plans manifests in parallel, so `planFiles()` does
-not return tasks in a reproducible order. Tasks are therefore sorted by
-`(data file location, start, length)` before batching or caching. The triple
-is a total order because two tasks over the same file cover disjoint byte
-ranges.
+**Total order.** Iceberg plans manifests in parallel, so `planFiles()` does not
+return tasks in a reproducible order. Tasks are therefore sorted before batching
+or caching, by
+
+```
+(data file location, start, length,
+ data sequence number, file sequence number,
+ manifest location, manifest entry position)
+```
+
+An earlier revision of this design sorted on the first three fields only,
+reasoning that two tasks over one file cover disjoint byte ranges. That is not
+enough, and review on
+[#12241](https://github.com/apache/gravitino/pull/12241#issuecomment-5129278423)
+asked for the claim to be proved or fixed. It cannot be proved: **one path can be
+referenced by several manifest entries.** Appending the same data file twice
+produces two entries with the same location, offset and length, differing in
+sequence number and potentially in the delete files attached to them:
+
+```
+location=…/dup.parquet start=0 length=10  dataSeq=2  manifest=…-m0.avro pos=0
+location=…/dup.parquet start=0 length=10  dataSeq=1  manifest=…-m0.avro pos=0
+```
+
+Sorting is stable, so tasks that tie keep the order Iceberg planned them in,
+which is exactly the order that is not reproducible. Two tied tasks either side
+of a batch boundary could therefore swap places between the plan and a later
+re-plan, and the client would receive one of them twice and never see the other -
+a wrong result, not merely a slow one.
+
+A manifest entry is unique within a snapshot, identified by its manifest and its
+position in that manifest, so comparing those makes the order total for any two
+tasks that are not interchangeable. Sequence numbers are compared first because
+they survive a rewrite into new manifests, and they remain the discriminator if a
+reader leaves the manifest fields unset. Tasks that tie on every key carry the
+same file, range, sequence numbers and entry, so exchanging them is invisible to
+a client.
 
 Both properties are needed together: pinning without ordering still lets a
 re-plan shuffle the batches; ordering without pinning still lets the
@@ -586,6 +619,53 @@ CatalogWrapperForREST.fetchScanTasks
 `FederatedCatalogWrapper` overrides the last step and posts to the remote
 catalog instead.
 
+### 5.15 Multi-replica deployments
+
+Gravitino's Iceberg REST server is routinely run as several replicas behind a
+load balancer, and the Iceberg Java client fetches plan tasks **concurrently**
+(`ScanTaskIterable` uses a worker pool), so the requests of one scan land on
+different replicas by design. This section states what that costs and what it
+does not.
+
+**Correctness does not depend on which replica serves a request.** A plan task
+carries everything needed to resolve it, so any replica that can load the table
+can decode it, reproduce the plan of the pinned snapshot, and slice the same
+range - provided the order in §5.6 is total, which is why that section matters
+more than it first appears. No replica holds state the others lack, nothing
+expires, and a restart mid-scan is invisible to the client.
+
+**Cost does depend on it.** Redeeming a plan task needs the full ordered task
+list for its snapshot. The scan plan cache is node-local, so `/plan` served by
+replica A warms only A: concurrent `/tasks` on B, C and D each miss and re-plan
+the whole pinned snapshot - reading the manifests again and sorting the full task
+list - to return one batch. For a plan of N tasks and batch size B the worst case
+is `ceil(N/B)` full plans spread across replicas, which for a large table
+multiplies manifest reads against object storage.
+
+Nothing about that is incorrect: the snapshot is pinned, so every re-plan of a
+given plan task produces the same tasks. It is a load-amplification problem, and
+the expected production posture is:
+
+| Measure | Effect |
+| ------- | ------ |
+| Enable a scan plan cache ([#12254](https://github.com/apache/gravitino/issues/12254) proposes making it the default) | Removes re-planning for requests that land on a replica that already has the plan |
+| Route a client's scan to one replica (load balancer affinity) | Makes the node-local cache effective for the whole scan |
+| Raise `scan-plan-task-batch-size` for large tables | Fewer plan tasks, so proportionally fewer redemptions |
+| Coalesce concurrent redemptions of one plan on a replica | Collapses the concurrent fetches of one scan into a single plan per replica |
+
+The measures above reduce the multiplier; they do not remove it. Removing it
+needs a plan task whose redemption cost is independent of the size of the plan -
+see the manifest-scoped alternative in §8.4 - or a cache shared by all replicas.
+
+**On signing plan tasks.** §5.5.4 explains why plan tasks are not signed: they
+grant nothing, and authorization comes from the request path. Review raised the
+consequence for this section, which is worth recording: if a future change signs
+or HMACs a plan task to distinguish "issued by this server" from "well-formed but
+forged", the key must be shared by every replica. A per-replica key would make a
+plan task verifiable only on the replica that issued it, reintroducing exactly
+the failure mode this design avoids, and it would do so silently - the client
+would see intermittent `404`s that depend on load balancer routing.
+
 ---
 
 ## 6. Backward compatibility
@@ -616,8 +696,11 @@ catalog instead.
 
 ## 8. Decisions taken in review
 
-Three questions were open when this design was first written and were settled
-in review on [#12241](https://github.com/apache/gravitino/pull/12241).
+Three questions were open when this design was first written and were settled in
+review on [#12241](https://github.com/apache/gravitino/pull/12241) (§8.1 to
+§8.3). The later sections record what a second round of review asked for: how
+this compares with other implementations, and what a full fix for re-planning
+cost would look like.
 
 ### 8.1 Batching does not depend on the scan plan cache
 
@@ -655,6 +738,56 @@ it pins exists, and the class that produces and reads it is named
 `PlanTaskCodec` rather than a token type, to keep the code aligned with that
 framing.
 
+### 8.4 How other implementations compare
+
+Review asked how this compares with what other catalogs are doing
+([#12241](https://github.com/apache/gravitino/pull/12241#issuecomment-5129106422)).
+
+**Apache Polaris (incubating): not implemented.** Polaris deliberately excludes
+all three scan planning paths from the catalog service spec it generates its API
+from - `.../plan`, `.../plan/{plan-id}` and `.../tasks` appear only as commented
+placeholders marked "Not implemented in Polaris" in
+[`spec/polaris-catalog-service.yaml`](https://github.com/apache/polaris/blob/main/spec/polaris-catalog-service.yaml),
+and its advertised `/v1/config` endpoint list omits them, so a conformant client
+falls back to client-side planning. The tracking issue,
+[apache/polaris#966](https://github.com/apache/polaris/issues/966), has been open
+since February 2025 with no comments, across spec refreshes up to Iceberg 1.11.
+There is therefore no Polaris design to borrow from or contrast against: it has
+neither the load-amplification problem nor the ordering problem, because it does
+not plan scans server side.
+
+**Iceberg's own reference handler: in-memory, single node.** The closest existing
+Java implementation is `CatalogHandlers` with `RESTCatalogAdapter`, the fixture
+behind the `iceberg-rest-fixture` image. It keeps plans in a static
+`InMemoryPlanningState`, hands out plan tasks derived from a plan id and an index,
+and resolves them by map lookup. That inverts this design's trade-off exactly:
+redemption is free, but a plan task means nothing after a restart or on another
+process, and the fixture is not intended for a replicated deployment. It also
+consults `min-rows-requested`, which this design does not (Non-Goal 2).
+
+So the comparison is: redemption cost is the price this design pays for working
+across replicas and restarts, and the reference implementation pays the opposite
+price. Neither problem is solved for free by an existing implementation.
+
+### 8.5 Manifest-scoped plan tasks, if amplification needs a real fix
+
+The measures in §5.15 shrink the re-planning multiplier without removing it. The
+way to remove it is to change what a plan task *is*: instead of an offset range
+into a global task list, make it name the work directly - a data manifest, or a
+manifest plus an entry range. Redeeming it would then read that one manifest and
+the snapshot's delete manifests, instead of re-planning the whole snapshot, so the
+cost per redemption would be independent of the plan's size, on any replica, with
+no shared cache. It would also make §5.6 unnecessary: with no global index there
+is nothing for a total order to stabilise.
+
+It is not proposed now because Iceberg does not expose it. `ManifestGroup` and
+`DeleteFileIndex`, which do residual evaluation and delete-file attachment, are
+package-private in `iceberg-core`; building tasks from `ManifestFiles.read` alone
+would mean reimplementing that logic and risking divergence from Iceberg's own
+scan semantics. The realistic paths are an upstream API request or a carefully
+scoped port, either of which is a change of its own, and the current design is
+correct in the meantime.
+
 ---
 
 ## 9. Task Breakdown
@@ -680,6 +813,8 @@ Delivered in [#12194](https://github.com/apache/gravitino/pull/12194):
 Follow-ups, each its own issue:
 
 - [ ] Decide whether the scan plan cache should be enabled by default (§8.1)
+- [ ] Coalesce concurrent redemptions of one plan on a replica, so the concurrent fetches of one scan cost one plan (§5.15)
+- [ ] Investigate manifest-scoped plan tasks, upstream API included, to remove re-planning entirely (§8.5)
 - [ ] Integration test with pyiceberg `scan-planning-mode=server` against a multi-batch table
 - [ ] Honor `min-rows-requested` when sizing batches (Non-Goal 2)
 - [ ] Ship a shared `ScanPlanCache` implementation so plan task redemption avoids re-planning across replicas (Non-Goal 3)
