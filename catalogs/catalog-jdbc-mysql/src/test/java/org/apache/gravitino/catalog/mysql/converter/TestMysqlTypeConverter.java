@@ -65,13 +65,11 @@ public class TestMysqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(0), DATETIME, 19, null, 0);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(3), DATETIME, 23, null, 3);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(6), DATETIME, 26, null, 6);
-    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(9), DATETIME, 29, null, 9);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withTimeZone(), TIMESTAMP, null, null, null);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withTimeZone(0), TIMESTAMP, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withTimeZone(0), TIMESTAMP, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withTimeZone(3), TIMESTAMP, 23, null, 3);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withTimeZone(6), TIMESTAMP, 26, null, 6);
-    checkJdbcTypeToGravitinoType(Types.TimestampType.withTimeZone(9), TIMESTAMP, 29, null, 9);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, 10, 2, 0);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL_UNSIGNED, 10, 2, 0);
     checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, 20, null, 0);
@@ -102,6 +100,78 @@ public class TestMysqlTypeConverter {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
+  }
+
+  @Test
+  public void testRejectNanosecondTimestampTypes() {
+    checkGravitinoTypeToJdbcType("datetime(6)", Types.TimestampType.withoutTimeZone(6));
+    checkGravitinoTypeToJdbcType("timestamp(6)", Types.TimestampType.withTimeZone(6));
+
+    IllegalArgumentException timestampException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.TimestampType.withoutTimeZone(9)));
+    Assertions.assertTrue(
+        timestampException
+            .getMessage()
+            .contains("fractional-second precision must be between 0 and 6"));
+
+    IllegalArgumentException timestampTzException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.TimestampType.withTimeZone(9)));
+    Assertions.assertTrue(
+        timestampTzException
+            .getMessage()
+            .contains("fractional-second precision must be between 0 and 6"));
+  }
+
+  @Test
+  public void testRejectVariantType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.VariantType.get()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("MySQL JSON does not represent the complete Variant value domain"));
+  }
+
+  @Test
+  public void testRejectNullType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.NullType.get()));
+    Assertions.assertTrue(
+        exception.getMessage().contains("the null-only placeholder has no MySQL column type"));
+  }
+
+  @Test
+  public void testRejectGeometryType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.GeometryType.of("SRID:3857")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("the JDBC catalog cannot round-trip Geometry CRS/SRID metadata"));
+  }
+
+  @Test
+  public void testRejectGeographyType() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                MYSQL_TYPE_CONVERTER.fromGravitino(Types.GeographyType.of("EPSG:4326", "karney")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "MySQL has no Geography type that preserves CRS and edge-algorithm metadata"));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {

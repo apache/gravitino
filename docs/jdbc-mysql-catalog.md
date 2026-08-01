@@ -134,16 +134,31 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `String`             | `Text`              |
 | `Date`               | `Date`              |
 | `Time[(p)]`          | `Time[(p)]`         |
-| `Timestamp_tz[(p)]`  | `Timestamp(p)`      |
-| `Timestamp[(p)]`     | `Datetime[(p)]`     |
+| `Timestamp_tz[(p)]`  | `Timestamp[(p)]`, p in [0, 6] |
+| `Timestamp[(p)]`     | `Datetime[(p)]`, p in [0, 6]  |
 | `Decimal`            | `Decimal`           |
 | `VarChar`            | `VarChar`           |
 | `FixedChar`          | `FixedChar`         |
 | `Binary`             | `Binary`            |
 | `BOOLEAN`            | `BIT`               |
 
+MySQL supports fractional-second precision from 0 through 6. The catalog rejects Gravitino
+`Timestamp` and `Timestamp_tz` precision from 7 through 9 before executing DDL.
+
+Gravitino `Variant` is rejected before executing DDL because MySQL `JSON` does not represent the
+complete Variant value domain.
+
+Gravitino `Null` (the V3 unknown type) is rejected before executing DDL because it is a null-only
+placeholder, not a MySQL column type.
+
+Although MySQL has a native `GEOMETRY` type, Gravitino `Geometry` is rejected before executing DDL
+because the JDBC catalog cannot round-trip its CRS/SRID metadata without loss.
+
+Gravitino `Geography` is rejected before executing DDL because MySQL has no distinct geography type
+that preserves both its CRS and edge-algorithm metadata.
+
 :::info
-MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` `Variant` `Null` `Geometry` `Geography` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
