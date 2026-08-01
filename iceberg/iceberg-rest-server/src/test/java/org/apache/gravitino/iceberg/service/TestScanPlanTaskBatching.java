@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -233,6 +234,54 @@ public class TestScanPlanTaskBatching {
   }
 
   @Test
+  void testTasksOverTheSameFileAreOrderedApart() {
+    // A plan task addresses tasks by position, so tasks that a re-plan could return in a different
+    // order must still order the same way. Data file location, offset and length are not enough for
+    // that: appending one path twice leaves two manifest entries that tie on all three, and only
+    // the entry identity tells them apart. Without a further tie-break, a re-plan could swap the
+    // two around a batch boundary, serving one twice and dropping the other.
+    CatalogWrapperForREST wrapper = newWrapper("duplicate-path", 1);
+    TableIdentifier tableId = createTableWithDataFiles(wrapper, "tbl", 0);
+    String duplicatedLocation = dataFileLocation("tbl", 0);
+    appendDataFile(wrapper, tableId, duplicatedLocation);
+    appendDataFile(wrapper, tableId, duplicatedLocation);
+
+    PlanTableScanResponse plan = planTableScan(wrapper, tableId);
+    Assertions.assertEquals(1, plan.fileScanTasks().size());
+    Assertions.assertEquals(1, plan.planTasks().size());
+
+    String planTask = plan.planTasks().get(0);
+    List<FileScanTask> fetched =
+        wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest(planTask)).fileScanTasks();
+    Assertions.assertEquals(1, fetched.size());
+
+    Assertions.assertEquals(
+        ImmutableList.of(duplicatedLocation, duplicatedLocation),
+        ImmutableList.<String>builder()
+            .addAll(dataFileLocations(plan.fileScanTasks()))
+            .addAll(dataFileLocations(fetched))
+            .build());
+    // Positions must follow the entries, not the order planning happened to return them in: the
+    // older entry sorts first because the tasks tie on location, offset and length. Iceberg plans
+    // the newest manifest first, so an order that merely preserved the planning order would put
+    // sequence number 2 in the inline batch.
+    Assertions.assertEquals(
+        ImmutableList.of(1L),
+        dataSequenceNumbers(plan.fileScanTasks()),
+        "The inline batch must hold the older manifest entry of the duplicated file");
+    Assertions.assertEquals(
+        ImmutableList.of(2L),
+        dataSequenceNumbers(fetched),
+        "The plan task must hold the newer manifest entry of the duplicated file");
+
+    // Redeeming the same plan task again must land on the same entry.
+    Assertions.assertEquals(
+        dataSequenceNumbers(fetched),
+        dataSequenceNumbers(
+            wrapper.fetchScanTasks(tableId, new FetchScanTasksRequest(planTask)).fileScanTasks()));
+  }
+
+  @Test
   void testFetchReportsAMissingTableRatherThanAnUnknownPlanTask() {
     CatalogWrapperForREST wrapper = newWrapper("missing-table", 1);
     ((SupportsNamespaces) wrapper.getCatalog()).createNamespace(NAMESPACE);
@@ -323,6 +372,12 @@ public class TestScanPlanTaskBatching {
       locations.add(dataFileLocation(tableName, i));
     }
     return locations.stream().sorted().collect(Collectors.toList());
+  }
+
+  private static List<Long> dataSequenceNumbers(List<FileScanTask> fileScanTasks) {
+    return fileScanTasks.stream()
+        .map(task -> task.file().dataSequenceNumber())
+        .collect(Collectors.toList());
   }
 
   private static List<String> dataFileLocations(List<FileScanTask> fileScanTasks) {
