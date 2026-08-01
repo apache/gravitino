@@ -39,5 +39,5 @@ banks==2.4.2
 # The multi-version matrix (`:clients:client-python:lanceRayMatrixTest`) keeps
 # its own per-version venvs and does not consume these pins.
 ray==2.55.1
-lance-ray==0.4.2
+lance-ray==0.5.0
 lance-namespace==0.7.5
