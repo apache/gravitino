@@ -106,6 +106,94 @@ public abstract class JdbcTableOperations implements TableOperation {
     sqlBuilder.append("DEFAULT ").append(defaultValue).append(SPACE);
   }
 
+  /**
+   * Validates all create-table types before generating or executing DDL.
+   *
+   * <p>This method first invokes the configured type converter for every column so that static
+   * connector rules fail before any DDL. It then invokes {@link
+   * #validateCreateTableTypeCapabilities(Connection, String, String, JdbcColumn[])} for
+   * connection-dependent checks.
+   *
+   * @param connection live JDBC connection used for the create operation
+   * @param databaseName database that will contain the table
+   * @param tableName table to create
+   * @param columns columns requested for the table
+   * @throws SQLException if capability discovery through the JDBC connection fails
+   */
+  protected final void validateCreateTableTypes(
+      Connection connection, String databaseName, String tableName, JdbcColumn[] columns)
+      throws SQLException {
+    Arrays.stream(columns).forEach(column -> typeConverter.fromGravitino(column.dataType()));
+    validateCreateTableTypeCapabilities(connection, databaseName, tableName, columns);
+  }
+
+  /**
+   * Validates all alter-table types before generating or executing DDL.
+   *
+   * <p>This method first invokes the configured type converter for every type-bearing change so
+   * that the entire batch is checked before any DDL. It then invokes {@link
+   * #validateAlterTableTypeCapabilities(Connection, String, String, TableChange...)} for
+   * connection-dependent checks.
+   *
+   * @param connection live JDBC connection used for the alter operation
+   * @param databaseName database containing the table
+   * @param tableName table to alter
+   * @param changes requested table changes
+   * @throws SQLException if capability discovery through the JDBC connection fails
+   */
+  protected final void validateAlterTableTypes(
+      Connection connection, String databaseName, String tableName, TableChange... changes)
+      throws SQLException {
+    Arrays.stream(changes)
+        .forEach(
+            change -> {
+              if (change instanceof TableChange.AddColumn addColumn) {
+                typeConverter.fromGravitino(addColumn.getDataType());
+              } else if (change instanceof TableChange.UpdateColumnType updateColumnType) {
+                typeConverter.fromGravitino(updateColumnType.getNewDataType());
+              }
+            });
+    validateAlterTableTypeCapabilities(connection, databaseName, tableName, changes);
+  }
+
+  /**
+   * Validates connection-dependent create-table type capabilities.
+   *
+   * <p>The default implementation accepts all types. Connector implementations can override this
+   * hook to inspect the database version, installed extensions, or server mode.
+   *
+   * @param connection live JDBC connection used for the create operation
+   * @param databaseName database that will contain the table
+   * @param tableName table to create
+   * @param columns columns requested for the table
+   * @throws SQLException if capability discovery through the JDBC connection fails
+   */
+  protected void validateCreateTableTypeCapabilities(
+      Connection connection, String databaseName, String tableName, JdbcColumn[] columns)
+      throws SQLException {
+    // Nothing to validate by default.
+  }
+
+  /**
+   * Validates connection-dependent alter-table type capabilities.
+   *
+   * <p>The default implementation accepts all types. Connector implementations can override this
+   * hook to inspect the database version, installed extensions, or server mode. Every requested
+   * change is provided together so that an invalid later change is rejected before an earlier DDL
+   * statement executes.
+   *
+   * @param connection live JDBC connection used for the alter operation
+   * @param databaseName database containing the table
+   * @param tableName table to alter
+   * @param changes requested table changes
+   * @throws SQLException if capability discovery through the JDBC connection fails
+   */
+  protected void validateAlterTableTypeCapabilities(
+      Connection connection, String databaseName, String tableName, TableChange... changes)
+      throws SQLException {
+    // Nothing to validate by default.
+  }
+
   @Override
   public void create(
       String databaseName,
@@ -143,6 +231,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       throws TableAlreadyExistsException {
     LOG.info("Attempting to create table {} in database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
+      validateCreateTableTypes(connection, databaseName, tableName, columns);
       String sql =
           generateCreateTableSql(
               tableName,
@@ -354,6 +443,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       throws NoSuchTableException {
     LOG.info("Attempting to alter table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
+      validateAlterTableTypes(connection, databaseName, tableName, changes);
       String sql = generateAlterTableSql(databaseName, tableName, changes);
       if (StringUtils.isEmpty(sql)) {
         LOG.info("No changes to alter table {} from database {}", tableName, databaseName);

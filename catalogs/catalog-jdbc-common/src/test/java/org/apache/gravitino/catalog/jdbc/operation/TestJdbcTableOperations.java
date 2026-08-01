@@ -22,6 +22,9 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -37,6 +40,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
@@ -45,7 +49,11 @@ import org.apache.gravitino.connector.BaseColumn;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -245,6 +253,118 @@ public class TestJdbcTableOperations {
     Assertions.assertTrue(JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("org.sqlite.JDBC"));
   }
 
+  @Test
+  public void testCreateTypeValidationRunsBeforeBothCreateOverloads() {
+    assertCreateRejectedBeforeSql(false);
+    assertCreateRejectedBeforeSql(true);
+  }
+
+  @Test
+  public void testAlterTypeValidationRunsBeforeSqlGeneration() {
+    ValidatingSqliteTableOperations operations = createValidatingTableOperations();
+    TableChange[] changes = {
+      TableChange.updateColumnType(new String[] {"col"}, Types.VariantType.get()),
+      TableChange.addColumn(new String[] {"later_col"}, Types.StringType.get())
+    };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> operations.alterTable(DATABASE_NAME, "validation_alter", changes));
+
+    Assertions.assertEquals(
+        ValidatingSqliteTableOperations.REJECTION_MESSAGE, exception.getMessage());
+    Assertions.assertTrue(operations.alterValidationCalled);
+    Assertions.assertEquals(changes.length, operations.validatedAlterChangeCount);
+    Assertions.assertFalse(operations.alterSqlGenerated);
+  }
+
+  @Test
+  public void testStaticConverterValidationRejectsWholeAlterBatchBeforeSqlGeneration() {
+    PreflightSqliteTableOperations operations = new PreflightSqliteTableOperations();
+    RejectingSqliteTypeConverter converter = new RejectingSqliteTypeConverter();
+    operations.initialize(
+        DATA_SOURCE,
+        EXCEPTION_CONVERTER,
+        converter,
+        COLUMN_DEFAULT_VALUE_CONVERTER,
+        Collections.emptyMap());
+    TableChange[] changes = {
+      TableChange.addColumn(new String[] {"valid_col"}, Types.StringType.get()),
+      TableChange.addColumn(new String[] {"invalid_col"}, Types.VariantType.get())
+    };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> operations.alterTable(DATABASE_NAME, "preflight_alter", changes));
+
+    Assertions.assertEquals(
+        "JDBC connector 'sqlite-test' cannot map source type 'variant': unsupported test type",
+        exception.getMessage());
+    Assertions.assertEquals(
+        Arrays.asList(Type.Name.STRING, Type.Name.VARIANT), converter.validatedTypes);
+    Assertions.assertFalse(operations.alterSqlGenerated);
+  }
+
+  private static void assertCreateRejectedBeforeSql(boolean useSortOrderOverload) {
+    ValidatingSqliteTableOperations operations = createValidatingTableOperations();
+    String tableName =
+        useSortOrderOverload ? "validation_create_with_sort" : "validation_create_without_sort";
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("variant_col")
+          .withType(Types.VariantType.get())
+          .withNullable(true)
+          .build()
+    };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              if (useSortOrderOverload) {
+                operations.create(
+                    DATABASE_NAME,
+                    tableName,
+                    columns,
+                    null,
+                    Collections.emptyMap(),
+                    new Transform[0],
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES,
+                    new SortOrder[0]);
+              } else {
+                operations.create(
+                    DATABASE_NAME,
+                    tableName,
+                    columns,
+                    null,
+                    Collections.emptyMap(),
+                    new Transform[0],
+                    Distributions.NONE,
+                    Indexes.EMPTY_INDEXES);
+              }
+            });
+
+    Assertions.assertEquals(
+        ValidatingSqliteTableOperations.REJECTION_MESSAGE, exception.getMessage());
+    Assertions.assertTrue(operations.createValidationCalled);
+    Assertions.assertFalse(operations.createSqlGenerated);
+    Assertions.assertFalse(operations.listTables(DATABASE_NAME).contains(tableName));
+  }
+
+  private static ValidatingSqliteTableOperations createValidatingTableOperations() {
+    ValidatingSqliteTableOperations operations = new ValidatingSqliteTableOperations();
+    operations.initialize(
+        DATA_SOURCE,
+        EXCEPTION_CONVERTER,
+        TYPE_CONVERTER,
+        COLUMN_DEFAULT_VALUE_CONVERTER,
+        Collections.emptyMap());
+    return operations;
+  }
+
   private static JdbcColumn[] generateRandomColumn(int minSize, int maxSize) {
     Random r = new Random();
     String prefixColName = "col_";
@@ -267,5 +387,85 @@ public class TestJdbcTableOperations {
         .skip(r.nextInt(values.size()))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("No type found"));
+  }
+
+  private static class ValidatingSqliteTableOperations extends SqliteTableOperations {
+
+    private static final String REJECTION_MESSAGE = "test connector rejects variant";
+
+    private boolean createValidationCalled;
+    private boolean createSqlGenerated;
+    private boolean alterValidationCalled;
+    private boolean alterSqlGenerated;
+    private int validatedAlterChangeCount;
+
+    @Override
+    protected void validateCreateTableTypeCapabilities(
+        Connection connection, String databaseName, String tableName, JdbcColumn[] columns)
+        throws SQLException {
+      Assertions.assertFalse(connection.isClosed());
+      Assertions.assertNotNull(connection.getMetaData());
+      createValidationCalled = true;
+      throw new IllegalArgumentException(REJECTION_MESSAGE);
+    }
+
+    @Override
+    protected void validateAlterTableTypeCapabilities(
+        Connection connection, String databaseName, String tableName, TableChange... changes)
+        throws SQLException {
+      Assertions.assertFalse(connection.isClosed());
+      Assertions.assertNotNull(connection.getMetaData());
+      alterValidationCalled = true;
+      validatedAlterChangeCount = changes.length;
+      throw new IllegalArgumentException(REJECTION_MESSAGE);
+    }
+
+    @Override
+    protected String generateCreateTableSql(
+        String tableName,
+        JdbcColumn[] columns,
+        String comment,
+        Map<String, String> properties,
+        Transform[] partitioning,
+        Distribution distribution,
+        Index[] indexes) {
+      createSqlGenerated = true;
+      return super.generateCreateTableSql(
+          tableName, columns, comment, properties, partitioning, distribution, indexes);
+    }
+
+    @Override
+    protected String generateAlterTableSql(
+        String databaseName, String tableName, TableChange... changes) {
+      alterSqlGenerated = true;
+      return "ALTER TABLE " + tableName;
+    }
+  }
+
+  private static class PreflightSqliteTableOperations extends SqliteTableOperations {
+
+    private boolean alterSqlGenerated;
+
+    @Override
+    protected String generateAlterTableSql(
+        String databaseName, String tableName, TableChange... changes) {
+      alterSqlGenerated = true;
+      return "ALTER TABLE " + tableName;
+    }
+  }
+
+  private static class RejectingSqliteTypeConverter extends SqliteTypeConverter {
+
+    private final List<Type.Name> validatedTypes = new ArrayList<>();
+
+    @Override
+    public String fromGravitino(Type type) {
+      validatedTypes.add(type.name());
+      if (type instanceof Types.VariantType) {
+        throw JdbcTypeConverter.unsupportedTypeException(
+            "sqlite-test", type, "unsupported test type");
+      }
+      return super.fromGravitino(type);
+    }
   }
 }
