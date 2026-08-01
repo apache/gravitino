@@ -25,6 +25,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.tag.Tag;
 
 /**
  * The interface provides functionalities for managing policies within a metalake. It includes a
@@ -125,6 +126,28 @@ public interface PolicyDispatcher {
    * @return The array of metadata objects associated with the specified policy.
    */
   MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName);
+
+  /**
+   * List all tag names associated with the specified policy under a metalake.
+   *
+   * @param metalake the name of the metalake
+   * @param policyName the name of the policy
+   * @return The array of tag names associated with the specified policy.
+   */
+  default String[] listTagsForPolicy(String metalake, String policyName) {
+    return Arrays.stream(listTagInfosForPolicy(metalake, policyName))
+        .map(Tag::name)
+        .toArray(String[]::new);
+  }
+
+  /**
+   * List detailed information for all tags associated with the specified policy under a metalake.
+   *
+   * @param metalake the name of the metalake
+   * @param policyName the name of the policy
+   * @return The array of tags associated with the specified policy.
+   */
+  Tag[] listTagInfosForPolicy(String metalake, String policyName);
 
   /**
    * List all the policy names associated with a metadata object under a metalake.

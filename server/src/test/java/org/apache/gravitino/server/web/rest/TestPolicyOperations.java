@@ -57,11 +57,13 @@ import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
+import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
@@ -69,6 +71,7 @@ import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.tag.Tag;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -770,6 +773,55 @@ public class TestPolicyOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = response2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  @Test
+  public void testListTagsForPolicy() {
+    String policyName = "policy1";
+    String[] tags = new String[] {"tag1", "tag2"};
+    when(policyManager.listTagsForPolicy(metalake, policyName)).thenReturn(tags);
+
+    Response response =
+        target(policyPath(metalake))
+            .path(policyName)
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+
+    NameListResponse nameListResponse = response.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nameListResponse.getCode());
+    Assertions.assertArrayEquals(tags, nameListResponse.getNames());
+
+    Tag tag =
+        TagEntity.builder()
+            .withId(1L)
+            .withName("tag1")
+            .withComment("comment")
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.listTagInfosForPolicy(metalake, policyName)).thenReturn(new Tag[] {tag});
+
+    Response detailsResponse =
+        target(policyPath(metalake))
+            .path(policyName)
+            .path("tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
+
+    TagListResponse tagListResponse = detailsResponse.readEntity(TagListResponse.class);
+    Assertions.assertEquals(0, tagListResponse.getCode());
+    Assertions.assertEquals(1, tagListResponse.getTags().length);
+    Assertions.assertEquals(tag.name(), tagListResponse.getTags()[0].name());
+    Assertions.assertEquals(tag.comment(), tagListResponse.getTags()[0].comment());
+    Assertions.assertEquals(Optional.empty(), tagListResponse.getTags()[0].inherited());
   }
 
   private String policyPath(String metalake) {

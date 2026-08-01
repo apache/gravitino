@@ -46,6 +46,7 @@ import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
+import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -255,6 +256,37 @@ public class PolicyManager implements PolicyDispatcher {
                 .toArray(new MetadataObject[0]);
           } catch (IOException e) {
             LOG.error("Failed to list metadata objects for policy {}", policyName, e);
+            throw new RuntimeException(e);
+          }
+        });
+  }
+
+  @Override
+  public Tag[] listTagInfosForPolicy(String metalake, String policyName) {
+    NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+
+    return TreeLockUtils.doWithTreeLock(
+        policyIdent,
+        LockType.READ,
+        () -> {
+          try {
+            return entityStore
+                .relationOperations()
+                .listEntitiesByRelation(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    policyIdent,
+                    Entity.EntityType.POLICY,
+                    true /* allFields */)
+                .stream()
+                .map(entity -> (Tag) entity)
+                .toArray(Tag[]::new);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchPolicyException(
+                e, "Policy with name %s under metalake %s does not exist", policyName, metalake);
+          } catch (IOException e) {
+            LOG.error(
+                "Failed to list tags for policy {} under metalake {}", policyName, metalake, e);
             throw new RuntimeException(e);
           }
         });

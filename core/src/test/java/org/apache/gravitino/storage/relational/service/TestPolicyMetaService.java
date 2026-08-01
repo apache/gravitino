@@ -49,6 +49,7 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
@@ -679,6 +680,118 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertEquals(2, policyEntities7.size());
     Assertions.assertTrue(policyEntities7.contains(policyEntity2));
     Assertions.assertTrue(policyEntities7.contains(policyEntity3));
+  }
+
+  @TestTemplate
+  public void testAssociatePoliciesWithTagAndListTagsForPolicy() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tagEntity1 =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag1")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("comment")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(tagEntity1, false);
+
+    TagEntity tagEntity2 =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag2")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("comment")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(tagEntity2, false);
+
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policyEntity1 =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("policy1")
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE_NAME))
+            .withComment("comment")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withContent(content)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    policyMetaService.insertPolicy(policyEntity1, false);
+
+    PolicyEntity policyEntity2 =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("policy2")
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE_NAME))
+            .withComment("comment")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withContent(content)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    policyMetaService.insertPolicy(policyEntity2, false);
+
+    NameIdentifier[] policiesToAdd =
+        new NameIdentifier[] {
+          NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy1"),
+          NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2")
+        };
+
+    List<PolicyEntity> policiesForTag =
+        policyMetaService.associatePoliciesWithTag(
+            tagEntity1.nameIdentifier(), policiesToAdd, new NameIdentifier[0]);
+    assertEquals(2, policiesForTag.size());
+    Assertions.assertTrue(policiesForTag.contains(policyEntity1));
+    Assertions.assertTrue(policiesForTag.contains(policyEntity2));
+
+    List<TagEntity> tagsForPolicy =
+        policyMetaService.listTagsForPolicy(policyEntity1.nameIdentifier());
+    assertEquals(1, tagsForPolicy.size());
+    Assertions.assertTrue(tagsForPolicy.contains(tagEntity1));
+
+    List<PolicyEntity> listedPoliciesForTag =
+        policyMetaService.listPoliciesForTag(tagEntity1.nameIdentifier());
+    assertEquals(2, listedPoliciesForTag.size());
+    Assertions.assertTrue(listedPoliciesForTag.contains(policyEntity1));
+    Assertions.assertTrue(listedPoliciesForTag.contains(policyEntity2));
+
+    List<PolicyEntity> policiesForTag2 =
+        policyMetaService.associatePoliciesWithTag(
+            tagEntity2.nameIdentifier(),
+            new NameIdentifier[] {NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy1")},
+            new NameIdentifier[0]);
+    assertEquals(1, policiesForTag2.size());
+
+    tagsForPolicy = policyMetaService.listTagsForPolicy(policyEntity1.nameIdentifier());
+    assertEquals(2, tagsForPolicy.size());
+    Assertions.assertTrue(tagsForPolicy.contains(tagEntity1));
+    Assertions.assertTrue(tagsForPolicy.contains(tagEntity2));
+
+    List<PolicyEntity> policiesAfterRemove =
+        policyMetaService.associatePoliciesWithTag(
+            tagEntity1.nameIdentifier(),
+            new NameIdentifier[0],
+            new NameIdentifier[] {NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy1")});
+    assertEquals(1, policiesAfterRemove.size());
+    Assertions.assertFalse(policiesAfterRemove.contains(policyEntity1));
+    Assertions.assertTrue(policiesAfterRemove.contains(policyEntity2));
+
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            policyMetaService.associatePoliciesWithTag(
+                tagEntity1.nameIdentifier(),
+                new NameIdentifier[] {NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2")},
+                new NameIdentifier[0]));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            policyMetaService.associatePoliciesWithTag(
+                NameIdentifierUtil.ofTag(METALAKE_NAME, "missing_tag"),
+                policiesToAdd,
+                new NameIdentifier[0]));
   }
 
   @TestTemplate

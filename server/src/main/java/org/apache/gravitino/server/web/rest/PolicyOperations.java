@@ -51,7 +51,9 @@ import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
+import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
+import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
@@ -63,6 +65,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -330,6 +333,73 @@ public class PolicyOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handlePolicyException(OperationType.LIST, "", metalake, e);
+    }
+  }
+
+  @GET
+  @Path("{policy}/tags")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-tags-for-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-tags-for-policy", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION)
+  public Response listTagsForPolicy(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
+          String policyName,
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+    LOG.info(
+        "Received list tag {} request for policy: {} under metalake: {}",
+        verbose ? "infos" : "names",
+        policyName,
+        metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            if (verbose) {
+              Tag[] tags = policyDispatcher.listTagInfosForPolicy(metalake, policyName);
+              tags = tags == null ? new Tag[0] : tags;
+              tags =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
+                      Entity.EntityType.TAG,
+                      tags,
+                      tag -> NameIdentifierUtil.ofTag(metalake, tag.name()));
+              TagDTO[] tagDTOs =
+                  Arrays.stream(tags)
+                      .map(tag -> DTOConverters.toDTO(tag, Optional.empty()))
+                      .toArray(TagDTO[]::new);
+
+              LOG.info(
+                  "List {} tag infos for policy: {} under metalake: {}",
+                  tagDTOs.length,
+                  policyName,
+                  metalake);
+              return Utils.ok(new TagListResponse(tagDTOs));
+            } else {
+              String[] tagNames = policyDispatcher.listTagsForPolicy(metalake, policyName);
+              tagNames = tagNames == null ? new String[0] : tagNames;
+              tagNames =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
+                      Entity.EntityType.TAG,
+                      tagNames,
+                      tagName -> NameIdentifierUtil.ofTag(metalake, tagName));
+              LOG.info(
+                  "List {} tags for policy: {} under metalake: {}",
+                  tagNames.length,
+                  policyName,
+                  metalake);
+              return Utils.ok(new NameListResponse(tagNames));
+            }
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handlePolicyException(OperationType.LIST, policyName, metalake, e);
     }
   }
 

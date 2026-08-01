@@ -25,6 +25,8 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -45,6 +47,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
@@ -54,6 +57,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -61,7 +65,11 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
@@ -947,6 +955,103 @@ public class TestTagOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = response8.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse1.getCode());
     Assertions.assertEquals(NoSuchTagException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  @Test
+  public void testListPoliciesForTag() {
+    String tagName = "tag1";
+    String[] policies = new String[] {"policy1", "policy2"};
+    when(tagManager.listPoliciesForTag(metalake, tagName)).thenReturn(policies);
+
+    Response response =
+        target(tagPath(metalake))
+            .path(tagName)
+            .path("policies")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+
+    NameListResponse nameListResponse = response.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nameListResponse.getCode());
+    Assertions.assertArrayEquals(policies, nameListResponse.getNames());
+
+    ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
+    PolicyContent content =
+        PolicyContents.custom(contentFields, ImmutableSet.of(MetadataObject.Type.TABLE), null);
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("policy1")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(tagManager.listPolicyInfosForTag(metalake, tagName))
+        .thenReturn(new PolicyEntity[] {policy});
+
+    Response detailsResponse =
+        target(tagPath(metalake))
+            .path(tagName)
+            .path("policies")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
+
+    PolicyListResponse policyListResponse = detailsResponse.readEntity(PolicyListResponse.class);
+    Assertions.assertEquals(0, policyListResponse.getCode());
+    Assertions.assertEquals(1, policyListResponse.getPolicies().length);
+    Assertions.assertEquals(policy.name(), policyListResponse.getPolicies()[0].name());
+    Assertions.assertEquals(Optional.empty(), policyListResponse.getPolicies()[0].inherited());
+  }
+
+  @Test
+  public void testAssociatePoliciesForTag() {
+    String tagName = "tag1";
+    String[] policiesToAdd = new String[] {"policy1", "policy2"};
+    String[] policiesToRemove = new String[] {"policy3", "policy4"};
+
+    when(tagManager.associatePoliciesForTag(metalake, tagName, policiesToAdd, policiesToRemove))
+        .thenReturn(policiesToAdd);
+
+    PoliciesAssociateRequest request =
+        new PoliciesAssociateRequest(policiesToAdd, policiesToRemove);
+    Response response =
+        target(tagPath(metalake))
+            .path(tagName)
+            .path("policies")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+
+    NameListResponse nameListResponse = response.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nameListResponse.getCode());
+    Assertions.assertArrayEquals(policiesToAdd, nameListResponse.getNames());
+
+    when(tagManager.associatePoliciesForTag(metalake, tagName, policiesToAdd, policiesToRemove))
+        .thenReturn(null);
+
+    Response nullResponse =
+        target(tagPath(metalake))
+            .path(tagName)
+            .path("policies")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), nullResponse.getStatus());
+    NameListResponse nullNameListResponse = nullResponse.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nullNameListResponse.getCode());
+    Assertions.assertEquals(0, nullNameListResponse.getNames().length);
   }
 
   @Test

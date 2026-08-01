@@ -25,6 +25,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -87,6 +88,22 @@ public class TagHookDispatcher implements TagDispatcher {
   @Override
   public MetadataObject[] listMetadataObjectsForTag(String metalake, String name) {
     return dispatcher.listMetadataObjectsForTag(metalake, name);
+  }
+
+  @Override
+  public String[] listPoliciesForTag(String metalake, String name) {
+    return dispatcher.listPoliciesForTag(metalake, name);
+  }
+
+  @Override
+  public PolicyEntity[] listPolicyInfosForTag(String metalake, String name) {
+    return dispatcher.listPolicyInfosForTag(metalake, name);
+  }
+
+  @Override
+  public String[] associatePoliciesForTag(
+      String metalake, String name, String[] policiesToAdd, String[] policiesToRemove) {
+    return dispatcher.associatePoliciesForTag(metalake, name, policiesToAdd, policiesToRemove);
   }
 
   @Override

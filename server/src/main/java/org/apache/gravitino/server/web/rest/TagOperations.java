@@ -41,6 +41,8 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.dto.policy.PolicyDTO;
+import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
@@ -48,11 +50,13 @@ import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -292,6 +296,111 @@ public class TagOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.LIST, "", tagName, e);
+    }
+  }
+
+  @GET
+  @Path("{tag}/policies")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-policies-for-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-policies-for-tag", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION)
+  public Response listPoliciesForTag(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+    LOG.info(
+        "Received list policy {} request for tag: {} under metalake: {}",
+        verbose ? "infos" : "names",
+        tagName,
+        metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            if (verbose) {
+              PolicyEntity[] policies = tagDispatcher.listPolicyInfosForTag(metalake, tagName);
+              policies = policies == null ? new PolicyEntity[0] : policies;
+              policies =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                      Entity.EntityType.POLICY,
+                      policies,
+                      policy -> NameIdentifierUtil.ofPolicy(metalake, policy.name()));
+              PolicyDTO[] policyDTOs =
+                  Arrays.stream(policies)
+                      .map(policy -> PolicyOperations.toDTO(policy, Optional.empty()))
+                      .toArray(PolicyDTO[]::new);
+
+              LOG.info(
+                  "List {} policy infos for tag: {} under metalake: {}",
+                  policyDTOs.length,
+                  tagName,
+                  metalake);
+              return Utils.ok(new PolicyListResponse(policyDTOs));
+            } else {
+              String[] policyNames = tagDispatcher.listPoliciesForTag(metalake, tagName);
+              policyNames = policyNames == null ? new String[0] : policyNames;
+              policyNames =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                      Entity.EntityType.POLICY,
+                      policyNames,
+                      policyName -> NameIdentifierUtil.ofPolicy(metalake, policyName));
+              LOG.info(
+                  "List {} policies for tag: {} under metalake: {}",
+                  policyNames.length,
+                  tagName,
+                  metalake);
+              return Utils.ok(new NameListResponse(policyNames));
+            }
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleTagException(OperationType.LIST, tagName, metalake, e);
+    }
+  }
+
+  @POST
+  @Path("{tag}/policies")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "associate-policies-for-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "associate-policies-for-tag", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "METALAKE::OWNER || ((TAG::OWNER || ANY_APPLY_TAG) && (POLICY::OWNER || ANY_APPLY_POLICY))")
+  public Response associatePoliciesForTag(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_POLICY)
+          PoliciesAssociateRequest request) {
+    LOG.info(
+        "Received associate policies request for tag: {} under metalake: {}", tagName, metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            String[] policyNames =
+                tagDispatcher.associatePoliciesForTag(
+                    metalake, tagName, request.getPoliciesToAdd(), request.getPoliciesToRemove());
+            policyNames = policyNames == null ? new String[0] : policyNames;
+
+            LOG.info(
+                "Associated policies: {} for tag: {} under metalake: {}",
+                Arrays.toString(policyNames),
+                tagName,
+                metalake);
+            return Utils.ok(new NameListResponse(policyNames));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, tagName, metalake, e);
     }
   }
 

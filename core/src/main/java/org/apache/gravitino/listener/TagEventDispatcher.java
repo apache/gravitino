@@ -56,6 +56,7 @@ import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectPreE
 import org.apache.gravitino.listener.api.event.ListTagsInfoPreEvent;
 import org.apache.gravitino.listener.api.event.ListTagsPreEvent;
 import org.apache.gravitino.listener.api.info.TagInfo;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -208,6 +209,22 @@ public class TagEventDispatcher implements TagDispatcher {
               PrincipalUtils.getCurrentUserName(), metalake, name, e));
       throw e;
     }
+  }
+
+  @Override
+  public String[] listPoliciesForTag(String metalake, String name) {
+    return dispatcher.listPoliciesForTag(metalake, name);
+  }
+
+  @Override
+  public PolicyEntity[] listPolicyInfosForTag(String metalake, String name) {
+    return dispatcher.listPolicyInfosForTag(metalake, name);
+  }
+
+  @Override
+  public String[] associatePoliciesForTag(
+      String metalake, String name, String[] policiesToAdd, String[] policiesToRemove) {
+    return dispatcher.associatePoliciesForTag(metalake, name, policiesToAdd, policiesToRemove);
   }
 
   @Override

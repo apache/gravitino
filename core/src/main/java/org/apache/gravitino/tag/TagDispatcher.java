@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.tag;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.meta.PolicyEntity;
 
 /**
  * {@code TagDispatcher} interface provides functionalities for managing tags within a metalake. It
@@ -95,6 +97,40 @@ public interface TagDispatcher {
    * @return The array of metadata objects associated with the specified tag.
    */
   MetadataObject[] listMetadataObjectsForTag(String metalake, String name);
+
+  /**
+   * List all policy names associated with the specified tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @return The list of policy names associated with the specified tag.
+   */
+  default String[] listPoliciesForTag(String metalake, String name) {
+    return Arrays.stream(listPolicyInfosForTag(metalake, name))
+        .map(PolicyEntity::name)
+        .toArray(String[]::new);
+  }
+
+  /**
+   * List detailed information for all policies associated with the specified tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @return An array of policies associated with the specified tag.
+   */
+  PolicyEntity[] listPolicyInfosForTag(String metalake, String name);
+
+  /**
+   * Associate or disassociate policies with the specified tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @param policiesToAdd Policies to associate with the tag.
+   * @param policiesToRemove Policies to disassociate from the tag.
+   * @return An array of updated policy names.
+   */
+  String[] associatePoliciesForTag(
+      String metalake, String name, String[] policiesToAdd, String[] policiesToRemove);
 
   /**
    * List all tag names associated with the specified metadata object.

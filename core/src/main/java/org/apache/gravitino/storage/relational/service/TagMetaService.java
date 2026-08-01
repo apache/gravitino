@@ -41,6 +41,7 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
@@ -148,8 +149,16 @@ public class TagMetaService {
     String metalakeName = identifier.namespace().level(0);
     int[] tagDeletedCount = new int[] {0};
     int[] tagMetadataObjectRelDeletedCount = new int[] {0};
+    int[] tagPolicyRelDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
+        () ->
+            tagPolicyRelDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    PolicyTagRelMapper.class,
+                    mapper ->
+                        mapper.softDeletePolicyTagRelsByMetalakeAndTagName(
+                            metalakeName, identifier.name())),
         () ->
             tagDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
@@ -165,7 +174,8 @@ public class TagMetaService {
                         mapper.softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
                             metalakeName, identifier.name())));
 
-    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] > 0;
+    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] + tagPolicyRelDeletedCount[0]
+        > 0;
   }
 
   @Monitored(
@@ -378,6 +388,7 @@ public class TagMetaService {
   public int deleteTagMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] tagDeletedCount = new int[] {0};
     int[] tagMetadataObjectRelDeletedCount = new int[] {0};
+    int[] tagPolicyRelDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -389,9 +400,14 @@ public class TagMetaService {
             tagMetadataObjectRelDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     TagMetadataObjectRelMapper.class,
-                    mapper -> mapper.deleteTagEntityRelsByLegacyTimeline(legacyTimeline, limit)));
+                    mapper -> mapper.deleteTagEntityRelsByLegacyTimeline(legacyTimeline, limit)),
+        () ->
+            tagPolicyRelDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    PolicyTagRelMapper.class,
+                    mapper -> mapper.deletePolicyTagRelsByLegacyTimeline(legacyTimeline, limit)));
 
-    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0];
+    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] + tagPolicyRelDeletedCount[0];
   }
 
   private TagPO getTagPOByMetalakeAndName(String metalakeName, String tagName) {
