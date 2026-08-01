@@ -32,6 +32,7 @@ import org.apache.gravitino.iceberg.service.IcebergAuthenticationFilter;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergHealthCheckPathMatcher;
+import org.apache.gravitino.iceberg.service.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore;
@@ -148,6 +149,8 @@ public class RESTService implements GravitinoAuxiliaryService {
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
         new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
 
+    IcebergIdempotencyManager icebergIdempotencyManager =
+        new IcebergIdempotencyManager(icebergConfig);
     // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
@@ -194,6 +197,7 @@ public class RESTService implements GravitinoAuxiliaryService {
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
             cleanupManager.ifPresent(
                 manager -> bind(manager).to(IcebergCleanupManager.class).ranked(1));
+            bind(icebergIdempotencyManager).to(IcebergIdempotencyManager.class).ranked(1);
             bind(icebergTableDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
             bind(icebergViewDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
             bind(icebergNamespaceDispatcher)
