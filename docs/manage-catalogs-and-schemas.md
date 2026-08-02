@@ -10,8 +10,8 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-This page covers the catalog and schema API. For what a catalog and a schema are, the catalog types,
-what Gravitino stores, permissions, and how to work with them in the UI, see
+This page covers the Gravitino API for catalogs and schemas. For what a catalog and a schema are,
+the catalog types, what Gravitino stores, permissions, and how to work with them in the UI, see
 [Catalogs and Schemas](./catalogs-and-schemas.md).
 
 Connection properties differ by provider and are documented on each catalog type's own page.
