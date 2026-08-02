@@ -28,8 +28,8 @@ existing job executors (schedulers), such as Apache Airflow, Apache Livy, to exe
 Gravitino's job system provides an extensible way to connect to different job executors.
 
 :::note
-1. The job system is a new feature and it is still under
-   development, so some features may not be fully implemented yet.
+1. The job system is still under development, so some features may not be fully
+   implemented yet.
 2. The aim of the job system is not to replace the existing job executors. So, it can only
    support running a single job at a time, and it doesn't support job scheduling for now.
    :::
@@ -661,7 +661,7 @@ These properties will be passed to the airflow job executor when it is instantia
 
 ## Future Work
 
-The job system is a new feature and it still needs more work:
+The job system still needs more work:
 
 1. Support modification of job templates.
 2. Support running Spark jobs (Java and PySpark) based on the Spark job template in the local job
