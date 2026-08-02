@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-This page covers the tag API. For what a tag is, which object types can carry one, how inheritance
+This page covers the Gravitino API for tags. For what a tag is, which object types can carry one, how inheritance
 resolves, and how to work with tags in the UI, see [Tags](./tags.md).
 
 ## Tag Operations
