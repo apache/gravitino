@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-This page covers the policy API. For what a policy is, which object types can carry one, what goes in
+This page covers the Gravitino API for policies. For what a policy is, which object types can carry one, what goes in
 policy content, how inheritance resolves, and how to work with policies in the UI, see
 [Policies](./policies.md).
 
