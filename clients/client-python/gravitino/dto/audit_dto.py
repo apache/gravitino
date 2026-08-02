@@ -16,11 +16,33 @@
 # under the License.
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Optional
 
 from dataclasses_json import DataClassJsonMixin, config
 
 from gravitino.api.audit import Audit
+
+
+def _deserialize_datetime(value: Optional[datetime | str]) -> Optional[datetime]:
+    if value is None or isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        raise TypeError(f"Audit time must be an ISO-8601 string, got {type(value)}")
+
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    parsed = datetime.fromisoformat(normalized)
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else parsed
+
+
+def _serialize_datetime(value: Optional[datetime]) -> Optional[str]:
+    if value is None:
+        return None
+    if not isinstance(value, datetime):
+        raise TypeError(f"Audit time must be a datetime, got {type(value)}")
+
+    normalized = value.astimezone(timezone.utc) if value.tzinfo is not None else value
+    return normalized.isoformat().replace("+00:00", "Z")
 
 
 @dataclass
@@ -30,9 +52,14 @@ class AuditDTO(Audit, DataClassJsonMixin):
     _creator: Optional[str] = field(default=None, metadata=config(field_name="creator"))
     """The creator of the audit."""
 
-    _create_time: Optional[str] = field(
-        default=None, metadata=config(field_name="createTime")
-    )  # TODO: Can't deserialized datetime from JSON
+    _create_time: Optional[datetime] = field(
+        default=None,
+        metadata=config(
+            field_name="createTime",
+            encoder=_serialize_datetime,
+            decoder=_deserialize_datetime,
+        ),
+    )
     """The create time of the audit."""
 
     _last_modifier: Optional[str] = field(
@@ -40,10 +67,19 @@ class AuditDTO(Audit, DataClassJsonMixin):
     )
     """The last modifier of the audit."""
 
-    _last_modified_time: Optional[str] = field(
-        default=None, metadata=config(field_name="lastModifiedTime")
-    )  # TODO: Can't deserialized datetime from JSON
+    _last_modified_time: Optional[datetime] = field(
+        default=None,
+        metadata=config(
+            field_name="lastModifiedTime",
+            encoder=_serialize_datetime,
+            decoder=_deserialize_datetime,
+        ),
+    )
     """The last modified time of the audit."""
+
+    def __post_init__(self) -> None:
+        self._create_time = _deserialize_datetime(self._create_time)
+        self._last_modified_time = _deserialize_datetime(self._last_modified_time)
 
     def __hash__(self):
         return hash(
@@ -73,7 +109,7 @@ class AuditDTO(Audit, DataClassJsonMixin):
         """
         return self._creator
 
-    def create_time(self) -> str:
+    def create_time(self) -> datetime:
         """The creation time of the entity.
 
         Returns:
@@ -88,7 +124,7 @@ class AuditDTO(Audit, DataClassJsonMixin):
         """
         return self._last_modifier
 
-    def last_modified_time(self) -> str:
+    def last_modified_time(self) -> datetime:
         """
         Returns:
              The last modified time of the entity.
