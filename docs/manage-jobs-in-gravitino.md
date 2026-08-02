@@ -14,7 +14,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 1.0.0, Apache Gravitino introduces a new submodule called the job system for users to
+Apache Gravitino provides a submodule called the job system for users to
 register, run, and manage jobs. This job system integrates with the existing metadata
 management, enabling users to execute the jobs or actions based on the metadata,
 known as metadata-driven actions. For instance, this allows users to run jobs for tasks such as
@@ -28,7 +28,7 @@ existing job executors (schedulers), such as Apache Airflow, Apache Livy, to exe
 Gravitino's job system provides an extensible way to connect to different job executors.
 
 :::note
-1. The job system is a new feature introduced in Gravitino 1.0.0, and it is still under
+1. The job system is a new feature and it is still under
    development, so some features may not be fully implemented yet.
 2. The aim of the job system is not to replace the existing job executors. So, it can only
    support running a single job at a time, and it doesn't support job scheduling for now.
@@ -661,7 +661,7 @@ These properties will be passed to the airflow job executor when it is instantia
 
 ## Future Work
 
-The job system is a new feature introduced in Gravitino 1.0.0, and it still needs more work:
+The job system is a new feature and it still needs more work:
 
 1. Support modification of job templates.
 2. Support running Spark jobs (Java and PySpark) based on the Spark job template in the local job

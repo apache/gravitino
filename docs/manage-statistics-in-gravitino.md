@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 1.0.0, Gravitino introduces statistics of tables and partitions.
+Gravitino provides statistics of tables and partitions.
 
 This document provides a brief introduction using both Gravitino Java client and
 REST APIs. If you want to know more about the statistics system in Gravitino, refer to the

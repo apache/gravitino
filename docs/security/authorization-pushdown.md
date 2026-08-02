@@ -62,7 +62,7 @@ authorization.ranger.service.name=hiveRepo
 ```
 
 :::caution
-Gravitino 0.8.0 only supports the authorization Apache Ranger Hive service , Apache Iceberg service and Apache Paimon Service. 
+Gravitino only supports the authorization Apache Ranger Hive service, Apache Iceberg service and Apache Paimon service. 
 Spark can use Kyuubi authorization plugin to access Gravitino's catalog. But the plugin can't support to update or delete data for Paimon catalog.
 More data source authorization is under development.
 :::
