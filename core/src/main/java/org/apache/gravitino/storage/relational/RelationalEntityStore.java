@@ -392,6 +392,7 @@ public class RelationalEntityStore
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    Entity.EntityType destEntityType = getDestinationEntityType(relType);
     List<E> result =
         backend.updateEntityRelations(
             relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
@@ -400,11 +401,11 @@ public class RelationalEntityStore
     // concurrent read could repopulate the cache with stale pre-commit data.
     cache.invalidate(srcEntityIdent, srcEntityType);
     for (NameIdentifier destToAdd : destEntitiesToAdd) {
-      cache.invalidate(destToAdd, srcEntityType);
+      cache.invalidate(destToAdd, destEntityType);
     }
 
     for (NameIdentifier destToRemove : destEntitiesToRemove) {
-      cache.invalidate(destToRemove, srcEntityType);
+      cache.invalidate(destToRemove, destEntityType);
     }
 
     return result;
@@ -421,5 +422,17 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+  }
+
+  private static Entity.EntityType getDestinationEntityType(Type relType) {
+    switch (relType) {
+      case POLICY_METADATA_OBJECT_REL:
+        return Entity.EntityType.POLICY;
+      case TAG_METADATA_OBJECT_REL:
+        return Entity.EntityType.TAG;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
   }
 }

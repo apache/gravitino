@@ -526,7 +526,7 @@ public class PolicyManager implements PolicyDispatcher {
    * Tells a "the related entity does not exist" failure apart from a "the metadata object does not
    * exist" one. The store signals both with {@link NoSuchEntityException}, so the message built by
    * the relational services is the only discriminator; it is rebuilt here from the same constant
-   * and the same locale-less lowercasing they use.
+   * and the same lowercasing behavior they use.
    */
   private static boolean isMissingEntity(
       NoSuchEntityException e, Entity.EntityType type, String name) {

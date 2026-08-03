@@ -36,13 +36,30 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests the non-cacheable entity type contract that {@link BaseEntityCache} enforces on behalf of
+ * Tests the cacheable entity type allowlist that {@link BaseEntityCache} enforces on behalf of
  * every implementation.
  */
 public class TestBaseEntityCache {
 
-  private static final Set<Entity.EntityType> NON_CACHEABLE_TYPES =
-      ImmutableSet.of(Entity.EntityType.USER, Entity.EntityType.GROUP, Entity.EntityType.ROLE);
+  private static final Set<Entity.EntityType> CACHEABLE_TYPES =
+      ImmutableSet.of(
+          Entity.EntityType.METALAKE,
+          Entity.EntityType.CATALOG,
+          Entity.EntityType.SCHEMA,
+          Entity.EntityType.TABLE,
+          Entity.EntityType.VIEW,
+          Entity.EntityType.COLUMN,
+          Entity.EntityType.FILESET,
+          Entity.EntityType.TOPIC,
+          Entity.EntityType.TAG,
+          Entity.EntityType.MODEL,
+          Entity.EntityType.MODEL_VERSION,
+          Entity.EntityType.POLICY,
+          Entity.EntityType.TABLE_STATISTIC,
+          Entity.EntityType.JOB_TEMPLATE,
+          Entity.EntityType.JOB,
+          Entity.EntityType.AUDIT,
+          Entity.EntityType.FUNCTION);
 
   private RecordingCache cache;
 
@@ -52,10 +69,10 @@ public class TestBaseEntityCache {
   }
 
   @Test
-  void testIsCacheableRejectsOnlyUserGroupRole() {
+  void testIsCacheableAcceptsOnlyApprovedTypes() {
     for (Entity.EntityType type : Entity.EntityType.values()) {
       Assertions.assertEquals(
-          !NON_CACHEABLE_TYPES.contains(type),
+          CACHEABLE_TYPES.contains(type),
           BaseEntityCache.isCacheable(type),
           "Unexpected cacheability for " + type);
     }

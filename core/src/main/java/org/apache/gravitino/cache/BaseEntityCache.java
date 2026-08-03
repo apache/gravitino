@@ -33,15 +33,17 @@ import org.apache.gravitino.NameIdentifier;
  * This class is abstract and cannot be instantiated directly, it is designed to be a base class for
  * other entity cache implementations.
  *
- * <p>This class enforces the non-cacheable entity type contract documented on {@link
- * SupportsEntityStoreCache#put(Entity)}: {@link #put(Entity)} is final and drops non-cacheable
- * entities before delegating to {@link #doPut(Entity)}, so no subclass can accidentally cache them.
+ * <p>This class enforces the cacheable entity type allowlist documented on {@link
+ * SupportsEntityStoreCache#put(Entity)}: {@link #put(Entity)} is final and drops entities that have
+ * not been explicitly approved before delegating to {@link #doPut(Entity)}, so no subclass can
+ * accidentally cache them.
  */
 public abstract class BaseEntityCache implements EntityCache {
 
   /**
-   * Entity types that must never be cached, see {@link SupportsEntityStoreCache#put(Entity)} for
-   * the contract.
+   * Entity types that have been explicitly approved for caching, see {@link
+   * SupportsEntityStoreCache#put(Entity)} for the contract. New entity types are excluded by
+   * default until their invalidation behavior has been validated.
    *
    * <p>{@code USER}, {@code GROUP} and {@code ROLE} are materialized with relation-derived data
    * joined in at load time: a role carries its securable objects, and a user/group carries its role
@@ -53,9 +55,25 @@ public abstract class BaseEntityCache implements EntityCache {
    * over the entity hierarchy would evict it. Caching them would therefore serve stale
    * authorization data.
    */
-  private static final Set<Entity.EntityType> NON_CACHEABLE_TYPES =
+  private static final Set<Entity.EntityType> CACHEABLE_TYPES =
       Sets.immutableEnumSet(
-          Entity.EntityType.USER, Entity.EntityType.GROUP, Entity.EntityType.ROLE);
+          Entity.EntityType.METALAKE,
+          Entity.EntityType.CATALOG,
+          Entity.EntityType.SCHEMA,
+          Entity.EntityType.TABLE,
+          Entity.EntityType.VIEW,
+          Entity.EntityType.COLUMN,
+          Entity.EntityType.FILESET,
+          Entity.EntityType.TOPIC,
+          Entity.EntityType.TAG,
+          Entity.EntityType.MODEL,
+          Entity.EntityType.MODEL_VERSION,
+          Entity.EntityType.POLICY,
+          Entity.EntityType.TABLE_STATISTIC,
+          Entity.EntityType.JOB_TEMPLATE,
+          Entity.EntityType.JOB,
+          Entity.EntityType.AUDIT,
+          Entity.EntityType.FUNCTION);
 
   protected final Config cacheConfig;
 
@@ -79,7 +97,7 @@ public abstract class BaseEntityCache implements EntityCache {
   public static boolean isCacheable(Entity.EntityType type) {
     Preconditions.checkArgument(type != null, "Entity type cannot be null");
 
-    return !NON_CACHEABLE_TYPES.contains(type);
+    return CACHEABLE_TYPES.contains(type);
   }
 
   /** {@inheritDoc} */
