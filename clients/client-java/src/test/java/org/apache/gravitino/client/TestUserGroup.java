@@ -134,6 +134,7 @@ public class TestUserGroup extends TestBase {
 
     UserDTO mockUser =
         UserDTO.builder()
+            .withId(1L)
             .withName(username)
             .withExternalId(externalId)
             .withEnabled(false)
@@ -427,6 +428,7 @@ public class TestUserGroup extends TestBase {
 
   private UserDTO mockUserDTO(String name) {
     return UserDTO.builder()
+        .withId(1L)
         .withName(name)
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

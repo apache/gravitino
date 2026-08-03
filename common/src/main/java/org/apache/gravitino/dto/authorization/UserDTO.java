@@ -86,6 +86,9 @@ public class UserDTO implements User {
     return id;
   }
 
+  /**
+   * @return The name of the User DTO.
+   */
   @Override
   public String name() {
     return name;
