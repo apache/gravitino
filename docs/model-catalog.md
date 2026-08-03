@@ -66,9 +66,9 @@ The Model catalog supports registering, listing and deleting models and model ve
 
 ### Model Properties
 
-| Property name      | Description                                         | Default value | Required | Immutable | Since Version |
-|--------------------|-----------------------------------------------------|---------------|----------|-----------|---------------|
-| `default-uri-name` | The default URI name for the versions of the model. | (none)        | No       | No        | 1.0.0         |
+| Property name      | Description                                         | Default value | Required | Immutable |
+|--------------------|-----------------------------------------------------|---------------|----------|-----------|
+| `default-uri-name` | The default URI name for the versions of the model. | (none)        | No       | No        |
 
 ### Model Operations
 
@@ -82,9 +82,9 @@ The Model catalog supports linking, listing and deleting model versions.
 
 ### ModelVersion Properties
 
-| Property name      | Description                                                                                                          | Default value | Required | Immutable | Since Version |
-|--------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
-| `default-uri-name` | The default URI name for the model version. If set, it will override the `default-uri-name` property at model level. | (none)        | No       | No        | 1.0.0         |
+| Property name      | Description                                                                                                          | Default value | Required | Immutable |
+|--------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------|
+| `default-uri-name` | The default URI name for the model version. If set, it will override the `default-uri-name` property at model level. | (none)        | No       | No        |
 
 ### ModelVersion Operations
 

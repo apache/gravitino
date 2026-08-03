@@ -35,16 +35,16 @@ The Glue catalog supports creating, updating, and deleting databases and tables 
 
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Glue catalog has the following properties:
 
-| Property Name            | Description                                                                                                                                                                                                 | Default Value            | Required | Immutable | Since Version |
-|--------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|----------|-----------|---------------|
-| `aws-region`             | AWS region for the Glue Data Catalog (e.g. `us-east-1`).                                                                                                                                                    | (none)                   | Yes      | Yes       | 1.3.0         |
-| `aws-glue-catalog-id`    | The 12-digit AWS account ID that owns the Glue catalog. When omitted, defaults to the caller's AWS account ID.                                                                                              | (none)                   | No       | Yes       | 1.3.0         |
-| `aws-access-key-id`      | AWS access key ID for static credential authentication. When omitted, the default credential chain is used.                                                                                                 | (none)                   | No       | No        | 1.3.0         |
-| `aws-secret-access-key`  | AWS secret access key paired with `aws-access-key-id`. When omitted, the default credential chain is used.                                                                                                  | (none)                   | No       | No        | 1.3.0         |
-| `aws-glue-endpoint`      | Custom Glue endpoint URL for VPC endpoints or LocalStack testing (e.g. `http://localhost:4566`).                                                                                                            | (none)                   | No       | No        | 1.3.0         |
-| `warehouse`              | Base storage path used as the warehouse when no explicit `location` is specified at table creation time (e.g. `s3://my-bucket/warehouse`). Table location is derived as `warehouse/database/table`. | (none) | Yes | No | 1.3.0 |
-| `default-table-format`   | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`.                                                                                                  | `hive`                   | No       | No        | 1.3.0         |
-| `table-format-filter`    | Comma-separated list of table formats exposed by `listTables()` and `loadTable()`. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. Use to restrict visible table types.                     | `all`                    | No       | No        | 1.3.0         |
+| Property Name           | Description                                                                                                                                                                                         | Default Value | Required | Immutable |
+|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------|
+| `aws-region`            | AWS region for the Glue Data Catalog (e.g. `us-east-1`).                                                                                                                                            | (none)        | Yes      | Yes       |
+| `aws-glue-catalog-id`   | The 12-digit AWS account ID that owns the Glue catalog. When omitted, defaults to the caller's AWS account ID.                                                                                      | (none)        | No       | Yes       |
+| `aws-access-key-id`     | AWS access key ID for static credential authentication. When omitted, the default credential chain is used.                                                                                         | (none)        | No       | No        |
+| `aws-secret-access-key` | AWS secret access key paired with `aws-access-key-id`. When omitted, the default credential chain is used.                                                                                          | (none)        | No       | No        |
+| `aws-glue-endpoint`     | Custom Glue endpoint URL for VPC endpoints or LocalStack testing (e.g. `http://localhost:4566`).                                                                                                    | (none)        | No       | No        |
+| `warehouse`             | Base storage path used as the warehouse when no explicit `location` is specified at table creation time (e.g. `s3://my-bucket/warehouse`). Table location is derived as `warehouse/database/table`. | (none)        | Yes      | No        |
+| `default-table-format`  | Default format for tables created via Gravitino's `createTable()` API. Accepted values: `iceberg`, `hive`.                                                                                          | `hive`        | No       | No        |
+| `table-format-filter`   | Comma-separated list of table formats exposed by `listTables()` and `loadTable()`. Accepted values: `all`, `hive`, `iceberg`, `delta`, `parquet`. Use to restrict visible table types.              | `all`         | No       | No        |
 
 :::note
 **Authentication priority**: Static credentials (`aws-access-key-id` + `aws-secret-access-key`) take precedence over the default credential chain (environment variables, instance profile, container credentials).
@@ -55,7 +55,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `aws-access-key-id` and `aws-secret-access-key` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `aws-access-key-id` and `aws-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
 :::
 
 ## Schema
@@ -109,28 +109,28 @@ The `fieldName` specified in the `distribution` and `sortOrders` attribute must 
 The Glue catalog supports all data types defined in the [Hive Language Manual](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types).
 The following table lists the data types mapped from the Glue catalog to Gravitino.
 
-| Glue Data Type            | Gravitino Data Type | Since Version |
-|---------------------------|---------------------|---------------|
-| `boolean`                 | `boolean`           | 1.3.0         |
-| `tinyint`                 | `byte`              | 1.3.0         |
-| `smallint`                | `short`             | 1.3.0         |
-| `int` / `integer`         | `integer`           | 1.3.0         |
-| `bigint`                  | `long`              | 1.3.0         |
-| `float`                   | `float`             | 1.3.0         |
-| `double`                  | `double`            | 1.3.0         |
-| `decimal`                 | `decimal`           | 1.3.0         |
-| `string`                  | `string`            | 1.3.0         |
-| `char`                    | `char`              | 1.3.0         |
-| `varchar`                 | `varchar`           | 1.3.0         |
-| `timestamp`               | `timestamp`         | 1.3.0         |
-| `date`                    | `date`              | 1.3.0         |
-| `interval_year_month`     | `interval_year`     | 1.3.0         |
-| `interval_day_time`       | `interval_day`      | 1.3.0         |
-| `binary`                  | `binary`            | 1.3.0         |
-| `array`                   | `list`              | 1.3.0         |
-| `map`                     | `map`               | 1.3.0         |
-| `struct`                  | `struct`            | 1.3.0         |
-| `uniontype`               | `union`             | 1.3.0         |
+| Glue Data Type        | Gravitino Data Type |
+|-----------------------|---------------------|
+| `boolean`             | `boolean`           |
+| `tinyint`             | `byte`              |
+| `smallint`            | `short`             |
+| `int` / `integer`     | `integer`           |
+| `bigint`              | `long`              |
+| `float`               | `float`             |
+| `double`              | `double`            |
+| `decimal`             | `decimal`           |
+| `string`              | `string`            |
+| `char`                | `char`              |
+| `varchar`             | `varchar`           |
+| `timestamp`           | `timestamp`         |
+| `date`                | `date`              |
+| `interval_year_month` | `interval_year`     |
+| `interval_day_time`   | `interval_day`      |
+| `binary`              | `binary`            |
+| `array`               | `list`              |
+| `map`                 | `map`               |
+| `struct`              | `struct`            |
+| `uniontype`           | `union`             |
 
 :::info
 Data types not listed above map to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)**, which represents an unresolvable data type from the Glue catalog.
@@ -146,18 +146,18 @@ The following table lists predefined properties for Glue tables. Additional key-
 **Immutable**: Fields that cannot be modified once set.
 :::
 
-| Property Name           | Description                                                                                                                                | Default Value                                                                         | Required | Reserved | Immutable | Since Version |
-|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|----------|----------|-----------|---------------|
-| `location`              | The location for table storage, such as `s3://bucket/prefix/test_table`. Derived from `warehouse/database/table` when not specified.       | (derived from warehouse)                                                              | No       | No       | No        | 1.3.0         |
-| `format`                | The table file format (`parquet`, `orc`, `textfile`, etc.). When set, `input-format`, `output-format`, and `serde-lib` are derived automatically. Used primarily when creating Hive-format tables via Trino. | (none) | No | No | Yes | 1.3.0 |
-| `input-format`          | The input format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcInputFormat`.                                           | `org.apache.hadoop.mapred.TextInputFormat`                                            | No       | No       | Yes       | 1.3.0         |
-| `output-format`         | The output format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat`.                                         | `org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat`                          | No       | No       | Yes       | 1.3.0         |
-| `serde-lib`             | The serde library class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcSerde`.                                                | `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe`                                  | No       | No       | Yes       | 1.3.0         |
-| `serde-name`            | The name of the serde.                                                                                                                     | (none)                                                                                | No       | No       | No        | 1.3.0         |
-| `serde.parameter.`      | The prefix of the serde parameter, such as `"serde.parameter.orc.create.index" = "true"`, indicating ORC serde lib to create row indexes. | (none)                                                                                | No       | No       | No        | 1.3.0         |
-| `table-format`          | Table format stored in Glue `Table.parameters()`. Use `ICEBERG` to create an Iceberg table. Common values: `ICEBERG`, `HIVE`.              | (none)                                                                                | No       | No       | No        | 1.3.0         |
-| `metadata_location`     | Iceberg table metadata file location stored in Glue `Table.parameters()`. When set during `createTable()`, registers an existing Iceberg table rather than creating a new one. | (none)                                                               | No       | No       | No        | 1.3.0         |
-| `comment`               | Used to store a table comment.                                                                                                             | (none)                                                                                | No       | Yes      | No        | 1.3.0         |
+| Property Name       | Description                                                                                                                                                                                                  | Default Value                                                | Required | Reserved | Immutable |
+|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|----------|----------|-----------|
+| `location`          | The location for table storage, such as `s3://bucket/prefix/test_table`. Derived from `warehouse/database/table` when not specified.                                                                         | (derived from warehouse)                                     | No       | No       | No        |
+| `format`            | The table file format (`parquet`, `orc`, `textfile`, etc.). When set, `input-format`, `output-format`, and `serde-lib` are derived automatically. Used primarily when creating Hive-format tables via Trino. | (none)                                                       | No       | No       | Yes       |
+| `input-format`      | The input format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcInputFormat`.                                                                                                             | `org.apache.hadoop.mapred.TextInputFormat`                   | No       | No       | Yes       |
+| `output-format`     | The output format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat`.                                                                                                           | `org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat` | No       | No       | Yes       |
+| `serde-lib`         | The serde library class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcSerde`.                                                                                                                  | `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe`         | No       | No       | Yes       |
+| `serde-name`        | The name of the serde.                                                                                                                                                                                       | (none)                                                       | No       | No       | No        |
+| `serde.parameter.`  | The prefix of the serde parameter, such as `"serde.parameter.orc.create.index" = "true"`, indicating ORC serde lib to create row indexes.                                                                    | (none)                                                       | No       | No       | No        |
+| `table-format`      | Table format stored in Glue `Table.parameters()`. Use `ICEBERG` to create an Iceberg table. Common values: `ICEBERG`, `HIVE`.                                                                                | (none)                                                       | No       | No       | No        |
+| `metadata_location` | Iceberg table metadata file location stored in Glue `Table.parameters()`. When set during `createTable()`, registers an existing Iceberg table rather than creating a new one.                               | (none)                                                       | No       | No       | No        |
+| `comment`           | Used to store a table comment.                                                                                                                                                                               | (none)                                                       | No       | Yes      | No        |
 
 :::note
 All entries in the Glue `Table.parameters()` pass through Gravitino's API layer intact. This passthrough ensures `table_type=ICEBERG`, `metadata_location=s3://...`, `spark.sql.sources.provider=delta`, and any other format indicators survive Gravitino's metadata proxy layer.
@@ -173,11 +173,11 @@ Gravitino defines a unified set of [metadata operation interfaces](./manage-rela
 
 ##### Alter table
 
-| Glue Alter Operation     | Gravitino Table Update Request | Since Version |
-|--------------------------|--------------------------------|---------------|
-| `Alter Table Properties` | `Set a table property`         | 1.3.0         |
-| `Alter Table Comment`    | `Update comment`               | 1.3.0         |
-| `Remove Properties`      | `Remove a table property`      | 1.3.0         |
+| Glue Alter Operation     | Gravitino Table Update Request |
+|--------------------------|--------------------------------|
+| `Alter Table Properties` | `Set a table property`         |
+| `Alter Table Comment`    | `Update comment`               |
+| `Remove Properties`      | `Remove a table property`      |
 
 :::caution
 Hive-format table rename is not supported. AWS Glue does not provide a native rename API for tables; renaming would require recreating the table.
@@ -186,12 +186,12 @@ Iceberg-format table rename is supported.
 
 ##### Alter column
 
-| Glue Alter Operation     | Gravitino Table Update Request    | Since Version |
-|--------------------------|-----------------------------------|---------------|
-| `Change Column Name`     | `Rename a column`                 | 1.3.0         |
-| `Change Column Type`     | `Update the type of a column`     | 1.3.0         |
-| `Change Column Position` | `Update the position of a column` | 1.3.0         |
-| `Change Column Comment`  | `Update the column comment`       | 1.3.0         |
+| Glue Alter Operation     | Gravitino Table Update Request    |
+|--------------------------|-----------------------------------|
+| `Change Column Name`     | `Rename a column`                 |
+| `Change Column Type`     | `Update the type of a column`     |
+| `Change Column Position` | `Update the position of a column` |
+| `Change Column Comment`  | `Update the column comment`       |
 
 ##### Alter partition
 
