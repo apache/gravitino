@@ -9,360 +9,211 @@ keywords:
 license: "This software is licensed under the Apache License version 2."
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
-
 ## Overview
 
-This document describes how to use Apache Gravitino to manage a generic lakehouse catalog using Lance as the underlying table format. 
+A Lance table in Apache Gravitino is a Lance dataset on storage plus its metadata in a `lakehouse-generic` catalog. Two APIs reach the same tables.
 
+- **Lance REST API.** The [Lance REST Service](./lance-rest-service.md) speaks the Lance REST Catalog protocol on port 9101, for `lance-spark`, `lance-ray`, and any Lance SDK client.
+- **Gravitino REST API.** Tables are ordinary Gravitino relational objects on port 8090, with `format` set to `lance`.
 
-## Table Management
+This page describes the table itself, which is the same either way. Where the two APIs differ, the difference is named.
 
-### Supported Operations
+## Capabilities
 
-For Lance tables in a Generic Lakehouse Catalog, the following table summarizes supported operations:
+| Capability                        | Lance REST API                     | Gravitino REST API                      |
+|-----------------------------------|------------------------------------|-----------------------------------------|
+| Create a table                    | `CreateTable`                      | Create table with `format=lance`        |
+| Record a table without a dataset  | `DeclareTable`                     | Create table with `lance.declared=true` |
+| Adopt an existing dataset         | `RegisterTable`                    | Create table with `lance.register=true` |
+| List and describe                 | `ListTables`, `DescribeTable`      | List tables, load table                 |
+| Drop or rename a column           | `drop_columns`, `alter_columns`  ¹ | Alter table ¹                           |
+| Add an index                      | Not available ²                    | Alter table ³                           |
+| Remove metadata, keep the dataset | `DeregisterTable`                  | Drop table with `external=true`         |
+| Remove metadata and the dataset   | `DropTable`  ⁴                     | Purge table                             |
 
-| Operation | Support Status  |
-|-----------|-----------------|
-| List      | ✅ Full          |
-| Load      | ✅ Full          |
-| Alter     | Not support now |
-| Create    | ✅ Full          |
-| Register  | ✅ Full          |
-| Drop      | ✅ Full          |
-| Purge     | ✅ Full          |
+¹ Changes are applied to the Lance dataset before the metadata is updated, and are not atomic across multiple changes, so a failure part way through can leave a subset applied.
+² A workload that builds indexes needs the Gravitino REST API for that step.
+³ Vector and scalar index types are supported. Vector index parameters are not currently configurable.
+⁴ Removes the dataset files even though the service marks every table it creates `external`, so it behaves like Purge rather than like Drop.
 
-:::note Feature Limitations
-- **Partitioning:** Not supported
-- **Sort Orders:** Not supported
-- **Distributions:** Not supported
-- **Indexes:** Not supported
-:::
+Partitioning, sort orders, and distributions are not supported on either API. Column type changes are rejected.
 
-### Data Type Mappings
+## Table Properties
 
-Lance uses Apache Arrow for table schemas. The following table shows type mappings between Gravitino and Arrow:
+Every property below is a property of the table, whichever API created it. On the Gravitino REST API you set them directly. On the Lance REST API the service supplies them from the call you made, as the last column shows.
 
-| Gravitino Type                   | Arrow Type                              |
-|----------------------------------|-----------------------------------------|
-| `Struct`                         | `Struct`                                |
-| `Map`                            | Not supported by Lance                  |
-| `List`                           | `Array`                                 |
-| `Boolean`                        | `Boolean`                               |
-| `Byte`                           | `Int8`                                  |
-| `Short`                          | `Int16`                                 |
-| `Integer`                        | `Int32`                                 |
-| `Long`                           | `Int64`                                 |
-| `Float`                          | `Float`                                 |
-| `Double`                         | `Double`                                |
-| `String`                         | `Utf8`                                  |
-| `Binary`                         | `Binary`                                |
-| `Decimal(p, s)`                  | `Decimal(p, s)` (128-bit)               |
-| `Date`                           | `Date`                                  |
-| `Timestamp`/`Timestamp(6)`       | `TimestampType withoutZone`             |
-| `Timestamp(0)`                   | `TimestampType Second withoutZone`      |
-| `Timestamp(3)`                   | `TimestampType Millisecond withoutZone` |
-| `Timestamp(9)`                   | `TimestampType Nanosecond withoutZone`  |
-| `Timestamp_tz`/`Timestamp_tz(6)` | `TimestampType Microsecond withUtc`     |
-| `Timestamp_tz(0)`                | `TimestampType Second withUtc`          |
-| `Timestamp_tz(3)`                | `TimestampType Millisecond withUtc`     |
-| `Timestamp_tz(9)`                | `TimestampType Nanosecond withUtc`      |
-| `Time`/`Time(9)`                 | `Time Nanosecond`                       |
-| `Null`                           | `Null`                                  |
-| `Fixed(n)`                       | `Fixed-Size Binary(n)`                  |
-| `Interval_year`                  | Not supported by Lance                  |
-| `Interval_day`                   | `Duration(Microsecond)`                 |
-| `External(arrow_field_json_str)` | Any Arrow Field                         |
+| Property                 | Description                                                                                                                                          | Default  | Supplied on the Lance Path By   |
+|--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------------------------|
+| `format`                 | Selects the table implementation. Use `lance`                                                                                                        | (none)   | Always `lance`                  |
+| `location`               | Storage path for the dataset. Lance supports S3, GCS, OSS, Azure, HDFS, local files, and memory                                                      | (none)   | `x-lance-table-location` header |
+| `external`               | When `true`, dropping the table removes only the metadata and leaves the dataset. When `false`, dropping removes both                                | `false`  | Always `true`                   |
+| `lance.creation-mode`    | `CREATE` fails if the table exists, `EXIST_OK` does nothing if it exists, `OVERWRITE` replaces it and deletes the existing dataset unless registered | `CREATE` | The `mode` query parameter      |
+| `lance.register`         | When `true`, links an existing dataset instead of creating one. You manage the data directory                                                        | `false`  | `RegisterTable`                 |
+| `lance.declared`         | When `true`, records the table in metadata without creating a dataset                                                                                | `false`  | `DeclareTable`                  |
+| `lance.storage.{option}` | Storage options for this table, overriding the catalog values                                                                                        | (none)   | Inherited from the catalog      |
+| `lance.version`          | Dataset version Gravitino last read columns from                                                                                                     | (none)   | The server, on both paths       |
 
-### External Types
+`external` is the one row whose described behavior does not hold on the Lance REST API, because `DropTable` removes the dataset files regardless. It matters only if the same table is later dropped through the Gravitino REST API, where the files would be kept.
 
-For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_json_str)` type, which accepts a JSON string representation of an Arrow `Field`.
+If `location` is set at neither the table nor the header, it resolves from the schema or catalog. See [Location Resolution](./lakehouse-generic-catalog.md#location-resolution).
 
-**Requirements:**
-- JSON must conform to Apache Arrow [Field specification](https://github.com/apache/arrow-java/blob/ed81e5981a2bee40584b3a411ed755cb4cc5b91f/vector/src/main/java/org/apache/arrow/vector/types/pojo/Field.java#L80C1-L86C68)
-- `name` attribute must match column name exactly
-- `nullable` attribute must match column nullability
-- `children` array:
-  - Empty for primitive types
-  - Contains child field definitions for complex types (Struct, List)
+## Data Type Mappings
 
-**Examples:**
+Lance uses Apache Arrow for table schemas.
 
-| Arrow Type        | External Type Definition                                                                                                                                                                                                                |
-|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `Large Utf8`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largeutf8\"},\"children\":[]}")`                                                                                                                               |
-| `Large Binary`    | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largebinary\"},\"children\":[]}")`                                                                                                                             |
-| `Large List`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largelist\"},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")`         |
-| `Fixed-Size List` | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\",\"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")` |
+| Gravitino Type                   | Arrow Type                               |
+|----------------------------------|------------------------------------------|
+| `Boolean`                        | `Boolean`                                |
+| `Byte`                           | `Int8`                                   |
+| `Short`                          | `Int16`                                  |
+| `Integer`                        | `Int32`                                  |
+| `Long`                           | `Int64`                                  |
+| `Float`                          | `Float`                                  |
+| `Double`                         | `Double`                                 |
+| `Decimal(p, s)`                  | `Decimal(p, s)` (128-bit)                |
+| `String`                         | `Utf8`                                   |
+| `Binary`                         | `Binary`                                 |
+| `Fixed(n)`                       | `Fixed-Size Binary(n)`                   |
+| `Date`                           | `Date`                                   |
+| `Time`/`Time(9)`                 | `Time Nanosecond`                        |
+| `Timestamp`/`Timestamp(6)`       | `TimestampType Microsecond withoutZone`  |
+| `Timestamp(0)`                   | `TimestampType Second withoutZone`       |
+| `Timestamp(3)`                   | `TimestampType Millisecond withoutZone`  |
+| `Timestamp(9)`                   | `TimestampType Nanosecond withoutZone`   |
+| `Timestamp_tz`/`Timestamp_tz(6)` | `TimestampType Microsecond withUtc`      |
+| `Timestamp_tz(0)`                | `TimestampType Second withUtc`           |
+| `Timestamp_tz(3)`                | `TimestampType Millisecond withUtc`      |
+| `Timestamp_tz(9)`                | `TimestampType Nanosecond withUtc`       |
+| `Interval_day`                   | `Duration(Microsecond)`                  |
+| `List`                           | `List`                                   |
+| `Struct`                         | `Struct`                                 |
+| `Map`                            | `Map`                                    |
+| `Union`                          | `Union(Sparse)`, rejected by Lance       |
+| `Interval_year`                  | `Interval(YearMonth)`, rejected by Lance |
+| `Null`                           | `Null`                                   |
+| `External(arrow_field_json_str)` | Any Arrow field                          |
 
-### Table Properties
+Two rows convert cleanly to Arrow but are rejected at the dataset, because Lance defines no interval and no union type. `Interval_day` is fine, since it maps to an Arrow `Duration`, which Lance does have.
 
-Required and optional properties for tables in a Generic Lakehouse Catalog:
+Lance also has types with no Gravitino equivalent, including unsigned integers, `Float16`, `LargeUtf8`, `LargeBinary`, and dictionaries. Reach them with [External Types](#external-types).
 
-| Property              | Description                                                                                                                                                                                                                                                                                                                               | Default  | Required     | Since Version |
-|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|---------------|
-| `format`              | Table format: `lance`, only `lance` is fully supported.                                                                                                                                                                                                                                                                                   | (none)   | Yes          | 1.1.0         |
-| `location`            | Storage path for table metadata and data, Lance supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                           | (none)   | Conditional* | 1.1.0         |
-| `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                  | false    | No           | 1.1.0         |
-| `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                             | `CREATE` | No           | 1.1.0         |
-| `lance.register`      | Whether it is a register table operation. If it's `true`, This API will not create data directory actually and it's the user's responsibility to create and manage the data directory. `false` it will actually create a table.                                                                                                           | false    | No           | 1.1.0         |
-| `lance.storage.xxxx`  | Any additional storage-specific properties required by Lance format (e.g., S3 credentials, HDFS configs). Replace `xxxx` with actual property names. For example, we can use `lance.storage.aws_access_key_id` to set S3 aws_access_key_id when using a S3 location, for detail, refer to https://lancedb.com/docs/storage/integrations/  | (none)   | No           | 1.1.0         |
+Vector columns need care. Gravitino `List` produces an Arrow `List`, which is variable length, while Lance stores embeddings as a fixed-size list, written `fixed_size_list:float:128` in its own type system. Declare one with `External` and a `fixedsizelist` type whose `listSize` is the embedding dimension. See [External Types](#external-types) for the form.
 
-- `CREATE`: Create a new table, fail if the table already exists.
-- `EXIST_OK`: Create a new table if it does not exist, otherwise do nothing.
-- `OVERWRITE`: Create a new table, overwrite if the table already exists, it will delete the existing data directory first if the table is not a registered table and then create a new one.
+## External Types
 
-**Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
+For Arrow types with no Gravitino equivalent, use `External(arrow_field_json_str)`, which takes a JSON string form of an Arrow [Field](https://github.com/apache/arrow-java/blob/main/vector/src/main/java/org/apache/arrow/vector/types/pojo/Field.java). The `name` and `nullable` attributes have to match the column, and `children` is empty for primitive types and holds child field definitions for complex ones.
 
-Also set additional properties specific to your lakehouse format or custom requirements.
+| Arrow Type        | External Type Definition                                                                                                                                                                                                                       |
+|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Large Utf8`      | `External("{\"name\":\"col\",\"nullable\":true,\"type\":{\"name\":\"largeutf8\"},\"children\":[]}")`                                                                                                                                           |
+| `Large Binary`    | `External("{\"name\":\"col\",\"nullable\":true,\"type\":{\"name\":\"largebinary\"},\"children\":[]}")`                                                                                                                                         |
+| `Large List`      | `External("{\"name\":\"col\",\"nullable\":true,\"type\":{\"name\":\"largelist\"},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")`                     |
+| `Fixed-Size List` | `External("{\"name\":\"col\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\",\"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")` |
 
-### Schema Refresh
+## Examples
 
-For Lance tables, Gravitino stores table columns in its metadata store. Some Lance writers can also
-update the dataset directly at the Lance location. To keep Gravitino metadata in sync, the Generic
-Lakehouse catalog supports catalog-level schema refresh modes:
+### Lance REST API
 
-| Mode                  | Behavior                                                                                                                                                                                                                                                                         |
-|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `DECLARED_AND_EMPTY`  | Default. Refreshes schema from the Lance dataset for two cases: (1) declared tables (`lance.declared=true`) whose schema has not yet been written to Gravitino; (2) tables whose Gravitino column list is empty, for example tables registered before their schema was captured. |
-| `VERSION_CHECK`       | Opens the Lance dataset on every `loadTable`, compares the dataset version with `lance.version`, and refreshes columns when the version has changed.                                                                                                                             |
+Endpoints and protocol details are on the [Lance REST Service](./lance-rest-service.md#lance-rest-api) page.
 
-Use `VERSION_CHECK` only when tables may be modified directly through the Lance path outside
-Gravitino. It adds a dataset version check to every `loadTable` call.
+**Creating a table.** The catalog and schema have to exist first, as the two levels of Lance namespace above the table. Creating them is covered in the [Lance REST Service](./lance-rest-service.md#quick-start) Quick Start.
 
-:::note Zero-column Lance dataset
-If a Lance dataset genuinely has no columns, `DECLARED_AND_EMPTY` mode records the checked dataset
-version (`lance.version`) on the first `loadTable` call. Subsequent loads skip opening the dataset
-as long as the stored version is unchanged. Once columns are written to the dataset, the next
-`VERSION_CHECK` load or an explicit `alterTable` will detect the change and repair the schema.
-:::
+The Arrow IPC body makes this the one call that is awkward to issue by hand. Write the schema to a file first:
 
-### Table Operations
+```python
+import pyarrow as pa
 
-Table operations follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for comprehensive documentation.
+schema = pa.schema([("id", pa.int32()), ("score", pa.float32())])
+with pa.ipc.new_stream("schema.arrows", schema):
+    pass
+```
 
-The following sections provide examples and important details for working with Lance tables. 
-
-#### Create a Lance Table
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+Then post it, naming the table with all three levels:
 
 ```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" -d '{
-  "name": "lance_table",
-  "comment": "Example Lance table",
+LANCE_URL=http://localhost:9101/lance
+TABLE_ID={catalog_name}%24{schema_name}%24{table_name}
+
+curl -X POST "${LANCE_URL}/v1/table/${TABLE_ID}/create?mode=create" \
+  -H 'Content-Type: application/vnd.apache.arrow.stream' \
+  -H 'x-lance-table-location: s3://{bucket}/{schema_name}/{table_name}.lance' \
+  --data-binary @schema.arrows
+```
+
+The response carries the resolved location and the `storageOptions` the client needs to read the dataset directly.
+
+**Registering an existing table.** Registration takes JSON and points at a dataset that already exists. Gravitino sets `lance.register` for you.
+
+```shell
+curl -X POST "${LANCE_URL}/v1/table/${TABLE_ID}/register" \
+  -H 'Content-Type: application/json' \
+  -d '{"location": "s3://{bucket}/{schema_name}/{table_name}.lance",
+       "mode": "create"}'
+```
+
+### Gravitino REST API
+
+**Creating a table.** A `lakehouse-generic` catalog and a schema have to exist first. See [Creating a Catalog](./lakehouse-generic-catalog.md#for-lance-tables). `format` is required and selects the Lance implementation.
+
+```shell
+GRAVITINO_URL=http://localhost:8090
+CATALOG=${GRAVITINO_URL}/api/metalakes/{metalake_name}/catalogs/{catalog_name}
+TABLES=${CATALOG}/schemas/{schema_name}/tables
+
+curl -X POST "${TABLES}" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "name": "{table_name}",
   "columns": [
-    {
-      "name": "id",
-      "type": "integer",
-      "comment": "Primary identifier",
-      "nullable": false
-    }
+    {"name": "id", "type": "integer", "nullable": false},
+    {"name": "score", "type": "float"}
   ],
-  "properties": {
-    "format": "lance",
-    "location": "/tmp/lance_catalog/schema/lance_table"
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs/generic_lakehouse_lance_catalog/schemas/schema/tables
+  "properties": {"format": "lance"}
+}'
 ```
 
-</TabItem>
-<TabItem value="java" label="Java">
+The table location is derived from the catalog or schema location. Lance clients reading the table receive the catalog's resolved `lance.storage.*` values as storage options, so they need no credentials of their own.
 
-```java
-Catalog catalog = gravitinoClient.loadCatalog("generic_lakehouse_lance_catalog");
-TableCatalog tableCatalog = catalog.asTableCatalog();
-
-Map<String, String> tableProperties = ImmutableMap.<String, String>builder()
-    .put("format", "lance")
-    .put("location", "/tmp/lance_catalog/schema/example_table")
-    .build();
-
-tableCatalog.createTable(
-    NameIdentifier.of("schema", "lance_table"),
-    new Column[] {
-        Column.of("id", Types.IntegerType.get(), "Primary identifier", 
-                  true, false, null)
-    },
-    "Example Lance table",
-    tableProperties,
-    null,  // partitions
-    null,  // distributions
-    null,  // sortOrders
-    null   // indexes
-);
-```
-
-</TabItem>
-</Tabs>
-
-#### Register External Tables
-
-Register existing Lance tables without moving or copying data:
-
-<Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+**Registering an existing table.** Registration links a dataset that already exists, without moving or copying data. Pass an empty column list and Gravitino reads the schema from the dataset.
 
 ```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" -d '{
-  "name": "register_lance_table",
-  "comment": "Registered existing Lance table",
+curl -X POST "${TABLES}" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "name": "{table_name}",
   "columns": [],
   "properties": {
     "format": "lance",
     "lance.register": "true",
-    "location": "/tmp/lance_catalog/schema/existing_lance_table"
+    "location": "s3://{bucket}/{prefix}/{table_name}.lance"
   }
-}' http://localhost:8090/api/metalakes/test/catalogs/generic_lakehouse_lance_catalog/schemas/schema/tables
+}'
 ```
 
-</TabItem>
-<TabItem value="java" label="Java">
+Creating and registering differ in what they do to storage. Create initializes a new dataset and needs the column definitions. Register touches no data and takes the schema from what is already there.
 
-```java
-Catalog catalog = gravitinoClient.loadCatalog("generic_lakehouse_lance_catalog");
-TableCatalog tableCatalog = catalog.asTableCatalog();
+Other table operations follow the standard relational catalog patterns described in [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations).
 
-Map<String, String> registerProperties = ImmutableMap.<String, String>builder()
-    .put("format", "lance")
-    .put("lance.register", "true")
-    .put("location", "/tmp/lance_catalog/schema/existing_lance_table")
-    .build();
+## Troubleshooting
 
-tableCatalog.createTable(
-    NameIdentifier.of("schema", "register_lance_table"),
-    new Column[] {},  // Schema auto-detected from existing table
-    "Registered existing Lance table",
-    registerProperties,
-    null, null, null, null
-);
-```
+| Error                                                     | Cause                                                                                      |
+|-----------------------------------------------------------|--------------------------------------------------------------------------------------------|
+| `Catalog is not a lakehouse catalog`                      | A catalog of that name exists on another provider. Returned as a 404 on the Lance REST API |
+| `Expected at most 2-level and at least 1-level namespace` | A namespace identifier with three or more levels                                           |
+| `Expected at 3-level namespace but got`                   | A table identifier that is not `catalog$schema$table`                                      |
+| `'location' property is neither set in table properties`  | No location at the table, schema, or catalog level                                         |
+| `Unsupported Gravitino type`                              | A column type with no Arrow mapping. Use `External`                                        |
+| `Expected precision to be one of 0, 3, 6, 9 but got`      | A timestamp precision Arrow does not have                                                  |
+| `Only RENAME alteration is supported currently`           | An `alter_columns` request other than a rename                                             |
+| `Unsupported changes to lance table`                      | An alter other than drop column, rename column, or add index                               |
+| `EXIST_OK mode is not supported for register operation`   | Register accepts `create` or `overwrite` only                                              |
+| `deregisterTable only supports external tables`           | The table was created through the Gravitino REST API without `external=true`               |
 
-</TabItem>
-</Tabs>
+## Related Pages
 
-:::tip Registration vs Creation
-- **Registration** (`lance.register: true`):
-  - Links to existing Lance dataset or a path placeholder
-  - Schema automatically detected from Lance metadata
-  - Useful for importing existing datasets
-
-- **Creation** (default):
-  - Creates new Lance table from scratch
-  - Requires column schema definition
-  - Initializes new Lance dataset files
-:::
-
-## Advanced Topics
-
-### Troubleshooting
-
-#### Common Issues
-
-**Issue: "Location not specified" error**
-```
-Solution: Ensure at least one level (catalog/schema/table) specifies the location property
-```
-
-**Issue: Permission denied errors**
-```
-Solution: Check file system permissions and credentials for the storage backend
-```
-
-**Issue: Table not found after registration**
-```
-Solution: Verify the location path points to a valid Lance dataset directory
-```
-
-### Migration Guide
-
-#### Migrate Existing Lance Tables
-
-1. **Inventory**: List all existing Lance table locations
-2. **Create Catalog**: Create Generic Lakehouse catalog pointing to root location
-3. **Register Tables**: Use register operation for each table
-4. **Verify**: Confirm all tables are accessible through Gravitino
-5. **Update Clients**: Point applications to Gravitino metadata instead of direct Lance access
-
-**Example Migration Script:**
-
-```shell
-# List of existing Lance tables to register
-tables_to_migrate=(
-    "sales orders /data/sales/orders"
-    "sales customers /data/sales/customers"
-    "inventory products /data/inventory/products"
-)
-
-# Register each table
-for entry in "${tables_to_migrate[@]}"; do
-    read -r schema table location <<< "$entry"
-    echo ${schema}
-    echo ${table}
-
-    curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-      -H "Content-Type: application/json" -d "{
-      \"name\": \"${table}\",
-      \"comment\": \"Registered existing Lance table\",
-      \"columns\": [],
-      \"properties\": {
-        \"format\": \"lance\",
-        \"lance.register\": \"true\",
-        \"location\": \"${location}\"
-      }
-    }" http://localhost:8090/api/metalakes/test/catalogs/generic_lakehouse_lance_catalog/schemas/$schema/tables
-
-    echo "Registered ${schema}.${table}"
-done
-```
-
-Other table operations (load, alter, drop, truncate) follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for details.
-
-### Lance Table with MinIO
-
-To use Lance tables stored in MinIO with Gravitino, configure the MinIO storage backend once on the Lance catalog. Gravitino will then return those storage options to Lance clients and Spark does not need to repeat them.
-
-```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" \
-  -d '{
-  "name": "lance_catalog",
-  "type": "RELATIONAL",
-  "provider": "lakehouse-generic",
-  "comment": "catalog for Lance tables on MinIO",
-  "properties": {
-    "location": "s3://bucket1/lance",
-    "lance.storage.endpoint": "http://minio:9000",
-    "lance.storage.access_key_id": "ak",
-    "lance.storage.secret_access_key": "sk",
-    "lance.storage.allow_http": "true",
-    "lance.storage.region": "us-east-1"
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs
-
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" -d '{
-  "name": "lance_orders",
-  "comment": "Order table stored in MinIO",
-  "columns": [
-    {
-      "name": "id",
-      "type": "integer",
-      "comment": "Primary identifier",
-      "nullable": false
-    }
-  ],
-  "properties": {
-    "format": "lance",
-    "location": "s3://bucket1/lance_orders"
-  }
-}' http://localhost:8090/api/metalakes/test/catalogs/lance_catalog/schemas/sales/tables
-
-```
-
-If you need to override storage on a single table, `lance.storage.*` table properties are still supported.
+- [Lance REST Service](./lance-rest-service.md) for the Lance-native path, service configuration, and the REST API
+- [Lance REST Integration](./lance-rest-integration.md) for `lance-spark` and `lance-ray` versions and examples
+- [Lakehouse Generic Catalog](./lakehouse-generic-catalog.md) for the catalog, storage options, and location resolution
+- [Delta Lake Tables](./lakehouse-generic-delta-table.md) for the other format the same catalog holds
