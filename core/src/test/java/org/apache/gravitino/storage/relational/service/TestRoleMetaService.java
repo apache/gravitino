@@ -46,6 +46,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -836,6 +837,52 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testConcurrentUpdateDoesNotChangeSecurableObjectsOnConflict() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "concurrent-role",
+            AUDIT_INFO,
+            "catalog");
+    RoleMetaService.getInstance().insertRole(role, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            RoleMetaService.getInstance()
+                .updateRole(
+                    role.nameIdentifier(),
+                    (RoleEntity oldRole) -> {
+                      advanceRoleVersion(role.id());
+                      List<SecurableObject> securableObjects =
+                          Lists.newArrayList(oldRole.securableObjects());
+                      securableObjects.add(
+                          SecurableObjects.ofMetalake(
+                              METALAKE_NAME, Lists.newArrayList(Privileges.CreateTable.allow())));
+                      return RoleEntity.builder()
+                          .withId(oldRole.id())
+                          .withName(oldRole.name())
+                          .withNamespace(oldRole.namespace())
+                          .withProperties(oldRole.properties())
+                          .withSecurableObjects(securableObjects)
+                          .withAuditInfo(oldRole.auditInfo())
+                          .build();
+                    }));
+
+    RoleEntity storedRole =
+        RoleMetaService.getInstance().getRoleByIdentifier(role.nameIdentifier());
+    assertTrue(
+        CollectionUtils.isEqualCollection(
+            Lists.newArrayList(
+                SecurableObjects.ofCatalog(
+                    "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
+            storedRole.securableObjects()));
+  }
+
+  @TestTemplate
   void testDeleteMetalakeCascade() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
     createAndInsertCatalog(METALAKE_NAME, "catalog");
@@ -1126,5 +1173,20 @@ class TestRoleMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private void advanceRoleVersion(long roleId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE role_meta SET current_version = current_version + 1 WHERE role_id = "
+                  + roleId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance role version failed", e);
+    }
   }
 }

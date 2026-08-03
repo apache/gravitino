@@ -41,6 +41,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -236,12 +237,17 @@ public class RoleMetaService {
           toSecurableObjectPOs(insertObjects, oldRoleEntity, metalake);
 
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  RoleMetaMapper.class,
-                  mapper ->
-                      mapper.updateRoleMeta(
-                          POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO)),
+          () -> {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    RoleMetaMapper.class,
+                    mapper ->
+                        mapper.updateRoleMeta(
+                            POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO));
+            if (updated == 0) {
+              throw optimisticLockException(identifier);
+            }
+          },
           () -> {
             if (deleteSecurableObjectPOs.isEmpty()) {
               return;
@@ -308,12 +314,19 @@ public class RoleMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long roleId = getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long roleId = rolePO.getRoleId();
 
     SessionUtils.doMultipleWithCommit(
-        () ->
-            SessionUtils.doWithoutCommit(
-                RoleMetaMapper.class, mapper -> mapper.softDeleteRoleMetaByRoleId(roleId)),
+        () -> {
+          int deleted =
+              SessionUtils.getWithoutCommit(
+                  RoleMetaMapper.class,
+                  mapper -> mapper.softDeleteRoleMetaByRoleId(roleId, rolePO.getCurrentVersion()));
+          if (deleted == 0) {
+            throw optimisticLockException(identifier);
+          }
+        },
         () ->
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByRoleId(roleId)),
@@ -453,6 +466,11 @@ public class RoleMetaService {
           roleName);
     }
     return rolePO;
+  }
+
+  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
+    return new OptimisticLockException(
+        "The role %s was modified concurrently; retry the operation", identifier);
   }
 
   private static MetadataObject.Type getType(String type) {
