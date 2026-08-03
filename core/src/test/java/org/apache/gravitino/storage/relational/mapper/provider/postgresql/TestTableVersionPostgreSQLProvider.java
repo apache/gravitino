@@ -16,23 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational;
+package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import java.util.List;
-import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Listener for batches consumed from {@code entity_change_log}. */
-@FunctionalInterface
-public interface EntityChangeLogListener {
+import org.junit.jupiter.api.Test;
 
-  /**
-   * Handles a batch of entity changes.
-   *
-   * <p>If this method throws, the poller may retry the same batch for this listener.
-   * Implementations must make the callback atomic or tolerate retrying changes that were applied
-   * before the exception.
-   *
-   * @param changes the entity changes fetched in one poller cycle
-   */
-  void onEntityChange(List<EntityChangeRecord> changes);
+class TestTableVersionPostgreSQLProvider {
+
+  @Test
+  void testSoftDeleteOnlyActiveTableVersion() {
+    TableVersionPostgreSQLProvider provider = new TableVersionPostgreSQLProvider();
+
+    String sql = provider.softDeleteTableVersionByTableIdAndVersion(1L, 1L);
+
+    assertTrue(
+        sql.endsWith("WHERE table_id = #{tableId} AND version = #{version} AND deleted_at = 0"),
+        "Soft delete should only update an active table version");
+  }
 }
