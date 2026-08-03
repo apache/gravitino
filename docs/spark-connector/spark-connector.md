@@ -26,14 +26,14 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 1. [Build](../how-to-build.md) or download the package ([gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3), [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4), [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)), and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
 
-| Property                                 | Type   | Default Value | Description                                                                                     | Required | Since Version |
-|------------------------------------------|--------|---------------|-------------------------------------------------------------------------------------------------|----------|---------------|
-| spark.plugins                            | string | (none)        | Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin` | Yes      | 0.5.0         |
-| spark.sql.gravitino.metalake             | string | (none)        | The metalake name that spark connector used to request to Gravitino.                            | Yes      | 0.5.0         |
-| spark.sql.gravitino.uri                  | string | (none)        | The uri of Gravitino server address.                                                            | Yes      | 0.5.0         |
-| spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       | 0.5.1         |
-| spark.sql.gravitino.enablePaimonSupport  | string | `false`       | Set to `true` to use Paimon catalog.                                                            | No       | 1.0.0         |
-| spark.sql.gravitino.client.              | string | (none)        | The configuration key prefix for the Gravitino client config.                                   | No       | 1.0.0         |
+| Property                                 | Type   | Default Value | Description                                                                                     | Required |
+|------------------------------------------|--------|---------------|-------------------------------------------------------------------------------------------------|----------|
+| spark.plugins                            | string | (none)        | Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin` | Yes      |
+| spark.sql.gravitino.metalake             | string | (none)        | The metalake name that spark connector used to request to Gravitino.                            | Yes      |
+| spark.sql.gravitino.uri                  | string | (none)        | The uri of Gravitino server address.                                                            | Yes      |
+| spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       |
+| spark.sql.gravitino.enablePaimonSupport  | string | `false`       | Set to `true` to use Paimon catalog.                                                            | No       |
+| spark.sql.gravitino.client.              | string | (none)        | The configuration key prefix for the Gravitino client config.                                   | No       |
 
 To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `spark.sql.` prefix.
 
@@ -84,26 +84,26 @@ The command `SHOW CATALOGS` will only display the Spark default catalog, named s
 
 Gravitino spark connector support the following datatype mapping between Spark and Gravitino.
 
-| Spark Data Type                   | Gravitino Data Type           | Since Version |
-|-----------------------------------|-------------------------------|---------------|
-| `BooleanType`                     | `boolean`                     | 0.5.0         |
-| `ByteType`                        | `byte`                        | 0.5.0         |
-| `ShortType`                       | `short`                       | 0.5.0         |
-| `IntegerType`                     | `integer`                     | 0.5.0         |
-| `LongType`                        | `long`                        | 0.5.0         |
-| `FloatType`                       | `float`                       | 0.5.0         |
-| `DoubleType`                      | `double`                      | 0.5.0         |
-| `DecimalType`                     | `decimal`                     | 0.5.0         |
-| `StringType`                      | `string`                      | 0.5.0         |
-| `CharType`                        | `char`                        | 0.5.0         |
-| `VarcharType`                     | `varchar`                     | 0.5.0         |
-| `TimestampType`                   | `timestamp with time zone`    | 0.5.0         |
-| `TimestampNTZType` *(Spark 3.4+)* | `timestamp without time zone` | 0.5.0         |
-| `DateType`                        | `date`                        | 0.5.0         |
-| `BinaryType`                      | `binary`                      | 0.5.0         |
-| `ArrayType`                       | `array`                       | 0.5.0         |
-| `MapType`                         | `map`                         | 0.5.0         |
-| `StructType`                      | `struct`                      | 0.5.0         |
+| Spark Data Type                   | Gravitino Data Type           |
+|-----------------------------------|-------------------------------|
+| `BooleanType`                     | `boolean`                     |
+| `ByteType`                        | `byte`                        |
+| `ShortType`                       | `short`                       |
+| `IntegerType`                     | `integer`                     |
+| `LongType`                        | `long`                        |
+| `FloatType`                       | `float`                       |
+| `DoubleType`                      | `double`                      |
+| `DecimalType`                     | `decimal`                     |
+| `StringType`                      | `string`                      |
+| `CharType`                        | `char`                        |
+| `VarcharType`                     | `varchar`                     |
+| `TimestampType`                   | `timestamp with time zone`    |
+| `TimestampNTZType` *(Spark 3.4+)* | `timestamp without time zone` |
+| `DateType`                        | `date`                        |
+| `BinaryType`                      | `binary`                      |
+| `ArrayType`                       | `array`                       |
+| `MapType`                         | `map`                         |
+| `StructType`                      | `struct`                      |
 
 :::note
 For Gravitino `UUID` type, Spark connector represents it as `StringType` because Spark has no native UUID type.

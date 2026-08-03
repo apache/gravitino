@@ -105,15 +105,15 @@ DROP VIEW order_view;
 The Gravitino Flink connector transforms the following properties in a catalog to Flink connector configuration.
 
 
-| Gravitino catalog property name | Flink Iceberg connector configuration | Description                                                                                                   | Since Version    |
-|---------------------------------|---------------------------------------|---------------------------------------------------------------------------------------------------------------|------------------|
-| `catalog-backend`               | `catalog-type`                        | Catalog backend type, currently, `Hive` and `REST` catalogs are supported, and `JDBC` is in continuous validation | 0.8.0-incubating |
-| `uri`                           | `uri`                                 | Catalog backend URI                                                                                           | 0.8.0-incubating |
-| `warehouse`                     | `warehouse`                           | Catalog backend warehouse                                                                                     | 0.8.0-incubating |
-| `io-impl`                       | `io-impl`                             | The IO implementation for `FileIO` in Iceberg.                                                                | 0.8.0-incubating |
-| `oss-endpoint`                  | `oss.endpoint`                        | The endpoint of Aliyun OSS service.                                                                           | 0.8.0-incubating |
-| `oss-access-key-id`             | `client.access-key-id`                | The static access key ID used to access OSS data.                                                             | 0.8.0-incubating |
-| `oss-secret-access-key`         | `client.access-key-secret`            | The static secret access key used to access OSS data.                                                         | 0.8.0-incubating |
+| Gravitino catalog property name | Flink Iceberg connector configuration | Description                                                                                                       |
+|---------------------------------|---------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `catalog-backend`               | `catalog-type`                        | Catalog backend type, currently, `Hive` and `REST` catalogs are supported, and `JDBC` is in continuous validation |
+| `uri`                           | `uri`                                 | Catalog backend URI                                                                                               |
+| `warehouse`                     | `warehouse`                           | Catalog backend warehouse                                                                                         |
+| `io-impl`                       | `io-impl`                             | The IO implementation for `FileIO` in Iceberg.                                                                    |
+| `oss-endpoint`                  | `oss.endpoint`                        | The endpoint of Aliyun OSS service.                                                                               |
+| `oss-access-key-id`             | `client.access-key-id`                | The static access key ID used to access OSS data.                                                                 |
+| `oss-secret-access-key`         | `client.access-key-secret`            | The static secret access key used to access OSS data.                                                             |
 
 Gravitino catalog property names with the prefix `flink.bypass.` are passed to Flink iceberg connector. For example, using `flink.bypass.clients` to pass the `clients` to the Flink iceberg connector.
 

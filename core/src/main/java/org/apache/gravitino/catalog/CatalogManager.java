@@ -461,7 +461,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     if (!trackLocalMutations) {
       return;
     }
-    localMutationCounts.computeIfAbsent(ident, k -> new AtomicInteger()).incrementAndGet();
+    int pending =
+        localMutationCounts.computeIfAbsent(ident, k -> new AtomicInteger()).incrementAndGet();
+    LOG.debug("Marked a local mutation for catalog {}, {} pending marker(s)", ident, pending);
   }
 
   /**

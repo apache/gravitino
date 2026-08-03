@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.integration.test;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
@@ -1100,6 +1101,160 @@ public class CatalogClickHouseIT extends BaseIT {
                   + column.name()
                   + ", default value: "
                   + column.defaultValue());
+      }
+    }
+  }
+
+  @Test
+  @EnabledIf("supportColumnDefaultValueExpression")
+  void testMATERIALIZEDAndALIASColumnDefaultKinds() {
+    // Verify that MATERIALIZED and ALIAS columns are correctly distinguished from DEFAULT
+    // columns on round-trip through the Gravitino API. The ClickHouse JDBC driver hardcodes
+    // IS_GENERATEDCOLUMN to 'NO', so the catalog must query system.columns.default_kind
+    // to correctly identify these column kinds.
+    String tableName = GravitinoITUtils.genRandomName("test_default_kind");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  id Int64,\n"
+            + "  created_date Date DEFAULT today(),\n"
+            + "  computed_date Date MATERIALIZED today(),\n"
+            + "  alias_date Date ALIAS today(),\n"
+            + "  computed_int Int64 MATERIALIZED id + 1,\n"
+            + "  alias_int Int64 ALIAS id * 2,\n"
+            + "  materialized_str String MATERIALIZED concat('prefix_', toString(id)),\n"
+            + "  alias_str String ALIAS concat('suffix_', toString(id)),\n"
+            + "  nullable_default Nullable(Date) DEFAULT today(),\n"
+            + "  nullable_materialized Nullable(Date) MATERIALIZED today(),\n"
+            + "  nullable_alias Nullable(Date) ALIAS today()\n"
+            + ") ENGINE = MergeTree ORDER BY id;\n";
+
+    clickhouseService.executeQuery(sql);
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "id":
+          // No default value
+          Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "created_date":
+          // DEFAULT column: today() is an expression, not a literal
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          Assertions.assertEquals(
+              "today()", ((UnparsedExpression) column.defaultValue()).unparsedExpression());
+          break;
+        case "computed_date":
+          // MATERIALIZED column: must resolve to UnparsedExpression, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          Assertions.assertEquals(
+              "today()", ((UnparsedExpression) column.defaultValue()).unparsedExpression());
+          break;
+        case "alias_date":
+          // ALIAS column: must resolve to UnparsedExpression, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          Assertions.assertEquals(
+              "today()", ((UnparsedExpression) column.defaultValue()).unparsedExpression());
+          break;
+        case "computed_int":
+          // MATERIALIZED with arithmetic expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "alias_int":
+          // ALIAS with arithmetic expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "materialized_str":
+          // MATERIALIZED with function expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "alias_str":
+          // ALIAS with function expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "nullable_default":
+          // Nullable + DEFAULT: should have a default value
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "nullable_materialized":
+          // Nullable + MATERIALIZED: should have a default value, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "nullable_alias":
+          // Nullable + ALIAS: should have a default value, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        default:
+          Assertions.fail(
+              "Unexpected column name: "
+                  + column.name()
+                  + ", default value: "
+                  + column.defaultValue());
+      }
+    }
+  }
+
+  @Test
+  @EnabledIf("supportColumnDefaultValueExpression")
+  void testDefaultColumnsNotMismarkedAsMaterialized() {
+    // Regression guard: columns with DEFAULT (not MATERIALIZED/ALIAS) must remain as DEFAULT
+    // on round-trip. The getDefaultKinds() query should not cause plain DEFAULT columns to be
+    // re-processed through the expression branch intended for MATERIALIZED/ALIAS.
+    String tableName = GravitinoITUtils.genRandomName("test_default_only");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  id Int64,\n"
+            + "  status UInt8 DEFAULT 0,\n"
+            + "  name String DEFAULT 'unknown',\n"
+            + "  created_at DateTime DEFAULT now()\n"
+            + ") ENGINE = MergeTree ORDER BY id;\n";
+
+    clickhouseService.executeQuery(sql);
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "id":
+          Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "status":
+          // DEFAULT literal 0 — must NOT be UnparsedExpression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertFalse(
+              column.defaultValue() instanceof UnparsedExpression,
+              "DEFAULT column 'status' should not be treated as MATERIALIZED/ALIAS");
+          break;
+        case "name":
+          // DEFAULT literal 'unknown' — must NOT be UnparsedExpression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertFalse(
+              column.defaultValue() instanceof UnparsedExpression,
+              "DEFAULT column 'name' should not be treated as MATERIALIZED/ALIAS");
+          break;
+        case "created_at":
+          // DEFAULT now() is a function expression → UnparsedExpression is acceptable here
+          // (falls back because now() is not a valid timestamp literal).
+          // The key assertion: it must NOT be DEFAULT_VALUE_NOT_SET.
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        default:
+          Assertions.fail("Unexpected column: " + column.name());
       }
     }
   }
@@ -2650,5 +2805,71 @@ public class CatalogClickHouseIT extends BaseIT {
     // ClickHouse 24.8 always includes default SETTINGS (index_granularity = 8192) in
     // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
     Assertions.assertEquals(1, settingsCount);
+  }
+
+  /**
+   * Verifies round-trip for new ClickHouse types (Int128/256, UInt128/256, Enum8/16, Date32) via
+   * SQL CREATE TABLE + Gravitino loadTable. BFloat16 is excluded because it requires ClickHouse
+   * 24.12+ (the Gravitino CI image is 24.8.14). The BFloat16 converter mapping is verified in
+   * {@link org.apache.gravitino.catalog.clickhouse.converter.TestClickHouseTypeConverter}.
+   */
+  @Test
+  void testCreateTableWithNewTypeMappings() {
+    String tableName = GravitinoITUtils.genRandomName("test_new_types");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s ("
+                + "c_int128 Int128, c_int256 Int256, "
+                + "c_uint128 UInt128, c_uint256 UInt256, "
+                + "c_enum8 Enum8('a'=1,'b'=2), "
+                + "c_enum16 Enum16('x'=1,'y'=2), "
+                + "c_date32 Date32"
+                + ") ORDER BY c_int128",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Assertions.assertEquals(Types.ExternalType.of("Int128"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("Int256"), loadedTable.columns()[1].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("UInt128"), loadedTable.columns()[2].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("UInt256"), loadedTable.columns()[3].dataType());
+    // Enum types use instanceof check (not exact value match) because the ClickHouse JDBC driver
+    // may normalize the enum definition format (e.g., spacing around '=' and ',').
+    Assertions.assertTrue(loadedTable.columns()[4].dataType() instanceof Types.ExternalType);
+    Assertions.assertTrue(loadedTable.columns()[5].dataType() instanceof Types.ExternalType);
+    Assertions.assertEquals(Types.ExternalType.of("Date32"), loadedTable.columns()[6].dataType());
+  }
+
+  /**
+   * Tests that GraphiteMergeTree engine creation fails when graphite.config property is missing.
+   * Note: Positive path test (successful creation with valid config) is not included because it
+   * requires a pre-configured graphite_rollup element on the ClickHouse server side, which is not
+   * available in the standard test container.
+   */
+  @Test
+  void testGraphiteMergeTreeEngineCreation() {
+    String tableName = GravitinoITUtils.genRandomName("test_graphite");
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "pk", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("val", Types.StringType.get(), "data", true, false, DEFAULT_VALUE_NOT_SET)
+        };
+    Assertions.assertTrue(ENGINE.GRAPHITEMERGETREE.isRequireOrderBy());
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GRAVITINO_ENGINE_KEY, ENGINE.GRAPHITEMERGETREE.getValue());
+    // GraphiteMergeTree requires graphite.config property
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    NameIdentifier.of(schemaName, tableName),
+                    columns,
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    getSortOrders("id"),
+                    Indexes.EMPTY_INDEXES));
   }
 }

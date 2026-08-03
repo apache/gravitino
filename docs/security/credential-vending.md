@@ -383,7 +383,7 @@ The credential provider implementations ship in separate jars. Whichever compone
 
 Substitute `{cloud}` with `aws`, `gcp`, `aliyun`, or `azure`. Note the two jar families: the `-bundle` variants also carry Hadoop and cloud SDK packages, which the Fileset catalog and the IRC need. The Hive, Glue, and Paimon catalogs only vend credentials, so they take the plain `gravitino-{cloud}` jar.
 
-Since Gravitino 1.1.0, the Gravitino Iceberg cloud bundle jars already include the Iceberg cloud bundle jars, so there is no need to download and include those separately.
+The Gravitino Iceberg cloud bundle jars already include the Iceberg cloud bundle jars, so there is no need to download and include those separately.
 
 Vending JDBC user and password requires no additional jar.
 
@@ -395,7 +395,7 @@ Bundle jars on Maven Central:
 
 ## Upgrading From a Release Earlier Than 1.3.0
 
-Since 1.3.0, sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are excluded from `GET /api/metalakes/{metalake}/catalogs/{catalog}`. Clients written against earlier releases that read those properties directly lose access to them.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are excluded from `GET /api/metalakes/{metalake}/catalogs/{catalog}`. Clients written against earlier releases that read those properties directly lose access to them.
 
 For a zero-downtime migration, set the following in `gravitino.conf`:
 
