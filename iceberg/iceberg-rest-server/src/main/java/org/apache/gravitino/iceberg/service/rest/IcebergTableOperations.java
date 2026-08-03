@@ -68,6 +68,7 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.filter.IcebergTableDeletionAuthzHandler;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
@@ -252,18 +253,19 @@ public class IcebergTableOperations {
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER ",
+      expression = AuthorizationExpressionConstants.ICEBERG_DROP_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
+      @AuthorizationMetadata(type = Entity.EntityType.TABLE)
+          @IcebergAuthorizationMetadata(type = RequestType.MANAGE_TABLE_DELETION)
+          @Encoded()
+          @PathParam("table")
           String table,
-      @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
+      @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested,
+      @Context HttpServletRequest servletRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -276,11 +278,15 @@ public class IcebergTableOperations {
         purgeRequested);
     try {
       return Utils.doAs(
-          httpRequest,
+          servletRequest,
           () -> {
+            if (IcebergTableDeletionAuthzHandler.authorizedDeletion(servletRequest) != null) {
+              // Authorization observed an already-retained generation. Linearize this retry at
+              // that observation rather than dispatching a name-based delete against a later row.
+              return IcebergRESTUtils.noContent();
+            }
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
-            IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+            IcebergRequestContext context = new IcebergRequestContext(servletRequest, catalogName);
             tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
             return IcebergRESTUtils.noContent();
           });

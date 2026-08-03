@@ -215,6 +215,18 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
+  public void testLifecycleDropRetainsTombstonedEntity() throws IOException {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    when(mockDispatcher.managesDeletionLifecycle(mockContext, false)).thenReturn(true);
+
+    hookDispatcher.dropTable(mockContext, tableId, false);
+
+    verify(mockDispatcher).dropTable(mockContext, tableId, false);
+    verify(mockDispatcher, never()).tableExists(mockContext, tableId);
+    verify(mockEntityStore, never()).delete(any(), any());
+  }
+
+  @Test
   public void testDropTableReimportsEntityWhenTableExistsAfterDrop() throws IOException {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
     when(mockDispatcher.tableExists(mockContext, tableId)).thenReturn(true);
