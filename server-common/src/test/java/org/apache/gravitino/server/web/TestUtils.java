@@ -31,6 +31,7 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -162,6 +163,19 @@ public class TestUtils {
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
     assertEquals("RuntimeException", errorResponse.getType());
     assertEquals("New message", errorResponse.getMessage());
+  }
+
+  @Test
+  public void testOptimisticLockConflict() {
+    OptimisticLockException exception = new OptimisticLockException("Conflict");
+    Response response = Utils.optimisticLockConflict("Conflict", exception);
+
+    assertNotNull(response);
+    assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals(OptimisticLockException.class.getSimpleName(), errorResponse.getType());
+    assertEquals("Conflict", errorResponse.getMessage());
   }
 
   @Test
