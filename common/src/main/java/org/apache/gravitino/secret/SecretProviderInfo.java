@@ -25,10 +25,8 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Safe metadata for a configured secrets-provider instance. */
-@DeveloperApi
 public final class SecretProviderInfo {
 
   private final String name;

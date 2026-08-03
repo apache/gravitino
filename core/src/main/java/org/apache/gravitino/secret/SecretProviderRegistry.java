@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +48,6 @@ import org.slf4j.LoggerFactory;
  * gravitino.secret.provider.<name>.uri=<optional-non-secret-endpoint>
  * }</pre>
  */
-@DeveloperApi
 public final class SecretProviderRegistry implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(SecretProviderRegistry.class);
