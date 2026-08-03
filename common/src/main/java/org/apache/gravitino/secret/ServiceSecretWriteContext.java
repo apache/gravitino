@@ -22,7 +22,12 @@ package org.apache.gravitino.secret;
 import java.util.Objects;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Default immutable {@link SecretWriteContext} for server-side secret write-through. */
+/**
+ * Server-side {@link SecretWriteContext} for entity write-through secrets.
+ *
+ * <p>Carries the metadata needed to build a write-through URN of the form {@code
+ * urn:gravitino-secret:<providerName>:<entityType>:<entityId>:<propertyKey>}.
+ */
 @DeveloperApi
 public final class ServiceSecretWriteContext implements SecretWriteContext {
 
@@ -32,7 +37,7 @@ public final class ServiceSecretWriteContext implements SecretWriteContext {
   private final String propertyKey;
 
   /**
-   * Creates a secret write context.
+   * Creates a secret write context for entity write-through.
    *
    * @param providerName the configured secret provider name used in the URN
    * @param entityType the entity type (catalog, schema, or fileset)
@@ -47,22 +52,38 @@ public final class ServiceSecretWriteContext implements SecretWriteContext {
     this.propertyKey = propertyKey;
   }
 
-  @Override
+  /**
+   * Returns the configured secret provider name used in the URN.
+   *
+   * @return the provider name
+   */
   public String providerName() {
     return providerName;
   }
 
-  @Override
+  /**
+   * Returns the entity type (catalog, schema, or fileset).
+   *
+   * @return the entity type
+   */
   public String entityType() {
     return entityType;
   }
 
-  @Override
+  /**
+   * Returns the stable entity identifier.
+   *
+   * @return the entity identifier
+   */
   public long entityId() {
     return entityId;
   }
 
-  @Override
+  /**
+   * Returns the property key holding the secret.
+   *
+   * @return the property key
+   */
   public String propertyKey() {
     return propertyKey;
   }

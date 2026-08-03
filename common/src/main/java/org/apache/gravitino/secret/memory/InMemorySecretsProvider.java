@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.SecretWriteContext;
+import org.apache.gravitino.secret.ServiceSecretWriteContext;
 
 /**
  * In-memory secret provider for development and unit tests only.
@@ -56,15 +57,17 @@ public class InMemorySecretsProvider implements SecretProvider {
     if (plaintext == null) {
       throw new IllegalArgumentException("plaintext must not be null");
     }
-    if (context == null) {
-      throw new IllegalArgumentException("context must not be null");
+    if (!(context instanceof ServiceSecretWriteContext)) {
+      throw new IllegalArgumentException(
+          "InMemorySecretsProvider requires ServiceSecretWriteContext");
     }
+    ServiceSecretWriteContext writeContext = (ServiceSecretWriteContext) context;
     String urn =
         SecretUrn.buildWriteThrough(
-            context.providerName(),
-            context.entityType(),
-            context.entityId(),
-            context.propertyKey());
+            writeContext.providerName(),
+            writeContext.entityType(),
+            writeContext.entityId(),
+            writeContext.propertyKey());
     secrets.put(
         urn, Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8)));
     return urn;

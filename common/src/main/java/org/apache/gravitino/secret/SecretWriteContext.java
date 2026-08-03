@@ -21,35 +21,13 @@ package org.apache.gravitino.secret;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Context information used when writing a secret through a {@link SecretProvider}. */
+/**
+ * Context passed to {@link SecretProvider#writeSecret(String, SecretWriteContext)}.
+ *
+ * <p>This is intentionally a marker interface. Different providers may require different write
+ * metadata; implementations should document the concrete context type they accept (for example
+ * {@link ServiceSecretWriteContext} for entity write-through), and callers must supply a compatible
+ * instance.
+ */
 @DeveloperApi
-public interface SecretWriteContext {
-
-  /**
-   * Returns the configured secret provider name used in the URN.
-   *
-   * @return the provider name
-   */
-  String providerName();
-
-  /**
-   * Returns the entity type (catalog, schema, or fileset).
-   *
-   * @return the entity type
-   */
-  String entityType();
-
-  /**
-   * Returns the stable entity identifier.
-   *
-   * @return the entity identifier
-   */
-  long entityId();
-
-  /**
-   * Returns the property key holding the secret.
-   *
-   * @return the property key
-   */
-  String propertyKey();
-}
+public interface SecretWriteContext {}
