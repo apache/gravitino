@@ -19,87 +19,37 @@
 
 package org.apache.gravitino.secret;
 
-import java.util.Objects;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Immutable context for writing a secret at entity create time. */
+/** Context information used when writing a secret through a {@link SecretProvider}. */
 @DeveloperApi
-public final class SecretWriteContext {
-
-  private final String providerName;
-  private final String entityType;
-  private final long entityId;
-  private final String propertyKey;
+public interface SecretWriteContext {
 
   /**
-   * Creates a secret write context.
-   *
-   * @param providerName the configured secret provider name used in the URN
-   * @param entityType the entity type (catalog, schema, or fileset)
-   * @param entityId the entity identifier
-   * @param propertyKey the property key holding the secret
-   */
-  public SecretWriteContext(
-      String providerName, String entityType, long entityId, String propertyKey) {
-    this.providerName = providerName;
-    this.entityType = entityType;
-    this.entityId = entityId;
-    this.propertyKey = propertyKey;
-  }
-
-  /**
-   * Returns the configured secret provider name.
+   * Returns the configured secret provider name used in the URN.
    *
    * @return the provider name
    */
-  public String providerName() {
-    return providerName;
-  }
+  String providerName();
 
   /**
-   * Returns the entity type.
+   * Returns the entity type (catalog, schema, or fileset).
    *
    * @return the entity type
    */
-  public String entityType() {
-    return entityType;
-  }
+  String entityType();
 
   /**
-   * Returns the entity identifier.
+   * Returns the stable entity identifier.
    *
    * @return the entity identifier
    */
-  public long entityId() {
-    return entityId;
-  }
+  long entityId();
 
   /**
-   * Returns the property key.
+   * Returns the property key holding the secret.
    *
    * @return the property key
    */
-  public String propertyKey() {
-    return propertyKey;
-  }
-
-  @Override
-  public boolean equals(Object other) {
-    if (this == other) {
-      return true;
-    }
-    if (!(other instanceof SecretWriteContext)) {
-      return false;
-    }
-    SecretWriteContext that = (SecretWriteContext) other;
-    return entityId == that.entityId
-        && Objects.equals(providerName, that.providerName)
-        && Objects.equals(entityType, that.entityType)
-        && Objects.equals(propertyKey, that.propertyKey);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(providerName, entityType, entityId, propertyKey);
-  }
+  String propertyKey();
 }

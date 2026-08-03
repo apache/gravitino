@@ -32,7 +32,8 @@ public class TestInMemorySecretsProvider {
     Assertions.assertEquals("memory", provider.type());
 
     provider.initialize("memory", Map.of());
-    SecretWriteContext context = new SecretWriteContext("memory", "catalog", 10L, "password");
+    SecretWriteContext context =
+        new ServiceSecretWriteContext("memory", "catalog", 10L, "password");
     String urn = provider.writeSecret("s3cr3t", context);
     Assertions.assertEquals("urn:gravitino-secret:memory:catalog:10:password", urn);
     Assertions.assertEquals("s3cr3t", provider.readSecret(urn));
@@ -45,7 +46,8 @@ public class TestInMemorySecretsProvider {
   @Test
   public void testWriteSecretRejectsNullArguments() {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
-    SecretWriteContext context = new SecretWriteContext("memory", "catalog", 10L, "password");
+    SecretWriteContext context =
+        new ServiceSecretWriteContext("memory", "catalog", 10L, "password");
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> provider.writeSecret(null, context));
     Assertions.assertThrows(
@@ -56,7 +58,8 @@ public class TestInMemorySecretsProvider {
   public void testCloseClearsStoredSecrets() {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
     provider.initialize("memory", Map.of());
-    SecretWriteContext context = new SecretWriteContext("memory", "catalog", 10L, "password");
+    SecretWriteContext context =
+        new ServiceSecretWriteContext("memory", "catalog", 10L, "password");
     String urn = provider.writeSecret("s3cr3t", context);
     Assertions.assertEquals("s3cr3t", provider.readSecret(urn));
 
