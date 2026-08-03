@@ -61,18 +61,19 @@ The rest of this document analyses what TreeLock really does today, then compare
 
 ## Goals
 
-1. **Understand what TreeLock protects today**: Describe what TreeLock actually guards, and which of those guarantees the shared database could provide instead.
-2. **Evaluate the candidate directions on equal footing**: Assess each direction — database-native concurrency, and a cross-node distributed lock — against the same criteria (correctness, performance, maintainability, operational cost), informed by how comparable systems solve the two-store problem. Neither direction is assumed better going in.
-3. **Correctness for one and for many servers**: Whatever is chosen must be correct with a single server and under HA.
-4. **Decide with evidence**: End with a direction and the reasons behind it, plus a plan a developer can start on.
+1. **Work with one server and with many.** The same operation must behave the same way on a single server and behind a load balancer. TreeLock only works inside one JVM, so HA is exactly where it stops helping.
+2. **Fix the races we can fix.** Lost updates, two servers both "winning" a create, a child left under a deleted parent — these are writes where Gravitino's own database is the only source of truth, so they are ours to fix. Where an external catalog owns the data, match what it guarantees and write down what that is.
+3. **Keep the change small.** Prefer rules the database already enforces over anything new to deploy: no extra service, no extra dependency, and keep call sites as they are where possible.
+4. **Easy to run and to extend.** Adding an entity type or a catalog should get the same protection by following an existing pattern, instead of remembering which lock to take. Conflicts should be visible in logs, metrics and HTTP status codes, not something operators have to guess at.
 
 ---
 
 ## Non-Goals
 
-1. **No single transaction across the external catalog and the Gravitino store**: We will not try 2PC/XA across the two stores. External catalogs do not all offer the same transaction guarantees, so the existing pattern (re-sync on read, which is safe to repeat) is kept.
-2. **Write correctness only, not read staleness**: This document is about correct concurrent *writes*. Keeping each server's *cached reads* fresh across nodes (the `EntityChangeLogPoller` work) is a separate effort, out of scope here.
-3. **No change to external-catalog behavior**: We will not change how Hive/Iceberg/JDBC connectors keep their own data correct; they are the source of truth for their own data.
+1. **A distributed lock is not the target.** It is one option among others, not the goal. If a database rule can do the job, that wins; a cross-node lock is only worth considering where nothing else works.
+2. **No single transaction across the external catalog and the Gravitino store.** No 2PC/XA. Not every external catalog offers the same guarantees, so we keep today's pattern: external system first, store second, store fixed on the next read.
+3. **Stale reads are a different problem.** This document is about concurrent *writes*. Keeping each server's cached reads fresh is the `EntityChangeLogPoller` work, not this.
+4. **We do not change how external catalogs behave.** Hive, Iceberg and JDBC keep their own concurrency semantics, and Gravitino does not promise more than they give.
 
 ---
 
