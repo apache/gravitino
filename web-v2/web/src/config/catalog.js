@@ -223,6 +223,32 @@ export const tableDefaultProps = {
       select: ['lance', 'delta'],
       description: 'The format of the table'
     }
+  ],
+  'jdbc-clickhouse': [
+    {
+      key: 'engine',
+      defaultValue: 'MergeTree',
+      select: [
+        'MergeTree',
+        'ReplacingMergeTree',
+        'SummingMergeTree',
+        'AggregatingMergeTree',
+        'CollapsingMergeTree',
+        'VersionedCollapsingMergeTree',
+        'GraphiteMergeTree',
+        'ReplicatedMergeTree',
+        'ReplicatedReplacingMergeTree',
+        'ReplicatedSummingMergeTree',
+        'ReplicatedAggregatingMergeTree',
+        'ReplicatedCollapsingMergeTree',
+        'ReplicatedVersionedCollapsingMergeTree',
+        'ReplicatedGraphiteMergeTree',
+        'Distributed',
+        'TinyLog',
+        'Log',
+        'StripeLog'
+      ]
+    }
   ]
 }
 

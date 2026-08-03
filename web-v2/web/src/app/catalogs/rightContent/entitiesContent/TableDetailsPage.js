@@ -230,6 +230,7 @@ export default function TableDetailsPage({ ...props }) {
       fields: i.fieldNames,
       name: i.name,
       indexType: i.indexType,
+      properties: i.properties,
       text: `${i.name}(${i.fieldNames.map(v => v.join('.')).join(',')})`
     }
   })
@@ -264,6 +265,22 @@ export default function TableDetailsPage({ ...props }) {
               </Tooltip>
             )
           })}
+        </Space.Compact>
+        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
+          <span className='min-w-20 bg-gray-100 p-1'>Granularity</span>
+          {indexList?.map((item, idx) => (
+            <Tooltip title={item.properties?.granularity} key={`granularity-${idx}`}>
+              <span className='block max-w-20 truncate p-1'>{item.properties?.granularity ?? '-'}</span>
+            </Tooltip>
+          ))}
+        </Space.Compact>
+        <Space.Compact direction='vertical' className='divide-y border-gray-100'>
+          <span className='min-w-24 bg-gray-100 p-1'>Set Max Values</span>
+          {indexList?.map((item, idx) => (
+            <Tooltip title={item.properties?.set_max_values} key={`set-max-values-${idx}`}>
+              <span className='block max-w-24 truncate p-1'>{item.properties?.set_max_values ?? '-'}</span>
+            </Tooltip>
+          ))}
         </Space.Compact>
       </Space.Compact>
     )

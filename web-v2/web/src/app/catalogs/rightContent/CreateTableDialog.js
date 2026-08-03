@@ -57,6 +57,7 @@ import {
   ColumnWithParamType,
   UnsupportColumnType,
   autoIncrementInfoMap,
+  clickHouseMergeTreeEngines,
   defaultValueSupported,
   dialogContentMaxHeigth,
   distributionInfoMap,
@@ -118,6 +119,14 @@ export default function CreateTableDialog({ ...props }) {
   const isClickHouseDistributedEngine =
     provider === 'jdbc-clickhouse' &&
     values?.properties?.find(item => item?.key === 'engine')?.value?.toLowerCase?.() === 'distributed'
+
+  const clickHouseEngine =
+    provider === 'jdbc-clickhouse'
+      ? values?.engine || values?.properties?.find(item => item?.key === 'engine')?.value
+      : undefined
+
+  const isClickHouseMergeTreeEngine =
+    provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.includes(clickHouseEngine)
   const isColumnsRequired = !isClickHouseDistributedEngine
 
   const defaultValues = {
@@ -200,7 +209,16 @@ export default function CreateTableDialog({ ...props }) {
     if (sortOredsInfo) {
       ;``
       tabs.push({
-        label: <span className='font-normal text-[rgb(0,0,0,0.88)]'>Sort Orders</span>,
+        label: (
+          <span
+            className={cn('font-normal text-[rgb(0,0,0,0.88)]', {
+              'before:mr-0.5 before:font-["SimSun"] before:text-[#ff4d4f] before:content-["*"]':
+                isClickHouseMergeTreeEngine
+            })}
+          >
+            Sort Orders
+          </span>
+        ),
         key: 'sortOrders'
       })
     }
@@ -226,7 +244,15 @@ export default function CreateTableDialog({ ...props }) {
       })
     }
     setTabOptions(tabs)
-  }, [isColumnsRequired, provider, partitioningInfo, sortOredsInfo, indexesInfo, distributionInfo])
+  }, [
+    isColumnsRequired,
+    isClickHouseMergeTreeEngine,
+    provider,
+    partitioningInfo,
+    sortOredsInfo,
+    indexesInfo,
+    distributionInfo
+  ])
 
   useEffect(() => {
     scrollRef.current && handScroll()
@@ -243,6 +269,30 @@ export default function CreateTableDialog({ ...props }) {
       form.validateFields([['distribution', 'strategy']], { recursive: true })
     }
   }, [values?.distribution?.strategy, provider, values?.partitions, values?.sortOrders])
+
+  useEffect(() => {
+    if (!open || editTable || isLoading) {
+      return
+    }
+
+    if (!isClickHouseMergeTreeEngine) {
+      if (values?.sortOrders?.length > 0) {
+        form.setFieldValue('sortOrders', [])
+      }
+      form.setFields([{ name: 'sortOrders', errors: [] }])
+    } else {
+      // Re-validate sortOrders when switching to MergeTree engine
+      const sortOrders = form.getFieldValue('sortOrders')
+      if (!sortOrders?.length) {
+        form.setFields([
+          {
+            name: 'sortOrders',
+            errors: ['Sort orders are required for MergeTree family engines']
+          }
+        ])
+      }
+    }
+  }, [open, editTable, isLoading, isClickHouseMergeTreeEngine])
 
   useEffect(() => {
     values?.columns?.forEach((col, index) => {
@@ -471,6 +521,16 @@ export default function CreateTableDialog({ ...props }) {
                 form.setFieldValue(['indexes', idxIndex, 'name'], item.name)
                 form.setFieldValue(['indexes', idxIndex, 'indexType'], capitalizeFirstLetter(item.indexType))
                 form.setFieldValue(['indexes', idxIndex, 'fieldName'], fields)
+
+                // Populate index properties
+                if (item.properties) {
+                  if (item.properties.granularity != null) {
+                    form.setFieldValue(['indexes', idxIndex, 'granularity'], Number(item.properties.granularity))
+                  }
+                  if (item.properties.set_max_values != null) {
+                    form.setFieldValue(['indexes', idxIndex, 'setMaxValues'], Number(item.properties.set_max_values))
+                  }
+                }
                 idxIndex++
               })
             }
@@ -594,9 +654,54 @@ export default function CreateTableDialog({ ...props }) {
 
   const handleSubmit = e => {
     e.preventDefault()
+
+    const currentEngine = form.getFieldValue('engine')
+    const isCurrentMergeTree = provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.includes(currentEngine)
+
+    // For non-MergeTree ClickHouse engines, clear sortOrders errors before validating
+    if (sortOredsInfo && !isCurrentMergeTree) {
+      form.setFields([{ name: 'sortOrders', errors: [] }])
+    }
+
     form
       .validateFields()
       .then(async () => {
+        // Additional check: for MergeTree engines, sortOrders must not be empty
+        if (sortOredsInfo && isCurrentMergeTree) {
+          const sortOrders = form.getFieldValue('sortOrders')
+          if (!sortOrders?.length) {
+            form.setFields([
+              {
+                name: 'sortOrders',
+                errors: ['Sort orders are required for MergeTree family engines']
+              }
+            ])
+
+            return Promise.reject({ errorFields: [{ name: ['sortOrders'] }] })
+          }
+          const columns = form.getFieldValue('columns') || []
+
+          const nullableFields = sortOrders
+            .filter(s => {
+              if (!s?.fieldName) return false
+              const col = columns.find(c => c?.name === s.fieldName)
+
+              return col && !col?.required
+            })
+            .map(s => s.fieldName)
+          if (nullableFields.length > 0) {
+            form.setFields([
+              {
+                name: 'sortOrders',
+                errors: [
+                  `Nullable columns cannot be used in ORDER BY for MergeTree engines: ${nullableFields.join(', ')}`
+                ]
+              }
+            ])
+
+            return Promise.reject({ errorFields: [{ name: ['sortOrders'] }] })
+          }
+        }
         setConfirmLoading(true)
 
         let submitted = false
@@ -729,11 +834,27 @@ export default function CreateTableDialog({ ...props }) {
           }
           if (indexesInfo) {
             submitData['indexes'] = values.indexes?.map(i => {
-              return {
+              const index = {
                 indexType: i.indexType,
                 name: i.name,
                 fieldNames: i.fieldName.map(f => [f])
               }
+
+              // Build properties for data skipping indexes
+              const properties = {}
+              if (i.indexType?.startsWith('data_skipping_')) {
+                if (i.granularity != null) {
+                  properties['granularity'] = String(i.granularity)
+                }
+                if (i.indexType === 'data_skipping_set' && i.setMaxValues != null) {
+                  properties['set_max_values'] = String(i.setMaxValues)
+                }
+              }
+              if (Object.keys(properties).length > 0) {
+                index.properties = properties
+              }
+
+              return index
             })
           }
           if (
@@ -1244,23 +1365,28 @@ export default function CreateTableDialog({ ...props }) {
     )
   }
 
+  const isDataSkippingIndex = indexType => indexType?.startsWith('data_skipping_')
+
   const renderTableIndexes = (fields, subOpt) => {
     return (
       <div className='flex flex-col divide-y divide-solid border-b border-solid'>
-        <div className='grid grid-cols-5 divide-x divide-solid'>
+        <div className='grid grid-cols-7 divide-x divide-solid'>
           <div className='col-span-1 bg-gray-100 p-1 text-center'>Index Type</div>
           <div className='col-span-2 bg-gray-100 p-1 text-center'>Field</div>
           <div className='col-span-1 bg-gray-100 p-1 text-center'>Index Name</div>
+          <div className='col-span-1 bg-gray-100 p-1 text-center'>Granularity</div>
+          <div className='col-span-1 bg-gray-100 p-1 text-center'>Set Max Values</div>
           <div className='col-span-1 bg-gray-100 p-1 text-center'>Action</div>
         </div>
         {fields.map(subField => (
           <div key={subField.name}>
-            <div className='grid grid-cols-5'>
+            <div className='grid grid-cols-7'>
               <div className='col-span-1 px-2 py-1'>
                 <Form.Item noStyle name={[subField.name, 'indexType']} label='Index Type'>
                   <Select
                     size='small'
                     className='w-full'
+                    popupMatchSelectWidth={false}
                     placeholder='Index Type'
                     disabled={!!editTable}
                     onChange={value => {
@@ -1269,6 +1395,10 @@ export default function CreateTableDialog({ ...props }) {
                       } else {
                         form.setFieldValue(['indexes', subField.name, 'name'], '')
                       }
+
+                      // Clear properties when index type changes
+                      form.setFieldValue(['indexes', subField.name, 'granularity'], undefined)
+                      form.setFieldValue(['indexes', subField.name, 'setMaxValues'], undefined)
                     }}
                   >
                     {(indexesInfo || []).map(type => (
@@ -1333,6 +1463,52 @@ export default function CreateTableDialog({ ...props }) {
                         ]}
                       >
                         <Input size='small' placeholder='Index Name' disabled={!!editTable || isPrimaryKeyIndex} />
+                      </Form.Item>
+                    )
+                  }}
+                </Form.Item>
+              </div>
+              <div className='col-span-1 px-2 py-1'>
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, curValues) =>
+                    prevValues?.indexes?.[subField.name]?.indexType !== curValues?.indexes?.[subField.name]?.indexType
+                  }
+                >
+                  {({ getFieldValue }) => {
+                    const currentIndexType = getFieldValue(['indexes', subField.name, 'indexType'])
+                    const showGranularity = isDataSkippingIndex(currentIndexType)
+
+                    if (!showGranularity) {
+                      return <span className='text-gray-300'>-</span>
+                    }
+
+                    return (
+                      <Form.Item noStyle name={[subField.name, 'granularity']} label='Granularity'>
+                        <InputNumber size='small' className='w-full' placeholder='1' min={1} disabled={!!editTable} />
+                      </Form.Item>
+                    )
+                  }}
+                </Form.Item>
+              </div>
+              <div className='col-span-1 px-2 py-1'>
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, curValues) =>
+                    prevValues?.indexes?.[subField.name]?.indexType !== curValues?.indexes?.[subField.name]?.indexType
+                  }
+                >
+                  {({ getFieldValue }) => {
+                    const currentIndexType = getFieldValue(['indexes', subField.name, 'indexType'])
+                    const showSetMaxValues = currentIndexType === 'data_skipping_set'
+
+                    if (!showSetMaxValues) {
+                      return <span className='text-gray-300'>-</span>
+                    }
+
+                    return (
+                      <Form.Item noStyle name={[subField.name, 'setMaxValues']} label='Set Max Values'>
+                        <InputNumber size='small' className='w-full' placeholder='0' min={0} disabled={!!editTable} />
                       </Form.Item>
                     )
                   }}

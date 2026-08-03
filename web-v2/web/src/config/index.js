@@ -238,6 +238,11 @@ const tableLevelPropInfoMap = {
     reserved: [],
     immutable: ['default-location-name'],
     allowAdd: true
+  },
+  'jdbc-clickhouse': {
+    reserved: [],
+    immutable: ['engine'],
+    allowAdd: true
   }
 }
 
@@ -328,7 +333,7 @@ export const indexesInfoMap = {
   'jdbc-oceanbase': ['primary_key', 'unique_key'],
   'jdbc-postgresql': ['primary_key', 'unique_key'],
   'lakehouse-paimon': ['primary_key'],
-  'jdbc-clickhouse': ['primary_key']
+  'jdbc-clickhouse': ['primary_key', 'data_skipping_minmax', 'data_skipping_bloom_filter', 'data_skipping_set']
 }
 
 export const autoIncrementInfoMap = {
@@ -347,3 +352,20 @@ export const autoIncrementInfoMap = {
 }
 
 export const defaultValueSupported = ['jdbc-doris', 'jdbc-mysql', 'jdbc-oceanbase', 'jdbc-postgresql', 'jdbc-starrocks']
+
+export const clickHouseMergeTreeEngines = [
+  'MergeTree',
+  'ReplacingMergeTree',
+  'SummingMergeTree',
+  'AggregatingMergeTree',
+  'CollapsingMergeTree',
+  'VersionedCollapsingMergeTree',
+  'GraphiteMergeTree',
+  'ReplicatedMergeTree',
+  'ReplicatedReplacingMergeTree',
+  'ReplicatedSummingMergeTree',
+  'ReplicatedAggregatingMergeTree',
+  'ReplicatedCollapsingMergeTree',
+  'ReplicatedVersionedCollapsingMergeTree',
+  'ReplicatedGraphiteMergeTree'
+]
