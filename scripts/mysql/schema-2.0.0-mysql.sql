@@ -73,10 +73,13 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     PRIMARY KEY (`table_id`),
     UNIQUE KEY `uk_sid_tn_del` (`schema_id`, `table_name`, `deleted_at`),
     KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    KEY `idx_cid` (`catalog_id`),
+    UNIQUE KEY `uk_tm_deletion` (`deletion_id`),
+    KEY `idx_tm_deleted_action` (`deleted_at`, `deletion_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table metadata';
 
 CREATE TABLE IF NOT EXISTS `table_column_version_info` (
@@ -593,6 +596,16 @@ CREATE TABLE IF NOT EXISTS `job_metrics` (
     KEY `idx_job_metrics_metric_ts` (`metric_ts`),
     KEY `idx_job_metrics_identifier_metric_ts` (`job_identifier`(255), `metric_ts`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'optimizer job metrics';
+
+CREATE TABLE IF NOT EXISTS `entity_deletion` (
+  `deletion_id`              VARCHAR(64)    NOT NULL COMMENT 'opaque identifier for one active deletion generation',
+  `state`                    VARCHAR(16)    NOT NULL COMMENT 'DELETED|PURGING',
+  `retention_expires_at`     BIGINT(20)     UNSIGNED NOT NULL COMMENT 'fixed recovery deadline in milliseconds',
+  `purge_job_id`             VARCHAR(64)    DEFAULT NULL COMMENT 'batch purge job that claimed this generation',
+  PRIMARY KEY (`deletion_id`),
+  KEY `idx_entity_deletion_gc` (`state`, `retention_expires_at`, `deletion_id`),
+  KEY `idx_entity_deletion_purge_job` (`purge_job_id`, `deletion_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'active deletion lifecycle actions';
 
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',

@@ -34,6 +34,7 @@ public @interface IcebergAuthorizationMetadata {
     RENAME_TABLE,
     RENAME_VIEW,
     CREATE_NAMESPACE,
+    MANAGE_TABLE_DELETION,
   }
   /**
    * The type of the parameter to be used for authorization.

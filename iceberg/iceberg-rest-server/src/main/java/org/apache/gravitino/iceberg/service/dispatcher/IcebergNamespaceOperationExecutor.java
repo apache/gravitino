@@ -26,8 +26,11 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
+import org.apache.gravitino.iceberg.service.deletion.IcebergTableDeletionLifecycle;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterViewRequest;
@@ -48,12 +51,28 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
 
   private final IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private final Optional<IcebergCleanupManager> cleanupManager;
+  private final Optional<IcebergTableDeletionLifecycle> deletionLifecycle;
 
   public IcebergNamespaceOperationExecutor(
       IcebergCatalogWrapperManager icebergCatalogWrapperManager,
       Optional<IcebergCleanupManager> cleanupManager) {
+    this(icebergCatalogWrapperManager, cleanupManager, Optional.empty());
+  }
+
+  /**
+   * Creates a namespace executor that also enforces retained table-name reservations.
+   *
+   * @param icebergCatalogWrapperManager Iceberg catalog wrapper manager
+   * @param cleanupManager optional legacy cleanup manager
+   * @param deletionLifecycle optional relational table deletion lifecycle
+   */
+  public IcebergNamespaceOperationExecutor(
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager,
+      Optional<IcebergCleanupManager> cleanupManager,
+      Optional<IcebergTableDeletionLifecycle> deletionLifecycle) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
     this.cleanupManager = cleanupManager;
+    this.deletionLifecycle = deletionLifecycle;
   }
 
   @Override
@@ -130,6 +149,12 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
       RegisterTableRequest registerTableRequest) {
     IcebergCleanupHelper.rejectIfBeingPurged(
         cleanupManager, context.catalogName(), namespace, registerTableRequest.name());
+    TableIdentifier identifier = TableIdentifier.of(namespace, registerTableRequest.name());
+    if (deletionLifecycle
+        .map(lifecycle -> lifecycle.isNameReserved(context.catalogName(), identifier))
+        .orElse(false)) {
+      throw new AlreadyExistsException("Table already exists: %s", identifier);
+    }
 
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
