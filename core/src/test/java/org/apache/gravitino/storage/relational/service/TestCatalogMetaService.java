@@ -50,7 +50,9 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -147,6 +149,55 @@ public class TestCatalogMetaService extends TestJDBCBackend {
 
     CatalogEntity updatedCatalog = backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
     Assertions.assertNotNull(updatedCatalog.getComment());
+  }
+
+  @TestTemplate
+  public void testAlterAndDeleteUseCurrentVersion() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_occ",
+            auditInfo);
+    backend.insert(catalog, false);
+    CatalogPO oldPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    CatalogEntity updatedCatalog =
+        CatalogEntity.builder()
+            .withId(catalog.id())
+            .withName(catalog.name())
+            .withNamespace(catalog.namespace())
+            .withAuditInfo(auditInfo)
+            .withComment("updated")
+            .withProperties(catalog.getProperties())
+            .withType(catalog.getType())
+            .withProvider(catalog.getProvider())
+            .build();
+    CatalogPO newPO =
+        POConverters.updateCatalogPOWithVersion(oldPO, updatedCatalog, oldPO.getMetalakeId());
+
+    int updated =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class, mapper -> mapper.updateCatalogMeta(newPO, oldPO));
+    int staleUpdate =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class, mapper -> mapper.updateCatalogMeta(newPO, oldPO));
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class,
+            mapper ->
+                mapper.softDeleteCatalogMetasByCatalogId(catalog.id(), oldPO.getCurrentVersion()));
+    assertEquals(1, updated);
+    assertEquals(0, staleUpdate);
+    assertEquals(0, staleDelete);
+    assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    int deleted =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class,
+            mapper ->
+                mapper.softDeleteCatalogMetasByCatalogId(catalog.id(), newPO.getCurrentVersion()));
+    assertEquals(1, deleted);
   }
 
   @TestTemplate

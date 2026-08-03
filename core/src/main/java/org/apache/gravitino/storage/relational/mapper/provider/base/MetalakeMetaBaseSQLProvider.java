@@ -143,23 +143,18 @@ public class MetalakeMetaBaseSQLProvider {
         + " current_version = #{newMetalakeMeta.currentVersion},"
         + " last_version = #{newMetalakeMeta.lastVersion}"
         + " WHERE metalake_id = #{oldMetalakeMeta.metalakeId}"
-        + " AND metalake_name = #{oldMetalakeMeta.metalakeName}"
-        + " AND (metalake_comment = #{oldMetalakeMeta.metalakeComment} "
-        + "  OR (metalake_comment IS NULL and #{oldMetalakeMeta.metalakeComment} IS NULL))"
-        + " AND properties = #{oldMetalakeMeta.properties}"
-        + " AND audit_info = #{oldMetalakeMeta.auditInfo}"
-        + " AND schema_version = #{oldMetalakeMeta.schemaVersion}"
         + " AND current_version = #{oldMetalakeMeta.currentVersion}"
-        + " AND last_version = #{oldMetalakeMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String softDeleteMetalakeMetaByMetalakeId(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE metalake_id = #{metalakeId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String deleteMetalakeMetasByLegacyTimeline(

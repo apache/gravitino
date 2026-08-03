@@ -49,7 +49,11 @@ import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
@@ -143,6 +147,56 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     SchemaEntity updatedSchema =
         schemaMetaService.getSchemaByIdentifier(schemaEntity.nameIdentifier());
     Assertions.assertEquals("schema comment updated", updatedSchema.comment());
+  }
+
+  @TestTemplate
+  public void testAlterAndDeleteUseCurrentVersion() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_occ",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+    SchemaPO oldPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+    SchemaEntity updatedSchema =
+        SchemaEntity.builder()
+            .withId(schema.id())
+            .withName(schema.name())
+            .withNamespace(schema.namespace())
+            .withAuditInfo(schema.auditInfo())
+            .withComment("updated")
+            .withProperties(schema.properties())
+            .build();
+    SchemaPO newPO = POConverters.updateSchemaPOWithVersion(oldPO, updatedSchema);
+
+    int updated =
+        SessionUtils.doWithCommitAndFetchResult(
+            SchemaMetaMapper.class, mapper -> mapper.updateSchemaMeta(newPO, oldPO));
+    int staleUpdate =
+        SessionUtils.doWithCommitAndFetchResult(
+            SchemaMetaMapper.class, mapper -> mapper.updateSchemaMeta(newPO, oldPO));
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                    schema.id(), oldPO.getCurrentVersion()));
+    Assertions.assertEquals(1, updated);
+    Assertions.assertEquals(0, staleUpdate);
+    Assertions.assertEquals(0, staleDelete);
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    int deleted =
+        SessionUtils.doWithCommitAndFetchResult(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                    schema.id(), newPO.getCurrentVersion()));
+    Assertions.assertEquals(1, deleted);
   }
 
   @TestTemplate

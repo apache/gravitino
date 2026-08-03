@@ -40,6 +40,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
@@ -230,15 +231,19 @@ public class SchemaMetaService {
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      SchemaMetaMapper.class,
-                      mapper ->
-                          ops.updatePO(
-                              mapper,
-                              POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity),
-                              oldSchemaPO))),
+          () -> {
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    SchemaMetaMapper.class,
+                    mapper ->
+                        ops.updatePO(
+                            mapper,
+                            POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity),
+                            oldSchemaPO)));
+            if (updateResult.get() == 0) {
+              throw optimisticLockException(identifier);
+            }
+          },
           () -> {
             if (isRenamed && updateResult.get() > 0) {
               SessionUtils.doWithoutCommit(
@@ -257,11 +262,7 @@ public class SchemaMetaService {
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + identifier);
-    }
+    return newEntity;
   }
 
   @Monitored(
@@ -287,11 +288,17 @@ public class SchemaMetaService {
       if (schemaIds.isEmpty()) {
         return false;
       }
+      List<Long> descendantSchemaIds =
+          schemaIds.stream().filter(id -> !id.equals(schemaId)).collect(Collectors.toList());
       SessionUtils.doMultipleWithCommit(
-          () ->
+          () -> deleteSchemaWithVersion(identifier, schemaId, schemaPO.getCurrentVersion()),
+          () -> {
+            if (!descendantSchemaIds.isEmpty()) {
               SessionUtils.doWithoutCommit(
                   SchemaMetaMapper.class,
-                  mapper -> mapper.softDeleteSchemaMetasBySchemaIds(schemaIds)),
+                  mapper -> mapper.softDeleteSchemaMetasBySchemaIds(descendantSchemaIds));
+            }
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
@@ -411,12 +418,8 @@ public class SchemaMetaService {
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
 
-      List<Long> singleSchemaId = Collections.singletonList(schemaId);
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  SchemaMetaMapper.class,
-                  mapper -> mapper.softDeleteSchemaMetasBySchemaIds(singleSchemaId)),
+          () -> deleteSchemaWithVersion(identifier, schemaId, schemaPO.getCurrentVersion()),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -457,6 +460,22 @@ public class SchemaMetaService {
           });
     }
     return true;
+  }
+
+  private void deleteSchemaWithVersion(
+      NameIdentifier identifier, Long schemaId, Long currentVersion) {
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper -> mapper.softDeleteSchemaMetaBySchemaIdAndVersion(schemaId, currentVersion));
+    if (deleted == 0) {
+      throw optimisticLockException(identifier);
+    }
+  }
+
+  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
+    return new OptimisticLockException(
+        "The schema %s was modified concurrently; retry the operation", identifier);
   }
 
   @Monitored(

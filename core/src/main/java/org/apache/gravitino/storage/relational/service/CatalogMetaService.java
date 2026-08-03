@@ -34,6 +34,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -229,15 +230,19 @@ public class CatalogMetaService {
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      CatalogMetaMapper.class,
-                      mapper ->
-                          mapper.updateCatalogMeta(
-                              POConverters.updateCatalogPOWithVersion(
-                                  oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
-                              oldCatalogPO))),
+          () -> {
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    CatalogMetaMapper.class,
+                    mapper ->
+                        mapper.updateCatalogMeta(
+                            POConverters.updateCatalogPOWithVersion(
+                                oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
+                            oldCatalogPO)));
+            if (updateResult.get() == 0) {
+              throw optimisticLockException(identifier);
+            }
+          },
           () -> {
             if (updateResult.get() > 0) {
               SessionUtils.doWithoutCommit(
@@ -256,11 +261,7 @@ public class CatalogMetaService {
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + identifier);
-    }
+    return newEntity;
   }
 
   @Monitored(
@@ -270,15 +271,14 @@ public class CatalogMetaService {
     NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
-    long catalogId = EntityIdService.getEntityId(identifier, Entity.EntityType.CATALOG);
+    CatalogPO catalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
+    long catalogId = catalogPO.getCatalogId();
+    long currentVersion = catalogPO.getCurrentVersion();
     String metalakeName = identifier.namespace().level(0);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  CatalogMetaMapper.class,
-                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
+          () -> deleteCatalogWithVersion(identifier, catalogId, currentVersion),
           () ->
               SessionUtils.doWithoutCommit(
                   SchemaMetaMapper.class,
@@ -368,10 +368,7 @@ public class CatalogMetaService {
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  CatalogMetaMapper.class,
-                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
+          () -> deleteCatalogWithVersion(identifier, catalogId, currentVersion),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -413,6 +410,22 @@ public class CatalogMetaService {
     }
 
     return true;
+  }
+
+  private void deleteCatalogWithVersion(
+      NameIdentifier identifier, Long catalogId, Long currentVersion) {
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId, currentVersion));
+    if (deleted == 0) {
+      throw optimisticLockException(identifier);
+    }
+  }
+
+  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
+    return new OptimisticLockException(
+        "The catalog %s was modified concurrently; retry the operation", identifier);
   }
 
   @Monitored(

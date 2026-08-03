@@ -138,7 +138,7 @@ public class POConverters {
       MetalakePO oldMetalakePO, BaseMetalake newMetalake) {
     Long lastVersion = oldMetalakePO.getLastVersion();
     // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    Long nextVersion = lastVersion + 1;
     try {
       return MetalakePO.builder()
           .withMetalakeId(newMetalake.id())
@@ -235,7 +235,7 @@ public class POConverters {
       CatalogPO oldCatalogPO, CatalogEntity newCatalog, Long metalakeId) {
     Long lastVersion = oldCatalogPO.getLastVersion();
     // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    Long nextVersion = lastVersion + 1;
     try {
       return CatalogPO.builder()
           .withCatalogId(newCatalog.id())
@@ -331,7 +331,7 @@ public class POConverters {
   public static SchemaPO updateSchemaPOWithVersion(SchemaPO oldSchemaPO, SchemaEntity newSchema) {
     Long lastVersion = oldSchemaPO.getLastVersion();
     // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    Long nextVersion = lastVersion + 1;
     try {
       return SchemaPO.builder()
           .withSchemaId(oldSchemaPO.getSchemaId())

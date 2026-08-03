@@ -88,8 +88,9 @@ public class MetalakeMetaSQLProviderFactory {
     return getProvider().updateMetalakeMeta(newMetalakePO, oldMetalakePO);
   }
 
-  public static String softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().softDeleteMetalakeMetaByMetalakeId(metalakeId);
+  public static String softDeleteMetalakeMetaByMetalakeId(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion);
   }
 
   public static String deleteMetalakeMetasByLegacyTimeline(

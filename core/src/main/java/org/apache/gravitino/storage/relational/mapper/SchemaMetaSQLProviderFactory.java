@@ -120,6 +120,11 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().softDeleteSchemaMetasBySchemaIds(schemaIds);
   }
 
+  public static String softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteSchemaMetaBySchemaIdAndVersion(schemaId, currentVersion);
+  }
+
   public static String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteSchemaMetasByMetalakeId(metalakeId);
   }

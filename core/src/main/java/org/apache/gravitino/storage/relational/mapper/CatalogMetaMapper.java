@@ -89,7 +89,8 @@ public interface CatalogMetaMapper {
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,
       method = "softDeleteCatalogMetasByCatalogId")
-  Integer softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId);
+  Integer softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,

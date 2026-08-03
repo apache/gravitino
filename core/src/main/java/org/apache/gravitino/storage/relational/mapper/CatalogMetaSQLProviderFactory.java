@@ -109,8 +109,9 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().updateCatalogMeta(newCatalogPO, oldCatalogPO);
   }
 
-  public static String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteCatalogMetasByCatalogId(catalogId);
+  public static String softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteCatalogMetasByCatalogId(catalogId, currentVersion);
   }
 
   public static String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

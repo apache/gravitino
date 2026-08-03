@@ -33,6 +33,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -183,11 +184,15 @@ public class MetalakeMetaService {
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      MetalakeMetaMapper.class,
-                      mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO))),
+          () -> {
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    MetalakeMetaMapper.class,
+                    mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO)));
+            if (updateResult.get() == 0) {
+              throw optimisticLockException(ident);
+            }
+          },
           () -> {
             if (isRenamed && updateResult.get() > 0) {
               SessionUtils.doWithoutCommit(
@@ -206,11 +211,7 @@ public class MetalakeMetaService {
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newMetalakeEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + ident);
-    }
+    return newMetalakeEntity;
   }
 
   @Monitored(
@@ -218,14 +219,21 @@ public class MetalakeMetaService {
       baseMetricName = "deleteMetalake")
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
     NameIdentifierUtil.checkMetalake(ident);
-    Long metalakeId = getMetalakeIdByName(ident.name());
+    MetalakePO metalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
+    if (metalakePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          ident.toString());
+    }
+    Long metalakeId = metalakePO.getMetalakeId();
+    Long currentVersion = metalakePO.getCurrentVersion();
     if (metalakeId != null) {
       if (cascade) {
         SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+            () -> deleteMetalakeWithVersion(ident, metalakeId, currentVersion),
             () ->
                 SessionUtils.doWithoutCommit(
                     CatalogMetaMapper.class,
@@ -353,10 +361,7 @@ public class MetalakeMetaService {
               "Entity %s has sub-entities, you should remove sub-entities first", ident);
         }
         SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+            () -> deleteMetalakeWithVersion(ident, metalakeId, currentVersion),
             () ->
                 SessionUtils.doWithoutCommit(
                     UserRoleRelMapper.class,
@@ -418,6 +423,22 @@ public class MetalakeMetaService {
       }
     }
     return true;
+  }
+
+  private void deleteMetalakeWithVersion(
+      NameIdentifier identifier, Long metalakeId, Long currentVersion) {
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class,
+            mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion));
+    if (deleted == 0) {
+      throw optimisticLockException(identifier);
+    }
+  }
+
+  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
+    return new OptimisticLockException(
+        "The metalake %s was modified concurrently; retry the operation", identifier);
   }
 
   @Monitored(

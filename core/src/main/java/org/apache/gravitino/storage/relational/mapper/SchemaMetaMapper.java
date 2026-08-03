@@ -109,6 +109,12 @@ public interface SchemaMetaMapper {
 
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
+      method = "softDeleteSchemaMetaBySchemaIdAndVersion")
+  Integer softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion);
+
+  @UpdateProvider(
+      type = SchemaMetaSQLProviderFactory.class,
       method = "softDeleteSchemaMetasByMetalakeId")
   Integer softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
