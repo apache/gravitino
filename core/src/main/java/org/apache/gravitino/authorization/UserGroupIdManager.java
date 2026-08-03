@@ -20,12 +20,15 @@ package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.time.Instant;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,7 +126,13 @@ class UserGroupIdManager extends UserGroupManager {
         .withEnabled(enabled)
         .withRoleNames(user.roleNames())
         .withRoleIds(user.roleIds())
-        .withAuditInfo(user.auditInfo())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(user.auditInfo().creator())
+                .withCreateTime(user.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
         .build();
   }
 }

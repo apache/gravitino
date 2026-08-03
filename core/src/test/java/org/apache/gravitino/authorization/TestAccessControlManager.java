@@ -572,6 +572,12 @@ public class TestAccessControlManager {
     Assertions.assertFalse(disabled.enabled());
     Assertions.assertEquals(userId, disabled.id());
     Assertions.assertEquals("ext-id-user", disabled.externalId());
+    Assertions.assertEquals(added.auditInfo().creator(), disabled.auditInfo().creator());
+    Assertions.assertEquals(added.auditInfo().createTime(), disabled.auditInfo().createTime());
+    Assertions.assertNotNull(disabled.auditInfo().lastModifier());
+    Assertions.assertNotNull(disabled.auditInfo().lastModifiedTime());
+    Assertions.assertTrue(
+        !disabled.auditInfo().lastModifiedTime().isBefore(added.auditInfo().createTime()));
 
     User enabledAndExt =
         accessControlManager.alterUserById(
