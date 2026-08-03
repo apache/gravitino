@@ -43,8 +43,8 @@ public class TestInMemorySecretsProvider {
     Assertions.assertEquals("memory", provider.type());
 
     provider.initialize("memory", Map.of());
-    String urn = provider.writeSecret("s3cr3t", writeAttributes());
-    Assertions.assertEquals("urn:gravitino-secret:memory:catalog:10:password", urn);
+    SecretUrn urn = provider.writeSecret("s3cr3t", writeAttributes());
+    Assertions.assertEquals("urn:gravitino-secret:memory:catalog:10:password", urn.toString());
     Assertions.assertEquals("s3cr3t", provider.readSecret(urn));
 
     provider.deleteSecret(urn);
@@ -71,10 +71,18 @@ public class TestInMemorySecretsProvider {
   }
 
   @Test
+  public void testReadDeleteRejectNullUrn() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> provider.deleteSecret(null));
+  }
+
+  @Test
   public void testCloseClearsStoredSecrets() {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
     provider.initialize("memory", Map.of());
-    String urn = provider.writeSecret("s3cr3t", writeAttributes());
+    SecretUrn urn = provider.writeSecret("s3cr3t", writeAttributes());
     Assertions.assertEquals("s3cr3t", provider.readSecret(urn));
 
     provider.close();

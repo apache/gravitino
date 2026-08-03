@@ -39,25 +39,25 @@ public class TestSecretUrn {
 
   @Test
   public void testBuildAndParseWriteThroughUrn() {
-    String urn =
+    SecretUrn urn =
         SecretUrn.buildWriteThrough("memory", attributes("catalog", "42", "jdbc-password"));
-    Assertions.assertEquals("urn:gravitino-secret:memory:catalog:42:jdbc-password", urn);
+    Assertions.assertEquals("urn:gravitino-secret:memory:catalog:42:jdbc-password", urn.toString());
+    Assertions.assertEquals("memory", urn.providerName());
+    Assertions.assertEquals(List.of("catalog", "42", "jdbc-password"), urn.identifierSegments());
 
-    SecretUrn.ParsedUrn parsed = SecretUrn.parse(urn);
-    Assertions.assertEquals("memory", parsed.providerName());
-    Assertions.assertEquals("catalog:42:jdbc-password", parsed.identifier());
-    Assertions.assertEquals(List.of("catalog", "42", "jdbc-password"), parsed.identifierSegments());
+    SecretUrn parsed = SecretUrn.parse(urn.toString());
+    Assertions.assertEquals(urn, parsed);
   }
 
   @Test
   public void testDottedPropertyKeyInUrn() {
-    String urn =
+    SecretUrn urn =
         SecretUrn.buildWriteThrough("local", attributes("catalog", "1", "authentication.password"));
-    Assertions.assertEquals("urn:gravitino-secret:local:catalog:1:authentication.password", urn);
-    SecretUrn.ParsedUrn parsed = SecretUrn.parse(urn);
-    Assertions.assertEquals("local", parsed.providerName());
     Assertions.assertEquals(
-        List.of("catalog", "1", "authentication.password"), parsed.identifierSegments());
+        "urn:gravitino-secret:local:catalog:1:authentication.password", urn.toString());
+    Assertions.assertEquals("local", urn.providerName());
+    Assertions.assertEquals(
+        List.of("catalog", "1", "authentication.password"), urn.identifierSegments());
   }
 
   @Test

@@ -56,7 +56,7 @@ public class InMemorySecretsProvider implements SecretProvider {
   }
 
   @Override
-  public String writeSecret(String plaintext, Map<String, String> attributes) {
+  public SecretUrn writeSecret(String plaintext, Map<String, String> attributes) {
     if (plaintext == null) {
       throw new IllegalArgumentException("plaintext must not be null");
     }
@@ -64,15 +64,19 @@ public class InMemorySecretsProvider implements SecretProvider {
       throw new IllegalStateException("InMemorySecretsProvider is not initialized");
     }
 
-    String urn = SecretUrn.buildWriteThrough(providerName, attributes);
+    SecretUrn urn = SecretUrn.buildWriteThrough(providerName, attributes);
     secrets.put(
-        urn, Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8)));
+        urn.toString(),
+        Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8)));
     return urn;
   }
 
   @Override
-  public String readSecret(String urn) {
-    String encoded = secrets.get(urn);
+  public String readSecret(SecretUrn urn) {
+    if (urn == null) {
+      throw new IllegalArgumentException("urn must not be null");
+    }
+    String encoded = secrets.get(urn.toString());
     if (encoded == null) {
       throw new IllegalArgumentException("Secret not found for URN: " + urn);
     }
@@ -80,8 +84,11 @@ public class InMemorySecretsProvider implements SecretProvider {
   }
 
   @Override
-  public void deleteSecret(String urn) {
-    secrets.remove(urn);
+  public void deleteSecret(SecretUrn urn) {
+    if (urn == null) {
+      throw new IllegalArgumentException("urn must not be null");
+    }
+    secrets.remove(urn.toString());
   }
 
   @Override

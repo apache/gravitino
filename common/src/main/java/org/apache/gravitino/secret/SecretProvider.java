@@ -57,7 +57,7 @@ public interface SecretProvider {
    * @param attributes provider-specific write attributes
    * @return the secret URN
    */
-  String writeSecret(String plaintext, Map<String, String> attributes);
+  SecretUrn writeSecret(String plaintext, Map<String, String> attributes);
 
   /**
    * Reads a secret by URN.
@@ -65,14 +65,14 @@ public interface SecretProvider {
    * @param urn the secret URN
    * @return the secret plaintext
    */
-  String readSecret(String urn);
+  String readSecret(SecretUrn urn);
 
   /**
    * Deletes a secret by URN.
    *
    * @param urn the secret URN
    */
-  void deleteSecret(String urn);
+  void deleteSecret(SecretUrn urn);
 
   /**
    * Releases resources owned by this provider.
