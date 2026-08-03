@@ -38,9 +38,31 @@ class TestIcebergCleanupJob {
             ImmutableMap.of("k", "v"),
             "alice");
     Assertions.assertEquals(42L, job.catalogId());
+    Assertions.assertNull(job.tableId());
+    Assertions.assertNull(job.deletionId());
     Assertions.assertEquals("db", job.namespace());
     Assertions.assertEquals(ImmutableMap.of("k", "v"), job.fileIOProperties());
     Assertions.assertEquals("alice", job.createdBy());
+  }
+
+  @Test
+  void testRetainedDeletionFactory() {
+    IcebergCleanupJob job =
+        IcebergCleanupJob.forRetainedDeletion(
+            0L,
+            101L,
+            "D1",
+            42L,
+            "db",
+            "t",
+            "s3://b/db/t/metadata/0.json",
+            "org.apache.iceberg.aws.s3.S3FileIO",
+            ImmutableMap.of("k", "v"),
+            "alice");
+
+    Assertions.assertEquals(101L, job.tableId());
+    Assertions.assertEquals("D1", job.deletionId());
+    Assertions.assertEquals(42L, job.catalogId());
   }
 
   @Test

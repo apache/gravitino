@@ -99,13 +99,22 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
+    boolean lifecycleManaged = dispatcher.managesDeletionLifecycle(context, purgeRequested);
     dispatcher.dropTable(context, tableIdentifier, purgeRequested);
+    if (lifecycleManaged) {
+      return;
+    }
     // Reconcile against Iceberg backend state — without a distributed TreeLock,
     // another node may recreate the same table between the drop above and the
     // EntityStore delete, leaving a stale Gravitino entity if we blindly delete.
     bestEffortReconcileTableEntity(context, tableIdentifier);
     IcebergOrphanSchemaCleanup.bestEffortCleanUp(
         metalake, namespaceDispatcher, context, tableIdentifier.namespace());
+  }
+
+  @Override
+  public boolean managesDeletionLifecycle(IcebergRequestContext context, boolean purgeRequested) {
+    return dispatcher.managesDeletionLifecycle(context, purgeRequested);
   }
 
   @Override

@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import lombok.Getter;
 
 @Getter
@@ -33,6 +34,7 @@ public class TablePO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+  @Nullable private String deletionId;
 
   private String format;
 
@@ -79,6 +81,11 @@ public class TablePO {
     return deletedAt;
   }
 
+  @Nullable
+  public String getDeletionId() {
+    return deletionId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -96,7 +103,8 @@ public class TablePO {
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
+        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt())
+        && Objects.equal(getDeletionId(), tablePO.getDeletionId());
   }
 
   @Override
@@ -110,7 +118,8 @@ public class TablePO {
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
-        getDeletedAt());
+        getDeletedAt(),
+        getDeletionId());
   }
 
   public static class Builder {
@@ -162,6 +171,11 @@ public class TablePO {
 
     public Builder withDeletedAt(Long deletedAt) {
       tablePO.deletedAt = deletedAt;
+      return this;
+    }
+
+    public Builder withDeletionId(@Nullable String deletionId) {
+      tablePO.deletionId = deletionId;
       return this;
     }
 
