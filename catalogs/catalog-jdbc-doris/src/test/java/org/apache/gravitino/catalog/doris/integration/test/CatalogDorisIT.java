@@ -79,6 +79,7 @@ import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.awaitility.Awaitility;
@@ -991,6 +992,48 @@ public class CatalogDorisIT extends BaseIT {
   }
 
   @Test
+  void testRejectNanosecondTimestampsWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_timestamp_ns",
+        Types.TimestampType.withoutTimeZone(9),
+        "fractional-second precision must be between 0 and 6");
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_timestamp_tz_ns",
+        Types.TimestampType.withTimeZone(9),
+        "Doris DATETIME does not store time-zone information");
+  }
+
+  @Test
+  void testRejectVariantWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_variant",
+        Types.VariantType.get(),
+        "MySQL JDBC metadata reports Doris VARIANT as UNKNOWN");
+  }
+
+  @Test
+  void testRejectNullTypeWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_null", Types.NullType.get(), "the null-only placeholder has no Doris column type");
+  }
+
+  @Test
+  void testRejectGeometryWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geometry",
+        Types.GeometryType.of("SRID:3857"),
+        "Doris GEO uses String/Varchar storage and cannot preserve Geometry CRS metadata");
+  }
+
+  @Test
+  void testRejectGeographyWithoutSideEffects() {
+    assertUnsupportedV3TypeDoesNotCreateTable(
+        "test_geography",
+        Types.GeographyType.of("EPSG:4326", "karney"),
+        "Doris GEO has no Geography column type that preserves CRS and edge-algorithm metadata");
+  }
+
+  @Test
   void testNonPartitionedTable() {
     // create a non-partitioned table
     String tableName = GravitinoITUtils.genRandomName("test_non_partitioned_table");
@@ -1278,5 +1321,35 @@ public class CatalogDorisIT extends BaseIT {
     assertEquals(2, partitions.size());
     assertPartition(Partitions.list("p1", p1Values, Collections.emptyMap()), partitions.get("p1"));
     assertPartition(Partitions.list("p2", p2Values, Collections.emptyMap()), partitions.get("p2"));
+  }
+
+  private void assertUnsupportedV3TypeDoesNotCreateTable(
+      String tablePrefix, Type type, String expectedMessage) {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName(tablePrefix));
+    Column[] columns = {
+      Column.of("id", Types.IntegerType.get(), "distribution column"),
+      Column.of("v3_column", type, "V3 column")
+    };
+    Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        columns,
+                        null,
+                        Collections.emptyMap(),
+                        Transforms.EMPTY_TRANSFORM,
+                        distribution,
+                        null,
+                        Indexes.EMPTY_INDEXES));
+
+    assertTrue(exception.getMessage().contains(expectedMessage), exception::getMessage);
+    assertFalse(catalog.asTableCatalog().tableExists(tableIdentifier));
   }
 }
