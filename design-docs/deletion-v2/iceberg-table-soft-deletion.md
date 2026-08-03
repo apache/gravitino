@@ -19,93 +19,92 @@
 
 # Design: Soft Deletion for Iceberg Tables
 
-| Field   | Value                                                                               |
-| ------- | ----------------------------------------------------------------------------------- |
-| Status  | Draft — for discussion                                                              |
-| Author  | Nevin Zheng                                                                         |
-| Created | 2026-07-29                                                                          |
-| Module  | `core`, `server`, `iceberg/iceberg-rest-server`                                     |
+| Field | Value |
+| --- | --- |
+| Status | Draft — for discussion |
+| Author | Nevin Zheng |
+| Created | 2026-07-29 |
+| Module | `core`, `server`, `iceberg/iceberg-rest-server` |
 | Related | [Asynchronous Hard Deletion](../async-iceberg-rest-hard-deletion.md) (§3 Non-Goal 1) |
 
-**Scope.** The deletion record, the metadata model, and the API for discovering and
-undeleting a dropped Iceberg table, and the purge that runs when the window closes.
-Purge reuses the shipped cleanup worker; its scheduling and operator tooling are
-deferred (§5.5). Existing drop and purge behavior is unchanged.
+**Scope.** This design adds a retained deletion record, metadata model, discovery,
+undelete, and expiry-driven purge for Iceberg tables. It exposes the same lifecycle
+through two management facades: the PRD-requested Iceberg REST management extension
+and the native Gravitino table API. Both delegate to one deletion and purge control
+plane. Purge reuses the shipped cleanup worker; worker scheduling and operator tooling
+are deferred. With soft delete disabled, existing drop and purge behavior is unchanged.
 
 ---
 
 ## 1. Background
 
-Dropping an Iceberg table is terminal — no window exists in which a mistaken drop
-can be undone.
+Dropping an Iceberg table is terminal — no recovery window exists today.
 
-| Request                                       | What happens                                  | Recoverable |
-| --------------------------------------------- | --------------------------------------------- | ----------- |
-| `DELETE …` (no purge)                         | Registration removed; data files orphaned     | No          |
-| `DELETE …?purgeRequested=true` (synchronous)  | Files deleted on the request thread           | No          |
-| `DELETE …?purgeRequested=true` (asynchronous) | A cleanup job deletes files in the background | No          |
+| Request | What happens | Recoverable |
+| --- | --- | --- |
+| `DELETE …` (no purge) | Registration is removed; data files are orphaned | No |
+| `DELETE …?purgeRequested=true` (synchronous) | Files are deleted on the request thread | No |
+| `DELETE …?purgeRequested=true` (asynchronous) | A cleanup job deletes files in the background | No |
 
-The asynchronous path shipped with
-[Asynchronous Hard Deletion](../async-iceberg-rest-hard-deletion.md), which moved
-cleanup off the request thread. It deliberately left recovery out — its §3 Non-Goal
-1 destroys files with no undrop path and defers soft delete to a follow-up. This is
-that follow-up.
+[Asynchronous Hard Deletion](../async-iceberg-rest-hard-deletion.md) moved cleanup
+off the request thread. It deliberately left recovery out: a table is dropped and,
+when requested, its files are later destroyed. This design adds the retained period
+before that irreversible hand-off.
 
-Two existing mechanisms look adjacent but are not recovery. **Relational
-tombstones** (`deleted_at` plus `RelationalGarbageCollector`) are storage hygiene:
-nothing reads those rows back, there is no restore verb, and the name frees up at
-once. **The purge tombstone** holds an identifier only while a cleanup job runs, to
-stop a recreate landing on the old storage prefix.
-
-Gravitino retains deleted rows today, but it neither reserves their names nor gives
-users a way to see or recover them. Missing is a durable record saying *this was
-deleted, it can still be restored, and here is when that stops being true.*
+Two existing mechanisms are adjacent but are not recovery. Relational tombstones
+(`deleted_at` plus `RelationalGarbageCollector`) are storage hygiene: no user-facing
+read or restore exists, and a name is reusable immediately. The asynchronous purge
+tombstone only protects a name while an existing cleanup job runs. Neither says,
+durably, *this deletion can still be undone until this deadline*.
 
 ---
 
 ## 2. Recommended Design
 
-**Decision.** Replace today's V1 row-tombstone deletion model with the V2 entity
-deletion model, and make V2 the single implementation after migration. A V2 deletion
-has its own durable `entity_deletion` record; the table retains its identity and V2
-can therefore expose a bounded, name-reserving restore window.
+**Decision.** Introduce V2 entity deletions and make that model the single deletion
+implementation after migration. Each retained Iceberg drop has a durable
+`entity_deletion` action. The table retains its identity; the action owns retention,
+state, actor, and purge ownership. This creates a bounded recovery window while
+holding the original name.
 
 | Decision | Recommendation |
-| -------- | -------------- |
-| Deletion state | Put timestamps, retention, state, actor, and purge ownership on `entity_deletion`, not on `table_meta`. |
-| Relationship during the first V2 rollout | Use nullable `table_meta.deletion_id` to point at the V2 record; it is a relationship projection, not duplicated lifecycle state. |
-| Compatibility | Fully migrate V1 to V2. Do not operate two deletion implementations indefinitely. |
-| Default policy | Configure V2 on the Iceberg catalog, with a two-week default retention period. |
+| --- | --- |
+| Deletion state | Store timestamps, retention, state, actor, and purge ownership on `entity_deletion`, not `table_meta`. |
+| V2 relationship | Add nullable `table_meta.deletion_id` as a relationship projection, not duplicate lifecycle state. |
+| Public API | Implement both the Iceberg management extension (A) and native Gravitino table API (B) over one control plane. |
+| Compatibility | Fully migrate V1 to V2; do not operate both deletion implementations indefinitely. |
+| Default policy | Configure V2 on the Iceberg catalog, with a two-week default recovery period. |
 
 ### 2.1 User-visible behavior
 
-The existing drop route remains the entry point. V2 adds discovery and recovery on
-the existing Gravitino table resource:
+The normal Iceberg REST table `DELETE` remains the entry point. A retained drop hides
+the table and holds its name. Before the persisted deadline, a user can discover and
+restore the exact original metadata identity. At expiry, a purge claim makes recovery
+unavailable and hands the deletion to asynchronous cleanup.
+
+V2 has two management facades:
 
 ```text
-DELETE /.../tables/{table}
-GET    /.../tables?deleted=true
-GET    /.../tables/{table}?deleted=true
-POST   /.../tables/{table}/undrop
+A. Iceberg management extension
+GET    /iceberg/management/v1/.../tables?deleted=true
+POST   /iceberg/management/v1/.../tables/{table}/undrop?deletionId={id}
+
+B. Native Gravitino table API
+GET    /api/.../tables?include=deleted
+PATCH  /api/.../tables/{table}?include=deleted&id={entityId}&deletionId={deletionId}
 ```
 
-A successful drop hides the table and reserves its name. Before the deadline, a user
-can discover it and restore its original metadata identity. After the deadline, a
-purge claim makes recovery unavailable and asynchronous cleanup removes metadata and,
-when requested, Iceberg files. Standard Iceberg REST clients continue to see the
-existing drop protocol.
+The standard Iceberg REST `/v1` wire contract is unchanged. The management route is
+a documented Gravitino extension; the native route is an Iceberg-first use of a
+potential broader Gravitino recovery pattern. No non-Iceberg entity type is enabled
+by this design.
 
-### 2.2 Rollout decision
+### 2.2 Rollout and migration decision
 
-V1 is the current `deleted_at`/garbage-collector implementation. V2 is the entity
-deletion model. The proposal recommends a full V1 → V2 schema and service migration,
-so API routes, reads, locking, garbage collection, and purge use one state machine.
-The alternative—routing individual operations through V1 or V2 according to
-configuration—is documented as a fallback only in §6.3.
-
-The remainder of this document contains the detailed storage comparison, exact API
-contract, transaction/purge mechanics, and migration plan. Reference implementations
-are in Appendix A.
+V1 is the current `deleted_at` / garbage-collector model. V2 is the entity-deletion
+model. This proposal recommends a full V1 → V2 schema and service migration so reads,
+locks, garbage collection, and purge use one state machine. A temporary V1/V2
+interoperation route is documented only as a fallback in §6.3.
 
 ---
 
@@ -113,46 +112,44 @@ are in Appendix A.
 
 ### 3.1 Goals
 
-1. **Recoverable window**: a dropped table is restorable to its *original* identity
-   — same id, name, and attached metadata — until a persisted deadline.
-2. **Bounded**: recoverability ends at that deadline whether or not purge has run.
-3. **Reserved name**: the name stays occupied until purge, so no new table can take
-   it and make restore ambiguous.
-4. **Discoverable**: users can list what they dropped and how long they have left,
-   through the existing Gravitino metadata API.
-5. **No Iceberg REST wire change**: standard clients drop tables exactly as today.
-6. **Automatic expiry**: when the window closes, purge removes the files and the
-   metadata with no operator action.
+1. **Recoverable window:** a dropped Iceberg table can return with its original ID,
+   name, and attached metadata until a persisted deadline.
+2. **Bounded:** recovery ends at that deadline even if physical cleanup has not run.
+3. **Reserved name:** no new table can take a retained deleted table's name.
+4. **Discoverable:** callers can find a deleted table, its deletion generation, and
+   its remaining recovery time.
+5. **Two compatible facades:** the PRD management API and the native Gravitino API
+   use one lifecycle rather than two independent storage models.
+6. **No standard IRC wire change:** normal Iceberg clients continue to use existing
+   `/v1` drop behavior.
+7. **Automatic expiry:** an expiry scan invokes the shared purge method without an
+   operator having to reissue the request.
 
----
+### 3.2 Non-goals
 
-### 3.2 Non-Goals
-
-1. **Purge internals**: §5.5 defines the purge lifecycle and its transactions;
-   scheduling parameters, retry tuning, and operator repair tooling are deferred.
-2. **Changing existing drop or purge behavior**: the synchronous and asynchronous
-   hard-delete paths are untouched, including their defaults and `purgeRequested`.
-3. **Non-Iceberg connectors**: JDBC, Kafka, and Paimon drops destroy the object at
-   the source. Iceberg is recoverable because a saved metadata pointer can be
-   re-registered.
-4. **Namespace, schema, and view recovery**: different containment rules; a follow-up.
-5. **Schema- and table-level retention overrides**: phase 1 resolves retention from
-   the catalog property at drop time.
-6. **Trash / recycle-bin UX**: no Web UI work.
+1. **Purge-worker internals:** retry tuning, scheduling parameters, and repair UI
+   are deferred; §5.6 defines only the action-to-worker boundary.
+2. **Non-Iceberg connectors and entity types:** JDBC, Kafka, Paimon, namespaces,
+   schemas, views, and other entities require their own source-system recovery and
+   purge design.
+3. **Changing standard hard-delete behavior when soft delete is disabled.**
+4. **Schema- and table-level retention overrides:** phase 1 resolves retention from
+   the Iceberg catalog when the table is dropped.
+5. **Trash / recycle-bin UI.**
 
 ---
 
 ## 4. Detailed Storage Design
 
-The decision is **where deletion state lives**. Both sketches begin with the current
-`table_meta` row: `table_id`, `table_name`, `metalake_id`, `catalog_id`, `schema_id`,
-`audit_info`, `current_version`, `last_version`, and the legacy `deleted_at` column.
+The design question is where deletion state lives. Both options begin with the
+current `table_meta` row: `table_id`, `table_name`, `metalake_id`, `catalog_id`,
+`schema_id`, audit fields, version fields, and the legacy `deleted_at` marker.
 
-### 4.1 Recommended: Separate deletion action record
+### 4.1 Recommended: separate deletion action record
 
-Phase 1 keeps the current table row as the table's identity and adds one nullable
-relationship pointer. The deletion action, including its timestamp and purge
-lifecycle, is its own entity record.
+Phase 1 keeps the table row as the table's identity and adds one nullable relationship
+pointer. The deletion action owns the durable lifecycle. Iceberg purge-job parameters
+are constructed from the retained table metadata when the action is purged.
 
 ```mermaid
 erDiagram
@@ -165,7 +162,7 @@ erDiagram
         text audit_info
         int current_version
         int last_version
-        bigint deleted_at "legacy GC marker; remains 0 for a retained table"
+        bigint deleted_at "legacy marker; 0 for a retained V2 table"
         varchar deletion_id "NULL when live; unique when deleted"
     }
     entity_deletion {
@@ -177,83 +174,73 @@ erDiagram
         varchar state "DELETED or PURGING"
         varchar deleted_by
         boolean purge_requested
+        varchar purge_handler "ICEBERG_HARD_DELETE in V1"
         varchar purge_job_id "NULL until claimed"
     }
     table_meta ||--o| entity_deletion : "active deletion_id"
 ```
 
 `table_meta.deletion_id IS NULL` means the table is live. A non-null value identifies
-the one deletion action that currently hides it. Restore clears the pointer and
-removes the action record in one transaction; table metadata and relations do not
-need to be rewritten. This puts all lifecycle data on the deletion action rather
-than copying lifecycle columns onto the table row.
+the active deletion action. Restore clears the pointer and removes the action in one
+transaction; the retained Gravitino table metadata and relations do not need to be
+recreated.
 
 #### Fields and invariants
 
-Only one field is added to the current `table_meta` row. Every other new field belongs
-to the deletion action record.
-
 | Record and field | Purpose |
-| ---------------- | ------- |
-| `table_meta.deletion_id` | Phase-1 nullable, unique pointer to the active deletion action. `NULL` means live; a non-null value reserves the table name and identifies the action to restore or purge. |
-| `entity_deletion.deletion_id` | Opaque primary key for the same deletion generation. This is the durable action identifier, not a table name. |
-| `entity_deletion.entity_type` | `TABLE` in phase 1. Keeps the record reusable when another metadata entity becomes recoverable. |
-| `entity_deletion.entity_id` | The original `table_id`, preserving table identity across restore. |
-| `entity_deletion.deleted_at` | Authoritative time of the deletion action. New soft deletes leave `table_meta.deleted_at` at `0`. |
-| `entity_deletion.retention_expires_at` | Calculated once at drop time, so later retention configuration changes affect only later drops. |
-| `entity_deletion.state` | `DELETED` while recoverable and `PURGING` once a worker has claimed irreversible cleanup. |
-| `entity_deletion.deleted_by` | Principal that requested the deletion, for discovery and audit. |
-| `entity_deletion.purge_requested` | Captures whether eventual purge deletes Iceberg files or only catalog metadata. |
-| `entity_deletion.purge_job_id` | `NULL` while recoverable; set by the successful `DELETED → PURGING` claim. |
+| --- | --- |
+| `table_meta.deletion_id` | Nullable, unique pointer to the active action. It reserves the table name and identifies the deletion to restore or purge. |
+| `entity_deletion.deletion_id` | Opaque immutable ID for one deletion generation, not a table name. |
+| `entity_type` | `TABLE` in V1. It permits future expansion without enabling it now. |
+| `entity_id` | Original immutable `table_id`; restore returns the same identity. |
+| `deleted_at` | Authoritative V2 deletion time. A retained V2 table keeps `table_meta.deleted_at = 0`. |
+| `retention_expires_at` | Calculated at drop time; later configuration changes affect only later drops. |
+| `state` | `DELETED` while recoverable and `PURGING` after irreversible cleanup is claimed. |
+| `deleted_by` | Deleting principal, for safe discovery and audit correlation. |
+| `purge_requested` | Whether final cleanup deletes Iceberg files or only catalog metadata. |
+| `purge_handler` | The typed physical-cleanup handler. V1 uses `ICEBERG_HARD_DELETE`. |
+| `purge_job_id` | `NULL` while recoverable; set by the successful `DELETED → PURGING` claim. |
 
-During the compatibility transition, a table is hidden when either the legacy marker
-or the new pointer is present:
+When a deletion is claimed for purge, the service constructs
+`IcebergPurgeJobParameters` from the retained table metadata and current catalog
+configuration, then passes them to the typed purge handler. The deletion action stores
+lifecycle state, not a second copy of Iceberg table metadata or credentials.
 
-```
+During migration, a table is hidden when either V1 or V2 marks it deleted:
+
+```text
 isDeleted = table_meta.deleted_at != 0 OR table_meta.deletion_id IS NOT NULL
 ```
 
-The existing garbage collector scans `deleted_at`, so it does not see retained
-tables. The existing unique key on `(schema_id, table_name, deleted_at)` continues to
-reserve a retained name because its `deleted_at` remains `0`. A unique index on
-`table_meta.deletion_id`, together with the drop transaction's
-`deletion_id IS NULL` check, permits only one active deletion action per table across
-MySQL, PostgreSQL, and H2. The reference direction is only
-`table_meta.deletion_id → entity_deletion`; it must not cascade, so a table-row
-delete can never silently erase the deletion action record.
+The existing garbage collector scans `deleted_at`, so it does not collect retained V2
+tables. Because the retained row keeps `deleted_at = 0`, the existing unique key on
+`(schema_id, table_name, deleted_at)` holds the name. A unique index on
+`table_meta.deletion_id`, together with the locked `deletion_id IS NULL` check,
+permits only one active action per table across MySQL, PostgreSQL, and H2. The pointer
+must not cascade: removal of a table row must never silently erase an action record.
 
 #### Longer-term simplification
 
-Phase 1 deliberately stores the **relationship key** in both records:
-`table_meta.deletion_id` points to `entity_deletion.deletion_id`. It does not
-duplicate deletion time, retention, state, actor, or purge-job fields; those remain
-authoritative only on `entity_deletion`.
+Phase 1 deliberately stores only the relationship key in both records:
+`table_meta.deletion_id` points to `entity_deletion.deletion_id`. Lifecycle fields
+remain authoritative only on `entity_deletion`.
 
-The recommended long-term shape is deletion-entity-only: remove the
-`table_meta.deletion_id` projection and resolve an active deletion through a unique
-`entity_deletion(entity_type, entity_id)` record. That keeps the base entity row
-entirely about the table. It is a follow-up migration, not an R1 prerequisite: it
-requires the deleted-read, locking, and indexing paths to use the deletion entity
-directly. Phase 1 retains the pointer because it is the smaller, compatible rollout
-while the generic entity-deletion layer is introduced.
+The long-term simplification is deletion-entity-only: remove the pointer and resolve
+an active action through a unique `entity_deletion(entity_type, entity_id)` record.
+That is a later migration, not a V1 prerequisite, because every deleted-read, lock,
+and index path must then resolve through the action entity directly.
 
-### 4.2 Alternative: Glob the deletion lifecycle onto the current row (not recommended)
+### 4.2 Alternative: glob the lifecycle onto the current row (not recommended)
 
-The alternative keeps one row by adding every deletion-action field to the existing
-`table_meta` record.
+The alternative adds `retention_expires_at`, deletion state, actor,
+`purge_requested`, and `purge_job_id` directly to `table_meta`.
 
 ```mermaid
 erDiagram
     table_meta {
         bigint table_id PK
         varchar table_name
-        bigint metalake_id
-        bigint catalog_id
-        bigint schema_id
-        text audit_info
-        int current_version
-        int last_version
-        bigint deleted_at "overloaded: legacy GC marker and deletion time"
+        bigint deleted_at "overloaded deletion time"
         bigint retention_expires_at
         varchar deletion_state "DELETED or PURGING"
         varchar deleted_by
@@ -262,12 +249,21 @@ erDiagram
     }
 ```
 
-This saves one table but makes `table_meta` represent both a table and a mutable
-deletion action. It also requires the same state-machine columns on every future
-recoverable entity type. Restore becomes a multi-column inverse update whose
-correctness depends on clearing every lifecycle field; a deletion action has no
-independent identifier for audit, purge ownership, or future extension. For those
-reasons, this option is not recommended.
+This saves one table but makes one row mean both a table and a mutable deletion action.
+It requires lifecycle columns on every future recoverable entity, has no independent
+deletion-generation ID, and makes restore a correctness-sensitive multi-column inverse
+update. The dedicated action is clearer, reversible, and separately extensible.
+
+### 4.3 Other alternatives considered
+
+| Alternative | Why it is not the chosen model |
+| --- | --- |
+| Extend the existing asynchronous cleanup-job row | A cleanup job is execution state, not a recoverable deletion. It exists only for the purge path and would mix a weeks-long retained action with worker attempts, heartbeats, and failures. |
+| Derive recovery from audit or change-log rows | A log can explain history but cannot act as an authoritative deadline, name reservation, exact-generation selector, or restore-versus-purge concurrency boundary. |
+
+The existing cleanup-job row remains the correct execution record after an action is
+claimed for purge. It is intentionally linked by `purge_job_id`, rather than expanded
+into the retained deletion record.
 
 ---
 
@@ -275,256 +271,258 @@ reasons, this option is not recommended.
 
 ### 5.1 Overview
 
-A drop with soft delete enabled writes a **deletion record** and leaves the table
-row in place. The record holds the deadline and is the only thing making the table
-recoverable. Restore deletes the record; passing the deadline ends recoverability.
+When soft delete is enabled, a drop writes a deletion action and retains the table
+row. The action holds the deadline and is the only object that makes the table
+recoverable. Restore removes the action; successful final purge removes it after
+table cleanup. The action is disposable recovery state, not an audit ledger: delete,
+restore, purge, and failure audit events are separate concerns.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Live
     Live --> Deleted: DELETE (soft delete enabled)
-    Deleted --> Live: UNDROP (before deadline)
+    Deleted --> Live: UNDROP before deadline
     Deleted --> Expired: deadline passes
-    Expired --> Purging: claimed by purge (§5.5)
+    Expired --> Purging: purge claim
     Purging --> [*]: purge completes
 ```
 
-`Expired` is derived, not stored — it is `DELETED` with the deadline behind it.
-`Purging` is stored and is the hard cutoff: once a purge owns the record, restore is
-refused even if no file has been deleted. There is no `Restoring` state; restore is
-a single transaction.
+`Expired` is derived, not stored: it is `DELETED` after its deadline. `PURGING` is the
+hard recovery cutoff; once a purge owns an action, undelete is refused even if file
+deletion has not started. There is no public `RESTORING`, `RESTORED`, or `PURGED`
+action record in V1.
 
-### 5.2 API
+### 5.2 API surfaces and rollout
 
-All new surface extends the **Gravitino metadata routes**. No new route tree, and no
-change to the Iceberg REST wire protocol.
+**Decision: implement both public management surfaces for Iceberg tables.** The
+deletion action, retention policy, audit metadata, and purge job are shared. A and B
+are transport facades over one control plane, not competing metadata models.
 
-| Operation    | Route                                                                      |
-| ------------ | -------------------------------------------------------------------------- |
-| Drop         | `DELETE /api/metalakes/{m}/catalogs/{c}/schemas/{s}/tables/{t}`             |
-| List deleted | `GET  /api/metalakes/{m}/catalogs/{c}/schemas/{s}/tables?deleted=true`      |
-| Load deleted | `GET  /api/metalakes/{m}/catalogs/{c}/schemas/{s}/tables/{t}?deleted=true`  |
-| Restore      | `POST /api/metalakes/{m}/catalogs/{c}/schemas/{s}/tables/{t}/undrop`        |
+**A is the committed PRD surface.** Mark's PRD requests an Iceberg REST management
+API, so it is the required Iceberg-facing interface. **B is also implemented for the
+same Iceberg lifecycle** because Gravitino-native clients need a consistent recovery
+experience. Extending B to more entity types is a future product/API decision; this
+document enables no non-Iceberg type.
 
-`deleted=true` reuses the existing table routes rather than adding a `/deletions`
-tree: the table is addressed by the name it still holds, so clients need no second
-identifier. The response carries safe fields only — never a metadata location,
-FileIO properties, or credentials:
+#### A. Iceberg management API — Iceberg-only scope
+
+This is a documented Gravitino management extension next to, but not inside, upstream
+Iceberg REST `/v1` routes.
+
+```http
+# Standard Iceberg REST table drop; configuration selects the lifecycle.
+DELETE /iceberg/v1/{prefix}/namespaces/{namespace}/tables/{table}?purgeRequested={boolean}
+
+# Gravitino-specific Iceberg management extension.
+GET    /iceberg/management/v1/{prefix}/namespaces/{namespace}/tables?deleted=true
+GET    /iceberg/management/v1/{prefix}/namespaces/{namespace}/tables/{table}?deleted=true&deletionId={id}
+POST   /iceberg/management/v1/{prefix}/namespaces/{namespace}/tables/{table}/undrop?deletionId={id}
+DELETE /iceberg/management/v1/{prefix}/namespaces/{namespace}/tables/{table}/deletions/{id}
+```
+
+The final `DELETE` calls the shared purge method for the selected action. It marks
+the action `PURGING`, after which undelete is refused, and delegates cleanup to the
+Iceberg purge handler. The expiry scanner calls the same method for expired actions.
+This tree is not an Iceberg REST standard; it is versioned and documented as a
+Gravitino extension.
+
+#### B. Native Gravitino soft-delete and purge API — incremental rollout
+
+This extends the native Gravitino table resource with the same retained deletion
+contract. V1 enables it for Iceberg tables only, alongside A.
+
+```http
+GET    /api/metalakes/{m}/catalogs/{c}/schemas/{s}/tables?include=deleted&name={table}&id={entityId}
+GET    /api/metalakes/{m}/catalogs/{c}/schemas/{s}/tables/{table}?include=deleted&id={entityId}&deletionId={deletionId}
+PATCH  /api/metalakes/{m}/catalogs/{c}/schemas/{s}/tables/{table}?include=deleted&id={entityId}&deletionId={deletionId}
+
+{ "deleted": false }
+
+DELETE /api/metalakes/{m}/catalogs/{c}/schemas/{s}/tables/{table}?include=deleted&id={entityId}&deletionId={deletionId}&purge=true
+```
+
+The deleted list returns each deletion's opaque `deletionId`. `PATCH` restores only
+the selected retained generation. `entityId` and `deletionId` together select the
+exact action; the table name and parent route are validated against the saved action
+rather than acting as the mutation key. The explicit native purge calls the same
+purge method as A. No other entity type is enabled by this design.
+
+#### Shared behavior, results, and errors
+
+Both discovery APIs expose safe fields only — never a metadata location, FileIO
+properties, or credentials.
 
 ```json
 {
   "name": "orders",
   "entityId": "984273",
+  "deletionId": "del_01H...",
   "deletedAt": 1784800000000,
   "retentionExpiresAt": 1784886400000,
   "deletedBy": "alice",
-  "purgeRequested": true,
+  "purgeRequested": false,
   "recoverable": true
 }
 ```
 
-**Drop behavior.** With soft delete disabled, all three paths in §1 are untouched.
-With it enabled, a deletion record is created and the table row is retained;
-`purgeRequested` is *captured on the record* and consumed by purge when the window
-closes (§5.5), so the parameter keeps its meaning — files still die if it was
-`true`, just later.
+With soft delete disabled, all existing drop paths are unchanged. With it enabled,
+`purgeRequested=false` receives the configured retained window.
+`purgeRequested=true` creates the same deletion action but sets
+`retention_expires_at` to the deletion time. It is therefore deleted briefly, then
+the expiry scanner claims it and calls the shared purge method.
 
-**Errors.** No conditional headers, so no `412` or `428`.
-
-| Code  | Condition                                                                  |
-| ----- | -------------------------------------------------------------------------- |
-| `204` | Drop accepted                                                              |
-| `200` | Deleted read or restore succeeded                                          |
-| `400` | Malformed request                                                          |
-| `403` | Caller may not read deleted metadata or restore                            |
-| `404` | No live table, or no retained deletion — including after a completed purge  |
-| `409` | Create, register, or rename targets a name held by a retained deletion      |
-| `410` | The deadline has passed, or a purge already owns the record                 |
+| Code | Condition |
+| --- | --- |
+| `200` | Deleted read or restore succeeds. |
+| `202` | Purge has been accepted for asynchronous execution. |
+| `204` | Standard Iceberg drop is accepted. |
+| `400` | Request path, body, query, or header is malformed. |
+| `403` | Caller is not allowed to discover, restore, or purge the deletion. |
+| `404` | No selected retained deletion exists, including an action consumed by restore. |
+| `409` | Create, register, or rename targets a name held by a retained deletion. |
+| `410` | An undelete is requested after the deadline or after purge owns the action. |
 
 ### 5.3 Concurrency
 
-Consistency comes from **row locks**, not ETags or a revision column. There is no
-`If-Match` and no client-visible precondition. Each transaction takes
-`SELECT … FOR UPDATE` on the rows it touches, in one order — **record, then table
-row**.
+Row locks and the action-state predicate provide server-side serialization. Each
+mutation supplies the exact immutable `deletionId` and locks the deletion action and
+table row in one order: **action, then table row**. A and B therefore share the same
+correctness boundary without a public conditional-header contract.
 
-| Transaction     | Locks                  | Steps                                                                                                                  |
-| --------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Drop**        | table row only         | Verify live and `deletion_id IS NULL`; insert the record; set `deletion_id`; commit                                     |
-| **Restore**     | record, then table row | Verify the predicate below; clear `deletion_id`; delete the record; commit                                              |
-| **Purge claim** | record, then table row | Re-verify the deadline has passed; CAS `DELETED → PURGING` and attach `purge_job_id`; commit                             |
+| Transaction | Locks | Steps |
+| --- | --- | --- |
+| **Drop** | table row | Verify live and `deletion_id IS NULL`; insert action; set pointer; commit. |
+| **Restore** | action, then table row | Verify target and recovery predicate; clear pointer; remove action; commit. |
+| **Purge claim** | action, then table row | Verify `DELETED`; the expiry scan also verifies expiry; CAS `DELETED → PURGING`; attach job ID; commit. |
 
-Drop takes a single lock, so it cannot be in a deadlock cycle, and because the
-pointer it writes lives on the row it locks, it still serializes against restore and
-purge. Recoverability is a predicate, not a stored flag:
+Recoverability is a predicate, not a stored flag:
 
-```
+```text
 state = 'DELETED' AND now < retention_expires_at AND purge_job_id IS NULL
 ```
 
-The deadline is exclusive for restore and inclusive for purge, so no instant is
-both. `server_now` is captured once per transaction; clock skew across nodes could
-let one consider a record recoverable while another considers it expired, which the
-`PURGING` CAS still resolves to a single winner.
-
-Restore consumes the record, so it cannot apply twice: a replayed restore finds a
-live table and no record, returning `404`. A replayed drop finds `deletion_id`
-already set and creates nothing.
+The deadline is exclusive for restore and inclusive for purge. `server_now` is
+captured once per transaction. Expiry or `PURGING` returns `410`. If a concurrent
+restore already consumed the selected action, the exact-ID replay returns `404`; a
+caller with a lost response confirms success by loading the normal live table.
 
 ### 5.4 User journeys
 
-**Drop and restore.**
+**Drop and restore through either management facade.**
 
 ```mermaid
 sequenceDiagram
     actor U as User
     participant G as Gravitino
     participant S as Store
-    U->>G: DELETE .../tables/orders
-    G->>S: lock table row, insert record, set deletion_id
+    U->>G: DELETE table
+    G->>S: lock table, insert action, set deletion_id
     G-->>U: 204 No Content
-    U->>G: GET .../tables?deleted=true
-    G-->>U: orders — recoverable, expires in 23h
-    U->>G: POST .../tables/orders/undrop
-    G->>S: lock record + table row, clear deletion_id, delete record
+    U->>G: discover deleted table
+    G-->>U: deletion ID and deadline
+    U->>G: selected UNDROP or PATCH
+    G->>S: lock action + table, clear pointer, delete action
     G-->>U: 200 OK — live table
 ```
 
-**Deadline passes.**
+**Deadline and name reservation.** A request after the deadline receives `410`; the
+same name remains reserved until successful finalization. A same-name create,
+register, or rename receives `409`, rather than silently stranding the recoverable
+table. A user who wants the old table restores it; one who wants replacement contents
+uses an explicit replace workflow after purge.
 
-```mermaid
-sequenceDiagram
-    actor U as User
-    participant G as Gravitino
-    participant S as Store
-    Note over S: retention_expires_at reached
-    U->>G: POST .../tables/orders/undrop
-    G->>S: lock record, evaluate predicate
-    G-->>U: 410 Gone — window closed
-    Note over S: record is now purge-eligible (§5.5)
-```
+### 5.5 Delete semantics
 
-**Name held during the window.**
+| `soft-delete.enabled` | `purgeRequested` | Result |
+| --- | --- | --- |
+| `false` | `false` | Existing metadata-only drop; no retained action. |
+| `false` | `true` | Existing hard-delete behavior; no recovery window. |
+| `true` | `false` | Create a retained action with the catalog's captured recovery deadline. |
+| `true` | `true` | Create an immediately expired action; it is deleted briefly, then the expiry scanner invokes the purge handler to delete Iceberg files. |
+| `true`, retention `0` | either | Immediately purge-eligible; no usable recovery window. |
 
-```mermaid
-sequenceDiagram
-    actor U as User
-    participant G as Gravitino
-    U->>G: CREATE TABLE orders
-    G-->>U: 409 AlreadyExists — name held by a retained deletion
-    U->>G: POST .../tables/orders/undrop
-    G-->>U: 200 OK — original table restored
-```
+The enabled drop transaction must capture the action, set the table pointer, and
+reserve the name before returning success. A retry must detect the existing retained
+action rather than create a second deletion generation.
 
-The `409` is deliberate: a user recreating the name usually meant to get the old
-table back, and letting a new empty table take it would strand the recoverable one.
+### 5.6 Purge
 
-### 5.5 Purge
-
-Purge runs in three phases. The middle one is the shipped async cleanup worker,
-unchanged — only the claim and the finalization are new.
+Purge has a small control-plane handoff. A background scan selects expired actions and
+calls the shared purge method. The method transitions the selected action to
+`PURGING`, creates or links the cleanup job, and returns. Scheduling, batch size,
+retry policy, and operator repair are deliberately deferred.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Deleted: DELETE
-    Deleted --> Live: UNDROP (before deadline)
+    Deleted --> Live: UNDROP before deadline
     Deleted --> Expired: deadline passes
-    Expired --> Purging: timer claims (row lock + CAS + enqueue)
-    Purging --> Purging: retry on failure; name stays reserved
-    Purging --> [*]: files gone, then table row and record removed
+    Expired --> Purging: expiry scan calls purge
+    Deleted --> Purging: explicit PURGE
+    Purging --> Purging: retry on failure; name remains reserved
+    Purging --> [*]: files handled, table row and action removed
 ```
 
-| Phase           | Runs                                                                                                   | Notes                                                            |
-| --------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| **1. Claim**    | A timer, in one transaction per batch: row lock each expired record, CAS `DELETED → PURGING`, set `purge_job_id`, insert a cleanup job | Purely relational; no external side effect yet |
-| **2. Delete**   | The shipped cleanup worker, unchanged                                                                   | Rebuilds the file graph from the table's metadata pointer and deletes leaf-first, root `metadata.json` last |
-| **3. Finalize** | One transaction: remove table-owned rows, the table row, then the record                                | Only on confirmed success                                        |
+| Phase | Runs | Notes |
+| --- | --- | --- |
+| **1. Claim** | Expiry scan or explicit management purge | Lock the action; transition `DELETED → PURGING`; compute `IcebergPurgeJobParameters` from retained metadata; then create or link the cleanup job. |
+| **2. Delete** | Existing cleanup worker | For `purge_requested=true`, delete Iceberg files; otherwise remove catalog metadata only. |
+| **3. Finalize** | Completion transaction | Match `table_id`, `deletion_id`, and `purge_job_id`; remove table-owned rows, table row, then action. |
 
-```mermaid
-sequenceDiagram
-    participant T as Timer
-    participant S as Store
-    participant W as Cleanup worker
-    participant O as Object store
-    T->>S: lock expired records, CAS to PURGING, enqueue jobs
-    Note over S: restore now returns 410
-    W->>S: claim job
-    W->>O: delete files (existing procedure)
-    O-->>W: done
-    W->>S: remove table row + deletion record
-    Note over S: name released, lookups return 404
-```
+Once an action is `PURGING`, undelete is refused. A failed purge stays `PURGING`,
+keeps the name reserved, and requires repair. It must not become recoverable again or
+silently release the name. Predicated finalization prevents an old job from deleting a
+table that was restored and later dropped again.
 
-Three rules make this safe. Finalization is **predicated** on matching `table_id`,
-`deletion_id`, and `purge_job_id`, so a table that was restored and dropped again is
-never destroyed by the old generation's job. When `purge_requested` is false, phase
-2 is skipped and only metadata is removed — files are left, matching today's
-metadata-only drop. And a job that exhausts its retries leaves the record in
-`PURGING` with the name still reserved, awaiting operator repair; a failed purge
-never silently releases a name or returns the record to `DELETED`.
+### 5.7 Interoperation with asynchronous hard deletion
 
-### 5.6 Interoperation with asynchronous hard deletion
+Soft delete and the existing asynchronous hard-delete path do not own the same table
+at once.
 
-Soft delete and the shipped async hard deletion never act on the same table at once.
-Configuration decides which path a drop takes:
+| Soft delete | Drop owner | Name reservation |
+| --- | --- | --- |
+| Disabled | Existing hard-delete path | Existing cleanup-job tombstone where applicable |
+| Enabled | This retained-action lifecycle | Retained `table_meta` row |
 
-| Soft delete | A drop is handled by            | The name is reserved by |
-| ----------- | ------------------------------- | ----------------------- |
-| Disabled    | Async hard deletion (unchanged) | The cleanup job row     |
-| Enabled     | Soft deletion (this design)     | The retained table row  |
+They meet only at `DELETED → PURGING`: one action hands an expired retained table to
+the existing worker. The soft-delete flag gates new writes only. Disabling it stops
+new retained actions; existing actions continue to restore or drain through purge.
+The scan reads retained actions regardless of the current flag value.
 
-They meet at exactly one point: when the deadline passes, the `DELETED → PURGING`
-CAS hands the table over. That single transition is why only one owner ever holds a
-name at a time.
+### 5.8 Catalog configuration
 
-**The flag gates writes, not reads.** Creating a deletion record is the only
-conditional behavior; every read of `entity_deletion` is always active, and
-hard-delete teardown always removes any record it finds — in the same transaction
-that removes the table row, since the pointer does not cascade. So the flag governs
-new drops only: turning it off stops new retained deletions while existing records
-keep draining through restore or expiry, rather than stranding with names held.
-Where the feature was never enabled the table is empty and every read is an indexed
-miss.
+V1 configures soft delete on the Iceberg catalog. The resolved value is captured in
+`entity_deletion.retention_expires_at` at drop time, so a later configuration change
+applies only to later drops.
 
-### 5.7 Catalog configuration
+| Catalog property | Default | Description |
+| --- | --- | --- |
+| `gravitino.entity.soft-delete.enabled` | `false` | Opt in; `false` retains current behavior. |
+| `gravitino.entity.soft-delete.retention-ms` | `1209600000` | Two-week recovery window; valid range 0–90 days. |
 
-Phase 1 configures soft delete on the Iceberg catalog. These catalog properties are
-the defaults for every table in that catalog; the resolved retention is captured in
-`entity_deletion.retention_expires_at` when the table is dropped. A later catalog
-change therefore affects subsequent drops only.
+Phase 1 honors these properties for Iceberg tables only. Retention `0` means no usable
+recovery window. Schema- and table-level overrides are deferred.
 
-| Catalog property                            | Default      | Description                                      |
-| ------------------------------------------- | ------------ | ------------------------------------------------ |
-| `gravitino.entity.soft-delete.enabled`      | `false`      | Opt-in. Off preserves today's behavior exactly.  |
-| `gravitino.entity.soft-delete.retention-ms` | `1209600000` | Recovery window: two weeks. Valid range 0–90 days. |
+### 5.9 Authorization
 
-Phase 1 honors these for Iceberg tables only. Retention `0` means the record is
-immediately expired — no usable window. Schema- and table-level overrides are
-explicitly deferred.
+Authorize deleted reads, restore, and purge before any deleted metadata is disclosed
+or changed, using current parent-schema permissions. A deleted table's object-level
+owner may no longer be evaluable. Unauthorized, wrong-generation, and missing targets
+share a sanitized `404` where needed to avoid an existence oracle. Authorization
+policy details are intentionally kept out of this V1 storage/lifecycle decision. The
+V2 drop retains table associations, so a successful restore re-exposes the original
+Gravitino owner, tags, policies, and grants. External authorization-plugin replay is
+deferred.
 
-### 5.8 Authorization
-
-Reading deleted metadata and restoring are authorized before anything is disclosed
-or changed, against *current* permissions rather than those captured at drop time.
-Because a deleted table's owner may no longer be evaluable, phase 1 authorizes both
-against the parent schema. Unauthorized, wrong-generation, and missing targets share
-a sanitized `404`, so `deleted=true` cannot probe for existence.
-
-Restore reinstates the table's pre-drop grants, owner, tags, and policies, since
-those rows were never touched.
-
-### 5.9 Backward compatibility
+### 5.10 Backward compatibility
 
 With soft delete disabled, behavior is unchanged. With it enabled:
 
-- Live reads and lists exclude retained tables once the `isDeleted` predicate is
-  propagated (§4.1).
-- A dropped name stays occupied until purge, so create, register, and rename may
-  return `409` where they previously succeeded. This is the one visible change.
-- Standard Iceberg REST clients see no protocol change — a drop still succeeds and
-  `HEAD` still returns `404`.
-- Metadata and files survive until purge runs, so an enabled deployment holds
-  storage for at least the length of the window.
+- Live reads and lists exclude a table with a non-null `deletion_id`.
+- A dropped name remains occupied until purge finalization; create, register, and
+  rename can return `409` where they previously succeeded.
+- Standard Iceberg REST clients still use the normal drop protocol.
+- Metadata and files remain until the selected purge behavior runs.
 
 ---
 
@@ -532,103 +530,79 @@ With soft delete disabled, behavior is unchanged. With it enabled:
 
 ### 6.1 Terms
 
-**V1 deletion** is the current Gravitino behavior: a drop marks the metadata row with
-`deleted_at`; the relational garbage collector later removes the tombstone. It has no
-public deleted-object query or restore contract, and it frees the name immediately.
+**V1 deletion** is the current `deleted_at` plus garbage-collector behavior. It has
+no public deleted-object discovery or restore contract and frees the name immediately.
 
-**V2 entity deletion** is this proposal: a deletion is represented by an
-`entity_deletion` record with its own identity, timestamp, retention deadline, state,
-and purge ownership. The metadata row is retained, a V2 deletion reserves its name,
-and the metadata API can list and restore it.
+**V2 entity deletion** is this design: a dedicated action has a deletion ID,
+retention deadline, state, and purge ownership. The retained table row holds the name
+and V2 supplies discovery and recovery through the two management facades.
 
-### 6.2 Option A: Full V1 → V2 migration (recommended)
+### 6.2 Option A: full V1 → V2 migration (recommended)
 
-Make V2 the single deletion implementation. The schema migration adds the deletion
-entity and the V2 relationship/indexes, and the service migration moves every delete,
-read, garbage-collection, and purge path to the V2 model. New API routes therefore
-always read one state machine, and catalog configuration tunes V2 retention rather
-than choosing between two deletion implementations.
+Make V2 the single deletion implementation. The schema migration adds the action
+entity and relationship/indexes; the service migration moves delete, read, garbage
+collection, and purge to V2. New API routes then see one state machine.
 
-The data migration must preserve the timestamp of every surviving V1 tombstone and
-must never grant it a new recovery window. A V1 tombstone that has already expired
-continues directly to cleanup; a migration conflict, such as a name legitimately
-reused under V1, is not silently restored. The implementation can drain such rows or
-record them as non-recoverable V2 actions, but it must finish the cutover with only
-the V2 schema and behavior active.
-
-This is the recommended option because it creates one query model, one locking model,
-one garbage-collection/purge lifecycle, and one set of user-visible semantics. It is
-more work in the migration itself, but substantially simpler to operate and evolve.
+The data migration preserves the timestamp of every surviving V1 tombstone and never
+grants it a new recovery window. A V1 row already past expiry continues to cleanup. A
+name legitimately reused under V1 is never silently restored; it is drained or
+recorded as nonrecoverable before cutover completes.
 
 ### 6.3 Option B: V1/V2 interoperation (not recommended)
 
-Keep both deletion implementations and add routing so a request takes either the V1
-or V2 path according to configuration. The routes, reads, garbage collector, and
-purge workers would all need to understand both representations; a catalog-level mode
-would decide which path a new drop takes.
-
-This reduces the initial migration work but leaves two durable deletion contracts in
-production. Discovery and restore must merge V1/V2 results, locking and name rules
-can differ by mode, and every future feature must be implemented and tested twice.
-For that reason it is a fallback only if a full cutover is operationally impossible,
-not the proposed delivery model.
+Keep both representations and route each operation by configuration. This lowers the
+initial migration cost but forces discovery, locks, garbage collection, and future
+features to understand two durable contracts. It is a fallback only if full cutover
+is operationally impossible.
 
 ---
 
 ## 7. Delivery Plan
 
 ### 7.1 Record and lifecycle
-- [ ] Add the `entity_deletion` table and migrations (MySQL, H2, PostgreSQL)
-- [ ] Add nullable `table_meta.deletion_id` with its unique index and conversion objects
-- [ ] Propagate the `isDeleted` predicate (§4.1) through every read path
-- [ ] Implement the row-locked drop transaction behind the soft-delete config
-- [ ] Implement the row-locked restore transaction
+
+- [ ] Add `entity_deletion` and migrations for MySQL, H2, and PostgreSQL.
+- [ ] Add nullable `table_meta.deletion_id` and its unique index.
+- [ ] Propagate the V1/V2 `isDeleted` predicate through live reads.
+- [ ] Implement locked V2 drop and restore transactions behind the Iceberg catalog configuration.
+- [ ] Construct typed Iceberg purge-job parameters from retained table metadata when
+  the shared purge method claims an action.
 
 ### 7.2 API
-- [ ] Add `?deleted=true` to table list and load in `server/`
-- [ ] Add the `POST …/undrop` endpoint and DTOs
-- [ ] Authorization for deleted reads and restore
-- [ ] Java and Python client support
-- [ ] Update the OpenAPI spec and validate with `./gradlew :docs:build`
-- [ ] Update user-facing documentation in `docs/`
+
+- [ ] **A (PRD):** add the versioned Iceberg management resource, DTOs, and documentation.
+- [ ] **B (Iceberg only):** add deleted discovery, exact-generation read, exact-generation `PATCH`, and explicit purge to the native API.
+- [ ] Keep A and B as facades over the same deletion action and lifecycle transactions.
+- [ ] Add authorization, Java/Python client support, OpenAPI validation, and user documentation.
+- [ ] Do not enable another entity type without a type-specific deletion/recovery/purge design.
 
 ### 7.3 Purge
-- [ ] Timer that claims expired records: row lock, CAS to `PURGING`, enqueue the cleanup job
-- [ ] Route claimed records into the shipped cleanup worker; skip file deletion when `purge_requested` is false
-- [ ] Predicated finalization: table-owned rows, the table row, then the record
-- [ ] Operator repair path for records stuck in `PURGING`
 
----
+- [ ] Claim expired actions with a row lock, CAS, job link, and durable enqueue.
+- [ ] Route claimed actions to the existing cleanup worker.
+- [ ] Add exact-generation finalization and repair for actions stuck in `PURGING`.
 
 ### 7.4 Testing
 
-- **Unit**: drop writes exactly one record; restore consumes it; replayed drop and
-  restore are safe; the recoverability predicate at each boundary, including
-  retention `0`.
-- **Concurrency**: restore versus purge claim — exactly one wins; concurrent drops
-  produce one record; lock ordering under contention on H2, MySQL, and PostgreSQL.
-- **Integration** (`gravitino-docker-test`): drop, list with `deleted=true`, restore,
-  then confirm the original identity and attached metadata survive; restore after the
-  deadline returns `410`; a same-name create returns `409` on both the Gravitino and
-  Iceberg REST paths; restart mid-window loses nothing.
-- **Purge**: expiry deletes files and releases the name; `purge_requested = false`
-  removes metadata and leaves files; a table restored and re-dropped is never
-  destroyed by the old generation's job.
+- **Unit:** one action per drop; restore consumes it; retries are safe; retention 0;
+  `purgeRequested=true` is immediately purge-eligible and the expiry scan invokes
+  the same purge method.
+- **Concurrency:** restore versus purge claim has exactly one winner; concurrent drops
+  create one action; locking works on H2, MySQL, and PostgreSQL.
+- **Integration:** both A and B discover and restore the same deletion; original
+  identity survives; same-name create returns `409`; restart preserves the window.
+- **Purge:** expiry releases the name only after success; non-file purge leaves files;
+  an old generation's job cannot destroy a later drop.
 
 ---
 
 ## Appendix A: Competitive Reference Implementations
 
-This section distinguishes published API contracts from source-visible implementation
-details. The hosted Databricks Unity Catalog service and the open-source
-`unitycatalog/unitycatalog` project are separate implementations.
-
 ### A.1 Unity Catalog
 
 #### Databricks Unity Catalog (hosted)
 
-**Databricks SQL recovery API.** Unity Catalog exposes discovery and two restore
-forms:
+**Recovery surface.** Unity Catalog exposes discovery and two SQL restore forms:
 
 ```sql
 SHOW TABLES DROPPED [ { FROM | IN } schema_name ] [ LIMIT maxResults ];
@@ -637,17 +611,16 @@ UNDROP TABLE catalog.schema.table_name;
 UNDROP TABLE WITH ID '<table-id>';
 ```
 
-`SHOW TABLES DROPPED` lists recoverable dropped tables visible to the caller. Its
-result includes `catalogName`, `schemaName`, `tableName`, `tableId`, `tableType`,
-`deletedAt`, `createdAt`, `updatedAt`, `createdBy`, `owner`, and `comment`.
-`tableId` identifies one dropped generation. The name form restores the most recent
-matching table; `UNDROP TABLE WITH ID` restores the exact generation selected from
-the discovery result. The parent catalog and schema must exist, and a live same-name
-relation must be renamed before recovery. Recovery restores privileges, column
-specification, and properties; primary and foreign-key constraints are not restored,
-and ownership returns to the previous owner.
+`SHOW TABLES DROPPED` exposes a stable table ID, deletion timestamp, ownership, and
+other safe metadata. The published result includes `catalogName`, `schemaName`,
+`tableName`, `tableId`, `tableType`, `deletedAt`, `createdAt`, `updatedAt`,
+`createdBy`, `owner`, and `comment`. The ID form chooses one dropped generation
+exactly; the name form chooses the latest matching generation. A live same-name table
+must be renamed before recovery. Recovery restores privileges, columns, and
+properties; primary and foreign-key constraints are not restored, and ownership
+returns to the prior owner.
 
-**REST table API.** The documented table surface includes:
+Its documented REST table API has normal table CRUD, but no REST `undrop` operation:
 
 ```text
 GET    /api/2.1/unity-catalog/tables
@@ -656,32 +629,21 @@ GET    /api/2.1/unity-catalog/tables/{full_name}
 DELETE /api/2.1/unity-catalog/tables/{full_name}
 ```
 
-The public `TableInfo` model includes a stable `table_id` and an optional
-`deleted_at` timestamp. The documented REST list and get routes do not define a
-deleted-table selector, and the REST API does not document an HTTP undrop operation;
-the published recovery surface is Databricks SQL.
+The public `TableInfo` model includes a stable `table_id` and optional `deleted_at`.
+The documented REST list and get routes do not define a deleted-table selector; the
+published recovery surface is Databricks SQL.
 
-**Published metadata and lifecycle contract.** Databricks does not publish its
-physical metastore schema or hosted-service implementation. Its public behavior does
-establish that multiple dropped generations of one name can be retained and selected
-by immutable ID. The default recovery window is seven days; catalog and schema
-retention settings apply prospectively to subsequently dropped tables. When the
-window ends, the object is no longer recoverable and managed-table data files are
-deleted asynchronously. Deleting an external table removes catalog metadata while
-leaving its external files in place.
+Databricks does not publish its physical metastore schema. Its public behavior shows
+a retained recovery window, generation selection by immutable ID, prospective
+catalog/schema retention settings, and asynchronous deletion of managed data after
+the window.
 
-**References.**
-
-- [SHOW TABLES DROPPED](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-aux-show-tables-dropped)
-- [UNDROP TABLE](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-undrop-table)
-- [Unity Catalog Tables REST API](https://docs.databricks.com/api/workspace/tables)
-- [List Tables REST API](https://docs.databricks.com/api/workspace/tables/list)
-- [Object storage lifecycle in Unity Catalog](https://docs.databricks.com/aws/en/data-governance/unity-catalog/object-storage-lifecycle)
-- [ALTER CATALOG retention setting](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-alter-catalog)
+**References.** [SHOW TABLES DROPPED](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-aux-show-tables-dropped), [UNDROP TABLE](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-undrop-table), [Tables REST API](https://docs.databricks.com/api/workspace/tables), [Object storage lifecycle](https://docs.databricks.com/aws/en/data-governance/unity-catalog/object-storage-lifecycle), and [ALTER CATALOG retention](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-ddl-alter-catalog).
 
 #### Open-source Unity Catalog
 
-**REST API.** The open-source server exposes the same normal table-operation shape:
+The open-source server provides normal table CRUD routes but no `undrop`,
+`include_deleted`, dropped-table list, or retention route:
 
 ```text
 POST   /api/2.1/unity-catalog/tables
@@ -690,60 +652,63 @@ GET    /api/2.1/unity-catalog/tables/{full_name}
 DELETE /api/2.1/unity-catalog/tables/{full_name}
 ```
 
-Its OpenAPI contract has no `undrop`, `undelete`, `include_deleted`, dropped-table
-listing, or retention route. `DELETE` returns `200 OK`.
-
-**Source-visible metadata and lifecycle backing.** `TableInfoDAO` maps a live table
-to `uc_tables`, with a UUID `id` exposed as `table_id`, name, schema ID, type, owner,
-and creation/update attribution. It has no deletion timestamp, deletion state,
-retention expiry, deletion ID, or tombstone reference. Table columns and properties
-are associated with that live row.
+`TableInfoDAO` maps a live table to `uc_tables`, including its UUID `id`, name,
+schema ID, type, owner, and create/update attribution. It has no deletion timestamp,
+deletion state, retention expiry, deletion ID, or tombstone reference. Columns and
+properties are associated with that live row.
 
 `TableRepository.deleteTable` hard-deletes this metadata. For a managed table it
 attempts directory and Delta-commit cleanup, removes properties, and removes the
-table row (with its cascaded columns); for an external table it skips the file cleanup
-but still removes the catalog metadata. `TableService` then removes table
-authorizations. This source implementation therefore has no retained metadata from
-which to recover a table.
+table row with cascaded columns. For an external table it skips file cleanup but still
+removes catalog metadata. `TableService` then removes table authorizations. The
+open-source implementation therefore has no retained metadata from which to recover a
+table.
 
-**References.**
-
-- [OpenAPI table routes](https://github.com/unitycatalog/unitycatalog/blob/3976efb6556655b9359e7a98f71010c8ea9f395c/api/all.yaml)
-- [`TableInfoDAO` metadata model](https://github.com/unitycatalog/unitycatalog/blob/3976efb6556655b9359e7a98f71010c8ea9f395c/server/src/main/java/io/unitycatalog/server/persist/dao/TableInfoDAO.java)
-- [`TableRepository.deleteTable`](https://github.com/unitycatalog/unitycatalog/blob/3976efb6556655b9359e7a98f71010c8ea9f395c/server/src/main/java/io/unitycatalog/server/persist/TableRepository.java)
-- [`TableService.deleteTable`](https://github.com/unitycatalog/unitycatalog/blob/3976efb6556655b9359e7a98f71010c8ea9f395c/server/src/main/java/io/unitycatalog/server/service/TableService.java)
+**References.** [OpenAPI table routes](https://github.com/unitycatalog/unitycatalog/blob/3976efb6556655b9359e7a98f71010c8ea9f395c/api/all.yaml), [`TableInfoDAO`](https://github.com/unitycatalog/unitycatalog/blob/3976efb6556655b9359e7a98f71010c8ea9f395c/server/src/main/java/io/unitycatalog/server/persist/dao/TableInfoDAO.java), [`TableRepository.deleteTable`](https://github.com/unitycatalog/unitycatalog/blob/3976efb6556655b9359e7a98f71010c8ea9f395c/server/src/main/java/io/unitycatalog/server/persist/TableRepository.java), and [`TableService.deleteTable`](https://github.com/unitycatalog/unitycatalog/blob/3976efb6556655b9359e7a98f71010c8ea9f395c/server/src/main/java/io/unitycatalog/server/service/TableService.java).
 
 ### A.2 Apache Polaris
 
-**Iceberg REST API.** Polaris implements the standard Iceberg REST drop route:
+Polaris implements the standard Iceberg REST drop route:
 
 ```text
 DELETE /v1/{prefix}/namespaces/{namespace}/tables/{table}?purgeRequested={boolean}
 ```
 
-It returns `204 No Content`. `purgeRequested` defaults to `false` and means that the
-caller requests deletion of the underlying table data and metadata. The published
-OpenAPI defines no route to list dropped tables or to undrop one.
+It returns `204 No Content`; `purgeRequested` defaults to `false` and requests
+deletion of underlying data and metadata only when true. Its published OpenAPI has no
+deleted-table discovery or undelete route. `purgeRequested=true` is rejected unless
+the `DROP_WITH_PURGE_ENABLED` feature is enabled, which defaults to `false`.
 
-**Source-visible metadata and lifecycle backing.** `LocalIcebergCatalog.dropTable`
-removes the table catalog entry through `dropEntityIfExists`. A request with
-`purgeRequested=true` is rejected unless the `DROP_WITH_PURGE_ENABLED` feature is
-enabled; that feature defaults to `false`. In the transactional metastore
-implementation, an enabled purge both drops the entity and creates a `TASK` entity
-of type `ENTITY_CLEANUP_SCHEDULER` in the same transaction. Its task payload contains
-the dropped table metadata needed by the cleanup handler, which fans out file-cleanup
-work and then deletes the Iceberg metadata file.
+When enabled, Polaris's transactional metastore both drops the entity and creates a
+`TASK` entity of type `ENTITY_CLEANUP_SCHEDULER` in the same transaction. The task
+payload contains the table metadata needed by its cleanup handler, which fans out
+file-cleanup work and then deletes Iceberg metadata. This is a physical-cleanup
+mechanism, not a retained recovery contract: JDBC persistence deletes the metadata
+entity row, and lifecycle timestamps are not exposed through an Iceberg REST recovery
+or discovery API.
 
-That task is a physical-cleanup mechanism, not a recovery contract. The JDBC
-persistence implementation deletes the metadata entity row, while the core entity
-model's lifecycle timestamp fields are not exposed through an Iceberg REST discovery
-or restore API. Polaris publishes no recoverability window or undelete operation.
+**References.** [Iceberg REST OpenAPI drop route](https://github.com/apache/polaris/blob/main/spec/iceberg-rest-catalog-open-api.yaml), [`LocalIcebergCatalog.dropTable`](https://github.com/apache/polaris/blob/main/runtime/service/src/main/java/org/apache/polaris/service/catalog/iceberg/LocalIcebergCatalog.java), [`DROP_WITH_PURGE_ENABLED`](https://github.com/apache/polaris/blob/main/polaris-core/src/main/java/org/apache/polaris/core/config/FeatureConfiguration.java), [transactional cleanup task creation](https://github.com/apache/polaris/blob/main/polaris-core/src/main/java/org/apache/polaris/core/persistence/transactional/TransactionalMetaStoreManagerImpl.java), [table cleanup task handler](https://github.com/apache/polaris/blob/main/runtime/service/src/main/java/org/apache/polaris/service/task/TableCleanupTaskHandler.java), and [JDBC entity deletion](https://github.com/apache/polaris/blob/main/persistence/relational-jdbc/src/main/java/org/apache/polaris/persistence/relational/jdbc/JdbcBasePersistenceImpl.java).
 
-**References.**
+## Appendix B: Iceberg REST compatibility and soft deletion
 
-- [Iceberg REST OpenAPI drop route](https://github.com/apache/polaris/blob/main/spec/iceberg-rest-catalog-open-api.yaml)
-- [`LocalIcebergCatalog.dropTable`](https://github.com/apache/polaris/blob/main/runtime/service/src/main/java/org/apache/polaris/service/catalog/iceberg/LocalIcebergCatalog.java)
-- [`DROP_WITH_PURGE_ENABLED` configuration](https://github.com/apache/polaris/blob/main/polaris-core/src/main/java/org/apache/polaris/core/config/FeatureConfiguration.java)
-- [Transactional drop and task creation](https://github.com/apache/polaris/blob/main/polaris-core/src/main/java/org/apache/polaris/core/persistence/transactional/TransactionalMetaStoreManagerImpl.java)
-- [Table cleanup task handler](https://github.com/apache/polaris/blob/main/runtime/service/src/main/java/org/apache/polaris/service/task/TableCleanupTaskHandler.java)
-- [JDBC entity deletion](https://github.com/apache/polaris/blob/main/persistence/relational-jdbc/src/main/java/org/apache/polaris/persistence/relational/jdbc/JdbcBasePersistenceImpl.java)
+The upstream Iceberg REST Catalog specification does not define `undrop`, `undelete`,
+deleted-table listing, retention, or a soft-delete resource. It does provide these
+normal primitives:
+
+| IRC primitive | Standard role | Role in this design |
+| --- | --- | --- |
+| `DELETE .../tables/{table}?purgeRequested=false` | Remove catalog registration without requesting file deletion. | Starts a retained action when soft delete is enabled. |
+| `DELETE .../tables/{table}?purgeRequested=true` | Request metadata and file deletion. | Creates an immediately expired action and starts durable purge ASAP. |
+| `POST .../tables/{table}/unregister` | Remove a registration while returning its metadata location. | Possible internal metadata-only deletion mechanism. |
+| `POST .../register` | Register a supplied metadata location. | Possible internal restoration mechanism. |
+
+`unregister` and `register` are not `UNDROP`: they do not select an exact deletion,
+apply retention and authorization, reserve a name, or coordinate purge. Those are
+responsibilities of the Gravitino deletion action.
+
+The standard IRC `/v1` routes remain standard. A lives under
+`/iceberg/management/v1/...` as a separately versioned Gravitino extension. B lives
+under native Gravitino `/api/...` routes. Both invoke the same action records,
+retention checks, and purge handler.
+
+**References.** [Iceberg REST Catalog specification](https://iceberg.apache.org/rest-catalog-spec/) and [upstream OpenAPI contract](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml).
