@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
@@ -22,6 +23,8 @@ from typing import Optional
 from dataclasses_json import DataClassJsonMixin, config
 
 from gravitino.api.audit import Audit
+
+_FRACTIONAL_SECONDS_PATTERN = re.compile(r"(\.\d{6})\d+")
 
 
 def _deserialize_datetime(value: Optional[datetime | str]) -> Optional[datetime]:
@@ -31,6 +34,8 @@ def _deserialize_datetime(value: Optional[datetime | str]) -> Optional[datetime]
         raise TypeError(f"Audit time must be an ISO-8601 string, got {type(value)}")
 
     normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    # Match Python 3.11+ by truncating nanoseconds to microsecond precision.
+    normalized = _FRACTIONAL_SECONDS_PATTERN.sub(r"\1", normalized, count=1)
     parsed = datetime.fromisoformat(normalized)
     return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else parsed
 

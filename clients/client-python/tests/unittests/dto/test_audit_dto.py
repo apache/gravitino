@@ -34,6 +34,16 @@ class TestAuditDTO(unittest.TestCase):
         self.assertEqual(expected, audit.create_time())
         self.assertEqual(expected, audit.last_modified_time())
 
+    def test_deserialize_nanosecond_datetime(self):
+        audit = AuditDTO.from_json(
+            '{"creator":"alice","createTime":"2026-08-02T16:15:57.286603461Z"}'
+        )
+
+        self.assertEqual(
+            datetime(2026, 8, 2, 16, 15, 57, 286603, tzinfo=timezone.utc),
+            audit.create_time(),
+        )
+
     def test_serialize_datetime(self):
         create_time = datetime(
             2024,
