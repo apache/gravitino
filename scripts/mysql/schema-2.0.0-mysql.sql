@@ -73,10 +73,13 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     PRIMARY KEY (`table_id`),
     UNIQUE KEY `uk_sid_tn_del` (`schema_id`, `table_name`, `deleted_at`),
     KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    KEY `idx_cid` (`catalog_id`),
+    UNIQUE KEY `uk_tm_deletion` (`deletion_id`),
+    KEY `idx_tm_deleted_action` (`deleted_at`, `deletion_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table metadata';
 
 CREATE TABLE IF NOT EXISTS `table_column_version_info` (
@@ -594,6 +597,16 @@ CREATE TABLE IF NOT EXISTS `job_metrics` (
     KEY `idx_job_metrics_identifier_metric_ts` (`job_identifier`(255), `metric_ts`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'optimizer job metrics';
 
+CREATE TABLE IF NOT EXISTS `entity_deletion` (
+  `deletion_id`              VARCHAR(64)    NOT NULL COMMENT 'opaque identifier for one active deletion generation',
+  `state`                    VARCHAR(16)    NOT NULL COMMENT 'DELETED|PURGING',
+  `retention_expires_at`     BIGINT(20)     UNSIGNED NOT NULL COMMENT 'fixed recovery deadline in milliseconds',
+  `purge_job_id`             VARCHAR(64)    DEFAULT NULL COMMENT 'batch purge job that claimed this generation',
+  PRIMARY KEY (`deletion_id`),
+  KEY `idx_entity_deletion_gc` (`state`, `retention_expires_at`, `deletion_id`),
+  KEY `idx_entity_deletion_purge_job` (`purge_job_id`, `deletion_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'active deletion lifecycle actions';
+
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
   `metalake_name` VARCHAR(128)    NOT NULL COMMENT 'metalake name',
@@ -617,6 +630,8 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `attempts`          INT(10)       NOT NULL DEFAULT 0 COMMENT 'number of processing attempts made so far',
   `last_error`        VARCHAR(2048) NULL COMMENT 'truncated reason for the most recent failure, NULL until a job fails',
   `heartbeat_at`      BIGINT(20)    NOT NULL DEFAULT 0 COMMENT 'last heartbeat from the worker, 0 when not running',
+  `manifests_total`   BIGINT(20)    UNSIGNED NULL COMMENT 'advisory number of manifests discovered, NULL before progress is reported',
+  `manifests_done`    BIGINT(20)    UNSIGNED NULL COMMENT 'advisory number of manifests processed, NULL before progress is reported',
   `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
   `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`),

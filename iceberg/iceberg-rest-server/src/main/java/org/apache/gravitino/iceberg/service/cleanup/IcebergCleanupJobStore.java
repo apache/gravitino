@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.service.cleanup;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper;
 import org.apache.gravitino.iceberg.service.cleanup.mapper.provider.IcebergCleanupMapperPackageProvider;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
@@ -166,9 +167,66 @@ public class IcebergCleanupJobStore {
    * @return {@code true} iff the row was still owned by the caller
    */
   public boolean heartbeat(long id, long lastHeartbeat, long now) {
+    return heartbeat(id, lastHeartbeat, now, null, null);
+  }
+
+  /**
+   * Refreshes a heartbeat and advisory manifest progress with compare-and-swap ownership check.
+   *
+   * <p>The counters are observability only. They are not cleanup checkpoints and do not affect
+   * claims, retries, or completion.
+   *
+   * @param id job id
+   * @param lastHeartbeat previous heartbeat value
+   * @param now new heartbeat value
+   * @param manifestsTotal advisory number of manifests discovered
+   * @param manifestsDone advisory number of manifests processed
+   * @return {@code true} iff the row was still owned by the caller
+   */
+  public boolean heartbeat(
+      long id, long lastHeartbeat, long now, long manifestsTotal, long manifestsDone) {
+    if (manifestsTotal < 0 || manifestsDone < 0) {
+      throw new IllegalArgumentException("Manifest progress must not be negative");
+    }
+    if (manifestsDone > manifestsTotal) {
+      throw new IllegalArgumentException("Completed manifests must not exceed total manifests");
+    }
+    return heartbeat(
+        id, lastHeartbeat, now, Long.valueOf(manifestsTotal), Long.valueOf(manifestsDone));
+  }
+
+  private boolean heartbeat(
+      long id,
+      long lastHeartbeat,
+      long now,
+      @Nullable Long manifestsTotal,
+      @Nullable Long manifestsDone) {
     return SessionUtils.doWithCommitAndFetchResult(
-            IcebergCleanupJobMapper.class, mapper -> mapper.heartbeat(id, lastHeartbeat, now))
+            IcebergCleanupJobMapper.class,
+            mapper -> mapper.heartbeat(id, lastHeartbeat, now, manifestsTotal, manifestsDone))
         > 0;
+  }
+
+  /**
+   * Reads safe cleanup status and advisory manifest progress.
+   *
+   * @param id job id
+   * @return status, or empty if the job does not exist
+   */
+  public Optional<IcebergCleanupJobStatus> getStatus(long id) {
+    IcebergCleanupJobPO po =
+        SessionUtils.getWithoutCommit(
+            IcebergCleanupJobMapper.class, mapper -> mapper.selectStatus(id));
+    return po == null
+        ? Optional.empty()
+        : Optional.of(
+            new IcebergCleanupJobStatus(
+                po.getId(),
+                IcebergCleanupJob.State.valueOf(po.getState()),
+                po.getAttempts(),
+                po.getManifestsTotal(),
+                po.getManifestsDone(),
+                po.getUpdatedAt()));
   }
 
   /**

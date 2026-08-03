@@ -29,6 +29,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -37,6 +39,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -45,7 +48,11 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
+import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.ForbiddenException;
@@ -55,6 +62,7 @@ import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /** Test for {@link IcebergMetadataAuthorizationMethodInterceptor}. */
@@ -184,6 +192,30 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
+  public void testCreatesTableDeletionAuthorizationHandler() throws Exception {
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+    Method method =
+        TestOperations.class.getMethod(
+            "testTableDeletionOperation",
+            String.class,
+            String.class,
+            String.class,
+            HttpServletRequest.class);
+
+    Optional<AuthorizationHandler> handler =
+        interceptor.createAuthorizationHandler(
+            method,
+            method.getParameters(),
+            new Object[] {
+              TEST_CATALOG + "/", TEST_SCHEMA, "table", Mockito.mock(HttpServletRequest.class)
+            });
+
+    assertTrue(handler.isPresent());
+    assertTrue(handler.get() instanceof IcebergTableDeletionAuthzHandler);
+  }
+
+  @Test
   public void testExtractNestedSchemaNamespace() throws Exception {
     IcebergMetadataAuthorizationMethodInterceptor interceptor =
         new IcebergMetadataAuthorizationMethodInterceptor();
@@ -293,6 +325,62 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
 
     assertEquals("PROCEEDED", result);
     Mockito.verify(invocation, Mockito.times(1)).proceed();
+  }
+
+  @Test
+  public void testInvokeForcesLocalDeletionAuthorizationForRestCatalog() throws Throwable {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
+    Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(true);
+    resetContext(wrapperManager, true);
+
+    Method method =
+        TestOperations.class.getMethod(
+            "testTableDeletionOperation",
+            String.class,
+            String.class,
+            String.class,
+            HttpServletRequest.class);
+    MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
+    Mockito.when(invocation.getMethod()).thenReturn(method);
+    Mockito.when(invocation.getArguments())
+        .thenReturn(
+            new Object[] {
+              TEST_CATALOG + "/", TEST_SCHEMA, "tbl", Mockito.mock(HttpServletRequest.class)
+            });
+    Mockito.when(invocation.proceed()).thenReturn("PROCEEDED");
+    AtomicBoolean processed = new AtomicBoolean();
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor() {
+          @Override
+          protected Optional<AuthorizationHandler> createAuthorizationHandler(
+              Method interceptedMethod, Parameter[] parameters, Object[] args) {
+            return Optional.of(
+                new AuthorizationHandler() {
+                  @Override
+                  public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+                    processed.set(true);
+                  }
+
+                  @Override
+                  public boolean authorizationCompleted() {
+                    return true;
+                  }
+                });
+          }
+        };
+
+    try (MockedStatic<AuthorizationUtils> users = Mockito.mockStatic(AuthorizationUtils.class);
+        MockedStatic<PrincipalUtils> principals = Mockito.mockStatic(PrincipalUtils.class)) {
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn("alice");
+
+      assertEquals("PROCEEDED", interceptor.invoke(invocation));
+      users.verify(() -> AuthorizationUtils.checkCurrentUser(TEST_METALAKE, "alice"));
+    }
+
+    assertTrue(processed.get());
+    Mockito.verify(invocation).proceed();
   }
 
   @Test
@@ -489,6 +577,15 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String prefix,
         @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String namespace,
         @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table) {
+      // Test method
+    }
+
+    @AuthorizationExpression(expression = "true")
+    public void testTableDeletionOperation(
+        @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String prefix,
+        @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String namespace,
+        @IcebergAuthorizationMetadata(type = RequestType.MANAGE_TABLE_DELETION) String table,
+        HttpServletRequest request) {
       // Test method
     }
   }

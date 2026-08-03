@@ -404,6 +404,7 @@ public class POConverters {
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
+          .withDeletionId(null)
           .withFormat(
               tableEntity.properties() == null
                   ? null
@@ -466,6 +467,7 @@ public class POConverters {
               .withCurrentVersion(currentVersion)
               .withLastVersion(lastVersion)
               .withDeletedAt(DEFAULT_DELETED_AT)
+              .withDeletionId(null)
               .withComment(newTable.comment())
               .withProperties(
                   newTable.properties() == null
