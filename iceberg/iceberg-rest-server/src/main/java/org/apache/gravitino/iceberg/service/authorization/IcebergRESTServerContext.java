@@ -20,6 +20,8 @@
 package org.apache.gravitino.iceberg.service.authorization;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
@@ -82,6 +84,26 @@ public class IcebergRESTServerContext {
 
   public boolean skipAuthorizationForRestBackend() {
     return skipAuthorizationForRestBackend;
+  }
+
+  /**
+   * Returns whether local authorization should be delegated to one REST catalog backend.
+   *
+   * @param catalogName routed catalog name
+   * @return {@code true} only when delegation is enabled and the target is a REST catalog
+   */
+  public boolean shouldSkipAuthorization(String catalogName) {
+    if (!skipAuthorizationForRestBackend || catalogWrapperManager == null) {
+      return false;
+    }
+
+    IcebergCatalogWrapper catalogWrapper;
+    try {
+      catalogWrapper = catalogWrapperManager.getCatalogWrapper(catalogName);
+    } catch (NoSuchCatalogException e) {
+      return false;
+    }
+    return catalogWrapper.isRESTCatalog();
   }
 
   public String metalakeName() {
