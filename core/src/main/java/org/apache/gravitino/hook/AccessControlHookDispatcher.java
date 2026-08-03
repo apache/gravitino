@@ -34,6 +34,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.UserChange;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -110,33 +111,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
-  public User enableUser(String metalake, String externalId)
+  public User alterUserById(String metalake, long userId, UserChange... changes)
       throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.enableUser(metalake, externalId);
-  }
-
-  @Override
-  public User enableUserById(String metalake, long userId)
-      throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.enableUserById(metalake, userId);
-  }
-
-  @Override
-  public User disableUser(String metalake, String externalId)
-      throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.disableUser(metalake, externalId);
-  }
-
-  @Override
-  public User disableUserById(String metalake, long userId)
-      throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.disableUserById(metalake, userId);
-  }
-
-  @Override
-  public User updateUserExternalIdById(String metalake, long userId, String newExternalId)
-      throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.updateUserExternalIdById(metalake, userId, newExternalId);
+    return dispatcher.alterUserById(metalake, userId, changes);
   }
 
   @Override

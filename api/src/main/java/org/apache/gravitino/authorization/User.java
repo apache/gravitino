@@ -50,8 +50,9 @@ public interface User extends Auditable {
    * IAM), or null if not set.
    *
    * <p>Gravitino {@link User#name() user names} may differ from upstream ids or be unknown at sync
-   * time. External id lets integrators look up, enable/disable, and delete users without relying on
-   * the Gravitino user name.
+   * time. External id lets integrators look up and correlate users without relying on the Gravitino
+   * user name. Mutable attributes such as {@link #enabled()} and {@code externalId} are updated via
+   * {@code alterUserById}.
    *
    * @return The upstream external identifier, or null if not set.
    */

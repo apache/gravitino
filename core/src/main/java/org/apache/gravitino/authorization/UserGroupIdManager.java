@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -76,16 +77,10 @@ class UserGroupIdManager extends UserGroupManager {
     }
   }
 
-  User enableUserById(String metalake, long userId) throws NoSuchUserException {
-    return updateEnabledById(metalake, userId, true);
-  }
-
-  User disableUserById(String metalake, long userId) throws NoSuchUserException {
-    return updateEnabledById(metalake, userId, false);
-  }
-
-  User updateUserExternalIdById(String metalake, long userId, String newExternalId)
+  User alterUserById(String metalake, long userId, UserChange... changes)
       throws NoSuchUserException {
+    Preconditions.checkArgument(
+        changes != null && changes.length > 0, "User changes cannot be empty");
     try {
       return store
           .idOperations()
@@ -93,25 +88,14 @@ class UserGroupIdManager extends UserGroupManager {
               AuthorizationUtils.ofUserId(metalake, userId),
               Entity.EntityType.USER,
               UserEntity.class,
-              user ->
-                  UserEntity.builder()
-                      .withId(user.id())
-                      .withName(user.name())
-                      .withNamespace(user.namespace())
-                      .withExternalId(newExternalId)
-                      .withEnabled(user.enabled())
-                      .withRoleNames(user.roleNames())
-                      .withRoleIds(user.roleIds())
-                      .withAuditInfo(user.auditInfo())
-                      .build());
+              user -> applyChanges(user, changes));
     } catch (NoSuchEntityException e) {
       LOG.warn("User with id {} does not exist in the metalake {}", userId, metalake, e);
       throw new NoSuchUserException(
           AuthorizationUtils.USER_WITH_ID_DOES_NOT_EXIST_MSG, userId, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Updating external id for user with id {} in the metalake {} failed due to storage"
-              + " issues",
+          "Altering user with id {} in the metalake {} failed due to storage issues",
           userId,
           metalake,
           ioe);
@@ -119,38 +103,27 @@ class UserGroupIdManager extends UserGroupManager {
     }
   }
 
-  private User updateEnabledById(String metalake, long userId, boolean enabled)
-      throws NoSuchUserException {
-    try {
-      return store
-          .idOperations()
-          .updateById(
-              AuthorizationUtils.ofUserId(metalake, userId),
-              Entity.EntityType.USER,
-              UserEntity.class,
-              user ->
-                  UserEntity.builder()
-                      .withId(user.id())
-                      .withName(user.name())
-                      .withNamespace(user.namespace())
-                      .withExternalId(user.externalId())
-                      .withEnabled(enabled)
-                      .withRoleNames(user.roleNames())
-                      .withRoleIds(user.roleIds())
-                      .withAuditInfo(user.auditInfo())
-                      .build());
-    } catch (NoSuchEntityException e) {
-      LOG.warn("User with id {} does not exist in the metalake {}", userId, metalake, e);
-      throw new NoSuchUserException(
-          AuthorizationUtils.USER_WITH_ID_DOES_NOT_EXIST_MSG, userId, metalake);
-    } catch (IOException ioe) {
-      LOG.error(
-          "Updating enabled state for user with id {} in the metalake {} failed due to storage"
-              + " issues",
-          userId,
-          metalake,
-          ioe);
-      throw new RuntimeException(ioe);
+  private static UserEntity applyChanges(UserEntity user, UserChange... changes) {
+    String externalId = user.externalId();
+    boolean enabled = user.enabled();
+    for (UserChange change : changes) {
+      if (change instanceof UserChange.UpdateEnabled) {
+        enabled = ((UserChange.UpdateEnabled) change).enabled();
+      } else if (change instanceof UserChange.UpdateExternalId) {
+        externalId = ((UserChange.UpdateExternalId) change).getNewExternalId();
+      } else {
+        throw new IllegalArgumentException("Unsupported user change: " + change);
+      }
     }
+    return UserEntity.builder()
+        .withId(user.id())
+        .withName(user.name())
+        .withNamespace(user.namespace())
+        .withExternalId(externalId)
+        .withEnabled(enabled)
+        .withRoleNames(user.roleNames())
+        .withRoleIds(user.roleIds())
+        .withAuditInfo(user.auditInfo())
+        .build();
   }
 }

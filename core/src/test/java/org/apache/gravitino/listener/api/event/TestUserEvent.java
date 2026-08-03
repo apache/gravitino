@@ -507,19 +507,6 @@ public class TestUserEvent {
   }
 
   @Test
-  void testEnableUserEvent() {
-    dispatcher.enableUser(METALAKE, USER_EXT_ID);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(EnableUserPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.ENABLE_USER, preEvent.operationType());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(EnableUserEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.ENABLE_USER, event.operationType());
-  }
-
-  @Test
   void testRemoveUserByExternalIdEvent() {
     dispatcher.removeUserByExternalId(METALAKE, USER_EXT_ID);
 
@@ -559,7 +546,6 @@ public class TestUserEvent {
 
     when(dispatcher.getUser(METALAKE, userName)).thenReturn(user);
     when(dispatcher.getUserByExternalId(METALAKE, USER_EXT_ID)).thenReturn(externalIdUser);
-    when(dispatcher.enableUser(METALAKE, USER_EXT_ID)).thenReturn(externalIdUser);
     when(dispatcher.getUser(METALAKE, inExistUserName))
         .thenThrow(new NoSuchUserException("user not found"));
     when(dispatcher.getUser(INEXIST_METALAKE, userName))
