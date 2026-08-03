@@ -90,6 +90,7 @@ public class TestUserEvent {
     User mockUser = getMockUser("mock_user", ImmutableList.of("admin"));
     UserInfo info = new UserInfo(mockUser);
 
+    Assertions.assertEquals(1L, info.id());
     Assertions.assertEquals("mock_user", info.name());
     Assertions.assertEquals(Optional.empty(), info.externalId());
     Assertions.assertEquals(ImmutableList.of("admin"), info.roles());
@@ -580,6 +581,7 @@ public class TestUserEvent {
 
   private User getMockUser(String name, List<String> roles) {
     User user = mock(User.class);
+    when(user.id()).thenReturn(1L);
     when(user.name()).thenReturn(name);
     when(user.roles()).thenReturn(roles);
 
@@ -589,6 +591,7 @@ public class TestUserEvent {
   private User getMockUserWithExtId(
       String name, String externalId, boolean enabled, List<String> roles) {
     User user = mock(User.class);
+    when(user.id()).thenReturn(1L);
     when(user.name()).thenReturn(name);
     when(user.externalId()).thenReturn(externalId);
     when(user.enabled()).thenReturn(enabled);
@@ -598,6 +601,7 @@ public class TestUserEvent {
   }
 
   private void validateUserInfo(UserInfo userInfo, User expectedUser) {
+    Assertions.assertEquals(expectedUser.id(), userInfo.id());
     Assertions.assertEquals(userInfo.name(), expectedUser.name());
     Assertions.assertEquals(Optional.ofNullable(expectedUser.externalId()), userInfo.externalId());
     Assertions.assertEquals(userInfo.roles(), expectedUser.roles());

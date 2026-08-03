@@ -576,7 +576,7 @@ public class TestAccessControlManager {
     Assertions.assertTrue(enabled.enabled());
     Assertions.assertEquals(userId, enabled.id());
 
-    User updated = accessControlManager.updateUserExternalId(METALAKE, userId, "ext-id-user-2");
+    User updated = accessControlManager.updateUserExternalIdById(METALAKE, userId, "ext-id-user-2");
     Assertions.assertEquals(userId, updated.id());
     Assertions.assertEquals("ext-id-user-2", updated.externalId());
     User byNewExt = accessControlManager.getUserByExternalId(METALAKE, "ext-id-user-2");

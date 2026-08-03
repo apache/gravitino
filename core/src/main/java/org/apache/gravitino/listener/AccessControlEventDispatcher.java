@@ -321,9 +321,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
-  public User updateUserExternalId(String metalake, long userId, String newExternalId)
+  public User updateUserExternalIdById(String metalake, long userId, String newExternalId)
       throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.updateUserExternalId(metalake, userId, newExternalId);
+    return dispatcher.updateUserExternalIdById(metalake, userId, newExternalId);
   }
 
   /** {@inheritDoc} */

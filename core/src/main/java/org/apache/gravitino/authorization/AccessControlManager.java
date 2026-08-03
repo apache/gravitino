@@ -169,12 +169,12 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
-  public User updateUserExternalId(String metalake, long userId, String newExternalId)
+  public User updateUserExternalIdById(String metalake, long userId, String newExternalId)
       throws NoSuchUserException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofUserId(metalake, userId),
         LockType.WRITE,
-        () -> userGroupIdManager.updateUserExternalId(metalake, userId, newExternalId));
+        () -> userGroupIdManager.updateUserExternalIdById(metalake, userId, newExternalId));
   }
 
   @Override

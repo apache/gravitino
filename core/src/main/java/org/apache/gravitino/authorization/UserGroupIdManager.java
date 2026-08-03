@@ -84,7 +84,7 @@ class UserGroupIdManager extends UserGroupManager {
     return updateEnabledById(metalake, userId, false);
   }
 
-  User updateUserExternalId(String metalake, long userId, String newExternalId)
+  User updateUserExternalIdById(String metalake, long userId, String newExternalId)
       throws NoSuchUserException {
     try {
       return store

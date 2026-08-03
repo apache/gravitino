@@ -207,7 +207,7 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If updating the User encounters storage issues.
    */
-  User updateUserExternalId(String metalake, long userId, String newExternalId)
+  User updateUserExternalIdById(String metalake, long userId, String newExternalId)
       throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
