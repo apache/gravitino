@@ -19,10 +19,6 @@
 
 package org.apache.gravitino.secret.memory;
 
-import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
-import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
-import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
@@ -67,22 +63,8 @@ public class InMemorySecretsProvider implements SecretProvider {
     if (providerName == null) {
       throw new IllegalStateException("InMemorySecretsProvider is not initialized");
     }
-    if (attributes == null) {
-      throw new IllegalArgumentException("attributes must not be null");
-    }
 
-    String entityType = requiredAttribute(attributes, ATTR_ENTITY_TYPE);
-    String entityIdValue = requiredAttribute(attributes, ATTR_ENTITY_ID);
-    String propertyKey = requiredAttribute(attributes, ATTR_PROPERTY_KEY);
-    long entityId;
-    try {
-      entityId = Long.parseLong(entityIdValue);
-    } catch (NumberFormatException e) {
-      throw new IllegalArgumentException(
-          "attributes." + ATTR_ENTITY_ID + " must be a numeric entity id: " + entityIdValue, e);
-    }
-
-    String urn = SecretUrn.buildWriteThrough(providerName, entityType, entityId, propertyKey);
+    String urn = SecretUrn.buildWriteThrough(providerName, attributes);
     secrets.put(
         urn, Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8)));
     return urn;
@@ -105,13 +87,5 @@ public class InMemorySecretsProvider implements SecretProvider {
   @Override
   public void close() {
     secrets.clear();
-  }
-
-  private static String requiredAttribute(Map<String, String> attributes, String key) {
-    String value = attributes.get(key);
-    if (StringUtils.isBlank(value)) {
-      throw new IllegalArgumentException("attributes." + key + " must not be blank");
-    }
-    return value;
   }
 }

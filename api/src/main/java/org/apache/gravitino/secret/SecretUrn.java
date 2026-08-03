@@ -19,11 +19,15 @@
 
 package org.apache.gravitino.secret;
 
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -99,19 +103,39 @@ public final class SecretUrn {
   /**
    * Builds a write-through URN for an entity property secret.
    *
+   * <p>Required attributes: {@link SecretConstants#ATTR_ENTITY_TYPE}, {@link
+   * SecretConstants#ATTR_ENTITY_ID}, and {@link SecretConstants#ATTR_PROPERTY_KEY}.
+   *
    * @param providerName the configured provider name
-   * @param entityType the entity type
-   * @param entityId the entity identifier
-   * @param propertyKey the property key
+   * @param attributes write-through attributes
    * @return the write-through URN
    */
-  public static String buildWriteThrough(
-      String providerName, String entityType, long entityId, String propertyKey) {
+  public static String buildWriteThrough(String providerName, Map<String, String> attributes) {
+    if (attributes == null) {
+      throw new IllegalArgumentException("attributes must not be null");
+    }
+    String entityType = requiredAttribute(attributes, ATTR_ENTITY_TYPE);
+    String entityId = requiredAttribute(attributes, ATTR_ENTITY_ID);
+    String propertyKey = requiredAttribute(attributes, ATTR_PROPERTY_KEY);
+    try {
+      Long.parseLong(entityId);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "attributes." + ATTR_ENTITY_ID + " must be a numeric entity id: " + entityId, e);
+    }
     validateSegment(providerName);
     validateSegment(entityType);
-    validateSegment(String.valueOf(entityId));
+    validateSegment(entityId);
     validateSegment(propertyKey);
     return URN_PREFIX + providerName + ":" + entityType + ":" + entityId + ":" + propertyKey;
+  }
+
+  private static String requiredAttribute(Map<String, String> attributes, String key) {
+    String value = attributes.get(key);
+    if (StringUtils.isBlank(value)) {
+      throw new IllegalArgumentException("attributes." + key + " must not be blank");
+    }
+    return value;
   }
 
   /**
