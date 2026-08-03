@@ -76,11 +76,14 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     PRIMARY KEY (table_id),
     CONSTRAINT uk_sid_tn_del UNIQUE (schema_id, table_name, deleted_at),
     -- Aliases are used here, and indexes with the same name in H2 can only be created once.
     KEY idx_tmid (metalake_id),
-    KEY idx_tcid (catalog_id)
+    KEY idx_tcid (catalog_id),
+    UNIQUE KEY uk_tm_deletion (`deletion_id`),
+    KEY idx_tm_deleted_action (`deleted_at`, `deletion_id`)
 ) ENGINE=InnoDB;
 
 
@@ -606,6 +609,16 @@ CREATE INDEX IF NOT EXISTS `idx_table_metrics_composite`
   ON `table_metrics`(`table_identifier`, `table_partition`, `metric_ts`);
 CREATE INDEX IF NOT EXISTS `idx_job_metrics_identifier_metric_ts`
   ON `job_metrics`(`job_identifier`, `metric_ts`);
+
+CREATE TABLE IF NOT EXISTS `entity_deletion` (
+  `deletion_id`              VARCHAR(64)   NOT NULL COMMENT 'opaque identifier for one active deletion generation',
+  `state`                    VARCHAR(16)   NOT NULL COMMENT 'DELETED|PURGING',
+  `retention_expires_at`     BIGINT        NOT NULL COMMENT 'fixed recovery deadline in milliseconds',
+  `purge_job_id`             VARCHAR(64)   DEFAULT NULL COMMENT 'batch purge job that claimed this generation',
+  PRIMARY KEY (`deletion_id`),
+  KEY `idx_entity_deletion_gc` (`state`, `retention_expires_at`, `deletion_id`),
+  KEY `idx_entity_deletion_purge_job` (`purge_job_id`, `deletion_id`)
+) COMMENT='active deletion lifecycle actions';
 
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',

@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.iceberg.service.cleanup;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.Iterators;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,6 +53,7 @@ import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.SupportsBulkOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -231,25 +231,77 @@ public class IcebergCleanupManager implements AutoCloseable {
     List<Future<?>> futures = new ArrayList<>();
     Iterators.partition(files.iterator(), deleteBatchSize)
         .forEachRemaining(
-            batch ->
-                futures.add(
-                    deleteExecutor.submit(
-                        () -> CatalogUtil.deleteFiles(io, batch, "cleanup", true))));
+            batch -> futures.add(deleteExecutor.submit(() -> deleteBatch(io, batch))));
 
+    RuntimeException firstFailure = null;
+    InterruptedException interruption = null;
     for (Future<?> future : futures) {
-      try {
-        future.get();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException("Interrupted during bulk delete", e);
-      } catch (ExecutionException e) {
-        if (Throwables.getCausalChain(e).stream().anyMatch(NotFoundException.class::isInstance)) {
-          LOG.debug("Ignoring already-deleted file during async cleanup", e);
-          continue;
+      boolean complete = false;
+      while (!complete) {
+        try {
+          future.get();
+          complete = true;
+        } catch (InterruptedException e) {
+          // Keep draining tasks before runJob closes the shared FileIO. Restore the interrupt once
+          // every submitted batch has stopped using it.
+          if (interruption == null) {
+            interruption = e;
+          } else {
+            interruption.addSuppressed(e);
+          }
+        } catch (ExecutionException e) {
+          firstFailure = appendFailure(firstFailure, e.getCause());
+          complete = true;
         }
-        throw new RuntimeException("Bulk delete batch failed", e);
       }
     }
+
+    if (interruption != null) {
+      Thread.currentThread().interrupt();
+      RuntimeException interruptedFailure =
+          new RuntimeException("Interrupted during file deletion", interruption);
+      if (firstFailure != null) {
+        interruptedFailure.addSuppressed(firstFailure);
+      }
+      throw interruptedFailure;
+    }
+    if (firstFailure != null) {
+      throw firstFailure;
+    }
+  }
+
+  static void deleteBatch(FileIO io, List<String> files) {
+    if (io instanceof SupportsBulkOperations) {
+      // FileIO and its provider SDK own transient retries. If the operation still fails, propagate
+      // that final outcome so the durable cleanup job—not another local retry loop—decides when to
+      // run again.
+      ((SupportsBulkOperations) io).deleteFiles(files);
+      return;
+    }
+
+    for (String file : files) {
+      try {
+        io.deleteFile(file);
+      } catch (NotFoundException alreadyDeleted) {
+        // Missing individual files are idempotent success. Continue so one missing path never skips
+        // later paths in the same batch.
+        LOG.debug("Cleanup file {} is already absent", file);
+      }
+    }
+  }
+
+  private static RuntimeException appendFailure(RuntimeException firstFailure, Throwable failure) {
+    RuntimeException runtimeFailure =
+        failure instanceof RuntimeException
+            ? (RuntimeException) failure
+            : new RuntimeException("File delete batch failed", failure);
+    if (firstFailure == null) {
+      return runtimeFailure;
+    }
+    if (firstFailure != runtimeFailure) {
+      firstFailure.addSuppressed(runtimeFailure);
+    }
+    return firstFailure;
   }
 
   private void workerLoop() {

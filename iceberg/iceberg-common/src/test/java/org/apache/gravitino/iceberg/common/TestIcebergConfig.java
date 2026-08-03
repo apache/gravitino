@@ -102,6 +102,38 @@ public class TestIcebergConfig {
   }
 
   @Test
+  public void testSoftDeleteDefaultsAndRange() {
+    IcebergConfig defaults = new IcebergConfig(ImmutableMap.of());
+    Assertions.assertFalse(defaults.get(IcebergConfig.SOFT_DELETE_ENABLED));
+    Assertions.assertEquals(86_400_000L, defaults.get(IcebergConfig.SOFT_DELETE_RETENTION_MS));
+
+    IcebergConfig zeroRetention =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConfig.SOFT_DELETE_ENABLED.getKey(),
+                "true",
+                IcebergConfig.SOFT_DELETE_RETENTION_MS.getKey(),
+                "0"));
+    Assertions.assertTrue(zeroRetention.get(IcebergConfig.SOFT_DELETE_ENABLED));
+    Assertions.assertEquals(0L, zeroRetention.get(IcebergConfig.SOFT_DELETE_RETENTION_MS));
+
+    IcebergConfig maximumRetention =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConfig.SOFT_DELETE_RETENTION_MS.getKey(),
+                String.valueOf(90L * 24 * 60 * 60 * 1000)));
+    Assertions.assertEquals(
+        90L * 24 * 60 * 60 * 1000, maximumRetention.get(IcebergConfig.SOFT_DELETE_RETENTION_MS));
+
+    IcebergConfig invalidRetention =
+        new IcebergConfig(
+            ImmutableMap.of(IcebergConfig.SOFT_DELETE_RETENTION_MS.getKey(), "7776000001"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> invalidRetention.get(IcebergConfig.SOFT_DELETE_RETENTION_MS));
+  }
+
+  @Test
   public void testRESTCatalogBackendClientTimeoutDefaults() {
     IcebergConfig icebergConfig = new IcebergConfig(ImmutableMap.of());
 

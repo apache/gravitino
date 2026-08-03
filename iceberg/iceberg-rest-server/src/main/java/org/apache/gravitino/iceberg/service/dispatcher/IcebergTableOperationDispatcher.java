@@ -73,6 +73,18 @@ public interface IcebergTableOperationDispatcher {
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested);
 
   /**
+   * Returns whether a drop is handled as a retained relational deletion rather than an Iceberg
+   * catalog unregister.
+   *
+   * @param context Iceberg REST request context information
+   * @param purgeRequested whether the request asked to purge
+   * @return whether the durable deletion lifecycle owns the request
+   */
+  default boolean managesDeletionLifecycle(IcebergRequestContext context, boolean purgeRequested) {
+    return false;
+  }
+
+  /**
    * Loads an Iceberg table.
    *
    * @param context Iceberg REST request context information.
