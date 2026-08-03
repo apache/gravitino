@@ -120,6 +120,11 @@ public class UserMetaSQLProviderFactory {
     return getProvider().selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId);
   }
 
+  public static String selectUserMetaByMetalakeNameAndId(
+      @Param("metalakeName") String metalakeName, @Param("userId") Long userId) {
+    return getProvider().selectUserMetaByMetalakeNameAndId(metalakeName, userId);
+  }
+
   public static String updateUserMetaByExternalId(
       @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO) {
     return getProvider().updateUserMetaByExternalId(newUserPO, oldUserPO);

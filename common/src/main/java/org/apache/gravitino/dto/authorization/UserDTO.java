@@ -31,6 +31,9 @@ import org.apache.gravitino.dto.AuditDTO;
 /** Represents a User Data Transfer Object (DTO). */
 public class UserDTO implements User {
 
+  @JsonProperty("id")
+  private Long id;
+
   @JsonProperty("name")
   private String name;
 
@@ -60,7 +63,13 @@ public class UserDTO implements User {
    * @param enabled Whether the User DTO is enabled.
    */
   protected UserDTO(
-      String name, String externalId, List<String> roles, AuditDTO audit, boolean enabled) {
+      Long id,
+      String name,
+      String externalId,
+      List<String> roles,
+      AuditDTO audit,
+      boolean enabled) {
+    this.id = id;
     this.name = name;
     this.externalId = externalId;
     this.enabled = enabled;
@@ -71,6 +80,11 @@ public class UserDTO implements User {
   /**
    * @return The name of the User DTO.
    */
+  @Override
+  public Long id() {
+    return id;
+  }
+
   @Override
   public String name() {
     return name;
@@ -120,6 +134,9 @@ public class UserDTO implements User {
    */
   public static class Builder<S extends Builder> {
 
+    /** The id of the user. */
+    protected Long id;
+
     /** The name of the user. */
     protected String name;
 
@@ -134,6 +151,17 @@ public class UserDTO implements User {
 
     /** The audit information of the user. */
     protected AuditDTO audit;
+
+    /**
+     * Sets the id of the user.
+     *
+     * @param id The id of the user.
+     * @return The builder instance.
+     */
+    public S withId(Long id) {
+      this.id = id;
+      return (S) this;
+    }
 
     /**
      * Sets the name of the user.
@@ -200,9 +228,10 @@ public class UserDTO implements User {
      * @throws IllegalArgumentException If the name or audit are not set.
      */
     public UserDTO build() {
+      Preconditions.checkArgument(id != null, "id cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new UserDTO(name, externalId, roles, audit, enabled);
+      return new UserDTO(id, name, externalId, roles, audit, enabled);
     }
   }
 }

@@ -258,6 +258,19 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public User getUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.getUserById(metalake, userId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean removeUserById(String metalake, long userId) throws NoSuchMetalakeException {
+    return dispatcher.removeUserById(metalake, userId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public User enableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
@@ -276,6 +289,13 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public User enableUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.enableUserById(metalake, userId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public User disableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
@@ -290,6 +310,20 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       eventBus.dispatchEvent(new DisableUserFailureEvent(initiator, metalake, e, externalId));
       throw e;
     }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public User disableUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.disableUserById(metalake, userId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public User updateUserExternalId(String metalake, long userId, String newExternalId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.updateUserExternalId(metalake, userId, newExternalId);
   }
 
   /** {@inheritDoc} */

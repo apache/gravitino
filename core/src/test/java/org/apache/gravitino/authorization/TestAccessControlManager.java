@@ -556,6 +556,42 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testUserById() {
+    User added = accessControlManager.addUser(METALAKE, "id_user", "ext-id-user", true);
+    long userId = added.id();
+    Assertions.assertNotNull(userId);
+
+    User loaded = accessControlManager.getUserById(METALAKE, userId);
+    Assertions.assertEquals(userId, loaded.id());
+    Assertions.assertEquals("id_user", loaded.name());
+    Assertions.assertEquals("ext-id-user", loaded.externalId());
+    Assertions.assertTrue(loaded.enabled());
+
+    User disabled = accessControlManager.disableUserById(METALAKE, userId);
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertEquals(userId, disabled.id());
+    Assertions.assertEquals("ext-id-user", disabled.externalId());
+
+    User enabled = accessControlManager.enableUserById(METALAKE, userId);
+    Assertions.assertTrue(enabled.enabled());
+    Assertions.assertEquals(userId, enabled.id());
+
+    User updated = accessControlManager.updateUserExternalId(METALAKE, userId, "ext-id-user-2");
+    Assertions.assertEquals(userId, updated.id());
+    Assertions.assertEquals("ext-id-user-2", updated.externalId());
+    User byNewExt = accessControlManager.getUserByExternalId(METALAKE, "ext-id-user-2");
+    Assertions.assertEquals("id_user", byNewExt.name());
+    Assertions.assertEquals(userId, byNewExt.id());
+
+    Assertions.assertTrue(accessControlManager.removeUserById(METALAKE, userId));
+    Assertions.assertThrows(
+        NoSuchUserException.class, () -> accessControlManager.getUserById(METALAKE, userId));
+    Assertions.assertFalse(accessControlManager.removeUserById(METALAKE, userId));
+    Assertions.assertThrows(
+        NoSuchUserException.class, () -> accessControlManager.enableUserById(METALAKE, userId));
+  }
+
+  @Test
   public void testExtCache() {
     String extId = "ext-cache-user";
     accessControlManager.addUser(METALAKE, "cache_user", extId, true);

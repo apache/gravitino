@@ -99,15 +99,44 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public User getUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.getUserById(metalake, userId);
+  }
+
+  @Override
+  public boolean removeUserById(String metalake, long userId) throws NoSuchMetalakeException {
+    return dispatcher.removeUserById(metalake, userId);
+  }
+
+  @Override
   public User enableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
     return dispatcher.enableUser(metalake, externalId);
   }
 
   @Override
+  public User enableUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.enableUserById(metalake, userId);
+  }
+
+  @Override
   public User disableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
     return dispatcher.disableUser(metalake, externalId);
+  }
+
+  @Override
+  public User disableUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.disableUserById(metalake, userId);
+  }
+
+  @Override
+  public User updateUserExternalId(String metalake, long userId, String newExternalId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.updateUserExternalId(metalake, userId, newExternalId);
   }
 
   @Override

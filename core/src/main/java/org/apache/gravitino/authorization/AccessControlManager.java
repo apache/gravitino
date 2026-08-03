@@ -48,6 +48,7 @@ public class AccessControlManager implements AccessControlDispatcher {
 
   private final UserGroupManager userGroupManager;
   private final UserGroupExternalManager userGroupExternalManager;
+  private final UserGroupIdManager userGroupIdManager;
   private final RoleManager roleManager;
   private final PermissionManager permissionManager;
   private final List<String> serviceAdmins;
@@ -56,6 +57,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     this.roleManager = new RoleManager(store, idGenerator);
     this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.userGroupExternalManager = new UserGroupExternalManager(store, idGenerator);
+    this.userGroupIdManager = new UserGroupIdManager(store, idGenerator);
     this.permissionManager = new PermissionManager(store, roleManager);
     this.serviceAdmins = config.get(Configs.SERVICE_ADMINS);
   }
@@ -114,6 +116,23 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public User getUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUserId(metalake, userId),
+        LockType.READ,
+        () -> userGroupIdManager.getUserById(metalake, userId));
+  }
+
+  @Override
+  public boolean removeUserById(String metalake, long userId) throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUserId(metalake, userId),
+        LockType.WRITE,
+        () -> userGroupIdManager.removeUserById(metalake, userId));
+  }
+
+  @Override
   public User enableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
@@ -123,12 +142,39 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public User enableUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUserId(metalake, userId),
+        LockType.WRITE,
+        () -> userGroupIdManager.enableUserById(metalake, userId));
+  }
+
+  @Override
   public User disableUser(String metalake, String externalId)
       throws NoSuchUserException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofUserExternalId(metalake, externalId),
         LockType.WRITE,
         () -> userGroupExternalManager.disableUser(metalake, externalId));
+  }
+
+  @Override
+  public User disableUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUserId(metalake, userId),
+        LockType.WRITE,
+        () -> userGroupIdManager.disableUserById(metalake, userId));
+  }
+
+  @Override
+  public User updateUserExternalId(String metalake, long userId, String newExternalId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUserId(metalake, userId),
+        LockType.WRITE,
+        () -> userGroupIdManager.updateUserExternalId(metalake, userId, newExternalId));
   }
 
   @Override

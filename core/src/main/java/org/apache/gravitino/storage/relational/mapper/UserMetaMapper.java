@@ -104,6 +104,12 @@ public interface UserMetaMapper {
   UserPO selectUserMetaByMetalakeNameAndExternalId(
       @Param("metalakeName") String metalakeName, @Param("externalId") String externalId);
 
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "selectUserMetaByMetalakeNameAndId")
+  UserPO selectUserMetaByMetalakeNameAndId(
+      @Param("metalakeName") String metalakeName, @Param("userId") Long userId);
+
   @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "updateUserMetaByExternalId")
   Integer updateUserMetaByExternalId(
       @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO);

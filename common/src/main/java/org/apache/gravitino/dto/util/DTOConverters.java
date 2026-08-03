@@ -493,6 +493,7 @@ public class DTOConverters {
     }
 
     return UserDTO.builder()
+        .withId(user.id())
         .withName(user.name())
         .withExternalId(user.externalId())
         .withEnabled(user.enabled())

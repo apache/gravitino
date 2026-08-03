@@ -27,6 +27,7 @@ import org.apache.gravitino.authorization.User;
 /** Provides read-only access to user information for event listeners. */
 @DeveloperApi
 public class UserInfo {
+  private final Optional<Long> id;
   private final String name;
   private final Optional<String> externalId;
   private final boolean enabled;
@@ -38,10 +39,20 @@ public class UserInfo {
    * @param user the {@link User} instance.
    */
   public UserInfo(User user) {
+    this.id = Optional.ofNullable(user.id());
     this.name = user.name();
     this.externalId = Optional.ofNullable(user.externalId());
     this.enabled = user.enabled();
     this.roles = user.roles();
+  }
+
+  /**
+   * Returns the Gravitino-assigned id of the user.
+   *
+   * @return the user id, or empty if not set
+   */
+  public Optional<Long> id() {
+    return id;
   }
 
   /**

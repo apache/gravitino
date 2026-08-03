@@ -43,6 +43,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsExternalIdOperations;
+import org.apache.gravitino.SupportsIdOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CacheFactory;
@@ -71,6 +72,7 @@ public class RelationalEntityStore
     implements EntityStore,
         SupportsRelationOperations,
         SupportsExternalIdOperations,
+        SupportsIdOperations,
         SupportsEntityChangeLog {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
@@ -201,6 +203,11 @@ public class RelationalEntityStore
   }
 
   @Override
+  public SupportsIdOperations idOperations() {
+    return this;
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E getByExternalId(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
       throws NoSuchEntityException, IOException {
@@ -227,6 +234,39 @@ public class RelationalEntityStore
     } catch (NoSuchEntityException e) {
       LOGGER.warn(
           "The entity to be deleted by external id does not exist in the store: {}", ident, e);
+      return false;
+    } finally {
+      if (nameIdent != null) {
+        cache.invalidate(nameIdent, entityType);
+      }
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getById(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
+      throws NoSuchEntityException, IOException {
+    return backend.getById(ident, entityType);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateById(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    E updatedEntity = backend.updateById(ident, entityType, updater);
+    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+    return updatedEntity;
+  }
+
+  @Override
+  public boolean deleteById(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    NameIdentifier nameIdent = null;
+    try {
+      HasIdentifier entity = backend.getById(ident, entityType);
+      nameIdent = entity.nameIdentifier();
+      return backend.delete(nameIdent, entityType, false);
+    } catch (NoSuchEntityException e) {
+      LOGGER.warn("The entity to be deleted by id does not exist in the store: {}", ident, e);
       return false;
     } finally {
       if (nameIdent != null) {

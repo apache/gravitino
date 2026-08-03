@@ -36,6 +36,16 @@ public interface User extends Auditable {
   String name();
 
   /**
+   * The unique id assigned by Gravitino.
+   *
+   * <p>This id is server-assigned and immutable. Upstream systems may also supply an optional
+   * {@link #externalId()}.
+   *
+   * @return The unique id of the user.
+   */
+  Long id();
+
+  /**
    * The stable identifier assigned by an upstream identity system (for example, SCIM, LDAP, or
    * IAM), or null if not set.
    *
