@@ -46,6 +46,8 @@ import org.apache.gravitino.json.JsonUtils;
 public class IcebergCleanupJobPO {
 
   private Long id;
+  private Long tableId;
+  private String deletionId;
   private Long catalogId;
   private String namespace;
   private String tableName;
@@ -56,6 +58,8 @@ public class IcebergCleanupJobPO {
   private Integer attempts;
   private String lastError;
   private Long heartbeatAt;
+  private Long manifestsTotal;
+  private Long manifestsDone;
   private String createdBy;
   private Long updatedAt;
 
@@ -70,6 +74,8 @@ public class IcebergCleanupJobPO {
   public static IcebergCleanupJobPO fromCleanupJob(IcebergCleanupJob job, long id, long now) {
     return builder()
         .withId(id)
+        .withTableId(job.tableId())
+        .withDeletionId(job.deletionId())
         .withCatalogId(job.catalogId())
         .withNamespace(job.namespace())
         .withTableName(job.tableName())
@@ -80,6 +86,8 @@ public class IcebergCleanupJobPO {
         .withAttempts(0)
         .withLastError(null)
         .withHeartbeatAt(0L)
+        .withManifestsTotal(null)
+        .withManifestsDone(null)
         .withCreatedBy(job.createdBy())
         .withUpdatedAt(now)
         .build();
@@ -93,6 +101,23 @@ public class IcebergCleanupJobPO {
    * @return the domain job
    */
   public IcebergCleanupJob toCleanupJob() {
+    if (tableId != null && deletionId != null) {
+      return IcebergCleanupJob.forRetainedDeletion(
+          id,
+          tableId,
+          deletionId,
+          catalogId,
+          namespace,
+          tableName,
+          metadataLocation,
+          fileIOImpl,
+          jsonToProperties(fileIOProps),
+          createdBy);
+    }
+    if (tableId != null || deletionId != null) {
+      throw new IllegalStateException(
+          "Cleanup job must have both tableId and deletionId, or neither");
+    }
     return new IcebergCleanupJob(
         id,
         catalogId,

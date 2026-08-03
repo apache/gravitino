@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.cleanup.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -44,6 +45,10 @@ public interface IcebergCleanupJobMapper {
   List<IcebergCleanupJobPO> selectCandidateJobs(
       @Param("heartbeatExpiry") long heartbeatExpiry, @Param("window") int window);
 
+  /** Returns the observed number of PENDING and RUNNING cleanup jobs. */
+  @SelectProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "countInflightJobs")
+  int countInflightJobs();
+
   @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "markRunning")
   int markRunning(
       @Param("id") long id, @Param("now") long now, @Param("heartbeatExpiry") long heartbeatExpiry);
@@ -66,7 +71,14 @@ public interface IcebergCleanupJobMapper {
 
   @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "heartbeat")
   int heartbeat(
-      @Param("id") long id, @Param("lastHeartbeat") long lastHeartbeat, @Param("now") long now);
+      @Param("id") long id,
+      @Param("lastHeartbeat") long lastHeartbeat,
+      @Param("now") long now,
+      @Param("manifestsTotal") @Nullable Long manifestsTotal,
+      @Param("manifestsDone") @Nullable Long manifestsDone);
+
+  @SelectProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "selectStatus")
+  IcebergCleanupJobPO selectStatus(@Param("id") long id);
 
   @SelectProvider(
       type = IcebergCleanupJobSQLProviderFactory.class,

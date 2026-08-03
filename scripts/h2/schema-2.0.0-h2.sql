@@ -76,11 +76,14 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
+    `deletion_id` VARCHAR(64) DEFAULT NULL COMMENT 'table deletion generation identifier',
     PRIMARY KEY (table_id),
     CONSTRAINT uk_sid_tn_del UNIQUE (schema_id, table_name, deleted_at),
     -- Aliases are used here, and indexes with the same name in H2 can only be created once.
     KEY idx_tmid (metalake_id),
-    KEY idx_tcid (catalog_id)
+    KEY idx_tcid (catalog_id),
+    UNIQUE KEY uk_tm_deletion (`deletion_id`),
+    KEY idx_tm_deleted_action (`deleted_at`, `deletion_id`)
 ) ENGINE=InnoDB;
 
 
@@ -607,6 +610,16 @@ CREATE INDEX IF NOT EXISTS `idx_table_metrics_composite`
 CREATE INDEX IF NOT EXISTS `idx_job_metrics_identifier_metric_ts`
   ON `job_metrics`(`job_identifier`, `metric_ts`);
 
+CREATE TABLE IF NOT EXISTS `entity_deletion` (
+  `deletion_id`              VARCHAR(64)   NOT NULL COMMENT 'opaque identifier for one active deletion generation',
+  `state`                    VARCHAR(16)   NOT NULL COMMENT 'DELETED|PURGING',
+  `retention_expires_at`     BIGINT        NOT NULL COMMENT 'fixed recovery deadline in milliseconds',
+  `purge_job_id`             VARCHAR(64)   DEFAULT NULL COMMENT 'batch purge job that claimed this generation',
+  PRIMARY KEY (`deletion_id`),
+  KEY `idx_entity_deletion_gc` (`state`, `retention_expires_at`, `deletion_id`),
+  KEY `idx_entity_deletion_purge_job` (`purge_job_id`, `deletion_id`)
+) COMMENT='active deletion lifecycle actions';
+
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
   `metalake_name` VARCHAR(128)    NOT NULL COMMENT 'metalake name',
@@ -620,6 +633,8 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
 
 CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `id`                BIGINT        NOT NULL COMMENT 'globally unique cleanup job id',
+  `table_id`          BIGINT        NULL COMMENT 'immutable retained table id, NULL for legacy immediate-purge jobs',
+  `deletion_id`       VARCHAR(64)   NULL COMMENT 'opaque retained deletion generation, NULL for legacy immediate-purge jobs',
   `catalog_id`        BIGINT        NOT NULL COMMENT 'globally unique id of the owning catalog, stable across catalog rename',
   `namespace`         VARCHAR(512)  NOT NULL COMMENT 'namespace of the table to be cleaned up',
   `table_name`        VARCHAR(256)  NOT NULL COMMENT 'name of the table to be cleaned up',
@@ -630,9 +645,12 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `attempts`          INT           NOT NULL DEFAULT 0 COMMENT 'number of processing attempts made so far',
   `last_error`        VARCHAR(2048) NULL COMMENT 'truncated reason for the most recent failure, NULL until a job fails',
   `heartbeat_at`      BIGINT        NOT NULL DEFAULT 0 COMMENT 'last heartbeat from the worker, 0 when not running',
+  `manifests_total`   BIGINT        NULL COMMENT 'advisory number of manifests discovered, NULL before progress is reported',
+  `manifests_done`    BIGINT        NULL COMMENT 'advisory number of manifests processed, NULL before progress is reported',
   `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
   `updated_at`        BIGINT        NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`)
 ) COMMENT='async Iceberg table cleanup jobs';
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_icj_deletion` ON `iceberg_cleanup_job` (`deletion_id`);
 CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_id`, `namespace`, `table_name`, `state`);
