@@ -310,6 +310,45 @@ public interface AccessControlDispatcher {
       throws NoSuchGroupException, NoSuchMetalakeException;
 
   /**
+   * Gets a Group by Gravitino-assigned id.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param groupId The Gravitino-assigned id of the Group.
+   * @return The getting Group instance.
+   * @throws NoSuchGroupException If the Group with the given id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the Group encounters storage issues.
+   */
+  Group getGroupById(String metalake, long groupId)
+      throws NoSuchGroupException, NoSuchMetalakeException;
+
+  /**
+   * Removes a Group by Gravitino-assigned id.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param groupId The Gravitino-assigned id of the Group.
+   * @return True if the Group was successfully removed, false only when there's no such group,
+   *     otherwise it will throw an exception.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Group encounters storage issues.
+   */
+  boolean removeGroupById(String metalake, long groupId) throws NoSuchMetalakeException;
+
+  /**
+   * Updates the external identifier of a Group by Gravitino-assigned id.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param groupId The Gravitino-assigned id of the Group.
+   * @param newExternalId The new external identifier, or null to clear it.
+   * @return The updated Group instance.
+   * @throws NoSuchGroupException If the Group with the given id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If updating the Group encounters storage issues.
+   */
+  Group updateGroupExternalId(String metalake, long groupId, String newExternalId)
+      throws NoSuchGroupException, NoSuchMetalakeException;
+
+  /**
    * List groups
    *
    * @param metalake The Metalake of the Group.

@@ -240,14 +240,22 @@ public class TestMemoryEntityStore {
     public <E extends Entity & HasIdentifier> E getById(
         NameIdentifier ident, EntityType entityType, Class<E> type)
         throws NoSuchEntityException, IOException {
-      if (entityType != EntityType.USER) {
+      if (entityType != EntityType.USER && entityType != EntityType.GROUP) {
         throw new UnsupportedOperationException(
             "Get by id is not supported for entity type: " + entityType);
       }
 
-      AuthorizationUtils.checkUserId(ident);
-      long entityId = Long.parseLong(ident.name());
-      Namespace entityNamespace = AuthorizationUtils.ofUserNamespace(ident.namespace().level(0));
+      long entityId;
+      Namespace entityNamespace;
+      if (entityType == EntityType.USER) {
+        AuthorizationUtils.checkUserId(ident);
+        entityId = Long.parseLong(ident.name());
+        entityNamespace = AuthorizationUtils.ofUserNamespace(ident.namespace().level(0));
+      } else {
+        AuthorizationUtils.checkGroupId(ident);
+        entityId = Long.parseLong(ident.name());
+        entityNamespace = AuthorizationUtils.ofGroupNamespace(ident.namespace().level(0));
+      }
 
       for (Map.Entry<NameIdentifier, Entity> entry : entityMap.entrySet()) {
         Entity entity = entry.getValue();
@@ -284,6 +292,9 @@ public class TestMemoryEntityStore {
         if (entityType == EntityType.USER) {
           UserEntity user = getById(ident, entityType, UserEntity.class);
           return delete(user.nameIdentifier(), entityType);
+        } else if (entityType == EntityType.GROUP) {
+          GroupEntity group = getById(ident, entityType, GroupEntity.class);
+          return delete(group.nameIdentifier(), entityType);
         }
         throw new UnsupportedOperationException(
             "Delete by id is not supported for entity type: " + entityType);

@@ -592,6 +592,29 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testGroupById() {
+    Group added = accessControlManager.addGroup(METALAKE, "id_group", "ext-id-group");
+    long groupId = added.id();
+    Assertions.assertNotNull(groupId);
+
+    Group loaded = accessControlManager.getGroupById(METALAKE, groupId);
+    Assertions.assertEquals(groupId, loaded.id());
+    Assertions.assertEquals("id_group", loaded.name());
+    Assertions.assertEquals("ext-id-group", loaded.externalId());
+
+    Group updated = accessControlManager.updateGroupExternalId(METALAKE, groupId, "ext-id-group-2");
+    Assertions.assertEquals(groupId, updated.id());
+    Assertions.assertEquals("ext-id-group-2", updated.externalId());
+    Assertions.assertEquals(
+        "id_group", accessControlManager.getGroupByExternalId(METALAKE, "ext-id-group-2").name());
+
+    Assertions.assertTrue(accessControlManager.removeGroupById(METALAKE, groupId));
+    Assertions.assertThrows(
+        NoSuchGroupException.class, () -> accessControlManager.getGroupById(METALAKE, groupId));
+    Assertions.assertFalse(accessControlManager.removeGroupById(METALAKE, groupId));
+  }
+
+  @Test
   public void testExtCache() {
     String extId = "ext-cache-user";
     accessControlManager.addUser(METALAKE, "cache_user", extId, true);

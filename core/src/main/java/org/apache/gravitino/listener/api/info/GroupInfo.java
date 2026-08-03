@@ -27,6 +27,7 @@ import org.apache.gravitino.authorization.Group;
 /** Provides read-only access to group information for event listeners. */
 @DeveloperApi
 public class GroupInfo {
+  private final Optional<Long> id;
   private final String name;
   private final Optional<String> externalId;
   private List<String> roles;
@@ -37,9 +38,19 @@ public class GroupInfo {
    * @param group the {@link Group} object from which to create the {@link GroupInfo}.
    */
   public GroupInfo(Group group) {
+    this.id = Optional.ofNullable(group.id());
     this.name = group.name();
     this.externalId = Optional.ofNullable(group.externalId());
     this.roles = group.roles();
+  }
+
+  /**
+   * Returns the Gravitino-assigned id of the group.
+   *
+   * @return the group id, or empty if not set
+   */
+  public Optional<Long> id() {
+    return id;
   }
 
   /**
