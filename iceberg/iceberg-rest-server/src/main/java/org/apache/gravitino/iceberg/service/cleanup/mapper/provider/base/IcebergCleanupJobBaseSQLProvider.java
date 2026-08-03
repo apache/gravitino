@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.cleanup.mapper.provider.base;
 
 import static org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper.TABLE_NAME;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -39,12 +40,13 @@ public class IcebergCleanupJobBaseSQLProvider {
   public String insertCleanupJob(@Param("po") IcebergCleanupJobPO po) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (id, catalog_id, namespace, table_name, metadata_location,"
-        + " file_io_impl, file_io_props, state, attempts, last_error, heartbeat_at, created_by,"
-        + " updated_at) VALUES (#{po.id}, #{po.catalogId}, #{po.namespace},"
+        + " (id, table_id, deletion_id, catalog_id, namespace, table_name, metadata_location,"
+        + " file_io_impl, file_io_props, state, attempts, last_error, heartbeat_at,"
+        + " manifests_total, manifests_done, created_by, updated_at) VALUES"
+        + " (#{po.id}, #{po.tableId}, #{po.deletionId}, #{po.catalogId}, #{po.namespace},"
         + " #{po.tableName}, #{po.metadataLocation}, #{po.fileIOImpl}, #{po.fileIOProps},"
-        + " #{po.state}, #{po.attempts}, #{po.lastError}, #{po.heartbeatAt}, #{po.createdBy},"
-        + " #{po.updatedAt})";
+        + " #{po.state}, #{po.attempts}, #{po.lastError}, #{po.heartbeatAt},"
+        + " #{po.manifestsTotal}, #{po.manifestsDone}, #{po.createdBy}, #{po.updatedAt})";
   }
 
   /**
@@ -60,11 +62,13 @@ public class IcebergCleanupJobBaseSQLProvider {
     // trap, which also keeps the predicate index-friendly. Full rows are returned so a winning
     // claimer can build the job directly: the columns the job needs are immutable after enqueue,
     // so the pre-claim snapshot stays accurate without a re-read.
-    return "SELECT id, catalog_id AS catalogId, namespace,"
+    return "SELECT id, table_id AS tableId, deletion_id AS deletionId,"
+        + " catalog_id AS catalogId, namespace,"
         + " table_name AS tableName, metadata_location AS metadataLocation,"
         + " file_io_impl AS fileIOImpl, file_io_props AS fileIOProps, state, attempts,"
-        + " last_error AS lastError, heartbeat_at AS heartbeatAt, created_by AS createdBy,"
-        + " updated_at AS updatedAt FROM "
+        + " last_error AS lastError, heartbeat_at AS heartbeatAt,"
+        + " manifests_total AS manifestsTotal, manifests_done AS manifestsDone,"
+        + " created_by AS createdBy, updated_at AS updatedAt FROM "
         + TABLE_NAME
         + " WHERE state = 'PENDING'"
         + " OR (state = 'RUNNING' AND heartbeat_at < #{heartbeatExpiry})"
@@ -144,14 +148,35 @@ public class IcebergCleanupJobBaseSQLProvider {
    * @param id job id
    * @param lastHeartbeat previous heartbeat value the caller wrote (compare-and-swap key)
    * @param now new heartbeat value
+   * @param manifestsTotal advisory manifest total, or {@code null} to preserve the current value
+   * @param manifestsDone advisory completed manifest count, or {@code null} to preserve the current
+   *     value
    * @return the heartbeat UPDATE statement
    */
   public String heartbeat(
-      @Param("id") long id, @Param("lastHeartbeat") long lastHeartbeat, @Param("now") long now) {
+      @Param("id") long id,
+      @Param("lastHeartbeat") long lastHeartbeat,
+      @Param("now") long now,
+      @Param("manifestsTotal") @Nullable Long manifestsTotal,
+      @Param("manifestsDone") @Nullable Long manifestsDone) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET heartbeat_at = #{now}, updated_at = #{now}"
+        + " SET heartbeat_at = #{now}, updated_at = #{now},"
+        + " manifests_total = COALESCE(#{manifestsTotal}, manifests_total),"
+        + " manifests_done = COALESCE(#{manifestsDone}, manifests_done)"
         + " WHERE id = #{id} AND state = 'RUNNING' AND heartbeat_at = #{lastHeartbeat}";
+  }
+
+  /**
+   * @param id job id
+   * @return the safe status SELECT statement
+   */
+  public String selectStatus(@Param("id") long id) {
+    return "SELECT id, state, attempts,"
+        + " manifests_total AS manifestsTotal, manifests_done AS manifestsDone,"
+        + " updated_at AS updatedAt FROM "
+        + TABLE_NAME
+        + " WHERE id = #{id}";
   }
 
   /**
@@ -180,7 +205,11 @@ public class IcebergCleanupJobBaseSQLProvider {
   public String deleteFinishedJobsByLegacyTimeline(@Param("legacyTimeline") long legacyTimeline) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE state IN ('SUCCEEDED', 'FAILED') AND updated_at < #{legacyTimeline}";
+        + " WHERE state IN ('SUCCEEDED', 'FAILED') AND updated_at < #{legacyTimeline}"
+        + " AND (deletion_id IS NULL OR NOT EXISTS (SELECT 1 FROM entity_deletion d"
+        + " WHERE d.deletion_id = "
+        + TABLE_NAME
+        + ".deletion_id))";
   }
 
   /**

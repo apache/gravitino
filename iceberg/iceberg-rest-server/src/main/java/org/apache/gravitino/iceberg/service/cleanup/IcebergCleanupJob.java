@@ -21,6 +21,8 @@ package org.apache.gravitino.iceberg.service.cleanup;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.Objects;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
@@ -59,6 +61,8 @@ public class IcebergCleanupJob {
   }
 
   private final long id;
+  @Nullable private final Long tableId;
+  @Nullable private final String deletionId;
   private final long catalogId;
   private final String namespace;
   private final String tableName;
@@ -88,7 +92,76 @@ public class IcebergCleanupJob {
       String fileIOImpl,
       Map<String, String> fileIOProperties,
       String createdBy) {
+    this(
+        id,
+        null,
+        null,
+        catalogId,
+        namespace,
+        tableName,
+        metadataLocation,
+        fileIOImpl,
+        fileIOProperties,
+        createdBy);
+  }
+
+  /**
+   * Creates a cleanup job linked to one retained table-deletion generation.
+   *
+   * <p>The immutable identifiers let terminal cleanup verify and consume exactly the retained table
+   * row and deletion action that produced this job. Legacy immediate-purge jobs use the existing
+   * constructor and leave both identifiers {@code null}.
+   *
+   * @param id row id, or {@code 0} before persistence
+   * @param tableId immutable id of the retained table row
+   * @param deletionId opaque deletion-generation identifier
+   * @param catalogId globally unique id of the owning catalog; stable across catalog rename
+   * @param namespace table namespace (dotted)
+   * @param tableName table name
+   * @param metadataLocation the dropped table's {@code metadata.json} location
+   * @param fileIOImpl FileIO implementation class to reconstruct in the worker
+   * @param fileIOProperties properties to reconstruct the FileIO, snapshotted at enqueue
+   * @param createdBy principal that requested the drop
+   * @return a cleanup job linked to the retained deletion
+   */
+  public static IcebergCleanupJob forRetainedDeletion(
+      long id,
+      long tableId,
+      String deletionId,
+      long catalogId,
+      String namespace,
+      String tableName,
+      String metadataLocation,
+      String fileIOImpl,
+      Map<String, String> fileIOProperties,
+      String createdBy) {
+    return new IcebergCleanupJob(
+        id,
+        tableId,
+        Objects.requireNonNull(deletionId, "deletionId must not be null"),
+        catalogId,
+        namespace,
+        tableName,
+        metadataLocation,
+        fileIOImpl,
+        fileIOProperties,
+        createdBy);
+  }
+
+  private IcebergCleanupJob(
+      long id,
+      @Nullable Long tableId,
+      @Nullable String deletionId,
+      long catalogId,
+      String namespace,
+      String tableName,
+      String metadataLocation,
+      String fileIOImpl,
+      Map<String, String> fileIOProperties,
+      String createdBy) {
     this.id = id;
+    this.tableId = tableId;
+    this.deletionId = deletionId;
     this.catalogId = catalogId;
     this.namespace = namespace;
     this.tableName = tableName;

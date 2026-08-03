@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableCleanupContext;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
@@ -116,6 +117,27 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
     return loadTableInternal(identifier);
+  }
+
+  /**
+   * Loads a remote table once and snapshots its table-specific FileIO for asynchronous cleanup.
+   *
+   * @param tableIdentifier the table to snapshot
+   * @return immutable cleanup context for the table
+   */
+  @Override
+  public IcebergTableCleanupContext loadTableCleanupContext(TableIdentifier tableIdentifier) {
+    Table table = getCatalog().loadTable(tableIdentifier);
+    if (!(table instanceof BaseTable)) {
+      throw new IllegalStateException("Cannot snapshot cleanup context for a non-BaseTable");
+    }
+
+    BaseTable baseTable = (BaseTable) table;
+    FileIO fileIO = baseTable.io();
+    return new IcebergTableCleanupContext(
+        baseTable.operations().current().metadataFileLocation(),
+        fileIO.getClass().getName(),
+        retrieveFileIOProperties(fileIO));
   }
 
   @Override

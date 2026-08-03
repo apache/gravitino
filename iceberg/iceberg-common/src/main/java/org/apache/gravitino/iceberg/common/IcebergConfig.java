@@ -397,6 +397,28 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(720);
 
+  /** Whether Iceberg REST drops retain table metadata for UNDROP. */
+  public static final ConfigEntry<Boolean> SOFT_DELETE_ENABLED =
+      new ConfigBuilder("soft-delete.enabled")
+          .doc(
+              "Whether Iceberg REST table drops retain metadata for UNDROP. "
+                  + "This POC is available only when the REST service runs in auxiliary mode. "
+                  + "When disabled, both purgeRequested values keep their existing behavior.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  /** Retention duration captured on each Iceberg REST deletion action. */
+  public static final ConfigEntry<Long> SOFT_DELETE_RETENTION_MS =
+      new ConfigBuilder("soft-delete.retention-ms")
+          .doc("Iceberg REST soft-delete retention in milliseconds (0 to 90 days).")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .checkValue(
+              value -> value >= 0 && value <= 90L * 24 * 60 * 60 * 1000,
+              "The value must be between 0 and 90 days")
+          .createWithDefault(86_400_000L);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }

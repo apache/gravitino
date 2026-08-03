@@ -248,6 +248,18 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   /**
+   * Loads a table once and snapshots the information required by asynchronous cleanup.
+   *
+   * @param tableIdentifier the table to snapshot
+   * @return immutable cleanup context for the table
+   */
+  public IcebergTableCleanupContext loadTableCleanupContext(TableIdentifier tableIdentifier) {
+    BaseTable table = (BaseTable) getCatalog().loadTable(tableIdentifier);
+    return new IcebergTableCleanupContext(
+        table.operations().current().metadataFileLocation(), fileIOImpl(), fileIOProperties());
+  }
+
+  /**
    * Returns the FileIO implementation configured for this catalog.
    *
    * @return the {@code io-impl} class, or the Iceberg default when unset

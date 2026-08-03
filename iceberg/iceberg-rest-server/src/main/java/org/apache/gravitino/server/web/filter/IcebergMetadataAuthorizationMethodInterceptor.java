@@ -27,9 +27,6 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -132,6 +129,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
           case CREATE_NAMESPACE:
             return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
+          case MANAGE_TABLE_DELETION:
+            return Optional.of(new IcebergTableDeletionAuthzHandler(authExpr, parameters, args));
           default:
             break;
         }
@@ -152,29 +151,28 @@ public class IcebergMetadataAuthorizationMethodInterceptor
    */
   @Override
   protected boolean shouldSkipAuthorization(Map<EntityType, NameIdentifier> nameIdentifierMap) {
-    if (!IcebergRESTServerContext.getInstance().skipAuthorizationForRestBackend()) {
-      return false;
-    }
-
     NameIdentifier catalogId = nameIdentifierMap.get(EntityType.CATALOG);
     if (catalogId == null) {
       return false;
     }
+    return IcebergRESTServerContext.getInstance().shouldSkipAuthorization(catalogId.name());
+  }
 
-    IcebergCatalogWrapperManager wrapperManager =
-        IcebergRESTServerContext.getInstance().catalogWrapperManager();
-    if (wrapperManager == null) {
-      return false;
+  @Override
+  protected boolean shouldSkipAuthorization(
+      Method method,
+      Parameter[] parameters,
+      Object[] args,
+      Map<EntityType, NameIdentifier> nameIdentifierMap) {
+    for (Parameter parameter : parameters) {
+      IcebergAuthorizationMetadata metadata =
+          parameter.getAnnotation(IcebergAuthorizationMetadata.class);
+      if (metadata != null && metadata.type() == RequestType.MANAGE_TABLE_DELETION) {
+        // Retained-table DELETE and UNDROP mutate local relational state and are not forwarded to
+        // the configured REST backend. They therefore always require local authorization.
+        return false;
+      }
     }
-
-    IcebergCatalogWrapper catalogWrapper;
-    try {
-      catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
-    } catch (NoSuchCatalogException e) {
-      return false;
-    }
-    // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
-    // authorization. IRC2 handles authorization.
-    return catalogWrapper.isRESTCatalog();
+    return shouldSkipAuthorization(nameIdentifierMap);
   }
 }

@@ -114,6 +114,27 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
   }
 
   /**
+   * Hook for subclasses to make request-specific authorization delegation decisions.
+   *
+   * <p>The default preserves the identifier-only behavior. Subclasses may inspect method metadata
+   * when an operation is handled locally even though ordinary operations for the same catalog are
+   * delegated to a backend.
+   *
+   * @param method intercepted REST method
+   * @param parameters intercepted method parameters
+   * @param args intercepted method arguments
+   * @param nameIdentifierMap identifiers extracted from the request
+   * @return whether local authorization should be skipped
+   */
+  protected boolean shouldSkipAuthorization(
+      Method method,
+      Parameter[] parameters,
+      Object[] args,
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+    return shouldSkipAuthorization(nameIdentifierMap);
+  }
+
+  /**
    * Determine whether authorization is required and the rules via the authorization annotation ,
    * and obtain the metadata ID that requires authorization via the authorization annotation.
    *
@@ -133,7 +154,8 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         Object[] args = methodInvocation.getArguments();
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
             extractNameIdentifierFromParameters(parameters, args);
-        boolean skipStandardCheck = shouldSkipAuthorization(nameIdentifierMap);
+        boolean skipStandardCheck =
+            shouldSkipAuthorization(method, parameters, args, nameIdentifierMap);
 
         // Check if current user exists in the metalake.
         NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
