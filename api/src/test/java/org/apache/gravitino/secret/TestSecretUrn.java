@@ -19,31 +19,45 @@
 
 package org.apache.gravitino.secret;
 
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
+
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestSecretUrn {
 
+  private static Map<String, String> attributes(String entityType, String entityId, String key) {
+    return Map.of(
+        ATTR_ENTITY_TYPE, entityType,
+        ATTR_ENTITY_ID, entityId,
+        ATTR_PROPERTY_KEY, key);
+  }
+
   @Test
   public void testBuildAndParseWriteThroughUrn() {
-    String urn = SecretUrn.buildWriteThrough("memory", "catalog", 42L, "jdbc-password");
-    Assertions.assertEquals("urn:gravitino-secret:memory:catalog:42:jdbc-password", urn);
+    SecretUrn urn =
+        SecretUrn.buildWriteThrough("memory", attributes("catalog", "42", "jdbc-password"));
+    Assertions.assertEquals("urn:gravitino-secret:memory:catalog:42:jdbc-password", urn.toString());
+    Assertions.assertEquals("memory", urn.providerName());
+    Assertions.assertEquals(List.of("catalog", "42", "jdbc-password"), urn.identifierSegments());
 
-    SecretUrn.ParsedUrn parsed = SecretUrn.parse(urn);
-    Assertions.assertEquals("memory", parsed.providerName());
-    Assertions.assertEquals("catalog:42:jdbc-password", parsed.identifier());
-    Assertions.assertEquals(
-        java.util.List.of("catalog", "42", "jdbc-password"), parsed.identifierSegments());
+    SecretUrn parsed = SecretUrn.parse(urn.toString());
+    Assertions.assertEquals(urn, parsed);
   }
 
   @Test
   public void testDottedPropertyKeyInUrn() {
-    String urn = SecretUrn.buildWriteThrough("local", "catalog", 1L, "authentication.password");
-    Assertions.assertEquals("urn:gravitino-secret:local:catalog:1:authentication.password", urn);
-    SecretUrn.ParsedUrn parsed = SecretUrn.parse(urn);
-    Assertions.assertEquals("local", parsed.providerName());
+    SecretUrn urn =
+        SecretUrn.buildWriteThrough("local", attributes("catalog", "1", "authentication.password"));
     Assertions.assertEquals(
-        java.util.List.of("catalog", "1", "authentication.password"), parsed.identifierSegments());
+        "urn:gravitino-secret:local:catalog:1:authentication.password", urn.toString());
+    Assertions.assertEquals("local", urn.providerName());
+    Assertions.assertEquals(
+        List.of("catalog", "1", "authentication.password"), urn.identifierSegments());
   }
 
   @Test
@@ -51,7 +65,12 @@ public class TestSecretUrn {
     Assertions.assertThrows(IllegalArgumentException.class, () -> SecretUrn.parse("not-a-urn"));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> SecretUrn.buildWriteThrough("memory", "catalog", 1L, "bad key"));
+        () -> SecretUrn.buildWriteThrough("memory", attributes("catalog", "1", "bad key")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SecretUrn.buildWriteThrough("memory", attributes("catalog", "abc", "password")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> SecretUrn.buildWriteThrough("memory", null));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> SecretUrn.validateSegment("bad/key"));
   }

@@ -19,6 +19,10 @@
 
 package org.apache.gravitino.secret;
 
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
+
 import java.util.Map;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.Assertions;
@@ -26,15 +30,21 @@ import org.junit.jupiter.api.Test;
 
 public class TestInMemorySecretsProvider {
 
+  private static Map<String, String> writeAttributes() {
+    return Map.of(
+        ATTR_ENTITY_TYPE, "catalog",
+        ATTR_ENTITY_ID, "10",
+        ATTR_PROPERTY_KEY, "password");
+  }
+
   @Test
   public void testWriteReadDelete() {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
     Assertions.assertEquals("memory", provider.type());
 
     provider.initialize("memory", Map.of());
-    SecretWriteContext context = new SecretWriteContext("memory", "catalog", 10L, "password");
-    String urn = provider.writeSecret("s3cr3t", context);
-    Assertions.assertEquals("urn:gravitino-secret:memory:catalog:10:password", urn);
+    SecretUrn urn = provider.writeSecret("s3cr3t", writeAttributes());
+    Assertions.assertEquals("urn:gravitino-secret:memory:catalog:10:password", urn.toString());
     Assertions.assertEquals("s3cr3t", provider.readSecret(urn));
 
     provider.deleteSecret(urn);
@@ -45,19 +55,34 @@ public class TestInMemorySecretsProvider {
   @Test
   public void testWriteSecretRejectsNullArguments() {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
-    SecretWriteContext context = new SecretWriteContext("memory", "catalog", 10L, "password");
+    provider.initialize("memory", Map.of());
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> provider.writeSecret(null, context));
+        IllegalArgumentException.class, () -> provider.writeSecret(null, writeAttributes()));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> provider.writeSecret("s3cr3t", null));
+  }
+
+  @Test
+  public void testWriteSecretRejectsMissingAttributes() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.writeSecret("s3cr3t", Map.of()));
+  }
+
+  @Test
+  public void testReadDeleteRejectNullUrn() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> provider.deleteSecret(null));
   }
 
   @Test
   public void testCloseClearsStoredSecrets() {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
     provider.initialize("memory", Map.of());
-    SecretWriteContext context = new SecretWriteContext("memory", "catalog", 10L, "password");
-    String urn = provider.writeSecret("s3cr3t", context);
+    SecretUrn urn = provider.writeSecret("s3cr3t", writeAttributes());
     Assertions.assertEquals("s3cr3t", provider.readSecret(urn));
 
     provider.close();

@@ -28,5 +28,14 @@ public final class SecretConstants {
   /** Prefix for Gravitino secret URNs. */
   public static final String URN_PREFIX = "urn:gravitino-secret:";
 
+  /** Write attribute: entity type ({@code catalog}, {@code schema}, or {@code fileset}). */
+  public static final String ATTR_ENTITY_TYPE = "entityType";
+
+  /** Write attribute: stable numeric entity id. */
+  public static final String ATTR_ENTITY_ID = "entityId";
+
+  /** Write attribute: entity property key that holds the secret. */
+  public static final String ATTR_PROPERTY_KEY = "propertyKey";
+
   private SecretConstants() {}
 }

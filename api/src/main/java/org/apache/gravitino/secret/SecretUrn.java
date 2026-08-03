@@ -19,108 +19,95 @@
 
 package org.apache.gravitino.secret;
 
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Helpers for building and parsing Gravitino secret URNs. */
+/**
+ * Value object for a Gravitino secret URN of the form {@code
+ * urn:gravitino-secret:<providerName>:<identifier-segments...>}.
+ */
 @DeveloperApi
 public final class SecretUrn {
 
   // Allow '.' so dotted property keys (e.g. authentication.password) can appear in URNs.
   private static final Pattern SEGMENT_PATTERN = Pattern.compile("[a-zA-Z0-9._-]+");
 
-  /** Parsed representation of a Gravitino secret URN. */
-  public static final class ParsedUrn {
-    private final String providerName;
-    private final String identifier;
-    private final List<String> identifierSegments;
+  private final String providerName;
+  private final List<String> identifierSegments;
 
-    private ParsedUrn(String providerName, String identifier, List<String> identifierSegments) {
-      this.providerName = providerName;
-      this.identifier = identifier;
-      this.identifierSegments = identifierSegments;
-    }
-
-    /**
-     * Returns the provider name from the URN.
-     *
-     * @return the provider name
-     */
-    public String providerName() {
-      return providerName;
-    }
-
-    /**
-     * Returns the type-specific identifier portion of the URN.
-     *
-     * @return the identifier
-     */
-    public String identifier() {
-      return identifier;
-    }
-
-    /**
-     * Returns the identifier split into colon-separated segments.
-     *
-     * @return the identifier segments
-     */
-    public List<String> identifierSegments() {
-      return identifierSegments;
-    }
-
-    @Override
-    public boolean equals(Object other) {
-      if (this == other) {
-        return true;
-      }
-      if (!(other instanceof ParsedUrn)) {
-        return false;
-      }
-      ParsedUrn that = (ParsedUrn) other;
-      return Objects.equals(providerName, that.providerName)
-          && Objects.equals(identifier, that.identifier);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(providerName, identifier);
-    }
+  private SecretUrn(String providerName, List<String> identifierSegments) {
+    this.providerName = providerName;
+    this.identifierSegments = identifierSegments;
   }
 
-  private SecretUrn() {}
+  /**
+   * Returns the provider name from the URN.
+   *
+   * @return the provider name
+   */
+  public String providerName() {
+    return providerName;
+  }
 
   /**
-   * Builds a write-through URN for an entity property secret.
+   * Returns the type-specific identifier split into colon-separated segments.
+   *
+   * @return the identifier segments
+   */
+  public List<String> identifierSegments() {
+    return identifierSegments;
+  }
+
+  /**
+   * Builds a write-through secret URN for an entity property secret.
+   *
+   * <p>Required attributes: {@link SecretConstants#ATTR_ENTITY_TYPE}, {@link
+   * SecretConstants#ATTR_ENTITY_ID}, and {@link SecretConstants#ATTR_PROPERTY_KEY}.
    *
    * @param providerName the configured provider name
-   * @param entityType the entity type
-   * @param entityId the entity identifier
-   * @param propertyKey the property key
-   * @return the write-through URN
+   * @param attributes write-through attributes
+   * @return the write-through secret URN
    */
-  public static String buildWriteThrough(
-      String providerName, String entityType, long entityId, String propertyKey) {
+  public static SecretUrn buildWriteThrough(String providerName, Map<String, String> attributes) {
+    if (attributes == null) {
+      throw new IllegalArgumentException("attributes must not be null");
+    }
+    String entityType = requiredAttribute(attributes, ATTR_ENTITY_TYPE);
+    String entityId = requiredAttribute(attributes, ATTR_ENTITY_ID);
+    String propertyKey = requiredAttribute(attributes, ATTR_PROPERTY_KEY);
+    try {
+      Long.parseLong(entityId);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "attributes." + ATTR_ENTITY_ID + " must be a numeric entity id: " + entityId, e);
+    }
     validateSegment(providerName);
     validateSegment(entityType);
-    validateSegment(String.valueOf(entityId));
+    validateSegment(entityId);
     validateSegment(propertyKey);
-    return URN_PREFIX + providerName + ":" + entityType + ":" + entityId + ":" + propertyKey;
+    return new SecretUrn(
+        providerName,
+        Collections.unmodifiableList(Arrays.asList(entityType, entityId, propertyKey)));
   }
 
   /**
-   * Parses a Gravitino secret URN.
+   * Parses a Gravitino secret URN string.
    *
-   * @param urn the secret URN
-   * @return the parsed URN
+   * @param urn the secret URN string
+   * @return the parsed secret URN
    */
-  public static ParsedUrn parse(String urn) {
+  public static SecretUrn parse(String urn) {
     if (!StringUtils.startsWith(urn, URN_PREFIX)) {
       throw new IllegalArgumentException("Invalid Gravitino secret URN: " + urn);
     }
@@ -140,10 +127,7 @@ public final class SecretUrn {
     }
 
     String[] identifierParts = Arrays.copyOfRange(segments, 1, segments.length);
-    String providerName = segments[0];
-    String identifier = StringUtils.join(identifierParts, ':');
-    List<String> identifierSegments = Collections.unmodifiableList(Arrays.asList(identifierParts));
-    return new ParsedUrn(providerName, identifier, identifierSegments);
+    return new SecretUrn(segments[0], Collections.unmodifiableList(Arrays.asList(identifierParts)));
   }
 
   /**
@@ -155,5 +139,36 @@ public final class SecretUrn {
     if (StringUtils.isEmpty(segment) || !SEGMENT_PATTERN.matcher(segment).matches()) {
       throw new IllegalArgumentException("Invalid URN segment: " + segment);
     }
+  }
+
+  private static String requiredAttribute(Map<String, String> attributes, String key) {
+    String value = attributes.get(key);
+    if (StringUtils.isBlank(value)) {
+      throw new IllegalArgumentException("attributes." + key + " must not be blank");
+    }
+    return value;
+  }
+
+  @Override
+  public String toString() {
+    return URN_PREFIX + providerName + ":" + String.join(":", identifierSegments);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (!(other instanceof SecretUrn)) {
+      return false;
+    }
+    SecretUrn that = (SecretUrn) other;
+    return Objects.equals(providerName, that.providerName)
+        && Objects.equals(identifierSegments, that.identifierSegments);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(providerName, identifierSegments);
   }
 }

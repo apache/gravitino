@@ -23,9 +23,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.gravitino.secret.GravitinoSecretProvider;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretUrn;
-import org.apache.gravitino.secret.SecretWriteContext;
 
 /**
  * In-memory secret provider for development and unit tests only.
@@ -37,13 +37,17 @@ import org.apache.gravitino.secret.SecretWriteContext;
  * {@code byte[]}/{@code char[]} and explicitly zero them on delete/close. Do not use this provider
  * in production.
  */
-public class InMemorySecretsProvider implements GravitinoSecretProvider {
+public class InMemorySecretsProvider implements SecretProvider {
 
   private final ConcurrentHashMap<String, String> secrets = new ConcurrentHashMap<>();
+  private String providerName;
 
   @Override
   public void initialize(String name, Map<String, String> config) {
-    // No configuration required for the in-memory provider.
+    if (StringUtils.isBlank(name)) {
+      throw new IllegalArgumentException("provider name must not be blank");
+    }
+    this.providerName = name;
   }
 
   @Override
@@ -52,27 +56,27 @@ public class InMemorySecretsProvider implements GravitinoSecretProvider {
   }
 
   @Override
-  public String writeSecret(String plaintext, SecretWriteContext context) {
+  public SecretUrn writeSecret(String plaintext, Map<String, String> attributes) {
     if (plaintext == null) {
       throw new IllegalArgumentException("plaintext must not be null");
     }
-    if (context == null) {
-      throw new IllegalArgumentException("context must not be null");
+    if (providerName == null) {
+      throw new IllegalStateException("InMemorySecretsProvider is not initialized");
     }
-    String urn =
-        SecretUrn.buildWriteThrough(
-            context.providerName(),
-            context.entityType(),
-            context.entityId(),
-            context.propertyKey());
+
+    SecretUrn urn = SecretUrn.buildWriteThrough(providerName, attributes);
     secrets.put(
-        urn, Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8)));
+        urn.toString(),
+        Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8)));
     return urn;
   }
 
   @Override
-  public String readSecret(String urn) {
-    String encoded = secrets.get(urn);
+  public String readSecret(SecretUrn urn) {
+    if (urn == null) {
+      throw new IllegalArgumentException("urn must not be null");
+    }
+    String encoded = secrets.get(urn.toString());
     if (encoded == null) {
       throw new IllegalArgumentException("Secret not found for URN: " + urn);
     }
@@ -80,8 +84,11 @@ public class InMemorySecretsProvider implements GravitinoSecretProvider {
   }
 
   @Override
-  public void deleteSecret(String urn) {
-    secrets.remove(urn);
+  public void deleteSecret(SecretUrn urn) {
+    if (urn == null) {
+      throw new IllegalArgumentException("urn must not be null");
+    }
+    secrets.remove(urn.toString());
   }
 
   @Override

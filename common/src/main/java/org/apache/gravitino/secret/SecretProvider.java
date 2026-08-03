@@ -22,9 +22,9 @@ package org.apache.gravitino.secret;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Service provider interface for Gravitino secret backends. */
+/** Service provider interface for secret backends. */
 @DeveloperApi
-public interface GravitinoSecretProvider {
+public interface SecretProvider {
 
   /**
    * Initializes this provider after construction.
@@ -48,11 +48,16 @@ public interface GravitinoSecretProvider {
   /**
    * Writes a plaintext secret and returns its URN.
    *
+   * <p>Provider-specific write metadata is supplied as {@code attributes}. Required keys depend on
+   * the provider implementation; for example the in-memory write-through provider expects {@link
+   * SecretConstants#ATTR_ENTITY_TYPE}, {@link SecretConstants#ATTR_ENTITY_ID}, and {@link
+   * SecretConstants#ATTR_PROPERTY_KEY}.
+   *
    * @param plaintext the secret plaintext
-   * @param context the write context
+   * @param attributes provider-specific write attributes
    * @return the secret URN
    */
-  String writeSecret(String plaintext, SecretWriteContext context);
+  SecretUrn writeSecret(String plaintext, Map<String, String> attributes);
 
   /**
    * Reads a secret by URN.
@@ -60,14 +65,14 @@ public interface GravitinoSecretProvider {
    * @param urn the secret URN
    * @return the secret plaintext
    */
-  String readSecret(String urn);
+  String readSecret(SecretUrn urn);
 
   /**
    * Deletes a secret by URN.
    *
    * @param urn the secret URN
    */
-  void deleteSecret(String urn);
+  void deleteSecret(SecretUrn urn);
 
   /**
    * Releases resources owned by this provider.

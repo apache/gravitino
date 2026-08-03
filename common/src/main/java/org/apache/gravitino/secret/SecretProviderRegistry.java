@@ -38,8 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Loads and owns named {@link GravitinoSecretProvider} instances from server configuration for the
- * process lifetime (owned by {@code GravitinoEnv}, analogous to the KMS client registry).
+ * Loads and owns named {@link SecretProvider} instances from server configuration for the process
+ * lifetime (owned by {@code GravitinoEnv}, analogous to the KMS client registry).
  *
  * <p>Configuration shape:
  *
@@ -60,7 +60,7 @@ public final class SecretProviderRegistry implements AutoCloseable {
   /** Prefix for per-provider settings: {@code gravitino.secret.provider.<name>.}. */
   public static final String GRAVITINO_SECRET_PROVIDER_PREFIX = "gravitino.secret.provider.";
 
-  /** Fully qualified {@link GravitinoSecretProvider} implementation class. */
+  /** Fully qualified {@link SecretProvider} implementation class. */
   public static final String CLASS_NAME = "className";
 
   /** Optional non-secret provider endpoint exposed by the discovery API. */
@@ -69,7 +69,7 @@ public final class SecretProviderRegistry implements AutoCloseable {
   private static final Splitter COMMA_SPLITTER = Splitter.on(',').omitEmptyStrings().trimResults();
   private static final Pattern PROVIDER_NAME_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
 
-  private final Map<String, GravitinoSecretProvider> providers;
+  private final Map<String, SecretProvider> providers;
   private final List<SecretProviderInfo> providerInfos;
   private volatile boolean closed;
 
@@ -82,7 +82,7 @@ public final class SecretProviderRegistry implements AutoCloseable {
    */
   public SecretProviderRegistry(Config config) {
     Preconditions.checkArgument(config != null, "config must not be null");
-    Map<String, GravitinoSecretProvider> loaded = new LinkedHashMap<>();
+    Map<String, SecretProvider> loaded = new LinkedHashMap<>();
     List<SecretProviderInfo> infos = new ArrayList<>();
     try {
       for (String name : parseProviderNames(config.getRawString(GRAVITINO_SECRET_PROVIDERS, ""))) {
@@ -116,10 +116,10 @@ public final class SecretProviderRegistry implements AutoCloseable {
    * @throws IllegalArgumentException if the name is unknown
    * @throws IllegalStateException if the registry is closed
    */
-  public GravitinoSecretProvider getProvider(String name) {
+  public SecretProvider getProvider(String name) {
     checkOpen();
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be blank");
-    GravitinoSecretProvider provider = providers.get(name);
+    SecretProvider provider = providers.get(name);
     Preconditions.checkArgument(provider != null, "Unknown secret provider '%s'", name);
     return provider;
   }
@@ -188,7 +188,7 @@ public final class SecretProviderRegistry implements AutoCloseable {
     providerConfig.remove(CLASS_NAME);
     String uri = blankToNull(providerConfig.get(URI));
 
-    GravitinoSecretProvider provider = instantiate(name, className);
+    SecretProvider provider = instantiate(name, className);
     try {
       provider.initialize(name, ImmutableMap.copyOf(providerConfig));
     } catch (RuntimeException e) {
@@ -207,23 +207,23 @@ public final class SecretProviderRegistry implements AutoCloseable {
     return new LoadedProvider(provider, new SecretProviderInfo(name, type, uri));
   }
 
-  private static GravitinoSecretProvider instantiate(String name, String className) {
+  private static SecretProvider instantiate(String name, String className) {
     try {
       Object instance = Class.forName(className).getDeclaredConstructor().newInstance();
       Preconditions.checkArgument(
-          instance instanceof GravitinoSecretProvider,
-          "Secret provider '%s' className '%s' does not implement GravitinoSecretProvider",
+          instance instanceof SecretProvider,
+          "Secret provider '%s' className '%s' does not implement SecretProvider",
           name,
           className);
-      return (GravitinoSecretProvider) instance;
+      return (SecretProvider) instance;
     } catch (ReflectiveOperationException e) {
       throw new IllegalStateException(
           String.format("Failed to load secret provider '%s' (%s)", name, className), e);
     }
   }
 
-  private static void closeQuietly(Iterable<GravitinoSecretProvider> providers) {
-    for (GravitinoSecretProvider provider : providers) {
+  private static void closeQuietly(Iterable<SecretProvider> providers) {
+    for (SecretProvider provider : providers) {
       try {
         provider.close();
       } catch (RuntimeException e) {
@@ -237,10 +237,10 @@ public final class SecretProviderRegistry implements AutoCloseable {
   }
 
   private static final class LoadedProvider {
-    private final GravitinoSecretProvider provider;
+    private final SecretProvider provider;
     private final SecretProviderInfo info;
 
-    private LoadedProvider(GravitinoSecretProvider provider, SecretProviderInfo info) {
+    private LoadedProvider(SecretProvider provider, SecretProviderInfo info) {
       this.provider = provider;
       this.info = info;
     }

@@ -39,7 +39,7 @@ public final class SecretProviderInfo {
    * Creates provider metadata.
    *
    * @param name the configured provider instance name
-   * @param type the provider type identifier from {@link GravitinoSecretProvider#type()}
+   * @param type the provider type identifier from {@link SecretProvider#type()}
    * @param uri optional non-secret provider endpoint; may be {@code null}
    */
   @JsonCreator
