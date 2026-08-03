@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper.OWN
 import static org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper.STATISTIC_META_TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME;
 
 import com.google.common.base.Preconditions;
@@ -90,7 +91,17 @@ public class OrphanedMetadataObjectRelationSQLProvider {
         + entityTable
         + " entity WHERE entity."
         + entityIdColumn
-        + " = rel.metadata_object_id AND entity.deleted_at = 0)"
+        + " = rel.metadata_object_id AND "
+        + liveEntityPredicate(entityTable)
+        + ")"
         + " LIMIT #{limit}) orphan_ids)";
+  }
+
+  private static String liveEntityPredicate(String entityTable) {
+    // Retained tables are hidden from ordinary metadata reads but remain referentially present for
+    // UNDROP. Their relations must survive until the exact deletion generation is purged.
+    return TABLE_NAME.equals(entityTable)
+        ? "(entity.deleted_at = 0 OR entity.deletion_id IS NOT NULL)"
+        : "entity.deleted_at = 0";
   }
 }

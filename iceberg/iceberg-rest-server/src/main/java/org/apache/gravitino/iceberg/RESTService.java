@@ -36,6 +36,10 @@ import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergDeletionPurgeStore;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergRetainedDeletionPurgeCoordinator;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergRetainedDeletionRegistrationCleaner;
+import org.apache.gravitino.iceberg.service.deletion.IcebergTableDeletionLifecycle;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceHookDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
@@ -83,6 +87,7 @@ public class RESTService implements GravitinoAuxiliaryService {
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
   private Optional<IcebergCleanupManager> cleanupManager;
+  private IcebergTableDeletionLifecycle deletionLifecycle;
   private IcebergConfigProvider configProvider;
   private boolean auxMode;
 
@@ -125,17 +130,45 @@ public class RESTService implements GravitinoAuxiliaryService {
             auxMode,
             skipAuthorizationForRestBackend,
             icebergCatalogWrapperManager);
+    this.deletionLifecycle = new IcebergTableDeletionLifecycle(icebergConfig, auxMode);
+    // The feature flag controls creation and collection of new retained deletions. Existing V2
+    // generations must remain hidden and name-reserved after the flag is disabled, so auxiliary
+    // operation dispatchers always receive the read side of the lifecycle.
+    Optional<IcebergTableDeletionLifecycle> deletionLifecycleForOperations =
+        auxMode ? Optional.of(deletionLifecycle) : Optional.empty();
+    if (!auxMode && icebergConfig.get(IcebergConfig.SOFT_DELETE_ENABLED)) {
+      LOG.warn(
+          "Iceberg REST soft delete is currently supported only in auxiliary mode; "
+              + "the standalone service will keep legacy DELETE behavior.");
+    }
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     if (auxMode) {
       // Async cleanup reuses the entity store's shared relational backend (connection pool +
       // per-backend SQL), which is only available when running embedded in the Gravitino server
       // (auxiliary mode). In standalone mode the cleanup manager stays empty and purge requests
       // fall back to synchronous purge.
+      IcebergCleanupJobStore cleanupJobStore =
+          new IcebergCleanupJobStore(GravitinoEnv.getInstance().idGenerator());
+      IcebergRetainedDeletionRegistrationCleaner registrationCleaner =
+          new IcebergRetainedDeletionRegistrationCleaner(
+              cleanupJobStore, icebergCatalogWrapperManager);
+      IcebergRetainedDeletionPurgeCoordinator retainedDeletionCoordinator = null;
+      if (icebergConfig.get(IcebergConfig.SOFT_DELETE_ENABLED)) {
+        retainedDeletionCoordinator =
+            new IcebergRetainedDeletionPurgeCoordinator(
+                cleanupJobStore,
+                new IcebergDeletionPurgeStore(cleanupJobStore),
+                icebergCatalogWrapperManager,
+                icebergConfig.get(IcebergConfig.ASYNC_CLEANUP_MAX_INFLIGHT_JOBS),
+                icebergConfig.get(IcebergConfig.ASYNC_CLEANUP_ENQUEUE_BATCH_SIZE));
+      }
       this.cleanupManager =
           Optional.of(
               new IcebergCleanupManager(
-                  new IcebergCleanupJobStore(GravitinoEnv.getInstance().idGenerator()),
-                  icebergConfig));
+                  cleanupJobStore,
+                  icebergConfig,
+                  registrationCleaner,
+                  retainedDeletionCoordinator));
     } else {
       this.cleanupManager = Optional.empty();
       LOG.info(
@@ -146,11 +179,13 @@ public class RESTService implements GravitinoAuxiliaryService {
     // The raw namespace operation executor is shared with the table and view hook dispatchers so
     // their orphan-schema cleanup can probe namespace existence without firing namespace events.
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
-        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
+        new IcebergNamespaceOperationExecutor(
+            icebergCatalogWrapperManager, cleanupManager, deletionLifecycleForOperations);
 
     // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
-        new IcebergTableOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
+        new IcebergTableOperationExecutor(
+            icebergCatalogWrapperManager, cleanupManager, deletionLifecycleForOperations);
     IcebergTableOperationDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {
@@ -192,6 +227,7 @@ public class RESTService implements GravitinoAuxiliaryService {
             }
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
+            bind(deletionLifecycle).to(IcebergTableDeletionLifecycle.class).ranked(1);
             cleanupManager.ifPresent(
                 manager -> bind(manager).to(IcebergCleanupManager.class).ranked(1));
             bind(icebergTableDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
@@ -255,16 +291,18 @@ public class RESTService implements GravitinoAuxiliaryService {
       server.stop();
       LOG.info("Iceberg REST service stopped");
     }
-    if (configProvider != null) {
-      configProvider.close();
-    }
+    // Stop collectors and workers before closing the catalog wrappers they use for registration
+    // removal and cleanup-context discovery.
+    cleanupManager.ifPresent(IcebergCleanupManager::close);
     if (icebergCatalogWrapperManager != null) {
       icebergCatalogWrapperManager.close();
+    }
+    if (configProvider != null) {
+      configProvider.close();
     }
     if (icebergMetricsManager != null) {
       icebergMetricsManager.close();
     }
-    cleanupManager.ifPresent(IcebergCleanupManager::close);
   }
 
   public void join() {

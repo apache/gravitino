@@ -22,6 +22,8 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
@@ -33,6 +35,7 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJob;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
+import org.apache.gravitino.iceberg.service.deletion.IcebergTableDeletionLifecycle;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -40,6 +43,8 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -57,17 +62,34 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
   private final IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private final Optional<IcebergCleanupManager> cleanupManager;
+  private final Optional<IcebergTableDeletionLifecycle> deletionLifecycle;
 
   public IcebergTableOperationExecutor(
       IcebergCatalogWrapperManager icebergCatalogWrapperManager,
       Optional<IcebergCleanupManager> cleanupManager) {
+    this(icebergCatalogWrapperManager, cleanupManager, Optional.empty());
+  }
+
+  /**
+   * Creates a table operation executor with optional legacy cleanup and deletion lifecycle support.
+   *
+   * @param icebergCatalogWrapperManager Iceberg catalog wrapper manager
+   * @param cleanupManager optional legacy cleanup manager
+   * @param deletionLifecycle optional relational table deletion lifecycle
+   */
+  public IcebergTableOperationExecutor(
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager,
+      Optional<IcebergCleanupManager> cleanupManager,
+      Optional<IcebergTableDeletionLifecycle> deletionLifecycle) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
     this.cleanupManager = cleanupManager;
+    this.deletionLifecycle = deletionLifecycle;
   }
 
   @Override
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
+    rejectReservedName(context, TableIdentifier.of(namespace, createTableRequest.name()), true);
     IcebergCleanupHelper.rejectIfBeingPurged(
         cleanupManager, context.catalogName(), namespace, createTableRequest.name());
 
@@ -113,6 +135,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
+    rejectReservedName(context, tableIdentifier, false);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .updateTable(tableIdentifier, updateTableRequest);
@@ -121,6 +144,14 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
+    if (managesDeletionLifecycle(context, purgeRequested)) {
+      deletionLifecycle.get().delete(context, tableIdentifier, purgeRequested);
+      return;
+    }
+    // Disabling soft delete stops creating and collecting retained deletions, but existing
+    // generations must remain hidden and reserved until the feature is re-enabled or their
+    // already-linked cleanup job finishes.
+    rejectReservedName(context, tableIdentifier, false);
     IcebergCatalogWrapper wrapper =
         icebergCatalogWrapperManager.getCatalogWrapper(context.catalogName());
     if (!purgeRequested) {
@@ -159,8 +190,14 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   }
 
   @Override
+  public boolean managesDeletionLifecycle(IcebergRequestContext context, boolean purgeRequested) {
+    return deletionLifecycle.map(lifecycle -> lifecycle.manages(purgeRequested)).orElse(false);
+  }
+
+  @Override
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    rejectReservedName(context, tableIdentifier, false);
     CredentialPrivilege privilege = CredentialPrivilege.READ;
     if (context.requestCredentialVending()) {
       privilege = getCredentialPrivilege(context, tableIdentifier);
@@ -173,13 +210,29 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
   @Override
   public ListTablesResponse listTable(IcebergRequestContext context, Namespace namespace) {
-    return icebergCatalogWrapperManager
-        .getCatalogWrapper(context.catalogName())
-        .listTable(namespace);
+    ListTablesResponse response =
+        icebergCatalogWrapperManager.getCatalogWrapper(context.catalogName()).listTable(namespace);
+    if (deletionLifecycle.isEmpty()) {
+      return response;
+    }
+    Set<String> reservedNames =
+        deletionLifecycle.get().reservedTableNames(context.catalogName(), namespace);
+    if (reservedNames.isEmpty()) {
+      return response;
+    }
+    return ListTablesResponse.builder()
+        .addAll(
+            response.identifiers().stream()
+                .filter(identifier -> !reservedNames.contains(identifier.name()))
+                .collect(Collectors.toList()))
+        .build();
   }
 
   @Override
   public boolean tableExists(IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    if (isReserved(context, tableIdentifier)) {
+      return false;
+    }
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .tableExists(tableIdentifier);
@@ -187,6 +240,8 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
+    rejectReservedName(context, renameTableRequest.source(), false);
+    rejectReservedName(context, renameTableRequest.destination(), true);
     icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .renameTable(renameTableRequest);
@@ -195,6 +250,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public LoadCredentialsResponse getTableCredentials(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    rejectReservedName(context, tableIdentifier, false);
     CredentialPrivilege privilege = getCredentialPrivilege(context, tableIdentifier);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
@@ -222,6 +278,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest) {
+    rejectReservedName(context, tableIdentifier, false);
     CredentialPrivilege privilege = CredentialPrivilege.READ;
     if (context.requestCredentialVending()) {
       privilege = getCredentialPrivilege(context, tableIdentifier);
@@ -234,8 +291,28 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public Optional<String> getTableMetadataLocation(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    if (isReserved(context, tableIdentifier)) {
+      return Optional.empty();
+    }
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .getTableMetadataLocation(tableIdentifier);
+  }
+
+  private boolean isReserved(IcebergRequestContext context, TableIdentifier tableIdentifier) {
+    return deletionLifecycle
+        .map(lifecycle -> lifecycle.isNameReserved(context.catalogName(), tableIdentifier))
+        .orElse(false);
+  }
+
+  private void rejectReservedName(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, boolean creation) {
+    if (!isReserved(context, tableIdentifier)) {
+      return;
+    }
+    if (creation) {
+      throw new AlreadyExistsException("Table already exists: %s", tableIdentifier);
+    }
+    throw new NoSuchTableException("Table does not exist: %s", tableIdentifier);
   }
 }

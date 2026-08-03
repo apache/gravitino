@@ -93,12 +93,46 @@ public class TestIcebergConfig {
   public void testAsyncCleanupDefaults() {
     IcebergConfig config = new IcebergConfig(ImmutableMap.of());
     Assertions.assertEquals(2, config.get(IcebergConfig.ASYNC_CLEANUP_WORKER_THREADS));
+    Assertions.assertEquals(100, config.get(IcebergConfig.ASYNC_CLEANUP_MAX_INFLIGHT_JOBS));
+    Assertions.assertEquals(20, config.get(IcebergConfig.ASYNC_CLEANUP_ENQUEUE_BATCH_SIZE));
     Assertions.assertEquals(4, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_THREADS));
     Assertions.assertEquals(1000, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_BATCH_SIZE));
     Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_POLL_INTERVAL_SECS));
     Assertions.assertEquals(300, config.get(IcebergConfig.ASYNC_CLEANUP_HEARTBEAT_TIMEOUT_SECS));
     Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_MAX_ATTEMPTS));
     Assertions.assertEquals(720, config.get(IcebergConfig.ASYNC_CLEANUP_RETENTION_HOURS));
+  }
+
+  @Test
+  public void testSoftDeleteDefaultsAndRange() {
+    IcebergConfig defaults = new IcebergConfig(ImmutableMap.of());
+    Assertions.assertFalse(defaults.get(IcebergConfig.SOFT_DELETE_ENABLED));
+    Assertions.assertEquals(86_400_000L, defaults.get(IcebergConfig.SOFT_DELETE_RETENTION_MS));
+
+    IcebergConfig zeroRetention =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConfig.SOFT_DELETE_ENABLED.getKey(),
+                "true",
+                IcebergConfig.SOFT_DELETE_RETENTION_MS.getKey(),
+                "0"));
+    Assertions.assertTrue(zeroRetention.get(IcebergConfig.SOFT_DELETE_ENABLED));
+    Assertions.assertEquals(0L, zeroRetention.get(IcebergConfig.SOFT_DELETE_RETENTION_MS));
+
+    IcebergConfig maximumRetention =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConfig.SOFT_DELETE_RETENTION_MS.getKey(),
+                String.valueOf(90L * 24 * 60 * 60 * 1000)));
+    Assertions.assertEquals(
+        90L * 24 * 60 * 60 * 1000, maximumRetention.get(IcebergConfig.SOFT_DELETE_RETENTION_MS));
+
+    IcebergConfig invalidRetention =
+        new IcebergConfig(
+            ImmutableMap.of(IcebergConfig.SOFT_DELETE_RETENTION_MS.getKey(), "7776000001"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> invalidRetention.get(IcebergConfig.SOFT_DELETE_RETENTION_MS));
   }
 
   @Test

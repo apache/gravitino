@@ -22,10 +22,12 @@ package org.apache.gravitino.iceberg.service.cleanup;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper;
 import org.apache.gravitino.iceberg.service.cleanup.mapper.provider.IcebergCleanupMapperPackageProvider;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.TableDeletionService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.session.Configuration;
@@ -77,17 +79,38 @@ public class IcebergCleanupJobStore {
   }
 
   /**
-   * Persists a new PENDING job.
+   * Persists a legacy immediate-cleanup job as PENDING.
    *
-   * @param job job to persist
+   * <p>A job linked to a retained deletion must be inserted through {@link
+   * IcebergDeletionPurgeStore#claimAndEnqueue} so job creation and {@code DELETED -> PURGING}
+   * ownership commit in one transaction.
+   *
+   * @param job unlinked legacy job to persist
    * @return generated id
    */
   public long addJob(IcebergCleanupJob job) {
-    long id = idGenerator.nextId();
+    if (job.tableId() != null || job.deletionId() != null) {
+      throw new IllegalArgumentException(
+          "Retained-deletion jobs must be enqueued through the atomic purge handoff");
+    }
+    long id = allocateJobId();
     long now = System.currentTimeMillis();
-    IcebergCleanupJobPO po = IcebergCleanupJobPO.fromCleanupJob(job, id, now);
-    SessionUtils.doWithCommit(IcebergCleanupJobMapper.class, mapper -> mapper.insertCleanupJob(po));
+    SessionUtils.doWithCommit(
+        IcebergCleanupJobMapper.class,
+        mapper -> mapper.insertCleanupJob(IcebergCleanupJobPO.fromCleanupJob(job, id, now)));
     return id;
+  }
+
+  /** Allocates an application-generated cleanup-job identifier. */
+  long allocateJobId() {
+    return idGenerator.nextId();
+  }
+
+  /** Inserts a preallocated PENDING job into the caller's transaction. */
+  void insertJobWithoutCommit(IcebergCleanupJob job, long id, long now) {
+    IcebergCleanupJobPO po = IcebergCleanupJobPO.fromCleanupJob(job, id, now);
+    SessionUtils.doWithoutCommit(
+        IcebergCleanupJobMapper.class, mapper -> mapper.insertCleanupJob(po));
   }
 
   /**
@@ -120,6 +143,19 @@ public class IcebergCleanupJobStore {
   }
 
   /**
+   * Returns the observed number of cleanup jobs still eligible for worker execution.
+   *
+   * <p>This count is advisory across multiple servers. Exact duplicate prevention remains the
+   * deletion-action claim transaction and unique deletion-generation job link.
+   *
+   * @return PENDING plus RUNNING cleanup jobs
+   */
+  public int countInflightJobs() {
+    return SessionUtils.getWithoutCommit(
+        IcebergCleanupJobMapper.class, IcebergCleanupJobMapper::countInflightJobs);
+  }
+
+  /**
    * Marks a RUNNING job SUCCEEDED, only if the caller still owns it.
    *
    * @param id job id
@@ -135,6 +171,37 @@ public class IcebergCleanupJobStore {
                 mapper.markFinished(
                     id, IcebergCleanupJob.State.SUCCEEDED.name(), null, now, heartbeat))
         > 0;
+  }
+
+  /**
+   * Atomically succeeds a linked cleanup job and consumes its exact retained relational generation.
+   *
+   * <p>The heartbeat compare-and-swap is the worker fence. Only the worker that still owns the
+   * RUNNING job may proceed to the action/table row locks and exact metadata deletes. A failure in
+   * either half rolls back both the job transition and every relational delete; the already
+   * completed external cleanup is safe to replay.
+   *
+   * @param job linked retained-deletion cleanup job
+   * @param heartbeat caller's current heartbeat ownership token
+   * @return {@code true} iff this worker still owned and finalized the job
+   */
+  public boolean finalizeRetainedDeletion(IcebergCleanupJob job, long heartbeat) {
+    if (job.tableId() == null || job.deletionId() == null) {
+      throw new IllegalArgumentException("Cleanup job is not linked to a retained deletion");
+    }
+    long now = System.currentTimeMillis();
+    return SessionUtils.doWithCommitAndFetchResult(
+        IcebergCleanupJobMapper.class,
+        mapper -> {
+          if (mapper.markFinished(
+                  job.id(), IcebergCleanupJob.State.SUCCEEDED.name(), null, now, heartbeat)
+              != 1) {
+            return false;
+          }
+          TableDeletionService.getInstance()
+              .finalizePurge(job.tableId(), job.deletionId(), Long.toString(job.id()));
+          return true;
+        });
   }
 
   /**
@@ -166,9 +233,66 @@ public class IcebergCleanupJobStore {
    * @return {@code true} iff the row was still owned by the caller
    */
   public boolean heartbeat(long id, long lastHeartbeat, long now) {
+    return heartbeat(id, lastHeartbeat, now, null, null);
+  }
+
+  /**
+   * Refreshes a heartbeat and advisory manifest progress with compare-and-swap ownership check.
+   *
+   * <p>The counters are observability only. They are not cleanup checkpoints and do not affect
+   * claims, retries, or completion.
+   *
+   * @param id job id
+   * @param lastHeartbeat previous heartbeat value
+   * @param now new heartbeat value
+   * @param manifestsTotal advisory number of manifests discovered
+   * @param manifestsDone advisory number of manifests processed
+   * @return {@code true} iff the row was still owned by the caller
+   */
+  public boolean heartbeat(
+      long id, long lastHeartbeat, long now, long manifestsTotal, long manifestsDone) {
+    if (manifestsTotal < 0 || manifestsDone < 0) {
+      throw new IllegalArgumentException("Manifest progress must not be negative");
+    }
+    if (manifestsDone > manifestsTotal) {
+      throw new IllegalArgumentException("Completed manifests must not exceed total manifests");
+    }
+    return heartbeat(
+        id, lastHeartbeat, now, Long.valueOf(manifestsTotal), Long.valueOf(manifestsDone));
+  }
+
+  private boolean heartbeat(
+      long id,
+      long lastHeartbeat,
+      long now,
+      @Nullable Long manifestsTotal,
+      @Nullable Long manifestsDone) {
     return SessionUtils.doWithCommitAndFetchResult(
-            IcebergCleanupJobMapper.class, mapper -> mapper.heartbeat(id, lastHeartbeat, now))
+            IcebergCleanupJobMapper.class,
+            mapper -> mapper.heartbeat(id, lastHeartbeat, now, manifestsTotal, manifestsDone))
         > 0;
+  }
+
+  /**
+   * Reads safe cleanup status and advisory manifest progress.
+   *
+   * @param id job id
+   * @return status, or empty if the job does not exist
+   */
+  public Optional<IcebergCleanupJobStatus> getStatus(long id) {
+    IcebergCleanupJobPO po =
+        SessionUtils.getWithoutCommit(
+            IcebergCleanupJobMapper.class, mapper -> mapper.selectStatus(id));
+    return po == null
+        ? Optional.empty()
+        : Optional.of(
+            new IcebergCleanupJobStatus(
+                po.getId(),
+                IcebergCleanupJob.State.valueOf(po.getState()),
+                po.getAttempts(),
+                po.getManifestsTotal(),
+                po.getManifestsDone(),
+                po.getUpdatedAt()));
   }
 
   /**

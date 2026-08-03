@@ -169,6 +169,11 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
   }
 
   @Override
+  public boolean managesDeletionLifecycle(IcebergRequestContext context, boolean purgeRequested) {
+    return icebergTableOperationDispatcher.managesDeletionLifecycle(context, purgeRequested);
+  }
+
+  @Override
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     NameIdentifier gravitinoNameIdentifier =

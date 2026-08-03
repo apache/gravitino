@@ -78,6 +78,7 @@ public class TestSQLScripts extends TestJDBCBackend {
         String fromVersion = upgradeMatcher.group(1);
         Assertions.assertTrue(
             versionScrips.containsKey(fromVersion), "No schema script found for " + fromVersion);
+        versionScrips.get(fromVersion).add(scriptFile);
 
       } else if (metricsMatcher.matches()) {
         String version = metricsMatcher.group(1);
