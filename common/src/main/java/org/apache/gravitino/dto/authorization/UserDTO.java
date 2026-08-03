@@ -56,6 +56,7 @@ public class UserDTO implements User {
   /**
    * Creates a new instance of UserDTO.
    *
+   * @param id The id of the User DTO.
    * @param name The name of the User DTO.
    * @param externalId The external id of the User DTO.
    * @param roles The roles of the User DTO.
@@ -78,7 +79,7 @@ public class UserDTO implements User {
   }
 
   /**
-   * @return The name of the User DTO.
+   * @return The id of the User DTO.
    */
   @Override
   public Long id() {
