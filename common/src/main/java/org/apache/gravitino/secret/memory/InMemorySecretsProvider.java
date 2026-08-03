@@ -19,14 +19,17 @@
 
 package org.apache.gravitino.secret.memory;
 
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_ID;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_ENTITY_TYPE;
+import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretUrn;
-import org.apache.gravitino.secret.SecretWriteContext;
-import org.apache.gravitino.secret.ServiceSecretWriteContext;
 
 /**
  * In-memory secret provider for development and unit tests only.
@@ -41,10 +44,14 @@ import org.apache.gravitino.secret.ServiceSecretWriteContext;
 public class InMemorySecretsProvider implements SecretProvider {
 
   private final ConcurrentHashMap<String, String> secrets = new ConcurrentHashMap<>();
+  private String providerName;
 
   @Override
   public void initialize(String name, Map<String, String> config) {
-    // No configuration required for the in-memory provider.
+    if (StringUtils.isBlank(name)) {
+      throw new IllegalArgumentException("provider name must not be blank");
+    }
+    this.providerName = name;
   }
 
   @Override
@@ -53,21 +60,29 @@ public class InMemorySecretsProvider implements SecretProvider {
   }
 
   @Override
-  public String writeSecret(String plaintext, SecretWriteContext context) {
+  public String writeSecret(String plaintext, Map<String, String> attributes) {
     if (plaintext == null) {
       throw new IllegalArgumentException("plaintext must not be null");
     }
-    if (!(context instanceof ServiceSecretWriteContext)) {
-      throw new IllegalArgumentException(
-          "InMemorySecretsProvider requires ServiceSecretWriteContext");
+    if (providerName == null) {
+      throw new IllegalStateException("InMemorySecretsProvider is not initialized");
     }
-    ServiceSecretWriteContext writeContext = (ServiceSecretWriteContext) context;
-    String urn =
-        SecretUrn.buildWriteThrough(
-            writeContext.providerName(),
-            writeContext.entityType(),
-            writeContext.entityId(),
-            writeContext.propertyKey());
+    if (attributes == null) {
+      throw new IllegalArgumentException("attributes must not be null");
+    }
+
+    String entityType = requiredAttribute(attributes, ATTR_ENTITY_TYPE);
+    String entityIdValue = requiredAttribute(attributes, ATTR_ENTITY_ID);
+    String propertyKey = requiredAttribute(attributes, ATTR_PROPERTY_KEY);
+    long entityId;
+    try {
+      entityId = Long.parseLong(entityIdValue);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "attributes." + ATTR_ENTITY_ID + " must be a numeric entity id: " + entityIdValue, e);
+    }
+
+    String urn = SecretUrn.buildWriteThrough(providerName, entityType, entityId, propertyKey);
     secrets.put(
         urn, Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8)));
     return urn;
@@ -90,5 +105,13 @@ public class InMemorySecretsProvider implements SecretProvider {
   @Override
   public void close() {
     secrets.clear();
+  }
+
+  private static String requiredAttribute(Map<String, String> attributes, String key) {
+    String value = attributes.get(key);
+    if (StringUtils.isBlank(value)) {
+      throw new IllegalArgumentException("attributes." + key + " must not be blank");
+    }
+    return value;
   }
 }
