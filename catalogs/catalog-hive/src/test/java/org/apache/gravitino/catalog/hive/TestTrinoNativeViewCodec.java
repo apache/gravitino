@@ -37,7 +37,8 @@ class TestTrinoNativeViewCodec {
                 new TrinoNativeViewCodec.ViewColumn("name", "varchar(50)", "name column")),
             "a view comment",
             null,
-            true);
+            true,
+            List.of());
 
     String encoded = TrinoNativeViewCodec.encode(definition);
     Assertions.assertTrue(encoded.startsWith("/* Presto View: "));
@@ -69,7 +70,8 @@ class TestTrinoNativeViewCodec {
             List.of(new TrinoNativeViewCodec.ViewColumn("_col0", "integer", null)),
             null,
             null,
-            true);
+            true,
+            List.of());
 
     TrinoNativeViewCodec.ViewDefinition decoded =
         TrinoNativeViewCodec.decode(TrinoNativeViewCodec.encode(definition));
@@ -237,7 +239,7 @@ class TestTrinoNativeViewCodec {
   void testDecodeRejectsEmptyColumns() {
     TrinoNativeViewCodec.ViewDefinition definition =
         new TrinoNativeViewCodec.ViewDefinition(
-            "SELECT 1", null, null, List.of(), null, null, true);
+            "SELECT 1", null, null, List.of(), null, null, true, List.of());
     String encoded = TrinoNativeViewCodec.encode(definition);
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> TrinoNativeViewCodec.decode(encoded));

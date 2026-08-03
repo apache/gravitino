@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -194,6 +195,28 @@ class HiveViewCatalogOperations implements ViewCatalog {
       // here too, instead of being silently treated as a non-Trino view.
       boolean isTrinoView =
           Dialects.TRINO.equalsIgnoreCase(HiveView.detectDialect(currentHiveTable.properties()));
+      // Gravitino's view model has no owner/runAsInvoker/path concept, so replacing a native Trino
+      // view that carries a non-default value for any of them would silently discard it (e.g. a
+      // SECURITY DEFINER view with an owner would silently become an ownerless SECURITY INVOKER
+      // view). Reject the replace instead of doing that.
+      boolean currentTrinoViewHasUnrepresentableFields = false;
+      if (isTrinoView) {
+        TrinoNativeViewCodec.ViewDefinition currentDefinition;
+        try {
+          currentDefinition = TrinoNativeViewCodec.decode(currentHiveTable.viewOriginalText());
+        } catch (IllegalArgumentException e) {
+          throw new UnsupportedOperationException(
+              "View "
+                  + ident
+                  + " carries the presto_view marker but its payload cannot be "
+                  + "decoded",
+              e);
+        }
+        currentTrinoViewHasUnrepresentableFields =
+            currentDefinition.owner != null
+                || !currentDefinition.runAsInvoker
+                || !currentDefinition.path.isEmpty();
+      }
 
       String newViewName = currentHiveTable.name();
       String updatedViewOriginalText = currentHiveTable.viewOriginalText();
@@ -220,6 +243,12 @@ class HiveViewCatalogOperations implements ViewCatalog {
                       + "ReplaceView to change it, not SetProperty(comment)");
             }
             updatedComment = sp.getValue();
+          } else if (TrinoNativeViewCodec.PRESTO_VIEW_FLAG.equals(sp.getProperty())) {
+            throw new UnsupportedOperationException(
+                "Property '"
+                    + TrinoNativeViewCodec.PRESTO_VIEW_FLAG
+                    + "' is reserved for native Trino view storage and cannot be set directly; "
+                    + "use ReplaceView to change the view's dialect");
           } else {
             updatedProperties.put(sp.getProperty(), sp.getValue());
           }
@@ -232,10 +261,24 @@ class HiveViewCatalogOperations implements ViewCatalog {
                       + "ReplaceView to change it, not RemoveProperty(comment)");
             }
             updatedComment = null;
+          } else if (TrinoNativeViewCodec.PRESTO_VIEW_FLAG.equals(property)) {
+            throw new UnsupportedOperationException(
+                "Property '"
+                    + TrinoNativeViewCodec.PRESTO_VIEW_FLAG
+                    + "' is reserved for native Trino view storage and cannot be removed "
+                    + "directly; use ReplaceView to change the view's dialect");
           } else {
             updatedProperties.remove(property);
           }
         } else if (change instanceof ViewChange.ReplaceView) {
+          if (currentTrinoViewHasUnrepresentableFields) {
+            throw new UnsupportedOperationException(
+                "View "
+                    + ident
+                    + " is a native Trino view with a non-default owner, runAsInvoker, or SQL "
+                    + "path; Gravitino cannot represent these fields, so replacing it would "
+                    + "silently discard them");
+          }
           ViewChange.ReplaceView replace = (ViewChange.ReplaceView) change;
           SQLRepresentation sqlRepresentation =
               validateSQLRepresentation(
@@ -521,6 +564,12 @@ class HiveViewCatalogOperations implements ViewCatalog {
                 + "payload cannot be decoded on the next load",
             selected.dialect(),
             ident);
+        Preconditions.checkArgument(
+            defaultSchema == null || defaultCatalog != null,
+            "Dialect '%s' does not support a defaultSchema without a defaultCatalog for view "
+                + "%s, since Trino's native view format rejects such a payload",
+            selected.dialect(),
+            ident);
         return selected;
       case Dialects.FLINK:
         Preconditions.checkArgument(
@@ -597,7 +646,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
                 viewColumns,
                 comment,
                 /* owner= */ null,
-                /* runAsInvoker= */ true));
+                /* runAsInvoker= */ true,
+                /* path= */ Collections.emptyList()));
       default:
         throw new UnsupportedOperationException(
             String.format(

@@ -648,7 +648,8 @@ class TestHiveCatalogOperations {
                 List.of(new TrinoNativeViewCodec.ViewColumn("_col0", "integer", null)),
                 null,
                 null,
-                true));
+                true,
+                List.of()));
     when(hiveClient.getTable(anyString(), anyString(), anyString()))
         .thenReturn(
             HiveTable.builder()
@@ -700,7 +701,8 @@ class TestHiveCatalogOperations {
                 List.of(new TrinoNativeViewCodec.ViewColumn("id", "integer", null)),
                 "a comment",
                 null,
-                true));
+                true,
+                List.of()));
     when(hiveClient.getTable(anyString(), anyString(), anyString()))
         .thenReturn(
             HiveTable.builder()
@@ -863,7 +865,8 @@ class TestHiveCatalogOperations {
                 List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
                 null,
                 null,
-                true));
+                true,
+                List.of()));
     HiveTable currentTable =
         HiveTable.builder()
             .withName("v_hive")
@@ -936,7 +939,8 @@ class TestHiveCatalogOperations {
                 List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
                 null,
                 null,
-                true));
+                true,
+                List.of()));
     HiveTable currentTable =
         HiveTable.builder()
             .withName("v_trino")
@@ -983,7 +987,14 @@ class TestHiveCatalogOperations {
     String encoded =
         TrinoNativeViewCodec.encode(
             new TrinoNativeViewCodec.ViewDefinition(
-                "SELECT 1", null, null, List.of(), null, null, true));
+                "SELECT 1",
+                null,
+                null,
+                List.of(new TrinoNativeViewCodec.ViewColumn("c1", "integer", null)),
+                null,
+                null,
+                true,
+                List.of()));
     HiveTable currentTable =
         HiveTable.builder()
             .withName("v_trino")

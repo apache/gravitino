@@ -80,6 +80,10 @@ final class TrinoNativeViewCodec {
     @Nullable final String comment;
     @Nullable final String owner;
     final boolean runAsInvoker;
+    // Trino's SQL path setting for the view; Gravitino's view model has no equivalent, so this is
+    // only populated on decode() (to let callers detect and reject a non-empty path) and is always
+    // written back empty by encode().
+    final List<String> path;
 
     ViewDefinition(
         String originalSql,
@@ -88,7 +92,8 @@ final class TrinoNativeViewCodec {
         List<ViewColumn> columns,
         @Nullable String comment,
         @Nullable String owner,
-        boolean runAsInvoker) {
+        boolean runAsInvoker,
+        List<String> path) {
       this.originalSql = originalSql;
       this.catalog = catalog;
       this.schema = schema;
@@ -96,6 +101,7 @@ final class TrinoNativeViewCodec {
       this.comment = comment;
       this.owner = owner;
       this.runAsInvoker = runAsInvoker;
+      this.path = path;
     }
   }
 
@@ -180,6 +186,11 @@ final class TrinoNativeViewCodec {
           "Not a valid Trino native view: 'originalSql' field is missing or null");
     }
 
+    List<String> path = new ArrayList<>();
+    for (JsonNode pathNode : root.path("path")) {
+      path.add(pathNode.toString());
+    }
+
     return new ViewDefinition(
         originalSql,
         textOrNull(root, "catalog"),
@@ -187,7 +198,8 @@ final class TrinoNativeViewCodec {
         columns,
         textOrNull(root, "comment"),
         textOrNull(root, "owner"),
-        root.path("runAsInvoker").asBoolean(true));
+        root.path("runAsInvoker").asBoolean(true),
+        path);
   }
 
   @Nullable
