@@ -23,9 +23,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.po.EntityDeletionPO;
+import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -58,6 +61,30 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
         0,
         OrphanedMetadataObjectRelationService.getInstance()
             .softDeleteOrphanedRelations(MetadataObject.Type.TABLE, 10));
+
+    long deletedAt = System.currentTimeMillis();
+    String deletionId = "retained-table-deletion";
+    NameIdentifier identifier =
+        NameIdentifier.of(Namespace.of(metalake, catalog, schema), liveTable.name());
+    TablePO table = TableDeletionService.getInstance().getLiveTable(identifier);
+    TableDeletionService.getInstance()
+        .delete(
+            table,
+            deletedAt,
+            EntityDeletionPO.builder()
+                .deletionId(deletionId)
+                .state("DELETED")
+                .retentionExpiresAt(deletedAt + 86_400_000L)
+                .build());
+
+    Assertions.assertEquals(
+        0,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.TABLE, 10));
+    Assertions.assertEquals(5, countActiveRelations(liveTable.id()));
+
+    TableDeletionService.getInstance().restore(deletionId);
+    Assertions.assertEquals(5, countActiveRelations(liveTable.id()));
   }
 
   private void insertRelations(long liveId, long orphanId) throws SQLException {

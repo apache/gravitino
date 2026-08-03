@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -48,6 +49,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.inmemory.InMemoryFileIO;
+import org.apache.iceberg.io.BulkDeletionFailureException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.io.OutputFile;
@@ -65,7 +67,7 @@ import org.junit.jupiter.api.TestTemplate;
  * store: {@link TestJDBCBackend} initializes H2 by default, adds MySQL and PostgreSQL when {@code
  * dockerTest=true}, and truncates all backend tables before each invocation.
  */
-class TestIcebergCleanupManager extends TestJDBCBackend {
+public class TestIcebergCleanupManager extends TestJDBCBackend {
 
   private static final long CATALOG_ID = 100L;
   private static final String DATA_FILE = "memory://db/t/data/00000-0.parquet";
@@ -82,19 +84,19 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   private Object originalIdGenerator;
 
   @BeforeAll
-  public void snapshotGravitinoEnv() throws IllegalAccessException {
+  void snapshotGravitinoEnv() throws IllegalAccessException {
     originalConfig = FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
     originalIdGenerator = FieldUtils.readField(GravitinoEnv.getInstance(), "idGenerator", true);
   }
 
   @AfterAll
-  public void restoreGravitinoEnv() throws IllegalAccessException {
+  void restoreGravitinoEnv() throws IllegalAccessException {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", originalConfig, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", originalIdGenerator, true);
   }
 
   @BeforeEach
-  public void prepareCleanupJobStore() {
+  void prepareCleanupJobStore() {
     store = new IcebergCleanupJobStore(new RandomIdGenerator());
   }
 
@@ -164,12 +166,13 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testDeleteAllIgnoresMissingBulk() {
+  void testDeleteAllPropagatesBulkMissing() {
     IcebergCleanupManager svc =
         new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
     try {
-      Assertions.assertDoesNotThrow(
-          () -> svc.deleteAll(new MissingBulkFileIO(), Arrays.asList("already-gone")));
+      Assertions.assertThrows(
+          NotFoundException.class,
+          () -> svc.deleteAll(new MissingBulkFileIO(), Arrays.asList("unknown-batch-outcome")));
     } finally {
       svc.close();
     }
@@ -236,6 +239,44 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
       Assertions.assertEquals(1, calls.get());
     } finally {
       svc.close();
+    }
+  }
+
+  @TestTemplate
+  void testWorkerDurablyRetriesFinalFileIOFailure() {
+    BaseTable base = tableWithDataFile();
+    FileIO io = base.io();
+    String metadataLocation = base.operations().current().metadataFileLocation();
+    FailOnceBulkFileIO.configure(io);
+
+    Map<String, String> config = new HashMap<>();
+    config.put("async-cleanup.worker-threads", "1");
+    config.put("async-cleanup.poll-interval-secs", "1");
+    config.put("async-cleanup.max-attempts", "3");
+    IcebergCleanupManager svc = new IcebergCleanupManager(store, new IcebergConfig(config));
+    long id =
+        store.addJob(
+            new IcebergCleanupJob(
+                0L,
+                CATALOG_ID,
+                "db",
+                "retry_once",
+                metadataLocation,
+                FailOnceBulkFileIO.class.getName(),
+                ImmutableMap.of(),
+                "alice"));
+
+    svc.start();
+    try {
+      Awaitility.await()
+          .atMost(15, TimeUnit.SECONDS)
+          .until(() -> store.stateOf(id) == IcebergCleanupJob.State.SUCCEEDED);
+
+      Assertions.assertTrue(FailOnceBulkFileIO.deleteCalls() > 1);
+      Assertions.assertFalse(((InMemoryFileIO) io).fileExists(metadataLocation));
+    } finally {
+      svc.close();
+      FailOnceBulkFileIO.reset();
     }
   }
 
@@ -339,6 +380,57 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
       for (String path : paths) {
         deleted.add(path);
       }
+    }
+  }
+
+  /** Loadable FileIO that returns one final bulk failure before delegating later job attempts. */
+  public static class FailOnceBulkFileIO implements SupportsBulkOperations {
+    private static final AtomicInteger FAILURES_REMAINING = new AtomicInteger();
+    private static final AtomicInteger DELETE_CALLS = new AtomicInteger();
+    private static volatile FileIO delegate;
+
+    static void configure(FileIO fileIO) {
+      delegate = fileIO;
+      DELETE_CALLS.set(0);
+      FAILURES_REMAINING.set(1);
+    }
+
+    static int deleteCalls() {
+      return DELETE_CALLS.get();
+    }
+
+    static void reset() {
+      delegate = null;
+      DELETE_CALLS.set(0);
+      FAILURES_REMAINING.set(0);
+    }
+
+    @Override
+    public InputFile newInputFile(String path) {
+      return configuredDelegate().newInputFile(path);
+    }
+
+    @Override
+    public OutputFile newOutputFile(String path) {
+      return configuredDelegate().newOutputFile(path);
+    }
+
+    @Override
+    public void deleteFile(String path) {
+      configuredDelegate().deleteFile(path);
+    }
+
+    @Override
+    public void deleteFiles(Iterable<String> paths) {
+      DELETE_CALLS.incrementAndGet();
+      if (FAILURES_REMAINING.getAndUpdate(remaining -> Math.max(0, remaining - 1)) > 0) {
+        throw new BulkDeletionFailureException(1);
+      }
+      paths.forEach(configuredDelegate()::deleteFile);
+    }
+
+    private static FileIO configuredDelegate() {
+      return Objects.requireNonNull(delegate, "FailOnceBulkFileIO is not configured");
     }
   }
 
