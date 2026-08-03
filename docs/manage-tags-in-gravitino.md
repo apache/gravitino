@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 0.6.0, Gravitino introduces a new tag system that allows you to manage tags for
+Gravitino provides a tag system that allows you to manage tags for
 metadata objects. Tags are a way to categorize and organize metadata objects in Gravitino.
 
 This document briefly introduces how to use tags in Gravitino by both Gravitino Java client and

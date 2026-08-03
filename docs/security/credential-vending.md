@@ -14,29 +14,29 @@ Gravitino credential vending is used to generate temporary or static credentials
 - Supports Gravitino Iceberg REST server.
 - Supports Gravitino server with the following catalog types:
 
-  | Catalog type    | Supported credential types                         | Since version    |
-  |-----------------|----------------------------------------------------|------------------|
-  | Hadoop (Fileset)| S3, OSS, GCS, ADLS                                 | 0.7.0-incubating |
-  | Hive            | S3, OSS, GCS, ADLS                                 | 1.3.0            |
-  | Iceberg         | S3, OSS, GCS, ADLS                                 | 1.3.0            |
-  | Glue            | S3                                                 | 1.3.0            |
-  | JDBC            | JDBC user/password (`jdbc-user-password`)          | 1.3.0            |
-  | Paimon          | S3, OSS, JDBC user/password (`jdbc-user-password`) | 1.3.0            |
+| Catalog type     | Supported credential types                         |
+|------------------|----------------------------------------------------|
+| Hadoop (Fileset) | S3, OSS, GCS, ADLS                                 |
+| Hive             | S3, OSS, GCS, ADLS                                 |
+| Iceberg          | S3, OSS, GCS, ADLS                                 |
+| Glue             | S3                                                 |
+| JDBC             | JDBC user/password (`jdbc-user-password`)          |
+| Paimon           | S3, OSS, JDBC user/password (`jdbc-user-password`) |
 - Supports pluggable credentials with build-in credentials:
   - S3: `S3TokenCredential`, `S3SecretKeyCredential`, `AwsIrsaCredential`
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
-- Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs since 1.3.0.
+- Spark, Flink, and Trino connectors automatically consume vended credentials for Hive, Iceberg, Glue, JDBC, and Paimon catalogs.
 
 ## General Configurations
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations           | Description                                                                                | Default value | Required | Since Version    |
-|-------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-provider-type`          | `gravitino.iceberg-rest.credential-provider-type`      | Deprecated; use `credential-providers` instead.                                            | (none)        | Yes      | 0.7.0-incubating |
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`          | The credential provider types, separated by comma.                                         | (none)        | Yes      | 0.8.0-incubating |
-| `credential-cache-expire-ratio`     | `gravitino.iceberg-rest.credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino remove credential from the cache. | 0.15          | No       | 0.8.0-incubating |
-| `credential-cache-max-size`         | `gravitino.iceberg-rest.cache-max-size`                | Max size for the credential cache.                                                         | 10000         | No       | 0.8.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations           | Description                                                                                | Default value | Required |
+|-------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|
+| `credential-provider-type`          | `gravitino.iceberg-rest.credential-provider-type`      | Deprecated; use `credential-providers` instead.                                            | (none)        | Yes      |
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`          | The credential provider types, separated by comma.                                         | (none)        | Yes      |
+| `credential-cache-expire-ratio`     | `gravitino.iceberg-rest.credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino remove credential from the cache. | 0.15          | No       |
+| `credential-cache-max-size`         | `gravitino.iceberg-rest.cache-max-size`                | Max size for the credential cache.                                                         | 10000         | No       |
 
 ## Build-in Credentials Configurations
 
@@ -53,13 +53,13 @@ A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with t
 - **EKS integration**: Leverages existing IRSA setup while providing enhanced security through path-based restrictions
 
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                               | Default value | Required | Since Version |
-|-------------------------------------|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `aws-irsa` for AWS IRSA credential provider.                                                              | (none)        | Yes      | 1.0.0         |
-| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the IAM role to assume. Required for fine-grained path-based access control.                   | (none)        | Yes*     | 1.0.0         |
-| `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The AWS region for STS operations. Used for fine-grained access control.                                  | (none)        | No       | 1.0.0         |
-| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       | 1.0.0         |
-| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services.       | (none)        | No       | 1.0.0         |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                               | Default value | Required |
+|-------------------------------------|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `aws-irsa` for AWS IRSA credential provider.                                                              | (none)        | Yes      |
+| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the IAM role to assume. Required for fine-grained path-based access control.                   | (none)        | Yes*     |
+| `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The AWS region for STS operations. Used for fine-grained access control.                                  | (none)        | No       |
+| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       |
+| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services.       | (none)        | No       |
 
 **Note**: `s3-role-arn` is required only when using fine-grained path-based access control with vended credentials. For basic IRSA usage without path restrictions, only `credential-providers=aws-irsa` is needed.
 
@@ -73,26 +73,26 @@ A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with t
 
 A credential with static S3 access key id and secret access key.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                            | Default value | Required | Since Version    |
-|-------------------------------------|---------------------------------------------------|--------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `s3-secret-key` for S3 secret key credential provider. | (none)        | Yes      | 0.8.0-incubating |
-| `s3-access-key-id`                  | `gravitino.iceberg-rest.s3-access-key-id`         | The static access key ID used to access S3 data.       | (none)        | Yes      | 0.6.0-incubating |
-| `s3-secret-access-key`              | `gravitino.iceberg-rest.s3-secret-access-key`     | The static secret access key used to access S3 data.   | (none)        | Yes      | 0.6.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations  | Description                                            | Default value | Required |
+|-------------------------------------|-----------------------------------------------|--------------------------------------------------------|---------------|----------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers` | `s3-secret-key` for S3 secret key credential provider. | (none)        | Yes      |
+| `s3-access-key-id`                  | `gravitino.iceberg-rest.s3-access-key-id`     | The static access key ID used to access S3 data.       | (none)        | Yes      |
+| `s3-secret-access-key`              | `gravitino.iceberg-rest.s3-secret-access-key` | The static secret access key used to access S3 data.   | (none)        | Yes      |
 
 #### S3 Token Credential
 
 An S3 token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html). To use an S3 token credential, you should create a role and grant it proper privileges.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                                                                                 | Default value | Required | Since Version    |
-|-------------------------------------|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `s3-token` for S3 token credential provider.                                                                                                                | (none)        | Yes      | 0.8.0-incubating |
-| `s3-access-key-id`                  | `gravitino.iceberg-rest.s3-access-key-id`          | The static access key ID used to access S3 data.                                                                                                            | (none)        | Yes      | 0.6.0-incubating |
-| `s3-secret-access-key`              | `gravitino.iceberg-rest.s3-secret-access-key`      | The static secret access key used to access S3 data.                                                                                                        | (none)        | Yes      | 0.6.0-incubating |
-| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the role to access the S3 data.                                                                                                                  | (none)        | Yes      | 0.7.0-incubating |
-| `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The region of the S3 service, like `us-west-2`.                                                                                                             | (none)        | No       | 0.6.0-incubating |
-| `s3-external-id`                    | `gravitino.iceberg-rest.s3-external-id`            | The S3 external id to generate token.                                                                                                                       | (none)        | No       | 0.7.0-incubating |
-| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | The S3 session token expire time in secs, it couldn't exceed the max session time of the assumed role.                                                      | 3600          | No       | 0.7.0-incubating |
-| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | An alternative endpoint of the S3 token service, This could be used with s3-compatible object storage service like MINIO that has a different STS endpoint. | (none)        | No       | 0.8.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                                                                                 | Default value | Required |
+|-------------------------------------|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `s3-token` for S3 token credential provider.                                                                                                                | (none)        | Yes      |
+| `s3-access-key-id`                  | `gravitino.iceberg-rest.s3-access-key-id`          | The static access key ID used to access S3 data.                                                                                                            | (none)        | Yes      |
+| `s3-secret-access-key`              | `gravitino.iceberg-rest.s3-secret-access-key`      | The static secret access key used to access S3 data.                                                                                                        | (none)        | Yes      |
+| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the role to access the S3 data.                                                                                                                  | (none)        | Yes      |
+| `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The region of the S3 service, like `us-west-2`.                                                                                                             | (none)        | No       |
+| `s3-external-id`                    | `gravitino.iceberg-rest.s3-external-id`            | The S3 external id to generate token.                                                                                                                       | (none)        | No       |
+| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | The S3 session token expire time in secs, it couldn't exceed the max session time of the assumed role.                                                      | 3600          | No       |
+| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | An alternative endpoint of the S3 token service, This could be used with s3-compatible object storage service like MINIO that has a different STS endpoint. | (none)        | No       |
 
 ### OSS Credentials
 
@@ -100,25 +100,25 @@ An S3 token is a token credential with scoped privileges, by leveraging STS [Ass
 
 A credential with static OSS access key id and secret access key.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                   | Default value | Required | Since Version    |
-|-------------------------------------|---------------------------------------------------|-------------------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `oss-secret-key` for OSS secret credential.                                   | (none)        | Yes      | 0.8.0-incubating |
-| `oss-access-key-id`                 | `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                             | (none)        | Yes      | 0.7.0-incubating |
-| `oss-secret-access-key`             | `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                         | (none)        | Yes      | 0.7.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations   | Description                                           | Default value | Required |
+|-------------------------------------|------------------------------------------------|-------------------------------------------------------|---------------|----------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`  | `oss-secret-key` for OSS secret credential.           | (none)        | Yes      |
+| `oss-access-key-id`                 | `gravitino.iceberg-rest.oss-access-key-id`     | The static access key ID used to access OSS data.     | (none)        | Yes      |
+| `oss-secret-access-key`             | `gravitino.iceberg-rest.oss-secret-access-key` | The static secret access key used to access OSS data. | (none)        | Yes      |
 
 #### OSS Token Credential
 
 An OSS token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://www.alibabacloud.com/help/en/oss/developer-reference/use-temporary-access-credentials-provided-by-sts-to-access-oss). To use an OSS token credential, you should create a role and grant it proper privileges.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                                                  | Default value | Required | Since Version    |
-|-------------------------------------|---------------------------------------------------|--------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `oss-token` for s3 token credential.                                                                         | (none)        | Yes      | 0.8.0-incubating |
-| `oss-access-key-id`                 | `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                                                            | (none)        | Yes      | 0.7.0-incubating |
-| `oss-secret-access-key`             | `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                                                        | (none)        | Yes      | 0.7.0-incubating |
-| `oss-role-arn`                      | `gravitino.iceberg-rest.oss-role-arn`             | The ARN of the role to access the OSS data.                                                                  | (none)        | Yes      | 0.8.0-incubating |
-| `oss-region`                        | `gravitino.iceberg-rest.oss-region`               | The region of the OSS service, like `oss-cn-hangzhou`, only used when `credential-providers` is `oss-token`. | (none)        | No       | 0.8.0-incubating |
-| `oss-external-id`                   | `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token.                                                                       | (none)        | No       | 0.8.0-incubating |
-| `oss-token-expire-in-secs`          | `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs.                                                                  | 3600          | No       | 0.8.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                                                                  | Default value | Required |
+|-------------------------------------|---------------------------------------------------|--------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `oss-token` for s3 token credential.                                                                         | (none)        | Yes      |
+| `oss-access-key-id`                 | `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                                                            | (none)        | Yes      |
+| `oss-secret-access-key`             | `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                                                        | (none)        | Yes      |
+| `oss-role-arn`                      | `gravitino.iceberg-rest.oss-role-arn`             | The ARN of the role to access the OSS data.                                                                  | (none)        | Yes      |
+| `oss-region`                        | `gravitino.iceberg-rest.oss-region`               | The region of the OSS service, like `oss-cn-hangzhou`, only used when `credential-providers` is `oss-token`. | (none)        | No       |
+| `oss-external-id`                   | `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token.                                                                       | (none)        | No       |
+| `oss-token-expire-in-secs`          | `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs.                                                                  | 3600          | No       |
 
 ### ADLS Credentials
 
@@ -126,25 +126,25 @@ An OSS token is a token credential with scoped privileges, by leveraging STS [As
 
 A credential with static Azure storage account name and key.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations        | Description                                               | Default value | Required | Since Version    |
-|-------------------------------------|-----------------------------------------------------|-----------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`       | `azure-account-key` for Azure account key credential.     | (none)        | Yes      | 0.8.0-incubating |
-| `azure-storage-account-name`        | `gravitino.iceberg-rest.azure-storage-account-name` | The static storage account name used to access ADLS data. | (none)        | Yes      | 0.8.0-incubating |
-| `azure-storage-account-key`         | `gravitino.iceberg-rest.azure-storage-account-key`  | The static storage account key used to access ADLS data.  | (none)        | Yes      | 0.8.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations        | Description                                               | Default value | Required |
+|-------------------------------------|-----------------------------------------------------|-----------------------------------------------------------|---------------|----------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`       | `azure-account-key` for Azure account key credential.     | (none)        | Yes      |
+| `azure-storage-account-name`        | `gravitino.iceberg-rest.azure-storage-account-name` | The static storage account name used to access ADLS data. | (none)        | Yes      |
+| `azure-storage-account-key`         | `gravitino.iceberg-rest.azure-storage-account-key`  | The static storage account key used to access ADLS data.  | (none)        | Yes      |
 
 #### ADLS Token Credential
 
 An ADLS token is a token credential with scoped privileges, by leveraging Azure [User Delegation Sas](https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas). To use an ADLS token credential, you should create a Microsoft Entra ID service principal and grant it proper privileges.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations        | Description                                                         | Default value | Required | Since Version    |
-|-------------------------------------|-----------------------------------------------------|---------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`       | `adls-token` for ADLS token credential.                             | (none)        | Yes      | 0.8.0-incubating |
-| `azure-storage-account-name`        | `gravitino.iceberg-rest.azure-storage-account-name` | The static storage account name used to access ADLS data.           | (none)        | Yes      | 0.8.0-incubating |
-| `azure-storage-account-key`         | `gravitino.iceberg-rest.azure-storage-account-key`  | The static storage account key used to access ADLS data.            | (none)        | Yes      | 0.8.0-incubating |
-| `azure-tenant-id`                   | `gravitino.iceberg-rest.azure-tenant-id`            | Azure Active Directory (AAD) tenant ID.                             | (none)        | Yes      | 0.8.0-incubating |
-| `azure-client-id`                   | `gravitino.iceberg-rest.azure-client-id`            | Azure Active Directory (AAD) client ID used for authentication.     | (none)        | Yes      | 0.8.0-incubating |
-| `azure-client-secret`               | `gravitino.iceberg-rest.azure-client-secret`        | Azure Active Directory (AAD) client secret used for authentication. | (none)        | Yes      | 0.8.0-incubating |
-| `adls-token-expire-in-secs`         | `gravitino.iceberg-rest.adls-token-expire-in-secs`  | The ADLS SAS token expire time in secs.                             | 3600          | No       | 0.8.0-incubating | 
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations        | Description                                                         | Default value | Required |
+|-------------------------------------|-----------------------------------------------------|---------------------------------------------------------------------|---------------|----------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`       | `adls-token` for ADLS token credential.                             | (none)        | Yes      |
+| `azure-storage-account-name`        | `gravitino.iceberg-rest.azure-storage-account-name` | The static storage account name used to access ADLS data.           | (none)        | Yes      |
+| `azure-storage-account-key`         | `gravitino.iceberg-rest.azure-storage-account-key`  | The static storage account key used to access ADLS data.            | (none)        | Yes      |
+| `azure-tenant-id`                   | `gravitino.iceberg-rest.azure-tenant-id`            | Azure Active Directory (AAD) tenant ID.                             | (none)        | Yes      |
+| `azure-client-id`                   | `gravitino.iceberg-rest.azure-client-id`            | Azure Active Directory (AAD) client ID used for authentication.     | (none)        | Yes      |
+| `azure-client-secret`               | `gravitino.iceberg-rest.azure-client-secret`        | Azure Active Directory (AAD) client secret used for authentication. | (none)        | Yes      |
+| `adls-token-expire-in-secs`         | `gravitino.iceberg-rest.adls-token-expire-in-secs`  | The ADLS SAS token expire time in secs.                             | 3600          | No       |
 
 ### GCS Credentials
 
@@ -152,11 +152,11 @@ An ADLS token is a token credential with scoped privileges, by leveraging Azure 
 
 An GCS token is a token credential with scoped privileges, by leveraging GCS [Credential Access Boundaries](https://cloud.google.com/iam/docs/downscoping-short-lived-credentials). To use an GCS token credential, you should create an GCS service account and grant it proper privileges.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                | Default value                       | Required | Since Version    |
-|-------------------------------------|---------------------------------------------------|------------------------------------------------------------|-------------------------------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `gcs-token` for GCS token credential.                      | (none)                              | Yes      | 0.8.0-incubating |
-| `gcs-credential-file-path`          | `gravitino.iceberg-rest.gcs-credential-file-path` | Deprecated; use `gcs-service-account-file` instead.        | GCS Application default credential. | No       | 0.7.0-incubating |
-| `gcs-service-account-file`          | `gravitino.iceberg-rest.gcs-service-account-file` | The location of GCS credential file.                       | GCS Application default credential. | No       | 0.8.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                         | Default value                       | Required |
+|-------------------------------------|---------------------------------------------------|-----------------------------------------------------|-------------------------------------|----------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `gcs-token` for GCS token credential.               | (none)                              | Yes      |
+| `gcs-credential-file-path`          | `gravitino.iceberg-rest.gcs-credential-file-path` | Deprecated; use `gcs-service-account-file` instead. | GCS Application default credential. | No       |
+| `gcs-service-account-file`          | `gravitino.iceberg-rest.gcs-service-account-file` | The location of GCS credential file.                | GCS Application default credential. | No       |
 
 :::note
 For the Gravitino Iceberg REST server, ensure that the credential file is accessible by the server. For example, the server may be running on a GCE machine, or you may set the environment variable `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even when `gcs-service-account-file` is already configured.
@@ -185,7 +185,7 @@ For the Iceberg REST catalog server, download the corresponding Gravitino cloud 
 - [Gravitino Iceberg Azure bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle)
 
 :::note
-Since Gravitino 1.1.0, the above Gravitino Iceberg cloud bundle jars have already included the Iceberg cloud bundle jars, no need to download and include them separately.
+The above Gravitino Iceberg cloud bundle jars have already included the Iceberg cloud bundle jars, no need to download and include them separately.
 :::
 
 The classpath of the server:
@@ -195,7 +195,7 @@ The classpath of the server:
 
 ## Credential Vending for Catalogs
 
-Hive, Iceberg, Glue, JDBC, and Paimon catalogs support server-side credential vending since Gravitino 1.4.0. This section explains how credential vending works for these catalog types and how it differs from the Hadoop Fileset and Iceberg REST server cases.
+Hive, Iceberg, Glue, JDBC, and Paimon catalogs support server-side credential vending. This section explains how credential vending works for these catalog types and how it differs from the Hadoop Fileset and Iceberg REST server cases.
 
 ### Auto-Detection of Credential Providers
 
