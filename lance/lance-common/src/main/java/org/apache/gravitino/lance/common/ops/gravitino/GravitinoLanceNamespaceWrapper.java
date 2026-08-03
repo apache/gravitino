@@ -27,7 +27,11 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.auth.AuthProperties;
+import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
+import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceOperations;
@@ -78,14 +82,11 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
               }
             });
 
-    this.client =
-        GravitinoClient.builder(uri)
-            .withMetalake(metalakeName)
-            .withClientConfig(clientProperties)
-            .build();
+    this.client = createGravitinoClient(uri, metalakeName, clientProperties, config());
 
     LOG.info(
-        "GravitinoClient initialized with {} client properties for metalake: {}",
+        "GravitinoClient initialized with auth type {} and {} client properties for metalake: {}",
+        config().getGravitinoAuthType(),
         clientProperties.size(),
         metalakeName);
 
@@ -134,5 +135,66 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
           catalogName);
     }
     return catalog;
+  }
+
+  static GravitinoClient createGravitinoClient(
+      String uri, String metalake, Map<String, String> clientProperties, LanceConfig config) {
+    return newClientBuilder(uri, metalake, clientProperties, config).build();
+  }
+
+  /**
+   * Builds and configures the client builder, including the credentials the Lance REST service
+   * presents to the Gravitino server. Separated from {@link #createGravitinoClient} so that the
+   * configuration can be exercised without contacting a server.
+   *
+   * @param uri the Gravitino server URI
+   * @param metalake the metalake name
+   * @param clientProperties additional client properties, such as connection pool settings
+   * @param config the Lance REST service configuration holding the auth settings
+   * @return a configured client builder
+   */
+  @VisibleForTesting
+  static ClientBuilder newClientBuilder(
+      String uri, String metalake, Map<String, String> clientProperties, LanceConfig config) {
+    ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
+    builder.withClientConfig(clientProperties);
+    String authType = config.getGravitinoAuthType();
+    if (AuthProperties.isSimple(authType)) {
+      builder.withSimpleAuth(config.get(LanceConfig.GRAVITINO_SIMPLE_USERNAME));
+    } else if (AuthProperties.isOAuth2(authType)) {
+      DefaultOAuth2TokenProvider tokenProvider =
+          DefaultOAuth2TokenProvider.builder()
+              .withUri(requireConfig(config, LanceConfig.GRAVITINO_OAUTH2_SERVER_URI, "server-uri"))
+              .withCredential(
+                  requireConfig(config, LanceConfig.GRAVITINO_OAUTH2_CREDENTIAL, "credential"))
+              .withPath(
+                  requireConfig(config, LanceConfig.GRAVITINO_OAUTH2_TOKEN_PATH, "token-path"))
+              .withScope(requireConfig(config, LanceConfig.GRAVITINO_OAUTH2_SCOPE, "scope"))
+              .build();
+      builder.withOAuth(tokenProvider);
+    } else {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Unsupported value for %sgravitino-%s: %s. Supported values are %s and %s.",
+              LanceConfig.LANCE_CONFIG_PREFIX,
+              LanceConfig.CONFIG_AUTH_TYPE,
+              authType,
+              AuthProperties.SIMPLE_AUTH_TYPE,
+              AuthProperties.OAUTH2_AUTH_TYPE));
+    }
+    return builder;
+  }
+
+  private static String requireConfig(LanceConfig config, ConfigEntry<String> entry, String name) {
+    String value = config.get(entry);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(value),
+        "%sgravitino-oauth2.%s must be set when %sgravitino-%s is %s",
+        LanceConfig.LANCE_CONFIG_PREFIX,
+        name,
+        LanceConfig.LANCE_CONFIG_PREFIX,
+        LanceConfig.CONFIG_AUTH_TYPE,
+        AuthProperties.OAUTH2_AUTH_TYPE);
+    return value;
   }
 }
