@@ -524,7 +524,7 @@ export default function CreateTableDialog({ ...props }) {
               table.indexes.forEach(item => {
                 const fields = item.fieldNames.map(f => f[0])
                 form.setFieldValue(['indexes', idxIndex, 'name'], item.name)
-                form.setFieldValue(['indexes', idxIndex, 'indexType'], capitalizeFirstLetter(item.indexType))
+                form.setFieldValue(['indexes', idxIndex, 'indexType'], item.indexType)
                 form.setFieldValue(['indexes', idxIndex, 'fieldName'], fields)
 
                 // Populate index properties
