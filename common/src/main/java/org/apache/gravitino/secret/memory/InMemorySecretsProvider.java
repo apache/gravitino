@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.gravitino.secret.GravitinoSecretProvider;
+import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.SecretWriteContext;
 
@@ -37,7 +37,7 @@ import org.apache.gravitino.secret.SecretWriteContext;
  * {@code byte[]}/{@code char[]} and explicitly zero them on delete/close. Do not use this provider
  * in production.
  */
-public class InMemorySecretsProvider implements GravitinoSecretProvider {
+public class InMemorySecretsProvider implements SecretProvider {
 
   private final ConcurrentHashMap<String, String> secrets = new ConcurrentHashMap<>();
 

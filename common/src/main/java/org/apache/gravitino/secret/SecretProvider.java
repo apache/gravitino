@@ -22,9 +22,9 @@ package org.apache.gravitino.secret;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Service provider interface for Gravitino secret backends. */
+/** Service provider interface for secret backends. */
 @DeveloperApi
-public interface GravitinoSecretProvider {
+public interface SecretProvider {
 
   /**
    * Initializes this provider after construction.
