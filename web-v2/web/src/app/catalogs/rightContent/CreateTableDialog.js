@@ -116,9 +116,14 @@ export default function CreateTableDialog({ ...props }) {
   const [form] = Form.useForm()
   const values = Form.useWatch([], form)
 
+  const getClickHouseEngine = () => {
+    if (provider !== 'jdbc-clickhouse') return undefined
+    return form.getFieldValue('engine') || form.getFieldValue('properties')?.find(item => item?.key === 'engine')?.value
+  }
+
   const isClickHouseDistributedEngine =
     provider === 'jdbc-clickhouse' &&
-    values?.properties?.find(item => item?.key === 'engine')?.value?.toLowerCase?.() === 'distributed'
+    (values?.engine || values?.properties?.find(item => item?.key === 'engine')?.value)?.toLowerCase?.() === 'distributed'
 
   const clickHouseEngine =
     provider === 'jdbc-clickhouse'
@@ -655,7 +660,7 @@ export default function CreateTableDialog({ ...props }) {
   const handleSubmit = e => {
     e.preventDefault()
 
-    const currentEngine = form.getFieldValue('engine')
+    const currentEngine = getClickHouseEngine()
     const isCurrentMergeTree = provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.includes(currentEngine)
 
     // For non-MergeTree ClickHouse engines, clear sortOrders errors before validating
