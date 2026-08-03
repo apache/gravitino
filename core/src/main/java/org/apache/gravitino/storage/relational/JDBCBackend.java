@@ -353,6 +353,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E)
             UserMetaService.getInstance()
                 .getUserById(ident.namespace().level(0), Long.parseLong(ident.name()));
+      case GROUP:
+        AuthorizationUtils.checkGroupId(ident);
+        return (E)
+            GroupMetaService.getInstance()
+                .getGroupById(ident.namespace().level(0), Long.parseLong(ident.name()));
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get by id operation", entityType);
@@ -369,6 +374,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E)
             UserMetaService.getInstance()
                 .updateUserById(ident.namespace().level(0), Long.parseLong(ident.name()), updater);
+      case GROUP:
+        AuthorizationUtils.checkGroupId(ident);
+        return (E)
+            GroupMetaService.getInstance()
+                .updateGroupById(ident.namespace().level(0), Long.parseLong(ident.name()), updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update by id operation", entityType);
