@@ -44,6 +44,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -1331,6 +1332,132 @@ class TestUserMetaService extends TestJDBCBackend {
         () -> svc.insertUser(userWithExtId("u2", "ext-1"), false));
   }
 
+  @TestTemplate
+  void testConcurrentUpdateDoesNotChangeRolesOnConflict() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "catalog");
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            "catalog");
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            AUDIT_INFO,
+            "catalog");
+    RoleMetaService.getInstance().insertRole(role1, false);
+    RoleMetaService.getInstance().insertRole(role2, false);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "concurrent-user",
+            AUDIT_INFO,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    UserMetaService.getInstance().insertUser(user, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            UserMetaService.getInstance()
+                .updateUser(
+                    user.nameIdentifier(),
+                    (UserEntity oldUser) -> {
+                      advanceUserVersion(user.id());
+                      List<String> roleNames = Lists.newArrayList(oldUser.roleNames());
+                      List<Long> roleIds = Lists.newArrayList(oldUser.roleIds());
+                      roleNames.add(role2.name());
+                      roleIds.add(role2.id());
+                      return UserEntity.builder()
+                          .withId(oldUser.id())
+                          .withName(oldUser.name())
+                          .withNamespace(oldUser.namespace())
+                          .withExternalId(oldUser.externalId())
+                          .withEnabled(oldUser.enabled())
+                          .withRoleNames(roleNames)
+                          .withRoleIds(roleIds)
+                          .withAuditInfo(oldUser.auditInfo())
+                          .build();
+                    }));
+
+    UserEntity storedUser =
+        UserMetaService.getInstance().getUserByIdentifier(user.nameIdentifier());
+    assertEquals(Sets.newHashSet(role1.id()), Sets.newHashSet(storedUser.roleIds()));
+  }
+
+  @TestTemplate
+  void testConcurrentExternalIdUpdateRollsBackOnConflict() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("concurrent-user", "concurrent-ext-id");
+    service.insertUser(user, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateUserByExternalId(
+                userExtIdent(user.externalId()),
+                (UserEntity oldUser) -> {
+                  advanceUserVersion(user.id());
+                  return UserEntity.builder()
+                      .withId(oldUser.id())
+                      .withName(oldUser.name())
+                      .withNamespace(oldUser.namespace())
+                      .withExternalId(oldUser.externalId())
+                      .withEnabled(false)
+                      .withRoleNames(oldUser.roleNames())
+                      .withRoleIds(oldUser.roleIds())
+                      .withAuditInfo(oldUser.auditInfo())
+                      .build();
+                }));
+
+    assertTrue(queryEnabledByExtId(user.externalId()));
+  }
+
+  @TestTemplate
+  void testConcurrentByIdUpdateRollsBackOnConflict() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("concurrent-by-id-user", "concurrent-by-id-ext-id");
+    service.insertUser(user, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateUserById(
+                metalakeName,
+                user.id(),
+                (UserEntity oldUser) -> {
+                  advanceUserVersion(user.id());
+                  return UserEntity.builder()
+                      .withId(oldUser.id())
+                      .withName(oldUser.name())
+                      .withNamespace(oldUser.namespace())
+                      .withExternalId(oldUser.externalId())
+                      .withEnabled(false)
+                      .withRoleNames(oldUser.roleNames())
+                      .withRoleIds(oldUser.roleIds())
+                      .withAuditInfo(oldUser.auditInfo())
+                      .build();
+                }));
+
+    assertTrue(queryEnabledByExtId(user.externalId()));
+  }
+
+  @TestTemplate
+  void testDeleteUserById() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("delete-by-id-user", "delete-by-id-ext-id");
+    service.insertUser(user, false);
+
+    assertTrue(service.deleteUserById(metalakeName, user.id()));
+    assertFalse(service.deleteUserById(metalakeName, user.id()));
+  }
+
   private UserMetaService userMetaService() throws IOException {
     createAndInsertMakeLake(metalakeName);
     return UserMetaService.getInstance();
@@ -1440,5 +1567,20 @@ class TestUserMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private void advanceUserVersion(long userId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE user_meta SET current_version = current_version + 1 WHERE user_id = "
+                  + userId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance user version failed", e);
+    }
   }
 }

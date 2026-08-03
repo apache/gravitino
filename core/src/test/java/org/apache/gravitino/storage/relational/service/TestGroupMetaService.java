@@ -42,6 +42,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
@@ -1080,6 +1081,64 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testConcurrentUpdateDoesNotChangeRolesOnConflict() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            catalogName);
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            AUDIT_INFO,
+            catalogName);
+    RoleMetaService.getInstance().insertRole(role1, false);
+    RoleMetaService.getInstance().insertRole(role2, false);
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "concurrent-group",
+            AUDIT_INFO,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    GroupMetaService.getInstance().insertGroup(group, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            GroupMetaService.getInstance()
+                .updateGroup(
+                    group.nameIdentifier(),
+                    (GroupEntity oldGroup) -> {
+                      advanceGroupVersion(group.id());
+                      List<String> roleNames = Lists.newArrayList(oldGroup.roleNames());
+                      List<Long> roleIds = Lists.newArrayList(oldGroup.roleIds());
+                      roleNames.add(role2.name());
+                      roleIds.add(role2.id());
+                      return GroupEntity.builder()
+                          .withId(oldGroup.id())
+                          .withName(oldGroup.name())
+                          .withNamespace(oldGroup.namespace())
+                          .withExternalId(oldGroup.externalId())
+                          .withRoleNames(roleNames)
+                          .withRoleIds(roleIds)
+                          .withAuditInfo(oldGroup.auditInfo())
+                          .build();
+                    }));
+
+    GroupEntity storedGroup =
+        GroupMetaService.getInstance().getGroupByIdentifier(group.nameIdentifier());
+    assertEquals(Sets.newHashSet(role1.id()), Sets.newHashSet(storedGroup.roleIds()));
+  }
+
+  @TestTemplate
   void testExtDup() throws IOException {
     GroupMetaService svc = groupMetaService();
     svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
@@ -1133,5 +1192,20 @@ class TestGroupMetaService extends TestJDBCBackend {
         .withRoleIds(null)
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  private void advanceGroupVersion(long groupId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE group_meta SET current_version = current_version + 1 WHERE group_id = "
+                  + groupId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance group version failed", e);
+    }
   }
 }

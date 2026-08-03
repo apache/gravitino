@@ -99,11 +99,8 @@ public class UserMetaBaseSQLProvider {
         + " current_version = #{newUserMeta.currentVersion},"
         + " last_version = #{newUserMeta.lastVersion},"
         + " deleted_at = #{newUserMeta.deletedAt}"
-        + " WHERE external_id = #{oldUserMeta.externalId}"
-        + " AND metalake_id = #{oldUserMeta.metalakeId}"
-        + " AND audit_info = #{oldUserMeta.auditInfo}"
+        + " WHERE user_id = #{oldUserMeta.userId}"
         + " AND current_version = #{oldUserMeta.currentVersion}"
-        + " AND last_version = #{oldUserMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -152,12 +149,14 @@ public class UserMetaBaseSQLProvider {
         + " deleted_at = #{userMeta.deletedAt}";
   }
 
-  public String softDeleteUserMetaByUserId(@Param("userId") Long userId) {
+  public String softDeleteUserMetaByUserId(
+      @Param("userId") Long userId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + USER_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " WHERE user_id = #{userId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -181,11 +180,7 @@ public class UserMetaBaseSQLProvider {
         + " last_version = #{newUserMeta.lastVersion},"
         + " deleted_at = #{newUserMeta.deletedAt}"
         + " WHERE user_id = #{oldUserMeta.userId}"
-        + " AND user_name = #{oldUserMeta.userName}"
-        + " AND metalake_id = #{oldUserMeta.metalakeId}"
-        + " AND audit_info = #{oldUserMeta.auditInfo}"
         + " AND current_version = #{oldUserMeta.currentVersion}"
-        + " AND last_version = #{oldUserMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
