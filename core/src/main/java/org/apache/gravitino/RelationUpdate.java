@@ -22,8 +22,13 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 
 /**
- * Describes a relation update from a source entity to target endpoints. Target endpoint identity
- * and relation-edge attributes are carried by {@link RelationEdgeTarget}.
+ * Describes an immutable relation update from a source entity to target endpoints. Target endpoint
+ * identity and relation-edge attributes are carried by immutable {@link RelationEdgeTarget}
+ * instances.
+ *
+ * <p>The target endpoint arrays are copied when the update is created and when the targets are
+ * returned. The copy protects the array container from external mutation; the elements themselves
+ * are immutable.
  */
 public final class RelationUpdate {
 
@@ -93,14 +98,14 @@ public final class RelationUpdate {
   }
 
   /**
-   * @return A defensive copy of target endpoints to associate with the source entity.
+   * @return A copy of the target endpoint array to associate with the source entity.
    */
   public RelationEdgeTarget[] targetsToAdd() {
     return targetsToAdd.clone();
   }
 
   /**
-   * @return A defensive copy of target endpoints to disassociate from the source entity.
+   * @return A copy of the target endpoint array to disassociate from the source entity.
    */
   public RelationEdgeTarget[] targetsToRemove() {
     return targetsToRemove.clone();

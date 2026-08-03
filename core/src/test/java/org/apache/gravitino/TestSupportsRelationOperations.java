@@ -107,6 +107,37 @@ public class TestSupportsRelationOperations {
     Assertions.assertEquals(0, update.targetsToRemove().length);
   }
 
+  @Test
+  public void testRelationUpdateCopiesTargetArrays() {
+    NameIdentifier srcIdent = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    RelationEdgeTarget originalTarget =
+        RelationEdgeTarget.of(NameIdentifier.of("metalake", "tag"), Entity.EntityType.TAG, "dev");
+    RelationEdgeTarget replacementTarget =
+        RelationEdgeTarget.of(NameIdentifier.of("metalake", "tag2"), Entity.EntityType.TAG, "prod");
+    RelationEdgeTarget[] targetsToAdd = new RelationEdgeTarget[] {originalTarget};
+    RelationEdgeTarget[] targetsToRemove = new RelationEdgeTarget[] {originalTarget};
+
+    RelationUpdate update =
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            srcIdent,
+            Entity.EntityType.TABLE,
+            targetsToAdd,
+            targetsToRemove);
+
+    targetsToAdd[0] = replacementTarget;
+    targetsToRemove[0] = replacementTarget;
+    Assertions.assertSame(originalTarget, update.targetsToAdd()[0]);
+    Assertions.assertSame(originalTarget, update.targetsToRemove()[0]);
+
+    RelationEdgeTarget[] returnedTargetsToAdd = update.targetsToAdd();
+    RelationEdgeTarget[] returnedTargetsToRemove = update.targetsToRemove();
+    returnedTargetsToAdd[0] = replacementTarget;
+    returnedTargetsToRemove[0] = replacementTarget;
+    Assertions.assertSame(originalTarget, update.targetsToAdd()[0]);
+    Assertions.assertSame(originalTarget, update.targetsToRemove()[0]);
+  }
+
   private static class RecordingRelationOperations implements SupportsRelationOperations {
     private RelationQuery relationQuery;
     private RelationUpdate relationUpdate;

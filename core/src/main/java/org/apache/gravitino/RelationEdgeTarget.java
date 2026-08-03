@@ -23,8 +23,8 @@ import java.util.Optional;
 import javax.annotation.Nullable;
 
 /**
- * Represents the target endpoint of a relation edge in a relation update. The source endpoint is
- * supplied by {@link RelationUpdate}.
+ * Represents the immutable target endpoint of a relation edge in a relation update. The source
+ * endpoint is supplied by {@link RelationUpdate}.
  *
  * <p>The optional relation value is metadata stored on the edge itself rather than on either
  * endpoint entity. For example, a tag assignment value belongs to the tag-to-metadata-object
