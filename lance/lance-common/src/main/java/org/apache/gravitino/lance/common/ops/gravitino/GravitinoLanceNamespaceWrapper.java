@@ -41,9 +41,6 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
-import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.CatalogOperations;
-import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -178,15 +175,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
           .toArray(String[]::new);
     }
 
-    if (catalog instanceof BaseCatalog) {
-      CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof SupportsSchemas) {
-        return Arrays.stream(((SupportsSchemas) ops).listSchemas(Namespace.of()))
-            .map(NameIdentifier::name)
-            .toArray(String[]::new);
-      }
-    }
-
     return catalog.asSchemas().listSchemas();
   }
 
@@ -196,13 +184,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
       return schemaDispatcher.schemaExists(schemaIdent(catalog.name(), schemaName));
     }
 
-    if (catalog instanceof BaseCatalog) {
-      CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof SupportsSchemas) {
-        return ((SupportsSchemas) ops).schemaExists(NameIdentifier.of(schemaName));
-      }
-    }
-
     return catalog.asSchemas().schemaExists(schemaName);
   }
 
@@ -210,13 +191,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     SchemaDispatcher schemaDispatcher = currentSchemaDispatcher();
     if (schemaDispatcher != null) {
       return schemaDispatcher.loadSchema(schemaIdent(catalog.name(), schemaName));
-    }
-
-    if (catalog instanceof BaseCatalog) {
-      CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof SupportsSchemas) {
-        return ((SupportsSchemas) ops).loadSchema(NameIdentifier.of(schemaName));
-      }
     }
 
     return catalog.asSchemas().loadSchema(schemaName);
@@ -230,14 +204,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
           schemaIdent(catalog.name(), schemaName), comment, properties);
     }
 
-    if (catalog instanceof BaseCatalog) {
-      CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof SupportsSchemas) {
-        return ((SupportsSchemas) ops)
-            .createSchema(NameIdentifier.of(schemaName), comment, properties);
-      }
-    }
-
     return catalog.asSchemas().createSchema(schemaName, comment, properties);
   }
 
@@ -245,13 +211,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     SchemaDispatcher schemaDispatcher = currentSchemaDispatcher();
     if (schemaDispatcher != null) {
       return schemaDispatcher.alterSchema(schemaIdent(catalog.name(), schemaName), changes);
-    }
-
-    if (catalog instanceof BaseCatalog) {
-      CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof SupportsSchemas) {
-        return ((SupportsSchemas) ops).alterSchema(NameIdentifier.of(schemaName), changes);
-      }
     }
 
     return catalog.asSchemas().alterSchema(schemaName, changes);
@@ -263,13 +222,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
       return schemaDispatcher.dropSchema(schemaIdent(catalog.name(), schemaName), cascade);
     }
 
-    if (catalog instanceof BaseCatalog) {
-      CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof SupportsSchemas) {
-        return ((SupportsSchemas) ops).dropSchema(NameIdentifier.of(schemaName), cascade);
-      }
-    }
-
     return catalog.asSchemas().dropSchema(schemaName, cascade);
   }
 
@@ -277,13 +229,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     TableDispatcher tableDispatcher = currentTableDispatcher();
     if (tableDispatcher != null) {
       return new InternalTableCatalogAdapter(catalog.name(), tableDispatcher);
-    }
-
-    if (catalog instanceof BaseCatalog) {
-      CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof TableCatalog) {
-        return (TableCatalog) ops;
-      }
     }
 
     return catalog.asTableCatalog();
