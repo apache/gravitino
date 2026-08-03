@@ -388,14 +388,27 @@ final class TrinoNativeViewCodec {
     return Types.StructType.Field.nullableField(fieldName, fromTrinoTypeString(fieldType));
   }
 
-  /** Splits a comma-separated argument list, ignoring commas nested inside parentheses. */
+  /**
+   * Splits a comma-separated argument list, ignoring commas nested inside parentheses or inside a
+   * double-quoted row field name (which may itself contain commas, e.g. {@code row("a,b" integer)}
+   * ; a doubled {@code ""} inside the quotes is an escaped literal quote, not a terminator).
+   */
   private static String[] splitTopLevel(String s) {
     List<String> parts = new ArrayList<>();
     int depth = 0;
+    boolean inQuotes = false;
     int start = 0;
     for (int i = 0; i < s.length(); i++) {
       char c = s.charAt(i);
-      if (c == '(') {
+      if (c == '"') {
+        if (inQuotes && i + 1 < s.length() && s.charAt(i + 1) == '"') {
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (inQuotes) {
+        // Ignore parentheses/commas inside a quoted field name.
+      } else if (c == '(') {
         depth++;
       } else if (c == ')') {
         depth--;

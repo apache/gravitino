@@ -189,10 +189,11 @@ class HiveViewCatalogOperations implements ViewCatalog {
         throw new NoSuchViewException("No view named %s (it is a table, not a view)", ident.name());
       }
 
+      // Reuse the same dialect detection as loadHiveView()/toHiveView() so that a presto_view
+      // entry that is not a plain Trino view (e.g. a Trino/Presto materialized view) is rejected
+      // here too, instead of being silently treated as a non-Trino view.
       boolean isTrinoView =
-          "true"
-              .equalsIgnoreCase(
-                  currentHiveTable.properties().get(TrinoNativeViewCodec.PRESTO_VIEW_FLAG));
+          Dialects.TRINO.equalsIgnoreCase(HiveView.detectDialect(currentHiveTable.properties()));
 
       String newViewName = currentHiveTable.name();
       String updatedViewOriginalText = currentHiveTable.viewOriginalText();
