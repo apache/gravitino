@@ -118,31 +118,47 @@ public interface AccessControlDispatcher {
       throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
-   * Enables a User without removing role bindings.
+   * Gets a User by Gravitino-assigned id.
    *
    * @param metalake The Metalake of the User.
-   * @param externalId The external identifier of the User.
-   * @return The updated User instance.
-   * @throws IllegalArgumentException If externalId is null or blank.
-   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @param userId The Gravitino-assigned id of the User.
+   * @return The getting User instance.
+   * @throws NoSuchUserException If the User with the given id does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If updating the User encounters storage issues.
+   * @throws RuntimeException If getting the User encounters storage issues.
    */
-  User enableUser(String metalake, String externalId)
+  User getUserById(String metalake, long userId)
       throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
-   * Disables a User without removing role bindings.
+   * Removes a User by Gravitino-assigned id.
    *
    * @param metalake The Metalake of the User.
-   * @param externalId The external identifier of the User.
+   * @param userId The Gravitino-assigned id of the User.
+   * @return True if the User was successfully removed, false only when there's no such user,
+   *     otherwise it will throw an exception.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the User encounters storage issues.
+   */
+  boolean removeUserById(String metalake, long userId) throws NoSuchMetalakeException;
+
+  /**
+   * Alters a User by Gravitino-assigned id.
+   *
+   * <p>Supports updating {@code enabled} and/or {@code externalId} in one call via {@link
+   * UserChange}. Role bindings are preserved.
+   *
+   * @param metalake The Metalake of the User.
+   * @param userId The Gravitino-assigned id of the User.
+   * @param changes The changes to apply. Must not be empty.
    * @return The updated User instance.
-   * @throws IllegalArgumentException If externalId is null or blank.
-   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @throws IllegalArgumentException If changes is null or empty, or contains an unsupported
+   *     change.
+   * @throws NoSuchUserException If the User with the given id does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If updating the User encounters storage issues.
    */
-  User disableUser(String metalake, String externalId)
+  User alterUserById(String metalake, long userId, UserChange... changes)
       throws NoSuchUserException, NoSuchMetalakeException;
 
   /**

@@ -98,6 +98,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.storage.IdGenerator;
@@ -156,6 +157,8 @@ public class GravitinoEnv {
   private CredentialOperationDispatcher credentialOperationDispatcher;
 
   private KmsClientRegistry kmsClientRegistry;
+
+  private SecretProviderRegistry secretProviderRegistry;
 
   private TagDispatcher tagDispatcher;
 
@@ -437,6 +440,21 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the secrets-provider registry associated with the Gravitino environment.
+   *
+   * <p>The environment owns this registry. Callers may inject it into dependent components but must
+   * not close it.
+   *
+   * @return The secrets-provider registry instance.
+   * @throws IllegalStateException if the environment has not been initialized
+   */
+  public SecretProviderRegistry secretProviderRegistry() {
+    Preconditions.checkState(
+        secretProviderRegistry != null, "GravitinoEnv components are not initialized.");
+    return secretProviderRegistry;
+  }
+
+  /**
    * Get the IdGenerator associated with the Gravitino environment.
    *
    * @return The IdGenerator instance.
@@ -657,11 +675,16 @@ public class GravitinoEnv {
       kmsClientRegistry.close();
     }
 
+    if (secretProviderRegistry != null) {
+      secretProviderRegistry.close();
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
   private void initBaseComponents() {
     this.kmsClientRegistry = new KmsClientRegistry(config);
+    this.secretProviderRegistry = new SecretProviderRegistry(config);
 
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());

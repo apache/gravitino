@@ -23,6 +23,7 @@ import java.io.Closeable;
 import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
@@ -73,7 +74,12 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
    */
   @Override
   public void initialize(String inputName, Map<String, String> properties) {
-    super.initialize(inputName, properties);
+    try {
+      super.initialize(inputName, properties);
+    } catch (RuntimeException e) {
+      closePartiallyInitializedResources(e);
+      throw e;
+    }
 
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isKerberosAuth()) {
@@ -104,5 +110,25 @@ public class ClosableJdbcCatalog extends JdbcCatalog implements Closeable, Suppo
   @Override
   public <R> R doKerberosOperations(Executable<R> executable) throws Throwable {
     return KerberosCatalogUtils.doKerberosOperations(this.properties(), kerberosClient, executable);
+  }
+
+  private void closePartiallyInitializedResources(RuntimeException initializationException) {
+    // JdbcCatalog creates these resources before updating the JDBC schema, but registers them with
+    // its CloseableGroup only after the update succeeds. Its close() method therefore cannot clean
+    // them up when initialization fails during the schema update.
+    closePartiallyInitializedResource("connections", initializationException);
+    closePartiallyInitializedResource("io", initializationException);
+  }
+
+  private void closePartiallyInitializedResource(
+      String fieldName, RuntimeException initializationException) {
+    try {
+      Closeable resource = (Closeable) FieldUtils.readField(this, fieldName, true);
+      if (resource != null) {
+        resource.close();
+      }
+    } catch (Exception closeException) {
+      initializationException.addSuppressed(closeException);
+    }
   }
 }

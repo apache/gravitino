@@ -21,9 +21,11 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -39,8 +41,12 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsExternalIdOperations;
+import org.apache.gravitino.SupportsIdOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
@@ -62,6 +68,7 @@ public class RelationalEntityStore
     implements EntityStore,
         SupportsRelationOperations,
         SupportsExternalIdOperations,
+        SupportsIdOperations,
         SupportsEntityChangeLog {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
@@ -190,6 +197,11 @@ public class RelationalEntityStore
   }
 
   @Override
+  public SupportsIdOperations idOperations() {
+    return this;
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E getByExternalId(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
       throws NoSuchEntityException, IOException {
@@ -216,6 +228,39 @@ public class RelationalEntityStore
     } catch (NoSuchEntityException e) {
       LOGGER.warn(
           "The entity to be deleted by external id does not exist in the store: {}", ident, e);
+      return false;
+    } finally {
+      if (nameIdent != null) {
+        cache.invalidate(nameIdent, entityType);
+      }
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getById(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
+      throws NoSuchEntityException, IOException {
+    return backend.getById(ident, entityType);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateById(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    E updatedEntity = backend.updateById(ident, entityType, updater);
+    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+    return updatedEntity;
+  }
+
+  @Override
+  public boolean deleteById(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    NameIdentifier nameIdent = null;
+    try {
+      HasIdentifier entity = backend.getById(ident, entityType);
+      nameIdent = entity.nameIdentifier();
+      return backend.delete(nameIdent, entityType, false);
+    } catch (NoSuchEntityException e) {
+      LOGGER.warn("The entity to be deleted by id does not exist in the store: {}", ident, e);
       return false;
     } finally {
       if (nameIdent != null) {
@@ -392,21 +437,55 @@ public class RelationalEntityStore
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    Entity.EntityType destEntityType = getDestinationEntityType(relType);
-    List<E> result =
-        backend.updateEntityRelations(
-            relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    return updateEntityRelations(
+        RelationUpdate.of(
+            relType,
+            srcEntityIdent,
+            srcEntityType,
+            toRelationEdgeTargets(relType, destEntitiesToAdd),
+            toRelationEdgeTargets(relType, destEntitiesToRemove)));
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
+      throws IOException {
+    if (query.relationValue().isPresent()) {
+      return backend.listEntitiesByRelation(query);
+    }
+
+    return listEntitiesByRelation(
+        query.relationType(),
+        query.anchorIdentifier(),
+        query.anchorEntityType(),
+        query.allFields());
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(RelationUpdate update)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    validateRelationTargetTypes(update);
+
+    RelationEdgeTarget[] targetsToAdd = update.targetsToAdd();
+    RelationEdgeTarget[] targetsToRemove = update.targetsToRemove();
+    List<E> result;
+    if (update.hasRelationValues()) {
+      result = backend.updateEntityRelations(update);
+    } else {
+      result =
+          backend.updateEntityRelations(
+              update.relationType(),
+              update.sourceIdentifier(),
+              update.sourceEntityType(),
+              toNameIdentifiers(targetsToAdd),
+              toNameIdentifiers(targetsToRemove));
+    }
 
     // Invalidate after the backend write, not before: invalidating first opens a window where a
     // concurrent read could repopulate the cache with stale pre-commit data.
-    cache.invalidate(srcEntityIdent, srcEntityType);
-    for (NameIdentifier destToAdd : destEntitiesToAdd) {
-      cache.invalidate(destToAdd, destEntityType);
-    }
-
-    for (NameIdentifier destToRemove : destEntitiesToRemove) {
-      cache.invalidate(destToRemove, destEntityType);
-    }
+    Entity.EntityType targetEntityType = relationUpdateTargetType(update.relationType());
+    cache.invalidate(update.sourceIdentifier(), update.sourceEntityType());
+    invalidateRelationTargetCache(targetEntityType, targetsToAdd);
+    invalidateRelationTargetCache(targetEntityType, targetsToRemove);
 
     return result;
   }
@@ -424,7 +503,50 @@ public class RelationalEntityStore
     backend.batchPut(entities, overwritten);
   }
 
-  private static Entity.EntityType getDestinationEntityType(Type relType) {
+  private void invalidateRelationTargetCache(
+      Entity.EntityType targetEntityType, RelationEdgeTarget[] relationTargets) {
+    for (RelationEdgeTarget relationTarget : relationTargets) {
+      cache.invalidate(relationTarget.nameIdentifier(), targetEntityType);
+    }
+  }
+
+  private static void validateRelationTargetTypes(RelationUpdate update) {
+    Entity.EntityType targetEntityType = relationUpdateTargetType(update.relationType());
+    validateRelationTargetTypes(update.relationType(), targetEntityType, update.targetsToAdd());
+    validateRelationTargetTypes(update.relationType(), targetEntityType, update.targetsToRemove());
+  }
+
+  private static void validateRelationTargetTypes(
+      Type relType, Entity.EntityType targetEntityType, RelationEdgeTarget[] relationTargets) {
+    for (RelationEdgeTarget relationTarget : relationTargets) {
+      Preconditions.checkArgument(
+          relationTarget.entityType() == targetEntityType,
+          "Relation target type %s does not match expected destination type %s for relation type %s",
+          relationTarget.entityType(),
+          targetEntityType,
+          relType);
+    }
+  }
+
+  private static RelationEdgeTarget[] toRelationEdgeTargets(
+      Type relType, NameIdentifier[] nameIdentifiers) {
+    if (nameIdentifiers == null) {
+      return new RelationEdgeTarget[0];
+    }
+
+    Entity.EntityType targetEntityType = relationUpdateTargetType(relType);
+    return Arrays.stream(nameIdentifiers)
+        .map(nameIdentifier -> RelationEdgeTarget.of(nameIdentifier, targetEntityType, null))
+        .toArray(RelationEdgeTarget[]::new);
+  }
+
+  private static NameIdentifier[] toNameIdentifiers(RelationEdgeTarget[] relationTargets) {
+    return Arrays.stream(relationTargets)
+        .map(RelationEdgeTarget::nameIdentifier)
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static Entity.EntityType relationUpdateTargetType(Type relType) {
     switch (relType) {
       case POLICY_METADATA_OBJECT_REL:
         return Entity.EntityType.POLICY;

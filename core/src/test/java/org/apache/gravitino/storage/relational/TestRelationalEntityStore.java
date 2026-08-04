@@ -30,6 +30,9 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -167,7 +170,11 @@ public class TestRelationalEntityStore {
             })
         .when(backend)
         .updateEntityRelations(
-            relationType, src, Entity.EntityType.TABLE, destEntitiesToAdd, destEntitiesToRemove);
+            eq(relationType),
+            eq(src),
+            eq(Entity.EntityType.TABLE),
+            any(NameIdentifier[].class),
+            any(NameIdentifier[].class));
 
     store.updateEntityRelations(
         relationType, src, Entity.EntityType.TABLE, destEntitiesToAdd, destEntitiesToRemove);
@@ -176,7 +183,11 @@ public class TestRelationalEntityStore {
     inOrder
         .verify(backend)
         .updateEntityRelations(
-            relationType, src, Entity.EntityType.TABLE, destEntitiesToAdd, destEntitiesToRemove);
+            eq(relationType),
+            eq(src),
+            eq(Entity.EntityType.TABLE),
+            any(NameIdentifier[].class),
+            any(NameIdentifier[].class));
     inOrder.verify(cache).invalidate(src, Entity.EntityType.TABLE);
     inOrder.verify(cache).invalidate(destToAdd, destinationType);
     inOrder.verify(cache).invalidate(destToRemove, destinationType);
@@ -195,6 +206,81 @@ public class TestRelationalEntityStore {
                 Entity.EntityType.TABLE,
                 new NameIdentifier[0],
                 new NameIdentifier[0]));
+    Mockito.verifyNoInteractions(backend);
+  }
+
+  @Test
+  void testListEntitiesByRelationWithRelationValueDelegatesToBackend() throws IOException {
+    NameIdentifier tag = NameIdentifier.of("metalake", "tag1");
+    RelationQuery query =
+        RelationQuery.of(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            tag,
+            Entity.EntityType.TAG,
+            true,
+            "dev");
+
+    store.listEntitiesByRelation(query);
+
+    Mockito.verify(backend).listEntitiesByRelation(query);
+  }
+
+  @Test
+  void testUpdateRelationWithValuesInvalidatesCacheAfterBackendUpdate()
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
+          IllegalAccessException {
+    NameIdentifier src = NameIdentifier.of("metalake", "catalog", "schema", "table1");
+    NameIdentifier destToAdd = NameIdentifier.of("metalake", "tag1");
+    NameIdentifier destToRemove = NameIdentifier.of("metalake", "tag2");
+    RelationEdgeTarget[] destEntitiesToAdd =
+        new RelationEdgeTarget[] {RelationEdgeTarget.of(destToAdd, Entity.EntityType.TAG, "dev")};
+    RelationEdgeTarget[] destEntitiesToRemove =
+        new RelationEdgeTarget[] {
+          RelationEdgeTarget.of(destToRemove, Entity.EntityType.TAG, "prod")
+        };
+    RelationUpdate update =
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            src,
+            Entity.EntityType.TABLE,
+            destEntitiesToAdd,
+            destEntitiesToRemove);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    Mockito.doAnswer(
+            invocation -> {
+              Mockito.verify(cache, Mockito.never()).invalidate(src, Entity.EntityType.TABLE);
+              Mockito.verify(cache, Mockito.never()).invalidate(destToAdd, Entity.EntityType.TAG);
+              Mockito.verify(cache, Mockito.never())
+                  .invalidate(destToRemove, Entity.EntityType.TAG);
+              return List.of();
+            })
+        .when(backend)
+        .updateEntityRelations(update);
+
+    store.updateEntityRelations(update);
+
+    InOrder inOrder = Mockito.inOrder(backend, cache);
+    inOrder.verify(backend).updateEntityRelations(update);
+    inOrder.verify(cache).invalidate(src, Entity.EntityType.TABLE);
+    inOrder.verify(cache).invalidate(destToAdd, Entity.EntityType.TAG);
+    inOrder.verify(cache).invalidate(destToRemove, Entity.EntityType.TAG);
+  }
+
+  @Test
+  void testUpdateRelationRejectsMismatchedTargetTypeBeforeBackendUpdate() {
+    NameIdentifier src = NameIdentifier.of("metalake", "catalog", "schema", "table1");
+    NameIdentifier tag = NameIdentifier.of("metalake", "tag1");
+    RelationUpdate update =
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            src,
+            Entity.EntityType.TABLE,
+            new RelationEdgeTarget[] {RelationEdgeTarget.of(tag, Entity.EntityType.TABLE, "dev")},
+            new RelationEdgeTarget[0]);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> store.updateEntityRelations(update));
     Mockito.verifyNoInteractions(backend);
   }
 }
