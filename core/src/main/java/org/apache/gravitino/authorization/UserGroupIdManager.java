@@ -171,8 +171,10 @@ class UserGroupIdManager extends UserGroupManager {
     }
   }
 
-  Group updateGroupExternalId(String metalake, long groupId, String newExternalId)
+  Group alterGroupById(String metalake, long groupId, GroupChange... changes)
       throws NoSuchGroupException {
+    Preconditions.checkArgument(
+        changes != null && changes.length > 0, "Group changes cannot be empty");
     try {
       return store
           .idOperations()
@@ -180,28 +182,44 @@ class UserGroupIdManager extends UserGroupManager {
               AuthorizationUtils.ofGroupId(metalake, groupId),
               Entity.EntityType.GROUP,
               GroupEntity.class,
-              group ->
-                  GroupEntity.builder()
-                      .withId(group.id())
-                      .withName(group.name())
-                      .withNamespace(group.namespace())
-                      .withExternalId(newExternalId)
-                      .withRoleNames(group.roleNames())
-                      .withRoleIds(group.roleIds())
-                      .withAuditInfo(group.auditInfo())
-                      .build());
+              group -> applyGroupChanges(group, changes));
     } catch (NoSuchEntityException e) {
       LOG.warn("Group with id {} does not exist in the metalake {}", groupId, metalake, e);
       throw new NoSuchGroupException(
           AuthorizationUtils.GROUP_WITH_ID_DOES_NOT_EXIST_MSG, groupId, metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Updating external id for group with id {} in the metalake {} failed due to storage"
-              + " issues",
+          "Altering group with id {} in the metalake {} failed due to storage issues",
           groupId,
           metalake,
           ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  private static GroupEntity applyGroupChanges(GroupEntity group, GroupChange... changes) {
+    String externalId = group.externalId();
+    for (GroupChange change : changes) {
+      if (change instanceof GroupChange.UpdateExternalId) {
+        externalId = ((GroupChange.UpdateExternalId) change).getNewExternalId();
+      } else {
+        throw new IllegalArgumentException("Unsupported group change: " + change);
+      }
+    }
+    return GroupEntity.builder()
+        .withId(group.id())
+        .withName(group.name())
+        .withNamespace(group.namespace())
+        .withExternalId(externalId)
+        .withRoleNames(group.roleNames())
+        .withRoleIds(group.roleIds())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(group.auditInfo().creator())
+                .withCreateTime(group.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .build();
   }
 }

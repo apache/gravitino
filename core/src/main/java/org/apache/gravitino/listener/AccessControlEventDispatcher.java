@@ -25,6 +25,7 @@ import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.GroupChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -120,9 +121,6 @@ import org.apache.gravitino.listener.api.event.RevokePrivilegesPreEvent;
 import org.apache.gravitino.listener.api.event.RevokeUserRolesEvent;
 import org.apache.gravitino.listener.api.event.RevokeUserRolesFailureEvent;
 import org.apache.gravitino.listener.api.event.RevokeUserRolesPreEvent;
-import org.apache.gravitino.listener.api.event.UpdateGroupExternalIdEvent;
-import org.apache.gravitino.listener.api.event.UpdateGroupExternalIdFailureEvent;
-import org.apache.gravitino.listener.api.event.UpdateGroupExternalIdPreEvent;
 import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.listener.api.info.RoleInfo;
 import org.apache.gravitino.listener.api.info.UserInfo;
@@ -463,23 +461,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
-  public Group updateGroupExternalId(String metalake, long groupId, String newExternalId)
+  public Group alterGroupById(String metalake, long groupId, GroupChange... changes)
       throws NoSuchGroupException, NoSuchMetalakeException {
-    String initiator = PrincipalUtils.getCurrentUserName();
-
-    eventBus.dispatchEvent(
-        new UpdateGroupExternalIdPreEvent(initiator, metalake, groupId, newExternalId));
-    try {
-      Group groupObject = dispatcher.updateGroupExternalId(metalake, groupId, newExternalId);
-      eventBus.dispatchEvent(
-          new UpdateGroupExternalIdEvent(initiator, metalake, new GroupInfo(groupObject)));
-
-      return groupObject;
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new UpdateGroupExternalIdFailureEvent(initiator, metalake, e, groupId, newExternalId));
-      throw e;
-    }
+    return dispatcher.alterGroupById(metalake, groupId, changes);
   }
 
   /** {@inheritDoc} */

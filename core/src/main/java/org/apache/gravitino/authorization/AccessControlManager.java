@@ -227,12 +227,12 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
-  public Group updateGroupExternalId(String metalake, long groupId, String newExternalId)
+  public Group alterGroupById(String metalake, long groupId, GroupChange... changes)
       throws NoSuchGroupException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofGroupId(metalake, groupId),
         LockType.WRITE,
-        () -> userGroupIdManager.updateGroupExternalId(metalake, groupId, newExternalId));
+        () -> userGroupIdManager.alterGroupById(metalake, groupId, changes));
   }
 
   @Override

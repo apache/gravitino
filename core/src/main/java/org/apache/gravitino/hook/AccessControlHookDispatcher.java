@@ -28,6 +28,7 @@ import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.GroupChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.Privilege;
@@ -172,9 +173,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
-  public Group updateGroupExternalId(String metalake, long groupId, String newExternalId)
+  public Group alterGroupById(String metalake, long groupId, GroupChange... changes)
       throws NoSuchGroupException, NoSuchMetalakeException {
-    return dispatcher.updateGroupExternalId(metalake, groupId, newExternalId);
+    return dispatcher.alterGroupById(metalake, groupId, changes);
   }
 
   @Override

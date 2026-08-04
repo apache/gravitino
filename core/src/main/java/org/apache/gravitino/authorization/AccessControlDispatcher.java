@@ -286,17 +286,21 @@ public interface AccessControlDispatcher {
   boolean removeGroupById(String metalake, long groupId) throws NoSuchMetalakeException;
 
   /**
-   * Updates the external identifier of a Group by Gravitino-assigned id.
+   * Alters a Group by Gravitino-assigned id.
+   *
+   * <p>Supports updating {@code externalId} via {@link GroupChange}. Role bindings are preserved.
    *
    * @param metalake The Metalake of the Group.
    * @param groupId The Gravitino-assigned id of the Group.
-   * @param newExternalId The new external identifier, or null to clear it.
+   * @param changes The changes to apply. Must not be empty.
    * @return The updated Group instance.
+   * @throws IllegalArgumentException If changes is null or empty, or contains an unsupported
+   *     change.
    * @throws NoSuchGroupException If the Group with the given id does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If updating the Group encounters storage issues.
    */
-  Group updateGroupExternalId(String metalake, long groupId, String newExternalId)
+  Group alterGroupById(String metalake, long groupId, GroupChange... changes)
       throws NoSuchGroupException, NoSuchMetalakeException;
 
   /**

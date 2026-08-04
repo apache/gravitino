@@ -50,7 +50,8 @@ public interface Group extends Auditable {
    *
    * <p>Gravitino {@link Group#name() group names} may differ from upstream ids or be unknown at
    * sync time. External id lets integrators look up and delete groups without relying on the
-   * Gravitino group name.
+   * Gravitino group name. Mutable attributes such as {@code externalId} are updated via {@code
+   * alterGroupById}.
    *
    * @return The upstream external identifier, or null if not set.
    */

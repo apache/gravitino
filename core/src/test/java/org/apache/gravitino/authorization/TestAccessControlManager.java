@@ -671,15 +671,27 @@ public class TestAccessControlManager {
     Assertions.assertEquals("id_group", loaded.name());
     Assertions.assertEquals("ext-id-group", loaded.externalId());
 
-    Group updated = accessControlManager.updateGroupExternalId(METALAKE, groupId, "ext-id-group-2");
+    Group updated =
+        accessControlManager.alterGroupById(
+            METALAKE, groupId, GroupChange.updateExternalId("ext-id-group-2"));
     Assertions.assertEquals(groupId, updated.id());
     Assertions.assertEquals("ext-id-group-2", updated.externalId());
     Assertions.assertEquals(
         "id_group", accessControlManager.getGroupByExternalId(METALAKE, "ext-id-group-2").name());
 
+    Assertions.assertThrows(
+        NoSuchGroupException.class,
+        () ->
+            accessControlManager.alterGroupById(METALAKE, -1L, GroupChange.updateExternalId("x")));
+
     Assertions.assertTrue(accessControlManager.removeGroupById(METALAKE, groupId));
     Assertions.assertThrows(
         NoSuchGroupException.class, () -> accessControlManager.getGroupById(METALAKE, groupId));
     Assertions.assertFalse(accessControlManager.removeGroupById(METALAKE, groupId));
+    Assertions.assertThrows(
+        NoSuchGroupException.class,
+        () ->
+            accessControlManager.alterGroupById(
+                METALAKE, groupId, GroupChange.updateExternalId("x")));
   }
 }
