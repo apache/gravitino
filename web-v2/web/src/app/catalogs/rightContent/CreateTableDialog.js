@@ -665,6 +665,7 @@ export default function CreateTableDialog({ ...props }) {
     e.preventDefault()
 
     const currentEngine = getClickHouseEngine()
+
     const isCurrentMergeTree =
       provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.map(e => e.toLowerCase()).includes(currentEngine)
 
