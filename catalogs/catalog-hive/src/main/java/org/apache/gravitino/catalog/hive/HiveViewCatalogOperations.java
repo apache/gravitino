@@ -608,7 +608,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
    * Sets or clears the {@code presto_view} marker in the given HMS property map, so that a Trino
    * dialect view is recognized as a native Trino view (see {@link TrinoNativeViewCodec}).
    */
-  private static void applyTrinoViewMarker(Map<String, String> params, String dialect) {
+  private void applyTrinoViewMarker(Map<String, String> params, String dialect) {
     if (!Dialects.TRINO.equalsIgnoreCase(dialect)) {
       params.remove(TrinoNativeViewCodec.PRESTO_VIEW_FLAG);
       return;
