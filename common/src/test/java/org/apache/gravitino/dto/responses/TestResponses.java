@@ -245,6 +245,16 @@ public class TestResponses {
   }
 
   @Test
+  void testOptimisticLockConflictErrorResponse() throws IllegalArgumentException {
+    ErrorResponse error =
+        ErrorResponse.optimisticLockConflict(
+            "OptimisticLockException", "optimistic lock conflict", null);
+    error.validate(); // No exception thrown
+    assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, error.getCode());
+    assertEquals("OptimisticLockException", error.getType());
+  }
+
+  @Test
   void testNonEmptyErrorResponse() throws IllegalArgumentException {
     ErrorResponse error = ErrorResponse.nonEmpty("error type", "non empty error");
     error.validate(); // No exception thrown
