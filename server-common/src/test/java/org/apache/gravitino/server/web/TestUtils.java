@@ -30,6 +30,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
+import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.junit.jupiter.api.Assertions;
@@ -174,6 +175,7 @@ public class TestUtils {
     assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
     assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, errorResponse.getCode());
     assertEquals(OptimisticLockException.class.getSimpleName(), errorResponse.getType());
     assertEquals("Conflict", errorResponse.getMessage());
   }
