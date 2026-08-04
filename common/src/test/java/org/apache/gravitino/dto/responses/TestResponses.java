@@ -300,7 +300,7 @@ public class TestResponses {
   void testGroupResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    GroupDTO group = GroupDTO.builder().withName("group1").withAudit(audit).build();
+    GroupDTO group = GroupDTO.builder().withId(1L).withName("group1").withAudit(audit).build();
     GroupResponse response = new GroupResponse(group);
     response.validate(); // No exception thrown
   }

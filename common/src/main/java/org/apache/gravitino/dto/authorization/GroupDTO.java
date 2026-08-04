@@ -53,6 +53,7 @@ public class GroupDTO implements Group {
   /**
    * Creates a new instance of GroupDTO.
    *
+   * @param id The id of the Group DTO.
    * @param name The name of the Group DTO.
    * @param externalId The external id of the Group DTO.
    * @param roles The roles of the Group DTO.
@@ -67,13 +68,16 @@ public class GroupDTO implements Group {
   }
 
   /**
-   * @return The name of the Group DTO.
+   * @return The id of the Group DTO.
    */
   @Override
   public Long id() {
     return id;
   }
 
+  /**
+   * @return The name of the Group DTO.
+   */
   @Override
   public String name() {
     return name;
@@ -118,9 +122,10 @@ public class GroupDTO implements Group {
    */
   public static class Builder<S extends Builder> {
 
-    /** The name of the group. */
+    /** The id of the group. */
     protected Long id;
 
+    /** The name of the group. */
     protected String name;
 
     /** The external id of the group. */

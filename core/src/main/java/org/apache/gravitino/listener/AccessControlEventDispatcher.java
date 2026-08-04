@@ -46,6 +46,9 @@ import org.apache.gravitino.listener.api.event.AddGroupPreEvent;
 import org.apache.gravitino.listener.api.event.AddUserEvent;
 import org.apache.gravitino.listener.api.event.AddUserFailureEvent;
 import org.apache.gravitino.listener.api.event.AddUserPreEvent;
+import org.apache.gravitino.listener.api.event.AlterGroupEvent;
+import org.apache.gravitino.listener.api.event.AlterGroupFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterGroupPreEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateRolePreEvent;
@@ -463,7 +466,19 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Group alterGroupById(String metalake, long groupId, GroupChange... changes)
       throws NoSuchGroupException, NoSuchMetalakeException {
-    return dispatcher.alterGroupById(metalake, groupId, changes);
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new AlterGroupPreEvent(initiator, metalake, groupId, changes));
+    try {
+      Group groupObject = dispatcher.alterGroupById(metalake, groupId, changes);
+      eventBus.dispatchEvent(
+          new AlterGroupEvent(initiator, metalake, changes, new GroupInfo(groupObject)));
+
+      return groupObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new AlterGroupFailureEvent(initiator, metalake, groupId, changes, e));
+      throw e;
+    }
   }
 
   /** {@inheritDoc} */
