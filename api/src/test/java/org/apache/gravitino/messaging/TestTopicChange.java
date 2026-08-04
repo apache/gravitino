@@ -57,6 +57,68 @@ public class TestTopicChange {
   }
 
   @Test
+  void testUpdateDataLayoutChange() {
+    DataLayout layout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withTypeName("com.example.Order")
+            .withSchemaSubject("order-value")
+            .build();
+    TopicChange topicChange = TopicChange.updateDataLayout(DataLayouts.VALUE, layout);
+
+    Assertions.assertInstanceOf(TopicChange.UpdateDataLayout.class, topicChange);
+    TopicChange.UpdateDataLayout update = (TopicChange.UpdateDataLayout) topicChange;
+    Assertions.assertEquals(DataLayouts.VALUE, update.getName());
+    Assertions.assertEquals(layout, update.getNewDataLayout());
+  }
+
+  @Test
+  void testRemoveDataLayoutChange() {
+    TopicChange topicChange = TopicChange.removeDataLayout(DataLayouts.VALUE);
+    Assertions.assertInstanceOf(TopicChange.RemoveDataLayout.class, topicChange);
+    Assertions.assertEquals(TopicChange.removeDataLayout(DataLayouts.VALUE), topicChange);
+  }
+
+  @Test
+  void testUpdateValueDataLayoutChange() {
+    DataLayout layout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.AVRO)
+            .withSchemaSubject("order-value")
+            .build();
+
+    Assertions.assertEquals(
+        TopicChange.updateDataLayout(DataLayouts.VALUE, layout),
+        TopicChange.updateValueDataLayout(layout));
+  }
+
+  @Test
+  void testRemoveDataLayoutsChange() {
+    TopicChange removeAll = TopicChange.removeDataLayouts();
+
+    Assertions.assertInstanceOf(TopicChange.RemoveDataLayouts.class, removeAll);
+    Assertions.assertEquals(TopicChange.removeDataLayouts(), removeAll);
+    Assertions.assertEquals(TopicChange.removeDataLayouts().hashCode(), removeAll.hashCode());
+    Assertions.assertNotEquals(TopicChange.removeDataLayout(DataLayouts.VALUE), removeAll);
+  }
+
+  @Test
+  void testDataLayoutChangesRejectInvalidArguments() {
+    DataLayout layout = SchemaDataLayout.builder().withFormat(DataLayout.Format.PROTOBUF).build();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> TopicChange.updateDataLayout(" ", layout));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> TopicChange.updateDataLayout(null, layout));
+    Assertions.assertThrows(
+        NullPointerException.class, () -> TopicChange.updateDataLayout(DataLayouts.VALUE, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> TopicChange.removeDataLayout(" "));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> TopicChange.removeDataLayout(null));
+  }
+
+  @Test
   void testEqualsAndHashCode() {
     // remove property
     String property = "property1";
@@ -102,5 +164,25 @@ public class TestTopicChange {
 
     Assertions.assertNotEquals(setProperty2, setProperty3);
     Assertions.assertNotEquals(setProperty2.hashCode(), setProperty3.hashCode());
+
+    // update data layout
+    DataLayout layout1 =
+        SchemaDataLayout.builder().withFormat(DataLayout.Format.AVRO).withSchemaId("1").build();
+    DataLayout layout2 =
+        SchemaDataLayout.builder().withFormat(DataLayout.Format.AVRO).withSchemaId("1").build();
+    DataLayout layout3 =
+        SchemaDataLayout.builder().withFormat(DataLayout.Format.JSON).withSchemaId("2").build();
+    TopicChange updateLayout1 = TopicChange.updateDataLayout(DataLayouts.VALUE, layout1);
+    TopicChange updateLayout2 = TopicChange.updateDataLayout(DataLayouts.VALUE, layout2);
+    TopicChange updateLayout3 = TopicChange.updateDataLayout(DataLayouts.KEY, layout3);
+    Assertions.assertEquals(updateLayout1, updateLayout2);
+    Assertions.assertEquals(updateLayout1.hashCode(), updateLayout2.hashCode());
+    Assertions.assertNotEquals(updateLayout1, updateLayout3);
+
+    TopicChange removeLayout1 = TopicChange.removeDataLayout(DataLayouts.VALUE);
+    TopicChange removeLayout2 = TopicChange.removeDataLayout(DataLayouts.VALUE);
+    Assertions.assertEquals(removeLayout1, removeLayout2);
+    Assertions.assertEquals(removeLayout1.hashCode(), removeLayout2.hashCode());
+    Assertions.assertEquals(TopicChange.removeDataLayouts(), TopicChange.removeDataLayouts());
   }
 }

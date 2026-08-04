@@ -24,6 +24,8 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.messaging.Topic;
 
 /** Provides read-only access to topic information for event listeners. */
@@ -31,6 +33,7 @@ import org.apache.gravitino.messaging.Topic;
 public final class TopicInfo {
   private final String name;
   @Nullable private final String comment;
+  private final Map<String, DataLayout> dataLayouts;
   private final Map<String, String> properties;
   @Nullable private final Audit audit;
 
@@ -40,7 +43,7 @@ public final class TopicInfo {
    * @param topic The topic to extract information from.
    */
   public TopicInfo(Topic topic) {
-    this(topic.name(), topic.comment(), topic.properties(), topic.auditInfo());
+    this(topic.name(), topic.comment(), topic.dataLayouts(), topic.properties(), topic.auditInfo());
   }
 
   /**
@@ -52,8 +55,29 @@ public final class TopicInfo {
    * @param audit Optional audit information.
    */
   public TopicInfo(String name, String comment, Map<String, String> properties, Audit audit) {
+    this(name, comment, null, properties, audit);
+  }
+
+  /**
+   * Constructs topic information with detailed parameters including data layouts.
+   *
+   * @param name The name of the topic.
+   * @param comment An optional description of the topic.
+   * @param dataLayouts Named message schemas of the topic.
+   * @param properties A map of topic properties.
+   * @param audit Optional audit information.
+   */
+  public TopicInfo(
+      String name,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties,
+      Audit audit) {
     this.name = name;
     this.comment = comment;
+    Map<String, DataLayout> copiedDataLayouts = DataLayouts.copyOrNull(dataLayouts);
+    this.dataLayouts =
+        copiedDataLayouts == null ? ImmutableMap.of() : ImmutableMap.copyOf(copiedDataLayouts);
     this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
     this.audit = audit;
   }
@@ -75,6 +99,15 @@ public final class TopicInfo {
   @Nullable
   public String comment() {
     return comment;
+  }
+
+  /**
+   * Gets the named topic message schemas.
+   *
+   * @return The data layouts.
+   */
+  public Map<String, DataLayout> dataLayouts() {
+    return dataLayouts;
   }
 
   /**

@@ -157,6 +157,14 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "example_topic",
   "comment": "This is an example topic",
+  "dataLayouts": {
+    "value": {
+      "format": "protobuf",
+      "typeName": "com.example.Order",
+      "schemaSubject": "order-value",
+      "schemaUri": "http://localhost:8081"
+    }
+  },
   "properties": {
     "partition-count": "3",
     "replication-factor": 1
@@ -181,16 +189,36 @@ Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
         .put("replication-factor": "1")
         .build();
 
+DataLayout valueLayout = SchemaDataLayout.builder()
+    .withFormat(DataLayout.Format.PROTOBUF)
+    .withTypeName("com.example.Order")
+    .withSchemaSubject("order-value")
+    .withSchemaUri("http://localhost:8081")
+    .build();
+
 topicCatalog.createTopic(
   NameIdentifier.of("default", "example_topic"),
   "This is an example topic",
-  null, // The message schema of the topic object. Always null because it's not supported yet.
+  DataLayouts.ofValue(valueLayout), // Message schemas; persisted in Gravitino (not in Kafka).
   propertiesMap,
 );
 ```
 
 </TabItem>
 </Tabs>
+
+:::note
+`dataLayouts` describes named topic message schemas (Protobuf, Avro, JSON, Schema Registry subject, etc.).
+The conventional names are `key` for the record key schema and `value` for the record value schema.
+Use `DataLayouts.KEY`, `DataLayouts.VALUE`, `DataLayouts.ofValue(...)`, or `DataLayouts.of(key, value)`
+from Java. Additional names are allowed for vendor-specific roles. Gravitino stores layouts in its
+own entity store; Kafka catalog create/alter calls accept them but do not write them to broker topic configs.
+
+The server validates each layout: it must not be empty, schema fields must not be blank, `schemaUri`
+must be a syntactically valid URI, and `schemaText` must be valid JSON when `format` is `avro` or
+`json`. `format` values are matched case-insensitively on requests; responses always use the
+lowercase form.
+:::
 
 ### Alter a Topic
 
@@ -212,6 +240,15 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "@type": "setProperty",
       "property": "key3",
       "value": "value3"
+    }, {
+      "@type": "updateDataLayout",
+      "name": "value",
+      "newDataLayout": {
+        "format": "avro",
+        "schemaSubject": "order-value",
+        "schemaVersion": "3",
+        "schemaUri": "http://localhost:8081"
+      }
     }
   ]
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/default/topics/topic
@@ -227,8 +264,17 @@ Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 TopicCatalog topicCatalog = catalog.asTopicCatalog();
 
+DataLayout newLayout = SchemaDataLayout.builder()
+    .withFormat(DataLayout.Format.AVRO)
+    .withSchemaSubject("order-value")
+    .withSchemaVersion("3")
+    .withSchemaUri("http://localhost:8081")
+    .build();
+
 Topic t = topicCatalog.alterTopic(NameIdentifier.of("default", "topic"),
-    TopicChange.removeProperty("key2"), TopicChange.setProperty("key3", "value3"));
+    TopicChange.removeProperty("key2"),
+    TopicChange.setProperty("key3", "value3"),
+    TopicChange.updateValueDataLayout(newLayout));
 // ...
 ```
 
@@ -240,6 +286,9 @@ Gravitino supports the following changes to a topic:
 | Supported modification  | JSON                                                         | Java                                        |
 |-------------------------|--------------------------------------------------------------|---------------------------------------------|
 | Update a comment        | `{"@type":"updateComment","newComment":"new_comment"}`       | `TopicChange.updateComment("new_comment")`  |
+| Update data layout      | `{"@type":"updateDataLayout","name":"value","newDataLayout":{...}}` | `TopicChange.updateDataLayout(DataLayouts.VALUE, layout)` |
+| Remove data layout      | `{"@type":"removeDataLayout","name":"value"}`                | `TopicChange.removeDataLayout(DataLayouts.VALUE)` |
+| Remove all data layouts | `{"@type":"removeDataLayouts"}`                              | `TopicChange.removeDataLayouts()`           |
 | Set a topic property    | `{"@type":"setProperty","property":"key1","value":"value1"}` | `TopicChange.setProperty("key1", "value1")` |
 | Remove a topic property | `{"@type":"removeProperty","property":"key1"}`               | `TopicChange.removeProperty("key1")`        |
 

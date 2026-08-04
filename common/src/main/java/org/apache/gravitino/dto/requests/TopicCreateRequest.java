@@ -28,6 +28,8 @@ import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.messaging.DataLayoutDTO;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to create a topic. */
@@ -48,9 +50,13 @@ public class TopicCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
+  @Nullable
+  @JsonProperty("dataLayouts")
+  private final Map<String, DataLayoutDTO> dataLayouts;
+
   /** Default constructor for Jackson deserialization. */
   public TopicCreateRequest() {
-    this(null, null, null);
+    this(null, null, null, null);
   }
 
   /**
@@ -59,17 +65,50 @@ public class TopicCreateRequest implements RESTRequest {
    * @param name The name of the topic.
    * @param comment The comment of the topic.
    * @param properties The properties of the topic.
+   * @param dataLayouts The named message schemas of the topic.
    */
   public TopicCreateRequest(
-      String name, @Nullable String comment, @Nullable Map<String, String> properties) {
+      String name,
+      @Nullable String comment,
+      @Nullable Map<String, String> properties,
+      @Nullable Map<String, DataLayoutDTO> dataLayouts) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;
+    this.dataLayouts = dataLayouts;
+  }
+
+  /**
+   * Backward-compatible constructor without data layouts.
+   *
+   * @param name The name of the topic.
+   * @param comment The comment of the topic.
+   * @param properties The properties of the topic.
+   */
+  public TopicCreateRequest(
+      String name, @Nullable String comment, @Nullable Map<String, String> properties) {
+    this(name, comment, properties, null);
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
+    DataLayouts.validateNoReservedProperties(properties);
+    if (dataLayouts != null) {
+      dataLayouts.forEach(
+          (layoutName, layout) -> {
+            Preconditions.checkArgument(
+                StringUtils.isNotBlank(layoutName), "data layout names must not be blank");
+            Preconditions.checkArgument(
+                layout != null, "data layout \"%s\" must not be null", layoutName);
+            try {
+              layout.validate();
+            } catch (IllegalArgumentException e) {
+              throw new IllegalArgumentException(
+                  "data layout \"" + layoutName + "\": " + e.getMessage(), e);
+            }
+          });
+    }
   }
 }

@@ -43,9 +43,13 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.messaging.DataLayoutDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
+import org.apache.gravitino.messaging.SchemaDataLayout;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -368,6 +372,98 @@ public class TestPOConverters {
     assertEquals(expectedTopic.auditInfo().creator(), convertedTopic.auditInfo().creator());
     assertEquals(expectedTopic.comment(), convertedTopic.comment());
     assertEquals(expectedTopic.properties(), convertedTopic.properties());
+  }
+
+  @Test
+  public void testTopicPODataLayoutRoundTrip() throws JsonProcessingException {
+    DataLayout layout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withTypeName("com.example.Order")
+            .withSchemaId("42")
+            .withSchemaVersion("7")
+            .withSchemaUri("http://localhost:8081")
+            .withSchemaSubject("order-value")
+            .withSchemaText("syntax = \"proto3\";")
+            .withProperties(ImmutableMap.of("compatibility", "BACKWARD"))
+            .build();
+
+    TopicEntity entity =
+        TopicEntity.builder()
+            .withId(9L)
+            .withName("orders")
+            .withNamespace(NamespaceUtil.ofTopic("ml", "cat", "sch"))
+            .withComment("orders topic")
+            .withProperties(ImmutableMap.of("partition-count", "3"))
+            .withDataLayouts(DataLayouts.ofValue(layout))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build())
+            .build();
+
+    TopicPO po =
+        POConverters.initializeTopicPOWithVersion(
+            entity, TopicPO.builder().withMetalakeId(1L).withCatalogId(2L).withSchemaId(3L));
+
+    Assertions.assertTrue(po.getProperties().contains(DataLayouts.ENTITY_STORAGE_KEY));
+    Assertions.assertTrue(po.getProperties().contains("partition-count"));
+
+    TopicEntity loaded = POConverters.fromTopicPO(po, NamespaceUtil.ofTopic("ml", "cat", "sch"));
+    assertEquals(DataLayouts.ofValue(layout), loaded.dataLayouts());
+    assertEquals(ImmutableMap.of("partition-count", "3"), loaded.properties());
+    Assertions.assertFalse(loaded.properties().containsKey(DataLayouts.ENTITY_STORAGE_KEY));
+  }
+
+  @Test
+  public void testTopicPOMalformedDataLayoutsJsonIsIgnored() throws JsonProcessingException {
+    TopicPO topicPO =
+        createTopicPO(
+            1L,
+            "test",
+            1L,
+            1L,
+            1L,
+            "test comment",
+            ImmutableMap.of("key", "value", DataLayouts.ENTITY_STORAGE_KEY, "{not-json"));
+
+    TopicEntity convertedTopic =
+        POConverters.fromTopicPO(
+            topicPO, NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"));
+
+    Assertions.assertTrue(convertedTopic.dataLayouts().isEmpty());
+    assertEquals(ImmutableMap.of("key", "value"), convertedTopic.properties());
+  }
+
+  @Test
+  public void testTopicPOReservedDataLayoutKeyIsStrippedFromProperties()
+      throws JsonProcessingException {
+    DataLayout layout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.JSON)
+            .withSchemaSubject("order-value")
+            .build();
+    TopicPO topicPO =
+        createTopicPO(
+            1L,
+            "test",
+            1L,
+            1L,
+            1L,
+            "test comment",
+            ImmutableMap.of(
+                "key",
+                "value",
+                DataLayouts.ENTITY_STORAGE_KEY,
+                JsonUtils.anyFieldMapper()
+                    .writeValueAsString(
+                        ImmutableMap.of(DataLayouts.VALUE, DataLayoutDTO.fromDataLayout(layout)))));
+
+    TopicEntity convertedTopic =
+        POConverters.fromTopicPO(
+            topicPO, NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"));
+
+    Assertions.assertFalse(convertedTopic.properties().containsKey(DataLayouts.ENTITY_STORAGE_KEY));
+    assertEquals(DataLayouts.ofValue(layout), convertedTopic.dataLayouts());
+    assertEquals(ImmutableMap.of("key", "value"), convertedTopic.properties());
   }
 
   @Test

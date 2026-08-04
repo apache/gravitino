@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -38,6 +39,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.dto.messaging.DataLayoutDTO;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
 import org.apache.gravitino.dto.rel.expressions.FunctionArg;
@@ -46,6 +48,8 @@ import org.apache.gravitino.dto.rel.partitioning.Partitioning;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -94,9 +98,13 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
 public class POConverters {
+  private static final Logger LOG = LoggerFactory.getLogger(POConverters.class);
+
   public static final long INIT_VERSION = 1L;
   public static final long DEFAULT_DELETED_AT = 0L;
 
@@ -868,12 +876,38 @@ public class POConverters {
 
   public static TopicEntity fromTopicPO(TopicPO topicPO, Namespace namespace) {
     try {
+      Map<String, String> properties =
+          topicPO.getProperties() == null
+              ? null
+              : JsonUtils.anyFieldMapper().readValue(topicPO.getProperties(), Map.class);
+      Map<String, DataLayout> dataLayouts = null;
+      if (properties != null && properties.containsKey(DataLayouts.ENTITY_STORAGE_KEY)) {
+        String layoutsJson = properties.get(DataLayouts.ENTITY_STORAGE_KEY);
+        Map<String, String> cleaned = Maps.newHashMap(properties);
+        cleaned.remove(DataLayouts.ENTITY_STORAGE_KEY);
+        properties = cleaned.isEmpty() ? null : cleaned;
+        if (layoutsJson != null && !layoutsJson.isEmpty()) {
+          try {
+            Map<String, DataLayoutDTO> dataLayoutDTOs =
+                JsonUtils.anyFieldMapper()
+                    .readValue(layoutsJson, new TypeReference<Map<String, DataLayoutDTO>>() {});
+            dataLayouts = DataLayouts.copyOrNull(dataLayoutDTOs);
+          } catch (JsonProcessingException e) {
+            LOG.warn(
+                "Failed to parse data layouts for topic {} in namespace {}; ignoring stored layouts",
+                topicPO.getTopicName(),
+                namespace,
+                e);
+          }
+        }
+      }
       return TopicEntity.builder()
           .withId(topicPO.getTopicId())
           .withName(topicPO.getTopicName())
           .withNamespace(namespace)
           .withComment(topicPO.getComment())
-          .withProperties(JsonUtils.anyFieldMapper().readValue(topicPO.getProperties(), Map.class))
+          .withProperties(properties)
+          .withDataLayouts(dataLayouts)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(topicPO.getAuditInfo(), AuditInfo.class))
           .build();
@@ -909,7 +943,8 @@ public class POConverters {
           .withTopicId(topicEntity.id())
           .withTopicName(topicEntity.name())
           .withComment(topicEntity.comment())
-          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(topicEntity.properties()))
+          .withProperties(
+              JsonUtils.anyFieldMapper().writeValueAsString(topicPropertiesForStorage(topicEntity)))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(topicEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -932,7 +967,8 @@ public class POConverters {
           .withCatalogId(oldTopicPO.getCatalogId())
           .withSchemaId(oldTopicPO.getSchemaId())
           .withComment(newEntity.comment())
-          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.properties()))
+          .withProperties(
+              JsonUtils.anyFieldMapper().writeValueAsString(topicPropertiesForStorage(newEntity)))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -941,6 +977,30 @@ public class POConverters {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
+  }
+
+  /**
+   * Merge topic entity properties with serialized {@link DataLayout}s for entity-store persistence.
+   * Kafka does not store DataLayouts; they live only in Gravitino's topic_meta.properties JSON.
+   */
+  private static Map<String, String> topicPropertiesForStorage(TopicEntity topicEntity)
+      throws JsonProcessingException {
+    Map<String, String> properties = Maps.newHashMap();
+    if (topicEntity.properties() != null) {
+      properties.putAll(topicEntity.properties());
+    }
+    properties.remove(DataLayouts.ENTITY_STORAGE_KEY);
+    if (!topicEntity.dataLayouts().isEmpty()) {
+      Map<String, DataLayoutDTO> dataLayoutDTOs = Maps.newLinkedHashMap();
+      topicEntity
+          .dataLayouts()
+          .forEach(
+              (name, layout) -> dataLayoutDTOs.put(name, DataLayoutDTO.fromDataLayout(layout)));
+      properties.put(
+          DataLayouts.ENTITY_STORAGE_KEY,
+          JsonUtils.anyFieldMapper().writeValueAsString(dataLayoutDTOs));
+    }
+    return properties;
   }
 
   /**

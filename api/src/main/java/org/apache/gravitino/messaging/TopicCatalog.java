@@ -75,16 +75,20 @@ public interface TopicCatalog {
    *
    * @param ident A topic identifier.
    * @param comment The comment of the topic object. Null is set if no comment is specified.
-   * @param dataLayout The message schema of the topic object. Always null because it's not
-   *     supported yet.
+   * @param dataLayouts Named message schemas for the topic (see {@link Topic#dataLayouts()}). Null
+   *     or empty if unset. Persisted by Gravitino's entity store; underlying catalogs (e.g. Kafka)
+   *     may ignore them.
    * @param properties The properties of the topic object. Empty map is set if no properties are
    *     specified.
-   * @return The topic as defined by the caller, without all default values.
+   * @return The created topic object.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TopicAlreadyExistsException If the topic already exists.
    */
   Topic createTopic(
-      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      NameIdentifier ident,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException;
 
   /**

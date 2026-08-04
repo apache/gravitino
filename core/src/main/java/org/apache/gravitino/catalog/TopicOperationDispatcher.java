@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.EntityStore;
@@ -40,6 +41,7 @@ import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
@@ -120,8 +122,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    *
    * @param ident A topic identifier.
    * @param comment The comment of the topic object. Null is set if no comment is specified.
-   * @param dataLayout The message schema of the topic object. Always null because it's not
-   *     supported yet.
+   * @param dataLayouts Named message schemas for the topic object.
    * @param properties The properties of the topic object. Empty map is set if no properties are
    *     specified.
    * @return The topic metadata.
@@ -130,7 +131,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
    */
   @Override
   public Topic createTopic(
-      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      NameIdentifier ident,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
 
     // Load the schema to make sure the schema exists.
@@ -141,7 +145,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(ident.namespace().levels()),
         LockType.WRITE,
-        () -> internalCreateTopic(ident, comment, dataLayout, properties));
+        () -> internalCreateTopic(ident, comment, dataLayouts, properties));
   }
 
   /**
@@ -157,6 +161,17 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
   public Topic alterTopic(NameIdentifier ident, TopicChange... changes)
       throws NoSuchTopicException, IllegalArgumentException {
 
+    for (TopicChange change : changes) {
+      if (change instanceof TopicChange.SetProperty) {
+        TopicChange.SetProperty setProperty = (TopicChange.SetProperty) change;
+        DataLayouts.validateNoReservedProperties(
+            Collections.singletonMap(setProperty.getProperty(), setProperty.getValue()));
+      } else if (change instanceof TopicChange.RemoveProperty) {
+        TopicChange.RemoveProperty removeProperty = (TopicChange.RemoveProperty) change;
+        DataLayouts.validateNoReservedProperties(
+            Collections.singletonMap(removeProperty.getProperty(), ""));
+      }
+    }
     validateAlterProperties(ident, HasPropertyMetadata::topicPropertiesMetadata, changes);
 
     // As Gravitino does not support TopicChange.renameTopic, we can directly lock the topic.
@@ -184,24 +199,29 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                           id,
                           TopicEntity.class,
                           TOPIC,
-                          topicEntity ->
-                              TopicEntity.builder()
-                                  .withId(topicEntity.id())
-                                  .withName(topicEntity.name())
-                                  .withNamespace(ident.namespace())
-                                  .withComment(
-                                      StringUtils.isBlank(alteredTopic.comment())
-                                          ? topicEntity.comment()
-                                          : alteredTopic.comment())
-                                  .withAuditInfo(
-                                      AuditInfo.builder()
-                                          .withCreator(topicEntity.auditInfo().creator())
-                                          .withCreateTime(topicEntity.auditInfo().createTime())
-                                          .withLastModifier(
-                                              PrincipalUtils.getCurrentPrincipal().getName())
-                                          .withLastModifiedTime(Instant.now())
-                                          .build())
-                                  .build()),
+                          topicEntity -> {
+                            Map<String, DataLayout> resolvedLayouts =
+                                DataLayouts.applyChanges(topicEntity.dataLayouts(), changes);
+                            return TopicEntity.builder()
+                                .withId(topicEntity.id())
+                                .withName(topicEntity.name())
+                                .withNamespace(ident.namespace())
+                                .withComment(
+                                    StringUtils.isBlank(alteredTopic.comment())
+                                        ? topicEntity.comment()
+                                        : alteredTopic.comment())
+                                .withProperties(topicEntity.properties())
+                                .withDataLayouts(resolvedLayouts)
+                                .withAuditInfo(
+                                    AuditInfo.builder()
+                                        .withCreator(topicEntity.auditInfo().creator())
+                                        .withCreateTime(topicEntity.auditInfo().createTime())
+                                        .withLastModifier(
+                                            PrincipalUtils.getCurrentPrincipal().getName())
+                                        .withLastModifiedTime(Instant.now())
+                                        .build())
+                                .build();
+                          }),
                   "UPDATE",
                   getStringIdFromProperties(alteredTopic.properties()).id());
 
@@ -352,13 +372,18 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
   }
 
   private Topic internalCreateTopic(
-      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties) {
+      NameIdentifier ident,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    Map<String, DataLayout> validatedDataLayouts = DataLayouts.copyOrNull(dataLayouts);
     doWithCatalog(
         catalogIdent,
         c ->
             c.doWithPropertiesMeta(
                 p -> {
+                  DataLayouts.validateNoReservedProperties(properties);
                   validatePropertyForCreate(p.topicPropertiesMetadata(), properties);
                   return null;
                 }),
@@ -374,7 +399,8 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
         doWithCatalog(
             catalogIdent,
             c ->
-                c.doWithTopicOps(t -> t.createTopic(ident, comment, dataLayout, updatedProperties)),
+                c.doWithTopicOps(
+                    t -> t.createTopic(ident, comment, validatedDataLayouts, updatedProperties)),
             NoSuchSchemaException.class,
             TopicAlreadyExistsException.class);
 
@@ -383,6 +409,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             .withId(fromProperties(topic.properties()).id())
             .withName(ident.name())
             .withComment(comment)
+            .withDataLayouts(validatedDataLayouts)
             .withNamespace(ident.namespace())
             .withAuditInfo(
                 AuditInfo.builder()

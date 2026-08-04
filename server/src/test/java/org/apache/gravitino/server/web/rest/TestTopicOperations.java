@@ -46,6 +46,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
+import org.apache.gravitino.dto.messaging.DataLayoutDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.requests.TopicCreateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
@@ -58,6 +59,9 @@ import org.apache.gravitino.dto.responses.TopicResponse;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
+import org.apache.gravitino.messaging.SchemaDataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rest.RESTUtils;
@@ -304,6 +308,107 @@ public class TestTopicOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateTopicWithDataLayouts() {
+    DataLayout keyLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.JSON)
+            .withSchemaSubject("order-key")
+            .build();
+    DataLayout valueLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withSchemaSubject("order-value")
+            .build();
+    Map<String, DataLayout> dataLayouts = DataLayouts.of(keyLayout, valueLayout);
+    Topic topic = mockTopic("topic1", "comment", ImmutableMap.of("key1", "value1"), dataLayouts);
+    when(dispatcher.createTopic(any(), any(), any(), any())).thenReturn(topic);
+
+    TopicCreateRequest req =
+        TopicCreateRequest.builder()
+            .name("topic1")
+            .comment("comment")
+            .properties(ImmutableMap.of("key1", "value1"))
+            .dataLayouts(
+                ImmutableMap.of(
+                    DataLayouts.KEY,
+                    DataLayoutDTO.fromDataLayout(keyLayout),
+                    DataLayouts.VALUE,
+                    DataLayoutDTO.fromDataLayout(valueLayout)))
+            .build();
+    Response resp =
+        target(topicPath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    TopicResponse topicResp = resp.readEntity(TopicResponse.class);
+    Assertions.assertEquals(0, topicResp.getCode());
+    Assertions.assertEquals(dataLayouts, topicResp.getTopic().dataLayouts());
+  }
+
+  @Test
+  public void testCreateTopicWithEmptyDataLayoutReturnsBadRequest() {
+    TopicCreateRequest req =
+        TopicCreateRequest.builder()
+            .name("topic1")
+            .dataLayouts(ImmutableMap.of(DataLayouts.VALUE, DataLayoutDTO.builder().build()))
+            .build();
+
+    Response resp =
+        target(topicPath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
+    // The invalid layout must be rejected before reaching the dispatcher.
+    Mockito.verify(dispatcher, Mockito.never()).createTopic(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testCreateTopicWithReservedPropertyReturnsBadRequest() {
+    TopicCreateRequest req =
+        TopicCreateRequest.builder()
+            .name("topic1")
+            .properties(ImmutableMap.of(DataLayouts.ENTITY_STORAGE_KEY, "{}"))
+            .build();
+
+    Response resp =
+        target(topicPath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
+    Mockito.verify(dispatcher, Mockito.never()).createTopic(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testUpdateTopicWithInvalidDataLayoutReturnsBadRequest() {
+    TopicUpdatesRequest req =
+        new TopicUpdatesRequest(
+            ImmutableList.of(
+                new TopicUpdateRequest.UpdateTopicDataLayoutRequest(
+                    DataLayouts.VALUE, DataLayoutDTO.builder().build())));
+
+    Response resp =
+        target(topicPath(metalake, catalog, schema) + "/topic1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
+    Mockito.verify(dispatcher, Mockito.never()).alterTopic(any(), any(TopicChange.class));
+  }
+
+  @Test
   public void testSetTopicProperties() {
     TopicUpdateRequest req = new TopicUpdateRequest.SetTopicPropertyRequest("key1", "value1");
     Topic topic = mockTopic("topic1", "comment", ImmutableMap.of("key1", "value1"));
@@ -321,6 +426,47 @@ public class TestTopicOperations extends BaseOperationsTest {
   public void testUpdateTopicComment() {
     TopicUpdateRequest req = new TopicUpdateRequest.UpdateTopicCommentRequest("new comment");
     Topic topic = mockTopic("topic1", "new comment", ImmutableMap.of());
+    assertUpdateTopic(new TopicUpdatesRequest(ImmutableList.of(req)), topic);
+  }
+
+  @Test
+  public void testUpdateTopicDataLayout() {
+    DataLayout layout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.AVRO)
+            .withSchemaSubject("order-value")
+            .build();
+    TopicUpdateRequest req =
+        new TopicUpdateRequest.UpdateTopicDataLayoutRequest(
+            DataLayouts.VALUE, DataLayoutDTO.fromDataLayout(layout));
+    Topic topic =
+        mockTopic(
+            "topic1", "comment", ImmutableMap.of("key1", "value1"), DataLayouts.ofValue(layout));
+
+    assertUpdateTopic(new TopicUpdatesRequest(ImmutableList.of(req)), topic);
+  }
+
+  @Test
+  public void testRemoveTopicDataLayout() {
+    TopicUpdateRequest req = new TopicUpdateRequest.RemoveTopicDataLayoutRequest(DataLayouts.KEY);
+    DataLayout layout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withSchemaSubject("order-value")
+            .build();
+    Topic topic =
+        mockTopic(
+            "topic1", "comment", ImmutableMap.of("key1", "value1"), DataLayouts.ofValue(layout));
+
+    assertUpdateTopic(new TopicUpdatesRequest(ImmutableList.of(req)), topic);
+  }
+
+  @Test
+  public void testRemoveTopicDataLayouts() {
+    TopicUpdateRequest req = new TopicUpdateRequest.RemoveTopicDataLayoutsRequest();
+    Topic topic =
+        mockTopic("topic1", "comment", ImmutableMap.of("key1", "value1"), ImmutableMap.of());
+
     assertUpdateTopic(new TopicUpdatesRequest(ImmutableList.of(req)), topic);
   }
 
@@ -399,13 +545,23 @@ public class TestTopicOperations extends BaseOperationsTest {
     Assertions.assertEquals(updatedTopic.name(), topicDTO.name());
     Assertions.assertEquals(updatedTopic.comment(), topicDTO.comment());
     Assertions.assertEquals(updatedTopic.properties(), topicDTO.properties());
+    Assertions.assertEquals(updatedTopic.dataLayouts(), topicDTO.dataLayouts());
   }
 
   private Topic mockTopic(String name, String comment, Map<String, String> properties) {
+    return mockTopic(name, comment, properties, ImmutableMap.of());
+  }
+
+  private Topic mockTopic(
+      String name,
+      String comment,
+      Map<String, String> properties,
+      Map<String, DataLayout> dataLayouts) {
     Topic mockedTopic = mock(Topic.class);
     when(mockedTopic.name()).thenReturn(name);
     when(mockedTopic.comment()).thenReturn(comment);
     when(mockedTopic.properties()).thenReturn(properties);
+    when(mockedTopic.dataLayouts()).thenReturn(dataLayouts);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("gravitino");

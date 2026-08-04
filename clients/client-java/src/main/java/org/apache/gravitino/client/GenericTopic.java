@@ -30,6 +30,7 @@ import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
+import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -71,6 +72,11 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles, SupportsPolici
   @Override
   public String comment() {
     return topicDTO.comment();
+  }
+
+  @Override
+  public Map<String, DataLayout> dataLayouts() {
+    return topicDTO.dataLayouts();
   }
 
   @Override

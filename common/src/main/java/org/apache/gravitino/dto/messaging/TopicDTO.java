@@ -19,11 +19,15 @@
 package org.apache.gravitino.dto.messaging;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.messaging.Topic;
 
 /** Represents a topic DTO (Data Transfer Object). */
@@ -45,6 +49,9 @@ public class TopicDTO implements Topic {
   @JsonProperty("properties")
   private Map<String, String> properties;
 
+  @JsonProperty("dataLayouts")
+  private Map<String, DataLayoutDTO> dataLayouts;
+
   @JsonProperty("audit")
   private AuditDTO audit;
 
@@ -58,10 +65,17 @@ public class TopicDTO implements Topic {
    * @param properties The properties associated with the topic.
    * @param audit The audit information for the topic.
    */
-  private TopicDTO(String name, String comment, Map<String, String> properties, AuditDTO audit) {
+  private TopicDTO(
+      String name,
+      String comment,
+      Map<String, String> properties,
+      Map<String, DataLayoutDTO> dataLayouts,
+      AuditDTO audit) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;
+    this.dataLayouts =
+        dataLayouts == null ? null : Collections.unmodifiableMap(new LinkedHashMap<>(dataLayouts));
     this.audit = audit;
   }
 
@@ -82,6 +96,12 @@ public class TopicDTO implements Topic {
   }
 
   @Override
+  public Map<String, DataLayout> dataLayouts() {
+    Map<String, DataLayout> copiedDataLayouts = DataLayouts.copyOrNull(dataLayouts);
+    return copiedDataLayouts == null ? Collections.emptyMap() : copiedDataLayouts;
+  }
+
+  @Override
   public Audit auditInfo() {
     return audit;
   }
@@ -98,12 +118,13 @@ public class TopicDTO implements Topic {
     return Objects.equals(name, topicDTO.name)
         && Objects.equals(comment, topicDTO.comment)
         && Objects.equals(properties, topicDTO.properties)
+        && Objects.equals(dataLayouts, topicDTO.dataLayouts)
         && Objects.equals(audit, topicDTO.audit);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, comment, properties, audit);
+    return Objects.hash(name, comment, properties, dataLayouts, audit);
   }
 
   @Override
@@ -117,6 +138,8 @@ public class TopicDTO implements Topic {
         + '\''
         + ", properties="
         + properties
+        + ", dataLayouts="
+        + dataLayouts
         + ", audit="
         + audit
         + '}';
@@ -127,6 +150,7 @@ public class TopicDTO implements Topic {
     private String name;
     private String comment;
     private Map<String, String> properties;
+    private Map<String, DataLayoutDTO> dataLayouts;
     private AuditDTO audit;
 
     private Builder() {}
@@ -165,6 +189,17 @@ public class TopicDTO implements Topic {
     }
 
     /**
+     * Sets the data layouts for the topic.
+     *
+     * @param dataLayouts The data layouts associated with the topic.
+     * @return The builder instance.
+     */
+    public Builder withDataLayouts(Map<String, DataLayoutDTO> dataLayouts) {
+      this.dataLayouts = dataLayouts;
+      return this;
+    }
+
+    /**
      * Sets the audit information for the topic.
      *
      * @param audit The audit information for the topic.
@@ -179,7 +214,7 @@ public class TopicDTO implements Topic {
      * @return The constructed Topic DTO.
      */
     public TopicDTO build() {
-      return new TopicDTO(name, comment, properties, audit);
+      return new TopicDTO(name, comment, properties, dataLayouts, audit);
     }
   }
 }

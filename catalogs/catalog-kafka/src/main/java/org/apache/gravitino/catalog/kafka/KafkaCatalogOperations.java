@@ -61,6 +61,7 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
@@ -251,7 +252,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
   @Override
   public Topic createTopic(
-      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      NameIdentifier ident,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     checkSchemaExists(schemaIdent);
@@ -285,6 +289,8 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       return KafkaTopic.builder()
           .withName(ident.name())
           .withComment(comment)
+          // DataLayouts are persisted in Gravitino's entity store, not in Kafka broker metadata.
+          .withDataLayouts(dataLayouts)
           // Because there is no way to store the Gravitino ID in Kafka, therefor we use the topic
           // ID as the Gravitino ID
           .withProperties(newPropertiesWithId(convertToGravitinoId(topicId), created_properties))
@@ -331,6 +337,8 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       if (change instanceof TopicChange.UpdateTopicComment) {
         newComment = ((TopicChange.UpdateTopicComment) change).getNewComment();
 
+      } else if (DataLayouts.isLayoutChange(change)) {
+        // Data layouts are entity-store-only metadata. Kafka accepts but does not apply them.
       } else if (change instanceof TopicChange.SetProperty) {
         TopicChange.SetProperty setProperty = (TopicChange.SetProperty) change;
         if (KafkaTopicPropertiesMetadata.PARTITION_COUNT.equals(setProperty.getProperty())) {

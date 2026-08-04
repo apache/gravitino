@@ -49,6 +49,7 @@ public class KafkaTopic extends BaseTopic {
       KafkaTopic topic = new KafkaTopic();
       topic.name = name;
       topic.comment = comment;
+      topic.dataLayouts = dataLayouts;
       topic.properties = properties;
       topic.auditInfo = auditInfo;
       return topic;

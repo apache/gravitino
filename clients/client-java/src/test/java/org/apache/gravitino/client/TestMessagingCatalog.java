@@ -27,11 +27,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
+import org.apache.gravitino.dto.messaging.DataLayoutDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.TopicCreateRequest;
@@ -45,7 +47,11 @@ import org.apache.gravitino.dto.responses.TopicResponse;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
+import org.apache.gravitino.messaging.SchemaDataLayout;
 import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.messaging.TopicChange;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -227,6 +233,44 @@ public class TestMessagingCatalog extends TestBase {
   }
 
   @Test
+  public void testCreateTopicWithDataLayouts() throws JsonProcessingException {
+    NameIdentifier topic = NameIdentifier.of("schema1", "topic_with_layouts");
+    String topicPath =
+        withSlash(
+            MessagingCatalog.formatTopicRequestPath(
+                Namespace.of(metalakeName, catalogName, "schema1")));
+    DataLayout keyLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.JSON)
+            .withSchemaSubject("order-key")
+            .build();
+    DataLayout valueLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withSchemaSubject("order-value")
+            .build();
+    ImmutableMap<String, DataLayout> dataLayouts =
+        ImmutableMap.copyOf(DataLayouts.of(keyLayout, valueLayout));
+
+    TopicDTO mockTopic =
+        mockTopicDTO(
+            topic.name(), "comment", ImmutableMap.of("k1", "k2"), toDataLayoutDTOs(dataLayouts));
+    TopicCreateRequest topicCreateRequest =
+        new TopicCreateRequest(
+            topic.name(), "comment", ImmutableMap.of("k1", "k2"), toDataLayoutDTOs(dataLayouts));
+    TopicResponse topicResponse = new TopicResponse(mockTopic);
+    buildMockResource(Method.POST, topicPath, topicCreateRequest, topicResponse, SC_OK);
+
+    Topic createdTopic =
+        catalog
+            .asTopicCatalog()
+            .createTopic(topic, "comment", dataLayouts, ImmutableMap.of("k1", "k2"));
+
+    Assertions.assertNotNull(createdTopic);
+    assertTopic(mockTopic, createdTopic);
+  }
+
+  @Test
   public void testAlterTopic() throws JsonProcessingException {
     NameIdentifier topic = NameIdentifier.of("schema1", "topic1");
     String topicPath =
@@ -266,6 +310,57 @@ public class TestMessagingCatalog extends TestBase {
 
     alteredTopic = catalog.asTopicCatalog().alterTopic(topic, req3.topicChange());
     assertTopic(mockTopic3, alteredTopic);
+
+    // test update topic data layout
+    DataLayout valueLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.AVRO)
+            .withSchemaSubject("order-value")
+            .build();
+    TopicUpdateRequest req4 =
+        new TopicUpdateRequest.UpdateTopicDataLayoutRequest(
+            DataLayouts.VALUE, DataLayoutDTO.fromDataLayout(valueLayout));
+    TopicDTO mockTopic4 =
+        mockTopicDTO(
+            topic.name(),
+            "new comment",
+            ImmutableMap.of("k1", "v1"),
+            toDataLayoutDTOs(DataLayouts.ofValue(valueLayout)));
+    TopicResponse resp4 = new TopicResponse(mockTopic4);
+    buildMockResource(
+        Method.PUT, topicPath, new TopicUpdatesRequest(ImmutableList.of(req4)), resp4, SC_OK);
+
+    alteredTopic =
+        catalog
+            .asTopicCatalog()
+            .alterTopic(topic, TopicChange.updateDataLayout(DataLayouts.VALUE, valueLayout));
+    assertTopic(mockTopic4, alteredTopic);
+
+    // test remove topic data layout
+    TopicUpdateRequest req5 = new TopicUpdateRequest.RemoveTopicDataLayoutRequest(DataLayouts.KEY);
+    TopicDTO mockTopic5 =
+        mockTopicDTO(
+            topic.name(),
+            "new comment",
+            ImmutableMap.of("k1", "v1"),
+            toDataLayoutDTOs(DataLayouts.ofValue(valueLayout)));
+    TopicResponse resp5 = new TopicResponse(mockTopic5);
+    buildMockResource(
+        Method.PUT, topicPath, new TopicUpdatesRequest(ImmutableList.of(req5)), resp5, SC_OK);
+
+    alteredTopic =
+        catalog.asTopicCatalog().alterTopic(topic, TopicChange.removeDataLayout(DataLayouts.KEY));
+    assertTopic(mockTopic5, alteredTopic);
+
+    // test remove all topic data layouts
+    TopicUpdateRequest req6 = new TopicUpdateRequest.RemoveTopicDataLayoutsRequest();
+    TopicDTO mockTopic6 = mockTopicDTO(topic.name(), "new comment", ImmutableMap.of("k1", "v1"));
+    TopicResponse resp6 = new TopicResponse(mockTopic6);
+    buildMockResource(
+        Method.PUT, topicPath, new TopicUpdatesRequest(ImmutableList.of(req6)), resp6, SC_OK);
+
+    alteredTopic = catalog.asTopicCatalog().alterTopic(topic, TopicChange.removeDataLayouts());
+    assertTopic(mockTopic6, alteredTopic);
 
     // test NoSuchTopicException
     ErrorResponse errResp =
@@ -326,10 +421,19 @@ public class TestMessagingCatalog extends TestBase {
 
   private TopicDTO mockTopicDTO(
       String name, String comment, ImmutableMap<String, String> properties) {
+    return mockTopicDTO(name, comment, properties, null);
+  }
+
+  private TopicDTO mockTopicDTO(
+      String name,
+      String comment,
+      ImmutableMap<String, String> properties,
+      ImmutableMap<String, DataLayoutDTO> dataLayouts) {
     return TopicDTO.builder()
         .withName(name)
         .withComment(comment)
         .withProperties(properties)
+        .withDataLayouts(dataLayouts)
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
   }
@@ -338,5 +442,13 @@ public class TestMessagingCatalog extends TestBase {
     Assertions.assertEquals(expected.name(), actual.name());
     Assertions.assertEquals(expected.comment(), actual.comment());
     Assertions.assertEquals(expected.properties(), actual.properties());
+    Assertions.assertEquals(expected.dataLayouts(), actual.dataLayouts());
+  }
+
+  private ImmutableMap<String, DataLayoutDTO> toDataLayoutDTOs(
+      Map<String, ? extends DataLayout> dataLayouts) {
+    ImmutableMap.Builder<String, DataLayoutDTO> builder = ImmutableMap.builder();
+    dataLayouts.forEach((name, layout) -> builder.put(name, DataLayoutDTO.fromDataLayout(layout)));
+    return builder.build();
   }
 }

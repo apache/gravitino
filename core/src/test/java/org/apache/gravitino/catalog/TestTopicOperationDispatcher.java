@@ -50,6 +50,9 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
+import org.apache.gravitino.messaging.SchemaDataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
@@ -257,6 +260,212 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+  }
+
+  @Test
+  public void testCreateAndAlterTopicDataLayout() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_datalayout");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_datalayout");
+    DataLayout layout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withTypeName("com.example.Order")
+            .withSchemaSubject("order-value")
+            .withSchemaUri("http://localhost:8081")
+            .build();
+
+    Topic created =
+        topicOperationDispatcher.createTopic(
+            topicIdent, "comment", DataLayouts.ofValue(layout), props);
+    Assertions.assertEquals(DataLayouts.ofValue(layout), created.dataLayouts());
+
+    Topic loaded = topicOperationDispatcher.loadTopic(topicIdent);
+    Assertions.assertEquals(DataLayouts.ofValue(layout), loaded.dataLayouts());
+
+    TopicEntity entity = entityStore.get(topicIdent, Entity.EntityType.TOPIC, TopicEntity.class);
+    Assertions.assertEquals(DataLayouts.ofValue(layout), entity.dataLayouts());
+    Assertions.assertFalse(
+        entity.properties() != null
+            && entity.properties().containsKey(DataLayouts.ENTITY_STORAGE_KEY));
+
+    DataLayout updatedLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.AVRO)
+            .withSchemaSubject("order-value")
+            .withSchemaVersion("3")
+            .withSchemaUri("http://localhost:8081")
+            .build();
+    Topic altered =
+        topicOperationDispatcher.alterTopic(
+            topicIdent, TopicChange.updateValueDataLayout(updatedLayout));
+    Assertions.assertEquals(DataLayouts.ofValue(updatedLayout), altered.dataLayouts());
+    Assertions.assertEquals(
+        DataLayouts.ofValue(updatedLayout),
+        topicOperationDispatcher.loadTopic(topicIdent).dataLayouts());
+
+    Topic cleared =
+        topicOperationDispatcher.alterTopic(
+            topicIdent, TopicChange.removeDataLayout(DataLayouts.VALUE));
+    Assertions.assertTrue(cleared.dataLayouts().isEmpty());
+    Assertions.assertTrue(topicOperationDispatcher.loadTopic(topicIdent).dataLayouts().isEmpty());
+  }
+
+  @Test
+  public void testCreateTopicRejectsReservedDataLayoutProperty() {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_datalayout_reserved");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_reserved");
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                topicOperationDispatcher.createTopic(
+                    topicIdent,
+                    "comment",
+                    null,
+                    ImmutableMap.of("k1", "v1", DataLayouts.ENTITY_STORAGE_KEY, "{\"value\":{}}")));
+    Assertions.assertTrue(exception.getMessage().contains(DataLayouts.ENTITY_STORAGE_KEY));
+  }
+
+  @Test
+  public void testCreateTopicPersistsKeyAndValueDataLayouts() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_datalayout_key_value");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_key_value");
+    DataLayout keyLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.JSON)
+            .withSchemaSubject("order-key")
+            .build();
+    DataLayout valueLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withSchemaSubject("order-value")
+            .build();
+    Map<String, DataLayout> expectedLayouts = DataLayouts.of(keyLayout, valueLayout);
+
+    Topic created =
+        topicOperationDispatcher.createTopic(topicIdent, "comment", expectedLayouts, props);
+
+    Assertions.assertEquals(expectedLayouts, created.dataLayouts());
+    Assertions.assertEquals(
+        expectedLayouts, topicOperationDispatcher.loadTopic(topicIdent).dataLayouts());
+    TopicEntity entity = entityStore.get(topicIdent, Entity.EntityType.TOPIC, TopicEntity.class);
+    Assertions.assertEquals(expectedLayouts, entity.dataLayouts());
+  }
+
+  @Test
+  public void testAlterOneDataLayoutPreservesOtherLayouts() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_datalayout_partial_update");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_partial_update");
+    DataLayout keyLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.JSON)
+            .withSchemaSubject("order-key")
+            .build();
+    DataLayout valueLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withSchemaSubject("order-value-v1")
+            .build();
+    topicOperationDispatcher.createTopic(
+        topicIdent, "comment", DataLayouts.of(keyLayout, valueLayout), props);
+
+    DataLayout updatedValueLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.AVRO)
+            .withSchemaSubject("order-value-v2")
+            .build();
+    Topic altered =
+        topicOperationDispatcher.alterTopic(
+            topicIdent, TopicChange.updateValueDataLayout(updatedValueLayout));
+    Assertions.assertEquals(DataLayouts.of(keyLayout, updatedValueLayout), altered.dataLayouts());
+
+    Topic afterValueRemoval =
+        topicOperationDispatcher.alterTopic(
+            topicIdent, TopicChange.removeDataLayout(DataLayouts.VALUE));
+    Assertions.assertEquals(
+        ImmutableMap.of(DataLayouts.KEY, keyLayout), afterValueRemoval.dataLayouts());
+    Assertions.assertEquals(
+        ImmutableMap.of(DataLayouts.KEY, keyLayout),
+        topicOperationDispatcher.loadTopic(topicIdent).dataLayouts());
+  }
+
+  @Test
+  public void testCreateTopicValidatesDataLayoutsBeforeCatalogMutation() {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_datalayout_invalid");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_invalid_layout");
+
+    DataLayout layout = SchemaDataLayout.builder().build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            topicOperationDispatcher.createTopic(
+                topicIdent, "comment", ImmutableMap.of(" ", layout), props));
+
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    Assertions.assertFalse(testCatalogOperations.topicExists(topicIdent));
+  }
+
+  @Test
+  public void testAlterTopicDataLayoutChangesAreAppliedInOrder() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_datalayout_ordered");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_ordered");
+    DataLayout initialValueLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withSchemaSubject("order-value-v1")
+            .build();
+    topicOperationDispatcher.createTopic(
+        topicIdent, "comment", DataLayouts.ofValue(initialValueLayout), props);
+
+    DataLayout keyLayout =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.JSON)
+            .withSchemaSubject("order-key")
+            .build();
+    DataLayout valueLayoutV2 =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.AVRO)
+            .withSchemaSubject("order-value-v2")
+            .build();
+    DataLayout valueLayoutV3 =
+        SchemaDataLayout.builder()
+            .withFormat(DataLayout.Format.PROTOBUF)
+            .withSchemaSubject("order-value-v3")
+            .build();
+
+    Topic altered =
+        topicOperationDispatcher.alterTopic(
+            topicIdent,
+            TopicChange.updateDataLayout(DataLayouts.KEY, keyLayout),
+            TopicChange.updateDataLayout(DataLayouts.VALUE, valueLayoutV2),
+            TopicChange.removeDataLayout(DataLayouts.KEY),
+            TopicChange.updateDataLayout(DataLayouts.VALUE, valueLayoutV3));
+
+    Assertions.assertEquals(DataLayouts.ofValue(valueLayoutV3), altered.dataLayouts());
+    Assertions.assertEquals(
+        DataLayouts.ofValue(valueLayoutV3),
+        topicOperationDispatcher.loadTopic(topicIdent).dataLayouts());
+    TopicEntity entity = entityStore.get(topicIdent, Entity.EntityType.TOPIC, TopicEntity.class);
+    Assertions.assertEquals(DataLayouts.ofValue(valueLayoutV3), entity.dataLayouts());
   }
 
   @Test

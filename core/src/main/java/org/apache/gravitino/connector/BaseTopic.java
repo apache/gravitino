@@ -18,10 +18,13 @@
  */
 package org.apache.gravitino.connector;
 
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.messaging.DataLayout;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.meta.AuditInfo;
 
@@ -32,6 +35,8 @@ public abstract class BaseTopic implements Topic {
   protected String name;
 
   @Nullable protected String comment;
+
+  @Nullable protected Map<String, DataLayout> dataLayouts;
 
   @Nullable protected Map<String, String> properties;
 
@@ -52,6 +57,14 @@ public abstract class BaseTopic implements Topic {
   @Override
   public String comment() {
     return comment;
+  }
+
+  /**
+   * @return The named message schemas of the topic, or empty map if unset.
+   */
+  @Override
+  public Map<String, DataLayout> dataLayouts() {
+    return dataLayouts == null ? Collections.emptyMap() : dataLayouts;
   }
 
   /**
@@ -82,6 +95,8 @@ public abstract class BaseTopic implements Topic {
 
     SELF withComment(String comment);
 
+    SELF withDataLayouts(Map<String, DataLayout> dataLayouts);
+
     SELF withProperties(Map<String, String> properties);
 
     SELF withAuditInfo(AuditInfo auditInfo);
@@ -101,6 +116,7 @@ public abstract class BaseTopic implements Topic {
       implements Builder<SELF, T> {
     protected String name;
     protected String comment;
+    protected Map<String, DataLayout> dataLayouts;
     protected Map<String, String> properties;
     protected AuditInfo auditInfo;
 
@@ -125,6 +141,18 @@ public abstract class BaseTopic implements Topic {
     @Override
     public SELF withComment(String comment) {
       this.comment = comment;
+      return self();
+    }
+
+    /**
+     * Sets the named message schemas of the topic.
+     *
+     * @param dataLayouts The named message schemas of the topic.
+     * @return The builder instance.
+     */
+    @Override
+    public SELF withDataLayouts(Map<String, DataLayout> dataLayouts) {
+      this.dataLayouts = DataLayouts.copyOrNull(dataLayouts);
       return self();
     }
 

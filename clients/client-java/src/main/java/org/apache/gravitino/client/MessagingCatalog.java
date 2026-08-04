@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
+import org.apache.gravitino.dto.messaging.DataLayoutDTO;
 import org.apache.gravitino.dto.requests.TopicCreateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdatesRequest;
@@ -128,12 +130,12 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
   }
 
   /**
-   * Create a new topic with the given identifier, comment, data layout and properties.
+   * Create a new topic with the given identifier, comment, data layouts and properties.
    *
    * @param ident A topic identifier, which should be "schema.topic" format.
    * @param comment The comment of the topic object. Null is set if no comment is specified.
-   * @param dataLayout The message schema of the topic object. Always null because it's not
-   *     supported yet.
+   * @param dataLayouts Named message schemas of the topic object, or null if unset. Persisted in
+   *     Gravitino's entity store (not in the messaging broker).
    * @param properties The properties of the topic object. Empty map is set if no properties are
    *     specified.
    * @return The created topic object.
@@ -142,7 +144,10 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
    */
   @Override
   public Topic createTopic(
-      NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
+      NameIdentifier ident,
+      String comment,
+      Map<String, DataLayout> dataLayouts,
+      Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
     checkTopicNameIdentifier(ident);
 
@@ -152,6 +157,7 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
             .name(ident.name())
             .comment(comment)
             .properties(properties)
+            .dataLayouts(toDataLayoutDTOs(dataLayouts))
             .build();
 
     TopicResponse resp =
@@ -164,6 +170,16 @@ class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
     resp.validate();
 
     return new GenericTopic(resp.getTopic(), restClient, fullNamespace);
+  }
+
+  private static Map<String, DataLayoutDTO> toDataLayoutDTOs(Map<String, DataLayout> dataLayouts) {
+    if (dataLayouts == null || dataLayouts.isEmpty()) {
+      return null;
+    }
+    Map<String, DataLayoutDTO> dataLayoutDTOs = new LinkedHashMap<>();
+    dataLayouts.forEach(
+        (name, layout) -> dataLayoutDTOs.put(name, DataLayoutDTO.fromDataLayout(layout)));
+    return dataLayoutDTOs;
   }
 
   /**

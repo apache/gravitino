@@ -23,10 +23,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.messaging.DataLayoutDTO;
+import org.apache.gravitino.messaging.DataLayouts;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rest.RESTRequest;
 
@@ -42,7 +45,16 @@ import org.apache.gravitino.rest.RESTRequest;
       name = "setProperty"),
   @JsonSubTypes.Type(
       value = TopicUpdateRequest.RemoveTopicPropertyRequest.class,
-      name = "removeProperty")
+      name = "removeProperty"),
+  @JsonSubTypes.Type(
+      value = TopicUpdateRequest.UpdateTopicDataLayoutRequest.class,
+      name = "updateDataLayout"),
+  @JsonSubTypes.Type(
+      value = TopicUpdateRequest.RemoveTopicDataLayoutRequest.class,
+      name = "removeDataLayout"),
+  @JsonSubTypes.Type(
+      value = TopicUpdateRequest.RemoveTopicDataLayoutsRequest.class,
+      name = "removeDataLayouts")
 })
 public interface TopicUpdateRequest extends RESTRequest {
 
@@ -127,6 +139,7 @@ public interface TopicUpdateRequest extends RESTRequest {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
       Preconditions.checkArgument(value != null, "\"value\" field is required and cannot be null");
+      DataLayouts.validateNoReservedProperties(Collections.singletonMap(property, value));
     }
 
     /**
@@ -180,6 +193,104 @@ public interface TopicUpdateRequest extends RESTRequest {
     @Override
     public TopicChange topicChange() {
       return TopicChange.removeProperty(property);
+    }
+  }
+
+  /** Represents a request to update the data layout of a topic. */
+  @EqualsAndHashCode
+  @ToString
+  @Getter
+  class UpdateTopicDataLayoutRequest implements TopicUpdateRequest {
+
+    @JsonProperty("name")
+    private final String name;
+
+    @JsonProperty("newDataLayout")
+    private final DataLayoutDTO newDataLayout;
+
+    /**
+     * Constructor for UpdateTopicDataLayoutRequest.
+     *
+     * @param name the layout name to update
+     * @param newDataLayout the new data layout of the topic
+     */
+    public UpdateTopicDataLayoutRequest(String name, DataLayoutDTO newDataLayout) {
+      this.name = name;
+      this.newDataLayout = newDataLayout;
+    }
+
+    /** Default constructor for Jackson deserialization. */
+    public UpdateTopicDataLayoutRequest() {
+      this(null, null);
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
+      Preconditions.checkArgument(newDataLayout != null, "\"newDataLayout\" field is required");
+      try {
+        newDataLayout.validate();
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException("data layout \"" + name + "\": " + e.getMessage(), e);
+      }
+    }
+
+    @Override
+    public TopicChange topicChange() {
+      return TopicChange.updateDataLayout(name, newDataLayout.toSchemaDataLayout());
+    }
+  }
+
+  /** Represents a request to remove the data layout of a topic. */
+  @EqualsAndHashCode
+  @ToString
+  @Getter
+  class RemoveTopicDataLayoutRequest implements TopicUpdateRequest {
+
+    @JsonProperty("name")
+    private final String name;
+
+    /**
+     * Constructor for RemoveTopicDataLayoutRequest.
+     *
+     * @param name the layout name to remove
+     */
+    public RemoveTopicDataLayoutRequest(String name) {
+      this.name = name;
+    }
+
+    /** Default constructor for Jackson deserialization. */
+    public RemoveTopicDataLayoutRequest() {
+      this(null);
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
+    }
+
+    @Override
+    public TopicChange topicChange() {
+      return TopicChange.removeDataLayout(name);
+    }
+  }
+
+  /** Represents a request to remove all data layouts of a topic. */
+  @EqualsAndHashCode
+  @ToString
+  class RemoveTopicDataLayoutsRequest implements TopicUpdateRequest {
+
+    /** Default constructor for Jackson deserialization. */
+    public RemoveTopicDataLayoutsRequest() {}
+
+    @Override
+    public void validate() throws IllegalArgumentException {}
+
+    @Override
+    public TopicChange topicChange() {
+      return TopicChange.removeDataLayouts();
     }
   }
 }
