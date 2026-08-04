@@ -59,8 +59,12 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -883,6 +887,76 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testCreateFencesMetalakeAndRollsBackFenceOnFailure() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    MetalakePO beforeCreate = getMetalakePO();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "fenced-role",
+            AUDIT_INFO,
+            "catalog");
+
+    service.insertRole(role, false);
+
+    MetalakePO afterCreate = getMetalakePO();
+    assertEquals(beforeCreate.getCurrentVersion() + 1, afterCreate.getCurrentVersion());
+    assertEquals(afterCreate.getCurrentVersion(), afterCreate.getLastVersion());
+
+    RoleEntity duplicate =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            role.name(),
+            AUDIT_INFO,
+            "catalog");
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class, () -> service.insertRole(duplicate, false));
+
+    MetalakePO afterFailedCreate = getMetalakePO();
+    assertEquals(afterCreate.getCurrentVersion(), afterFailedCreate.getCurrentVersion());
+    assertEquals(afterCreate.getLastVersion(), afterFailedCreate.getLastVersion());
+  }
+
+  @TestTemplate
+  void testMetadataOnlyUpdateUsesOcc() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    RoleMetaService service = RoleMetaService.getInstance();
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "metadata-only-role",
+            AUDIT_INFO,
+            "catalog");
+    service.insertRole(role, false);
+    RolePO beforeUpdate = getRolePO(role.name());
+
+    service.updateRole(role.nameIdentifier(), (RoleEntity oldRole) -> copyRole(oldRole, "value-1"));
+
+    RolePO afterUpdate = getRolePO(role.name());
+    assertEquals(beforeUpdate.getCurrentVersion() + 1, afterUpdate.getCurrentVersion());
+    assertEquals(
+        "value-1", service.getRoleByIdentifier(role.nameIdentifier()).properties().get("key"));
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateRole(
+                role.nameIdentifier(),
+                (RoleEntity oldRole) -> {
+                  advanceRoleVersion(role.id());
+                  return copyRole(oldRole, "value-2");
+                }));
+    assertEquals(
+        "value-1", service.getRoleByIdentifier(role.nameIdentifier()).properties().get("key"));
+  }
+
+  @TestTemplate
   void testDeleteMetalakeCascade() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
     createAndInsertCatalog(METALAKE_NAME, "catalog");
@@ -1104,6 +1178,29 @@ class TestRoleMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private MetalakePO getMetalakePO() {
+    return SessionUtils.getWithoutCommit(
+        MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(METALAKE_NAME));
+  }
+
+  private RolePO getRolePO(String roleName) {
+    MetalakePO metalakePO = getMetalakePO();
+    return SessionUtils.getWithoutCommit(
+        RoleMetaMapper.class,
+        mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakePO.getMetalakeId(), roleName));
+  }
+
+  private RoleEntity copyRole(RoleEntity role, String propertyValue) {
+    return RoleEntity.builder()
+        .withId(role.id())
+        .withName(role.name())
+        .withNamespace(role.namespace())
+        .withProperties(ImmutableMap.of("key", propertyValue))
+        .withSecurableObjects(role.securableObjects())
+        .withAuditInfo(role.auditInfo())
+        .build();
   }
 
   private Integer countUserRoleRels() {
