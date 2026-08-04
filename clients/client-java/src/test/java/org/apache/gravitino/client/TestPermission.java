@@ -92,6 +92,7 @@ public class TestPermission extends TestBase {
     RoleGrantRequest request = new RoleGrantRequest(roles);
     UserDTO userDTO =
         UserDTO.builder()
+            .withId(1L)
             .withName("user")
             .withRoles(Lists.newArrayList("roles"))
             .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
@@ -118,6 +119,7 @@ public class TestPermission extends TestBase {
         String.format(API_PERMISSION_PATH, metalakeName, String.format("users/%s/revoke", user));
     UserDTO userDTO =
         UserDTO.builder()
+            .withId(1L)
             .withName("user")
             .withRoles(Lists.newArrayList())
             .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())

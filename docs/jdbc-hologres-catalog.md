@@ -43,15 +43,15 @@ Check the relevant data source configuration in [data source properties](https:/
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Hologres catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                           | Default value | Required | Since Version    |
-|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database`                                        | (none)        | Yes      | 1.3.0 |
-| `jdbc-driver`           | The driver of the JDBC connection. Must be `org.postgresql.Driver`.                                                                                                   | (none)        | Yes      | 1.3.0 |
-| `jdbc-database`         | The database name. This is mandatory for Hologres.                                                                                                                    | (none)        | Yes      | 1.3.0 |
-| `jdbc-user`             | The JDBC user name (AccessKey ID or database username).                                                                                                               | (none)        | Yes      | 1.3.0 |
-| `jdbc-password`         | The JDBC password (AccessKey Secret or database password).                                                                                                            | (none)        | Yes      | 1.3.0 |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                        | `2`           | No       | 1.3.0 |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                       | `10`          | No       | 1.3.0 |
+| Configuration item   | Description                                                                                                                   | Default value | Required |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database` | (none)        | Yes      |
+| `jdbc-driver`        | The driver of the JDBC connection. Must be `org.postgresql.Driver`.                                                           | (none)        | Yes      |
+| `jdbc-database`      | The database name. This is mandatory for Hologres.                                                                            | (none)        | Yes      |
+| `jdbc-user`          | The JDBC user name (AccessKey ID or database username).                                                                       | (none)        | Yes      |
+| `jdbc-password`      | The JDBC password (AccessKey Secret or database password).                                                                    | (none)        | Yes      |
+| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                | `2`           | No       |
+| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                               | `10`          | No       |
 
 :::caution
 Hologres uses the PostgreSQL JDBC Driver (version 42.3.2 or later recommended). You need to download the PostgreSQL JDBC Driver and place it in the `catalogs/jdbc-hologres/libs` directory under the Gravitino distribution (e.g., `distribution/package/catalogs/jdbc-hologres/libs` or `distribution/package-all/catalogs/jdbc-hologres/libs`).
@@ -62,7 +62,7 @@ Hologres uses the PostgreSQL JDBC Driver (version 42.3.2 or later recommended). 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
 :::
 
 ## Schema
