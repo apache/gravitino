@@ -66,7 +66,7 @@ import org.junit.jupiter.api.TestTemplate;
 
 public class TestTagMetaService extends TestJDBCBackend {
 
-  private static final String METALAKE_NAME = "metalake_for_tag_test";
+  private static final String METALAKE_NAME = "metalake_for_tag_meta_service_test";
 
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
 

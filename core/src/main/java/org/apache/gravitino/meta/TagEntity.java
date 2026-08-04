@@ -152,13 +152,12 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
         && Objects.equals(comment, that.comment)
         && Objects.equals(properties, that.properties)
         && Arrays.equals(allowedValues, that.allowedValues)
-        && Objects.equals(assignment, that.assignment)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    int result = Objects.hash(id, name, namespace, comment, properties, assignment, auditInfo);
+    int result = Objects.hash(id, name, namespace, comment, properties, auditInfo);
     result = 31 * result + Arrays.hashCode(allowedValues);
     return result;
   }

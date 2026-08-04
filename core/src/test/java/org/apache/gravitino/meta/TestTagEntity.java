@@ -42,4 +42,22 @@ public class TestTagEntity {
         new String[] {"dev", "prod"}, tagEntity.assignment().get().values());
     Assertions.assertFalse(tagEntity.fields().values().contains(tagEntity.assignment().get()));
   }
+
+  @Test
+  public void testTagEntityEqualityIgnoresAssignmentContext() {
+    TagEntity tagEntity =
+        TagEntity.builder()
+            .withId(1L)
+            .withName("tag")
+            .withNamespace(Namespace.of("metalake"))
+            .withComment("comment")
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+
+    TagEntity tagEntityWithAssignment =
+        tagEntity.copyWithAssignment(TagAssignment.ofValues("dev", "prod"));
+
+    Assertions.assertEquals(tagEntity, tagEntityWithAssignment);
+    Assertions.assertEquals(tagEntity.hashCode(), tagEntityWithAssignment.hashCode());
+  }
 }
