@@ -210,6 +210,7 @@ public class AccessControlManager implements AccessControlDispatcher {
         () -> userGroupExternalManager.getGroupByExternalId(metalake, externalId));
   }
 
+  @Override
   public Group getGroupById(String metalake, long groupId)
       throws NoSuchGroupException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
