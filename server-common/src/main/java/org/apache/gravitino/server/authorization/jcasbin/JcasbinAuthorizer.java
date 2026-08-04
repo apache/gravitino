@@ -522,6 +522,50 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public Set<String> findUnheldRoles(
+      Principal principal,
+      String metalake,
+      Set<String> declaredRoleNames,
+      AuthorizationRequestContext requestContext) {
+    if (declaredRoleNames == null || declaredRoleNames.isEmpty()) {
+      return new LinkedHashSet<>();
+    }
+    String username = principal.getName();
+    Set<String> heldRoleNames;
+    try {
+      List<String> groupNames = principalGroupNames(principal);
+      // Prime the role caches and versions that the downstream authorize() call will reuse.
+      Optional<UserUpdatedAt> userInfoOpt =
+          prefetchUserAndGroupInfo(metalake, username, groupNames, requestContext);
+      if (!userInfoOpt.isPresent()) {
+        // No user record => the caller holds no roles, so every declared role is unheld.
+        return new LinkedHashSet<>(declaredRoleNames);
+      }
+      Map<Long, RoleUpdatedAt> roleVersions = requestContext.getPrefetchedRoleVersions();
+      heldRoleNames =
+          roleVersions.values().stream()
+              .map(RoleUpdatedAt::getRoleName)
+              .collect(Collectors.toSet());
+    } catch (Exception e) {
+      // Fail closed: if membership cannot be resolved, treat every declared role as unheld.
+      LOG.warn(
+          "Failed to resolve held roles for user {} in metalake {}; rejecting role assumption",
+          username,
+          metalake,
+          e);
+      return new LinkedHashSet<>(declaredRoleNames);
+    }
+
+    Set<String> unheldRoles = new LinkedHashSet<>();
+    for (String roleName : declaredRoleNames) {
+      if (!heldRoleNames.contains(roleName)) {
+        unheldRoles.add(roleName);
+      }
+    }
+    return unheldRoles;
+  }
+
+  @Override
   public boolean hasSetOwnerPermission(
       String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();

@@ -21,15 +21,19 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -39,8 +43,12 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsExternalIdOperations;
+import org.apache.gravitino.SupportsIdOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CacheFactory;
@@ -69,6 +77,7 @@ public class RelationalEntityStore
     implements EntityStore,
         SupportsRelationOperations,
         SupportsExternalIdOperations,
+        SupportsIdOperations,
         SupportsEntityChangeLog {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
@@ -77,6 +86,7 @@ public class RelationalEntityStore
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityChangeLogPoller entityChangeLogPoller;
+  private EntityChangeLogCleaner entityChangeLogCleaner;
   private EntityCache cache;
 
   @VisibleForTesting
@@ -99,16 +109,23 @@ public class RelationalEntityStore
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
 
-    // The change-log poller is a side module of the entity store: it polls the entity_change_log
-    // table this store writes to, dispatches batches to registered listeners (e.g. for cross-node
-    // cache invalidation), and prunes expired rows. Like the garbage collector, it is owned and
-    // lifecycle-managed by the store itself.
+    // Polling and cleanup use separate single-threaded schedulers. Polling only dispatches changes
+    // to local listeners, while cleanup independently removes records beyond the retention period.
     this.entityChangeLogPoller =
         new EntityChangeLogPoller(
             config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
+            config.get(Configs.ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES),
+            EntityChangeLogPoller.ListenerFailureAction.valueOf(
+                config
+                    .get(Configs.ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION)
+                    .toUpperCase(Locale.ROOT)));
+    this.entityChangeLogCleaner =
+        new EntityChangeLogCleaner(
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
-            TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
+            TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)),
+            TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)));
     this.entityChangeLogPoller.start();
+    this.entityChangeLogCleaner.start();
   }
 
   private RelationalBackend createRelationalEntityBackend(Config config) {
@@ -191,6 +208,11 @@ public class RelationalEntityStore
   }
 
   @Override
+  public SupportsIdOperations idOperations() {
+    return this;
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E getByExternalId(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
       throws NoSuchEntityException, IOException {
@@ -217,6 +239,39 @@ public class RelationalEntityStore
     } catch (NoSuchEntityException e) {
       LOGGER.warn(
           "The entity to be deleted by external id does not exist in the store: {}", ident, e);
+      return false;
+    } finally {
+      if (nameIdent != null) {
+        cache.invalidate(nameIdent, entityType);
+      }
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getById(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
+      throws NoSuchEntityException, IOException {
+    return backend.getById(ident, entityType);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateById(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    E updatedEntity = backend.updateById(ident, entityType, updater);
+    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+    return updatedEntity;
+  }
+
+  @Override
+  public boolean deleteById(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    NameIdentifier nameIdent = null;
+    try {
+      HasIdentifier entity = backend.getById(ident, entityType);
+      nameIdent = entity.nameIdentifier();
+      return backend.delete(nameIdent, entityType, false);
+    } catch (NoSuchEntityException e) {
+      LOGGER.warn("The entity to be deleted by id does not exist in the store: {}", ident, e);
       return false;
     } finally {
       if (nameIdent != null) {
@@ -276,10 +331,39 @@ public class RelationalEntityStore
 
   @Override
   public void close() throws IOException {
-    cache.clear();
-    entityChangeLogPoller.close();
-    garbageCollector.close();
-    backend.close();
+    // Keep shutting the remaining components down even if one of them fails, and tolerate a
+    // half-finished initialize() that left some of them null.
+    IOException failure = null;
+    failure = closeComponent(failure, "entity cache", cache == null ? null : cache::clear);
+    failure = closeComponent(failure, "entity change log poller", entityChangeLogPoller);
+    failure = closeComponent(failure, "entity change log cleaner", entityChangeLogCleaner);
+    failure = closeComponent(failure, "relational garbage collector", garbageCollector);
+    failure = closeComponent(failure, "relational backend", backend);
+
+    if (failure != null) {
+      throw failure;
+    }
+  }
+
+  private static IOException closeComponent(
+      @Nullable IOException failure, String name, @Nullable AutoCloseable component) {
+    if (component == null) {
+      return failure;
+    }
+
+    try {
+      component.close();
+      return failure;
+    } catch (Exception e) {
+      LOGGER.warn("Failed to close {}", name, e);
+      if (failure != null) {
+        failure.addSuppressed(e);
+        return failure;
+      }
+      return e instanceof IOException
+          ? (IOException) e
+          : new IOException("Failed to close " + name, e);
+    }
   }
 
   @Override
@@ -432,21 +516,54 @@ public class RelationalEntityStore
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    return updateEntityRelations(
+        RelationUpdate.of(
+            relType,
+            srcEntityIdent,
+            srcEntityType,
+            toRelationEdgeTargets(relType, srcEntityType, destEntitiesToAdd),
+            toRelationEdgeTargets(relType, srcEntityType, destEntitiesToRemove)));
+  }
 
-    // Invalidate after the backend write, not before. Invalidating before creates a window where
-    // a concurrent read can repopulate the cache with stale pre-commit data.
-    List<E> result =
-        backend.updateEntityRelations(
-            relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
-
-    cache.invalidate(srcEntityIdent, srcEntityType, relType);
-    for (NameIdentifier destToAdd : destEntitiesToAdd) {
-      cache.invalidate(destToAdd, srcEntityType, relType);
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
+      throws IOException {
+    if (query.relationValue().isPresent()) {
+      return backend.listEntitiesByRelation(query);
     }
 
-    for (NameIdentifier destToRemove : destEntitiesToRemove) {
-      cache.invalidate(destToRemove, srcEntityType, relType);
+    return listEntitiesByRelation(
+        query.relationType(),
+        query.anchorIdentifier(),
+        query.anchorEntityType(),
+        query.allFields());
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(RelationUpdate update)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    validateRelationTargetTypes(update);
+
+    RelationEdgeTarget[] targetsToAdd = update.targetsToAdd();
+    RelationEdgeTarget[] targetsToRemove = update.targetsToRemove();
+    List<E> result;
+    if (update.hasRelationValues()) {
+      result = backend.updateEntityRelations(update);
+    } else {
+      result =
+          backend.updateEntityRelations(
+              update.relationType(),
+              update.sourceIdentifier(),
+              update.sourceEntityType(),
+              toNameIdentifiers(targetsToAdd),
+              toNameIdentifiers(targetsToRemove));
     }
+
+    Entity.EntityType targetEntityType =
+        relationUpdateTargetType(update.relationType(), update.sourceEntityType());
+    cache.invalidate(update.sourceIdentifier(), update.sourceEntityType(), update.relationType());
+    invalidateRelationTargetCache(update.relationType(), targetEntityType, targetsToAdd);
+    invalidateRelationTargetCache(update.relationType(), targetEntityType, targetsToRemove);
 
     return result;
   }
@@ -462,6 +579,62 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+  }
+
+  private void invalidateRelationTargetCache(
+      Type relType, Entity.EntityType targetEntityType, RelationEdgeTarget[] relationTargets) {
+    for (RelationEdgeTarget relationTarget : relationTargets) {
+      cache.invalidate(relationTarget.nameIdentifier(), targetEntityType, relType);
+    }
+  }
+
+  private static void validateRelationTargetTypes(RelationUpdate update) {
+    Entity.EntityType targetEntityType =
+        relationUpdateTargetType(update.relationType(), update.sourceEntityType());
+    validateRelationTargetTypes(update.relationType(), targetEntityType, update.targetsToAdd());
+    validateRelationTargetTypes(update.relationType(), targetEntityType, update.targetsToRemove());
+  }
+
+  private static void validateRelationTargetTypes(
+      Type relType, Entity.EntityType targetEntityType, RelationEdgeTarget[] relationTargets) {
+    for (RelationEdgeTarget relationTarget : relationTargets) {
+      Preconditions.checkArgument(
+          relationTarget.entityType() == targetEntityType,
+          "Relation target type %s does not match expected destination type %s for relation type %s",
+          relationTarget.entityType(),
+          targetEntityType,
+          relType);
+    }
+  }
+
+  private static RelationEdgeTarget[] toRelationEdgeTargets(
+      Type relType, Entity.EntityType srcEntityType, NameIdentifier[] nameIdentifiers) {
+    if (nameIdentifiers == null) {
+      return new RelationEdgeTarget[0];
+    }
+
+    Entity.EntityType targetEntityType = relationUpdateTargetType(relType, srcEntityType);
+    return Arrays.stream(nameIdentifiers)
+        .map(nameIdentifier -> RelationEdgeTarget.of(nameIdentifier, targetEntityType, null))
+        .toArray(RelationEdgeTarget[]::new);
+  }
+
+  private static NameIdentifier[] toNameIdentifiers(RelationEdgeTarget[] relationTargets) {
+    return Arrays.stream(relationTargets)
+        .map(RelationEdgeTarget::nameIdentifier)
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static Entity.EntityType relationUpdateTargetType(
+      Type relType, Entity.EntityType srcEntityType) {
+    switch (relType) {
+      case POLICY_METADATA_OBJECT_REL:
+        return Entity.EntityType.POLICY;
+      case TAG_METADATA_OBJECT_REL:
+        return Entity.EntityType.TAG;
+      default:
+        return srcEntityType;
+    }
   }
 
   private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>> getCachedRelations(

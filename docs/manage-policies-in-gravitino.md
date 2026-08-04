@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 1.0.0, Gravitino introduces a new policy system that allows you to manage policies for
+Gravitino provides a policy system that allows you to manage policies for
 metadata objects. Policies are a set of rules that can be associated with a metadata
 object for data governance and similar purposes.
 

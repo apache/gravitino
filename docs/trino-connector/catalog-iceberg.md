@@ -147,10 +147,10 @@ CREATE TABLE catalog.dbname.tablename
 
 The following tables are the properties supported by the Iceberg table:
 
-| Property       | Description                             | Default Value                                              | Required | Reserved | Since Version |
-|----------------|-----------------------------------------|------------------------------------------------------------|----------|----------|---------------|
-| partitioning   | Partition columns for the table         | (none)                                                     | No       | No       | 0.4.0         |
-| sorted_by      | Sorted columns for the table            | (none)                                                     | No       | No       | 0.4.0         | 
+| Property     | Description                     | Default Value | Required | Reserved |
+|--------------|---------------------------------|---------------|----------|----------|
+| partitioning | Partition columns for the table | (none)        | No       | No       |
+| sorted_by    | Sorted columns for the table    | (none)        | No       | No       |
 
 Reserved properties: A reserved property is one can't be set by users but can be read by users. 
 
