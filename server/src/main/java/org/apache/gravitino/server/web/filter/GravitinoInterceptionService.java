@@ -41,11 +41,13 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
@@ -188,6 +190,28 @@ public class GravitinoInterceptionService implements InterceptionService {
                   metalakeIdent.name(),
                   ex);
               return Utils.internalError("Failed to validate user", ex);
+            }
+
+            // Role assumption: reject a NAMED declaration that names roles the caller does not
+            // hold (403); ALL/NONE need no membership check.
+            ActiveRoles activeRoles = authorizationRequestContext.getActiveRoles();
+            if (activeRoles.mode() == ActiveRoles.Mode.NAMED) {
+              Set<String> unheldRoles =
+                  GravitinoAuthorizerProvider.getInstance()
+                      .getGravitinoAuthorizer()
+                      .findUnheldRoles(
+                          PrincipalUtils.getCurrentPrincipal(),
+                          metalakeIdent.name(),
+                          activeRoles.roleNames(),
+                          authorizationRequestContext);
+              if (!unheldRoles.isEmpty()) {
+                dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
+                return Utils.forbidden(
+                    String.format(
+                        "User '%s' cannot assume active role(s) that are not held: %s",
+                        currentUser, unheldRoles),
+                    null);
+              }
             }
           }
 

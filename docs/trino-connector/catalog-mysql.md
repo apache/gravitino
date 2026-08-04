@@ -57,19 +57,19 @@ MySQL's schemas cannot support properties.
 
 The following are supported MySQL table properties:
 
-| Property name                      | Type   | Default Value  | Description                                                                                                                             | Required | Since Version |
-|------------------------------------|--------|----------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
-| engine                             | string | InnoDB         | The engine that MySQL table uses.                                                                                                       | No       | 0.4.0         |
-| auto_increment_offset              | string | (none)         | The auto increment offset for the table.                                                                                                | No       | 0.4.0         |
-| primary_key                        | list   | (none)         | The primary keys for the table, can choose multi columns as the table primary key. All key columns must be defined as `NOT NULL`.       | No       | 1.0.0         |
-| unique_key                         | list   | (none)         | The unique keys for the table, can choose multi columns for multi unique key. Each unique key should be defined as `keyName:col1,col2`. | No       | 1.0.0         |
+| Property name         | Type   | Default Value | Description                                                                                                                             | Required |
+|-----------------------|--------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------|
+| engine                | string | InnoDB        | The engine that MySQL table uses.                                                                                                       | No       |
+| auto_increment_offset | string | (none)        | The auto increment offset for the table.                                                                                                | No       |
+| primary_key           | list   | (none)        | The primary keys for the table, can choose multi columns as the table primary key. All key columns must be defined as `NOT NULL`.       | No       |
+| unique_key            | list   | (none)        | The unique keys for the table, can choose multi columns for multi unique key. Each unique key should be defined as `keyName:col1,col2`. | No       |
 
 The following are supported MySQL column properties:
 
-| Property name                      | Type    | Default Value | Description                                       | Required | Since Version |
-|------------------------------------|---------|---------------|---------------------------------------------------|----------|---------------|
-| auto_increment                     | boolean | false         | The auto increment column.                        | No       | 1.0.0         |
-| default                            | string  | (none)        | The default value for column.                     | No       | 1.0.0         |
+| Property name  | Type    | Default Value | Description                   | Required |
+|----------------|---------|---------------|-------------------------------|----------|
+| auto_increment | boolean | false         | The auto increment column.    | No       |
+| default        | string  | (none)        | The default value for column. | No       |
 
 **Note:** Creating tables supports constant default values only. Expression default values are not supported. `SHOW CREATE TABLE` also renders only constant default values.
 The following are Trino type which support configuration of default values:
