@@ -134,6 +134,25 @@ To enable the Lance REST service within Gravitino server, configure the followin
 | `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI (required when namespace-backend is `gravitino`)        | http://localhost:8090   | Yes      | 1.1.0         |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      | 1.1.0         |
 
+**Authentication to the Gravitino Server**
+
+The Lance REST service makes its own requests to the Gravitino server. Those requests must carry
+credentials, otherwise a Gravitino server configured with an authenticator other than `simple`
+rejects them and every Lance operation fails. Configure the auth type to match the Gravitino
+server:
+
+| Configuration Property                             | Description                                                                        | Default Value       | Required          | Since Version |
+|----------------------------------------------------|------------------------------------------------------------------------------------|---------------------|-------------------|---------------|
+| `gravitino.lance-rest.gravitino-auth-type`         | Auth type used to reach the Gravitino server. Supported values: `simple`, `oauth2` | `simple`            | No                | 1.3.0         |
+| `gravitino.lance-rest.gravitino-simple.user-name`  | User name presented when the auth type is `simple`                                 | `lance-rest-server` | No                | 1.3.0         |
+| `gravitino.lance-rest.gravitino-oauth2.server-uri` | OAuth2 server URI                                                                  | (none)              | Yes, for `oauth2` | 1.3.0         |
+| `gravitino.lance-rest.gravitino-oauth2.credential` | Credential used to request the OAuth2 token                                        | (none)              | Yes, for `oauth2` | 1.3.0         |
+| `gravitino.lance-rest.gravitino-oauth2.token-path` | Path on the OAuth2 server used to request the token                                | (none)              | Yes, for `oauth2` | 1.3.0         |
+| `gravitino.lance-rest.gravitino-oauth2.scope`      | Scope of the requested OAuth2 token                                                | (none)              | Yes, for `oauth2` | 1.3.0         |
+
+This setting controls how the service authenticates to the Gravitino server. It does not change how
+callers authenticate to the Lance REST service itself.
+
 **Example Configuration:**
 
 ```properties
