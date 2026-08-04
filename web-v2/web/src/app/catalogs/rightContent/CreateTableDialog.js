@@ -118,20 +118,24 @@ export default function CreateTableDialog({ ...props }) {
 
   const getClickHouseEngine = () => {
     if (provider !== 'jdbc-clickhouse') return undefined
-    return form.getFieldValue('engine') || form.getFieldValue('properties')?.find(item => item?.key === 'engine')?.value
+
+    return (
+      form.getFieldValue('engine') || form.getFieldValue('properties')?.find(item => item?.key === 'engine')?.value
+    )?.toLowerCase()
   }
 
   const isClickHouseDistributedEngine =
     provider === 'jdbc-clickhouse' &&
-    (values?.engine || values?.properties?.find(item => item?.key === 'engine')?.value)?.toLowerCase?.() === 'distributed'
+    (values?.engine || values?.properties?.find(item => item?.key === 'engine')?.value)?.toLowerCase?.() ===
+      'distributed'
 
   const clickHouseEngine =
     provider === 'jdbc-clickhouse'
-      ? values?.engine || values?.properties?.find(item => item?.key === 'engine')?.value
+      ? (values?.engine || values?.properties?.find(item => item?.key === 'engine')?.value)?.toLowerCase()
       : undefined
 
   const isClickHouseMergeTreeEngine =
-    provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.includes(clickHouseEngine)
+    provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.map(e => e.toLowerCase()).includes(clickHouseEngine)
   const isColumnsRequired = !isClickHouseDistributedEngine
 
   const defaultValues = {
@@ -661,7 +665,8 @@ export default function CreateTableDialog({ ...props }) {
     e.preventDefault()
 
     const currentEngine = getClickHouseEngine()
-    const isCurrentMergeTree = provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.includes(currentEngine)
+    const isCurrentMergeTree =
+      provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.map(e => e.toLowerCase()).includes(currentEngine)
 
     // For non-MergeTree ClickHouse engines, clear sortOrders errors before validating
     if (sortOredsInfo && !isCurrentMergeTree) {
@@ -840,7 +845,7 @@ export default function CreateTableDialog({ ...props }) {
           if (indexesInfo) {
             submitData['indexes'] = values.indexes?.map(i => {
               const index = {
-                indexType: i.indexType,
+                indexType: provider === 'jdbc-clickhouse' ? i.indexType?.toUpperCase() : i.indexType,
                 name: i.name,
                 fieldNames: i.fieldName.map(f => [f])
               }

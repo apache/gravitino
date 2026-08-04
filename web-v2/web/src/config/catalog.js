@@ -17,6 +17,8 @@
  * under the License.
  */
 
+import { clickHouseMergeTreeEngines } from '@/config'
+
 export const checkCatalogIcon = ({ type, provider }) => {
   switch (type) {
     case 'relational':
@@ -228,26 +230,7 @@ export const tableDefaultProps = {
     {
       key: 'engine',
       defaultValue: 'MergeTree',
-      select: [
-        'MergeTree',
-        'ReplacingMergeTree',
-        'SummingMergeTree',
-        'AggregatingMergeTree',
-        'CollapsingMergeTree',
-        'VersionedCollapsingMergeTree',
-        'GraphiteMergeTree',
-        'ReplicatedMergeTree',
-        'ReplicatedReplacingMergeTree',
-        'ReplicatedSummingMergeTree',
-        'ReplicatedAggregatingMergeTree',
-        'ReplicatedCollapsingMergeTree',
-        'ReplicatedVersionedCollapsingMergeTree',
-        'ReplicatedGraphiteMergeTree',
-        'Distributed',
-        'TinyLog',
-        'Log',
-        'StripeLog'
-      ]
+      select: [...clickHouseMergeTreeEngines, 'Distributed', 'TinyLog', 'Log', 'StripeLog']
     }
   ]
 }
