@@ -428,6 +428,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     }
   }
 
+  /** {@inheritDoc} */
+  @Override
   public Group getGroupById(String metalake, long groupId)
       throws NoSuchGroupException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
