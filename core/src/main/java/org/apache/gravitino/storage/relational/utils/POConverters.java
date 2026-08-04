@@ -1481,6 +1481,7 @@ public class POConverters {
   }
 
   private static String[] allowedValuesForStorage(TagValueConstraint valueConstraint) {
+    // Storage encoding: null means ANY_VALUE, an empty array means NO_VALUE.
     switch (valueConstraint.type()) {
       case ANY_VALUE:
         return null;

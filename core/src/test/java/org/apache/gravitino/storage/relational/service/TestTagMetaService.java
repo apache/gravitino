@@ -679,6 +679,17 @@ public class TestTagMetaService extends TestJDBCBackend {
                     new TagValue[] {TagValue.of("stage", "qa")},
                     new TagValue[0]));
     Assertions.assertTrue(exception.getMessage().contains("is not in allowed values"));
+
+    IllegalArgumentException noValueException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tagMetaService.associateTagValuesWithMetadataObject(
+                    catalog.nameIdentifier(),
+                    catalog.type(),
+                    new TagValue[] {TagValue.noValue("stage")},
+                    new TagValue[0]));
+    Assertions.assertTrue(noValueException.getMessage().contains("requires assignment values"));
   }
 
   @TestTemplate

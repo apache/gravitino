@@ -516,7 +516,7 @@ COMMENT ON COLUMN tag_meta.tag_name IS 'tag name';
 COMMENT ON COLUMN tag_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN tag_meta.tag_comment IS 'tag comment';
 COMMENT ON COLUMN tag_meta.properties IS 'tag properties';
-COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values';
+COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value';
 COMMENT ON COLUMN tag_meta.audit_info IS 'tag audit info';
 
 
@@ -541,7 +541,7 @@ COMMENT ON COLUMN tag_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN tag_relation_meta.tag_id IS 'tag id';
 COMMENT ON COLUMN tag_relation_meta.metadata_object_id IS 'metadata object id';
 COMMENT ON COLUMN tag_relation_meta.metadata_object_type IS 'metadata object type';
-COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag relation value';
+COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag assignment value';
 COMMENT ON COLUMN tag_relation_meta.audit_info IS 'tag relation audit info';
 COMMENT ON COLUMN tag_relation_meta.current_version IS 'tag relation current version';
 COMMENT ON COLUMN tag_relation_meta.last_version IS 'tag relation last version';

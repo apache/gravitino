@@ -594,6 +594,11 @@ public class TagMetaService {
     String[] allowedValues =
         JsonUtils.anyFieldMapper().readValue(tagPO.getAllowedValues(), String[].class);
     if (!tagValue.value().isPresent()) {
+      Preconditions.checkArgument(
+          allowedValues.length == 0,
+          "Tag %s requires assignment values from allowed values %s",
+          tagValue.name(),
+          Arrays.toString(allowedValues));
       return;
     }
 
