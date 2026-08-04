@@ -16,32 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.authorization;
 
-package org.apache.gravitino.cache;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.Level;
-import org.openjdk.jmh.annotations.Setup;
+public class TestGroupChange {
 
-/**
- * EntityCachePutBenchmark benchmarks the performance of {@link EntityCache#put} operations for
- * standard entities.
- *
- * <p>Each benchmark invocation starts with a cleared cache to ensure that measurements reflect
- * fresh insertions without side effects from previous state.
- *
- * @see org.apache.gravitino.cache.EntityCache
- * @see org.openjdk.jmh.annotations.Benchmark
- */
-public class PutEntityCacheBenchmark extends AbstractEntityBenchmark {
-
-  @Setup(Level.Invocation)
-  public void prepareForCachePut() {
-    cache.clear();
-  }
-
-  @Benchmark
-  public void benchmarkPut() {
-    entities.forEach(e -> cache.put(e));
+  @Test
+  void testUpdateExternalId() {
+    GroupChange.UpdateExternalId change =
+        (GroupChange.UpdateExternalId) GroupChange.updateExternalId("ext-1");
+    Assertions.assertEquals("ext-1", change.getNewExternalId());
+    Assertions.assertEquals(GroupChange.updateExternalId("ext-1"), change);
+    Assertions.assertEquals(GroupChange.updateExternalId(null), GroupChange.updateExternalId(null));
+    Assertions.assertNotEquals(GroupChange.updateExternalId("ext-2"), change);
   }
 }

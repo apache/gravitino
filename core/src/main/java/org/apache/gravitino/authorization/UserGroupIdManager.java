@@ -24,8 +24,10 @@ import java.time.Instant;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -130,6 +132,91 @@ class UserGroupIdManager extends UserGroupManager {
             AuditInfo.builder()
                 .withCreator(user.auditInfo().creator())
                 .withCreateTime(user.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .build();
+  }
+
+  boolean removeGroupById(String metalake, long groupId) {
+    try {
+      return store
+          .idOperations()
+          .deleteById(AuthorizationUtils.ofGroupId(metalake, groupId), Entity.EntityType.GROUP);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Removing group with id {} in the metalake {} failed due to storage issues",
+          groupId,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  Group getGroupById(String metalake, long groupId) throws NoSuchGroupException {
+    try {
+      return store
+          .idOperations()
+          .getById(
+              AuthorizationUtils.ofGroupId(metalake, groupId),
+              Entity.EntityType.GROUP,
+              GroupEntity.class);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Group with id {} does not exist in the metalake {}", groupId, metalake, e);
+      throw new NoSuchGroupException(
+          AuthorizationUtils.GROUP_WITH_ID_DOES_NOT_EXIST_MSG, groupId, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Getting group with id {} failed due to storage issues", groupId, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  Group alterGroupById(String metalake, long groupId, GroupChange... changes)
+      throws NoSuchGroupException {
+    Preconditions.checkArgument(
+        changes != null && changes.length > 0, "Group changes cannot be empty");
+    try {
+      return store
+          .idOperations()
+          .updateById(
+              AuthorizationUtils.ofGroupId(metalake, groupId),
+              Entity.EntityType.GROUP,
+              GroupEntity.class,
+              group -> applyGroupChanges(group, changes));
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Group with id {} does not exist in the metalake {}", groupId, metalake, e);
+      throw new NoSuchGroupException(
+          AuthorizationUtils.GROUP_WITH_ID_DOES_NOT_EXIST_MSG, groupId, metalake);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Altering group with id {} in the metalake {} failed due to storage issues",
+          groupId,
+          metalake,
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  private static GroupEntity applyGroupChanges(GroupEntity group, GroupChange... changes) {
+    String externalId = group.externalId();
+    for (GroupChange change : changes) {
+      if (change instanceof GroupChange.UpdateExternalId) {
+        externalId = ((GroupChange.UpdateExternalId) change).getNewExternalId();
+      } else {
+        throw new IllegalArgumentException("Unsupported group change: " + change);
+      }
+    }
+    return GroupEntity.builder()
+        .withId(group.id())
+        .withName(group.name())
+        .withNamespace(group.namespace())
+        .withExternalId(externalId)
+        .withRoleNames(group.roleNames())
+        .withRoleIds(group.roleIds())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(group.auditInfo().creator())
+                .withCreateTime(group.auditInfo().createTime())
                 .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
                 .withLastModifiedTime(Instant.now())
                 .build())

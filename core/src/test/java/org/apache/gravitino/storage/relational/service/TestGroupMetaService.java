@@ -1202,6 +1202,36 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testByIdMutationsUseOcc() throws IOException {
+    GroupMetaService service = groupMetaService();
+    GroupEntity group = groupWithExtId("by-id-group", "by-id-ext-id");
+    service.insertGroup(group, false);
+    GroupPO beforeUpdate = getGroupPO(group.name());
+
+    service.updateGroupById(
+        metalakeName, group.id(), (GroupEntity oldGroup) -> copyGroup(oldGroup, "updated-by-id"));
+
+    GroupPO afterUpdate = getGroupPO(group.name());
+    assertEquals(beforeUpdate.getCurrentVersion() + 1, afterUpdate.getCurrentVersion());
+    assertEquals("updated-by-id", service.getGroupById(metalakeName, group.id()).externalId());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateGroupById(
+                metalakeName,
+                group.id(),
+                (GroupEntity oldGroup) -> {
+                  advanceGroupVersion(group.id());
+                  return copyGroup(oldGroup, "conflicting-by-id");
+                }));
+    assertEquals("updated-by-id", service.getGroupById(metalakeName, group.id()).externalId());
+
+    assertTrue(service.deleteGroupById(metalakeName, group.id()));
+    assertFalse(service.deleteGroupById(metalakeName, group.id()));
+  }
+
+  @TestTemplate
   void testGroupExtDel() throws IOException {
     GroupMetaService svc = groupMetaService();
     svc.insertGroup(groupWithExtId("g1", "ext-del-by"), false);

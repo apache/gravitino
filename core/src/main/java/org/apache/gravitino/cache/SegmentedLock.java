@@ -21,14 +21,9 @@ package org.apache.gravitino.cache;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Segmented lock for improved concurrency. Divides locks into segments to reduce contention.
@@ -38,12 +33,6 @@ public class SegmentedLock {
   private static final Object NULL_KEY = new Object();
 
   private final Striped<Lock> stripedLocks;
-
-  /**
-   * Stable index for each stripe lock, built once at construction. Used to sort locks in {@link
-   * #getDistinctSortedLocks} with a guaranteed total order (no hash-collision ties).
-   */
-  private final Map<Lock, Integer> lockIndices;
 
   /** CountDownLatch for global operations - null when no operation is in progress */
   private final AtomicReference<CountDownLatch> globalOperationLatch = new AtomicReference<>();
@@ -62,10 +51,6 @@ public class SegmentedLock {
     }
 
     this.stripedLocks = Striped.lock(numSegments);
-    this.lockIndices =
-        IntStream.range(0, this.stripedLocks.size())
-            .boxed()
-            .collect(Collectors.toMap(this.stripedLocks::getAt, i -> i));
   }
 
   /**
@@ -192,50 +177,6 @@ public class SegmentedLock {
     }
   }
 
-  /**
-   * Acquires locks for multiple keys in a consistent order (sorted by stripe index) to avoid
-   * deadlocks, then executes the action.
-   *
-   * @param keys The keys to lock
-   * @param action Action to run
-   * @param <E> Exception type
-   * @throws E Exception from the action
-   */
-  public <E extends Exception> void withMultipleKeyLockAndThrow(
-      List<? extends Object> keys, EntityCache.ThrowingRunnable<E> action) throws E {
-    waitForGlobalComplete();
-    List<Lock> sortedLocks = getDistinctSortedLocks(keys);
-    acquireAllLocks(sortedLocks);
-    try {
-      action.run();
-    } finally {
-      releaseAllLocks(sortedLocks);
-    }
-  }
-
-  /**
-   * Acquires locks for multiple keys in a consistent order (sorted by stripe index) to avoid
-   * deadlocks, then executes the action and returns the result.
-   *
-   * @param keys The keys to lock
-   * @param action Action to run
-   * @param <T> Result type
-   * @param <E> Exception type
-   * @return Action result
-   * @throws E Exception from the action
-   */
-  public <T, E extends Exception> T withMultipleKeyLockAndThrow(
-      List<? extends Object> keys, EntityCache.ThrowingSupplier<T, E> action) throws E {
-    waitForGlobalComplete();
-    List<Lock> sortedLocks = getDistinctSortedLocks(keys);
-    acquireAllLocks(sortedLocks);
-    try {
-      return action.get();
-    } finally {
-      releaseAllLocks(sortedLocks);
-    }
-  }
-
   /** Checks if a global operation is currently in progress. */
   @VisibleForTesting
   public boolean isClearing() {
@@ -275,38 +216,6 @@ public class SegmentedLock {
       globalOperationLatch.set(null);
       latch.countDown();
     }
-  }
-
-  private List<Lock> getDistinctSortedLocks(List<? extends Object> keys) {
-    return keys.stream()
-        .map(this::getSegmentLock)
-        .distinct()
-        .sorted(Comparator.comparingInt(lockIndices::get))
-        .collect(Collectors.toList());
-  }
-
-  private void acquireAllLocks(List<Lock> locks) {
-    int lockedCount = 0;
-    try {
-      for (Lock lock : locks) {
-        lock.lockInterruptibly();
-        lockedCount++;
-      }
-    } catch (InterruptedException e) {
-      releaseLocks(locks, lockedCount);
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while acquiring batch lock", e);
-    }
-  }
-
-  private static void releaseLocks(List<Lock> locks, int lockedCount) {
-    for (int i = lockedCount - 1; i >= 0; i--) {
-      locks.get(i).unlock();
-    }
-  }
-
-  private void releaseAllLocks(List<Lock> locks) {
-    releaseLocks(locks, locks.size());
   }
 
   /**
