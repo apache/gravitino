@@ -21,37 +21,50 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.GroupChange;
 
-/** Represents an event triggered when disabling a user by external id fails. */
+/** Represents an event triggered when an attempt to alter a group fails due to an exception. */
 @DeveloperApi
-public class DisableUserFailureEvent extends UserFailureEvent {
-  private final String externalId;
+public class AlterGroupFailureEvent extends GroupFailureEvent {
+  private final long groupId;
+  private final GroupChange[] changes;
 
   /**
-   * Creates a new {DisableUserFailureEvent}.
+   * Creates a new {@link AlterGroupFailureEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
+   * @param groupId The Gravitino-assigned id of the group.
+   * @param changes The changes attempted to be made to the group.
    * @param exception The exception that caused the failure.
-   * @param externalId The external identifier of the user.
    */
-  public DisableUserFailureEvent(
-      String initiator, String metalake, Exception exception, String externalId) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, externalId), exception);
-    this.externalId = externalId;
+  public AlterGroupFailureEvent(
+      String initiator, String metalake, long groupId, GroupChange[] changes, Exception exception) {
+    super(initiator, AuthorizationUtils.ofGroupId(metalake, groupId), exception);
+    this.groupId = groupId;
+    this.changes = changes;
   }
 
   /**
-   * Returns the external identifier of the user.
+   * Returns the Gravitino-assigned id of the group.
    *
-   * @return The external identifier.
+   * @return The group id.
    */
-  public String externalId() {
-    return externalId;
+  public long groupId() {
+    return groupId;
+  }
+
+  /**
+   * Returns the changes attempted to be made to the group.
+   *
+   * @return An array of {@link GroupChange}.
+   */
+  public GroupChange[] changes() {
+    return changes;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.DISABLE_USER;
+    return OperationType.ALTER_GROUP;
   }
 }

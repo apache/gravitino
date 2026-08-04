@@ -21,45 +21,35 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.listener.api.info.UserInfo;
 
-/** Represents an event triggered after successfully disabling a user by external id. */
+/** Represents an event triggered before retrieving a group by Gravitino-assigned id. */
 @DeveloperApi
-public class DisableUserEvent extends UserEvent {
-  private final UserInfo updatedUserInfo;
+public class GetGroupByIdPreEvent extends GroupPreEvent {
+  private final long groupId;
 
   /**
-   * Creates a new {DisableUserEvent}.
+   * Creates a new {@link GetGroupByIdPreEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param updatedUserInfo The updated user information.
+   * @param groupId The Gravitino-assigned id of the group.
    */
-  public DisableUserEvent(String initiator, String metalake, UserInfo updatedUserInfo) {
-    super(
-        initiator,
-        AuthorizationUtils.ofUserExternalId(
-            metalake,
-            updatedUserInfo
-                .externalId()
-                .orElseThrow(
-                    () ->
-                        new IllegalStateException(
-                            "User external id is required for DisableUserEvent"))));
-    this.updatedUserInfo = updatedUserInfo;
+  public GetGroupByIdPreEvent(String initiator, String metalake, long groupId) {
+    super(initiator, AuthorizationUtils.ofGroupId(metalake, groupId));
+    this.groupId = groupId;
   }
 
   /**
-   * Returns the updated user information.
+   * Returns the Gravitino-assigned id of the group being retrieved.
    *
-   * @return The user information.
+   * @return The group id.
    */
-  public UserInfo updatedUserInfo() {
-    return updatedUserInfo;
+  public long groupId() {
+    return groupId;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.DISABLE_USER;
+    return OperationType.GET_GROUP_BY_ID;
   }
 }

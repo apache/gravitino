@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 
@@ -60,7 +61,8 @@ public interface SupportsRelationOperations {
   }
 
   /**
-   * List the entities according to a given entity in a specific relation.
+   * List the entities according to a given entity in a specific relation. Compatibility adapter for
+   * {@link #listEntitiesByRelation(RelationQuery)}.
    *
    * @param <E> the type of entities returned.
    * @param relType The type of relation.
@@ -88,9 +90,27 @@ public interface SupportsRelationOperations {
    *  The end entity type is determined by the relType parameter and start entity.
    * </pre>
    */
-  <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
+  default <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
-      throws IOException;
+      throws IOException {
+    return listEntitiesByRelation(
+        RelationQuery.of(relType, nameIdentifier, identType, allFields, null));
+  }
+
+  /**
+   * Canonical relation query API. Implementations should add future relation-edge query attributes
+   * to {@link RelationQuery} instead of introducing new relation-specific overloads.
+   *
+   * @param <E> The type of entities returned.
+   * @param query The relation query.
+   * @return The list of entities.
+   * @throws IOException When occurs storage issues, it will throw IOException.
+   */
+  default <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "listEntitiesByRelation with RelationQuery is not supported by this implementation");
+  }
 
   /**
    * Retrieves the relations for a batch of source entities in a single call.
@@ -194,8 +214,15 @@ public interface SupportsRelationOperations {
   }
 
   /**
-   * Updates the relations for a given entity by adding a set of new relations and removing another
-   * set of relations.
+   * Updates the relations for a given source entity by adding a set of new relation targets and
+   * removing another set of relation targets. Compatibility adapter for {@link
+   * #updateEntityRelations(RelationUpdate)}.
+   *
+   * <p>For {@link Type#POLICY_METADATA_OBJECT_REL} and {@link Type#TAG_METADATA_OBJECT_REL}, this
+   * update adapter treats the source entity as the metadata object and the destination identifiers
+   * as policies or tags. Reverse traversal is done by {@link
+   * #listEntitiesByRelation(RelationQuery)} using the same relation type with the policy or tag as
+   * the query anchor.
    *
    * @param <E> The type of the entity returned in the list, which represents the final state of
    *     related entities.
@@ -217,7 +244,55 @@ public interface SupportsRelationOperations {
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    return updateEntityRelations(
+        RelationUpdate.of(
+            relType,
+            srcEntityIdent,
+            srcEntityType,
+            toRelationEdgeTargets(relType, srcEntityType, destEntitiesToAdd),
+            toRelationEdgeTargets(relType, srcEntityType, destEntitiesToRemove)));
+  }
+
+  /**
+   * Canonical relation update API. Implementations should add future relation-edge update
+   * attributes to {@link RelationUpdate} or {@link RelationEdgeTarget} instead of introducing new
+   * relation-specific overloads.
+   *
+   * @param <E> The type of the entity returned in the list, which represents the final state of
+   *     related entities.
+   * @param update The relation update.
+   * @return A list of entities that are related to the given entity after the update.
+   * @throws IOException If a storage-related error occurs.
+   * @throws NoSuchEntityException If any of the specified entities does not exist.
+   * @throws EntityAlreadyExistsException If a relation to be added already exists.
+   */
+  default <E extends Entity & HasIdentifier> List<E> updateEntityRelations(RelationUpdate update)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     throw new UnsupportedOperationException(
-        "updateEntityRelations is not supported by this implementation");
+        "updateEntityRelations with RelationUpdate is not supported by this implementation");
+  }
+
+  private static RelationEdgeTarget[] toRelationEdgeTargets(
+      Type relType, Entity.EntityType srcEntityType, NameIdentifier[] nameIdentifiers) {
+    if (nameIdentifiers == null) {
+      return null;
+    }
+
+    Entity.EntityType targetEntityType = relationUpdateTargetType(relType, srcEntityType);
+    return Arrays.stream(nameIdentifiers)
+        .map(nameIdentifier -> RelationEdgeTarget.of(nameIdentifier, targetEntityType, null))
+        .toArray(RelationEdgeTarget[]::new);
+  }
+
+  private static Entity.EntityType relationUpdateTargetType(
+      Type relType, Entity.EntityType srcEntityType) {
+    switch (relType) {
+      case POLICY_METADATA_OBJECT_REL:
+        return Entity.EntityType.POLICY;
+      case TAG_METADATA_OBJECT_REL:
+        return Entity.EntityType.TAG;
+      default:
+        return srcEntityType;
+    }
   }
 }

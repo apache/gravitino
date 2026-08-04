@@ -406,6 +406,12 @@ public interface AuditLog {
 
     GET_GROUP_BY_EXTERNAL_ID,
 
+    GET_GROUP_BY_ID,
+
+    REMOVE_GROUP_BY_ID,
+
+    ALTER_GROUP,
+
     LIST_GROUPS,
 
     LIST_GROUP_NAMES,

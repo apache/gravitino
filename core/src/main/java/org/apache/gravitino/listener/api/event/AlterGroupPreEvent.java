@@ -21,37 +21,49 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.GroupChange;
 
-/** Represents an event triggered when enabling a user by external id fails. */
+/** Represents an event triggered before altering a group by Gravitino-assigned id. */
 @DeveloperApi
-public class EnableUserFailureEvent extends UserFailureEvent {
-  private final String externalId;
+public class AlterGroupPreEvent extends GroupPreEvent {
+  private final long groupId;
+  private final GroupChange[] changes;
 
   /**
-   * Creates a new {EnableUserFailureEvent}.
+   * Creates a new {@link AlterGroupPreEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param exception The exception that caused the failure.
-   * @param externalId The external identifier of the user.
+   * @param groupId The Gravitino-assigned id of the group.
+   * @param changes The changes being applied to the group.
    */
-  public EnableUserFailureEvent(
-      String initiator, String metalake, Exception exception, String externalId) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, externalId), exception);
-    this.externalId = externalId;
+  public AlterGroupPreEvent(
+      String initiator, String metalake, long groupId, GroupChange[] changes) {
+    super(initiator, AuthorizationUtils.ofGroupId(metalake, groupId));
+    this.groupId = groupId;
+    this.changes = changes;
   }
 
   /**
-   * Returns the external identifier of the user.
+   * Returns the Gravitino-assigned id of the group being altered.
    *
-   * @return The external identifier.
+   * @return The group id.
    */
-  public String externalId() {
-    return externalId;
+  public long groupId() {
+    return groupId;
+  }
+
+  /**
+   * Returns the changes being applied to the group.
+   *
+   * @return An array of {@link GroupChange}.
+   */
+  public GroupChange[] changes() {
+    return changes;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.ENABLE_USER;
+    return OperationType.ALTER_GROUP;
   }
 }

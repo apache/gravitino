@@ -20,7 +20,9 @@
 package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.util.List;
+import java.util.Set;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -30,8 +32,49 @@ import org.apache.gravitino.NameIdentifier;
  * An abstract class that provides a basic implementation for the {@link EntityCache} interface.
  * This class is abstract and cannot be instantiated directly, it is designed to be a base class for
  * other entity cache implementations.
+ *
+ * <p>This class enforces the cacheable entity type allowlist documented on {@link
+ * SupportsEntityStoreCache#put(Entity)}: {@link #put(Entity)} is final and drops entities that have
+ * not been explicitly approved before delegating to {@link #doPut(Entity)}, so no subclass can
+ * accidentally cache them.
  */
 public abstract class BaseEntityCache implements EntityCache {
+
+  /**
+   * Entity types that have been explicitly approved for caching, see {@link
+   * SupportsEntityStoreCache#put(Entity)} for the contract. New entity types are excluded by
+   * default until their invalidation behavior has been validated.
+   *
+   * <p>{@code USER}, {@code GROUP} and {@code ROLE} are materialized with relation-derived data
+   * joined in at load time: a role carries its securable objects, and a user/group carries its role
+   * names. A mutation on the entity itself invalidates its own key through the write path, but this
+   * embedded data also goes stale through a mutation on a different entity. For example, deleting
+   * or renaming a securable object changes a role's materialized form, and deleting or renaming a
+   * role changes a user's/group's role names. Such a mutation touches neither this entity's own key
+   * nor any hierarchy ancestor of it, so neither the write-path invalidation nor a prefix cascade
+   * over the entity hierarchy would evict it. Caching them would therefore serve stale
+   * authorization data.
+   */
+  private static final Set<Entity.EntityType> CACHEABLE_TYPES =
+      Sets.immutableEnumSet(
+          Entity.EntityType.METALAKE,
+          Entity.EntityType.CATALOG,
+          Entity.EntityType.SCHEMA,
+          Entity.EntityType.TABLE,
+          Entity.EntityType.VIEW,
+          Entity.EntityType.COLUMN,
+          Entity.EntityType.FILESET,
+          Entity.EntityType.TOPIC,
+          Entity.EntityType.TAG,
+          Entity.EntityType.MODEL,
+          Entity.EntityType.MODEL_VERSION,
+          Entity.EntityType.POLICY,
+          Entity.EntityType.TABLE_STATISTIC,
+          Entity.EntityType.JOB_TEMPLATE,
+          Entity.EntityType.JOB,
+          Entity.EntityType.AUDIT,
+          Entity.EntityType.FUNCTION);
+
   protected final Config cacheConfig;
 
   /**
@@ -44,6 +87,45 @@ public abstract class BaseEntityCache implements EntityCache {
 
     this.cacheConfig = config;
   }
+
+  /**
+   * Returns whether entities of the given type may be cached.
+   *
+   * @param type The entity type to check.
+   * @return {@code true} if entities of this type may be cached, {@code false} otherwise.
+   */
+  public static boolean isCacheable(Entity.EntityType type) {
+    Preconditions.checkArgument(type != null, "Entity type cannot be null");
+
+    return CACHEABLE_TYPES.contains(type);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public final <E extends Entity & HasIdentifier> void put(E entity) {
+    Preconditions.checkArgument(entity != null, "Entity cannot be null");
+
+    // Called before the cacheability check and before any subclass takes this entity's lock: it
+    // may take another key's lock (e.g. the model key when inserting a model version), and nesting
+    // two entity locks could deadlock. A non-cacheable entity can still invalidate a cacheable one,
+    // so this runs for every entity.
+    invalidateOnKeyChange(entity);
+
+    if (!isCacheable(entity.type())) {
+      return;
+    }
+
+    doPut(entity);
+  }
+
+  /**
+   * Caches the given entity. Called by {@link #put(Entity)} once the entity is known to be
+   * non-null, cacheable, and any related cache entries have been invalidated.
+   *
+   * @param entity The entity to cache.
+   * @param <E> The class of the entity.
+   */
+  protected abstract <E extends Entity & HasIdentifier> void doPut(E entity);
 
   /**
    * Returns the {@link NameIdentifier} of the entity based on its type.

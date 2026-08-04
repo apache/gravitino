@@ -21,45 +21,37 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.listener.api.info.UserInfo;
 
-/** Represents an event triggered after successfully enabling a user by external id. */
+/** Represents an event triggered when retrieving a group by Gravitino-assigned id fails. */
 @DeveloperApi
-public class EnableUserEvent extends UserEvent {
-  private final UserInfo updatedUserInfo;
+public class GetGroupByIdFailureEvent extends GroupFailureEvent {
+  private final long groupId;
 
   /**
-   * Creates a new {EnableUserEvent}.
+   * Creates a new {@link GetGroupByIdFailureEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param updatedUserInfo The updated user information.
+   * @param exception The exception that caused the failure.
+   * @param groupId The Gravitino-assigned id of the group.
    */
-  public EnableUserEvent(String initiator, String metalake, UserInfo updatedUserInfo) {
-    super(
-        initiator,
-        AuthorizationUtils.ofUserExternalId(
-            metalake,
-            updatedUserInfo
-                .externalId()
-                .orElseThrow(
-                    () ->
-                        new IllegalStateException(
-                            "User external id is required for EnableUserEvent"))));
-    this.updatedUserInfo = updatedUserInfo;
+  public GetGroupByIdFailureEvent(
+      String initiator, String metalake, Exception exception, long groupId) {
+    super(initiator, AuthorizationUtils.ofGroupId(metalake, groupId), exception);
+    this.groupId = groupId;
   }
 
   /**
-   * Returns the updated user information.
+   * Returns the Gravitino-assigned id of the group.
    *
-   * @return The user information.
+   * @return The group id.
    */
-  public UserInfo updatedUserInfo() {
-    return updatedUserInfo;
+  public long groupId() {
+    return groupId;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.ENABLE_USER;
+    return OperationType.GET_GROUP_BY_ID;
   }
 }

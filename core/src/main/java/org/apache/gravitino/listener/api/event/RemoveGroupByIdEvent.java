@@ -22,34 +22,46 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 
-/** Represents an event triggered before enabling a user by external id. */
+/** Represents an event triggered after removing a group by Gravitino-assigned id. */
 @DeveloperApi
-public class EnableUserPreEvent extends UserPreEvent {
-  private final String externalId;
+public class RemoveGroupByIdEvent extends GroupEvent {
+  private final long groupId;
+  private final boolean isExists;
 
   /**
-   * Creates a new {@link EnableUserPreEvent}.
+   * Creates a new {@link RemoveGroupByIdEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param externalId The external identifier of the user.
+   * @param groupId The Gravitino-assigned id of the group.
+   * @param isExists Whether the group existed and was removed.
    */
-  public EnableUserPreEvent(String initiator, String metalake, String externalId) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, externalId));
-    this.externalId = externalId;
+  public RemoveGroupByIdEvent(String initiator, String metalake, long groupId, boolean isExists) {
+    super(initiator, AuthorizationUtils.ofGroupId(metalake, groupId));
+    this.groupId = groupId;
+    this.isExists = isExists;
   }
 
   /**
-   * Returns the external identifier of the user.
+   * Returns the Gravitino-assigned id of the removed group.
    *
-   * @return The external identifier.
+   * @return The group id.
    */
-  public String externalId() {
-    return externalId;
+  public long groupId() {
+    return groupId;
+  }
+
+  /**
+   * Returns whether the group existed and was removed.
+   *
+   * @return {@code true} if the group was removed.
+   */
+  public boolean isExists() {
+    return isExists;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.ENABLE_USER;
+    return OperationType.REMOVE_GROUP_BY_ID;
   }
 }

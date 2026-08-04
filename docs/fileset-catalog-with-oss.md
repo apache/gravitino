@@ -30,17 +30,17 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with OSS:
 
-| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Default value   | Required | Since version    |
-|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`.                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location.                                                                                                                                                                                                                                                                   | `builtin-local` | No       | 0.7.0-incubating |
-| `oss-endpoint`                | The endpoint of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | (none)          | Yes      | 0.7.0-incubating |
-| `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | (none)          | Yes      | 0.7.0-incubating |
-| `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | (none)          | Yes      | 0.7.0-incubating |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, see [oss-credential-vending](security/credential-vending.md#oss-credentials)  | (none)          | No       | 0.8.0-incubating |
+| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Default value   | Required |
+|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|
+| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`.                                                                                                                                                                                                                                                                                                 | (none)          | Yes      |
+| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location.                                                                                                                                                                                                                                                                  | `builtin-local` | No       |
+| `oss-endpoint`                | The endpoint of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | (none)          | Yes      |
+| `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | (none)          | Yes      |
+| `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | (none)          | Yes      |
+| `credential-providers`        | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, see [oss-credential-vending](security/credential-vending.md#oss-credentials) | (none)          | No       |
 
 :::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aliyun-bundle`).
+`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aliyun-bundle`).
 :::
 
 ### Schema Configuration
@@ -242,11 +242,11 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 To access fileset with OSS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
-| Configuration item      | Description                       | Default value | Required | Since version    |
-|-------------------------|-----------------------------------|---------------|----------|------------------|
-| `oss-endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      | 0.7.0-incubating |
-| `oss-access-key-id`     | The access key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
-| `oss-secret-access-key` | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
+| Configuration item      | Description                       | Default value | Required |
+|-------------------------|-----------------------------------|---------------|----------|
+| `oss-endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      |
+| `oss-access-key-id`     | The access key of the Aliyun OSS. | (none)        | Yes      |
+| `oss-secret-access-key` | The secret key of the Aliyun OSS. | (none)        | Yes      |
 
 :::note
 If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted. More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
@@ -291,7 +291,7 @@ If your wants to custom your hadoop version or there is already a hadoop version
 ```
 
 :::note
-Since version 1.1.0, the `gravitino-aliyun` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
+The `gravitino-aliyun` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
 :::
 
 Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
@@ -443,11 +443,11 @@ For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 
 To access fileset with OSS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
-| Configuration item      | Description                       | Default value | Required | Since version    |
-|-------------------------|-----------------------------------|---------------|----------|------------------|
-| `oss_endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      | 0.7.0-incubating |
-| `oss_access_key_id`     | The access key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
-| `oss_secret_access_key` | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
+| Configuration item      | Description                       | Default value | Required |
+|-------------------------|-----------------------------------|---------------|----------|
+| `oss_endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      |
+| `oss_access_key_id`     | The access key of the Aliyun OSS. | (none)        | Yes      |
+| `oss_secret_access_key` | The secret key of the Aliyun OSS. | (none)        | Yes      |
 
 :::note
 If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
@@ -499,7 +499,7 @@ For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-g
 
 ## Fileset with Credential Vending
 
-Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
+Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
 
 ### Create an OSS Fileset Catalog with Credential Vending
 

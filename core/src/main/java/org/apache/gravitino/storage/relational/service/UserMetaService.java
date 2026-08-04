@@ -387,4 +387,89 @@ public class UserMetaService {
     }
     return newEntity;
   }
+
+  private UserPO getUserPOByMetalakeNameAndId(String metalakeName, Long userId) {
+    UserPO userPO =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.selectUserMetaByMetalakeNameAndId(metalakeName, userId));
+
+    if (userPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.USER.name().toLowerCase(),
+          String.valueOf(userId));
+    }
+    return userPO;
+  }
+
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getUserById")
+  public UserEntity getUserById(String metalake, long userId) {
+    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
+    UserPO userPO = getUserPOByMetalakeNameAndId(metalake, userId);
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    return POConverters.fromUserPO(userPO, rolePOs, userNamespace);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateUserById")
+  public <E extends Entity & HasIdentifier> UserEntity updateUserById(
+      String metalake, long userId, Function<E, E> updater) throws IOException {
+    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
+    UserPO oldUserPO = getUserPOByMetalakeNameAndId(metalake, userId);
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
+    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, userNamespace);
+    UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldEntity.id(), newEntity.id()),
+        "The updated user entity id: %s should be same with the user entity id before: %s",
+        newEntity.id(),
+        oldEntity.id());
+
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper ->
+                      mapper.updateUserMeta(
+                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+      throw re;
+    }
+    return newEntity;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteUserById")
+  public boolean deleteUserById(String metalake, long userId) {
+    try {
+      getUserPOByMetalakeNameAndId(metalake, userId);
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserMetaMapper.class, mapper -> mapper.softDeleteUserMetaByUserId(userId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByOwnerIdAndType(
+                        userId, Entity.EntityType.USER.name())));
+    return true;
+  }
 }

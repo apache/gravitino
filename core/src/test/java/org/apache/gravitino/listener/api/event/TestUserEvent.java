@@ -90,6 +90,7 @@ public class TestUserEvent {
     User mockUser = getMockUser("mock_user", ImmutableList.of("admin"));
     UserInfo info = new UserInfo(mockUser);
 
+    Assertions.assertEquals(1L, info.id());
     Assertions.assertEquals("mock_user", info.name());
     Assertions.assertEquals(Optional.empty(), info.externalId());
     Assertions.assertEquals(ImmutableList.of("admin"), info.roles());
@@ -506,19 +507,6 @@ public class TestUserEvent {
   }
 
   @Test
-  void testEnableUserEvent() {
-    dispatcher.enableUser(METALAKE, USER_EXT_ID);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(EnableUserPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.ENABLE_USER, preEvent.operationType());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(EnableUserEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.ENABLE_USER, event.operationType());
-  }
-
-  @Test
   void testRemoveUserByExternalIdEvent() {
     dispatcher.removeUserByExternalId(METALAKE, USER_EXT_ID);
 
@@ -558,7 +546,6 @@ public class TestUserEvent {
 
     when(dispatcher.getUser(METALAKE, userName)).thenReturn(user);
     when(dispatcher.getUserByExternalId(METALAKE, USER_EXT_ID)).thenReturn(externalIdUser);
-    when(dispatcher.enableUser(METALAKE, USER_EXT_ID)).thenReturn(externalIdUser);
     when(dispatcher.getUser(METALAKE, inExistUserName))
         .thenThrow(new NoSuchUserException("user not found"));
     when(dispatcher.getUser(INEXIST_METALAKE, userName))
@@ -580,6 +567,7 @@ public class TestUserEvent {
 
   private User getMockUser(String name, List<String> roles) {
     User user = mock(User.class);
+    when(user.id()).thenReturn(1L);
     when(user.name()).thenReturn(name);
     when(user.roles()).thenReturn(roles);
 
@@ -589,6 +577,7 @@ public class TestUserEvent {
   private User getMockUserWithExtId(
       String name, String externalId, boolean enabled, List<String> roles) {
     User user = mock(User.class);
+    when(user.id()).thenReturn(1L);
     when(user.name()).thenReturn(name);
     when(user.externalId()).thenReturn(externalId);
     when(user.enabled()).thenReturn(enabled);
@@ -598,6 +587,7 @@ public class TestUserEvent {
   }
 
   private void validateUserInfo(UserInfo userInfo, User expectedUser) {
+    Assertions.assertEquals(expectedUser.id(), userInfo.id());
     Assertions.assertEquals(userInfo.name(), expectedUser.name());
     Assertions.assertEquals(Optional.ofNullable(expectedUser.externalId()), userInfo.externalId());
     Assertions.assertEquals(userInfo.roles(), expectedUser.roles());
