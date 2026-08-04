@@ -277,6 +277,16 @@ public class SchemaMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  /** Returns SQL that advances a schema OCC version conditionally. */
+  public String fenceSchemaMeta(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET last_version = current_version + 1, current_version = current_version + 1"
+        + " WHERE schema_id = #{schemaId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
   public String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return "<script>"
         + "UPDATE "
@@ -299,6 +309,20 @@ public class SchemaMetaBaseSQLProvider {
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE schema_id = #{schemaId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
+  /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
+  public String softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs) {
+    return "<script>"
+        + "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

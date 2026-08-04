@@ -86,11 +86,30 @@ public interface CatalogMetaMapper {
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO);
 
+  /**
+   * Advances the catalog version when the expected OCC version still matches.
+   *
+   * @return the number of updated rows
+   */
+  @UpdateProvider(type = CatalogMetaSQLProviderFactory.class, method = "fenceCatalogMeta")
+  Integer fenceCatalogMeta(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion);
+
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,
       method = "softDeleteCatalogMetasByCatalogId")
   Integer softDeleteCatalogMetasByCatalogId(
       @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion);
+
+  /**
+   * Soft-deletes catalogs whose identifiers and OCC versions still match.
+   *
+   * @return the number of deleted rows
+   */
+  @UpdateProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "softDeleteCatalogMetasWithVersion")
+  Integer softDeleteCatalogMetasWithVersion(@Param("catalogMetas") List<CatalogPO> catalogPOs);
 
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,

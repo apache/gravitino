@@ -109,9 +109,21 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().updateCatalogMeta(newCatalogPO, oldCatalogPO);
   }
 
+  /** Returns SQL that advances a catalog OCC version conditionally. */
+  public static String fenceCatalogMeta(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().fenceCatalogMeta(catalogId, currentVersion);
+  }
+
   public static String softDeleteCatalogMetasByCatalogId(
       @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
     return getProvider().softDeleteCatalogMetasByCatalogId(catalogId, currentVersion);
+  }
+
+  /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */
+  public static String softDeleteCatalogMetasWithVersion(
+      @Param("catalogMetas") List<CatalogPO> catalogPOs) {
+    return getProvider().softDeleteCatalogMetasWithVersion(catalogPOs);
   }
 
   public static String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

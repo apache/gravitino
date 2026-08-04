@@ -102,6 +102,15 @@ public interface SchemaMetaMapper {
   Integer updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO);
 
+  /**
+   * Advances the schema version when the expected OCC version still matches.
+   *
+   * @return the number of updated rows
+   */
+  @UpdateProvider(type = SchemaMetaSQLProviderFactory.class, method = "fenceSchemaMeta")
+  Integer fenceSchemaMeta(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion);
+
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
       method = "softDeleteSchemaMetasBySchemaIds")
@@ -112,6 +121,16 @@ public interface SchemaMetaMapper {
       method = "softDeleteSchemaMetaBySchemaIdAndVersion")
   Integer softDeleteSchemaMetaBySchemaIdAndVersion(
       @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion);
+
+  /**
+   * Soft-deletes schemas whose identifiers and OCC versions still match.
+   *
+   * @return the number of deleted rows
+   */
+  @UpdateProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "softDeleteSchemaMetasWithVersion")
+  Integer softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs);
 
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,

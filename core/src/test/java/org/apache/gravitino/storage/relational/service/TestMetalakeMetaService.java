@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -178,6 +179,57 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
                           .withVersion(current.getVersion())
                           .build();
                     }));
+  }
+
+  @TestTemplate
+  public void testDeleteReportsOptimisticLockConflict() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    MetalakePO stalePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
+    BaseMetalake competingUpdate =
+        BaseMetalake.builder()
+            .withId(metalake.id())
+            .withName(metalake.name())
+            .withAuditInfo(metalake.auditInfo())
+            .withComment("competing update")
+            .withProperties(metalake.properties())
+            .withVersion(metalake.getVersion())
+            .build();
+    MetalakePO competingPO = POConverters.updateMetalakePOWithVersion(stalePO, competingUpdate);
+    SessionUtils.doWithCommitAndFetchResult(
+        MetalakeMetaMapper.class, mapper -> mapper.updateMetalakeMeta(competingPO, stalePO));
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    MetalakeMetaService.getInstance()
+                        .deleteMetalakeWithVersion(
+                            metalake.nameIdentifier(),
+                            metalake.id(),
+                            stalePO.getCurrentVersion())));
+    assertTrue(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+  }
+
+  @TestTemplate
+  public void testNonCascadeDeleteRollsBackMetalakeFence() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    MetalakePO beforeDelete =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
+
+    assertThrows(
+        NonEmptyEntityException.class,
+        () -> MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), false));
+
+    MetalakePO afterDelete =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
+    Assertions.assertEquals(beforeDelete.getCurrentVersion(), afterDelete.getCurrentVersion());
+    assertTrue(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
   }
 
   @TestTemplate

@@ -210,6 +210,16 @@ public class CatalogMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  /** Returns SQL that advances a catalog OCC version conditionally. */
+  public String fenceCatalogMeta(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET last_version = current_version + 1, current_version = current_version + 1"
+        + " WHERE catalog_id = #{catalogId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
   public String softDeleteCatalogMetasByCatalogId(
       @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
@@ -218,6 +228,21 @@ public class CatalogMetaBaseSQLProvider {
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE catalog_id = #{catalogId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
+  /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */
+  public String softDeleteCatalogMetasWithVersion(
+      @Param("catalogMetas") List<CatalogPO> catalogPOs) {
+    return "<script>"
+        + "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

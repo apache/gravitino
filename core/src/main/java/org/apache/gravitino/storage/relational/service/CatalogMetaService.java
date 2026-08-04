@@ -36,7 +36,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -45,6 +44,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -59,6 +59,8 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -182,20 +184,32 @@ public class CatalogMetaService {
     try {
       NameIdentifierUtil.checkCatalog(catalogEntity.nameIdentifier());
 
-      String metalake = NameIdentifierUtil.getMetalake(catalogEntity.nameIdentifier());
-      Long metalakeId =
-          EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+      String metalakeName = NameIdentifierUtil.getMetalake(catalogEntity.nameIdentifier());
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalakeName);
+      }
 
-      SessionUtils.doWithCommit(
-          CatalogMetaMapper.class,
-          mapper -> {
-            CatalogPO po = POConverters.initializeCatalogPOWithVersion(catalogEntity, metalakeId);
-            if (overwrite) {
-              mapper.insertCatalogMetaOnDuplicateKeyUpdate(po);
-            } else {
-              mapper.insertCatalogMeta(po);
-            }
-          });
+      SessionUtils.doMultipleWithCommit(
+          () -> fenceMetalakeForCatalogCreate(metalakePO),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  CatalogMetaMapper.class,
+                  mapper -> {
+                    CatalogPO po =
+                        POConverters.initializeCatalogPOWithVersion(
+                            catalogEntity, metalakePO.getMetalakeId());
+                    if (overwrite) {
+                      mapper.insertCatalogMetaOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertCatalogMeta(po);
+                    }
+                  }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, catalogEntity.nameIdentifier().toString());
@@ -278,11 +292,10 @@ public class CatalogMetaService {
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
-          () -> deleteCatalogWithVersion(identifier, catalogId, currentVersion),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  SchemaMetaMapper.class,
-                  mapper -> mapper.softDeleteSchemaMetasByCatalogId(catalogId)),
+          () -> {
+            deleteCatalogWithVersion(identifier, catalogId, currentVersion);
+            deleteSchemasWithVersions(identifier, catalogId);
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
@@ -359,16 +372,17 @@ public class CatalogMetaService {
                         OperateType.DROP));
           });
     } else {
-      List<SchemaEntity> schemaEntities =
-          SchemaMetaService.getInstance()
-              .listSchemasByNamespace(
-                  NamespaceUtil.ofSchema(identifier.namespace().level(0), catalogName));
-      if (!schemaEntities.isEmpty()) {
-        throw new NonEmptyEntityException(
-            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-      }
       SessionUtils.doMultipleWithCommit(
-          () -> deleteCatalogWithVersion(identifier, catalogId, currentVersion),
+          () -> {
+            deleteCatalogWithVersion(identifier, catalogId, currentVersion);
+            List<SchemaPO> schemaPOs =
+                SessionUtils.getWithoutCommit(
+                    SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
+            if (!schemaPOs.isEmpty()) {
+              throw new NonEmptyEntityException(
+                  "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+            }
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -420,6 +434,37 @@ public class CatalogMetaService {
             mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId, currentVersion));
     if (deleted == 0) {
       throw optimisticLockException(identifier);
+    }
+  }
+
+  private void fenceMetalakeForCatalogCreate(MetalakePO metalakePO) {
+    int fenced =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class,
+            mapper ->
+                mapper.fenceMetalakeMeta(
+                    metalakePO.getMetalakeId(), metalakePO.getCurrentVersion()));
+    if (fenced == 0) {
+      throw new OptimisticLockException(
+          "The parent metalake %s was modified concurrently; retry the operation",
+          metalakePO.getMetalakeName());
+    }
+  }
+
+  private void deleteSchemasWithVersions(NameIdentifier catalogIdentifier, Long catalogId) {
+    List<SchemaPO> schemaPOs =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
+    if (schemaPOs.isEmpty()) {
+      return;
+    }
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
+    if (deleted != schemaPOs.size()) {
+      throw new OptimisticLockException(
+          "A schema under catalog %s was modified concurrently; retry the operation",
+          catalogIdentifier);
     }
   }
 

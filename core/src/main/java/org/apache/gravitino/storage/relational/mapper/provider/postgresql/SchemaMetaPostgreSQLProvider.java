@@ -125,6 +125,20 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public String softDeleteSchemaMetasWithVersion(List<SchemaPO> schemaPOs) {
+    return "<script>"
+        + "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
+  }
+
   @Override
   public String softDeleteSchemaMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "

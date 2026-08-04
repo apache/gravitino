@@ -147,6 +147,16 @@ public class MetalakeMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  /** Returns SQL that advances a metalake OCC version conditionally. */
+  public String fenceMetalakeMeta(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET last_version = current_version + 1, current_version = current_version + 1"
+        + " WHERE metalake_id = #{metalakeId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
   public String softDeleteMetalakeMetaByMetalakeId(
       @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
