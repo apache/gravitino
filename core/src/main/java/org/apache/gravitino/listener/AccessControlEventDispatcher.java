@@ -25,6 +25,7 @@ import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.GroupChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -45,6 +46,9 @@ import org.apache.gravitino.listener.api.event.AddGroupPreEvent;
 import org.apache.gravitino.listener.api.event.AddUserEvent;
 import org.apache.gravitino.listener.api.event.AddUserFailureEvent;
 import org.apache.gravitino.listener.api.event.AddUserPreEvent;
+import org.apache.gravitino.listener.api.event.AlterGroupEvent;
+import org.apache.gravitino.listener.api.event.AlterGroupFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterGroupPreEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateRolePreEvent;
@@ -54,6 +58,9 @@ import org.apache.gravitino.listener.api.event.DeleteRolePreEvent;
 import org.apache.gravitino.listener.api.event.GetGroupByExternalIdEvent;
 import org.apache.gravitino.listener.api.event.GetGroupByExternalIdFailureEvent;
 import org.apache.gravitino.listener.api.event.GetGroupByExternalIdPreEvent;
+import org.apache.gravitino.listener.api.event.GetGroupByIdEvent;
+import org.apache.gravitino.listener.api.event.GetGroupByIdFailureEvent;
+import org.apache.gravitino.listener.api.event.GetGroupByIdPreEvent;
 import org.apache.gravitino.listener.api.event.GetGroupEvent;
 import org.apache.gravitino.listener.api.event.GetGroupFailureEvent;
 import org.apache.gravitino.listener.api.event.GetGroupPreEvent;
@@ -96,6 +103,9 @@ import org.apache.gravitino.listener.api.event.OverridePrivilegesPreEvent;
 import org.apache.gravitino.listener.api.event.RemoveGroupByExternalIdEvent;
 import org.apache.gravitino.listener.api.event.RemoveGroupByExternalIdFailureEvent;
 import org.apache.gravitino.listener.api.event.RemoveGroupByExternalIdPreEvent;
+import org.apache.gravitino.listener.api.event.RemoveGroupByIdEvent;
+import org.apache.gravitino.listener.api.event.RemoveGroupByIdFailureEvent;
+import org.apache.gravitino.listener.api.event.RemoveGroupByIdPreEvent;
 import org.apache.gravitino.listener.api.event.RemoveGroupEvent;
 import org.apache.gravitino.listener.api.event.RemoveGroupFailureEvent;
 import org.apache.gravitino.listener.api.event.RemoveGroupPreEvent;
@@ -414,6 +424,61 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new GetGroupByExternalIdFailureEvent(initiator, metalake, e, externalId));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Group getGroupById(String metalake, long groupId)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetGroupByIdPreEvent(initiator, metalake, groupId));
+    try {
+      Group groupObject = dispatcher.getGroupById(metalake, groupId);
+      eventBus.dispatchEvent(
+          new GetGroupByIdEvent(initiator, metalake, new GroupInfo(groupObject)));
+
+      return groupObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new GetGroupByIdFailureEvent(initiator, metalake, e, groupId));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean removeGroupById(String metalake, long groupId) throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new RemoveGroupByIdPreEvent(initiator, metalake, groupId));
+    try {
+      boolean isExists = dispatcher.removeGroupById(metalake, groupId);
+      eventBus.dispatchEvent(new RemoveGroupByIdEvent(initiator, metalake, groupId, isExists));
+
+      return isExists;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new RemoveGroupByIdFailureEvent(initiator, metalake, e, groupId));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Group alterGroupById(String metalake, long groupId, GroupChange... changes)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new AlterGroupPreEvent(initiator, metalake, groupId, changes));
+    try {
+      Group groupObject = dispatcher.alterGroupById(metalake, groupId, changes);
+      eventBus.dispatchEvent(
+          new AlterGroupEvent(initiator, metalake, changes, new GroupInfo(groupObject)));
+
+      return groupObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new AlterGroupFailureEvent(initiator, metalake, groupId, changes, e));
       throw e;
     }
   }
