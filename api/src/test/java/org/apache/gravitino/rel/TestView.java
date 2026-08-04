@@ -24,8 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.rel.metric.Dataset;
+import org.apache.gravitino.rel.metric.SemanticModel;
 import org.junit.jupiter.api.Test;
 
 public class TestView {
@@ -105,6 +109,22 @@ public class TestView {
     assertNull(view.defaultSchema());
   }
 
+  @Test
+  public void testMetricRepresentationReturnsStructuredRepresentation() {
+    MetricRepresentation representation = testMetricRepresentation();
+    View view = testView(representation);
+
+    assertEquals(representation, view.metricRepresentation().orElseThrow(AssertionError::new));
+  }
+
+  @Test
+  public void testMetricRepresentationReturnsEmptyForLogicalView() {
+    View view =
+        testView(SQLRepresentation.builder().withDialect("trino").withSql("select 1").build());
+
+    assertFalse(view.metricRepresentation().isPresent());
+  }
+
   private static View testView(Representation... representations) {
     return new View() {
       @Override
@@ -151,5 +171,19 @@ public class TestView {
         return Instant.EPOCH;
       }
     };
+  }
+
+  private static MetricRepresentation testMetricRepresentation() {
+    Dataset dataset =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .build();
+    SemanticModel model =
+        SemanticModel.builder()
+            .withName("sales")
+            .withDatasets(Collections.singletonList(dataset))
+            .build();
+    return MetricRepresentation.builder().withSemanticModel(model).build();
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.rel;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
@@ -101,6 +102,40 @@ public interface ViewCatalog {
       Map<String, String> properties)
       throws NoSuchSchemaException, ViewAlreadyExistsException {
     throw new UnsupportedOperationException("createView is not supported");
+  }
+
+  /**
+   * Creates a Metric View through the existing View lifecycle.
+   *
+   * <p>A Metric View has no fixed output columns and contains exactly one {@link
+   * MetricRepresentation}. It does not use a default catalog or schema because each dataset source
+   * is catalog and schema qualified.
+   *
+   * @param ident A view identifier.
+   * @param comment The view comment, or {@code null}.
+   * @param representation The Metric View representation.
+   * @param properties The view properties.
+   * @return The created Metric View.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws ViewAlreadyExistsException If the view already exists.
+   * @throws IllegalArgumentException If the Metric View constraints are violated.
+   */
+  default View createMetricView(
+      NameIdentifier ident,
+      @Nullable String comment,
+      MetricRepresentation representation,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, ViewAlreadyExistsException {
+    Preconditions.checkArgument(
+        representation != null, "A Metric View must contain one MetricRepresentation");
+    return createView(
+        ident,
+        comment,
+        new Column[0],
+        new Representation[] {representation},
+        null,
+        null,
+        properties);
   }
 
   /**
